@@ -1,44 +1,43 @@
-# studybuddy-ui
+# 📚 StudyBuddy: Peer Academic Tutoring Network
 
-This template should help get you started developing with Vue 3 in Vite.
+## Overview
 
-## Recommended IDE Setup
+StudyBuddy is a localized, web-based peer academic tutoring and knowledge-sharing network designed BY university students FOR university students.
 
-[VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+### Core Objectives
 
-## Recommended Browser Setup
+- **Smart Matching:** A recommender system utilizing content-based and collaborative filtering to match tutees with compatible peer tutors based on subject expertise.
+- **Flexible Scheduling:** A dynamic availability module that assesses assigned workloads and prevents tutor burnout.
+- **Compensation Tracking:** A module calculating payments based on session completion.
+- **Performance Reporting:** Comprehensive tracking of session history, earnings records, and tutoring metrics.
+---
 
-- Chromium-based browsers (Chrome, Edge, Brave, etc.):
-  - [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd)
-  - [Turn on Custom Object Formatter in Chrome DevTools](http://bit.ly/object-formatters)
-- Firefox:
-  - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
-  - [Turn on Custom Object Formatter in Firefox DevTools](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
+## 🛠 Tech Stack
 
-## Customize configuration
+- **Frontend Framework:** Vue 3 (Composition API)
+- **Styling & UI:** Bootstrap 5 & Custom CSS Variables
+- **Routing:** Vue Router
+- **Build Tool:** Vite
 
-See [Vite Configuration Reference](https://vite.dev/config/).
+---
 
-## Project Setup
+## 🚀 Project Setup for Team Members
 
-```sh
+### 1. Prerequisites
+
+Ensure you have [Node.js](https://nodejs.org/) installed on your machine.
+
+### 2. Installation
+
+Clone the repository and install the required dependencies (Vue, Bootstrap, etc.):
+
+```bash
+# Clone the repository
+git clone <insert-your-repo-link-here>
+
+# Navigate into the project directory
+cd studybuddy-ui
+
+# Install all dependencies
 npm install
-```
-
-### Compile and Hot-Reload for Development
-
-```sh
-npm run dev
-```
-
-### Compile and Minify for Production
-
-```sh
-npm run build
-```
-
-### Lint with [ESLint](https://eslint.org/)
-
-```sh
-npm run lint
 ```
