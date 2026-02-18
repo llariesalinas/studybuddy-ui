@@ -1,85 +1,100 @@
-<script setup>
-import { RouterLink, RouterView } from 'vue-router'
-import HelloWorld from './components/HelloWorld.vue'
-</script>
-
 <template>
-  <header>
-    <img alt="Vue logo" class="logo" src="@/assets/logo.svg" width="125" height="125" />
+  <div v-if="isPublicRoute" class="public-layout">
+    <router-view />
+  </div>
 
-    <div class="wrapper">
-      <HelloWorld msg="You did it!" />
+  <div v-else class="d-flex vh-100 overflow-hidden">
+    <aside class="sidebar d-flex flex-column text-white p-3 shadow-sm" style="width: 250px; background-color: var(--sb-dark);">
+      <div class="d-flex align-items-center mb-5 mt-3 px-2">
+        <i class="bi bi-book text-sb-primary fs-4 me-2"></i>
+        <h4 class="mb-0 fw-bold">StudyBuddy</h4>
+      </div>
 
-      <nav>
-        <RouterLink to="/">Home</RouterLink>
-        <RouterLink to="/about">About</RouterLink>
-      </nav>
-    </div>
-  </header>
+      <ul class="nav nav-pills flex-column mb-auto">
+        <li class="nav-item mb-2">
+          <router-link to="/dashboard" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
+            <i class="bi bi-grid-1x2 me-3"></i> Dashboard
+          </router-link>
+        </li>
+        <li class="nav-item mb-2">
+          <router-link to="/tutors" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
+            <i class="bi bi-search me-3"></i> Find Tutors
+          </router-link>
+        </li>
+        <li class="nav-item mb-2">
+          <router-link to="/schedule" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
+            <i class="bi bi-calendar3 me-3"></i> Schedule
+          </router-link>
+        </li>
+        <li class="nav-item mb-2">
+          <router-link to="/reports" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
+            <i class="bi bi-file-earmark-text me-3"></i> Sessions & Reports
+          </router-link>
+        </li>
+      </ul>
+    </aside>
 
-  <RouterView />
+    <main class="flex-grow-1 overflow-auto p-5" style="background-color: var(--sb-bg);">
+      <router-view />
+    </main>
+  </div>
 </template>
 
-<style scoped>
-header {
-  line-height: 1.5;
-  max-height: 100vh;
+<script setup>
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
+
+const route = useRoute()
+
+// Computed property to check if the current route is public
+const isPublicRoute = computed(() => {
+  return ['home', 'login', 'register'].includes(route.name)
+})
+</script>
+
+<style>
+/* Global styles */
+:root {
+  --sb-dark: #0A1916;
+  --sb-primary: #00895A; /* Your exact Figma Green */
+  --sb-primary-hover: #00704A; /* Slightly darker for button hovers */
+  --sb-bg: #F8F9FA;
+  --sb-card-border: #EAEAEA;
 }
 
-.logo {
-  display: block;
-  margin: 0 auto 2rem;
+body {
+  background-color: var(--sb-bg);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
-nav {
-  width: 100%;
-  font-size: 12px;
-  text-align: center;
-  margin-top: 2rem;
+/* --- Brand Color Utility Classes --- */
+.text-sb-primary { 
+  color: var(--sb-primary) !important; 
 }
 
-nav a.router-link-exact-active {
-  color: var(--color-text);
+.bg-sb-primary { 
+  background-color: var(--sb-primary) !important; 
 }
 
-nav a.router-link-exact-active:hover {
-  background-color: transparent;
+.border-sb { 
+  border-color: var(--sb-card-border) !important; 
 }
 
-nav a {
-  display: inline-block;
-  padding: 0 1rem;
-  border-left: 1px solid var(--color-border);
+/* Button Hover State */
+.btn.bg-sb-primary:hover {
+  background-color: var(--sb-primary-hover) !important;
+  color: #ffffff !important;
 }
 
-nav a:first-of-type {
-  border: 0;
+/* --- Sidebar Navigation Styles --- */
+.active-nav {
+  background-color: rgba(0, 137, 90, 0.1) !important;
+  color: var(--sb-primary) !important;
+  font-weight: 600;
+  border-radius: 8px;
+  opacity: 1 !important;
 }
-
-@media (min-width: 1024px) {
-  header {
-    display: flex;
-    place-items: center;
-    padding-right: calc(var(--section-gap) / 2);
-  }
-
-  .logo {
-    margin: 0 2rem 0 0;
-  }
-
-  header .wrapper {
-    display: flex;
-    place-items: flex-start;
-    flex-wrap: wrap;
-  }
-
-  nav {
-    text-align: left;
-    margin-left: -1rem;
-    font-size: 1rem;
-
-    padding: 1rem 0;
-    margin-top: 1rem;
-  }
+.nav-link:hover {
+  opacity: 1 !important;
 }
 </style>
