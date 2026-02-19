@@ -41,6 +41,26 @@ const router = createRouter({
       path: '/reports',
       name: 'reports',
       component: () => import('@/views/SessionsReports.vue')
+    },
+    {
+      path: '/profile',
+      name: 'profile',
+      component: () => import('@/views/Profile.vue')
+    },
+    {
+      path: '/book',
+      name: 'book',
+      component: () => import('@/views/InitialBooking.vue')
+    },
+    {
+      path: '/tutor/:id', // The :id makes it dynamic for different tutors
+      name: 'tutor-details',
+      component: () => import('@/views/TutorDetails.vue')
+    },
+    {
+      path: '/payment',
+      name: 'payment',
+      component: () => import('@/views/PaymentScreen.vue')
     }
   ]
 })

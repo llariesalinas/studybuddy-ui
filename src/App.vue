@@ -35,6 +35,18 @@
     </aside>
 
     <main class="flex-grow-1 overflow-auto p-5" style="background-color: var(--sb-bg);">
+      <header class="d-flex justify-content-between align-items-center mb-5 pb-3 border-bottom border-sb">
+          <div>
+            </div>
+          <div class="d-flex gap-3 align-items-center">
+            <router-link to="/book" class="btn bg-sb-primary text-white px-4 py-2 rounded-3 fw-semibold shadow-sm">
+              Book Session
+            </router-link>
+            <router-link to="/profile" class="text-sb-primary fs-3 ms-2 transition-all hover-lift">
+              <i class="bi bi-person-circle"></i>
+            </router-link>
+          </div>
+        </header>
       <router-view />
     </main>
   </div>
