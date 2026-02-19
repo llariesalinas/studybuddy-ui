@@ -20,6 +20,11 @@ const router = createRouter({
       name: 'register',
       component: () => import('@/views/Register.vue')
     },
+    {
+      path: '/preferencesetup',
+      name: 'preferencesetup',
+      component: () => import('@/views/PreferenceSetup.vue')
+    },
 
     // --- AUTHENTICATED ROUTES (With Sidebar) ---
     {

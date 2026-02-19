@@ -76,7 +76,7 @@ const router = useRouter()
 const handleRegister = () => {
   // Logic to save user to database will go here later
   // For now, immediately push them into the dashboard to simulate logging in
-  router.push('/dashboard')
+  router.push('/preferencesetup')
 }
 </script>
 
