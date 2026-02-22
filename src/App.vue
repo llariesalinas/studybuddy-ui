@@ -60,7 +60,7 @@ const route = useRoute()
 
 // Computed property to check if the current route is public
 const isPublicRoute = computed(() => {
-  return ['home', 'login', 'register'].includes(route.name)
+  return ['home', 'login', 'register', 'preferencesetup'].includes(route.name)
 })
 </script>
 
