@@ -2,6 +2,7 @@ import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router'
 import { createPinia } from 'pinia'
+import { useAuthStore } from '@/stores/auth' // 1. Import the store
 
 // 1. Import Bootstrap CSS
 import 'bootstrap/dist/css/bootstrap.min.css'
@@ -13,6 +14,11 @@ const pinia = createPinia()
 
 app.use(pinia)
 app.use(router)
+
+// 2. Initialize Auth state to load the token into Axios
+const authStore = useAuthStore()
+authStore.initializeAuth()
+
 app.mount('#app')
 
 // 3. Import Bootstrap JS at the end so it loads after the DOM
