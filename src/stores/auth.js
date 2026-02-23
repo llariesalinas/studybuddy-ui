@@ -1,48 +1,74 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import axios from 'axios'
 
 export const useAuthStore = defineStore('auth', () => {
-  const router = useRouter()
-
-  // State
+  // --- STATE ---
+  // We initialize the token by checking if one already exists in the browser's memory
+  const token = ref(localStorage.getItem('access_token') || null)
   const user = ref(null)
 
-  // Getters (Used by router/index.js)
-  const isAuthenticated = computed(() => user.value !== null)
-  const userRole = computed(() => user.value?.role || null)
+  // --- GETTERS ---
+  // A clean way to check if someone is logged in anywhere in your app
+  const isAuthenticated = computed(() => !!token.value)
 
-  // Actions
-  const register = async (userData) => {
-    // 1. Mock setting the user in state
-    user.value = { email: userData.email, role: userData.role }
+  // --- ACTIONS ---
 
-    // 2. Redirect to correct Preference Setup based on Role
-    if (userData.role === 'tutor') {
-      router.push('/tutor-setup')
-    } else {
-      router.push('/preferencesetup') // Tutee setup
-    }
-  }
-
+  // 1. The Login Function
   const login = async (credentials) => {
-    // Mocking an API response: Assuming they are a student for this test,
-    // but in real life, Django tells you what role they are.
-    // Change 'tutee' to 'tutor' here to test the tutor login flow.
-    user.value = { email: credentials.email, role: 'tutee' }
+    // API_INTEGRATION_POINT: Update to Ry's actual login endpoint
+    const response = await axios.post('http://127.0.0.1:8000/api/login/', credentials)
 
-    // Redirect to correct Dashboard based on Role
-    if (user.value.role === 'tutor') {
-      router.push('/tch-dashboard')
+    // Assuming Django returns an object like { access: "eyJh...", refresh: "..." }
+    // Adjust 'response.data.access' based on exactly what Ry's API sends back
+    const receivedToken = response.data.access || response.data.token
+
+    if (receivedToken) {
+      setToken(receivedToken)
+      // Optional: If Django returns user data (name, email), save it here
+      if (response.data.user) {
+        user.value = response.data.user
+      }
     } else {
-      router.push('/dashboard')
+      throw new Error("No token received from server.")
     }
   }
 
+  // 2. The Logout Function
   const logout = () => {
+    token.value = null
     user.value = null
-    router.push('/login')
+    localStorage.removeItem('access_token')
+
+    // Strip the token off future Axios requests
+    delete axios.defaults.headers.common['Authorization']
   }
 
-  return { user, isAuthenticated, userRole, register, login, logout }
+  // 3. The Utility Function (Internal use)
+  const setToken = (newToken) => {
+    token.value = newToken
+    // Save to browser storage so it survives refresh
+    localStorage.setItem('access_token', newToken)
+
+    // Automatically attach this token to the header of EVERY future Axios call
+    // Django expects: "Authorization: Bearer <your_token>"
+    axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`
+  }
+
+  // 4. Initialize Auth (Run this when the app first loads)
+  const initializeAuth = () => {
+    if (token.value) {
+      // If a token exists in storage upon refresh, immediately attach it to Axios
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token.value}`
+    }
+  }
+
+  return {
+    token,
+    user,
+    isAuthenticated,
+    login,
+    logout,
+    initializeAuth
+  }
 })

@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
-import {ref} from 'vue'
+import { ref } from 'vue'
 
-export const useInitialBookingPrefsStore = defineStore ('preferences', () => {
+export const useInitialBookingPrefsStore = defineStore('initialBookingPrefs', () => {
     const selectedSubject = ref('')
     const selectedTopic = ref('')
     const selectedDate = ref(null)
@@ -16,7 +16,15 @@ export const useInitialBookingPrefsStore = defineStore ('preferences', () => {
         selectedMode.value = ''
         selectedStartTime.value = null
         selectedEndTime.value = null
-
     }
-    return {selectedSubject, selectedTopic, selectedDate, selectedMode, selectedStartTime, selectedEndTime, resetPreferences}
+
+    return {
+      selectedSubject,
+      selectedTopic,
+      selectedDate,
+      selectedMode,
+      selectedStartTime,
+      selectedEndTime,
+      resetPreferences
+    }
 })
