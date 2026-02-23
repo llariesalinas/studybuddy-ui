@@ -15,9 +15,6 @@
             <label class="form-label fw-semibold small text-dark">First Name</label>
             <div class="input-group">
               <span class="input-group-text bg-white border-end-0 text-muted"><i class="bi bi-person"></i></span>
-<<<<<<< HEAD
-              <input type="text" v-model="store.newUserFullName" class="form-control border-start-0 ps-0 shadow-none" placeholder="Juan Dela Cruz" required>
-=======
               <input type="text" v-model="store.newUserFname" class="form-control border-start-0 ps-0 shadow-none" placeholder="Juan Dela Cruz" required>
             </div>
           </div>
@@ -35,7 +32,6 @@
             <div class="input-group">
               <span class="input-group-text bg-white border-end-0 text-muted"><i class="bi bi-person"></i></span>
               <input type="text" v-model="store.newUserLname" class="form-control border-start-0 ps-0 shadow-none" placeholder="Juan Dela Cruz" required>
->>>>>>> f9d760dc92e14411b8ba5de87c3a52d429813b8c
             </div>
           </div>
 
@@ -82,7 +78,7 @@ import { useRegistrationInfoStore } from '@/stores/registrationinfo'
 import axios from 'axios'
 
 const router = useRouter()
-const store = useRegistrationInfoStore()
+const store = useRegistrationInfoStore() //this do: 
 const isSubmitting = ref(false)
 
 const handleRegister = async () => {
@@ -90,17 +86,13 @@ const handleRegister = async () => {
 
   try {
     // API_INTEGRATION_POINT: Match this URL to Ry's Django server
-    const DJANGO_URL = 'http://localhost:8000/api/v1/register/'
+    const DJANGO_URL = 'http://localhost:8000/api/register/' //final
 
     const response = await axios.post(DJANGO_URL, {
       // These keys MUST match Ry's Django Serializer exactly
-<<<<<<< HEAD
-      full_name: store.newUserFullName,
-=======
-      Fname: store.newUserFname,
-      Mname: store.newUserMname,
-      Lname: store.newUserLname,
->>>>>>> f9d760dc92e14411b8ba5de87c3a52d429813b8c
+      fname: store.newUserFname,
+      mname: store.newUserMname,
+      lname: store.newUserLname,
       email: store.newUserEmail,
       password: store.newUserPassword,
       role: store.newUserType
