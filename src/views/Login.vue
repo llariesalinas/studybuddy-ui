@@ -18,6 +18,7 @@
             <label class="form-label fw-semibold small text-dark">University Email</label>
             <input
               type="email"
+              v-model="email"
               class="form-control shadow-none"
               placeholder="you@university.edu"
               required
@@ -31,6 +32,7 @@
             </div>
             <input
               type="password"
+              v-model="password"
               class="form-control shadow-none mt-2"
               placeholder="••••••••"
               required
@@ -39,18 +41,20 @@
 
           <button
             type="submit"
-            class="btn bg-sb-primary text-white w-100 py-2 rounded-3 fw-semibold shadow-sm"
+            class="btn bg-sb-primary text-white w-100 py-2 rounded-3 fw-semibold shadow-sm d-flex justify-content-center align-items-center gap-2"
+            :disabled="isSubmitting"
           >
-            Sign In
+            <span v-if="isSubmitting" class="spinner-border spinner-border-sm me-2"></span>
+            {{ isSubmitting ? 'Signing In...' : 'Sign In' }}
           </button>
         </form>
 
         <div class="text-center mt-4">
           <p class="text-muted small mb-0">
             No account?
-            <router-link to="/register" class="text-sb-primary fw-bold text-decoration-none"
-              >Create one</router-link
-            >
+            <router-link to="/register" class="text-sb-primary fw-bold text-decoration-none">
+              Create one
+            </router-link>
           </p>
         </div>
       </div>
@@ -59,13 +63,38 @@
 </template>
 
 <script setup>
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
+const authStore = useAuthStore()
 
-const handleLogin = () => {
-  // Logic to authenticate user will go here
-  router.push('/dashboard')
+const email = ref('')
+const password = ref('')
+const isSubmitting = ref(false)
+
+const handleLogin = async () => {
+  isSubmitting.value = true
+
+  try {
+    // API_INTEGRATION_POINT: The actual axios call is delegated to the store
+    await authStore.login({
+      email: email.value,
+      password: password.value
+    })
+
+    console.log('Login successful')
+
+    // Route to dashboard on success
+    router.push('/dashboard')
+
+  } catch (error) {
+    console.error('Login Error:', error)
+    alert('Login failed. Please check your credentials.')
+  } finally {
+    isSubmitting.value = false
+  }
 }
 </script>
 

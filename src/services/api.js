@@ -1,7 +1,7 @@
-import axios from "axios";
+import axios from 'axios'
 
-const api = axios.create({
-  baseURL: "http://127.0.0.1:8000/api/",
-});
+const API_URL = 'http://127.0.0.1:8000/api'
 
-export default api;
+export const getUsers = async () => {
+  return await axios.get(`${API_URL}/users/`)
+}

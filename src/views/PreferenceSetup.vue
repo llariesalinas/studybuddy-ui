@@ -108,10 +108,11 @@
             <div class="d-flex justify-content-end">
               <button
                 class="btn bg-sb-primary text-white px-4 rounded-3 fw-semibold"
-                :disabled="!store.selectedTime"
+                :disabled="!store.selectedTime || isSubmitting"
                 @click="finish"
               >
-                Go to Dashboard
+                <span v-if="isSubmitting" class="spinner-border spinner-border-sm me-2"></span>
+                {{ isSubmitting ? 'Saving...' : 'Go to Dashboard' }}
               </button>
             </div>
           </div>
@@ -126,13 +127,14 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePreferenceStore } from '@/stores/preferences'
+import axios from 'axios'
 
 const router = useRouter()
 const store = usePreferenceStore()
 
-
 const currentCard = ref(0)
-const totalCards = 3 
+const totalCards = 3
+const isSubmitting = ref(false)
 
 const selectLevel = (level) => {
   store.selectedLevel = level
@@ -173,14 +175,28 @@ const nextCard = () => {
   }
 }
 
-const finish = () => {
-  // Code to send preferences to backend
-  console.log('User Preferences:', {
-    subjects: store.selectedSubjects,
-    level: store.selectedLevel,
-    time: store.selectedTime
-  })
-  router.push('/dashboard')
+const finish = async () => {
+  isSubmitting.value = true
+
+  try {
+    const payload = {
+      preferredSubjects: store.selectedSubjects,
+      preferredLevel: store.selectedLevel,
+      preferredTime: store.selectedTime
+    }
+
+    // API_INTEGRATION_POINT: Coordinate this endpoint with Ry
+    await axios.post('http://127.0.0.1:8000/api/preferences/', payload)
+
+    console.log('Preferences saved successfully')
+    router.push('/dashboard')
+
+  } catch (error) {
+    console.error('Failed to save preferences:', error)
+    alert('Could not save preferences. Please check your connection.')
+  } finally {
+    isSubmitting.value = false
+  }
 }
 
 const progressPercentage = computed(() => ((currentCard.value + 1) / totalCards) * 100)

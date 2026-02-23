@@ -77,9 +77,11 @@
           <div class="text-end mt-4">
             <button
               type="submit"
-              class="btn bg-sb-primary text-white px-5 py-2 rounded-3 fw-semibold shadow-sm"
+              class="btn bg-sb-primary text-white px-5 py-2 rounded-3 fw-semibold shadow-sm d-inline-flex justify-content-center align-items-center gap-2"
+              :disabled="isSubmitting"
             >
-              Find Tutor
+              <span v-if="isSubmitting" class="spinner-border spinner-border-sm me-2"></span>
+              {{ isSubmitting ? 'Searching...' : 'Find Tutor' }}
             </button>
           </div>
         </form>
@@ -89,11 +91,14 @@
 </template>
 
 <script setup>
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useInitialBookingPrefsStore } from '@/stores/initialbookingprefs'
+import axios from 'axios'
 
 const router = useRouter()
 const store = useInitialBookingPrefsStore()
+const isSubmitting = ref(false)
 
 const subjects = [
   'Mathematics',
@@ -107,15 +112,32 @@ const subjects = [
 const modes = ['Online', 'Face-to-face']
 
 // Submit handler
-const findTutor = () => {
-  console.log('Booking Data:', {
-    subject: store.selectedSubject,
-    topic: store.selectedTopic,
-    date: store.selectedDate,
-    mode: store.selectedMode,
-    startTime: store.selectedStartTime,
-    endTime: store.selectedEndTime
-  }) // debug: check what’s stored
-  router.push('/tutors')
+const findTutor = async () => {
+  isSubmitting.value = true
+
+  try {
+    const payload = {
+      subject: store.selectedSubject,
+      topic: store.selectedTopic,
+      date: store.selectedDate,
+      mode: store.selectedMode,
+      startTime: store.selectedStartTime,
+      endTime: store.selectedEndTime
+    }
+
+    console.log('Sending Booking Data:', payload)
+
+    // API_INTEGRATION_POINT: Coordinate this endpoint with Ry
+    await axios.post('http://127.0.0.1:8000/api/bookings/', payload)
+
+    // Only route to the tutors page if the backend accepted the data
+    router.push('/tutors')
+
+  } catch (error) {
+    console.error('Booking submission failed:', error)
+    alert('Failed to process booking. Please check your connection.')
+  } finally {
+    isSubmitting.value = false
+  }
 }
 </script>

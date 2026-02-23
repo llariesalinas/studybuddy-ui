@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import Dashboard from '@/views/Dashboard.vue'
-import TestAPi from '@/views/TestApi.vue'
+
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
@@ -66,14 +66,8 @@ const router = createRouter({
       path: '/payment',
       name: 'payment',
       component: () => import('@/views/PaymentScreen.vue')
-    },
-    {
-      path: '/testapi',
-      name: 'testapi',
-      component: () => import('@/views/TestApi.vue'),
     }
-    
   ]
 })
 
-export default router
+  export default router
