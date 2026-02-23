@@ -63,7 +63,7 @@
         path: '/payment',
         name: 'payment',
         component: () => import('@/views/PaymentScreen.vue'),
-        meta: { requiresAuth: true, role: 'tutee' }
+        // meta: { requiresAuth: true, role: 'tutee' }
       },
 
       // --- TUTOR ROUTES (Teaching Hub) ---
