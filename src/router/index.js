@@ -65,6 +65,12 @@
         component: () => import('@/views/PaymentScreen.vue'),
         meta: { requiresAuth: true, role: 'tutee' }
       },
+      {
+        path: '/finalbooking',
+        name: 'finalbooking',
+        component: () =>  import('@/views/FinalBooking.vue'),
+        // meta: { requiresAuth: true, role: 'tutee' }
+      },
 
       // --- TUTOR ROUTES (Teaching Hub) ---
       {
@@ -104,7 +110,7 @@
         name: 'profile',
         component: () => import('@/views/Profile.vue'),
         meta: { requiresAuth: true }
-      }
+      },
     ]
   })
 
