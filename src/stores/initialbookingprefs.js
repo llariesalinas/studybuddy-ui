@@ -10,12 +10,12 @@ export const useInitialBookingPrefsStore = defineStore ('preferences', () => {
     const selectedEndTime = ref(null)
 
     const resetPreferences = () => {
-        selectedSubject = ''
-        selectedTopic = ''
-        selectedDate = null
-        selectedMode = ''
-        selectedStartTime = null
-        selectedEndTime = null
+        selectedSubject.value = ''
+        selectedTopic.value = ''
+        selectedDate.value = null
+        selectedMode.value = ''
+        selectedStartTime.value = null
+        selectedEndTime.value = null
 
     }
     return {selectedSubject, selectedTopic, selectedDate, selectedMode, selectedStartTime, selectedEndTime, resetPreferences}

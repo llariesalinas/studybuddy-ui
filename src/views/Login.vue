@@ -58,14 +58,21 @@
   </div>
 </template>
 
+<input type="email" v-model="email" class="form-control shadow-none" placeholder="you@university.edu" required />
+<input type="password" v-model="password" class="form-control shadow-none mt-2" placeholder="••••••••" required />
+
 <script setup>
-import { useRouter } from 'vue-router'
+import { ref } from 'vue'
+import { useAuthStore } from '@/stores/auth'
 
-const router = useRouter()
+const authStore = useAuthStore()
 
-const handleLogin = () => {
-  // Logic to authenticate user will go here
-  router.push('/dashboard')
+const email = ref('')
+const password = ref('')
+
+const handleLogin = async () => {
+  // Call the store's login function
+  await authStore.login({ email: email.value, password: password.value })
 }
 </script>
 
