@@ -91,6 +91,7 @@
 <script setup>
 import { useRouter } from 'vue-router'
 import { useInitialBookingPrefsStore } from '@/stores/initialbookingprefs'
+import axios from 'axios'
 
 const router = useRouter()
 const store = useInitialBookingPrefsStore()
@@ -107,7 +108,7 @@ const subjects = [
 const modes = ['Online', 'Face-to-face']
 
 // Submit handler
-const findTutor = () => {
+const findTutor = async() => {
   console.log('Booking Data:', {
     subject: store.selectedSubject,
     topic: store.selectedTopic,
@@ -115,7 +116,32 @@ const findTutor = () => {
     mode: store.selectedMode,
     startTime: store.selectedStartTime,
     endTime: store.selectedEndTime
-  }) // debug: check what’s stored
+  }) 
   router.push('/tutors')
+
+  //Code to send booking information to backend
+  // try{
+  //   console.log('Booking Data:', {
+  //   subject: store.selectedSubject,
+  //   topic: store.selectedTopic,
+  //   date: store.selectedDate,
+  //   mode: store.selectedMode,
+  //   startTime: store.selectedStartTime,
+  //   endTime: store.selectedEndTime
+  // }) 
+  // await axios.post('API link goes here', {
+  //   selectedSubject: store.selectedSubject,
+  //   selectedTopic: store.selectedTopic,
+  //   selectedDate: store.selectedDate,
+  //   selectedMode: store.selectedMode,
+  //   selectedStartTime: store.selectedStartTime,
+  //   selectedEndTime: store.selectedEndTime
+  // })
+
+  // router.push('/tutors')
+  // }
+  // catch{
+
+  // }
 }
 </script>
