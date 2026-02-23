@@ -12,10 +12,26 @@
 
         <form @submit.prevent="handleRegister">
           <div class="mb-3">
-            <label class="form-label fw-semibold small text-dark">Full Name</label>
+            <label class="form-label fw-semibold small text-dark">First Name</label>
             <div class="input-group">
               <span class="input-group-text bg-white border-end-0 text-muted"><i class="bi bi-person"></i></span>
-              <input type="text" v-model="store.newUserFullName" class="form-control border-start-0 ps-0 shadow-none" placeholder="Juan Dela Cruz" required>
+              <input type="text" v-model="store.newUserFname" class="form-control border-start-0 ps-0 shadow-none" placeholder="Juan Dela Cruz" required>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold small text-dark">Middle Name</label>
+            <div class="input-group">
+              <span class="input-group-text bg-white border-end-0 text-muted"><i class="bi bi-person"></i></span>
+              <input type="text" v-model="store.newUserMname" class="form-control border-start-0 ps-0 shadow-none" placeholder="Juan Dela Cruz" required>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold small text-dark">Last Name</label>
+            <div class="input-group">
+              <span class="input-group-text bg-white border-end-0 text-muted"><i class="bi bi-person"></i></span>
+              <input type="text" v-model="store.newUserLname" class="form-control border-start-0 ps-0 shadow-none" placeholder="Juan Dela Cruz" required>
             </div>
           </div>
 
@@ -74,7 +90,9 @@ const handleRegister = async () => {
 
     const response = await axios.post(DJANGO_URL, {
       // These keys MUST match Ry's Django Serializer exactly
-      full_name: store.newUserFullName,
+      newUserFname: store.newUserFname,
+      newUserMname: store.newUserMname,
+      newUserLname: store.newUserLname,
       email: store.newUserEmail,
       password: store.newUserPassword,
       role: store.newUserType
