@@ -7,9 +7,9 @@ export const usePreferenceStore = defineStore('preferences', () => {
     const selectedTime = ref(null)
 
     const resetPreferences = () => {
-        selectedSubjects = []
-        selectedLevel = null
-        selectedTime = null
+        selectedSubjects.value = []
+        selectedLevel.value = null
+        selectedTime.value = null
     }
     return {selectedSubjects, selectedLevel, selectedTime, resetPreferences}
 })

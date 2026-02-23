@@ -1,70 +1,103 @@
 <template>
-  <div class="payment-content d-flex justify-content-center">
-    <div class="card border-sb shadow-sm rounded-4 w-100" style="max-width: 800px;">
-      <div class="row g-0">
-        
-        <div class="col-md-5 bg-light p-4 p-md-5 border-end border-sb rounded-start-4">
-          <h5 class="fw-bold mb-4">Payment Summary</h5>
-          
-          <div class="d-flex justify-content-between mb-3">
-            <span class="text-muted">Tutor</span>
-            <span class="fw-semibold">Maria Santos</span>
-          </div>
-          <div class="d-flex justify-content-between mb-3">
-            <span class="text-muted">Subject</span>
-            <span class="fw-semibold">Calculus</span>
-          </div>
-          <div class="d-flex justify-content-between mb-3">
-            <span class="text-muted">Duration</span>
-            <span class="fw-semibold">1 Hour</span>
-          </div>
-          
-          <hr class="border-sb my-4">
-          
-          <div class="d-flex justify-content-between align-items-center">
-            <span class="fw-bold fs-5">Total</span>
-            <span class="fw-bold fs-3 text-sb-primary">₱150.00</span>
-          </div>
+  <div class="payment-mgmt-content">
+    <div class="mb-4 d-flex justify-content-between align-items-center">
+      <div>
+        <h2 class="fw-bold text-dark">Payment Verification</h2>
+        <p class="text-muted">Confirm receipt of payments from your tutees.</p>
+      </div>
+      <div class="text-end border border-sb rounded-3 px-4 py-2 bg-white shadow-sm">
+        <span class="d-block small text-muted fw-bold text-uppercase">Pending Balance</span>
+        <span class="fs-4 fw-bold text-warning">₱{{ totalPending }}</span>
+      </div>
+    </div>
+
+    <div v-if="isLoading" class="text-center py-5 text-sb-primary">
+      <div class="spinner-border" role="status"></div>
+    </div>
+
+    <div v-else class="card border-sb shadow-sm rounded-4">
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+              <tr class="text-muted small">
+                <th class="ps-4 pb-3 pt-3">Tutee</th>
+                <th class="pb-3 pt-3">Session Date</th>
+                <th class="pb-3 pt-3">Amount (₱)</th>
+                <th class="pb-3 pt-3">Status</th>
+                <th class="pe-4 pb-3 pt-3 text-end">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="payment in pendingPayments" :key="payment.payment_id" style="border-bottom: 1px solid var(--sb-card-border);">
+                <td class="ps-4 py-3 fw-semibold text-dark">{{ payment.tutee_name }}</td>
+                <td class="py-3 text-muted">{{ payment.booking_date }}</td>
+                <td class="py-3 fw-bold">₱{{ payment.amount }}</td>
+                <td class="py-3">
+                  <span class="badge bg-warning bg-opacity-10 text-warning border border-warning px-3 py-1 rounded-pill">
+                    {{ payment.payment_Status }}
+                  </span>
+                </td>
+                <td class="pe-4 py-3 text-end">
+                  <button @click="markAsPaid(payment)" class="btn btn-sm bg-sb-primary text-white fw-semibold rounded-3 px-3 shadow-sm" :disabled="payment.isProcessing">
+                     <span v-if="payment.isProcessing" class="spinner-border spinner-border-sm me-1"></span>
+                    {{ payment.isProcessing ? 'Verifying...' : 'Mark as Paid' }}
+                  </button>
+                </td>
+              </tr>
+
+              <tr v-if="pendingPayments.length === 0">
+                <td colspan="5" class="text-center py-5 text-muted">
+                  No pending payments to verify. Great job!
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
-
-        <div class="col-md-7 p-4 p-md-5">
-          <h5 class="fw-bold mb-4">Payment Options</h5>
-          
-          <div class="d-flex gap-2 mb-4">
-            <button class="btn btn-outline-dark px-4 rounded-3 active">GCash</button>
-            <button class="btn btn-outline-dark px-4 rounded-3">Card</button>
-          </div>
-
-          <form @submit.prevent="confirmPayment">
-            <div class="mb-3">
-              <label class="form-label fw-semibold small">Account Name</label>
-              <input type="text" class="form-control border-sb shadow-none" placeholder="Juan Dela Cruz" required>
-            </div>
-            
-            <div class="mb-4">
-              <label class="form-label fw-semibold small">Mobile Number</label>
-              <input type="text" class="form-control border-sb shadow-none" placeholder="09XX XXX XXXX" required>
-            </div>
-
-            <button type="submit" class="btn bg-sb-primary text-white w-100 py-3 rounded-3 fw-bold shadow-sm mt-2">
-              Confirm Payment
-            </button>
-          </form>
-        </div>
-
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted } from 'vue'
 
-const router = useRouter()
+const isLoading = ref(true)
+const pendingPayments = ref([])
 
-const confirmPayment = () => {
-  // Logic to process payment goes here
-  // Redirect to the sessions report page to see the booked session
-  router.push('/reports')
+// Calculates the total directly from the reactive array
+const totalPending = computed(() => {
+  return pendingPayments.value.reduce((sum, p) => sum + p.amount, 0)
+})
+
+onMounted(async () => {
+  // API_INTEGRATION_POINT: GET /api/v1/payments/?status=PENDING
+  setTimeout(() => {
+    pendingPayments.value = [
+      { payment_id: 501, booking_id: 12, tutee_name: 'Liam Torres', booking_date: 'Oct 25, 2026', amount: 150, payment_Status: 'PENDING', isProcessing: false },
+      { payment_id: 502, booking_id: 14, tutee_name: 'Sophia Cruz', booking_date: 'Oct 26, 2026', amount: 300, payment_Status: 'PENDING', isProcessing: false }
+    ]
+    isLoading.value = false
+  }, 700)
+})
+
+const markAsPaid = async (payment) => {
+  payment.isProcessing = true
+  try {
+    // API_INTEGRATION_POINT: PATCH /api/v1/payments/{payment_id}/
+    // Payload: { payment_Status: 'PAID' }
+
+    console.log(`Updating payment ${payment.payment_id} to PAID`)
+
+    // Simulate backend response delay
+    setTimeout(() => {
+      // Remove from the pending list UI once the backend confirms success
+      pendingPayments.value = pendingPayments.value.filter(p => p.payment_id !== payment.payment_id)
+    }, 1000)
+
+  } catch (error) {
+    console.error('Failed to verify payment', error)
+    payment.isProcessing = false
+  }
 }
 </script>

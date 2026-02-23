@@ -12,21 +12,24 @@
 
       <ul class="nav nav-pills flex-column mb-auto">
         <li class="nav-item mb-2">
-          <router-link to="/dashboard" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
+          <router-link :to="userRole === 'tutor' ? '/tch-dashboard' : '/dashboard'" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
             <i class="bi bi-grid-1x2 me-3"></i> Dashboard
           </router-link>
         </li>
-        <li class="nav-item mb-2">
+
+        <li class="nav-item mb-2" v-if="userRole === 'tutee'">
           <router-link to="/tutors" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
             <i class="bi bi-search me-3"></i> Find Tutors
           </router-link>
         </li>
+
         <li class="nav-item mb-2">
           <router-link to="/schedule" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
             <i class="bi bi-calendar3 me-3"></i> Schedule
           </router-link>
         </li>
-        <li class="nav-item mb-2">
+
+        <li class="nav-item mb-2" v-if="userRole === 'tutor'">
           <router-link to="/reports" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
             <i class="bi bi-file-earmark-text me-3"></i> Sessions & Reports
           </router-link>
@@ -55,13 +58,17 @@
 <script setup>
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
+import { useAuthStore } from '@/stores/auth' // Import auth store
 
 const route = useRoute()
+const authStore = useAuthStore()
 
-// Computed property to check if the current route is public
 const isPublicRoute = computed(() => {
-  return ['home', 'login', 'register', 'preferencesetup'].includes(route.name)
+  return ['home', 'login', 'register', 'preferencesetup', 'tutorpreferencesetup'].includes(route.name)
 })
+
+// Get the role from the store to control the sidebar links
+const userRole = computed(() => authStore.userRole)
 </script>
 
 <style>
@@ -80,16 +87,16 @@ body {
 }
 
 /* --- Brand Color Utility Classes --- */
-.text-sb-primary { 
-  color: var(--sb-primary) !important; 
+.text-sb-primary {
+  color: var(--sb-primary) !important;
 }
 
-.bg-sb-primary { 
-  background-color: var(--sb-primary) !important; 
+.bg-sb-primary {
+  background-color: var(--sb-primary) !important;
 }
 
-.border-sb { 
-  border-color: var(--sb-card-border) !important; 
+.border-sb {
+  border-color: var(--sb-card-border) !important;
 }
 
 /* Button Hover State */
