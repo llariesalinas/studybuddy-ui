@@ -90,9 +90,9 @@ const handleRegister = async () => {
 
     const response = await axios.post(DJANGO_URL, {
       // These keys MUST match Ry's Django Serializer exactly
-      newUserFname: store.newUserFname,
-      newUserMname: store.newUserMname,
-      newUserLname: store.newUserLname,
+      Fname: store.newUserFname,
+      Mname: store.newUserMname,
+      Lname: store.newUserLname,
       email: store.newUserEmail,
       password: store.newUserPassword,
       role: store.newUserType
