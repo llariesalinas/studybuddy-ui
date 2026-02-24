@@ -114,24 +114,17 @@
    * It ensures users are logged in and have the correct ERD role.
    */
   router.beforeEach((to, from, next) => {
-    const authStore = useAuthStore()
+  const authStore = useAuthStore()
 
-    // 1. Check if route requires login
-    if (to.meta.requiresAuth && !authStore.isAuthenticated) {
-      return next('/login')
-    }
+  if (to.meta.requiresAuth && !authStore.isAuthenticated) {
+    return next('/login')
+  }
 
-    // 2. Check Role-Based Access Control (RBAC)
-    if (to.meta.role && authStore.userRole !== to.meta.role) {
-      // If a tutor tries to enter a student page, or vice versa
-      // Redirect them to their respective dashboard
-      return authStore.userRole === 'tutor'
-        ? next('/tch-dashboard')
-        : next('/dashboard')
-    }
+  if (to.meta.role && authStore.userRole !== to.meta.role) {
+    return next('/')
+  }
 
-    // 3. Otherwise, proceed
-    next()
-  })
+  next()
+})
 
-  export default router
+export default router

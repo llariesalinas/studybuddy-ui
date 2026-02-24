@@ -9,5 +9,12 @@ export const useRegistrationInfoStore= defineStore('newUserInfo', () => {
     const newUserPassword = ref('')
     const newUserType = ref('')
 
-    return {newUserFname, newUserMname, newUserLname, newUserEmail, newUserPassword, newUserType}
+    return {
+        newUserFname, 
+        newUserMname, 
+        newUserLname, 
+        newUserEmail, 
+        newUserPassword, 
+        newUserType}
 })
+

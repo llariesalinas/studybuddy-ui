@@ -78,7 +78,7 @@ import { useRegistrationInfoStore } from '@/stores/registrationinfo'
 import axios from 'axios'
 
 const router = useRouter()
-const store = useRegistrationInfoStore()
+const store = useRegistrationInfoStore() //this do: 
 const isSubmitting = ref(false)
 
 const handleRegister = async () => {
@@ -86,13 +86,13 @@ const handleRegister = async () => {
 
   try {
     // API_INTEGRATION_POINT: Match this URL to Ry's Django server
-    const DJANGO_URL = 'http://localhost:8000/api/v1/register/'
+    const DJANGO_URL = 'http://localhost:8000/api/register/' //final
 
     const response = await axios.post(DJANGO_URL, {
       // These keys MUST match Ry's Django Serializer exactly
-      Fname: store.newUserFname,
-      Mname: store.newUserMname,
-      Lname: store.newUserLname,
+      fname: store.newUserFname,
+      mname: store.newUserMname,
+      lname: store.newUserLname,
       email: store.newUserEmail,
       password: store.newUserPassword,
       role: store.newUserType
