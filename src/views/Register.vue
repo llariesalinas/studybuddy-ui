@@ -10,6 +10,10 @@
           <p class="text-muted small">Join the StudyBuddy network</p>
         </div>
 
+        <div v-if="generalError" class="alert alert-danger">
+          {{ generalError }}
+        </div>
+
         <form @submit.prevent="handleRegister">
           <div class="mb-3">
             <label class="form-label fw-semibold small text-dark">First Name</label>
@@ -40,6 +44,7 @@
             <div class="input-group">
               <span class="input-group-text bg-white border-end-0 text-muted"><i class="bi bi-envelope"></i></span>
               <input type="email" v-model="store.newUserEmail" class="form-control border-start-0 ps-0 shadow-none" placeholder="you@university.edu" required>
+              <div v-if="emailError" class="text-danger small mt-1">{{ emailError }}</div>
             </div>
           </div>
 
@@ -78,21 +83,27 @@ import { useRegistrationInfoStore } from '@/stores/registrationinfo'
 import axios from 'axios'
 
 const router = useRouter()
-const store = useRegistrationInfoStore()
+const store = useRegistrationInfoStore() //this do: 
 const isSubmitting = ref(false)
+
+const generalError = ref('')
+const emailError = ref('')
+
+generalError.value = ''
+emailError.value = ''
 
 const handleRegister = async () => {
   isSubmitting.value = true
 
   try {
     // API_INTEGRATION_POINT: Match this URL to Ry's Django server
-    const DJANGO_URL = 'http://localhost:8000/api/v1/register/'
+    const DJANGO_URL = 'http://localhost:8000/api/register/' //final
 
     const response = await axios.post(DJANGO_URL, {
       // These keys MUST match Ry's Django Serializer exactly
-      Fname: store.newUserFname,
-      Mname: store.newUserMname,
-      Lname: store.newUserLname,
+      fname: store.newUserFname,
+      mname: store.newUserMname,
+      lname: store.newUserLname,
       email: store.newUserEmail,
       password: store.newUserPassword,
       role: store.newUserType
@@ -108,9 +119,29 @@ const handleRegister = async () => {
     }
 
   } catch (error) {
-    console.error('Registration Error:', error.response?.data || error.message)
-    const errorMsg = error.response?.data?.detail || 'Registration failed. Is the server running?'
-    alert(errorMsg)
+      console.error('Registration Error:', error)
+
+      if (error.response) {
+        const data = error.response.data
+
+        if (data.email) {
+          emailError.value = data.email[0]
+        }
+        else if (data.detail) {
+          generalError.value = data.detail
+        }
+
+        else {
+          generalError.value = "Registration failed. Please try again."
+        }
+
+      } 
+      else if (error.request) {
+        generalError.value = "Server not responding. Please try again later."
+      } 
+      else {
+        generalError.value = "An unexpected error occurred."
+      }
   } finally {
     isSubmitting.value = false
   }
