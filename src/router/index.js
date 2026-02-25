@@ -39,7 +39,7 @@
         path: '/dashboard',
         name: 'dashboard',
         component: Dashboard,
-        meta: { requiresAuth: true, role: 'tutee' }
+        // meta: { requiresAuth: true, role: 'tutee' }
       },
       {
         path: '/tutors',
