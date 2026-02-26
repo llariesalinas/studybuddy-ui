@@ -1,7 +1,7 @@
 <template>
   <div class="p-4">
     <div class="mb-4">
-      <h2 class="fw-bold text-dark">Welcome back, Student!</h2>
+      <h2 class="fw-bold text-dark">Welcome back, {{ studentName }}!</h2>
       <p class="text-muted">Here's your tutoring overview for today.</p>
     </div>
 
@@ -134,10 +134,10 @@
 <script setup>
 import {ref, computed, onMounted} from 'vue'
 import { useRouter } from 'vue-router'
-import axios from 'axios'
+import api from '@/services/api/api' 
+import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
-
 const recommendedTutors = ref([])
 const upcomingSessions = ref([])
 const completedSessions = ref([])
@@ -150,7 +150,7 @@ const bookTutor = (tutorId) => {
 const fetchSessions = async() => {
   try{
     loading.value = true
-    const response = await axios.get('API link goes here')
+   const response = await api.get('dashboard/')
 
     recommendedTutors.value = response.data.recommendations
     upcomingSessions.value = response.data.upcoming
@@ -170,6 +170,14 @@ onMounted(() => {
 
 const upcomingCount = computed(() => upcomingSessions.value.length)
 const completedCount = computed(() => completedSessions.value.length)
+
+const authStore = useAuthStore()
+
+const studentName = computed(() => {
+  return authStore.user
+    ? authStore.user.fname
+    : 'Student'
+})
 
 const viewSessionDetails = (sessionId) => {
   // 1. We log the ID to satisfy ESLint and prep for backend integration

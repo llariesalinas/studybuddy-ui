@@ -1,12 +1,19 @@
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
-from rest_framework.decorators import api_view
+from django.utils.timezone import now
+
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
-from .models import UserProfile
 
-
+from .models import (
+    UserProfile,
+    Booking,
+    Tutor,
+    TutorSubjects
+)
 @api_view(['POST'])
 def register_user(request):
 
@@ -83,5 +90,78 @@ def login_view(request):
         "refresh": str(refresh),
         "role": profile.role,
         "user_id": profile.id,
-        "email": user.email
+        "email": user.email,
+        "fname": profile.fname,
+        "lname": profile.lname
+    })
+
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def student_dashboard(request):
+
+    user_profile = UserProfile.objects.get(user=request.user)
+
+    # -----------------------
+    # UPCOMING SESSIONS
+    # -----------------------
+    upcoming_bookings = Booking.objects.filter(
+        student=user_profile,
+        status='Confirmed',
+        session_date__gte=now().date()
+    ).select_related('tutor__profile', 'availability')
+
+    upcoming = [
+        {
+            "id": booking.id,
+            "subject": booking.tutor.profile.course or "General Tutoring",
+            "tutor": f"{booking.tutor.profile.fname} {booking.tutor.profile.lname}",
+            "date": booking.session_date,
+            "time": booking.availability.time_slot.strftime("%H:%M")
+        }
+        for booking in upcoming_bookings
+    ]
+
+    # -----------------------
+    # COMPLETED SESSIONS
+    # -----------------------
+    completed_bookings = Booking.objects.filter(
+        student=user_profile,
+        status='Completed'
+    ).select_related('tutor__profile', 'availability')
+
+    completed = [
+        {
+            "id": booking.id,
+            "subject": booking.tutor.profile.course or "General Tutoring",
+            "tutor": f"{booking.tutor.profile.fname} {booking.tutor.profile.lname}",
+            "date": booking.session_date,
+            "time": booking.availability.time_slot.strftime("%H:%M")
+        }
+        for booking in completed_bookings
+    ]
+
+    # -----------------------
+    # RECOMMENDED TUTORS (Simple version)
+    # -----------------------
+    tutors = Tutor.objects.all().select_related('profile')[:3]
+
+    recommendations = []
+
+    for tutor in tutors:
+        tutor_subjects = TutorSubjects.objects.filter(tutor=tutor).select_related('subject')
+
+        recommendations.append({
+            "id": tutor.profile.id,
+            "name": f"{tutor.profile.fname} {tutor.profile.lname}",
+            "rating": tutor.rating_average,
+            "subjects": [ts.subject.subject_name for ts in tutor_subjects],
+            "hourlyRate": tutor.hourly_rate
+        })
+
+    return Response({
+        "upcoming": upcoming,
+        "completed": completed,
+        "recommendations": recommendations
     })
