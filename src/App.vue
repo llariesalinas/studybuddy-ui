@@ -45,9 +45,28 @@
             <router-link to="/book" class="btn bg-sb-primary text-white px-4 py-2 rounded-3 fw-semibold shadow-sm">
               Book Session
             </router-link>
-            <router-link to="/profile" class="text-sb-primary fs-3 ms-2 transition-all hover-lift">
-              <i class="bi bi-person-circle"></i>
-            </router-link>
+            <div class="profileDropdown">
+              <button 
+              class="btn text-sb-primary fs-3 ms-2 transition-all hover-lift"
+              @click="toggleDropdown"
+              >
+                <i class="bi bi-person-circle"></i>
+              </button>
+              <ul v-if="isOpen" class="dropdown-menu show position-absolute end-0 mt-2 me-2">
+                <li>
+                  <button class="btn btn-success dropdown-item text-center px-4"
+                            @click="manageAccount">
+                      Manage your account
+                    </button>
+                </li>
+                <li><hr class="dropdown-divider"></li>
+                <li><button class="btn btn-success dropdown-item text-danger text-center px-4"
+                            @click="logout">
+                      Log-out
+                    </button>
+                </li>
+              </ul>
+            </div>
           </div>
         </header>
       <router-view />
@@ -56,12 +75,33 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth' // Import auth store
+import router from './router'
 
 const route = useRoute()
 const authStore = useAuthStore()
+const isOpen = ref(false)
+
+const toggleDropdown = () => {
+  isOpen.value = !isOpen.value
+}
+
+const manageAccount = () => {
+  setTimeout(() => {
+    router.push('/profile')
+  }, 500)
+}
+
+const logout = () => {
+
+  setTimeout(() => {
+    router.push('/')
+  }, 500)
+
+  router.push
+}
 
 const isPublicRoute = computed(() => {
   return ['home', 'login', 'register', 'preferencesetup', 'tutorpreferencesetup'].includes(route.name)
