@@ -74,20 +74,36 @@ const email = ref('')
 const password = ref('')
 const isSubmitting = ref(false)
 
+
 const handleLogin = async () => {
+  console.log("Login function triggered")
   isSubmitting.value = true
 
   try {
     // API_INTEGRATION_POINT: The actual axios call is delegated to the store
-    await authStore.login({
+    const role = await authStore.login({
       email: email.value,
       password: password.value
     })
 
-    console.log('Login successful')
+    console.log("Role from backend:", role)
 
-    // Route to dashboard on success
-    router.push('/dashboard')
+    const normalizedRole = role?.toLowerCase()
+
+    console.log("Normalized Role:", normalizedRole)
+    // Route to dashboard based on user role
+    if (normalizedRole === 'tutor') {
+      console.log("Routing to tutor dashboard")
+      router.push('/tch-dashboard')
+    } 
+    else if (normalizedRole === 'tutee') {
+       console.log("Routing to student dashboard")
+      router.push('/dashboard')
+    } 
+    else {
+       console.log("Routing to fallback")
+      router.push('/')
+    }
 
   } catch (error) {
     console.error('Login Error:', error)
@@ -97,13 +113,3 @@ const handleLogin = async () => {
   }
 }
 </script>
-
-<style scoped>
-.form-control {
-  border-color: var(--sb-card-border);
-}
-.form-control:focus {
-  border-color: var(--sb-primary);
-  box-shadow: 0 0 0 0.25rem rgba(0, 137, 90, 0.25);
-}
-</style>
