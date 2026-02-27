@@ -32,7 +32,7 @@
           
           <div class="d-flex justify-content-between align-items-start flex-wrap">
             <h4 class="fw-bold mb-1">{{ tutorDetails?.name }}</h4>
-            <span class="fw-semibold mb-1">{{ tutorDetails.rating }} ⭐</span>
+            <span class="fw-semibold mb-1">{{ tutorDetails?.rating || 0 }} ⭐</span>
           </div>
 
           <div class="subjects-list mb-2">
@@ -45,7 +45,7 @@
             </span>
           </div>
 
-          <p class="mb-2 fw-semibold">{{ tutorDetails.hourly_rate }}/hr.</p>
+          <p class="mb-2 fw-semibold">{{ tutorDetails.hourly_rate || 0}}/hr.</p>
 
           <div class="border-top pt-2 mt-2">
             <h6 class="fw-semibold mb-1">About the Tutor</h6>
@@ -61,7 +61,7 @@
 
     <div class="card shadow-sm rounded-4">
       <div class="card-body">
-        <h5 class="fw-semibold mb-3">Maria's Schedule</h5>
+        <h5 class="fw-semibold mb-3">{{ tutorDetails.name }}'s Schedule</h5>
         <p><i class="bi bi-circle-fill text-success"></i> Available | <i class="bi bi-circle-fill text-danger"></i> Unavailable</p>
 
         <div class="table-responsive">
@@ -73,24 +73,26 @@
             </thead>
 
             <tbody>
-              <tr>
+              <tr v-for="rowIndex in maxRows" :key="rowIndex">
                 <td v-for="day in days" :key="day">
                   <div
-                    v-for="slot in groupedSchedule[day]"
-                    :key="slot.start_time"
+                    v-if="groupedSchedule[day][rowIndex - 1]"
                     class="slot-cell"
                     :class="{
-                      available: !slot.is_booked,
-                      booked: slot.is_booked,
-                      selected: selectedSlots.includes(slot)
-                    }"
-                    @click="toggleSlot(slot)"
-                  >
-                    {{ slot.start_time }} - {{ slot.end_time }}
-                  </div>
-                </td>
-              </tr>
-            </tbody>
+                      available: !groupedSchedule[day][rowIndex - 1].is_booked,
+                      booked: groupedSchedule[day][rowIndex - 1].is_booked,
+                      selected: selectedSlots.some(
+                        s => s.availability_id === groupedSchedule[day][rowIndex - 1].id
+          )
+        }"
+        @click="toggleSlot(groupedSchedule[day][rowIndex - 1])"
+      >
+        {{ groupedSchedule[day][rowIndex - 1].time_slot }} -
+        {{ addOneHour(groupedSchedule[day][rowIndex - 1].time_slot) }}
+      </div>
+    </td>
+  </tr>
+</tbody>
           </table>
         </div>
         <div class="text-end mt-3">
@@ -115,7 +117,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useBookingPrefsStore } from '@/stores/selectedSessions'
 import { useBookedSessionStore } from '@/stores/bookedSessionDetails'
-import axios from 'axios'
+import api from '@/services/api/api'
 
 const router = useRouter()
 const route = useRoute()
@@ -127,6 +129,15 @@ const tutorID = route.params.id
 const selectedSlots = ref([])
 const tutorSchedule = ref([])
 
+const days = [
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+  'Sunday'
+]
 
 const dayIndexMap = {
   'Monday': 0,
@@ -136,6 +147,17 @@ const dayIndexMap = {
   'Friday': 4,
   'Saturday': 5,
   'Sunday': 6
+}
+
+
+function addOneHour(time) {
+  const [h, m] = time.split(':')
+  const date = new Date()
+  date.setHours(parseInt(h))
+  date.setMinutes(parseInt(m))
+  date.setHours(date.getHours() + 1)
+
+  return date.toTimeString().slice(0,5)
 }
 
 function getSlotDate(slot) {
@@ -163,105 +185,40 @@ const tutorDetails = ref({
 })
 
 
-const getTutorDetails = async() => {
+const getTutorDetails = async () => {
   try {
-    const response = await axios.get(`tutors/${tutorID}/`)
-
+    const response = await api.get(`tutors/${tutorID}/`)
     tutorDetails.value = {
       profile_id: response.data.profile_id,
-      initials: response.data.fname[0] + response.data.lname[0],
       name: `${response.data.fname} ${response.data.lname}`,
-      year_course: 'Tutor',
       subjects: response.data.subjects,
       rating: response.data.rating_average ?? 5.0,
       bio: response.data.bio,
       hourly_rate: response.data.hourly_rate ?? 150,
       total_sessions: response.data.total_sessions ?? 0
     }
-
-  } 
-  catch (error) {
+  } catch (error) {
     console.error('Failed to load tutor details.', error)
   }
 }
 
-// const getTutorSched = async() => {
-//   try {
-//     const response = await axios.get(`tutors/${tutorID}/schedule`)
+const getTutorSchedule = async () => {
+  try {
+    const response = await api.get(`tutors/${tutorID}/availability/`)
+    tutorSchedule.value = response.data
+  } catch (error) {
+    console.error('Failed to load tutor schedule.', error)
+  }
+}
 
-//     tutorSchedule.value = response.data
-//   } 
-//   catch (error) {
-//     console.error('Error loading tutor schedule', error)
-//   }
-// }
-
-/* Load Tutor details & schedule */
 onMounted(async () => {
-  getTutorDetails()
-  // getTutorSched()
-  tutorSchedule.value = [
-    {
-      day: 'Monday',
-      start_time: '09:00',
-      end_time: '10:00',
-      is_booked: false
-    },
-    {
-      day: 'Monday',
-      start_time: '10:00',
-      end_time: '11:00',
-      is_booked: true
-    },
-    {
-      day: 'Tuesday',
-      start_time: '10:00',
-      end_time: '11:00',
-      is_booked: true
-    },
-    {
-      day: 'Wednesday',
-      start_time: '13:00',
-      end_time: '14:00',
-      is_booked: false
-    },
-    {
-      day: 'Wednesday',
-      start_time: '14:00',
-      end_time: '15:00',
-      is_booked: false
-    },
-    {
-      day: 'Thursday',
-      start_time: '10:00',
-      end_time: '11:00',
-      is_booked: true
-    },
-    {
-      day: 'Friday',
-      start_time: '10:00',
-      end_time: '11:00',
-      is_booked: true
-    },
-    {
-      day: 'Saturday',
-      start_time: '10:00',
-      end_time: '11:00',
-      is_booked: true
-    },
-    {
-      day: 'Sunday',
-      start_time: '10:00',
-      end_time: '11:00',
-      is_booked: true
-    },
-  ]
+  await getTutorDetails()
+  await getTutorSchedule()
 })
 
 
 
 const groupedSchedule = computed(() => {
-  const days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
 
   const result = {}
 
@@ -278,61 +235,55 @@ const groupedSchedule = computed(() => {
   return result
 })
 
+const maxRows = computed(() => {
+  const lengths = days.map(day => groupedSchedule.value[day]?.length || 0)
+  return lengths.length ? Math.max(...lengths) : 0
+})
+
 const toggleSlot = (slot) => {
-  if (slot.is_booked) return  // cannot select booked slots
+  if (slot.is_booked) return
 
-  // include the actual date in the slot
-  const slotWithDate = { ...slot, date: getSlotDate(slot) }
+  const slotWithDate = {
+    availability_id: slot.id,
+    session_date: getSlotDate(slot),
+    session_mode: "Online"
+  }
 
-  // check if already selected
   const exists = selectedSlots.value.some(
-    s => s.day === slot.day &&
-         s.start_time === slot.start_time &&
-         s.end_time === slot.end_time
+    s => s.availability_id === slot.id
   )
 
   if (exists) {
-    // remove from selection
     selectedSlots.value = selectedSlots.value.filter(
-      s => !(s.day === slot.day &&
-             s.start_time === slot.start_time &&
-             s.end_time === slot.end_time)
+      s => s.availability_id !== slot.id
     )
   } else {
-    // add to selection with date
     selectedSlots.value.push(slotWithDate)
   }
-
-  // update Pinia store
-  bookedSessionStore.bookedSessions = selectedSlots.value
 }
-
-const days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
 
 const backButton = () => {
     router.push('/tutors')
 }
 
 const bookSessions = async () => {
-    
   try {
 
-  await axios.post(
-  'API link goes here',
-  {
-    tutorId: bookedSessionStore.bookedSessionTutorID,
-    tutorName: bookedSessionStore.bookedSessionTutorName,
-    subject: bookedSessionStore.bookedSessionSub,
-    topic: bookedSessionStore.bookedSessionTop,
-    slots: selectedSlots.value,
-  }
-  )
+    for (const slot of selectedSlots.value) {
+      await api.post('bookings/', {
+        availability: slot.availability_id,
+        session_date: slot.session_date,
+        session_mode: slot.session_mode
+      })
+    }
 
-  router.push('/payment')
+    router.push('/payment')
+
   } catch (error) {
-  console.error('Booking failed', error)
+    console.error('Booking failed', error)
   }
 }
+
 </script>
 
 <style scoped>

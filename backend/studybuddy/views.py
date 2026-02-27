@@ -12,8 +12,8 @@ from rest_framework.generics import ListAPIView
 from django.utils.timezone import now
 
 
-from .models import Subjects, TutorSubjects, Tutor, Booking
-from .serializers import TutorSearchSerializer, SubjectSerializer
+from .models import Subjects, TutorAvailability, TutorSubjects, Tutor, Booking
+from .serializers import TutorDetailSerializer, TutorSearchSerializer, SubjectSerializer
 
 from .models import (
     UserProfile,
@@ -231,3 +231,72 @@ def tutor_dashboard(request):
         "hourly_rate": tutor.hourly_rate,
         "upcoming_bookings": bookings_data
     })
+
+#Booking details view
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_booking(request):
+
+    profile = request.user.userprofile
+    availability_id = request.data.get("availability")
+    session_date = request.data.get("session_date")
+    session_mode = request.data.get("session_mode")
+
+    try:
+        availability = TutorAvailability.objects.get(id=availability_id)
+    except TutorAvailability.DoesNotExist:
+        return Response({"error": "Invalid availability"}, status=404)
+
+    if availability.is_booked:
+        return Response({"error": "Slot already booked"}, status=400)
+
+    booking = Booking.objects.create(
+        student=profile,
+        tutor=availability.tutor,
+        availability=availability,
+        session_date=session_date,
+        session_mode=session_mode
+    )
+
+    availability.is_booked = True
+    availability.save()
+
+    return Response({"message": "Booking successful"})
+
+
+#Tutor Detail View
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def tutor_detail(request, profile_id):
+    try:
+        tutor = Tutor.objects.select_related('profile').get(profile_id=profile_id)
+    except Tutor.DoesNotExist:
+        return Response({"error": "Tutor not found"}, status=404)
+
+    serializer = TutorDetailSerializer(tutor)
+    return Response(serializer.data)
+
+#tutor availability schedule thing  vview
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def tutor_availability(request, tutor_id):
+    try:
+        tutor = Tutor.objects.get(profile_id=tutor_id)
+    except Tutor.DoesNotExist:
+        return Response({"error": "Tutor not found"}, status=404)
+
+    availability = TutorAvailability.objects.filter(tutor=tutor)
+
+    data = [
+        {
+            "id": slot.id,
+            "day": slot.get_day_display(),
+            "time_slot": slot.time_slot.strftime("%H:%M"),
+            "is_booked": slot.is_booked
+        }
+        for slot in availability
+    ]
+
+    return Response(data)
