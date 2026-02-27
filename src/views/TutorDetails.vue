@@ -16,33 +16,47 @@
     </div>
 
     <div class="card shadow-sm rounded-4 mb-4">
-        <div class="card-body">
+      <div class="card-body d-flex flex-column flex-md-row align-items-start gap-4">
 
-            <div class="d-flex align-items-center mb-3">
-            <div class="me-4">
-                <img
-                src="https://via.placeholder.com/100"
-                class="rounded-circle"
-                width="100"
-                height="100"
-                />
-            </div>
+        <div class="flex-shrink-0">
+          <img
+            src="https://via.placeholder.com/100"
+            class="rounded-circle"
+            width="100"
+            height="100"
+            alt="Tutor Profile"
+          />
+        </div>
 
-            <div>
-                <h4 class="fw-bold mb-1">John Doe</h4>
-                <p class="text-muted mb-1">Mathematics Specialist</p>
-                <p class="mb-0 fw-semibold">$30/hour</p>
-            </div>
-            </div>
+        <div class="flex-grow-1 d-flex flex-column">
+          
+          <div class="d-flex justify-content-between align-items-start flex-wrap">
+            <h4 class="fw-bold mb-1">{{ tutorDetails?.name }}</h4>
+            <span class="fw-semibold mb-1">{{ tutorDetails.rating }} ⭐</span>
+          </div>
 
-            <div class="border-top pt-3">
-            <h6 class="fw-semibold">About the Tutor</h6>
+          <div class="subjects-list mb-2">
+            <span
+              v-for="subject in tutorDetails.subjects"
+              :key="subject"
+              class="badge bg-light text-dark me-1 mb-1"
+            >
+              {{ subject }}
+            </span>
+          </div>
+
+          <p class="mb-2 fw-semibold">{{ tutorDetails.hourly_rate }}/hr.</p>
+
+          <div class="border-top pt-2 mt-2">
+            <h6 class="fw-semibold mb-1">About the Tutor</h6>
             <p class="text-muted mb-0">
-                Mathematics doesn’t have to be a mystery. I’m Maria, a dedicated tutor on a mission to turn "I can’t do this" into "Oh, I see it now!" With a focus on building confidence alongside core skills, I help students navigate everything from Pre-Algebra to Calculus without the stress. My goal isn't just to help you pass the next test—it's to give you the tools to tackle any problem that comes your way.
+              {{ tutorDetails.bio || "This tutor is a bit shy..." }}
             </p>
-            </div>
+          </div>
 
         </div>
+
+      </div>
     </div>
 
     <div class="card shadow-sm rounded-4">
@@ -51,40 +65,32 @@
         <p><i class="bi bi-circle-fill text-success"></i> Available | <i class="bi bi-circle-fill text-danger"></i> Unavailable</p>
 
         <div class="table-responsive">
-          <table class="table table-bordered align-middle text-center">
+          <table class="table table-bordered text-center align-middle calendar-table">
             <thead class="table-light">
               <tr>
-                <th>Monday</th>
-                <th>Tuesday</th>
-                <th>Wednesday</th>
-                <th>Thursday</th>
-                <th>Friday</th>
-                <th>Saturday</th>
-                <th>Sunday</th>
+                <th v-for="day in days" :key="day">{{ day }}</th>
               </tr>
             </thead>
+
             <tbody>
-                <tr v-for="(row, rowIndex) in schedule" :key="rowIndex">
-
-                    <td
-                    v-for="day in days"
-                    :key="day"
-                    @click="row[day] && toggleSlot(`${row.time}-${day}`)"
-                    :class="[
-                        row[day]
-                        ? 'bg-success time-cell'
-                        : 'bg-danger',
-
-                        selectedSlots.includes(`$s{row.time}-${day}`)
-                        ? 'selected-cell'
-                        : ''
-                    ]"
-                    >
-                    {{ row.time }}
-                    </td>
-
-                </tr>
-                </tbody>
+              <tr>
+                <td v-for="day in days" :key="day">
+                  <div
+                    v-for="slot in groupedSchedule[day]"
+                    :key="slot.start_time"
+                    class="slot-cell"
+                    :class="{
+                      available: !slot.is_booked,
+                      booked: slot.is_booked,
+                      selected: selectedSlots.includes(slot)
+                    }"
+                    @click="toggleSlot(slot)"
+                  >
+                    {{ slot.start_time }} - {{ slot.end_time }}
+                  </div>
+                </td>
+              </tr>
+            </tbody>
           </table>
         </div>
         <div class="text-end mt-3">
@@ -105,46 +111,203 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useBookingPrefsStore } from '@/stores/selectedSessions'
+import { useBookedSessionStore } from '@/stores/bookedSessionDetails'
 import axios from 'axios'
 
 const router = useRouter()
-const store = useBookingPrefsStore()
+const route = useRoute()
+const bookingPrefsStore = useBookingPrefsStore()
+const bookedSessionStore = useBookedSessionStore()
+
+const tutorID = route.params.id
 
 const selectedSlots = ref([])
-const schedule = ref([])
+const tutorSchedule = ref([])
 
-/* Load schedule */
-onMounted(async () => {
-  try {
-    const { data } = await axios.get('API link goes here')
-    schedule.value = data
-  } catch (error) {
-    console.error("Error loading schedule", error)
-  }
+
+const dayIndexMap = {
+  'Monday': 0,
+  'Tuesday': 1,
+  'Wednesday': 2,
+  'Thursday': 3,
+  'Friday': 4,
+  'Saturday': 5,
+  'Sunday': 6
+}
+
+function getSlotDate(slot) {
+  // get Monday of the current week
+  const monday = new Date()
+  monday.setDate(monday.getDate() - monday.getDay() + 1)
+  
+  // add day offset
+  const slotDate = new Date(monday)
+  slotDate.setDate(monday.getDate() + dayIndexMap[slot.day])
+  
+  return slotDate.toISOString().split('T')[0] // YYYY-MM-DD
+}
+
+const tutorDetails = ref({
+  profile_id: null,
+  initials: '',
+  name: '',
+  year_course: 'Tutor',
+  subjects: [],
+  rating: 0,
+  bio: '',
+  hourly_rate: 0,
+  total_sessions: 0
 })
 
-/* Toggle selection */
-const toggleSlot = (slotId) => {
-  if (selectedSlots.value.includes(slotId)) {
-    selectedSlots.value =
-      selectedSlots.value.filter(id => id !== slotId)
-  } else {
-    selectedSlots.value.push(slotId)
+
+const getTutorDetails = async() => {
+  try {
+    const response = await axios.get(`tutors/${tutorID}/`)
+
+    tutorDetails.value = {
+      profile_id: response.data.profile_id,
+      initials: response.data.fname[0] + response.data.lname[0],
+      name: `${response.data.fname} ${response.data.lname}`,
+      year_course: 'Tutor',
+      subjects: response.data.subjects,
+      rating: response.data.rating_average ?? 5.0,
+      bio: response.data.bio,
+      hourly_rate: response.data.hourly_rate ?? 150,
+      total_sessions: response.data.total_sessions ?? 0
+    }
+
+  } 
+  catch (error) {
+    console.error('Failed to load tutor details.', error)
   }
 }
 
-const days = [
-  'monday',
-  'tuesday',
-  'wednesday',
-  'thursday',
-  'friday',
-  'saturday',
-  'sunday'
-]
+// const getTutorSched = async() => {
+//   try {
+//     const response = await axios.get(`tutors/${tutorID}/schedule`)
+
+//     tutorSchedule.value = response.data
+//   } 
+//   catch (error) {
+//     console.error('Error loading tutor schedule', error)
+//   }
+// }
+
+/* Load Tutor details & schedule */
+onMounted(async () => {
+  getTutorDetails()
+  // getTutorSched()
+  tutorSchedule.value = [
+    {
+      day: 'Monday',
+      start_time: '09:00',
+      end_time: '10:00',
+      is_booked: false
+    },
+    {
+      day: 'Monday',
+      start_time: '10:00',
+      end_time: '11:00',
+      is_booked: true
+    },
+    {
+      day: 'Tuesday',
+      start_time: '10:00',
+      end_time: '11:00',
+      is_booked: true
+    },
+    {
+      day: 'Wednesday',
+      start_time: '13:00',
+      end_time: '14:00',
+      is_booked: false
+    },
+    {
+      day: 'Wednesday',
+      start_time: '14:00',
+      end_time: '15:00',
+      is_booked: false
+    },
+    {
+      day: 'Thursday',
+      start_time: '10:00',
+      end_time: '11:00',
+      is_booked: true
+    },
+    {
+      day: 'Friday',
+      start_time: '10:00',
+      end_time: '11:00',
+      is_booked: true
+    },
+    {
+      day: 'Saturday',
+      start_time: '10:00',
+      end_time: '11:00',
+      is_booked: true
+    },
+    {
+      day: 'Sunday',
+      start_time: '10:00',
+      end_time: '11:00',
+      is_booked: true
+    },
+  ]
+})
+
+
+
+const groupedSchedule = computed(() => {
+  const days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
+
+  const result = {}
+
+  days.forEach(day => {
+    result[day] = []
+  })
+
+  tutorSchedule.value.forEach(slot => {
+    if(result[slot.day]){
+      result[slot.day].push(slot)
+    }
+  })
+
+  return result
+})
+
+const toggleSlot = (slot) => {
+  if (slot.is_booked) return  // cannot select booked slots
+
+  // include the actual date in the slot
+  const slotWithDate = { ...slot, date: getSlotDate(slot) }
+
+  // check if already selected
+  const exists = selectedSlots.value.some(
+    s => s.day === slot.day &&
+         s.start_time === slot.start_time &&
+         s.end_time === slot.end_time
+  )
+
+  if (exists) {
+    // remove from selection
+    selectedSlots.value = selectedSlots.value.filter(
+      s => !(s.day === slot.day &&
+             s.start_time === slot.start_time &&
+             s.end_time === slot.end_time)
+    )
+  } else {
+    // add to selection with date
+    selectedSlots.value.push(slotWithDate)
+  }
+
+  // update Pinia store
+  bookedSessionStore.bookedSessions = selectedSlots.value
+}
+
+const days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
 
 const backButton = () => {
     router.push('/tutors')
@@ -152,19 +315,20 @@ const backButton = () => {
 
 const bookSessions = async () => {
     
-try {
-  console.log('Booked Slots:', selectedSlots.value)
-
-  store.bookedSessions = selectedSlots.value
+  try {
 
   await axios.post(
   'API link goes here',
   {
-    slots: selectedSlots.value
+    tutorId: bookedSessionStore.bookedSessionTutorID,
+    tutorName: bookedSessionStore.bookedSessionTutorName,
+    subject: bookedSessionStore.bookedSessionSub,
+    topic: bookedSessionStore.bookedSessionTop,
+    slots: selectedSlots.value,
   }
   )
 
-  router.push('/tutors')
+  router.push('/payment')
   } catch (error) {
   console.error('Booking failed', error)
   }
@@ -172,17 +336,39 @@ try {
 </script>
 
 <style scoped>
-.time-cell {
+.slot-cell {
+  padding: 8px;
+  margin-bottom: 6px;
+  border-radius: 6px;
   cursor: pointer;
   transition: 0.2s ease;
 }
 
-.time-cell:hover {
-  filter: brightness(0.9);
+.slot-cell.available {
+  background-color: #e8f7f1;
+  color: #00895a;
 }
 
-.selected-cell {
-  border: 2px solid #00895A !important;
+.slot-cell.booked {
+  background-color: #f8d7da;
+  color: #842029;
+  cursor: not-allowed;
+}
+
+.slot-cell.selected {
+  outline: 3px solid #00895a;
   font-weight: bold;
+}
+.subjects-list {
+  max-height: 100px; 
+  overflow-y: auto;
+}
+
+.subjects-list span {
+  white-space: nowrap;
+}
+
+.card-body img {
+  object-fit: cover;    
 }
 </style>

@@ -124,11 +124,11 @@ import api from '@/services/api/api'
 import { ref, onMounted, computed, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useInitialBookingPrefsStore } from '@/stores/initialbookingprefs'
-import { useBookedSessionsStore } from '@/stores/bookedSessionDetails'
+import { useBookedSessionStore } from '@/stores/bookedSessionDetails'
 import { useRouter } from 'vue-router'
 
 
-const bookedSessionsStore = useBookedSessionsStore()
+const bookedSessionStore = useBookedSessionStore()
 const initialbookStore = useInitialBookingPrefsStore()
 const authStore = useAuthStore()
 const isLoading = ref(true)
@@ -182,11 +182,11 @@ const searchTutor = async () => {
 }
 
 const toTutorDetails = (tutor) => {
-    bookedSessionsStore.bookedSessionTutorID = tutor.profile_id
-    bookedSessionsStore.bookedSessionTutorName = tutor.name
-    bookedSessionsStore.bookedSessionSub = initialbookStore.selectedSubject
-    bookedSessionsStore.bookedSessionTop = initialbookStore.selectedTopic
-    bookedSessionsStore.bookedSessionMode = initialbookStore.selectedMode
+    bookedSessionStore.bookedSessionTutorID = tutor.profile_id
+    bookedSessionStore.bookedSessionTutorName = tutor.name
+    bookedSessionStore.bookedSessionSub = initialbookStore.selectedSubject
+    bookedSessionStore.bookedSessionTop = initialbookStore.selectedTopic
+    bookedSessionStore.bookedSessionMode = initialbookStore.selectedMode
 
     router.push(`/tutor/${tutor.profile_id}`)
 }
