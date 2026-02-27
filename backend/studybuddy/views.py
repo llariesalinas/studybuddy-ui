@@ -176,25 +176,20 @@ def student_dashboard(request):
 class SearchTutorsView(APIView):
 
     def get(self, request):
-        subject_id = request.query_params.get('subject')
+        subject_code = request.query_params.get('subject')
 
-        if not subject_id:
+        if not subject_code:
             return Response(
                 {"error": "Subject is required"},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        tutor_subjects = TutorSubjects.objects.filter(
-            subject_id=subject_id
-        )
-
         tutors = Tutor.objects.filter(
-            id__in=tutor_subjects.values_list('tutor_id', flat=True)
-        ).distinct()
+            tutorsubjects__subject__subject_code=subject_code
+        ).select_related('profile').distinct()
 
         serializer = TutorSearchSerializer(tutors, many=True)
         return Response(serializer.data)
-        
 #Subject Serializer
 
 class SubjectListView(ListAPIView):

@@ -14,7 +14,7 @@
           <div class="mb-3">
             <label class="form-label fw-semibold small">Subject</label>
             <select v-model="store.selectedSubject" class="form-select border-sb shadow-none" required>
-              <option v-for="subject in subjects" :key="subject.id" :value="subject.id">
+              <option v-for="subject in subjects" :key="subject.subject_code" :value="subject.subject_code">
                 {{ subject.subject_name }}
               </option>
             </select>
@@ -118,7 +118,7 @@ const findTutor = async () => {
 
   try {
     router.push({
-      name: 'TutorList',
+      name: 'tutors',
       query: {
         subject: store.selectedSubject,
         topic: store.selectedTopic,
@@ -128,6 +128,8 @@ const findTutor = async () => {
         endTime: store.selectedEndTime
       }
     })
+
+
   } catch (error) {
     console.error(error)
   } finally {
