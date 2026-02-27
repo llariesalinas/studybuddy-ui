@@ -66,34 +66,3 @@
   </div>
 </template>
 
-<script setup>
-
-import { ref, onMounted } from 'vue'
-import api from '@/services/api/api'
-
-const totalSessions = ref(0)
-const avgRating = ref(0)
-const earnings = ref(0)
-const upcomingBookings = ref([])
-
-onMounted(async () => {
-  try {
-    const response = await api.get('tutor-dashboard/')
-    totalSessions.value = response.data.total_sessions
-    avgRating.value = response.data.rating_average
-    upcomingBookings.value = response.data.upcoming_bookings
-
-    // Temporary earnings calculation
-    earnings.value = totalSessions.value * response.data.hourly_rate
-
-  } catch (error) {
-    console.error("Failed to load tutor dashboard:", error)
-  }
-})
-</script>
-
-
-
-
-
-
