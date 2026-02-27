@@ -1,15 +1,14 @@
 import { ref } from "vue";
 import { defineStore } from "pinia";
 
-export const useBookedSessionsStore = defineStore('bookedSessionDetails', () => {
+export const useBookedSessionStore = defineStore('bookedSessionDetails', () => {
     const bookedSessionTutorID = ref(null)
     const bookedSessionTutorName = ref('')
     const bookedSessionSub = ref('')
     const bookedSessionTop = ref('')
     const bookedSessionMode = ref('')
     const bookedSessionDate = ref(null)
-    const bookedSessionStart = ref(null)
-    const bookedSessionEnd = ref(null)
+    const bookedSessions = ref([])
 
     return {bookedSessionTutorID, 
             bookedSessionTutorName, 
@@ -17,6 +16,5 @@ export const useBookedSessionsStore = defineStore('bookedSessionDetails', () => 
             bookedSessionTop, 
             bookedSessionMode, 
             bookedSessionDate, 
-            bookedSessionStart, 
-            bookedSessionEnd}
+            bookedSessions}
 })
