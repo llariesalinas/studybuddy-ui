@@ -42,7 +42,7 @@
           <div>
             </div>
           <div class="d-flex gap-3 align-items-center">
-            <router-link to="/book" class="btn bg-sb-primary text-white px-4 py-2 rounded-3 fw-semibold shadow-sm">
+            <router-link v-if="hideSessionButton" to="/book" class="btn bg-sb-primary text-white px-4 py-2 rounded-3 fw-semibold shadow-sm">
               Book Session
             </router-link>
             <div class="profileDropdown">
@@ -102,6 +102,17 @@ const logout = () => {
 
   router.push
 }
+
+const hideSessionButton = computed(() => {
+  const hiddenPages = [
+    'book',
+    'tutors',
+    'tutor-details',
+    'payment'
+  ]
+
+  return !hiddenPages.includes(route.name)
+})
 
 const isPublicRoute = computed(() => {
   return ['home', 'login', 'register', 'preferencesetup', 'tutorpreferencesetup'].includes(route.name)
