@@ -11,21 +11,21 @@
       <div class="col-md-4">
         <div class="card border-sb rounded-4 p-4 shadow-sm h-100">
           <p class="text-muted small fw-bold mb-2">TOTAL SESSIONS</p>
-          <h2 class="fw-bold mb-0 text-dark">12</h2>
+          <h2 class="fw-bold mb-0 text-dark">{{ totalSessions }}</h2>
         </div>
       </div>
       <div class="col-md-4">
         <div class="card border-sb rounded-4 p-4 shadow-sm h-100">
           <p class="text-muted small fw-bold mb-2">AVG RATING</p>
           <h2 class="fw-bold mb-0 text-dark d-flex align-items-center">
-            4.9 <i class="bi bi-star-fill text-warning fs-4 ms-2"></i>
+            {{ avgRating }} <i class="bi bi-star-fill text-warning fs-4 ms-2"></i>
           </h2>
         </div>
       </div>
       <div class="col-md-4">
         <div class="card border-0 rounded-4 p-4 shadow-sm h-100" style="background-color: var(--sb-dark);">
           <p class="text-white-50 small fw-bold mb-2">EARNINGS</p>
-          <h2 class="fw-bold text-white mb-0">₱3,450</h2>
+          <h2 class="fw-bold text-white mb-0">₱{{ earnings }}</h2>
         </div>
       </div>
     </div>
@@ -44,20 +44,56 @@
               </tr>
             </thead>
             <tbody>
-              <tr style="border-top: 1px solid var(--sb-card-border);">
-                <td class="py-3 text-dark">Lia Salinas</td>
-                <td class="py-3">
-                  <span class="badge bg-light text-dark border border-sb px-2 py-1">Vue.js</span>
-                </td>
-                <td class="py-3 text-dark">Feb 25, 2026</td>
-                <td class="py-3">
-                  <span class="badge bg-success bg-opacity-10 text-success border border-success px-3 py-1 rounded-pill">Confirmed</span>
-                </td>
-              </tr>
-            </tbody>
+            <tr v-for="booking in upcomingBookings" :key="booking.date">
+    <td class="py-3 text-dark">{{ booking.student }}</td>
+    <td class="py-3">
+      <span class="badge bg-light text-dark border border-sb px-2 py-1">
+        —
+      </span>
+    </td>
+    <td class="py-3 text-dark">{{ booking.date }}</td>
+    <td class="py-3">
+      <span class="badge bg-success bg-opacity-10 text-success border border-success px-3 py-1 rounded-pill">
+        {{ booking.status }}
+      </span>
+    </td>
+  </tr>
+</tbody>
           </table>
         </div>
       </div>
     </div>
   </div>
 </template>
+
+<script setup>
+
+import { ref, onMounted } from 'vue'
+import api from '@/services/api/api'
+
+const totalSessions = ref(0)
+const avgRating = ref(0)
+const earnings = ref(0)
+const upcomingBookings = ref([])
+
+onMounted(async () => {
+  try {
+    const response = await api.get('tutor-dashboard/')
+    totalSessions.value = response.data.total_sessions
+    avgRating.value = response.data.rating_average
+    upcomingBookings.value = response.data.upcoming_bookings
+
+    // Temporary earnings calculation
+    earnings.value = totalSessions.value * response.data.hourly_rate
+
+  } catch (error) {
+    console.error("Failed to load tutor dashboard:", error)
+  }
+})
+</script>
+
+
+
+
+
+

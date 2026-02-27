@@ -9,8 +9,10 @@ from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.views import APIView
 from rest_framework.generics import ListAPIView
+from django.utils.timezone import now
 
-from .models import Subjects, TutorSubjects, Tutor
+
+from .models import Subjects, TutorSubjects, Tutor, Booking
 from .serializers import TutorSearchSerializer, SubjectSerializer
 
 from .models import (
@@ -195,3 +197,37 @@ class SearchTutorsView(APIView):
 class SubjectListView(ListAPIView):
     queryset = Subjects.objects.all()
     serializer_class = SubjectSerializer    
+
+
+#Tutor Dashboard View
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def tutor_dashboard(request):
+    profile = request.user.userprofile
+
+    try:
+        tutor = Tutor.objects.get(profile=profile)
+    except Tutor.DoesNotExist:
+        return Response({"error": "Tutor not found"}, status=404)
+
+    upcoming = Booking.objects.filter(
+        tutor=tutor,
+        session_date__gte=now().date()
+    ).select_related("student")
+
+    bookings_data = [
+        {
+            "student": f"{b.student.fname} {b.student.lname}",
+            "date": b.session_date,
+            "status": b.status
+        }
+        for b in upcoming
+    ]
+
+    return Response({
+        "total_sessions": tutor.total_sessions,
+        "rating_average": tutor.rating_average,
+        "hourly_rate": tutor.hourly_rate,
+        "upcoming_bookings": bookings_data
+    })
