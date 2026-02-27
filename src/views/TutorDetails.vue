@@ -75,7 +75,7 @@
                         ? 'bg-success time-cell'
                         : 'bg-danger',
 
-                        selectedSlots.includes(`${row.time}-${day}`)
+                        selectedSlots.includes(`$s{row.time}-${day}`)
                         ? 'selected-cell'
                         : ''
                     ]"

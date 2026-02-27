@@ -14,8 +14,8 @@
           <div class="mb-3">
             <label class="form-label fw-semibold small">Subject</label>
             <select v-model="store.selectedSubject" class="form-select border-sb shadow-none" required>
-              <option v-for="subject in subjects" :key="subject" :value="subject">
-                {{ subject }}
+              <option v-for="subject in subjects" :key="subject.subject_code" :value="subject.subject_code">
+                {{ subject.subject_name }}
               </option>
             </select>
           </div>
@@ -95,19 +95,20 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useInitialBookingPrefsStore } from '@/stores/initialbookingprefs'
 import axios from 'axios'
+import { onMounted } from 'vue'
+import api from '@/services/api/api'
 
 const router = useRouter()
 const store = useInitialBookingPrefsStore()
 const isSubmitting = ref(false)
 
-const subjects = [
-  'Mathematics',
-  'Science',
-  'English',
-  'Programming',
-  'Data Structures',
-  'Business'
-]
+const subjects = ref([])
+
+onMounted(async () => {
+  const response = await api.get('subjects/')
+  subjects.value = response.data
+})
+
 
 const modes = ['Online', 'Face-to-face']
 
@@ -116,26 +117,21 @@ const findTutor = async () => {
   isSubmitting.value = true
 
   try {
-    const payload = {
-      subject: store.selectedSubject,
-      topic: store.selectedTopic,
-      date: store.selectedDate,
-      mode: store.selectedMode,
-      startTime: store.selectedStartTime,
-      endTime: store.selectedEndTime
-    }
+    router.push({
+      name: 'tutors',
+      query: {
+        subject: store.selectedSubject,
+        topic: store.selectedTopic,
+        date: store.selectedDate,
+        mode: store.selectedMode,
+        startTime: store.selectedStartTime,
+        endTime: store.selectedEndTime
+      }
+    })
 
-    console.log('Sending Booking Data:', payload)
-
-    // API_INTEGRATION_POINT: Coordinate this endpoint with Ry
-    await axios.post('http://127.0.0.1:8000/api/bookings/', payload)
-
-    // Only route to the tutors page if the backend accepted the data
-    router.push('/tutors')
 
   } catch (error) {
-    console.error('Booking submission failed:', error)
-    alert('Failed to process booking. Please check your connection.')
+    console.error(error)
   } finally {
     isSubmitting.value = false
   }

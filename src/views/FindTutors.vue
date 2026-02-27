@@ -10,12 +10,13 @@
             <div class="col-md-2">
                 <label class="form-label fw-semibold small">Subject</label>
                 <select v-model="initialbookStore.selectedSubject" class="form-select">
+                <option disabled value="">Select Subject</option>
                 <option
                     v-for="subject in subjects"
-                    :key="subject"
-                    :value="subject"
+                    :key="subject.subject_code"
+                    :value="subject.subject_code"
                 >
-                    {{ subject }}
+                    {{ subject.subject_name  }}
                 </option>
                 </select>
             </div>
@@ -171,11 +172,14 @@
 </template>
 
 <script setup>
+import { useRoute } from 'vue-router'
+import api from '@/services/api/api'
 import { ref, onMounted, computed, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
-import { useInitialBookingPrefsStore } from '@/stores/intialbookingprefs'
-import axios from 'axios'
+import { useInitialBookingPrefsStore } from '@/stores/initialbookingprefs'
 import * as bootstrap from 'bootstrap' // FIX 2: Imports Bootstrap JS so ESLint recognizes it
+
+
 
 const initialbookStore = useInitialBookingPrefsStore()
 const authStore = useAuthStore()
@@ -185,26 +189,14 @@ const isSubmitting = ref(false)
 const matchedTutors = ref([])
 const selectedTutor = ref(null)
 
-const subjectTopics = {
-    Mathematics: ['Calculus', 'Algebra', 'Geometry'],
-    Science: ['Chemistry', 'Biology', 'Geography'],
-    Programming: ['Software Development', 'Database Management', 'Data Science']
-}
 
-const subjects = [
-    'Mathematics',
-    'Science',
-    'Programming'
-    ]
+const route = useRoute()
 
 const modes = [
     'Online',
     'Face-to-face'
 ]
 
-const filteredTopics = computed(() => {
-    return subjectTopics[initialbookStore.selectedSubject] || []
-})
 
 watch(
     () => initialbookStore.selectedSubject,
@@ -218,25 +210,24 @@ const searchTutor = async () => {
   isLoading.value = true
 
   try {
-    const payload = {
-      subject: initialbookStore.selectedSubject,
-      topic: initialbookStore.selectedTopic,
-      mode: initialbookStore.selectedMode,
-      date: initialbookStore.selectedDate,
-      startTime: initialbookStore.selectedStartTime,
-      endTime: initialbookStore.selectedEndTime
-    }
-
-    const response = await axios.post(
-      'http://127.0.0.1:8000/api/recommendations/',
-      payload
+    const response = await api.get(
+      `search-tutors/?subject=${initialbookStore.selectedSubject}`
     )
 
-    matchedTutors.value = response.data
+    matchedTutors.value = response.data.map(tutor => ({
+      profile_id: tutor.profile_id,   // ✅ FIXED
+      initials: tutor.fname[0] + tutor.lname[0],
+      name: `${tutor.fname} ${tutor.lname}`,
+      year_course: 'Tutor',
+      rating: tutor.rating_average ?? 5.0,
+      bio: 'Peer tutor available.',
+      subjects: [],
+      hourly_rate: tutor.hourly_rate ?? 150,
+      total_sessions: tutor.total_sessions ?? 0
+    }))
 
   } catch (error) {
     console.error('Search failed:', error)
-    alert('Failed to fetch recommendations.')
   } finally {
     isSubmitting.value = false
     isLoading.value = false
@@ -253,16 +244,6 @@ const bookingPayload = ref({
     session_mode: 'Online'
 })
 
-onMounted(() => {
-    // API_INTEGRATION_POINT: GET /api/v1/recommendations/
-    setTimeout(() => {
-        matchedTutors.value = [
-            { profile_id: 101, initials: 'MS', name: 'Maria Santos', year_course: '3rd Year · Mathematics', rating: 4.9, bio: '3rd year Mathematics major passionate about making complex concepts accessible.', subjects: ['Calculus', 'Linear Algebra', 'Statistics'], hourly_rate: 150, total_sessions: 87 },
-            { profile_id: 102, initials: 'JR', name: 'James Reyes', year_course: '4th Year · Engineering', rating: 4.7, bio: 'Engineering student who loves breaking down science problems step by step.', subjects: ['Physics', 'Chemistry', 'Thermodynamics'], hourly_rate: 140, total_sessions: 52 }
-        ]
-        isLoading.value = false
-    }, 800)
-})
 
 const prepareBooking = (tutor) => {
     selectedTutor.value = tutor
@@ -274,6 +255,25 @@ const prepareBooking = (tutor) => {
     // (We use `|| 1` as a fallback just in case testing data is empty so the payload never breaks)
     bookingPayload.value.student_Profile_id = authStore.profile?.profile_id || 1
 }
+
+
+const subjects = ref([])
+
+onMounted(async () => {
+  const res = await api.get('subjects/')
+  subjects.value = res.data
+
+  // 🔥 Sync query param into store
+  if (route.query.subject) {
+    initialbookStore.selectedSubject = route.query.subject
+  }
+
+  if (initialbookStore.selectedSubject) {
+    await searchTutor()
+  } else {
+    isLoading.value = false
+  }
+})
 
 const submitBooking = async () => {
     isSubmitting.value = true
@@ -297,6 +297,8 @@ const submitBooking = async () => {
         bookingPayload.value = { tutor_Profile_id: null, student_Profile_id: null, booking_date: '', start_time: '', end_time: '', session_mode: 'Online' }
     }, 1000)
 }
+
+//route to tutor details page insert here
 </script>
 
 <style scoped>

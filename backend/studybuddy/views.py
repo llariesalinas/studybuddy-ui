@@ -7,6 +7,11 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.views import APIView
+from rest_framework.generics import ListAPIView
+
+from .models import Subjects, TutorSubjects, Tutor
+from .serializers import TutorSearchSerializer, SubjectSerializer
 
 from .models import (
     UserProfile,
@@ -165,3 +170,28 @@ def student_dashboard(request):
         "completed": completed,
         "recommendations": recommendations
     })
+
+#SearchTutors
+
+class SearchTutorsView(APIView):
+
+    def get(self, request):
+        subject_code = request.query_params.get('subject')
+
+        if not subject_code:
+            return Response(
+                {"error": "Subject is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        tutors = Tutor.objects.filter(
+            tutorsubjects__subject__subject_code=subject_code
+        ).select_related('profile').distinct()
+
+        serializer = TutorSearchSerializer(tutors, many=True)
+        return Response(serializer.data)
+#Subject Serializer
+
+class SubjectListView(ListAPIView):
+    queryset = Subjects.objects.all()
+    serializer_class = SubjectSerializer    

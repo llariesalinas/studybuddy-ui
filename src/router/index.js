@@ -54,7 +54,7 @@
         //meta: { requiresAuth: true, role: 'tutee' }
       },
       {
-        path: '/tutor/:id',
+        path: '/tutor',
         name: 'tutor-details',
         component: () => import('@/views/TutorDetails.vue'),
         //meta: { requiresAuth: true, role: 'tutee' }
