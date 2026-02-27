@@ -119,7 +119,7 @@ const isPublicRoute = computed(() => {
 })
 
 // Get the role from the store to control the sidebar links
-const userRole = computed(() => authStore.userRole)
+const userRole = computed(() => authStore.user.role)
 </script>
 
 <style>
