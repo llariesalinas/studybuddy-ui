@@ -60,9 +60,9 @@
         //meta: { requiresAuth: true, role: 'tutee' }
       },
       {
-        path: '/payment',
+        path: '/payment-tutee',
         name: 'payment',
-        component: () => import('@/views/PaymentScreen.vue'),
+        component: () => import('@/views/PaymentScreenTutee.vue'),
         // meta: { requiresAuth: true, role: 'tutee' }
       },
 
