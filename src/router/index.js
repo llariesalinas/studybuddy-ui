@@ -60,10 +60,10 @@
         //meta: { requiresAuth: true, role: 'tutee' }
       },
       {
-        path: '/payment-tutee',
-        name: 'payment',
+        path: '/payment-tutee/:tutorId',
+        name: 'PaymentTutee',
         component: () => import('@/views/PaymentScreenTutee.vue'),
-        // meta: { requiresAuth: true, role: 'tutee' }
+        props: true
       },
 
       // --- TUTOR ROUTES (Teaching Hub) ---

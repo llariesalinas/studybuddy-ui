@@ -110,11 +110,6 @@ class Booking(models.Model):
         ('Cancelled', 'Cancelled'),
     ]
 
-    MODE_CHOICES = [
-        ('Online', 'Online'),
-        ('F2F', 'Face-to-Face'),
-    ]
-
     student = models.ForeignKey(
         UserProfile,
         on_delete=models.CASCADE,
@@ -127,16 +122,17 @@ class Booking(models.Model):
         related_name="tutor_bookings"
     )
 
-    availability = models.OneToOneField(
+    availability = models.ForeignKey(
         TutorAvailability,
-        on_delete=models.CASCADE
+        on_delete=models.CASCADE,
+        related_name="bookings"
     )
 
     session_date = models.DateField()
 
     session_mode = models.CharField(
         max_length=10,
-        choices=MODE_CHOICES
+        choices=[('Online', 'Online'), ('F2F', 'Face-to-Face')]
     )
 
     status = models.CharField(
@@ -147,8 +143,8 @@ class Booking(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
 
-    def __str__(self):
-        return f"{self.student.fname} → {self.tutor.profile.fname} ({self.session_date})"
+    class Meta:
+        unique_together = ('availability', 'session_date')
 
 class Payment(models.Model):
 

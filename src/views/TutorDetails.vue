@@ -53,7 +53,7 @@
               {{ tutorDetails.bio || "This tutor is a bit shy..." }}
             </p>
           </div>
-
+            
         </div>
 
       </div>
@@ -62,7 +62,22 @@
     <div class="card shadow-sm rounded-4">
       <div class="card-body">
         <h5 class="fw-semibold mb-3">{{ tutorDetails.name }}'s Schedule</h5>
-        <p><i class="bi bi-circle-fill text-success"></i> Available | <i class="bi bi-circle-fill text-danger"></i> Unavailable</p>
+
+        <!-- ✅ Date Picker Added -->
+        <div class="mb-3 d-flex align-items-center gap-3">
+          <label class="fw-semibold mb-0">Select Date:</label>
+          <input
+            type="date"
+            class="form-control w-auto"
+            v-model="selectedDate"
+            :min="today"
+            @change="getTutorSchedule"
+          />
+        </div>
+
+        <p>
+          <i class="bi bi-circle-fill text-success"></i> Available
+        </p>
 
         <div class="table-responsive">
           <table class="table table-bordered text-center align-middle calendar-table">
@@ -126,6 +141,9 @@ const bookedSessionStore = useBookedSessionStore()
 
 const tutorID = route.params.id
 
+const selectedDate = ref(new Date().toISOString().split('T')[0])
+const today = new Date().toISOString().split('T')[0]
+
 const selectedSlots = ref([])
 const tutorSchedule = ref([])
 
@@ -139,15 +157,7 @@ const days = [
   'Sunday'
 ]
 
-const dayIndexMap = {
-  'Monday': 0,
-  'Tuesday': 1,
-  'Wednesday': 2,
-  'Thursday': 3,
-  'Friday': 4,
-  'Saturday': 5,
-  'Sunday': 6
-}
+
 
 
 function addOneHour(time) {
@@ -160,17 +170,6 @@ function addOneHour(time) {
   return date.toTimeString().slice(0,5)
 }
 
-function getSlotDate(slot) {
-  // get Monday of the current week
-  const monday = new Date()
-  monday.setDate(monday.getDate() - monday.getDay() + 1)
-  
-  // add day offset
-  const slotDate = new Date(monday)
-  slotDate.setDate(monday.getDate() + dayIndexMap[slot.day])
-  
-  return slotDate.toISOString().split('T')[0] // YYYY-MM-DD
-}
 
 const tutorDetails = ref({
   profile_id: null,
@@ -204,8 +203,18 @@ const getTutorDetails = async () => {
 
 const getTutorSchedule = async () => {
   try {
-    const response = await api.get(`tutors/${tutorID}/availability/`)
+    const response = await api.get(
+      `tutors/${route.params.id}/availability/`,
+      {
+        params: {
+          date: selectedDate.value
+        }
+      }
+    )
+
     tutorSchedule.value = response.data
+    selectedSlots.value = [] // reset selections when date changes
+
   } catch (error) {
     console.error('Failed to load tutor schedule.', error)
   }
@@ -241,11 +250,12 @@ const maxRows = computed(() => {
 })
 
 const toggleSlot = (slot) => {
-  if (slot.is_booked) return
+
+  if(slot.is_booked) return
 
   const slotWithDate = {
     availability_id: slot.id,
-    session_date: getSlotDate(slot),
+    session_date: selectedDate.value,
     session_mode: "Online"
   }
 
@@ -266,22 +276,14 @@ const backButton = () => {
     router.push('/tutors')
 }
 
-const bookSessions = async () => {
-  try {
+const bookSessions = () => {
 
-    for (const slot of selectedSlots.value) {
-      await api.post('bookings/', {
-        availability: slot.availability_id,
-        session_date: slot.session_date,
-        session_mode: slot.session_mode
-      })
-    }
+  bookedSessionStore.bookedSessions = selectedSlots.value
 
-    router.push('/payment')
+  bookedSessionStore.bookedSessionTutorName = tutorDetails.value.name
+  bookedSessionStore.bookedSessionTutorID = tutorID
 
-  } catch (error) {
-    console.error('Booking failed', error)
-  }
+  router.push(`/payment-tutee/${tutorID}`)
 }
 
 </script>

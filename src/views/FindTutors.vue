@@ -152,6 +152,15 @@ watch(
     }
 )
 
+const bookSessions = () => {
+
+  bookedSessionStore.bookedSessionTutorID = tutorID
+  bookedSessionStore.bookedSessionTutorName = tutorDetails.value.name
+  bookedSessionStore.bookedSessions = selectedSlots.value
+
+  router.push(`/payment-tutee/${tutorID}`)
+}
+
 const searchTutor = async () => {
   isSubmitting.value = true
   isLoading.value = true

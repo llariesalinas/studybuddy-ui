@@ -9,6 +9,7 @@ from .views import( login_view,
                    tutor_dashboard,
                    create_booking, tutor_detail
                    )
+from . import views
 
 urlpatterns = [
   
@@ -18,9 +19,11 @@ urlpatterns = [
     path('search-tutors/', SearchTutorsView.as_view(), name='search-tutors'),
     path('subjects/',SubjectListView.as_view(), name='subjects'),
     path('tutor-dashboard/', tutor_dashboard, name='tutor-dashboard'),
-    path('booking/',create_booking),
     path('tutors/<int:profile_id>/', tutor_detail),
     path('tutors/<int:tutor_id>/availability/', tutor_availability),
+    path('bookings/bulk/', views.bulk_booking),
+    path('bookings/',create_booking),
+    path('bookings/confirm/', views.confirm_payment_and_book),
 ]
 
 if settings.DEBUG:
