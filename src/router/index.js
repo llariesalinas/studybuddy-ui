@@ -85,6 +85,12 @@
         component: () => import('@/views/TutorPaymentScreen.vue'), // The verification view
         //meta: { requiresAuth: true, role: 'tutor' }
       },
+      {
+        path: '/tch-completedSessions',
+        name: 'tch-completedSessions',
+        component: () => import('@/views/TutorCompletedSessions.vue'),
+        //meta: { requiresAuth: true, role: 'tutor' }
+      },
 
       // --- SHARED ROUTES ---
       {
