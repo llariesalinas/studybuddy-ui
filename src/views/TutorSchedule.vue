@@ -5,7 +5,7 @@
       <p class="text-muted">Set the times you are free to accept bookings.</p>
     </div>
 
-    <div v-if="isLoading" class="text-center py-5 text-sb-primary">
+    <div v-if="tuteeSchedStore.isLoading" class="text-center py-5 text-sb-primary">
       <div class="spinner-border" role="status"></div>
       <p class="mt-2 fw-semibold">Loading schedule...</p>
     </div>
@@ -21,22 +21,22 @@
           </div>
 
           <div class="d-flex flex-column gap-2">
-            <div v-for="(slot, index) in getSlotsForDay(day)" :key="index" class="d-flex gap-3 align-items-center">
+            <div v-for="slot in tuteeSchedStore.availabilities" :key="slot.availability_id" class="d-flex gap-3 align-items-center">
               <div class="form-check form-switch mb-0">
-                <input class="form-check-input shadow-none" type="checkbox" v-model="slot.is_active" @change="saveAvailability">
+                <input class="form-check-input shadow-none" type="checkbox" v-model="slot.is_active" @change="updateSlot(slot)">
               </div>
-              <input type="time" v-model="slot.start_time" class="form-control form-control-sm border-sb shadow-none w-auto" @change="saveAvailability">
+              <input type="time" v-model="slot.start_time" class="form-control form-control-sm border-sb shadow-none w-auto" @change="updateSlot(slot)">
               <span class="text-muted small">to</span>
-              <input type="time" v-model="slot.end_time" class="form-control form-control-sm border-sb shadow-none w-auto" @change="saveAvailability">
+              <input type="time" v-model="slot.end_time" class="form-control form-control-sm border-sb shadow-none w-auto" @change="updateSlot(slot)">
 
               <span v-if="slot.is_booked" class="badge bg-danger bg-opacity-10 text-danger border border-danger ms-2">Booked</span>
 
-              <button v-if="!slot.is_booked" @click="removeSlot(day, index)" class="btn btn-link text-danger p-0 ms-auto shadow-none">
+              <button v-if="!slot.is_booked" @click="removeSlot(slot)" class="btn btn-link text-danger p-0 ms-auto shadow-none">
                 <i class="bi bi-trash"></i>
               </button>
             </div>
 
-            <p v-if="getSlotsForDay(day).length === 0" class="small text-muted mb-0 font-italic">No availability set for {{ day }}.</p>
+            <p v-if="tuteeSchedStore.availabilities.length === 0" class="small text-muted mb-0 font-italic">No availability set for {{ day }}.</p>
           </div>
         </div>
       </div>
@@ -46,48 +46,65 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useTuteeSchedStore } from '@/stores/tuteeSched'
 
-const isLoading = ref(true)
 const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+const tuteeSchedStore = useTuteeSchedStore()
 
-// ERD Mapping: TUTOR_AVAILABILITY
-const availabilities = ref([])
+
+const dayIndexMap = {
+  'Monday': 0,
+  'Tuesday': 1,
+  'Wednesday': 2,
+  'Thursday': 3,
+  'Friday': 4,
+  'Saturday': 5,
+  'Sunday': 6
+}
+
+function getSlotDate(day) {
+  const monday = new Date()
+
+  monday.setDate(monday.getDate() - monday.getDay() + 1)
+
+  const slotDate = new Date(monday)
+  slotDate.setDate(monday.getDate() + dayIndexMap[day])
+
+  return slotDate.toISOString().split('T')[0]
+}
 
 onMounted(async () => {
   // API_INTEGRATION_POINT: GET /api/v1/tutors/availability/
   // Fetch existing slots for the logged-in tutor
-  setTimeout(() => {
-    availabilities.value = [
-      { availability_id: 1, day_of_week: 'Monday', start_time: '10:00', end_time: '12:00', is_booked: false, is_active: true },
-      { availability_id: 2, day_of_week: 'Wednesday', start_time: '14:00', end_time: '16:00', is_booked: true, is_active: true }
-    ]
-    isLoading.value = false
-  }, 600)
+  tuteeSchedStore.fetchSchedule()
 })
 
-const getSlotsForDay = (day) => availabilities.value.filter(s => s.day_of_week === day)
 
 const addSlot = (day) => {
-  availabilities.value.push({
-    availability_id: null, // Null means it's a new unsaved record for Django
+
+  const newSlot = {
     day_of_week: day,
+    date: getSlotDate(day), 
     start_time: '09:00',
     end_time: '10:00',
     is_booked: false,
     is_active: true
-  })
+  }
+
+  tuteeSchedStore.addSlot(newSlot)
 }
 
-const removeSlot = (day, index) => {
-  const daySlots = getSlotsForDay(day)
-  const slotToRemove = daySlots[index]
-  // In reality, if availability_id is not null, trigger a DELETE request here
-  availabilities.value = availabilities.value.filter(s => s !== slotToRemove)
+const updateSlot = (slot) => {
+
+  const updatedSlot = {
+    ...slot,
+    date: getSlotDate(slot.day_of_week)
+  }
+
+  tuteeSchedStore.updateSlot(updatedSlot)
 }
 
-const saveAvailability = async () => {
-  // API_INTEGRATION_POINT: PATCH or POST /api/v1/tutors/availability/
-  // Fires off quietly in the background when they tweak a time or toggle switch
-  console.log('Syncing schedule to database...', availabilities.value)
+const removeSlot = (slot) => {
+  tuteeSchedStore.deleteSlot(slot.availability_id)
 }
 </script>
