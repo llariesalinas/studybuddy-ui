@@ -88,7 +88,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'studybuddy_db',
         'USER': 'postgres',
-        'PASSWORD': 'sysadmin2003',
+        'PASSWORD': 'indianmango',
         'HOST': 'localhost',
         'PORT': '5432',
     }
