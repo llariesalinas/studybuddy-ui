@@ -182,7 +182,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePaymentStore } from '@/stores/tuteePaymentDetails'
-import axios from 'axios'
+import api from '@/services/api/api'
 
 const router = useRouter()
 const paymentStore = usePaymentStore()
@@ -219,20 +219,20 @@ onMounted(async () => {
 const ConfirmPayment = async () => {
   try {
 
-    // await axios.post('API link', {
-    //   payment_method: paymentStore.selectedMethod,
-    //   amount_paid: paymentStore.amountPaid,
-    //   gcash_name: paymentStore.gCashName,
-    //   gcash_number: paymentStore.gCashNumber,
-    //   reference_number: paymentStore.gCashReference,
-    //   bank_name: paymentStore.bankName,
-    //   bank_account: paymentStore.bankAccount,
-    //   status: 'pending'
-    // })
+    await api.post('/paymentDetails', {
+      payment_method: paymentStore.selectedMethod,
+      amount_paid: paymentStore.amountPaid,
+      gcash_name: paymentStore.gCashName,
+      gcash_number: paymentStore.gCashNumber,
+      reference_number: paymentStore.gCashReference,
+      bank_name: paymentStore.bankName,
+      bank_account: paymentStore.bankAccount,
+      status: 'pending'
+    })
 
     alert('Payment details submitted!')
     router.replace('/dashboard')
-    paymentStore.$reset
+    paymentStore.$reset()
   } catch (error) {
     console.error('Payment error:', error)
   }
