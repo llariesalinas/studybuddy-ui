@@ -27,10 +27,14 @@
         component: () => import('@/views/PreferenceSetup.vue'),
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
         //meta: { requiresAuth: true, role: 'Tutee' }
 =======
         meta: { requiresAuth: true, role: 'Tutee' }
 >>>>>>> 55c05251b90d63bc5f9147814e303f15f12b9f22
+=======
+        //meta: { requiresAuth: true, role: 'Tutee' }
+>>>>>>> 9fdd74f (Fixed Authentication tokens)
 =======
         //meta: { requiresAuth: true, role: 'Tutee' }
 >>>>>>> 9fdd74f (Fixed Authentication tokens)
@@ -49,10 +53,14 @@
         component: Dashboard,
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
          //meta: { requiresAuth: true, role: 'Tutee' }
 =======
          meta: { requiresAuth: true, role: 'Tutee' }
 >>>>>>> 55c05251b90d63bc5f9147814e303f15f12b9f22
+=======
+         //meta: { requiresAuth: true, role: 'Tutee' }
+>>>>>>> 9fdd74f (Fixed Authentication tokens)
 =======
          //meta: { requiresAuth: true, role: 'Tutee' }
 >>>>>>> 9fdd74f (Fixed Authentication tokens)
@@ -63,10 +71,14 @@
         component: () => import('@/views/FindTutors.vue'),
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
         //meta: { requiresAuth: true, role: 'Tutee' }
 =======
         meta: { requiresAuth: true, role: 'Tutee' }
 >>>>>>> 55c05251b90d63bc5f9147814e303f15f12b9f22
+=======
+        //meta: { requiresAuth: true, role: 'Tutee' }
+>>>>>>> 9fdd74f (Fixed Authentication tokens)
 =======
         //meta: { requiresAuth: true, role: 'Tutee' }
 >>>>>>> 9fdd74f (Fixed Authentication tokens)
@@ -77,10 +89,14 @@
         component: () => import('@/views/InitialBooking.vue'),
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
         //meta: { requiresAuth: true, role: 'Tutee' }
 =======
         meta: { requiresAuth: true, role: 'Tutee' }
 >>>>>>> 55c05251b90d63bc5f9147814e303f15f12b9f22
+=======
+        //meta: { requiresAuth: true, role: 'Tutee' }
+>>>>>>> 9fdd74f (Fixed Authentication tokens)
 =======
         //meta: { requiresAuth: true, role: 'Tutee' }
 >>>>>>> 9fdd74f (Fixed Authentication tokens)
@@ -91,10 +107,14 @@
         component: () => import('@/views/TutorDetails.vue'),
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
         //meta: { requiresAuth: true, role: 'Tutee' }
 =======
         meta: { requiresAuth: true, role: 'Tutee' }
 >>>>>>> 55c05251b90d63bc5f9147814e303f15f12b9f22
+=======
+        //meta: { requiresAuth: true, role: 'Tutee' }
+>>>>>>> 9fdd74f (Fixed Authentication tokens)
 =======
         //meta: { requiresAuth: true, role: 'Tutee' }
 >>>>>>> 9fdd74f (Fixed Authentication tokens)
@@ -113,10 +133,14 @@
         component: () => import('@/views/TutorDashboard.vue'),
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
         //meta: { requiresAuth: true, role: 'Tutor' }
 =======
         meta: { requiresAuth: true, role: 'Tutor' }
 >>>>>>> 55c05251b90d63bc5f9147814e303f15f12b9f22
+=======
+        //meta: { requiresAuth: true, role: 'Tutor' }
+>>>>>>> 9fdd74f (Fixed Authentication tokens)
 =======
         //meta: { requiresAuth: true, role: 'Tutor' }
 >>>>>>> 9fdd74f (Fixed Authentication tokens)
@@ -127,10 +151,14 @@
         component: () => import('@/views/TutorSchedule.vue'), // The availability view
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
         //meta: { requiresAuth: true, role: 'Tutor' }
 =======
         meta: { requiresAuth: true, role: 'Tutor' }
 >>>>>>> 55c05251b90d63bc5f9147814e303f15f12b9f22
+=======
+        //meta: { requiresAuth: true, role: 'Tutor' }
+>>>>>>> 9fdd74f (Fixed Authentication tokens)
 =======
         //meta: { requiresAuth: true, role: 'Tutor' }
 >>>>>>> 9fdd74f (Fixed Authentication tokens)
@@ -139,6 +167,7 @@
         path: '/tch-payments',
         name: 'tch-payments',
         component: () => import('@/views/TutorPaymentScreen.vue'), // The verification view
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
         //meta: { requiresAuth: true, role: 'Tutor' }
@@ -154,6 +183,9 @@
         component: () => import('@/views/TutorCompletedSessions.vue'),
         //meta: { requiresAuth: true, role: 'tutor' }
 >>>>>>> 55c05251b90d63bc5f9147814e303f15f12b9f22
+=======
+        //meta: { requiresAuth: true, role: 'Tutor' }
+>>>>>>> 9fdd74f (Fixed Authentication tokens)
       },
 
       // --- SHARED ROUTES ---
