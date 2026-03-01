@@ -24,6 +24,7 @@ urlpatterns = [
     #path('bookings/bulk/', views.bulk_booking),
     #path('bookings/',create_booking),
     path('bookings/confirm/', views.confirm_payment_and_book),
+    path('bookings/<int:booking_id>/complete/', views.complete_session),
 ]
 
 if settings.DEBUG:

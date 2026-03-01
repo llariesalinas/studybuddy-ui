@@ -12,6 +12,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.views import APIView
 from rest_framework.generics import ListAPIView
 from django.utils.timezone import now
+from django.db.models import Case, When, Value, IntegerField
 
 
 from .models import Payment, Subjects, TutorAvailability, TutorSubjects, Tutor, Booking
@@ -223,18 +224,26 @@ def tutor_dashboard(request):
         return Response({"error": "Tutor not found"}, status=404)
 
     upcoming = Booking.objects.filter(
-        tutor=tutor,
-        session_date__gte=now().date()
-    ).select_related("student")
+    tutor=tutor
+).annotate(
+    status_priority=Case(
+        When(status="Confirmed", then=Value(0)),
+        When(status="Pending", then=Value(1)),
+        When(status="Completed", then=Value(2)),
+        default=Value(3),
+        output_field=IntegerField(),
+    )
+).order_by("status_priority", "session_date")
 
     bookings_data = [
-        {
-            "student": f"{b.student.fname} {b.student.lname}",
-            "date": b.session_date,
-            "status": b.status
-        }
-        for b in upcoming
-    ]
+    {
+        "id": b.id,  # ← REQUIRED
+        "student": f"{b.student.fname} {b.student.lname}",
+        "date": b.session_date,
+        "status": b.status
+    }
+    for b in upcoming
+]
 
     return Response({
         "total_sessions": tutor.total_sessions,
@@ -498,7 +507,7 @@ def confirm_payment_and_book(request):
         "booking_ids": created_bookings
     })
 
-#
+#Complete session view (tutor marks session as completed)
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def complete_session(request, booking_id):
@@ -506,6 +515,19 @@ def complete_session(request, booking_id):
     with transaction.atomic():
 
         booking = get_object_or_404(Booking, id=booking_id)
+
+        # ✅ Only tutor can complete their own session
+        if request.user.userprofile != booking.tutor.profile:
+            return Response(
+                {"error": "You are not authorized to complete this session."},
+                status=403
+            )
+
+        if booking.status == "Completed":
+            return Response(
+                {"error": "This session is already marked as completed."},
+                status=400
+            )
 
         if booking.status != "Confirmed":
             return Response(
@@ -522,7 +544,7 @@ def complete_session(request, booking_id):
         tutor.total_sessions += 1
         tutor.save()
 
-    return Response({
-        "message": "Session completed successfully."
-    })
+    return Response({"message": "Session completed successfully."})
+
+
 

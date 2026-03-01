@@ -8,7 +8,6 @@ const api = axios.create({
 api.interceptors.request.use((config) => {
   const authStore = useAuthStore()
 
-  // 🔥 IMPORTANT: token is a ref → use .value
   if (authStore.token) {
     config.headers.Authorization = `Bearer ${authStore.token}`
   }

@@ -94,7 +94,6 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useInitialBookingPrefsStore } from '@/stores/initialbookingprefs'
-import axios from 'axios'
 import { onMounted } from 'vue'
 import api from '@/services/api/api'
 
