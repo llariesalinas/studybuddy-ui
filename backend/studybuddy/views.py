@@ -245,7 +245,7 @@ def tutor_dashboard(request):
 
 #Booking details view
 
-@api_view(['POST'])
+"""@api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def create_booking(request):
 
@@ -273,7 +273,7 @@ def create_booking(request):
     availability.is_booked = True
     availability.save()
 
-    return Response({"message": "Booking successful"})
+    return Response({"message": "Booking successful"})"""
 
 
 #Tutor Detail View
@@ -358,7 +358,7 @@ def tutor_availability(request, tutor_id):
 #bulk booking request
 
 
-@api_view(['POST'])
+"""@api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def bulk_booking(request):
 
@@ -397,7 +397,7 @@ def bulk_booking(request):
             availability.is_booked = True
             availability.save()
 
-    return Response({"message": "Booking successful"})
+    return Response({"message": "Booking successful"})"""
 
 #Confirm payment View 
 @api_view(['POST'])
@@ -416,6 +416,16 @@ def confirm_payment_and_book(request):
 
     created_bookings = []
 
+    weekday_map = {
+        0: "Mon",
+        1: "Tue",
+        2: "Wed",
+        3: "Thu",
+        4: "Fri",
+        5: "Sat",
+        6: "Sun",
+    }
+
     with transaction.atomic():
 
         for slot in slots:
@@ -426,18 +436,32 @@ def confirm_payment_and_book(request):
                 tutor=tutor
             )
 
-        
-            session_date = datetime.strptime(
-                slot["session_date"], "%Y-%m-%d"
-            ).date()
+            # Convert string to date
+            try:
+                session_date = datetime.strptime(
+                    slot["session_date"], "%Y-%m-%d"
+                ).date()
+            except ValueError:
+                return Response(
+                    {"error": "Invalid session date format."},
+                    status=400
+                )
 
+            # 🚫 Block past dates
             if session_date < now().date():
                 return Response(
                     {"error": "Cannot book sessions in the past."},
                     status=400
-                )   
+                )
 
-            # 🔥 PUT CONFLICT CHECK RIGHT HERE
+            # 🚫 Ensure weekday matches availability template
+            if weekday_map[session_date.weekday()] != availability.day:
+                return Response(
+                    {"error": "Selected date does not match availability day."},
+                    status=400
+                )
+
+            # 🚫 Prevent double booking
             conflict_exists = Booking.objects.filter(
                 availability=availability,
                 session_date=session_date
@@ -449,7 +473,7 @@ def confirm_payment_and_book(request):
                     status=400
                 )
 
-            # 🔥 ONLY CREATE BOOKING IF NO CONFLICT
+            # ✅ Create booking
             booking = Booking.objects.create(
                 student=user_profile,
                 tutor=tutor,
@@ -459,6 +483,7 @@ def confirm_payment_and_book(request):
                 status="Confirmed"
             )
 
+            # ✅ Create payment record
             Payment.objects.create(
                 booking=booking,
                 amount=tutor.hourly_rate,
