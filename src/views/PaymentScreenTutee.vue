@@ -264,7 +264,7 @@ const ConfirmPayment = async () => {
     bookedSessionStore.$reset()
 
     await router.push({
-        path: '/dashboard',
+        name: 'dashboard',
         query: { refresh: Date.now() }
     })
 
