@@ -96,9 +96,8 @@ const manageAccount = () => {
 
 const logout = () => {
 
-  setTimeout(() => {
-    router.push('/')
-  }, 500)
+  authStore.logout()
+  router.push('/login') // Redirect to login after logout
 
   router.push
 }
@@ -119,7 +118,7 @@ const isPublicRoute = computed(() => {
 })
 
 // Get the role from the store to control the sidebar links
-const userRole = computed(() => authStore.user.role)
+const userRole = computed(() => authStore.user?.role?.toLowerCase() || null)
 </script>
 
 <style>

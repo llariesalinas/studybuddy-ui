@@ -431,7 +431,7 @@ def confirm_payment_and_book(request):
                 slot["session_date"], "%Y-%m-%d"
             ).date()
 
-            if session_date < now().today():
+            if session_date < now().date():
                 return Response(
                     {"error": "Cannot book sessions in the past."},
                     status=400
