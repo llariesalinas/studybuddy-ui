@@ -132,16 +132,13 @@
 </template>
 
 <script setup>
-import {ref, computed, onMounted} from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import api from '@/services/api/api' 
 import { useAuthStore } from '@/stores/auth'
 
-import { useInitialBookingPrefsStore } from '@/stores/initialbookingprefs'
-
-const initialbookStore = useInitialBookingPrefsStore()
-
 const router = useRouter()
+const route = useRoute()
 const recommendedTutors = ref([])
 const upcomingSessions = ref([])
 const completedSessions = ref([])
@@ -190,6 +187,13 @@ const viewSessionDetails = (sessionId) => {
   // 2. Route to the schedule page for now
   router.push('/schedule')
 }
+
+watch(
+  () => route.query.updated,
+  () => {
+    fetchSessions()
+  }
+)
 </script>
 
 <style scoped>
