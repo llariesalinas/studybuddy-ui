@@ -68,6 +68,12 @@
 
       // --- TUTOR ROUTES (Teaching Hub) ---
       {
+        path: '/tch-preferenceSetup',
+        name: 'tch-preferenceSetup',
+        component: () => import('@/views/TutorPreferenceSetup.vue'),
+        //meta: { requiresAuth: true, role: 'Tutor' }
+      },
+      {
         path: '/tch-dashboard',
         name: 'tch-dashboard',
         component: () => import('@/views/TutorDashboard.vue'),
@@ -89,6 +95,12 @@
         path: '/tch-completedSessions',
         name: 'tch-completedSessions',
         component: () => import('@/views/TutorCompletedSessions.vue'),
+        //meta: { requiresAuth: true, role: 'tutor' }
+      },
+      {
+        path: '/booking-details',
+        name: 'booking-details',
+        component: () => import('@/views/BookingDetails.vue')
         //meta: { requiresAuth: true, role: 'tutor' }
       },
 
