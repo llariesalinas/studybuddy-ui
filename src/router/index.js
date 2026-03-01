@@ -25,19 +25,7 @@
         path: '/preferencesetup', // Student onboarding
         name: 'preferencesetup',
         component: () => import('@/views/PreferenceSetup.vue'),
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-        //meta: { requiresAuth: true, role: 'Tutee' }
-=======
         meta: { requiresAuth: true, role: 'Tutee' }
->>>>>>> 55c05251b90d63bc5f9147814e303f15f12b9f22
-=======
-        //meta: { requiresAuth: true, role: 'Tutee' }
->>>>>>> 9fdd74f (Fixed Authentication tokens)
-=======
-        //meta: { requiresAuth: true, role: 'Tutee' }
->>>>>>> 9fdd74f (Fixed Authentication tokens)
       },
       {
         path: '/tutor-setup', // Tutor onboarding
@@ -51,73 +39,25 @@
         path: '/dashboard',
         name: 'dashboard',
         component: Dashboard,
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-         //meta: { requiresAuth: true, role: 'Tutee' }
-=======
          meta: { requiresAuth: true, role: 'Tutee' }
->>>>>>> 55c05251b90d63bc5f9147814e303f15f12b9f22
-=======
-         //meta: { requiresAuth: true, role: 'Tutee' }
->>>>>>> 9fdd74f (Fixed Authentication tokens)
-=======
-         //meta: { requiresAuth: true, role: 'Tutee' }
->>>>>>> 9fdd74f (Fixed Authentication tokens)
       },
       {
         path: '/tutors',
         name: 'tutors',
         component: () => import('@/views/FindTutors.vue'),
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-        //meta: { requiresAuth: true, role: 'Tutee' }
-=======
         meta: { requiresAuth: true, role: 'Tutee' }
->>>>>>> 55c05251b90d63bc5f9147814e303f15f12b9f22
-=======
-        //meta: { requiresAuth: true, role: 'Tutee' }
->>>>>>> 9fdd74f (Fixed Authentication tokens)
-=======
-        //meta: { requiresAuth: true, role: 'Tutee' }
->>>>>>> 9fdd74f (Fixed Authentication tokens)
       },
       {
         path: '/book',
         name: 'book',
         component: () => import('@/views/InitialBooking.vue'),
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-        //meta: { requiresAuth: true, role: 'Tutee' }
-=======
         meta: { requiresAuth: true, role: 'Tutee' }
->>>>>>> 55c05251b90d63bc5f9147814e303f15f12b9f22
-=======
-        //meta: { requiresAuth: true, role: 'Tutee' }
->>>>>>> 9fdd74f (Fixed Authentication tokens)
-=======
-        //meta: { requiresAuth: true, role: 'Tutee' }
->>>>>>> 9fdd74f (Fixed Authentication tokens)
       },
       {
         path: '/tutor/:id',
         name: 'tutor-details',
         component: () => import('@/views/TutorDetails.vue'),
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-        //meta: { requiresAuth: true, role: 'Tutee' }
-=======
         meta: { requiresAuth: true, role: 'Tutee' }
->>>>>>> 55c05251b90d63bc5f9147814e303f15f12b9f22
-=======
-        //meta: { requiresAuth: true, role: 'Tutee' }
->>>>>>> 9fdd74f (Fixed Authentication tokens)
-=======
-        //meta: { requiresAuth: true, role: 'Tutee' }
->>>>>>> 9fdd74f (Fixed Authentication tokens)
       },
       {
         path: '/payment-tutee/:tutorId',
@@ -131,61 +71,25 @@
         path: '/tch-dashboard',
         name: 'tch-dashboard',
         component: () => import('@/views/TutorDashboard.vue'),
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-        //meta: { requiresAuth: true, role: 'Tutor' }
-=======
         meta: { requiresAuth: true, role: 'Tutor' }
->>>>>>> 55c05251b90d63bc5f9147814e303f15f12b9f22
-=======
-        //meta: { requiresAuth: true, role: 'Tutor' }
->>>>>>> 9fdd74f (Fixed Authentication tokens)
-=======
-        //meta: { requiresAuth: true, role: 'Tutor' }
->>>>>>> 9fdd74f (Fixed Authentication tokens)
       },
       {
         path: '/tch-availability',
         name: 'tch-availability',
         component: () => import('@/views/TutorSchedule.vue'), // The availability view
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-        //meta: { requiresAuth: true, role: 'Tutor' }
-=======
         meta: { requiresAuth: true, role: 'Tutor' }
->>>>>>> 55c05251b90d63bc5f9147814e303f15f12b9f22
-=======
-        //meta: { requiresAuth: true, role: 'Tutor' }
->>>>>>> 9fdd74f (Fixed Authentication tokens)
-=======
-        //meta: { requiresAuth: true, role: 'Tutor' }
->>>>>>> 9fdd74f (Fixed Authentication tokens)
       },
       {
         path: '/tch-payments',
         name: 'tch-payments',
         component: () => import('@/views/TutorPaymentScreen.vue'), // The verification view
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-        //meta: { requiresAuth: true, role: 'Tutor' }
-=======
         meta: { requiresAuth: true, role: 'Tutor' }
-=======
-        //meta: { requiresAuth: true, role: 'Tutor' }
->>>>>>> 9fdd74f (Fixed Authentication tokens)
       },
       {
         path: '/tch-completedSessions',
         name: 'tch-completedSessions',
         component: () => import('@/views/TutorCompletedSessions.vue'),
         //meta: { requiresAuth: true, role: 'tutor' }
->>>>>>> 55c05251b90d63bc5f9147814e303f15f12b9f22
-=======
-        //meta: { requiresAuth: true, role: 'Tutor' }
->>>>>>> 9fdd74f (Fixed Authentication tokens)
       },
 
       // --- SHARED ROUTES ---
@@ -193,19 +97,19 @@
         path: '/schedule',
         name: 'schedule',
         component: () => import('@/views/Schedule.vue'),
-        //meta: { requiresAuth: true }
+        meta: { requiresAuth: true }
       },
       {
         path: '/reports',
         name: 'reports',
         component: () => import('@/views/SessionsReports.vue'),
-        //meta: { requiresAuth: true }
+        meta: { requiresAuth: true }
       },
       {
         path: '/profile',
         name: 'profile',
         component: () => import('@/views/Profile.vue'),
-        //meta: { requiresAuth: true }
+        meta: { requiresAuth: true }
       }
     ]
   })
@@ -235,7 +139,7 @@
       return next('/tch-dashboard')
     }
 
-    return next('/') // fallback
+    return next('/') // fallback`
   }
 
   next()
