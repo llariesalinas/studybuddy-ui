@@ -1,19 +1,16 @@
 import axios from 'axios'
+import { useAuthStore } from '@/stores/auth'
 
 const api = axios.create({
   baseURL: 'http://127.0.0.1:8000/api/',
 })
 
-api.interceptors.request.use(config => {
-  const token = localStorage.getItem('access_token')
+api.interceptors.request.use((config) => {
+  const authStore = useAuthStore()
 
-  // DO NOT attach token for login/register
-  if (
-    token &&
-    !config.url.includes('login') &&
-    !config.url.includes('register')
-  ) {
-    config.headers.Authorization = `Bearer ${token}`
+  // 🔥 IMPORTANT: token is a ref → use .value
+  if (authStore.token) {
+    config.headers.Authorization = `Bearer ${authStore.token}`
   }
 
   return config
