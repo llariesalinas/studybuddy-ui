@@ -38,7 +38,7 @@
     </aside>
 
     <main class="flex-grow-1 overflow-auto p-5" style="background-color: var(--sb-bg);">
-      <header class="d-flex justify-content-between align-items-center mb-5 pb-3 border-bottom border-sb">
+      <header class="d-flex justify-content-between align-items-center mb-3 pb-3 border-bottom border-sb">
           <div>
             </div>
           <div class="d-flex gap-3 align-items-center">
