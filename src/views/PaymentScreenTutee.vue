@@ -17,6 +17,7 @@
             <div class="card boarder-sb rounded-2 p-1 bg-light">
             <h5>Payment Summary</h5>
             <div v-if="paymentSummary">
+                <p><strong>Hours:</strong> {{ paymentSummary.hours }}</p>
                 <p><strong>Total:</strong> {{ paymentSummary.total }}</p>
                 <p><strong>Subject:</strong> {{ paymentSummary.subject }}</p>
                 <p><strong>Tutor:</strong> {{ paymentSummary.tutor }}</p>
@@ -179,13 +180,21 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { usePaymentStore } from '@/stores/tuteePaymentDetails'
+import { ref, onMounted, computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import api from '@/services/api/api'
+import { usePaymentStore } from '@/stores/tuteePaymentDetails'
+import { useBookedSessionStore } from '@/stores/bookedSessionDetails'
 
+const route = useRoute()
 const router = useRouter()
+
 const paymentStore = usePaymentStore()
+const bookedSessionStore = useBookedSessionStore()
+
+const tutorId = route.params.tutorId
+
+const tutor = ref(null)
 
 const paymentMethods = [
   { id: 0, label: 'Cash', icon: 'bi-cash-coin' },
@@ -193,12 +202,27 @@ const paymentMethods = [
   { id: 2, label: 'Credit/Debit', icon: 'bi-credit-card' }
 ]
 
-const paymentSummary = ref('')
+const paymentSummary = computed(() => {
+  if (!tutor.value) return null
+
+  const hourlyRate = parseFloat(tutor.value.hourly_rate)
+
+  const hours = bookedSessionStore.bookedSessions?.length || 0
+
+  const total = hourlyRate * hours
+
+  return {
+    hours,
+    total: `₱${total.toLocaleString()}`,
+    subject: bookedSessionStore.bookedSessionSub,
+    tutor: `${tutor.value.fname} ${tutor.value.lname}`
+  }
+})
 
 
 const backButton = () => {
-    router.push('/tutor')
-    paymentStore.$reset
+    router.push(`/tutor/${tutorId}`)
+    paymentStore.$reset()
 }
 
 const chooseMethod = (method) => {
@@ -206,35 +230,47 @@ const chooseMethod = (method) => {
 }
 
 onMounted(async () => {
-    try {
-        const response = await axios.get('')
+  try {
+    const response = await api.get(`tutors/${tutorId}/`)
+    tutor.value = response.data
+  } catch (error) {
+    console.error("Tutor not found")
+    router.push('/find-tutors')
+  }
 
-        paymentSummary.value = response.data
-    }
-    catch(error){
-        console.error('Error fetching payment summary', error)
-    }
+  // Protect against direct URL access
+  if (!bookedSessionStore.bookedSessionSub) {
+    alert("No Sessions Selected.")
+    router.push('/find-tutors')
+  }
 })
 
 const ConfirmPayment = async () => {
   try {
 
-    await api.post('/paymentDetails', {
-      payment_method: paymentStore.selectedMethod,
-      amount_paid: paymentStore.amountPaid,
-      gcash_name: paymentStore.gCashName,
-      gcash_number: paymentStore.gCashNumber,
-      reference_number: paymentStore.gCashReference,
-      bank_name: paymentStore.bankName,
-      bank_account: paymentStore.bankAccount,
-      status: 'pending'
+    console.log("Confirm clicked")
+
+    const response = await api.post('bookings/confirm/', {
+      tutor_id: tutorId,
+      slots: bookedSessionStore.bookedSessions,
+      payment_method: paymentStore.selectedMethod
     })
 
-    alert('Payment details submitted!')
-    router.replace('/dashboard')
+    console.log("Backend response:", response.data)
+
+    alert("Booking Confirmed!")
+
     paymentStore.$reset()
+    bookedSessionStore.$reset()
+
+    await router.push({
+        path: '/dashboard',
+        query: { refresh: Date.now() }
+    })
+
   } catch (error) {
-    console.error('Payment error:', error)
+    console.error("Payment error:", error.response?.data || error)
+    alert("Something went wrong.")
   }
 }
 

@@ -54,16 +54,16 @@
         //meta: { requiresAuth: true, role: 'tutee' }
       },
       {
-        path: '/tutor',
+        path: '/tutor/:id',
         name: 'tutor-details',
         component: () => import('@/views/TutorDetails.vue'),
         //meta: { requiresAuth: true, role: 'tutee' }
       },
       {
-        path: '/payment-tutee',
-        name: 'payment',
+        path: '/payment-tutee/:tutorId',
+        name: 'PaymentTutee',
         component: () => import('@/views/PaymentScreenTutee.vue'),
-        // meta: { requiresAuth: true, role: 'tutee' }
+        props: true
       },
 
       // --- TUTOR ROUTES (Teaching Hub) ---
@@ -83,6 +83,12 @@
         path: '/tch-payments',
         name: 'tch-payments',
         component: () => import('@/views/TutorPaymentScreen.vue'), // The verification view
+        //meta: { requiresAuth: true, role: 'tutor' }
+      },
+      {
+        path: '/tch-completedSessions',
+        name: 'tch-completedSessions',
+        component: () => import('@/views/TutorCompletedSessions.vue'),
         //meta: { requiresAuth: true, role: 'tutor' }
       },
 
