@@ -38,7 +38,7 @@
     </aside>
 
     <main class="flex-grow-1 overflow-auto p-5" style="background-color: var(--sb-bg);">
-      <header class="d-flex justify-content-between align-items-center mb-5 pb-3 border-bottom border-sb">
+      <header class="d-flex justify-content-between align-items-center mb-3 pb-3 border-bottom border-sb">
           <div>
             </div>
           <div class="d-flex gap-3 align-items-center">
@@ -96,9 +96,8 @@ const manageAccount = () => {
 
 const logout = () => {
 
-  setTimeout(() => {
-    router.push('/')
-  }, 500)
+  authStore.logout()
+  router.push('/login') // Redirect to login after logout
 
   router.push
 }
@@ -119,7 +118,7 @@ const isPublicRoute = computed(() => {
 })
 
 // Get the role from the store to control the sidebar links
-const userRole = computed(() => authStore.userRole)
+const userRole = computed(() => authStore.user?.role?.toLowerCase() || null)
 </script>
 
 <style>

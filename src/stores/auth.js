@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import api from '@/services/api/api' // Custom Axios instance
 
 export const useAuthStore = defineStore('auth', () => {
+  
 
   // --- STATE ---
   const token = ref(localStorage.getItem('access_token') || null)
@@ -12,7 +13,7 @@ export const useAuthStore = defineStore('auth', () => {
   const isAuthenticated = computed(() => !!token.value)
 
   // --- ACTIONS ---
-
+  const userRole = computed(() => user.value?.role || null)
   // 1. The Login Function
   const login = async (credentials) => {
     const response = await api.post('login/', credentials)
@@ -24,7 +25,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     token.value = receivedToken
-    localStorage.setItem('access_token', receivedToken)
+    
 
     // ✅ Store user info properly
     user.value = {
@@ -34,6 +35,8 @@ export const useAuthStore = defineStore('auth', () => {
       fname: response.data.fname,
       lname: response.data.lname
     }
+
+    localStorage.setItem('user_role', response.data.role)
 
     return response.data.role
   }
@@ -61,6 +64,7 @@ export const useAuthStore = defineStore('auth', () => {
   return {
     token,
     user,
+    userRole,
     isAuthenticated,
     login,
     logout,

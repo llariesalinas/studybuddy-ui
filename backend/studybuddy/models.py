@@ -13,6 +13,13 @@ class UserProfile(models.Model):
     course = models.CharField(max_length=100, blank=True)
     year_level = models.IntegerField(null=True, blank=True)
 
+    bio = models.TextField(blank=True, null=True)
+    profile_picture = models.ImageField(
+        upload_to='profile_pics/',
+        blank=True,
+        null=True
+    )
+
     ROLE_CHOICES = [
         ('Tutee', 'Tutee'),
         ('Tutor', 'Tutor'),
@@ -80,25 +87,19 @@ class TutorAvailability(models.Model):
         ('Sun', 'Sunday'),
     ]
 
-    tutor = models.ForeignKey(
-        Tutor,
-        on_delete=models.CASCADE,
-        related_name="availabilities"
-    )
-
-    day_of_week = models.CharField(max_length=3, choices=DAY_CHOICES)
+    tutor = models.ForeignKey(Tutor, on_delete=models.CASCADE)
+    day = models.CharField(max_length=3, choices=DAY_CHOICES)
     time_slot = models.TimeField()
-
     is_active = models.BooleanField(default=False)   # tutor toggles this
     is_booked = models.BooleanField(default=False)   # system controls this
 
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ('tutor', 'day_of_week', 'time_slot')
+        unique_together = ('tutor', 'day', 'time_slot')
 
     def __str__(self):
-        return f"{self.tutor.profile.fname} - {self.day_of_week} {self.time_slot}"
+        return f"{self.tutor.profile.fname} - {self.day} {self.time_slot}"
     
 class Booking(models.Model):
 
@@ -107,11 +108,6 @@ class Booking(models.Model):
         ('Confirmed', 'Confirmed'),
         ('Completed', 'Completed'),
         ('Cancelled', 'Cancelled'),
-    ]
-
-    MODE_CHOICES = [
-        ('Online', 'Online'),
-        ('F2F', 'Face-to-Face'),
     ]
 
     student = models.ForeignKey(
@@ -126,16 +122,17 @@ class Booking(models.Model):
         related_name="tutor_bookings"
     )
 
-    availability = models.OneToOneField(
+    availability = models.ForeignKey(
         TutorAvailability,
-        on_delete=models.CASCADE
+        on_delete=models.CASCADE,
+        related_name="bookings"
     )
 
     session_date = models.DateField()
 
     session_mode = models.CharField(
         max_length=10,
-        choices=MODE_CHOICES
+        choices=[('Online', 'Online'), ('F2F', 'Face-to-Face')]
     )
 
     status = models.CharField(
@@ -146,8 +143,8 @@ class Booking(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
 
-    def __str__(self):
-        return f"{self.student.fname} → {self.tutor.profile.fname} ({self.session_date})"
+    class Meta:
+        unique_together = ('availability', 'session_date')
 
 class Payment(models.Model):
 

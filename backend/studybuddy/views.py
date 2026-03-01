@@ -1,7 +1,9 @@
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
 from django.utils.timezone import now
-
+from django.db import transaction
+from datetime import datetime,timedelta, date
+from django.shortcuts import get_object_or_404
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -12,8 +14,8 @@ from rest_framework.generics import ListAPIView
 from django.utils.timezone import now
 
 
-from .models import Subjects, TutorSubjects, Tutor, Booking
-from .serializers import TutorSearchSerializer, SubjectSerializer
+from .models import Payment, Subjects, TutorAvailability, TutorSubjects, Tutor, Booking
+from .serializers import TutorDetailSerializer, TutorSearchSerializer, SubjectSerializer
 
 from .models import (
     UserProfile,
@@ -103,28 +105,32 @@ def login_view(request):
     })
 
 
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def student_dashboard(request):
 
     user_profile = UserProfile.objects.get(user=request.user)
 
+    today = now().date()
+
     # -----------------------
     # UPCOMING SESSIONS
     # -----------------------
     upcoming_bookings = Booking.objects.filter(
         student=user_profile,
-        status='Confirmed',
-        session_date__gte=now().date()
-    ).select_related('tutor__profile', 'availability')
+        status='Confirmed',   # MUST match booking creation
+        session_date__gte=today
+    ).select_related(
+        'tutor__profile',
+        'availability'
+    ).order_by('session_date', 'availability__time_slot')
 
     upcoming = [
         {
             "id": booking.id,
             "subject": booking.tutor.profile.course or "General Tutoring",
             "tutor": f"{booking.tutor.profile.fname} {booking.tutor.profile.lname}",
-            "date": booking.session_date,
+            "date": booking.session_date.strftime("%Y-%m-%d"),
             "time": booking.availability.time_slot.strftime("%H:%M")
         }
         for booking in upcoming_bookings
@@ -136,28 +142,33 @@ def student_dashboard(request):
     completed_bookings = Booking.objects.filter(
         student=user_profile,
         status='Completed'
-    ).select_related('tutor__profile', 'availability')
+    ).select_related(
+        'tutor__profile',
+        'availability'
+    ).order_by('-session_date')
 
     completed = [
         {
             "id": booking.id,
             "subject": booking.tutor.profile.course or "General Tutoring",
             "tutor": f"{booking.tutor.profile.fname} {booking.tutor.profile.lname}",
-            "date": booking.session_date,
+            "date": booking.session_date.strftime("%Y-%m-%d"),
             "time": booking.availability.time_slot.strftime("%H:%M")
         }
         for booking in completed_bookings
     ]
 
     # -----------------------
-    # RECOMMENDED TUTORS (Simple version)
+    # RECOMMENDED TUTORS
     # -----------------------
     tutors = Tutor.objects.all().select_related('profile')[:3]
 
     recommendations = []
 
     for tutor in tutors:
-        tutor_subjects = TutorSubjects.objects.filter(tutor=tutor).select_related('subject')
+        tutor_subjects = TutorSubjects.objects.filter(
+            tutor=tutor
+        ).select_related('subject')
 
         recommendations.append({
             "id": tutor.profile.id,
@@ -231,3 +242,262 @@ def tutor_dashboard(request):
         "hourly_rate": tutor.hourly_rate,
         "upcoming_bookings": bookings_data
     })
+
+#Booking details view
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_booking(request):
+
+    profile = request.user.userprofile
+    availability_id = request.data.get("availability")
+    session_date = request.data.get("session_date")
+    session_mode = request.data.get("session_mode")
+
+    try:
+        availability = TutorAvailability.objects.get(id=availability_id)
+    except TutorAvailability.DoesNotExist:
+        return Response({"error": "Invalid availability"}, status=404)
+
+    if availability.is_booked:
+        return Response({"error": "Slot already booked"}, status=400)
+
+    booking = Booking.objects.create(
+        student=profile,
+        tutor=availability.tutor,
+        availability=availability,
+        session_date=session_date,
+        session_mode=session_mode
+    )
+
+    availability.is_booked = True
+    availability.save()
+
+    return Response({"message": "Booking successful"})
+
+
+#Tutor Detail View
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def tutor_detail(request, profile_id):
+    try:
+        tutor = Tutor.objects.select_related('profile').get(profile_id=profile_id)
+    except Tutor.DoesNotExist:
+        return Response({"error": "Tutor not found"}, status=404)
+
+    serializer = TutorDetailSerializer(tutor)
+    return Response(serializer.data)
+
+#tutor availability schedule thing  vview
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def tutor_availability(request, tutor_id):
+
+    tutor = get_object_or_404(Tutor, profile_id=tutor_id)
+
+    date_str = request.GET.get("date")
+    if not date_str:
+        return Response({"error": "Date parameter is required."}, status=400)
+
+    try:
+        session_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except ValueError:
+        return Response({"error": "Invalid date format."}, status=400)
+
+    # 🔥 STEP 1 — Calculate week boundaries (Mon–Sun)
+    week_start = session_date - timedelta(days=session_date.weekday())
+    week_end = week_start + timedelta(days=6)
+
+    # 🔥 STEP 2 — Fetch all bookings for that week
+    weekly_bookings = Booking.objects.filter(
+        tutor=tutor,
+        session_date__range=(week_start, week_end),
+        status__in=["Confirmed", "Pending", "Completed"]
+    )
+
+    # 🔥 STEP 3 — Create fast lookup set
+    booked_map = {
+        (booking.availability_id, booking.session_date)
+        for booking in weekly_bookings
+    }
+
+    # 🔥 STEP 4 — Get recurring weekly availability template
+    availability = TutorAvailability.objects.filter(
+        tutor=tutor,
+        is_active=True
+    )
+
+    weekday_order = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]
+
+    data = []
+
+    for slot in availability:
+
+        # Determine actual date for this slot in selected week
+        slot_weekday_index = weekday_order.index(slot.day)
+        slot_date = week_start + timedelta(days=slot_weekday_index)
+
+        # 🚫 Block past dates
+        is_past = slot_date < date.today()
+
+        # 🔴 Block if booked in DB
+        is_booked = (slot.id, slot_date) in booked_map
+
+        data.append({
+            "id": slot.id,
+            "day": slot.get_day_display(),
+            "date": slot_date,
+            "time_slot": slot.time_slot.strftime("%H:%M"),
+            "is_booked": is_booked or is_past
+        })
+
+    return Response(data)
+    
+
+#bulk booking request
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def bulk_booking(request):
+
+    tutor_id = request.data.get("tutor_id")
+    slots = request.data.get("slots")
+
+    if not slots:
+        return Response({"error": "No slots provided"}, status=400)
+
+    try:
+        tutor = Tutor.objects.get(profile_id=tutor_id)
+    except Tutor.DoesNotExist:
+        return Response({"error": "Tutor not found"}, status=404)
+
+    student = request.user.userprofile
+
+    with transaction.atomic():
+
+        for slot_data in slots:
+            availability = TutorAvailability.objects.select_for_update().get(
+                id=slot_data["availability_id"],
+                tutor=tutor
+            )
+
+            if availability.is_booked:
+                raise Exception("Slot already booked")
+
+            Booking.objects.create(
+                student=student,
+                tutor=tutor,
+                availability=availability,
+                session_date=slot_data["session_date"],
+                session_mode=slot_data["session_mode"]
+            )
+
+            availability.is_booked = True
+            availability.save()
+
+    return Response({"message": "Booking successful"})
+
+#Confirm payment View 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def confirm_payment_and_book(request):
+
+    user_profile = get_object_or_404(UserProfile, user=request.user)
+
+    tutor_id = request.data.get("tutor_id")
+    slots = request.data.get("slots")
+
+    if not slots:
+        return Response({"error": "No slots selected"}, status=400)
+
+    tutor = get_object_or_404(Tutor, profile_id=tutor_id)
+
+    created_bookings = []
+
+    with transaction.atomic():
+
+        for slot in slots:
+
+            availability = get_object_or_404(
+                TutorAvailability.objects.select_for_update(),
+                id=slot["availability_id"],
+                tutor=tutor
+            )
+
+        
+            session_date = datetime.strptime(
+                slot["session_date"], "%Y-%m-%d"
+            ).date()
+
+            if session_date < now().date():
+                return Response(
+                    {"error": "Cannot book sessions in the past."},
+                    status=400
+                )   
+
+            # 🔥 PUT CONFLICT CHECK RIGHT HERE
+            conflict_exists = Booking.objects.filter(
+                availability=availability,
+                session_date=session_date
+            ).exists()
+
+            if conflict_exists:
+                return Response(
+                    {"error": "This slot is already booked for that date."},
+                    status=400
+                )
+
+            # 🔥 ONLY CREATE BOOKING IF NO CONFLICT
+            booking = Booking.objects.create(
+                student=user_profile,
+                tutor=tutor,
+                availability=availability,
+                session_date=session_date,
+                session_mode=slot["session_mode"],
+                status="Confirmed"
+            )
+
+            Payment.objects.create(
+                booking=booking,
+                amount=tutor.hourly_rate,
+                payment_status="Paid",
+                paid_at=now()
+            )
+
+            created_bookings.append(booking.id)
+
+    return Response({
+        "message": "Booking successful",
+        "booking_ids": created_bookings
+    })
+
+#
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def complete_session(request, booking_id):
+
+    with transaction.atomic():
+
+        booking = get_object_or_404(Booking, id=booking_id)
+
+        if booking.status != "Confirmed":
+            return Response(
+                {"error": "Only confirmed sessions can be completed."},
+                status=400
+            )
+
+        # 1️⃣ Mark as completed
+        booking.status = "Completed"
+        booking.save()
+
+        # 2️⃣ Increase tutor total sessions
+        tutor = booking.tutor
+        tutor.total_sessions += 1
+        tutor.save()
+
+    return Response({
+        "message": "Session completed successfully."
+    })
+
