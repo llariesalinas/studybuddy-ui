@@ -45,6 +45,11 @@
             <router-link v-if="hideSessionButton" to="/book" class="btn bg-sb-primary text-white px-4 py-2 rounded-3 fw-semibold shadow-sm">
               Book Session
             </router-link>
+
+            <router-link v-if="hideReqSessionsButton" to="/tch-requestedSessions" class="btn bg-sb-primary text-white px-4 py-2 rounded-3 fw-semibold shadow-sm">
+              Manage Pending Sessions
+            </router-link>
+
             <div class="profileDropdown">
               <button 
               class="btn text-sb-primary fs-3 ms-2 transition-all hover-lift"
@@ -107,9 +112,28 @@ const hideSessionButton = computed(() => {
     'book',
     'tutors',
     'tutor-details',
-    'payment'
+    'payment',
+    'tch-dashboard',
+    'tutorpreferencesetup',
+    'tch-availability',
+    'tch-availability',
+    'tch-payments',
+    'tch-requestedSessions',
+    'booking-details'
   ]
+  return !hiddenPages.includes(route.name)
+})
 
+const hideReqSessionsButton = computed(() => {
+  const hiddenPages = [
+    'book',
+    'tutors',
+    'tutor-details',
+    'paymentTutee',
+    'preferencesetup',
+    'dashboard',
+    'tch-requestedSessions'
+  ]
   return !hiddenPages.includes(route.name)
 })
 
