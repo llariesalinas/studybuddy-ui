@@ -212,7 +212,7 @@ const paymentSummary = computed(() => {
 
 const backButton = () => {
     router.push(`/tutor/${tutorId}`)
-    paymentStore.$reset()
+    paymentStore.reset()
 }
 
 const chooseMethod = (method) => {
@@ -250,7 +250,7 @@ const ConfirmPayment = async () => {
 
     alert("Booking Confirmed!")
 
-    paymentStore.$reset()
+    paymentStore.reset()
     bookedSessionStore.$reset()
 
     await router.push({

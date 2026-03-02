@@ -194,6 +194,21 @@ watch(
     fetchSessions()
   }
 )
+
+const completeSession = async (bookingId) => {
+  try {
+    await api.post(`bookings/${bookingId}/complete/`)
+    alert("Session marked as completed.")
+
+    // Refresh dashboard data
+    await loadTutorDashboard()
+
+  } catch (error) {
+    console.error(error)
+    alert("Failed to complete session.")
+  }
+}
+
 </script>
 
 <style scoped>

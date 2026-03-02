@@ -44,17 +44,49 @@
               </tr>
             </thead>
             <tbody>
-              <tr style="border-top: 1px solid var(--sb-card-border);">
-                <td class="py-3 text-dark">Lia Salinas</td>
-                <td class="py-3">
-                  <span class="badge bg-light text-dark border border-sb px-2 py-1">Vue.js</span>
-                </td>
-                <td class="py-3 text-dark">Feb 25, 2026</td>
-                <td class="py-3">
-                  <span class="badge bg-success bg-opacity-10 text-success border border-success px-3 py-1 rounded-pill">Confirmed</span>
-                </td>
-              </tr>
-            </tbody>
+            <tr
+              v-for="booking in upcomingBookings"
+              :key="booking.date + booking.student"
+              style="border-top: 1px solid var(--sb-card-border);"
+            >
+              <td class="py-3 text-dark">
+                {{ booking.student }}
+              </td>
+
+              <td class="py-3">
+                <span class="badge bg-light text-dark border border-sb px-2 py-1">
+                  {{ booking.subject || 'General' }}
+                </span>
+              </td>
+
+              <td class="py-3 text-dark">
+                {{ new Date(booking.date).toLocaleDateString() }}
+              </td>
+
+              <td class="py-3">
+                <span
+                  class="badge px-3 py-1 rounded-pill"
+                  :class="{
+                    'bg-success bg-opacity-10 text-success border border-success':
+                      booking.status === 'Confirmed',
+                    'bg-secondary bg-opacity-10 text-secondary border border-secondary':
+                      booking.status === 'Completed'
+                  }"
+                >
+                  {{ booking.status }}
+                </span>
+
+                <!-- ✅ Complete Button -->
+                <button
+                  v-if="booking.status === 'Confirmed'"
+                  class="btn btn-sm btn-outline-success ms-2"
+                  @click="completeSession(booking)"
+                >
+                  Mark Completed
+                </button>
+              </td>
+            </tr>
+          </tbody>
           </table>
         </div>
       </div>
@@ -63,7 +95,6 @@
 </template>
 
 <script setup>
-
 import { ref, onMounted } from 'vue'
 import api from '@/services/api/api'
 
@@ -72,18 +103,29 @@ const avgRating = ref(0)
 const earnings = ref(0)
 const upcomingBookings = ref([])
 
-onMounted(async () => {
+const loadTutorDashboard = async () => {
   try {
     const response = await api.get('tutor-dashboard/')
+
     totalSessions.value = response.data.total_sessions
     avgRating.value = response.data.rating_average
     upcomingBookings.value = response.data.upcoming_bookings
-
-    // Temporary earnings calculation
     earnings.value = totalSessions.value * response.data.hourly_rate
 
   } catch (error) {
     console.error("Failed to load tutor dashboard:", error)
   }
-})
+}
+
+const completeSession = async (booking) => {
+  try {
+    await api.post(`bookings/${booking.id}/complete/`)
+    await loadTutorDashboard()
+    alert("Session marked as completed successfully.")
+  } catch (error) {
+    alert(error.response?.data?.error || "Failed to complete session.")
+  }
+}
+
+onMounted(loadTutorDashboard)
 </script>

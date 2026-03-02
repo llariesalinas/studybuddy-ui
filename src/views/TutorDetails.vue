@@ -62,6 +62,9 @@
     <div class="card shadow-sm rounded-4">
       <div class="card-body">
         <h5 class="fw-semibold mb-3">{{ tutorDetails.name }}'s Schedule</h5>
+          <p class="fw-semibold text-muted">
+            Week of {{ weekRange }}
+          </p>
 
         <!-- ✅ Date Picker Added -->
         <div class="mb-3 d-flex align-items-center gap-3">
@@ -249,16 +252,45 @@ const maxRows = computed(() => {
   return lengths.length ? Math.max(...lengths) : 0
 })
 
+const weekRange = computed(() => {
+  const selected = new Date(selectedDate.value)
+
+  const day = selected.getDay()
+  const diffToMonday = (day === 0 ? -6 : 1 - day)
+
+  const monday = new Date(selected)
+  monday.setDate(selected.getDate() + diffToMonday)
+
+  const sunday = new Date(monday)
+  sunday.setDate(monday.getDate() + 6)
+
+  return `${monday.toLocaleDateString()} - ${sunday.toLocaleDateString()}`
+})
+
 const toggleSlot = (slot) => {
 
-  if(slot.is_booked) return
+  if (slot.is_booked) return
 
   const slotWithDate = {
     availability_id: slot.id,
-    session_date: selectedDate.value,
-    session_mode: "Online"
+    session_date: slot.date,
+    session_mode: bookingPrefsStore.selectedMode || "Online",
+    time_slot: slot.time_slot
   }
 
+  // If first selection → allow
+  if (selectedSlots.value.length === 0) {
+    selectedSlots.value.push(slotWithDate)
+    return
+  }
+
+  // ✅ Enforce SAME DATE
+  if (selectedSlots.value[0].session_date !== slot.date) {
+    alert("You can only book multiple hours on the same day.")
+    return
+  }
+
+  // If slot already selected → remove it
   const exists = selectedSlots.value.some(
     s => s.availability_id === slot.id
   )
@@ -267,9 +299,25 @@ const toggleSlot = (slot) => {
     selectedSlots.value = selectedSlots.value.filter(
       s => s.availability_id !== slot.id
     )
-  } else {
-    selectedSlots.value.push(slotWithDate)
+    return
   }
+
+  // ✅ Check Consecutiveness
+  const allTimes = selectedSlots.value
+    .map(s => parseInt(s.time_slot.split(':')[0]))
+  const newTime = parseInt(slot.time_slot.split(':')[0])
+
+  allTimes.push(newTime)
+  allTimes.sort((a, b) => a - b)
+
+  for (let i = 1; i < allTimes.length; i++) {
+    if (allTimes[i] - allTimes[i - 1] !== 1) {
+      alert("Selected hours must be consecutive.")
+      return
+    }
+  }
+
+  selectedSlots.value.push(slotWithDate)
 }
 
 const backButton = () => {
