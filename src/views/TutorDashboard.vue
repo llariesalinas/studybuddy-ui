@@ -77,13 +77,12 @@
                 </span>
 
                 <!-- ✅ Complete Button -->
-                <button
-                  v-if="booking.status === 'Confirmed'"
-                  class="btn btn-sm btn-outline-success ms-2"
-                  @click="completeSession(booking)"
-                >
-                  Mark Completed
-                </button>
+                <button 
+                    class="btn btn-sm bg-sb-primary text-white"
+                    @click="goToDetails(session.id)"
+                  >
+                    View Details
+                  </button>
               </td>
             </tr>
           </tbody>
@@ -102,6 +101,10 @@ const totalSessions = ref(0)
 const avgRating = ref(0)
 const earnings = ref(0)
 const upcomingBookings = ref([])
+
+const goToDetails = (sessionId) => {
+  router.push(`/booking-details/${sessionId}`)
+}
 
 const loadTutorDashboard = async () => {
   try {
