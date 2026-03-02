@@ -15,7 +15,7 @@
               </div>
               <span class="text-muted small fw-semibold">Total Sessions</span>
             </div>
-            <h3 class="fw-bold mb-0">3</h3>
+            <h3 class="fw-bold mb-0">{{ totalSessions }}</h3>
           </div>
         </div>
       </div>
@@ -29,7 +29,7 @@
               </div>
               <span class="text-muted small fw-semibold">Total Earnings</span>
             </div>
-            <h3 class="fw-bold mb-0">₱495</h3>
+            <h3 class="fw-bold mb-0">{{ totalEarnings }}</h3>
           </div>
         </div>
       </div>
@@ -43,7 +43,7 @@
               </div>
               <span class="text-muted small fw-semibold">Avg Rating</span>
             </div>
-            <h3 class="fw-bold mb-0">4.7</h3>
+            <h3 class="fw-bold mb-0">{{ averageRating }}</h3>
           </div>
         </div>
       </div>
@@ -57,7 +57,7 @@
               </div>
               <span class="text-muted small fw-semibold">Hours Tutored</span>
             </div>
-            <h3 class="fw-bold mb-0">3.5h</h3>
+            <h3 class="fw-bold mb-0">{{totalHours.toFixed(1)}}h</h3>
           </div>
         </div>
       </div>
@@ -93,14 +93,19 @@
                 <th class="fw-semibold pb-3">Status</th>
                 <th class="fw-semibold pb-3">Rating</th>
                 <th class="fw-semibold pb-3">Earnings</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="session in filteredSessions" :key="session.id" style="border-bottom: 1px solid var(--sb-card-border);">
+              <tr 
+              v-for="session in filteredSessions" 
+              :key="session.id" 
+              style="border-bottom: 1px solid var(--sb-card-border);"
+              class="session-row">
                 <td class="py-3 fw-bold">{{ session.subject }}</td>
                 <td class="py-3">{{ session.tutor }}</td>
                 <td class="py-3">{{ session.date }}</td>
-                <td class="py-3">{{ session.duration }} min</td>
+                <td class="py-3">{{ session.startTime }} - {{ session.endTime }}</td>
                 <td class="py-3">
                   <span class="badge rounded-pill px-3 py-1 fw-normal" :class="getStatusClass(session.status)">
                     {{ session.status }}
@@ -114,6 +119,14 @@
                 </td>
                 <td class="py-3 fw-bold">
                   {{ session.earnings ? '₱' + session.earnings : '—' }}
+                </td>
+                <td class="py-3 text-end action-cell">
+                  <button 
+                    class="btn btn-sm bg-sb-primary text-white"
+                    @click="goToDetails(session.id)"
+                  >
+                    View Details
+                  </button>
                 </td>
               </tr>
               
@@ -132,39 +145,86 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { useSessionsStore } from '@/stores/completedSessions'
+import { useRouter } from 'vue-router'
 
-// 1. Define the possible filters matching your design
-const filters = [
-  { label: 'All (6)', value: 'All' },
-  { label: 'Completed (3)', value: 'completed' },
-  { label: 'Upcoming (2)', value: 'upcoming' },
-  { label: 'Cancelled (1)', value: 'cancelled' }
-]
-
+const router = useRouter()
+const sessionStore = useSessionsStore()
 const currentFilter = ref('All')
 
-// 2. Data-driven Array: This is exactly how your DB will return data
-const sessions = ref([
-  { id: 1, subject: 'Calculus', tutor: 'Maria Santos', date: '2026-02-20', duration: 60, status: 'upcoming', rating: null, earnings: null },
-  { id: 2, subject: 'Data Structures', tutor: 'Carlos Tan', date: '2026-02-18', duration: 90, status: 'upcoming', rating: null, earnings: null },
-  { id: 3, subject: 'Academic Writing', tutor: 'Anna Cruz', date: '2026-02-15', duration: 60, status: 'completed', rating: 5, earnings: 130 },
-  { id: 4, subject: 'Physics', tutor: 'James Reyes', date: '2026-02-12', duration: 60, status: 'completed', rating: 4, earnings: 140 },
-  { id: 5, subject: 'Statistics', tutor: 'Maria Santos', date: '2026-02-10', duration: 90, status: 'completed', rating: 5, earnings: 225 },
-  { id: 6, subject: 'Biology', tutor: 'Sofia Garcia', date: '2026-02-08', duration: 60, status: 'cancelled', rating: null, earnings: null },
+const filters = computed(() => [
+  { 
+    label: `All (${sessionStore.sessions.length})`, 
+    value: 'All' 
+  },
+  { 
+    label: `Completed (${sessionStore.completedSessions.length})`, 
+    value: 'completed' 
+  },
+  { 
+    label: `Upcoming (${sessionStore.upcomingSessions.length})`, 
+    value: 'upcoming' 
+  },
+  { 
+    label: `Cancelled (${sessionStore.cancelledSessions.length})`, 
+    value: 'cancelled' 
+  }
 ])
 
-// 3. Computed Property for filtering: This handles the logic instantly on the frontend
-const filteredSessions = computed(() => {
-  if (currentFilter.value === 'All') {
-    return sessions.value
-  }
-  return sessions.value.filter(session => session.status === currentFilter.value)
+onMounted(() => {
+  sessionStore.fetchSessions()
 })
 
-// 4. Utility function to handle the dynamic CSS classes for the badges
+const goToDetails = (sessionId) => {
+  router.push(`/booking-details/${sessionId}`)
+}
+
+const totalSessions = computed(() =>
+  sessionStore.sessions.length
+)
+
+const totalEarnings = computed(() =>
+  sessionStore.completedSessions
+    .reduce((sum, s) => sum + (s.earnings || 0), 0)
+)
+
+const averageRating = computed(() => {
+  const rated = sessionStore.completedSessions
+    .filter(s => s.rating)
+
+  if (!rated.length) return 0
+
+  return (
+    rated.reduce((sum, s) => sum + s.rating, 0) /
+    rated.length
+  ).toFixed(1)
+})
+
+const totalHours = computed(() =>
+  sessionStore.completedSessions
+    .reduce((sum, s) => {
+      const start = new Date(`1970-01-01T${s.startTime}`)
+      const end = new Date(`1970-01-01T${s.endTime}`)
+      return sum + (end - start)
+    }, 0) / (1000 * 60 * 60)
+)
+
+const filteredSessions = computed(() => {
+  switch (currentFilter.value) {
+    case 'completed':
+      return sessionStore.completedSessions
+    case 'upcoming':
+      return sessionStore.upcomingSessions
+    case 'cancelled':
+      return sessionStore.cancelledSessions
+    default:
+      return sessionStore.sessions
+  }
+})
+
 const getStatusClass = (status) => {
-  switch (status) {
+  switch (status?.toLowerCase()) {
     case 'upcoming':
       return 'bg-warning bg-opacity-25 text-dark' // Soft orange
     case 'completed':
@@ -186,5 +246,9 @@ const getStatusClass = (status) => {
 /* Ensure the table looks completely clean, removing default Bootstrap borders on the sides */
 .table > :not(caption) > * > * {
   border-bottom-width: 0px;
+}
+
+.session-row {
+  position: relative;
 }
 </style>
