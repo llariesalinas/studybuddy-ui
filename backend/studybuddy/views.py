@@ -456,15 +456,7 @@ def confirm_payment_and_book(request):
                     status=400
                 )
 
-<<<<<<< HEAD
-            # 🚫 Block past dates
-=======
->>>>>>> origin/main
-            if session_date < now().date():
-                return Response(
-                    {"error": "Cannot book sessions in the past."},
-                    status=400
-                )
+            
 
             # 🚫 Ensure weekday matches availability template
             if weekday_map[session_date.weekday()] != availability.day:
