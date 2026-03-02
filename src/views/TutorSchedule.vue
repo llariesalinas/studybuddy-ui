@@ -1,10 +1,12 @@
 <template>
   <div class="availability-content">
+
+    <!-- HEADER -->
     <div class="d-flex justify-content-between align-items-start mb-4">
       <div>
-        <h2 class="fw-bold text-dark mb-1">My Availability</h2>
+        <h2 class="fw-bold text-dark mb-1">My Weekly Availability</h2>
         <p class="text-muted mb-0">
-          Set the times you are free to accept bookings.
+          Set recurring weekly time slots.
         </p>
       </div>
 
@@ -12,37 +14,46 @@
         class="btn btn-success align-self-center"
         @click="showAddModal = true"
       >
-        + Add Session
+        + Add Slot
       </button>
     </div>
-    <h4 class="fw-bold mt-4">Current Week</h4>
 
+    <!-- WEEKLY TEMPLATE TABLE -->
     <div class="table-responsive">
       <table class="table table-bordered text-center">
         <thead>
           <tr>
-            <th v-for="day in daysOfWeek" :key="day">{{ day }}</th>
+            <th
+              v-for="day in daysOfWeek"
+              :key="day.code"
+            >
+              {{ day.label }}
+            </th>
           </tr>
         </thead>
 
         <tbody>
           <tr v-for="rowIndex in maxRows" :key="rowIndex">
-            <td v-for="day in daysOfWeek" :key="day">
+            <td
+              v-for="day in daysOfWeek"
+              :key="day.code"
+            >
               <div
-                v-if="groupedCurrentWeek[day][rowIndex - 1]"
+                v-if="groupedSlots[day.code][rowIndex - 1]"
                 class="slot-cell available"
                 :class="{
                   active:
                     activeSlot?.availability_id ===
-                    groupedCurrentWeek[day][rowIndex - 1].availability_id
+                    groupedSlots[day.code][rowIndex - 1].availability_id
                 }"
-                @click="selectSlot(groupedCurrentWeek[day][rowIndex - 1])"
+                @click="selectSlot(groupedSlots[day.code][rowIndex - 1])"
               >
-                <div class="slot-time">
-                  {{ groupedCurrentWeek[day][rowIndex - 1].start_time }}
-                  –
-                  {{ groupedCurrentWeek[day][rowIndex - 1].end_time }}
-                </div>
+                {{
+                  groupedSlots[day.code][rowIndex - 1].time_slot
+                }} –
+                {{
+                  addOneHour(groupedSlots[day.code][rowIndex - 1].time_slot)
+                }}
               </div>
             </td>
           </tr>
@@ -50,238 +61,154 @@
       </table>
     </div>
 
-    <h4 class="fw-bold mt-5">Next Week</h4>
-
-    <div class="table-responsive">
-      <table class="table table-bordered text-center">
-        <thead>
-          <tr>
-            <th v-for="day in daysOfWeek" :key="day">{{ day }}</th>
-          </tr>
-        </thead>
-
-        <tbody>
-          <tr v-for="rowIndex in maxRows" :key="rowIndex">
-            <td v-for="day in daysOfWeek" :key="day">
-              <div
-                v-if="groupedNextWeek[day][rowIndex - 1]"
-                class="slot-cell available"
-                :class="{
-                  active:
-                    activeSlot?.availability_id ===
-                    groupedNextWeek[day][rowIndex - 1].availability_id
-                }"
-                @click="selectSlot(groupedNextWeek[day][rowIndex - 1])"
-              >
-                <div class="slot-time">
-                  {{ groupedNextWeek[day][rowIndex - 1].start_time }}
-                  –
-                  {{ groupedNextWeek[day][rowIndex - 1].end_time }}
-                </div>
-
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <div class="text-end mt-4 d-flex justify-content-end gap-2">
+    <!-- DELETE BUTTON -->
+    <div class="text-end mt-4">
       <button
-        class="btn btn-outline-danger px-4 fw-semibold"
+        class="btn btn-outline-danger"
         :disabled="!activeSlot"
         @click="deleteActiveSlot"
       >
-        Delete
-      </button>
-
-      <button
-        class="btn bg-sb-primary text-white px-4 fw-semibold"
-        :disabled="!activeSlot"
-        @click="openEditFromActive"
-      >
-        Edit
+        Delete Selected Slot
       </button>
     </div>
 
+    <!-- ADD SLOT MODAL -->
     <div v-if="showAddModal" class="modal-overlay">
       <div class="modal-box">
-        <h5 class="mb-3">Add Session</h5>
+        <h5 class="mb-3">Add Weekly Slot</h5>
 
-        <div class="mb-2">
-          <label class="form-label">Date</label>
-          <input type="date" v-model="newSession.date" class="form-control" :min="today" />
-        </div>
-
-        <div class="mb-2">
-          <label class="form-label">Start Time</label>
-          <input type="time" v-model="newSession.start_time" class="form-control" />
-        </div>
-
+        <!-- Day -->
         <div class="mb-3">
-          <label class="form-label">End Time</label>
-          <input type="time" v-model="newSession.end_time" class="form-control" />
+          <label>Day</label>
+          <select v-model="newSlot.day" class="form-control">
+            <option disabled value="">Select day</option>
+            <option
+              v-for="day in daysOfWeek"
+              :key="day.code"
+              :value="day.code"
+            >
+              {{ day.label }}
+            </option>
+          </select>
+        </div>
+
+        <!-- Start Time -->
+        <div class="mb-3">
+          <label>Start Time</label>
+          <input
+            type="time"
+            v-model="newSlot.start_time"
+            class="form-control"
+          />
+        </div>
+
+        <!-- End Time -->
+        <div class="mb-3">
+          <label>End Time</label>
+          <input
+            type="time"
+            v-model="newSlot.end_time"
+            class="form-control"
+          />
         </div>
 
         <div class="d-flex justify-content-end gap-2">
-          <button class="btn btn-secondary" @click="showAddModal = false">
+          <button
+            class="btn btn-secondary"
+            @click="showAddModal = false"
+          >
             Cancel
           </button>
 
-          <button class="btn btn-success" @click="saveSession">
+          <button
+            class="btn btn-success"
+            @click="saveSlot"
+          >
             Save
           </button>
         </div>
       </div>
     </div>
-    <div v-if="showEditModal" class="modal-overlay">
-      <div class="modal-box">
-        <h5 class="mb-3">Edit Session</h5>
 
-        <div class="mb-2">
-          <label class="form-label">Date</label>
-          <input type="date" v-model="editSession.date" class="form-control" />
-        </div>
-
-        <div class="mb-2">
-          <label class="form-label">Start Time</label>
-          <input type="time" v-model="editSession.start_time" class="form-control" />
-        </div>
-
-        <div class="mb-3">
-          <label class="form-label">End Time</label>
-          <input type="time" v-model="editSession.end_time" class="form-control" />
-        </div>
-
-        <div class="d-flex justify-content-end">
-          <div class="d-flex gap-2">
-            <button class="btn btn-secondary" @click="showEditModal = false">
-              Cancel
-            </button>
-            <button class="btn btn-success" @click="updateSession">
-              Save
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useTutorSchedStore } from '@/stores/tutorSched'
 
 const tutorSchedStore = useTutorSchedStore()
 
-const showEditModal = ref(false)
-
+// ===============================
+// UI STATE
+// ===============================
 const showAddModal = ref(false)
-
-const today = new Date().toISOString().split('T')[0]
-
-const groupedCurrentWeek = computed(() =>
-  groupByDay(currentWeekSchedule.value)
-)
-
-const groupedNextWeek = computed(() =>
-  groupByDay(nextWeekSchedule.value)
-)
-
 const activeSlot = ref(null)
 
+// ===============================
+// WEEK DAY DEFINITIONS
+// Must match Django DAY_CHOICES
+// ===============================
 const daysOfWeek = [
-  'Monday',
-  'Tuesday',
-  'Wednesday',
-  'Thursday',
-  'Friday',
-  'Saturday',
-  'Sunday'
+  { code: 'Mon', label: 'Monday' },
+  { code: 'Tue', label: 'Tuesday' },
+  { code: 'Wed', label: 'Wednesday' },
+  { code: 'Thu', label: 'Thursday' },
+  { code: 'Fri', label: 'Friday' },
+  { code: 'Sat', label: 'Saturday' },
+  { code: 'Sun', label: 'Sunday' }
 ]
 
-const maxRows = computed(() => {
-  const currentLengths = Object.values(groupedCurrentWeek.value).map(d => d.length)
-  const nextLengths = Object.values(groupedNextWeek.value).map(d => d.length)
-
-  return Math.max(...currentLengths, ...nextLengths, 0)
-})
-
-const newSession = ref({
-  date: '',
-  start_time: '',
-  end_time: '',
-  is_booked: false,
-  is_active: true
-})
-
-const getWeekRange = (weekOffset = 0) => {
-  const today = new Date()
-
-  const monday = new Date(today)
-  const dayOfWeek = monday.getDay()
-
-  const diff = (dayOfWeek === 0 ? -6 : 1) - dayOfWeek
-  monday.setDate(monday.getDate() + diff)
-
-  monday.setDate(monday.getDate() + (weekOffset * 7))
-  monday.setHours(0, 0, 0, 0)
-
-  const weekStart = new Date(monday)
-
-  const weekEnd = new Date(monday)
-  weekEnd.setDate(weekStart.getDate() + 6)
-  weekEnd.setHours(23, 59, 59, 999)
-
-  return { weekStart, weekEnd }
-}
-
-const currentWeekSchedule = computed(() => {
-  const { weekStart, weekEnd } = getWeekRange(0)
-
-  return tutorSchedStore.availabilities.filter(slot => {
-    const [y, m, d] = slot.date.split('-')
-    const slotDate = new Date(y, m - 1, d)
-
-    return slotDate >= weekStart && slotDate <= weekEnd
-  })
-})
-
-const nextWeekSchedule = computed(() => {
-  const { weekStart, weekEnd } = getWeekRange(1)
-
-  return tutorSchedStore.availabilities.filter(slot => {
-    const [y, m, d] = slot.date.split('-')
-    const slotDate = new Date(y, m - 1, d)
-
-    return slotDate >= weekStart && slotDate <= weekEnd
-  })
-})
-
-const groupByDay = (schedule) => {
+// ===============================
+// GROUP TEMPLATE SLOTS BY DAY
+// ===============================
+const groupedSlots = computed(() => {
   const result = {}
 
+  // initialize empty arrays
   daysOfWeek.forEach(day => {
-    result[day] = []
+    result[day.code] = []
   })
 
-  schedule.forEach(slot => {
-    if (result[slot.day_of_week]) {
-      result[slot.day_of_week].push(slot)
+  // group slots by day
+  tutorSchedStore.availabilities.forEach(slot => {
+    if (result[slot.day]) {
+      result[slot.day].push(slot)
     }
   })
 
-  return result
-}
+  // optional: sort times
+  Object.keys(result).forEach(day => {
+    result[day].sort((a, b) =>
+      a.time_slot.localeCompare(b.time_slot)
+    )
+  })
 
-const editSession = ref({
-  availability_id: null,
-  date: '',
-  start_time: '',
-  end_time: '',
-  is_active: true
+  return result
 })
 
+// ===============================
+// TABLE ROW COUNT
+// ===============================
+const maxRows = computed(() => {
+  return Math.max(
+    ...Object.values(groupedSlots.value).map(d => d.length),
+    0
+  )
+})
+
+// ===============================
+// NEW SLOT MODEL
+// ===============================
+const newSlot = ref({
+  day: '',
+  start_time: '',
+  end_time: ''
+})
+
+// ===============================
+// SELECT SLOT
+// ===============================
 const selectSlot = (slot) => {
   activeSlot.value =
     activeSlot.value?.availability_id === slot.availability_id
@@ -289,43 +216,15 @@ const selectSlot = (slot) => {
       : slot
 }
 
-const openEditFromActive = () => {
-  if (!activeSlot.value) return
-  editSession.value = { ...activeSlot.value }
-  showEditModal.value = true
-}
-
-const updateSession = async () => {
-  if (
-    !editSession.value.date ||
-    !editSession.value.start_time ||
-    !editSession.value.end_time
-  ) {
-    alert('Please complete all fields.')
-    return
-  }
-
-  try {
-    await tutorSchedStore.updateSlot({
-      ...editSession.value
-    })
-
-    // Refresh the availability list so table updates
-    await tutorSchedStore.fetchAvailability()
-
-    // Close the modal and reset active selection
-    showEditModal.value = false
-    activeSlot.value = null
-
-  } catch (error) {
-    console.error('Failed to update session:', error)
-  }
-}
-
+// ===============================
+// DELETE SLOT
+// ===============================
 const deleteActiveSlot = async () => {
   if (!activeSlot.value) return
 
-  if (!confirm('Delete this session?')) return
+  console.log("Deleting slot:", activeSlot.value)
+
+  if (!confirm('Delete this slot?')) return
 
   await tutorSchedStore.deleteSlot(activeSlot.value.availability_id)
   await tutorSchedStore.fetchAvailability()
@@ -333,43 +232,86 @@ const deleteActiveSlot = async () => {
   activeSlot.value = null
 }
 
-const saveSession = async () => {
-  if (
-    !newSession.value.date ||
-    !newSession.value.start_time ||
-    !newSession.value.end_time
-  ) {
+// ===============================
+// SAVE NEW SLOT
+// ===============================
+const saveSlot = async () => {
+  if (!newSlot.value.day || !newSlot.value.start_time || !newSlot.value.end_time) {
     alert('Please complete all fields.')
     return
   }
 
+  const start = new Date(`1970-01-01T${newSlot.value.start_time}`)
+  const end = new Date(`1970-01-01T${newSlot.value.end_time}`)
+
+  if (end <= start) {
+    alert('End time must be after start time.')
+    return
+  }
+
+  if (start.getMinutes() !== 0 || end.getMinutes() !== 0) {
+    alert('Please use full-hour times (e.g., 07:00, 10:00).')
+    return
+  }
+
   try {
-    await tutorSchedStore.addSlot({
-      ...newSession.value
-    })
+    let current = new Date(start)
+    let createdCount = 0
+
+    while (current < end) {
+      const hourString = current.toTimeString().slice(0, 5)
+
+      // 🔍 Check if slot already exists in store
+      const alreadyExists = tutorSchedStore.availabilities.some(
+        slot =>
+          slot.day === newSlot.value.day &&
+          slot.time_slot === hourString
+      )
+
+      if (!alreadyExists) {
+        await tutorSchedStore.addSlot({
+          day: newSlot.value.day,
+          time_slot: hourString
+        })
+        createdCount++
+      }
+
+      current.setHours(current.getHours() + 1)
+    }
+
+    if (createdCount === 0) {
+      alert('All selected time slots already exist.')
+    }
 
     await tutorSchedStore.fetchAvailability()
 
-    newSession.value = {
-      date: '',
+    newSlot.value = {
+      day: '',
       start_time: '',
-      end_time: '',
-      is_booked: false,
-      is_active: true
+      end_time: ''
     }
 
     showAddModal.value = false
 
   } catch (error) {
-    console.error('Failed to add session:', error)
+    console.error('Failed to add slots:', error)
+    alert('Something went wrong.')
   }
 }
 
-
+// ===============================
+// LOAD DATA ON MOUNT
+// ===============================
 onMounted(async () => {
   await tutorSchedStore.fetchAvailability()
   console.log(tutorSchedStore.availabilities)
 })
+
+const addOneHour = (timeString) => {
+  const date = new Date(`1970-01-01T${timeString}`)
+  date.setHours(date.getHours() + 1)
+  return date.toTimeString().slice(0, 5)
+}
 </script>
 
 <style scoped>

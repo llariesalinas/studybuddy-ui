@@ -456,7 +456,7 @@ def confirm_payment_and_book(request):
                     status=400
                 )
 
-            
+
 
             # 🚫 Ensure weekday matches availability template
             if weekday_map[session_date.weekday()] != availability.day:
@@ -524,12 +524,19 @@ def complete_session(request, booking_id):
                 status=400
             )
 
+        # 🚫 Block past dates
+        if booking.session_date < now().date():
+            return Response(
+                {"error": "Cannot complete sessions in the past."},
+                status=400
+            )
+        
         if booking.status != "Confirmed":
             return Response(
                 {"error": "Only confirmed sessions can be completed."},
                 status=400
             )
-
+        
         # 1️⃣ Mark as completed
         booking.status = "Completed"
         booking.save()
@@ -542,4 +549,80 @@ def complete_session(request, booking_id):
     return Response({"message": "Session completed successfully."})
 
 
+# ==========================================
+# TEMPLATE AVAILABILITY (Weekly Template)
+# ==========================================
 
+@api_view(['GET', 'POST', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def template_availability(request, pk=None):
+
+    profile = request.user.userprofile
+
+    try:
+        tutor = Tutor.objects.get(profile=profile)
+    except Tutor.DoesNotExist:
+        return Response({"error": "Tutor not found"}, status=404)
+
+    # =========================
+    # GET ALL SLOTS
+    # =========================
+    if request.method == 'GET':
+        slots = TutorAvailability.objects.filter(tutor=tutor)
+
+        data = [
+            {
+                "availability_id": slot.id,
+                "day": slot.day,
+                "day_display": slot.get_day_display(),
+                "time_slot": slot.time_slot.strftime("%H:%M"),
+                "is_active": slot.is_active,
+                "is_booked": slot.is_booked
+            }
+            for slot in slots
+        ]
+
+        return Response(data)
+
+    # =========================
+    # CREATE SLOT
+    # =========================
+    if request.method == 'POST':
+
+        day = request.data.get("day")
+        time_str = request.data.get("time_slot")
+
+        try:
+            time_obj = datetime.strptime(time_str, "%H:%M").time()
+        except Exception:
+            return Response({"error": "Invalid time format"}, status=400)
+
+        slot = TutorAvailability.objects.create(
+            tutor=tutor,
+            day=day,
+            time_slot=time_obj,
+            is_active=True,
+            is_booked=False
+        )
+
+        return Response({
+            "availability_id": slot.id,
+            "day": slot.day,
+            "day_display": slot.get_day_display(),
+            "time_slot": slot.time_slot.strftime("%H:%M"),
+            "is_active": slot.is_active,
+            "is_booked": slot.is_booked
+        }, status=201)
+
+    # =========================
+    # DELETE SLOT
+    # =========================
+    if request.method == 'DELETE':
+
+        if pk is None:
+            return Response({"error": "Slot ID required"}, status=400)
+
+        slot = get_object_or_404(TutorAvailability, id=pk, tutor=tutor)
+        slot.delete()
+
+        return Response({"message": "Deleted successfully"})

@@ -1,11 +1,12 @@
 from django.urls import path
 from django.conf.urls.static import static
 from django.conf import settings
-from .views import( login_view, 
+from .views import(
+                   login_view, 
                    register_user, 
                    student_dashboard, 
                    SearchTutorsView,
-                   SubjectListView, tutor_availability, 
+                   SubjectListView, template_availability, tutor_availability, 
                    tutor_dashboard,
                     tutor_detail
                    )
@@ -25,6 +26,8 @@ urlpatterns = [
     #path('bookings/',create_booking),
     path('bookings/confirm/', views.confirm_payment_and_book),
     path('bookings/<int:booking_id>/complete/', views.complete_session),
+    path('template-availability/', template_availability),
+    path('template-availability/<int:pk>/', template_availability),
 ]
 
 if settings.DEBUG:
