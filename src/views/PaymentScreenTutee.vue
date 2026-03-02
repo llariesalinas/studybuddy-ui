@@ -60,16 +60,6 @@
 
             <div v-if="paymentStore.selectedMethod === 0">
 
-                <div class="mb-3">
-                <label class="form-label">Amount</label>
-                <input
-                    type="number"
-                    class="form-control"
-                    v-model="paymentStore.amountPaid"
-                    placeholder="Enter amount"
-                />
-                </div>
-
                 <div class="alert alert-info">
                 Please prepare exact amount.
                 </div>

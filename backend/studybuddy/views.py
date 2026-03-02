@@ -456,7 +456,10 @@ def confirm_payment_and_book(request):
                     status=400
                 )
 
+<<<<<<< HEAD
             # 🚫 Block past dates
+=======
+>>>>>>> origin/main
             if session_date < now().date():
                 return Response(
                     {"error": "Cannot book sessions in the past."},
