@@ -16,7 +16,7 @@ from django.db.models import Case, When, Value, IntegerField
 from collections import defaultdict
 
 
-from .models import Payment, Subjects, TutorAvailability, TutorSubjects, Tutor, Booking
+from .models import Payment, PaymentMethod, Subjects, TutorAvailability, TutorSubjects, Tutor, Booking, PaymentMethod
 from .serializers import TutorDetailSerializer, TutorSearchSerializer, SubjectSerializer
 
 from .models import (
@@ -224,32 +224,42 @@ def tutor_dashboard(request):
     except Tutor.DoesNotExist:
         return Response({"error": "Tutor not found"}, status=404)
 
+    # 📌 Get completed bookings
+    completed_bookings = Booking.objects.filter(
+        tutor=tutor,
+        status="Completed"
+    ).select_related("payment")
+
+    total_earnings = 0
+
+    for b in completed_bookings:
+        if hasattr(b, "payment"):
+            amount = float(b.payment.amount)
+            platform_fee = amount * 0.16
+            transaction_fee = amount * 0.04
+            tutor_earned = amount - platform_fee - transaction_fee
+            total_earnings += tutor_earned
+
     upcoming = Booking.objects.filter(
-    tutor=tutor
-).annotate(
-    status_priority=Case(
-        When(status="Confirmed", then=Value(0)),
-        When(status="Pending", then=Value(1)),
-        When(status="Completed", then=Value(2)),
-        default=Value(3),
-        output_field=IntegerField(),
-    )
-).order_by("status_priority", "session_date")
+        tutor=tutor
+    ).order_by("session_date")
 
     bookings_data = [
-    {
-        "id": b.id,  # ← REQUIRED
-        "student": f"{b.student.fname} {b.student.lname}",
-        "date": b.session_date,
-        "status": b.status
-    }
-    for b in upcoming
-]
+        {
+            "id": b.id,
+            "student": f"{b.student.fname} {b.student.lname}",
+            "subject": b.tutor.profile.course or "General",
+            "date": b.session_date,
+            "status": b.status
+        }
+        for b in upcoming
+    ]
 
     return Response({
         "total_sessions": tutor.total_sessions,
         "rating_average": tutor.rating_average,
         "hourly_rate": tutor.hourly_rate,
+        "total_earnings": round(total_earnings, 2),
         "upcoming_bookings": bookings_data
     })
 
@@ -410,6 +420,7 @@ def bulk_booking(request):
     return Response({"message": "Booking successful"})"""
 
 #Confirm payment View 
+# Confirm payment View 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def confirm_payment_and_book(request):
@@ -418,11 +429,21 @@ def confirm_payment_and_book(request):
 
     tutor_id = request.data.get("tutor_id")
     slots = request.data.get("slots")
+    method_id = request.data.get("payment_method")
 
     if not slots:
         return Response({"error": "No slots selected"}, status=400)
 
+    if not method_id:
+        return Response({"error": "Payment method required"}, status=400)
+
     tutor = get_object_or_404(Tutor, profile_id=tutor_id)
+
+    # ✅ Validate payment method safely
+    try:
+        method = PaymentMethod.objects.get(method_id=method_id, is_active=True)
+    except PaymentMethod.DoesNotExist:
+        return Response({"error": "Invalid payment method"}, status=400)
 
     created_bookings = []
 
@@ -435,6 +456,8 @@ def confirm_payment_and_book(request):
         5: "Sat",
         6: "Sun",
     }
+
+    total_amount = 0  # ✅ accumulate total for multi-slot
 
     with transaction.atomic():
 
@@ -471,7 +494,7 @@ def confirm_payment_and_book(request):
                     status=400
                 )
 
-            # 🚫 Check conflict (DO NOT delete here)
+            # 🚫 Check conflict
             conflict_exists = Booking.objects.filter(
                 availability=availability,
                 session_date=session_date,
@@ -484,7 +507,7 @@ def confirm_payment_and_book(request):
                     status=400
                 )
 
-            # 🧹 Delete cancelled booking if exists (safe cleanup)
+            # 🧹 Cleanup cancelled booking
             Booking.objects.filter(
                 availability=availability,
                 session_date=session_date,
@@ -498,18 +521,26 @@ def confirm_payment_and_book(request):
                 availability=availability,
                 session_date=session_date,
                 session_mode=slot["session_mode"],
-                status="Pending"
+                status="Confirmed"   # 🔥 Better than Pending if already paid
             )
 
-            # ✅ Create payment record
+            created_bookings.append(booking.id)
+
+            total_amount += tutor.hourly_rate
+
+        # ✅ Create ONE payment record per booking
+        for booking_id in created_bookings:
             Payment.objects.create(
-                booking=booking,
+                booking_id=booking_id,
                 amount=tutor.hourly_rate,
+                method=method,
                 payment_status="Paid",
                 paid_at=now()
             )
 
-            created_bookings.append(booking.id)
+        # ✅ Optional: update tutor stats
+        tutor.total_sessions += len(created_bookings)
+        tutor.save()
 
     return Response({
         "message": "Booking successful",
@@ -778,11 +809,36 @@ def booking_detail(request, booking_id):
     if request.user.userprofile != booking.tutor.profile:
         return Response({"error": "Unauthorized"}, status=403)
 
-    # Payment calculations
-    amount_paid = float(booking.payment.amount) if hasattr(booking, 'payment') else 0
-    platform_fee = round(amount_paid * 0.16, 2)
-    transaction_fee = round(amount_paid * 0.04, 2)
-    tutor_earned = round(amount_paid - platform_fee - transaction_fee, 2)
+    # -------------------------
+    # Safe Payment Handling
+    # -------------------------
+    amount_paid = 0
+    platform_fee = 0
+    transaction_fee = 0
+    tutor_earned = 0
+    payment_status = "Pending"
+    transaction_id = None
+    method = None
+
+    if hasattr(booking, "payment") and booking.payment:
+
+        amount_paid = float(booking.payment.amount)
+        payment_status = booking.payment.payment_status
+        transaction_id = booking.payment.transaction_reference
+
+        # 🔥 GET REAL METHOD FROM DB
+        method = booking.payment.method.method_name if booking.payment.method else None
+
+        # Platform fee always applies
+        platform_fee = round(amount_paid * 0.16, 2)
+
+        # Only apply transaction fee if GCash
+        if method == "GCash":
+            transaction_fee = round(amount_paid * 0.04, 2)
+        else:
+            transaction_fee = 0
+
+        tutor_earned = round(amount_paid - platform_fee - transaction_fee, 2)
 
     return Response({
         "id": booking.id,
@@ -805,17 +861,32 @@ def booking_detail(request, booking_id):
                 datetime.combine(date.today(), booking.availability.time_slot)
                 + timedelta(hours=1)
             ).time().strftime("%H:%M"),
-            "rating": booking.rating.rating_score if hasattr(booking, 'rating') else None,
+            "rating": booking.rating.rating_score if hasattr(booking, "rating") else None,
             "status": booking.status
         },
 
         "payment": {
-            "transaction_id": booking.payment.transaction_reference if hasattr(booking, 'payment') else None,
-            "method": "GCash",
+            "transaction_id": transaction_id,
+            "method": method,
             "amount_paid": amount_paid,
             "tutor_earned": tutor_earned,
             "platform_fee": platform_fee,
             "transaction_fee": transaction_fee,
-            "status": booking.payment.payment_status if hasattr(booking, 'payment') else "Pending"
+            "status": payment_status
         }
     })
+
+@api_view(['GET'])
+def payment_methods(request):
+    methods = PaymentMethod.objects.filter(is_active=True)
+
+    data = [
+        {
+            "id": method.method_id,
+            "name": method.method_name,
+            "code": method.code
+        }
+        for method in methods
+    ]
+
+    return Response(data)
