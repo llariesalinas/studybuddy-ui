@@ -75,8 +75,8 @@
                 >
                   {{ booking.status }}
                 </span>
-
-                <!-- ✅ Complete Button -->
+              </td>
+              <td class="py-3">
                 <button
                   class="btn btn-success"
                   @click="goToBookingDetails(booking.id)"
