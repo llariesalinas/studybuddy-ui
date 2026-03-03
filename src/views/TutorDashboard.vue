@@ -160,6 +160,9 @@ const avgRating = ref(0)
 const earnings = ref(0)
 const upcomingBookings = ref([])
 
+
+
+
 const goToBookingDetails = (id) => {
   router.push({
     name: 'booking-details',

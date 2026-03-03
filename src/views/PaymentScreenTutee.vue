@@ -279,7 +279,7 @@ const ConfirmPayment = async () => {
       tutor_id: tutorId,
       date: bookedSessionStore.bookedSessionDate,
       slots: bookedSessionStore.bookedSessions,
-      payment_method: paymentStore.selectedMethod
+      payment_method: paymentStore.selectedMethod   // real DB method_id
     })
 
     alert("Booking Confirmed!")
