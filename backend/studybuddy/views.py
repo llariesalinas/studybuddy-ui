@@ -19,8 +19,13 @@ from collections import defaultdict
 from .recommender.hybrid import recommend_tutors_hybrid
 from .recommender.CF import build_rating_matrix
 
+<<<<<<< HEAD
 from .recommender.cbf import recommend_tutors
 from .models import Payment, PaymentMethod, Subjects, TutorAvailability, TutorSubjects, Tutor, Booking,Course,Preference
+=======
+
+from .models import Payment, PaymentMethod, Subjects, TutorAvailability, TutorSubjects, Tutor, Booking, PaymentMethod
+>>>>>>> 32c6f3b (Before Merging to Another Branch)
 from .serializers import TutorDetailSerializer, TutorSearchSerializer, SubjectSerializer
 
 from .models import (
@@ -379,6 +384,7 @@ def tutor_dashboard(request):
     except Tutor.DoesNotExist:
         return Response({"error": "Tutor not found"}, status=404)
 
+<<<<<<< HEAD
     # 📌 Completed sessions for earnings
     completed_bookings = Booking.objects.filter(
         tutor=tutor,
@@ -447,6 +453,38 @@ def tutor_dashboard(request):
                 current_group = [booking]
 
         bookings_data.append(build_combined_block(current_group))
+=======
+    # 📌 Get completed bookings
+    completed_bookings = Booking.objects.filter(
+        tutor=tutor,
+        status="Completed"
+    ).select_related("payment")
+
+    total_earnings = 0
+
+    for b in completed_bookings:
+        if hasattr(b, "payment"):
+            amount = float(b.payment.amount)
+            platform_fee = amount * 0.16
+            transaction_fee = amount * 0.04
+            tutor_earned = amount - platform_fee - transaction_fee
+            total_earnings += tutor_earned
+
+    upcoming = Booking.objects.filter(
+        tutor=tutor
+    ).order_by("session_date")
+
+    bookings_data = [
+        {
+            "id": b.id,
+            "student": f"{b.student.fname} {b.student.lname}",
+            "subject": b.tutor.profile.course or "General",
+            "date": b.session_date,
+            "status": b.status
+        }
+        for b in upcoming
+    ]
+>>>>>>> 32c6f3b (Before Merging to Another Branch)
 
     return Response({
         "total_sessions": tutor.total_sessions,
@@ -627,7 +665,11 @@ def confirm_payment_and_book(request):
 
     tutor = get_object_or_404(Tutor, profile_id=tutor_id)
 
+<<<<<<< HEAD
     #  Validate payment method safely
+=======
+    # ✅ Validate payment method safely
+>>>>>>> 32c6f3b (Before Merging to Another Branch)
     try:
         method = PaymentMethod.objects.get(method_id=method_id, is_active=True)
     except PaymentMethod.DoesNotExist:
@@ -645,7 +687,11 @@ def confirm_payment_and_book(request):
         6: "Sun",
     }
 
+<<<<<<< HEAD
     total_amount = 0  #  accumulate total for multi-slot
+=======
+    total_amount = 0  # ✅ accumulate total for multi-slot
+>>>>>>> 32c6f3b (Before Merging to Another Branch)
 
     with transaction.atomic():
 
@@ -709,14 +755,22 @@ def confirm_payment_and_book(request):
                 availability=availability,
                 session_date=session_date,
                 session_mode=slot["session_mode"],
+<<<<<<< HEAD
                 status="Pending"  # Better than Pending if already paid
+=======
+                status="Confirmed"   # 🔥 Better than Pending if already paid
+>>>>>>> 32c6f3b (Before Merging to Another Branch)
             )
 
             created_bookings.append(booking.id)
 
             total_amount += tutor.hourly_rate
 
+<<<<<<< HEAD
         #  Create ONE payment record per booking
+=======
+        # ✅ Create ONE payment record per booking
+>>>>>>> 32c6f3b (Before Merging to Another Branch)
         for booking_id in created_bookings:
             Payment.objects.create(
                 booking_id=booking_id,
@@ -726,6 +780,12 @@ def confirm_payment_and_book(request):
                 paid_at=now()
             )
 
+<<<<<<< HEAD
+=======
+        # ✅ Optional: update tutor stats
+        tutor.total_sessions += len(created_bookings)
+        tutor.save()
+>>>>>>> 32c6f3b (Before Merging to Another Branch)
 
     return Response({
         "message": "Booking successful",
@@ -927,6 +987,7 @@ def booking_detail(request, booking_id):
     if request.user.userprofile != booking.tutor.profile:
         return Response({"error": "Unauthorized"}, status=403)
 
+<<<<<<< HEAD
     # -------------------------------------------------
     # FIND ALL CONSECUTIVE BOOKINGS FOR THIS SESSION
     # -------------------------------------------------
@@ -948,6 +1009,8 @@ def booking_detail(request, booking_id):
 
     duration_hours = related_bookings.count()
 
+=======
+>>>>>>> 32c6f3b (Before Merging to Another Branch)
     # -------------------------
     # Safe Payment Handling
     # -------------------------
@@ -965,10 +1028,20 @@ def booking_detail(request, booking_id):
         payment_status = booking.payment.payment_status
         transaction_id = booking.payment.transaction_reference
 
+<<<<<<< HEAD
         method = booking.payment.method.method_name if booking.payment.method else None
 
         platform_fee = round(amount_paid * 0.16, 2)
 
+=======
+        # 🔥 GET REAL METHOD FROM DB
+        method = booking.payment.method.method_name if booking.payment.method else None
+
+        # Platform fee always applies
+        platform_fee = round(amount_paid * 0.16, 2)
+
+        # Only apply transaction fee if GCash
+>>>>>>> 32c6f3b (Before Merging to Another Branch)
         if method == "GCash":
             transaction_fee = round(amount_paid * 0.04, 2)
         else:
@@ -1004,11 +1077,19 @@ def booking_detail(request, booking_id):
 
             "topic": "",
             "date": booking.session_date.strftime("%Y-%m-%d"),
+<<<<<<< HEAD
 
             "start_time": start_time.strftime("%H:%M"),
             "end_time": end_time.strftime("%H:%M"),
             "duration_hours": duration_hours,
 
+=======
+            "start_time": booking.availability.time_slot.strftime("%H:%M"),
+            "end_time": (
+                datetime.combine(date.today(), booking.availability.time_slot)
+                + timedelta(hours=1)
+            ).time().strftime("%H:%M"),
+>>>>>>> 32c6f3b (Before Merging to Another Branch)
             "rating": booking.rating.rating_score if hasattr(booking, "rating") else None,
             "status": booking.status
         },
@@ -1024,6 +1105,7 @@ def booking_detail(request, booking_id):
         }
     })
 
+<<<<<<< HEAD
 #Complete booking view (tutor marks session as completed, updates earnings, etc.)
 
 @api_view(['POST'])
@@ -1324,6 +1406,10 @@ def update_tutor_profile(request):
 @api_view(['GET'])
 def payment_methods(request):
 
+=======
+@api_view(['GET'])
+def payment_methods(request):
+>>>>>>> 32c6f3b (Before Merging to Another Branch)
     methods = PaymentMethod.objects.filter(is_active=True)
 
     data = [

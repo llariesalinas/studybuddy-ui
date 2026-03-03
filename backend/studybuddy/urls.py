@@ -50,7 +50,11 @@ urlpatterns = [
     path('bookings/', views.list_bookings),
     path('bookings/<int:booking_id>/', views.booking_detail),
     path('payment-methods/', views.payment_methods),
+<<<<<<< HEAD
     
+=======
+
+>>>>>>> 32c6f3b (Before Merging to Another Branch)
     #Dynamic
     
     path('bookings/confirm/', views.confirm_payment_and_book),
