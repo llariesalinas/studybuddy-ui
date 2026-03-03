@@ -13,7 +13,7 @@ export const useSessionsStore = defineStore('sessions', () => {
     error.value = null
 
     try {
-      const response = await api.get('/bookings')
+      const response = await api.get('/bookings/')
       sessions.value = response.data
     } catch (err) {
       error.value = 'Failed to load sessions.'
@@ -33,7 +33,7 @@ export const useSessionsStore = defineStore('sessions', () => {
 
   const upcomingSessions = computed(() =>
     sessions.value
-      .filter(s => normalizeStatus(s.status) === 'upcoming')
+      .filter(s => normalizeStatus(s.status) === 'confirmed')
       .sort((a, b) => new Date(a.date) - new Date(b.date))
   )
 
@@ -49,21 +49,15 @@ export const useSessionsStore = defineStore('sessions', () => {
     .sort((a, b) => new Date(a.date) - new Date(b.date))
   )
 
-  const updateSessionStatus = async (id, newStatus) => {
-  try {
-    await api.patch(`/bookings/${id}`, {
-      status: newStatus
-    })
-
-    const session = sessions.value.find(s => s.id === id)
-    if (session) {
-      session.status = newStatus.toLowerCase()
-    }
-
-  } catch (error) {
-    console.error('Failed to update status')
+  const approveSession = async (id) => {
+  await api.post(`/bookings/${id}/approve/`)
+  await fetchSessions()
   }
-}
+
+  const rejectSession = async (id) => {
+  await api.post(`/bookings/${id}/reject/`)
+  await fetchSessions()
+  }
 
   return {
     sessions,
@@ -74,6 +68,7 @@ export const useSessionsStore = defineStore('sessions', () => {
     upcomingSessions,
     cancelledSessions,
     requestedSessions,
-    updateSessionStatus
+    approveSession,
+    rejectSession
   }
 })

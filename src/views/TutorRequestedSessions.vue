@@ -80,18 +80,20 @@
               <div class="col-md text-md-end mt-3 mt-md-0">
                 <div class="d-grid gap-2">
 
-                  <button
-                    class="btn btn-sm btn-success"
-                    @click="confirmSession(session.id)"
-                  >
-                    Confirm
-                  </button>
+                <button
+                  class="btn btn-sm btn-success"
+                  :disabled="confirmingId === session.id"
+                  @click="confirmSession(session.id)"
+                >
+                  {{ confirmingId === session.id ? "Confirming..." : "Confirm" }}
+                </button>
 
                   <button
                     class="btn btn-sm btn-danger"
+                    :disabled="rejectingId === session.id"
                     @click="rejectSession(session.id)"
                   >
-                    Reject
+                    {{ rejectingId === session.id ? "Rejecting..." : "Reject" }}
                   </button>
 
                 </div>
@@ -113,6 +115,8 @@
 import { ref, computed, onMounted } from 'vue'
 import { useSessionsStore } from '@/stores/completedSessions'
 
+const confirmingId = ref(null)
+const rejectingId = ref(null)
 const sessionStore = useSessionsStore()
 
 const selectedDate = ref('')
@@ -121,12 +125,16 @@ onMounted(() => {
   sessionStore.fetchSessions()
 })
 
-const confirmSession = (id) => {
-  sessionStore.updateSessionStatus(id, 'upcoming')
+const confirmSession = async (id) => {
+  confirmingId.value = id
+  await sessionStore.approveSession(id)
+  confirmingId.value = null
 }
 
-const rejectSession = (id) => {
-  sessionStore.updateSessionStatus(id, 'cancelled')
+const rejectSession = async (id) => {
+  rejectingId.value = id
+  await sessionStore.rejectSession(id)
+  rejectingId.value = null
 }
 
 const filteredSessions = computed(() => {
