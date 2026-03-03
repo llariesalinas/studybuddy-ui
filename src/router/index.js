@@ -94,7 +94,7 @@ const router = createRouter({
       // meta: { requiresAuth: true, role: 'Tutor' }
     },
     {
-      path: '/booking-details',
+      path: '/booking-details/:id',
       name: 'booking-details',
       component: () => import('@/views/BookingDetails.vue'),
       meta: { requiresAuth: true, role: 'Tutor' }

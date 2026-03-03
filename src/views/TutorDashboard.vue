@@ -46,7 +46,7 @@
             <tbody>
             <tr
               v-for="booking in upcomingBookings"
-              :key="booking.date + booking.student"
+              :key="booking.id"
               style="border-top: 1px solid var(--sb-card-border);"
             >
               <td class="py-3 text-dark">
@@ -77,12 +77,12 @@
                 </span>
 
                 <!-- ✅ Complete Button -->
-                <button 
-                    class="btn btn-sm bg-sb-primary text-white"
-                    @click="goToDetails(session.id)"
-                  >
-                    View Details
-                  </button>
+                <button
+                  class="btn btn-success"
+                  @click="goToBookingDetails(booking.id)"
+                >
+                  View Details
+                </button>
               </td>
             </tr>
           </tbody>
@@ -94,6 +94,7 @@
 </template>
 
 <script setup>
+import { useRouter } from 'vue-router'
 import { ref, onMounted } from 'vue'
 import api from '@/services/api/api'
 
@@ -101,10 +102,20 @@ const totalSessions = ref(0)
 const avgRating = ref(0)
 const earnings = ref(0)
 const upcomingBookings = ref([])
+const router = useRouter()
 
-const goToDetails = (sessionId) => {
-  router.push(`/booking-details/${sessionId}`)
+
+
+
+
+const goToBookingDetails = (id) => {
+  router.push({
+    name: 'booking-details',
+    params: { id }
+  })
 }
+
+
 
 const loadTutorDashboard = async () => {
   try {
@@ -113,7 +124,7 @@ const loadTutorDashboard = async () => {
     totalSessions.value = response.data.total_sessions
     avgRating.value = response.data.rating_average
     upcomingBookings.value = response.data.upcoming_bookings
-    earnings.value = totalSessions.value * response.data.hourly_rate
+    earnings.value = response.data.total_earnings
 
   } catch (error) {
     console.error("Failed to load tutor dashboard:", error)
