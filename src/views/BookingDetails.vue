@@ -120,11 +120,11 @@
 
           <div class="d-flex justify-content-end">
             <button
-              class="btn bg-sb-primary text-white"
-              :disabled="bookingDetailsStore.paymentInfo?.status === 'Paid'"
-              @click="bookingDetailsStore.confirmPayment"
+              v-if="bookingDetailsStore.sessionInfo?.status === 'Confirmed'"
+              class="btn btn-success"
+              @click="handleComplete"
             >
-              Confirm Payment
+              Complete Session
             </button>
           </div>
         </div>
@@ -173,8 +173,15 @@ import { useTutorBookingDetailStore } from '@/stores/tutorBookingDetails'
 const route = useRoute()
 const bookingId = route.params.id
 const bookingDetailsStore = useTutorBookingDetailStore()
-const store = useTutorBookingDetailStore()
 
+const handleComplete = async () => {
+  try {
+    await bookingDetailsStore.completeSession()
+    alert("Session marked as completed.")
+  } catch (error) {
+    alert(error.response?.data?.error || "Failed to complete session.")
+  }
+}
 
 onMounted(() => {
     bookingDetailsStore.fetchBookingDetails(route.params.id)

@@ -33,6 +33,26 @@ export const useTutorBookingDetailStore = defineStore('tutorBookingDetail', () =
     }
   }
 
+  const completeSession = async () => {
+  const id = booking.value?.id || booking.value?.session?.id
+
+  console.log("Completing booking ID:", id)
+
+  if (!id) {
+    console.log("NO ID FOUND")
+    return
+  }
+
+  try {
+    await api.post(`/bookings/${id}/complete/`)
+    await fetchBookingDetails(id)
+  } catch (err) {
+    console.error("Failed to complete session:", err)
+    throw err
+  }
+}
+
+
   const confirmPayment = async () => {
     if (!booking.value?.id) return
 
@@ -66,6 +86,7 @@ export const useTutorBookingDetailStore = defineStore('tutorBookingDetail', () =
     bookingId,
     fetchBookingDetails,
     confirmPayment,
-    resetStore
+    resetStore,
+    completeSession,
   }
 })

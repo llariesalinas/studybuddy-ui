@@ -22,6 +22,8 @@ export const useSessionsStore = defineStore('sessions', () => {
     }
   }
 
+  
+
   const normalizeStatus = (status) =>
     status?.toLowerCase() || ''
 
@@ -51,13 +53,22 @@ export const useSessionsStore = defineStore('sessions', () => {
 
   const approveSession = async (id) => {
   await api.post(`/bookings/${id}/approve/`)
-  await fetchSessions()
+
+  const session = sessions.value.find(s => s.id === id)
+  if (session) {
+    session.status = "Confirmed"
+  }
+
   }
 
   const rejectSession = async (id) => {
   await api.post(`/bookings/${id}/reject/`)
-  await fetchSessions()
+
+  const session = sessions.value.find(s => s.id === id)
+  if (session) {
+    session.status = "Cancelled"
   }
+  } 
 
   return {
     sessions,
