@@ -1,134 +1,181 @@
 <template>
+
   <nav class="navbar navbar-expand-lg bg-white py-3">
     <div class="container">
-      <a class="navbar-brand d-flex align-items-center fw-bold fs-4" href="#">
-        <i class="bi bi-book text-sb-primary me-2"></i>
-        <span class="text-dark">StudyBuddy</span>
+      <a class="navbar-brand fw-bold fs-4">
+        StudyBuddy
       </a>
     </div>
   </nav>
 
-  <div class="container py-5">
-    <div class="row justify-content-center">
-      <div class="col-md-7">
-        <div class="card border-sb shadow-sm rounded-4 p-4">
 
+  <div class="container py-5">
+
+    <div class="row justify-content-center">
+
+      <div class="col-md-7">
+
+        <div class="card shadow-sm rounded-4 p-4">
+
+          <!-- PROGRESS -->
           <div class="mb-4">
-            <div class="progress" style="height: 8px;">
-              <div class="progress-bar bg-success" :style="{ width: progressPercentage + '%' }"></div>
+            <div class="progress" style="height:8px;">
+              <div
+                class="progress-bar bg-success"
+                :style="{ width: progressPercentage + '%' }"
+              ></div>
             </div>
           </div>
 
+          <!-- CARD 1 SUBJECTS -->
           <div v-if="currentCard === 0">
+
             <div class="text-center mb-4">
-              <h3 class="fw-bold text-dark">What subjects are you interested in?</h3>
-              <p class="text-muted">Choose all that apply.</p>
+              <h3 class="fw-bold">What subjects are you interested in?</h3>
+              <p class="text-muted">Choose all that apply</p>
             </div>
 
             <div class="row g-3 mb-4">
-              <div class="col-6" v-for="subject in subjects" :key="subject">
+
+              <div
+                class="col-6"
+                v-for="subject in subjects"
+                :key="subject.subject_code"
+              >
+
                 <div
                   class="card border rounded-4 p-3 text-center h-100"
-                  :class="store.selectedSubjects.includes(subject)
+                  style="cursor:pointer"
+                  :class="store.selectedSubjects.includes(subject.subject_code)
                     ? 'border-success bg-success bg-opacity-10'
-                    : 'border-sb'"
-                  style="cursor:pointer;"
-                  @click="toggleSubject(subject)"
+                    : ''"
+                  @click="toggleSubject(subject.subject_code)"
                 >
-                  <h6 class="fw-bold mb-0">{{ subject }}</h6>
+
+                  <h6 class="fw-bold mb-0">
+                    {{ subject.subject_name }}
+                  </h6>
+
                 </div>
+
               </div>
+
             </div>
 
             <div class="d-flex justify-content-end">
+
               <button
-                type="button"
-                class="btn bg-sb-primary text-white px-4 rounded-3 fw-semibold"
+                class="btn btn-success px-4"
                 :disabled="store.selectedSubjects.length === 0"
                 @click="nextCard"
               >
                 Continue
               </button>
+
             </div>
+
           </div>
 
+
+          <!-- CARD 2 YEAR LEVEL -->
           <div v-else-if="currentCard === 1">
+
             <div class="text-center mb-4">
-              <h3 class="fw-bold text-dark">Select Your Level</h3>
-              <p class="text-muted">Choose your proficiency level for the subjects.</p>
+              <h3 class="fw-bold">Select Your Year Level</h3>
+              <p class="text-muted">Choose your current academic level</p>
             </div>
 
-            <div class="row g-3 mb-4 justify-content-center">
-              <div class="col-6" v-for="level in levels" :key="level">
-                <div
-                  class="card border rounded-4 p-3 text-center h-100"
-                  :class="store.selectedLevel === level
-                    ? 'border-success bg-success bg-opacity-10'
-                    : 'border-sb'"
-                  style="cursor:pointer;"
-                  @click="selectLevel(level)"
+            <div class="mb-4">
+
+              <select class="form-select" v-model="yearLevel">
+
+                <option disabled value="">Select Year Level</option>
+
+                <option
+                  v-for="level in yearLevels"
+                  :key="level.value"
+                  :value="level.value"
                 >
-                  <h6 class="fw-bold mb-0">{{ level }}</h6>
-                </div>
-              </div>
+                  {{ level.label }}
+                </option>
+
+              </select>
+
             </div>
 
             <div class="d-flex justify-content-end">
+
               <button
-                class="btn bg-sb-primary text-white px-4 rounded-3 fw-semibold"
-                :disabled="!store.selectedLevel"
+                class="btn btn-success px-4"
+                :disabled="!yearLevel"
                 @click="nextCard"
               >
                 Continue
               </button>
+
             </div>
+
           </div>
 
+
+          <!-- CARD 3 COURSE -->
           <div v-else-if="currentCard === 2">
+
             <div class="text-center mb-4">
-              <h3 class="fw-bold text-dark">Preferred Study Time</h3>
-              <p class="text-muted">Select the time you prefer to study.</p>
+              <h3 class="fw-bold">Select Your Course</h3>
+              <p class="text-muted">Choose your academic program</p>
             </div>
 
-            <div class="row g-3 mb-4 justify-content-center">
-              <div class="col-6" v-for="time in studyTimes" :key="time">
-                <div
-                  class="card border rounded-4 p-3 text-center h-100"
-                  :class="store.selectedTime === time
-                    ? 'border-success bg-success bg-opacity-10'
-                    : 'border-sb'"
-                  style="cursor:pointer;"
-                  @click="selectTime(time)"
+            <div class="mb-4">
+
+              <select class="form-select" v-model="selectedCourse">
+
+                <option disabled value="">Select Course</option>
+
+                <option
+                  v-for="course in courses"
+                  :key="course.course_code"
+                  :value="course.course_code"
                 >
-                  <h6 class="fw-bold mb-0">{{ time }}</h6>
-                </div>
-              </div>
+                  {{ course.course_name }}
+                </option>
+
+              </select>
+
             </div>
 
             <div class="d-flex justify-content-end">
+
               <button
-                class="btn bg-sb-primary text-white px-4 rounded-3 fw-semibold"
-                :disabled="!store.selectedTime || isSubmitting"
+                class="btn btn-success px-4"
+                :disabled="!selectedCourse || isSubmitting"
                 @click="finish"
               >
-                <span v-if="isSubmitting" class="spinner-border spinner-border-sm me-2"></span>
-                {{ isSubmitting ? 'Saving...' : 'Go to Dashboard' }}
+                {{ isSubmitting ? "Saving..." : "Go to Dashboard" }}
               </button>
+
             </div>
+
           </div>
 
         </div>
+
       </div>
+
     </div>
+
   </div>
+
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePreferenceStore } from '@/stores/preferences'
 import { useProfileStore } from '@/stores/profile'
 import api from '@/services/api/api'
+
 
 const router = useRouter()
 const store = usePreferenceStore()
@@ -138,114 +185,132 @@ const currentCard = ref(0)
 const totalCards = 3
 const isSubmitting = ref(false)
 
+const subjects = ref([])
+const courses = ref([])
 
-// ---------- SELECT LEVEL ----------
-const levels = ['Highschool', 'University']
-
-const selectLevel = (level) => {
-  store.selectedLevel = level
-}
+const yearLevel = ref('')
+const selectedCourse = ref('')
 
 
-// ---------- SELECT STUDY TIME ----------
-const studyTimes = ['Morning', 'Afternoon', 'Evening']
+/* YEAR LEVEL OPTIONS */
 
-const selectTime = (time) => {
-  store.selectedTime = time
-}
+const yearLevels = [
 
+  { label: "Grade 1", value: 1 },
+  { label: "Grade 2", value: 2 },
+  { label: "Grade 3", value: 3 },
+  { label: "Grade 4", value: 4 },
+  { label: "Grade 5", value: 5 },
+  { label: "Grade 6", value: 6 },
+  { label: "Grade 7", value: 7 },
+  { label: "Grade 8", value: 8 },
+  { label: "Grade 9", value: 9 },
+  { label: "Grade 10", value: 10 },
+  { label: "Grade 11", value: 11 },
+  { label: "Grade 12", value: 12 },
 
-// ---------- SUBJECT LIST ----------
-const subjects = [
-  'Mathematics',
-  'Science',
-  'English',
-  'Programming',
-  'Data Structures',
-  'Business'
+  { label: "1st Year College", value: 13 },
+  { label: "2nd Year College", value: 14 },
+  { label: "3rd Year College", value: 15 },
+  { label: "4th Year College", value: 16 }
+
 ]
 
 
-// ---------- TOGGLE SUBJECT ----------
-const toggleSubject = (subject) => {
+/* LOAD DATA */
 
-  if (store.selectedSubjects.includes(subject)) {
+onMounted(async () => {
+
+  try {
+
+    const subjectRes = await api.get('/subjects/')
+    subjects.value = subjectRes.data
+
+    const courseRes = await api.get('/courses/')
+    courses.value = courseRes.data
+
+  } catch (error) {
+
+    console.error("Failed loading setup data", error)
+
+  }
+
+})
+
+
+/* SUBJECT TOGGLE */
+
+const toggleSubject = (subjectCode) => {
+
+  if (store.selectedSubjects.includes(subjectCode)) {
 
     store.selectedSubjects = store.selectedSubjects.filter(
-      s => s !== subject
+      s => s !== subjectCode
     )
 
   } else {
 
-    store.selectedSubjects.push(subject)
+    store.selectedSubjects.push(subjectCode)
 
   }
 
 }
 
 
-// ---------- CARD NAVIGATION ----------
+/* NAVIGATION */
+
 const nextCard = () => {
 
   if (currentCard.value === 0 && store.selectedSubjects.length === 0) {
-    alert("Please select at least one subject.")
+    alert("Please select at least one subject")
     return
   }
 
-  if (currentCard.value === 1 && !store.selectedLevel) {
-    alert("Please select your study level.")
+  if (currentCard.value === 1 && !yearLevel.value) {
+    alert("Please select your year level")
     return
   }
 
-  if (currentCard.value === 2 && !store.selectedTime) {
-    alert("Please select your preferred study time.")
-    return
-  }
-
-  if (currentCard.value < totalCards - 1) {
-
-    currentCard.value += 1
-
-  } else {
-
-    finish()
-
-  }
+  currentCard.value++
 
 }
 
 
-// ---------- FINISH SETUP ----------
+/* FINISH SETUP */
+
 const finish = async () => {
 
   isSubmitting.value = true
 
   try {
 
-    const payload = {
+    await api.post('/profile/setup/', {
 
-      // mapped to backend UserProfile fields
-      course: store.selectedLevel,
-      year_level: 1, // temporary until year-level UI added
-      bio: `Prefers ${store.selectedTime} study sessions`,
+      course: selectedCourse.value,
+      year_level: yearLevel.value,
+      bio: "Student profile"
 
-    }
+    })
 
-    // SAVE PROFILE SETUP
-    await api.post('/profile/setup/', payload)
 
-    // unlock profile guard
+    await api.post('/preferences/', {
+
+      subjects: store.selectedSubjects,
+      preferred_mode: "Online",
+      hourly_budget: 500
+
+    })
+
+
     profileStore.profileCompleted = true
-
-    console.log('Preferences saved successfully')
 
     router.push('/dashboard')
 
   } catch (error) {
 
-    console.error('Failed to save preferences:', error)
+    console.error("Failed saving preferences", error)
 
-    alert('Could not save preferences. Please try again.')
+    alert("Could not save preferences")
 
   } finally {
 
@@ -256,7 +321,8 @@ const finish = async () => {
 }
 
 
-// ---------- PROGRESS BAR ----------
+/* PROGRESS BAR */
+
 const progressPercentage = computed(() => {
   return ((currentCard.value + 1) / totalCards) * 100
 })

@@ -3,6 +3,7 @@ from django.conf.urls.static import static
 from django.conf import settings
 from .views import(
                    complete_booking,
+                   list_courses,
                    login_view, 
                    register_user, 
                    student_dashboard, 
@@ -25,6 +26,7 @@ urlpatterns = [
     #Base
     path('register/', register_user),
     path('login/', login_view),
+    path('courses/', views.list_courses),
     path('profile/status/', views.profile_status),
     path('preferences/', views.save_preferences),
     path('dashboard/', student_dashboard),
@@ -41,7 +43,7 @@ urlpatterns = [
     path('payment-methods/', views.payment_methods),
     
     #Dynamic
-
+    
     path('bookings/confirm/', views.confirm_payment_and_book),
     path('template-availability/', template_availability),
     path('template-availability/<int:pk>/', template_availability),
@@ -49,7 +51,7 @@ urlpatterns = [
     path('bookings/<int:booking_id>/approve/', views.approve_booking),
     path('bookings/<int:booking_id>/reject/', views.reject_booking),
     path('tutor/setup/', views.tutor_setup),
-    
+    path('recommend-tutors/', views.recommend_tutors_view),
 ]
 
 if settings.DEBUG:

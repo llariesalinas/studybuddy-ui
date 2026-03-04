@@ -16,8 +16,8 @@ from django.utils.timezone import now
 from django.db.models import Case, When, Value, IntegerField
 from collections import defaultdict
 
-
-from .models import Payment, PaymentMethod, Subjects, TutorAvailability, TutorSubjects, Tutor, Booking, PaymentMethod
+from .recommender.cbf import recommend_tutors
+from .models import Payment, PaymentMethod, Subjects, TutorAvailability, TutorSubjects, Tutor, Booking, PaymentMethod,Course,Preference
 from .serializers import TutorDetailSerializer, TutorSearchSerializer, SubjectSerializer
 
 from .models import (
@@ -133,6 +133,21 @@ def login_view(request):
         "lname": profile.lname
     })
 
+
+@api_view(['GET'])
+def list_courses(request):
+
+    courses = Course.objects.all()
+
+    data = [
+        {
+            "course_code": c.course_code,
+            "course_name": c.course_name
+        }
+        for c in courses
+    ]
+
+    return Response(data)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -874,21 +889,6 @@ def complete_booking(request, booking_id):
 
     return Response({"message": "Session marked as completed successfully."})
 
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def setup_profile(request):
-
-    profile = request.user.userprofile
-
-    profile.course = request.data.get("course")
-    profile.year_level = request.data.get("year_level")
-    profile.bio = request.data.get("bio")
-
-    profile.save()
-
-    return Response({
-        "message": "Profile updated successfully"
-    })
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -931,3 +931,78 @@ def tutor_setup(request):
     profile.save()
 
     return Response({"message": "Tutor profile updated"})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def recommend_tutors_view(request):
+
+    student_profile = request.user.userprofile
+
+    subject = request.data.get("subject")
+    preferred_mode = request.data.get("preferred_mode")
+
+    if not subject:
+        return Response(
+            {"error": "Subject is required"},
+            status=400
+        )
+
+    # Run CBF algorithm
+    results = recommend_tutors(
+        student_profile,
+        subject,
+        preferred_mode
+    )
+
+    data = []
+
+    for r in results[:10]:
+
+        tutor = r["tutor"]
+        score = r["score"]
+
+        tutor_subjects = TutorSubjects.objects.filter(
+            tutor=tutor
+        ).select_related("subject")
+
+        subjects = [
+            ts.subject.subject_name
+            for ts in tutor_subjects
+        ]
+
+        data.append({
+            "id": tutor.profile.id,
+            "name": f"{tutor.profile.fname} {tutor.profile.lname}",
+            "score": round(score, 3),
+            "rating": tutor.rating_average,
+            "hourly_rate": tutor.hourly_rate,
+            "subjects": subjects
+            
+        })
+
+    return Response(data, status=200)
+
+#Setup Profile 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def setup_profile(request):
+
+    profile = request.user.userprofile
+
+    course_code = request.data.get("course")
+
+    if course_code:
+        course = Course.objects.get(course_code=course_code)
+        profile.course = course
+
+    profile.year_level = request.data.get("year_level")
+    profile.bio = request.data.get("bio")
+
+    profile.profile_completed = True
+
+    profile.save()
+
+    return Response({
+        "message": "Profile updated successfully"
+    })

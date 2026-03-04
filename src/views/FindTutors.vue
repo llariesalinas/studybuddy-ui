@@ -119,94 +119,131 @@
 </template>
 
 <script setup>
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import api from '@/services/api/api'
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, watch } from 'vue'
+
 import { useAuthStore } from '@/stores/auth'
 import { useInitialBookingPrefsStore } from '@/stores/initialbookingprefs'
 import { useBookedSessionStore } from '@/stores/bookedSessionDetails'
-import { useRouter } from 'vue-router'
-
-
-const bookedSessionStore = useBookedSessionStore()
-const initialbookStore = useInitialBookingPrefsStore()
-const authStore = useAuthStore()
-const isLoading = ref(true)
-const isSubmitting = ref(false)
-const router = useRouter()
-
-const matchedTutors = ref([])
 
 const route = useRoute()
+const router = useRouter()
 
-const modes = [
-    'Online',
-    'Face-to-face'
-]
+const authStore = useAuthStore()
+const initialbookStore = useInitialBookingPrefsStore()
+const bookedSessionStore = useBookedSessionStore()
+
+const isLoading = ref(true)
+const isSubmitting = ref(false)
+
+const matchedTutors = ref([])
+const subjects = ref([])
+
+const modes = ['Online', 'Face-to-face']
 
 
+/*
+Reset topic if subject changes
+*/
 watch(
-    () => initialbookStore.selectedSubject,
-    () => {
-        initialbookStore.selectedTopic = ''
-    }
+  () => initialbookStore.selectedSubject,
+  () => {
+    initialbookStore.selectedTopic = ''
+  }
 )
 
-const bookSessions = () => {
 
-  bookedSessionStore.bookedSessionTutorID = tutorID
-  bookedSessionStore.bookedSessionTutorName = tutorDetails.value.name
-  bookedSessionStore.bookedSessions = selectedSlots.value
-
-  router.push(`/payment-tutee/${tutorID}`)
-}
-
+/*
+CBF Tutor Search
+*/
 const searchTutor = async () => {
+
   isSubmitting.value = true
   isLoading.value = true
 
   try {
-    const response = await api.get(
-      `search-tutors/?subject=${initialbookStore.selectedSubject}`
-    )
+
+    const response = await api.post('/recommend-tutors/', {
+
+      subject: initialbookStore.selectedSubject,
+      topic: initialbookStore.selectedTopic,
+      preferred_mode: initialbookStore.selectedMode
+
+    })
 
     matchedTutors.value = response.data.map(tutor => ({
-      profile_id: tutor.profile_id,   // ✅ FIXED
-      initials: tutor.fname[0] + tutor.lname[0],
-      name: `${tutor.fname} ${tutor.lname}`,
+
+      profile_id: tutor.id,
+
+      initials: tutor.name
+        .split(' ')
+        .map(n => n[0])
+        .join(''),
+
+      name: tutor.name,
+
       year_course: 'Tutor',
-      rating: tutor.rating_average ?? 5.0,
+
+      rating: tutor.rating ?? 5.0,
+
       bio: 'Peer tutor available.',
-      subjects: [],
+
+      subjects: tutor.subjects ?? [],
+
       hourly_rate: tutor.hourly_rate ?? 150,
-      total_sessions: tutor.total_sessions ?? 0
+
+      total_sessions: tutor.total_sessions ?? 0,
+
+      score: tutor.score
+
     }))
 
   } catch (error) {
-    console.error('Search failed:', error)
+
+    console.error('CBF search failed:', error)
+
   } finally {
+
     isSubmitting.value = false
     isLoading.value = false
+
   }
+
 }
 
+
+/*
+Navigate to tutor details
+*/
 const toTutorDetails = (tutor) => {
-    bookedSessionStore.bookedSessionTutorID = tutor.profile_id
-    bookedSessionStore.bookedSessionTutorName = tutor.name
-    bookedSessionStore.bookedSessionSub = initialbookStore.selectedSubject
-    bookedSessionStore.bookedSessionTop = initialbookStore.selectedTopic
-    bookedSessionStore.bookedSessionMode = initialbookStore.selectedMode
 
-    router.push(`/tutor/${tutor.profile_id}`)
+  bookedSessionStore.bookedSessionTutorID = tutor.profile_id
+  bookedSessionStore.bookedSessionTutorName = tutor.name
+  bookedSessionStore.bookedSessionSub = initialbookStore.selectedSubject
+  bookedSessionStore.bookedSessionTop = initialbookStore.selectedTopic
+  bookedSessionStore.bookedSessionMode = initialbookStore.selectedMode
+
+  router.push(`/tutor/${tutor.profile_id}`)
 }
 
-const subjects = ref([])
 
+/*
+Initial page load
+*/
 onMounted(async () => {
-  const res = await api.get('subjects/')
-  subjects.value = res.data
 
-  // 🔥 Sync query param into store
+  try {
+
+    const res = await api.get('/subjects/')
+    subjects.value = res.data
+
+  } catch (error) {
+
+    console.error("Failed to load subjects", error)
+
+  }
+
   if (route.query.subject) {
     initialbookStore.selectedSubject = route.query.subject
   }
@@ -216,19 +253,6 @@ onMounted(async () => {
   } else {
     isLoading.value = false
   }
+
 })
 </script>
-
-<style scoped>
-.border-sb {
-    border-color: var(--sb-card-border) !important;
-}
-
-.text-sb-primary {
-    color: var(--sb-primary) !important;
-}
-
-.bg-sb-primary {
-    background-color: var(--sb-primary) !important;
-}
-</style>
