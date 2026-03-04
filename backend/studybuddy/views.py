@@ -26,6 +26,13 @@ from .models import (
     Tutor,
     TutorSubjects
 )
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from rest_framework import status
+from django.contrib.auth.models import User
+from .models import UserProfile, Tutor
+
+
 @api_view(['POST'])
 def register_user(request):
 
@@ -36,25 +43,29 @@ def register_user(request):
     lname = request.data.get('lname')
     role = request.data.get('role')
 
+    # Validate required fields
     if not all([email, password, fname, lname, role]):
         return Response(
             {"error": "Missing required fields"},
             status=status.HTTP_400_BAD_REQUEST
         )
 
+    # Prevent duplicate users
     if User.objects.filter(username=email).exists():
         return Response(
             {"error": "User already exists"},
             status=status.HTTP_400_BAD_REQUEST
         )
 
+    # Create Django User
     user = User.objects.create_user(
         username=email,
         email=email,
         password=password
     )
 
-    UserProfile.objects.create(
+    # Create UserProfile
+    profile = UserProfile.objects.create(
         user=user,
         fname=fname,
         mname=mname,
@@ -62,10 +73,25 @@ def register_user(request):
         role=role
     )
 
+    # 🔥 Create Tutor record if role is Tutor
+    if role == "Tutor":
+        Tutor.objects.create(profile=profile)
+
     return Response(
         {"message": "User registered successfully"},
         status=status.HTTP_201_CREATED
     )
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def profile_status(request):
+
+    profile = request.user.userprofile
+
+    return Response({
+        "profile_completed": profile.profile_completed,
+        "role": profile.role
+    })
 
 @api_view(['POST'])
 def login_view(request):
@@ -847,3 +873,61 @@ def complete_booking(request, booking_id):
         tutor.save()
 
     return Response({"message": "Session marked as completed successfully."})
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def setup_profile(request):
+
+    profile = request.user.userprofile
+
+    profile.course = request.data.get("course")
+    profile.year_level = request.data.get("year_level")
+    profile.bio = request.data.get("bio")
+
+    profile.save()
+
+    return Response({
+        "message": "Profile updated successfully"
+    })
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def save_preferences(request):
+
+    user = request.user
+    data = request.data
+
+    pref, created = Preference.objects.get_or_create(user=user)
+
+    pref.preferred_mode = data.get("preferred_mode")
+    pref.hourly_budget = data.get("hourly_budget")
+
+    pref.save()
+
+    # Handle ManyToMany subjects
+    subject_ids = data.get("subjects", [])
+    pref.subjects.set(subject_ids)
+
+    return Response({
+        "message": "Preferences saved successfully"
+    })
+
+@api_view(['POST'])
+def tutor_setup(request):
+
+    profile = request.user.userprofile
+    tutor = Tutor.objects.get(profile=profile)
+
+    tutor.teaching_level = request.data.get("teaching_level")
+
+    tutor.can_online = request.data.get("can_online", True)
+    tutor.can_f2f = request.data.get("can_f2f", False)
+
+    tutor.hourly_rate = request.data.get("hourly_rate")
+
+    tutor.save()
+
+    profile.profile_completed = True
+    profile.save()
+
+    return Response({"message": "Tutor profile updated"})

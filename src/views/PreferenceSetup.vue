@@ -127,25 +127,35 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePreferenceStore } from '@/stores/preferences'
-import axios from 'axios'
+import { useProfileStore } from '@/stores/profile'
+import api from '@/services/api/api'
 
 const router = useRouter()
 const store = usePreferenceStore()
+const profileStore = useProfileStore()
 
 const currentCard = ref(0)
 const totalCards = 3
 const isSubmitting = ref(false)
 
+
+// ---------- SELECT LEVEL ----------
+const levels = ['Highschool', 'University']
+
 const selectLevel = (level) => {
   store.selectedLevel = level
 }
-const levels = ['Highschool', 'University']
+
+
+// ---------- SELECT STUDY TIME ----------
+const studyTimes = ['Morning', 'Afternoon', 'Evening']
 
 const selectTime = (time) => {
   store.selectedTime = time
 }
-const studyTimes = ['Morning', 'Afternoon', 'Evening']
 
+
+// ---------- SUBJECT LIST ----------
 const subjects = [
   'Mathematics',
   'Science',
@@ -155,49 +165,100 @@ const subjects = [
   'Business'
 ]
 
+
+// ---------- TOGGLE SUBJECT ----------
 const toggleSubject = (subject) => {
+
   if (store.selectedSubjects.includes(subject)) {
-    store.selectedSubjects = store.selectedSubjects.filter(s => s !== subject)
+
+    store.selectedSubjects = store.selectedSubjects.filter(
+      s => s !== subject
+    )
+
   } else {
+
     store.selectedSubjects.push(subject)
+
   }
+
 }
 
+
+// ---------- CARD NAVIGATION ----------
 const nextCard = () => {
-  if (currentCard.value === 0 && store.selectedSubjects.length === 0) return
-  if (currentCard.value === 1 && !store.selectedLevel) return
-  if (currentCard.value === 2 && !store.selectedTime) return
+
+  if (currentCard.value === 0 && store.selectedSubjects.length === 0) {
+    alert("Please select at least one subject.")
+    return
+  }
+
+  if (currentCard.value === 1 && !store.selectedLevel) {
+    alert("Please select your study level.")
+    return
+  }
+
+  if (currentCard.value === 2 && !store.selectedTime) {
+    alert("Please select your preferred study time.")
+    return
+  }
 
   if (currentCard.value < totalCards - 1) {
+
     currentCard.value += 1
+
   } else {
+
     finish()
+
   }
+
 }
 
+
+// ---------- FINISH SETUP ----------
 const finish = async () => {
+
   isSubmitting.value = true
 
   try {
+
     const payload = {
-      preferredSubjects: store.selectedSubjects,
-      preferredLevel: store.selectedLevel,
-      preferredTime: store.selectedTime
+
+      // mapped to backend UserProfile fields
+      course: store.selectedLevel,
+      year_level: 1, // temporary until year-level UI added
+      bio: `Prefers ${store.selectedTime} study sessions`,
+
     }
 
-    // API_INTEGRATION_POINT: Coordinate this endpoint with Ry
-    await axios.post('http://127.0.0.1:8000/api/preferences/', payload)
+    // SAVE PROFILE SETUP
+    await api.post('/profile/setup/', payload)
+
+    // unlock profile guard
+    profileStore.profileCompleted = true
 
     console.log('Preferences saved successfully')
+
     router.push('/dashboard')
 
   } catch (error) {
+
     console.error('Failed to save preferences:', error)
-    alert('Could not save preferences. Please check your connection.')
+
+    alert('Could not save preferences. Please try again.')
+
   } finally {
+
     isSubmitting.value = false
+
   }
+
 }
 
-const progressPercentage = computed(() => ((currentCard.value + 1) / totalCards) * 100)
+
+// ---------- PROGRESS BAR ----------
+const progressPercentage = computed(() => {
+  return ((currentCard.value + 1) / totalCards) * 100
+})
+
 </script>

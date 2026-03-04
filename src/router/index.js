@@ -1,12 +1,14 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useProfileStore } from '@/stores/profile'
+
 import Dashboard from '@/views/Dashboard.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
 
-    // --- PUBLIC ROUTES ---
+    // ---------- PUBLIC ROUTES ----------
     {
       path: '/',
       name: 'home',
@@ -23,12 +25,12 @@ const router = createRouter({
       component: () => import('@/views/Register.vue')
     },
 
-    // --- STUDENT ROUTES ---
+    // ---------- STUDENT ROUTES ----------
     {
       path: '/preferencesetup',
       name: 'preferencesetup',
       component: () => import('@/views/PreferenceSetup.vue'),
-      meta: { requiresAuth: true, role: 'Tutee' }
+      meta: { requiresAuth: true }
     },
     {
       path: '/dashboard',
@@ -62,12 +64,12 @@ const router = createRouter({
       meta: { requiresAuth: true, role: 'Tutee' }
     },
 
-    // --- TUTOR ROUTES ---
+    // ---------- TUTOR ROUTES ----------
     {
       path: '/tutor-setup',
       name: 'tutorpreferencesetup',
       component: () => import('@/views/TutorPreferenceSetup.vue'),
-      meta: { requiresAuth: true, role: 'Tutor' }
+      meta: { requiresAuth: true }
     },
     {
       path: '/tch-dashboard',
@@ -91,7 +93,7 @@ const router = createRouter({
       path: '/tch-requestedSessions',
       name: 'tch-requestedSessions',
       component: () => import('@/views/TutorRequestedSessions.vue'),
-      // meta: { requiresAuth: true, role: 'Tutor' }
+      meta: { requiresAuth: true, role: 'Tutor' }
     },
     {
       path: '/booking-details/:id',
@@ -100,7 +102,7 @@ const router = createRouter({
       meta: { requiresAuth: true, role: 'Tutor' }
     },
 
-    // --- SHARED AUTH ROUTES ---
+    // ---------- SHARED ROUTES ----------
     {
       path: '/schedule',
       name: 'schedule',
@@ -119,33 +121,62 @@ const router = createRouter({
       component: () => import('@/views/Profile.vue'),
       meta: { requiresAuth: true }
     }
+
   ]
 })
 
 /*
-  NAVIGATION GUARD
-  Protects routes based on authentication and role
+  GLOBAL NAVIGATION GUARD
 */
-router.beforeEach((to, from, next) => {
-  const authStore = useAuthStore()
+router.beforeEach(async (to, from, next) => {
 
-  // If route requires authentication
+  const authStore = useAuthStore()
+  const profileStore = useProfileStore()
+
+  // 1️⃣ If route requires login
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     return next('/login')
   }
 
-  // If route requires specific role
-  if (to.meta.role && authStore.userRole !== to.meta.role) {
+  if (authStore.isAuthenticated) {
 
-    if (authStore.userRole === 'Tutee') {
-      return next('/dashboard')
+    // 2️⃣ Load profile status
+    if (!profileStore.loaded) {
+      await profileStore.checkProfileStatus()
     }
 
-    if (authStore.userRole === 'Tutor') {
-      return next('/tch-dashboard')
+    // 3️⃣ Profile completion guard
+    if (!profileStore.profileCompleted) {
+
+      const role = authStore.userRole
+
+      // allow setup pages
+      if (to.path === '/preferencesetup' || to.path === '/tutor-setup') {
+        return next()
+      }
+
+      // redirect based on role
+      if (role === 'Tutor') {
+        return next('/tutor-setup')
+      }
+
+      return next('/preferencesetup')
     }
 
-    return next('/')
+    // 4️⃣ Role protection
+    if (to.meta.role && authStore.userRole !== to.meta.role) {
+
+      if (authStore.userRole === 'Tutor') {
+        return next('/tch-dashboard')
+      }
+
+      if (authStore.userRole === 'Tutee') {
+        return next('/dashboard')
+      }
+
+      return next('/')
+    }
+
   }
 
   next()

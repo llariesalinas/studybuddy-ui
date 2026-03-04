@@ -14,6 +14,8 @@ from .views import(
                     approve_booking,
                     reject_booking,
                     booking_detail,
+                    setup_profile,
+                    profile_status
                    )
 from . import views
 
@@ -23,17 +25,21 @@ urlpatterns = [
     #Base
     path('register/', register_user),
     path('login/', login_view),
+    path('profile/status/', views.profile_status),
+    path('preferences/', views.save_preferences),
     path('dashboard/', student_dashboard),
     path('search-tutors/', SearchTutorsView.as_view(), name='search-tutors'),
     path('subjects/',SubjectListView.as_view(), name='subjects'),
     path('tutor-dashboard/', tutor_dashboard, name='tutor-dashboard'),
     path('tutors/<int:profile_id>/', tutor_detail),
     path('tutors/<int:tutor_id>/availability/', tutor_availability),
+    path('profile/setup/', views.setup_profile),
+
 
     path('bookings/', views.list_bookings),
     path('bookings/<int:booking_id>/', views.booking_detail),
     path('payment-methods/', views.payment_methods),
-
+    
     #Dynamic
 
     path('bookings/confirm/', views.confirm_payment_and_book),
@@ -42,7 +48,8 @@ urlpatterns = [
     path('bookings/<int:booking_id>/complete/', complete_booking),
     path('bookings/<int:booking_id>/approve/', views.approve_booking),
     path('bookings/<int:booking_id>/reject/', views.reject_booking),
-   
+    path('tutor/setup/', views.tutor_setup),
+    
 ]
 
 if settings.DEBUG:
