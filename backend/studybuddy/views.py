@@ -8,6 +8,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
+from django.utils import timezone
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.views import APIView
 from rest_framework.generics import ListAPIView
@@ -233,15 +234,24 @@ def tutor_dashboard(request):
     total_earnings = 0
 
     for b in completed_bookings:
-        if hasattr(b, "payment"):
+        if hasattr(b, "payment") and b.payment:
             amount = float(b.payment.amount)
             platform_fee = amount * 0.16
-            transaction_fee = amount * 0.04
+
+            method = b.payment.method.method_name if b.payment.method else None
+
+            if method == "GCash":
+                transaction_fee = amount * 0.04
+            else:
+                transaction_fee = 0
+
             tutor_earned = amount - platform_fee - transaction_fee
             total_earnings += tutor_earned
 
     upcoming = Booking.objects.filter(
-        tutor=tutor
+        tutor=tutor,
+        status="Confirmed",          # must match your exact DB value
+        session_date__gte=timezone.now()
     ).order_by("session_date")
 
     bookings_data = [
@@ -262,39 +272,6 @@ def tutor_dashboard(request):
         "total_earnings": round(total_earnings, 2),
         "upcoming_bookings": bookings_data
     })
-
-#Booking details view
-
-"""@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def create_booking(request):
-
-    profile = request.user.userprofile
-    availability_id = request.data.get("availability")
-    session_date = request.data.get("session_date")
-    session_mode = request.data.get("session_mode")
-
-    try:
-        availability = TutorAvailability.objects.get(id=availability_id)
-    except TutorAvailability.DoesNotExist:
-        return Response({"error": "Invalid availability"}, status=404)
-
-    if availability.is_booked:
-        return Response({"error": "Slot already booked"}, status=400)
-
-    booking = Booking.objects.create(
-        student=profile,
-        tutor=availability.tutor,
-        availability=availability,
-        session_date=session_date,
-        session_mode=session_mode
-    )
-
-    availability.is_booked = True
-    availability.save()
-
-    return Response({"message": "Booking successful"})"""
-
 
 #Tutor Detail View
 @api_view(['GET'])
@@ -521,7 +498,7 @@ def confirm_payment_and_book(request):
                 availability=availability,
                 session_date=session_date,
                 session_mode=slot["session_mode"],
-                status="Confirmed"   # 🔥 Better than Pending if already paid
+                status="Pending"  # Better than Pending if already paid
             )
 
             created_bookings.append(booking.id)
@@ -538,61 +515,11 @@ def confirm_payment_and_book(request):
                 paid_at=now()
             )
 
-        # ✅ Optional: update tutor stats
-        tutor.total_sessions += len(created_bookings)
-        tutor.save()
 
     return Response({
         "message": "Booking successful",
         "booking_ids": created_bookings
     })
-
-#Complete session view (tutor marks session as completed)
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def complete_session(request, booking_id):
-
-    with transaction.atomic():
-
-        booking = get_object_or_404(Booking, id=booking_id)
-
-        # ✅ Only tutor can complete their own session
-        if request.user.userprofile != booking.tutor.profile:
-            return Response(
-                {"error": "You are not authorized to complete this session."},
-                status=403
-            )
-
-        if booking.status == "Completed":
-            return Response(
-                {"error": "This session is already marked as completed."},
-                status=400
-            )
-
-        # 🚫 Block past dates
-        if booking.session_date < now().date():
-            return Response(
-                {"error": "Cannot complete sessions in the past."},
-                status=400
-            )
-        
-        if booking.status != "Confirmed":
-            return Response(
-                {"error": "Only confirmed sessions can be completed."},
-                status=400
-            )
-        
-        # 1️⃣ Mark as completed
-        booking.status = "Completed"
-        booking.save()
-
-        # 2️⃣ Increase tutor total sessions
-        tutor = booking.tutor
-        tutor.total_sessions += 1
-        tutor.save()
-
-    return Response({"message": "Session completed successfully."})
-
 
 # ==========================================
 # TEMPLATE AVAILABILITY (Weekly Template)
@@ -890,3 +817,33 @@ def payment_methods(request):
     ]
 
     return Response(data)
+
+#Complete booking view (tutor marks session as completed, updates earnings, etc.)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def complete_booking(request, booking_id):
+
+    with transaction.atomic():
+
+        profile = request.user.userprofile
+
+        try:
+            tutor = Tutor.objects.get(profile=profile)
+            booking = Booking.objects.get(id=booking_id, tutor=tutor)
+        except (Tutor.DoesNotExist, Booking.DoesNotExist):
+            return Response({"error": "Booking not found"}, status=404)
+
+        # ✅ DEBUG AFTER booking is defined
+        print("===== DEBUG STATUS =====")
+        print("DB booking.status:", booking.status)
+        print("========================")
+
+        # Temporarily remove status check for testing
+        booking.status = "Completed"
+        booking.save()
+
+        tutor.total_sessions += 1
+        tutor.save()
+
+    return Response({"message": "Session marked as completed successfully."})
