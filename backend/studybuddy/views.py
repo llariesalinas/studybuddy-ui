@@ -13,9 +13,10 @@ from rest_framework.views import APIView
 from rest_framework.generics import ListAPIView
 from django.utils.timezone import now
 from django.db.models import Case, When, Value, IntegerField
+from collections import defaultdict
 
 
-from .models import Payment, Subjects, TutorAvailability, TutorSubjects, Tutor, Booking
+from .models import Payment, PaymentMethod, Subjects, TutorAvailability, TutorSubjects, Tutor, Booking, PaymentMethod
 from .serializers import TutorDetailSerializer, TutorSearchSerializer, SubjectSerializer
 
 from .models import (
@@ -223,32 +224,42 @@ def tutor_dashboard(request):
     except Tutor.DoesNotExist:
         return Response({"error": "Tutor not found"}, status=404)
 
+    # 📌 Get completed bookings
+    completed_bookings = Booking.objects.filter(
+        tutor=tutor,
+        status="Completed"
+    ).select_related("payment")
+
+    total_earnings = 0
+
+    for b in completed_bookings:
+        if hasattr(b, "payment"):
+            amount = float(b.payment.amount)
+            platform_fee = amount * 0.16
+            transaction_fee = amount * 0.04
+            tutor_earned = amount - platform_fee - transaction_fee
+            total_earnings += tutor_earned
+
     upcoming = Booking.objects.filter(
-    tutor=tutor
-).annotate(
-    status_priority=Case(
-        When(status="Confirmed", then=Value(0)),
-        When(status="Pending", then=Value(1)),
-        When(status="Completed", then=Value(2)),
-        default=Value(3),
-        output_field=IntegerField(),
-    )
-).order_by("status_priority", "session_date")
+        tutor=tutor
+    ).order_by("session_date")
 
     bookings_data = [
-    {
-        "id": b.id,  # ← REQUIRED
-        "student": f"{b.student.fname} {b.student.lname}",
-        "date": b.session_date,
-        "status": b.status
-    }
-    for b in upcoming
-]
+        {
+            "id": b.id,
+            "student": f"{b.student.fname} {b.student.lname}",
+            "subject": b.tutor.profile.course or "General",
+            "date": b.session_date,
+            "status": b.status
+        }
+        for b in upcoming
+    ]
 
     return Response({
         "total_sessions": tutor.total_sessions,
         "rating_average": tutor.rating_average,
         "hourly_rate": tutor.hourly_rate,
+        "total_earnings": round(total_earnings, 2),
         "upcoming_bookings": bookings_data
     })
 
@@ -409,6 +420,7 @@ def bulk_booking(request):
     return Response({"message": "Booking successful"})"""
 
 #Confirm payment View 
+# Confirm payment View 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def confirm_payment_and_book(request):
@@ -417,11 +429,21 @@ def confirm_payment_and_book(request):
 
     tutor_id = request.data.get("tutor_id")
     slots = request.data.get("slots")
+    method_id = request.data.get("payment_method")
 
     if not slots:
         return Response({"error": "No slots selected"}, status=400)
 
+    if not method_id:
+        return Response({"error": "Payment method required"}, status=400)
+
     tutor = get_object_or_404(Tutor, profile_id=tutor_id)
+
+    # ✅ Validate payment method safely
+    try:
+        method = PaymentMethod.objects.get(method_id=method_id, is_active=True)
+    except PaymentMethod.DoesNotExist:
+        return Response({"error": "Invalid payment method"}, status=400)
 
     created_bookings = []
 
@@ -434,6 +456,8 @@ def confirm_payment_and_book(request):
         5: "Sat",
         6: "Sun",
     }
+
+    total_amount = 0  # ✅ accumulate total for multi-slot
 
     with transaction.atomic():
 
@@ -456,7 +480,12 @@ def confirm_payment_and_book(request):
                     status=400
                 )
 
-
+            # 🚫 Prevent booking past dates
+            if session_date < now().date():
+                return Response(
+                    {"error": "Cannot book a past date."},
+                    status=400
+                )
 
             # 🚫 Ensure weekday matches availability template
             if weekday_map[session_date.weekday()] != availability.day:
@@ -465,10 +494,11 @@ def confirm_payment_and_book(request):
                     status=400
                 )
 
-            # 🚫 Prevent double booking
+            # 🚫 Check conflict
             conflict_exists = Booking.objects.filter(
                 availability=availability,
-                session_date=session_date
+                session_date=session_date,
+                status__in=["Confirmed", "Pending", "Completed"]
             ).exists()
 
             if conflict_exists:
@@ -477,6 +507,13 @@ def confirm_payment_and_book(request):
                     status=400
                 )
 
+            # 🧹 Cleanup cancelled booking
+            Booking.objects.filter(
+                availability=availability,
+                session_date=session_date,
+                status="Cancelled"
+            ).delete()
+
             # ✅ Create booking
             booking = Booking.objects.create(
                 student=user_profile,
@@ -484,18 +521,26 @@ def confirm_payment_and_book(request):
                 availability=availability,
                 session_date=session_date,
                 session_mode=slot["session_mode"],
-                status="Confirmed"
+                status="Confirmed"   # 🔥 Better than Pending if already paid
             )
 
-            # ✅ Create payment record
+            created_bookings.append(booking.id)
+
+            total_amount += tutor.hourly_rate
+
+        # ✅ Create ONE payment record per booking
+        for booking_id in created_bookings:
             Payment.objects.create(
-                booking=booking,
+                booking_id=booking_id,
                 amount=tutor.hourly_rate,
+                method=method,
                 payment_status="Paid",
                 paid_at=now()
             )
 
-            created_bookings.append(booking.id)
+        # ✅ Optional: update tutor stats
+        tutor.total_sessions += len(created_bookings)
+        tutor.save()
 
     return Response({
         "message": "Booking successful",
@@ -626,3 +671,222 @@ def template_availability(request, pk=None):
         slot.delete()
 
         return Response({"message": "Deleted successfully"})
+    
+#accept booking
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def approve_booking(request, booking_id):
+
+    booking = get_object_or_404(Booking, id=booking_id)
+
+    # Ensure tutor owns booking
+    if request.user.userprofile != booking.tutor.profile:
+        return Response({"error": "Unauthorized"}, status=403)
+
+    if booking.status != "Pending":
+        return Response({"error": "Only pending bookings can be approved."}, status=400)
+
+    booking.status = "Confirmed"
+    booking.save()
+
+    return Response({"message": "Booking confirmed successfully."})
+
+#Reject booking 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def reject_booking(request, booking_id):
+
+    booking = get_object_or_404(Booking, id=booking_id)
+
+    if request.user.userprofile != booking.tutor.profile:
+        return Response({"error": "Unauthorized"}, status=403)
+
+    if booking.status != "Pending":
+        return Response({"error": "Only pending bookings can be rejected."}, status=400)
+
+    # Delete booking entirely
+    booking.delete()
+
+    return Response({"message": "Booking rejected and removed."})
+
+
+# Helper function to combine consecutive slots into blocks (for tutor dashboard)
+def build_combined_block(group):
+
+    first = group[0]
+    last = group[-1]
+
+    start_time = first.availability.time_slot
+
+    end_time = (
+        datetime.combine(date.today(), last.availability.time_slot)
+        + timedelta(hours=1)
+    ).time()
+
+    duration = len(group)  # number of consecutive hours
+
+    return {
+        "id": first.id,
+        "status": first.status,
+        "date": first.session_date,
+        "tuteeName": f"{first.student.fname} {first.student.lname}",
+        "subject": first.tutor.profile.course or "General",
+        "topic": "",
+        "startTime": start_time.strftime("%H:%M"),
+        "endTime": end_time.strftime("%H:%M"),
+        "duration_hours": duration
+    }
+
+
+
+#list Bookings View
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def list_bookings(request):
+
+    profile = request.user.userprofile
+
+    if profile.role == "Tutor":
+        bookings = Booking.objects.filter(
+            tutor__profile=profile
+        )
+    else:
+        bookings = Booking.objects.filter(
+            student=profile
+        )
+
+    bookings = bookings.order_by("session_date", "availability__time_slot")
+
+    grouped_by_date = defaultdict(list)
+
+    for b in bookings:
+        grouped_by_date[b.session_date].append(b)
+
+    final_data = []
+
+    for session_date, day_bookings in grouped_by_date.items():
+
+        day_bookings.sort(key=lambda b: b.availability.time_slot)
+
+        current_group = [day_bookings[0]]
+
+        for booking in day_bookings[1:]:
+
+            prev = current_group[-1]
+
+            prev_end = (
+                datetime.combine(date.today(), prev.availability.time_slot)
+                + timedelta(hours=1)
+            ).time()
+
+            if booking.availability.time_slot == prev_end \
+               and booking.status == prev.status:
+                current_group.append(booking)
+            else:
+                final_data.append(build_combined_block(current_group))
+                current_group = [booking]
+
+        final_data.append(build_combined_block(current_group))
+
+    return Response(final_data)
+
+#Booking Detail View (for tutor to see details of a specific booking, including payment info)
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def booking_detail(request, booking_id):
+
+    booking = get_object_or_404(
+        Booking.objects.select_related(
+            'student',
+            'tutor__profile',
+            'payment',
+            'availability'
+        ),
+        id=booking_id
+    )
+
+    # Ensure tutor owns this booking
+    if request.user.userprofile != booking.tutor.profile:
+        return Response({"error": "Unauthorized"}, status=403)
+
+    # -------------------------
+    # Safe Payment Handling
+    # -------------------------
+    amount_paid = 0
+    platform_fee = 0
+    transaction_fee = 0
+    tutor_earned = 0
+    payment_status = "Pending"
+    transaction_id = None
+    method = None
+
+    if hasattr(booking, "payment") and booking.payment:
+
+        amount_paid = float(booking.payment.amount)
+        payment_status = booking.payment.payment_status
+        transaction_id = booking.payment.transaction_reference
+
+        # 🔥 GET REAL METHOD FROM DB
+        method = booking.payment.method.method_name if booking.payment.method else None
+
+        # Platform fee always applies
+        platform_fee = round(amount_paid * 0.16, 2)
+
+        # Only apply transaction fee if GCash
+        if method == "GCash":
+            transaction_fee = round(amount_paid * 0.04, 2)
+        else:
+            transaction_fee = 0
+
+        tutor_earned = round(amount_paid - platform_fee - transaction_fee, 2)
+
+    return Response({
+        "id": booking.id,
+
+        "tutee": {
+            "name": f"{booking.student.fname} {booking.student.lname}",
+            "email": booking.student.user.email,
+            "course": booking.student.course,
+            "year_level": booking.student.year_level,
+            "bio": booking.student.bio,
+            "avatar": booking.student.profile_picture.url if booking.student.profile_picture else None
+        },
+
+        "session": {
+            "subject": booking.tutor.profile.course or "General",
+            "topic": "",
+            "date": booking.session_date.strftime("%Y-%m-%d"),
+            "start_time": booking.availability.time_slot.strftime("%H:%M"),
+            "end_time": (
+                datetime.combine(date.today(), booking.availability.time_slot)
+                + timedelta(hours=1)
+            ).time().strftime("%H:%M"),
+            "rating": booking.rating.rating_score if hasattr(booking, "rating") else None,
+            "status": booking.status
+        },
+
+        "payment": {
+            "transaction_id": transaction_id,
+            "method": method,
+            "amount_paid": amount_paid,
+            "tutor_earned": tutor_earned,
+            "platform_fee": platform_fee,
+            "transaction_fee": transaction_fee,
+            "status": payment_status
+        }
+    })
+
+@api_view(['GET'])
+def payment_methods(request):
+    methods = PaymentMethod.objects.filter(is_active=True)
+
+    data = [
+        {
+            "id": method.method_id,
+            "name": method.method_name,
+            "code": method.code
+        }
+        for method in methods
+    ]
+
+    return Response(data)

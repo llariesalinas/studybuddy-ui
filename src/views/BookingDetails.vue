@@ -171,7 +171,10 @@ import { useRoute } from 'vue-router'
 import { useTutorBookingDetailStore } from '@/stores/tutorBookingDetails'
 
 const route = useRoute()
+const bookingId = route.params.id
 const bookingDetailsStore = useTutorBookingDetailStore()
+const store = useTutorBookingDetailStore()
+
 
 onMounted(() => {
     bookingDetailsStore.fetchBookingDetails(route.params.id)

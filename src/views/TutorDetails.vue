@@ -267,30 +267,32 @@ const weekRange = computed(() => {
   return `${monday.toLocaleDateString()} - ${sunday.toLocaleDateString()}`
 })
 
+
+
 const toggleSlot = (slot) => {
 
   if (slot.is_booked) return
 
   const slotWithDate = {
     availability_id: slot.id,
-    session_date: slot.date,
+    session_date: selectedDate.value,
     session_mode: bookingPrefsStore.selectedMode || "Online",
     time_slot: slot.time_slot
   }
 
-  // If first selection → allow
+  // First selection
   if (selectedSlots.value.length === 0) {
     selectedSlots.value.push(slotWithDate)
     return
   }
 
-  // ✅ Enforce SAME DATE
-  if (selectedSlots.value[0].session_date !== slot.date) {
+  // Enforce same date
+  if (selectedSlots.value[0].session_date !== selectedDate.value) {
     alert("You can only book multiple hours on the same day.")
     return
   }
 
-  // If slot already selected → remove it
+  // If already selected → remove it
   const exists = selectedSlots.value.some(
     s => s.availability_id === slot.id
   )
@@ -302,37 +304,49 @@ const toggleSlot = (slot) => {
     return
   }
 
-  // ✅ Check Consecutiveness
-  const allTimes = selectedSlots.value
-    .map(s => parseInt(s.time_slot.split(':')[0]))
-  const newTime = parseInt(slot.time_slot.split(':')[0])
+  
 
-  allTimes.push(newTime)
-  allTimes.sort((a, b) => a - b)
 
-  for (let i = 1; i < allTimes.length; i++) {
-    if (allTimes[i] - allTimes[i - 1] !== 1) {
+  // Robust consecutiveness check
+  const allTimes = selectedSlots.value.map(s => s.time_slot)
+  allTimes.push(slot.time_slot)
+
+  const sortedTimes = allTimes
+    .map(t => {
+      const [h, m] = t.split(':')
+      const d = new Date()
+      d.setHours(parseInt(h))
+      d.setMinutes(parseInt(m))
+      d.setSeconds(0)
+      return d
+    })
+    .sort((a, b) => a - b)
+
+  for (let i = 1; i < sortedTimes.length; i++) {
+    const diffInMs = sortedTimes[i] - sortedTimes[i - 1]
+    const diffInHours = diffInMs / (1000 * 60 * 60)
+
+    if (diffInHours !== 1) {
       alert("Selected hours must be consecutive.")
       return
     }
   }
 
+  // ✅ Add slot after passing validation
   selectedSlots.value.push(slotWithDate)
-}
-
-const backButton = () => {
-    router.push('/tutors')
 }
 
 const bookSessions = () => {
 
-  bookedSessionStore.bookedSessions = selectedSlots.value
+  console.log("Booking:", selectedSlots.value)
 
+  bookedSessionStore.bookedSessions = [...selectedSlots.value]
   bookedSessionStore.bookedSessionTutorName = tutorDetails.value.name
   bookedSessionStore.bookedSessionTutorID = tutorID
 
   router.push(`/payment-tutee/${tutorID}`)
 }
+
 
 </script>
 

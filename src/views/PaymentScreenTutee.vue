@@ -58,7 +58,7 @@
 
             <div class="card border-sb rounded p-3 mt-3">
 
-            <div v-if="paymentStore.selectedMethod === 0">
+            <div v-if="selectedMethodName === 'Cash'">
 
                 <div class="alert alert-info">
                 Please prepare exact amount.
@@ -73,7 +73,7 @@
                 </button>
             </div>
 
-            <div v-else-if="paymentStore.selectedMethod === 1">
+            <div v-else-if="selectedMethodName === 'GCash'">
                 <div class="mb-3">
                 <label class="form-label">Account Name</label>
                 <input
@@ -112,7 +112,7 @@
                 </button>
             </div>
 
-            <div v-else-if="paymentStore.selectedMethod === 2">
+            <div v-else-if="selectedMethodName === 'Bank Transfer'">
                 <div class="mb-3">
                 <label class="form-label">Account Holder Name</label>
                 <input
@@ -185,20 +185,23 @@ const bookedSessionStore = useBookedSessionStore()
 const tutorId = route.params.tutorId
 
 const tutor = ref(null)
+const paymentMethods = ref([])
 
-const paymentMethods = [
-  { id: 0, label: 'Cash', icon: 'bi-cash-coin' },
-  { id: 1, label: 'GCash', icon: 'bi-wallet2' },
-  { id: 2, label: 'Credit/Debit', icon: 'bi-credit-card' }
-]
+const selectedMethodName = computed(() => {
+  const method = paymentMethods.value.find(
+    m => m.id === paymentStore.selectedMethod
+  )
+  return method ? method.label : null
+})
 
+// ---------------------------
+// PAYMENT SUMMARY
+// ---------------------------
 const paymentSummary = computed(() => {
   if (!tutor.value) return null
 
   const hourlyRate = parseFloat(tutor.value.hourly_rate)
-
   const hours = bookedSessionStore.bookedSessions?.length || 0
-
   const total = hourlyRate * hours
 
   return {
@@ -210,21 +213,45 @@ const paymentSummary = computed(() => {
 })
 
 
+// ---------------------------
+// NAVIGATION
+// ---------------------------
 const backButton = () => {
-    router.push(`/tutor/${tutorId}`)
-    paymentStore.reset()
+  router.push(`/tutor/${tutorId}`)
+  paymentStore.reset()
 }
 
-const chooseMethod = (method) => {
-  paymentStore.selectedMethod = method
+
+// ---------------------------
+// SELECT PAYMENT METHOD
+// ---------------------------
+const chooseMethod = (methodId) => {
+  paymentStore.selectedMethod = methodId
 }
 
+
+// ---------------------------
+// LOAD DATA
+// ---------------------------
 onMounted(async () => {
   try {
-    const response = await api.get(`tutors/${tutorId}/`)
-    tutor.value = response.data
+    // Load tutor
+    const tutorRes = await api.get(`tutors/${tutorId}/`)
+    tutor.value = tutorRes.data
+
+    // Load payment methods from backend
+    const methodsRes = await api.get('payment-methods/')
+    paymentMethods.value = methodsRes.data.map(m => ({
+      id: m.id,
+      label: m.name,
+      icon:
+        m.name === 'GCash' ? 'bi-wallet2' :
+        m.name === 'Cash' ? 'bi-cash-coin' :
+        'bi-credit-card'
+    }))
+
   } catch (error) {
-    console.error("Tutor not found")
+    console.error("Initialization error:", error)
     router.push('/find-tutors')
   }
 
@@ -235,18 +262,24 @@ onMounted(async () => {
   }
 })
 
-const ConfirmPayment = async () => {
-  try {
 
-    console.log("Confirm clicked")
+// ---------------------------
+// CONFIRM PAYMENT
+// ---------------------------
+const ConfirmPayment = async () => {
+
+  if (!paymentStore.selectedMethod) {
+    alert("Please select a payment method.")
+    return
+  }
+
+  try {
 
     const response = await api.post('bookings/confirm/', {
       tutor_id: tutorId,
       slots: bookedSessionStore.bookedSessions,
-      payment_method: paymentStore.selectedMethod
+      payment_method: paymentStore.selectedMethod   // real DB method_id
     })
-
-    console.log("Backend response:", response.data)
 
     alert("Booking Confirmed!")
 
@@ -254,16 +287,15 @@ const ConfirmPayment = async () => {
     bookedSessionStore.$reset()
 
     await router.push({
-        name: 'dashboard',
-        query: { refresh: Date.now() }
+      name: 'dashboard',
+      query: { refresh: Date.now() }
     })
 
   } catch (error) {
     console.error("Payment error:", error.response?.data || error)
-    alert("Something went wrong.")
+    alert(error.response?.data?.error || "Something went wrong.")
   }
 }
-
 </script>
 
 <style setup>
