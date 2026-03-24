@@ -1,5 +1,6 @@
 <template>
 
+  <!-- NAVBAR -->
   <nav class="navbar navbar-expand-lg bg-white py-3">
     <div class="container">
       <a class="navbar-brand fw-bold fs-4">
@@ -7,7 +8,6 @@
       </a>
     </div>
   </nav>
-
 
   <div class="container py-5">
 
@@ -27,6 +27,7 @@
             </div>
           </div>
 
+
           <!-- CARD 1 SUBJECTS -->
           <div v-if="currentCard === 0">
 
@@ -44,7 +45,7 @@
               >
 
                 <div
-                  class="card border rounded-4 p-3 text-center h-100"
+                  class="card border rounded-4 p-3 text-center h-100 subject-card"
                   style="cursor:pointer"
                   :class="store.selectedSubjects.includes(subject.subject_code)
                     ? 'border-success bg-success bg-opacity-10'
@@ -176,7 +177,6 @@ import { usePreferenceStore } from '@/stores/preferences'
 import { useProfileStore } from '@/stores/profile'
 import api from '@/services/api/api'
 
-
 const router = useRouter()
 const store = usePreferenceStore()
 const profileStore = useProfileStore()
@@ -190,7 +190,6 @@ const courses = ref([])
 
 const yearLevel = ref('')
 const selectedCourse = ref('')
-
 
 /* YEAR LEVEL OPTIONS */
 
@@ -216,17 +215,16 @@ const yearLevels = [
 
 ]
 
-
 /* LOAD DATA */
 
 onMounted(async () => {
 
   try {
 
-    const subjectRes = await api.get('/subjects/')
+    const subjectRes = await api.get('subjects/')
     subjects.value = subjectRes.data
 
-    const courseRes = await api.get('/courses/')
+    const courseRes = await api.get('courses/')
     courses.value = courseRes.data
 
   } catch (error) {
@@ -237,44 +235,29 @@ onMounted(async () => {
 
 })
 
-
 /* SUBJECT TOGGLE */
 
-const toggleSubject = (subjectCode) => {
+const toggleSubject = (code) => {
 
-  if (store.selectedSubjects.includes(subjectCode)) {
+  const index = store.selectedSubjects.indexOf(code)
 
-    store.selectedSubjects = store.selectedSubjects.filter(
-      s => s !== subjectCode
-    )
-
+  if (index > -1) {
+    store.selectedSubjects.splice(index, 1)
   } else {
-
-    store.selectedSubjects.push(subjectCode)
-
+    store.selectedSubjects.push(code)
   }
 
 }
 
-
-/* NAVIGATION */
+/* NEXT CARD */
 
 const nextCard = () => {
 
-  if (currentCard.value === 0 && store.selectedSubjects.length === 0) {
-    alert("Please select at least one subject")
-    return
+  if (currentCard.value < totalCards - 1) {
+    currentCard.value++
   }
-
-  if (currentCard.value === 1 && !yearLevel.value) {
-    alert("Please select your year level")
-    return
-  }
-
-  currentCard.value++
 
 }
-
 
 /* FINISH SETUP */
 
@@ -284,32 +267,26 @@ const finish = async () => {
 
   try {
 
-    await api.post('/profile/setup/', {
-
+    await api.post('profile/setup/', {
       course: selectedCourse.value,
       year_level: yearLevel.value,
       bio: "Student profile"
-
     })
 
-
-    await api.post('/preferences/', {
-
-      subjects: store.selectedSubjects,
-      preferred_mode: "Online",
-      hourly_budget: 500
-
+    await api.post("preferences/", {
+       subjects: [...store.selectedSubjects]
     })
-
 
     profileStore.profileCompleted = true
+    profileStore.loaded = true
+
+    store.resetPreferences()
 
     router.push('/dashboard')
 
   } catch (error) {
 
     console.error("Failed saving preferences", error)
-
     alert("Could not save preferences")
 
   } finally {
@@ -319,7 +296,6 @@ const finish = async () => {
   }
 
 }
-
 
 /* PROGRESS BAR */
 

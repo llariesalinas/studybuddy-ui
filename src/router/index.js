@@ -39,6 +39,12 @@ const router = createRouter({
       meta: { requiresAuth: true, role: 'Tutee' }
     },
     {
+      path: '/tutee-profile',
+      name: 'tutee-profile',
+      component: () => import('@/views/TuteeProfile.vue'),
+      meta: { requiresAuth: true, role: 'Tutee' }
+    },
+    {
       path: '/tutors',
       name: 'tutors',
       component: () => import('@/views/FindTutors.vue'),
@@ -75,6 +81,12 @@ const router = createRouter({
       path: '/tch-dashboard',
       name: 'tch-dashboard',
       component: () => import('@/views/TutorDashboard.vue'),
+      meta: { requiresAuth: true, role: 'Tutor' }
+    },
+    {
+      path: '/tutor-profile',
+      name: 'tutor-profile',
+      component: () => import('@/views/TutorProfile.vue'),
       meta: { requiresAuth: true, role: 'Tutor' }
     },
     {
@@ -133,16 +145,29 @@ router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
   const profileStore = useProfileStore()
 
-  // 1️⃣ If route requires login
+  // 1️⃣ Protect routes requiring authentication
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     return next('/login')
   }
 
   if (authStore.isAuthenticated) {
 
+    // Ensure token exists
+    if (!authStore.token) {
+      return next('/login')
+    }
+
     // 2️⃣ Load profile status
     if (!profileStore.loaded) {
-      await profileStore.checkProfileStatus()
+      try {
+        await profileStore.checkProfileStatus()
+      } catch (error) {
+
+        console.error("Profile check failed:", error)
+
+        authStore.logout()
+        return next('/login')
+      }
     }
 
     // 3️⃣ Profile completion guard
@@ -150,12 +175,10 @@ router.beforeEach(async (to, from, next) => {
 
       const role = authStore.userRole
 
-      // allow setup pages
       if (to.path === '/preferencesetup' || to.path === '/tutor-setup') {
         return next()
       }
 
-      // redirect based on role
       if (role === 'Tutor') {
         return next('/tutor-setup')
       }
@@ -180,6 +203,7 @@ router.beforeEach(async (to, from, next) => {
   }
 
   next()
+
 })
 
 export default router

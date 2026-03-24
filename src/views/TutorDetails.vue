@@ -74,7 +74,6 @@
             class="form-control w-auto"
             v-model="selectedDate"
             :min="today"
-            @change="getTutorSchedule"
           />
         </div>
 
@@ -131,7 +130,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useBookingPrefsStore } from '@/stores/selectedSessions'
 import { useBookedSessionStore } from '@/stores/bookedSessionDetails'
@@ -139,17 +138,25 @@ import api from '@/services/api/api'
 
 const router = useRouter()
 const route = useRoute()
+
 const bookingPrefsStore = useBookingPrefsStore()
 const bookedSessionStore = useBookedSessionStore()
 
 const tutorID = route.params.id
 
-const selectedDate = ref(new Date().toISOString().split('T')[0])
+// ✅ load selected date from booking page if available
+const selectedDate = ref(
+  bookingPrefsStore.selectedDate || new Date().toISOString().split('T')[0]
+)
+
 const today = new Date().toISOString().split('T')[0]
 
 const selectedSlots = ref([])
 const tutorSchedule = ref([])
 
+const backButton = () => {
+  router.back()
+}
 const days = [
   'Monday',
   'Tuesday',
@@ -160,9 +167,6 @@ const days = [
   'Sunday'
 ]
 
-
-
-
 function addOneHour(time) {
   const [h, m] = time.split(':')
   const date = new Date()
@@ -172,7 +176,6 @@ function addOneHour(time) {
 
   return date.toTimeString().slice(0,5)
 }
-
 
 const tutorDetails = ref({
   profile_id: null,
@@ -186,10 +189,11 @@ const tutorDetails = ref({
   total_sessions: 0
 })
 
-
 const getTutorDetails = async () => {
   try {
+
     const response = await api.get(`tutors/${tutorID}/`)
+
     tutorDetails.value = {
       profile_id: response.data.profile_id,
       name: `${response.data.fname} ${response.data.lname}`,
@@ -199,13 +203,16 @@ const getTutorDetails = async () => {
       hourly_rate: response.data.hourly_rate ?? 150,
       total_sessions: response.data.total_sessions ?? 0
     }
+
   } catch (error) {
     console.error('Failed to load tutor details.', error)
   }
 }
 
 const getTutorSchedule = async () => {
+
   try {
+
     const response = await api.get(
       `tutors/${route.params.id}/availability/`,
       {
@@ -216,18 +223,30 @@ const getTutorSchedule = async () => {
     )
 
     tutorSchedule.value = response.data
-    selectedSlots.value = [] // reset selections when date changes
+
+    // reset selections when date changes
+    selectedSlots.value = []
 
   } catch (error) {
+
     console.error('Failed to load tutor schedule.', error)
+
   }
+
 }
 
 onMounted(async () => {
+
   await getTutorDetails()
   await getTutorSchedule()
+
 })
 
+// reload schedule if date changes
+watch(selectedDate, (newDate) => {
+  bookingPrefsStore.selectedDate = newDate
+  getTutorSchedule()
+})
 
 
 const groupedSchedule = computed(() => {
@@ -248,14 +267,19 @@ const groupedSchedule = computed(() => {
 })
 
 const maxRows = computed(() => {
+
   const lengths = days.map(day => groupedSchedule.value[day]?.length || 0)
+
   return lengths.length ? Math.max(...lengths) : 0
+
 })
 
 const weekRange = computed(() => {
+
   const selected = new Date(selectedDate.value)
 
   const day = selected.getDay()
+
   const diffToMonday = (day === 0 ? -6 : 1 - day)
 
   const monday = new Date(selected)
@@ -265,9 +289,8 @@ const weekRange = computed(() => {
   sunday.setDate(monday.getDate() + 6)
 
   return `${monday.toLocaleDateString()} - ${sunday.toLocaleDateString()}`
+
 })
-
-
 
 const toggleSlot = (slot) => {
 
@@ -280,60 +303,68 @@ const toggleSlot = (slot) => {
     time_slot: slot.time_slot
   }
 
-  // First selection
+  // first selection
   if (selectedSlots.value.length === 0) {
     selectedSlots.value.push(slotWithDate)
     return
   }
 
-  // Enforce same date
+  // enforce same date
   if (selectedSlots.value[0].session_date !== selectedDate.value) {
     alert("You can only book multiple hours on the same day.")
     return
   }
 
-  // If already selected → remove it
+  // remove if already selected
   const exists = selectedSlots.value.some(
     s => s.availability_id === slot.id
   )
 
   if (exists) {
+
     selectedSlots.value = selectedSlots.value.filter(
       s => s.availability_id !== slot.id
     )
+
     return
   }
 
-  
-
-
-  // Robust consecutiveness check
+  // ensure consecutive hours
   const allTimes = selectedSlots.value.map(s => s.time_slot)
   allTimes.push(slot.time_slot)
 
   const sortedTimes = allTimes
     .map(t => {
+
       const [h, m] = t.split(':')
+
       const d = new Date()
+
       d.setHours(parseInt(h))
       d.setMinutes(parseInt(m))
       d.setSeconds(0)
+
       return d
+
     })
     .sort((a, b) => a - b)
 
   for (let i = 1; i < sortedTimes.length; i++) {
+
     const diffInMs = sortedTimes[i] - sortedTimes[i - 1]
     const diffInHours = diffInMs / (1000 * 60 * 60)
 
     if (diffInHours !== 1) {
+
       alert("Selected hours must be consecutive.")
       return
+
     }
+
   }
 
-  // ✅ Add slot after passing validation
   selectedSlots.value.push(slotWithDate)
+
 }
 
 const bookSessions = () => {
@@ -345,8 +376,8 @@ const bookSessions = () => {
   bookedSessionStore.bookedSessionTutorID = tutorID
 
   router.push(`/payment-tutee/${tutorID}`)
-}
 
+}
 
 </script>
 

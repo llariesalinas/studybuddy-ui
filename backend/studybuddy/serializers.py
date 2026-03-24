@@ -1,6 +1,6 @@
 
 from rest_framework import serializers
-from .models import Tutor, Subjects, TutorAvailability
+from .models import Tutor, Subjects, TutorAvailability,Preference
 
 # Create Serializers here.
 
@@ -53,3 +53,10 @@ class TutorAvailabilitySerializer(serializers.ModelSerializer):
 
     def get_day(self, obj):
         return obj.get_day_display()  # converts 'Mon' to 'Monday', etc.
+    
+
+class PreferenceSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Preference
+        fields = ['subjects']

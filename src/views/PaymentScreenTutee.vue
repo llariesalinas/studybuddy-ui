@@ -275,18 +275,19 @@ const ConfirmPayment = async () => {
 
   try {
 
-    const response = await api.post('bookings/confirm/', {
+    await api.post('bookings/confirm/', {
       tutor_id: tutorId,
+      date: bookedSessionStore.bookedSessionDate,
       slots: bookedSessionStore.bookedSessions,
-      payment_method: paymentStore.selectedMethod   // real DB method_id
+      payment_method: paymentStore.selectedMethod
     })
 
     alert("Booking Confirmed!")
 
     paymentStore.reset()
-    bookedSessionStore.$reset()
+    bookedSessionStore.resetStore()
 
-    await router.push({
+    router.push({
       name: 'dashboard',
       query: { refresh: Date.now() }
     })
