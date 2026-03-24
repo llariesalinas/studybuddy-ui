@@ -59,10 +59,9 @@
               </button>
               <ul v-if="isOpen" class="dropdown-menu show position-absolute end-0 mt-2 me-2">
                 <li>
-                  <button class="btn btn-success dropdown-item text-center px-4"
-                            @click="manageAccount">
-                      Manage your account
-                    </button>
+                  <div class="dropdown-item" @click="goToProfile">
+                    Manage your account
+                  </div>
                 </li>
                 <li><hr class="dropdown-divider"></li>
                 <li><button class="btn btn-success dropdown-item text-danger text-center px-4"
@@ -105,6 +104,19 @@ const logout = () => {
   router.push('/login') // Redirect to login after logout
 
   router.push
+}
+
+const goToProfile = () => {
+
+  if (userRole.value === 'tutee') {
+    router.push('/tutee-profile')
+  }
+
+  if (userRole.value === 'tutor') {
+    router.push('/tutor-profile')
+  }
+
+  isOpen.value = false
 }
 
 const hideSessionButton = computed(() => {

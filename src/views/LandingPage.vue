@@ -41,11 +41,13 @@
           </div>
           
           <div class="col-lg-6">
-            <div class="rounded-4 overflow-hidden shadow-lg border border-sb bg-light d-flex align-items-center justify-content-center" style="height: 400px; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);">
-              <div class="text-center text-muted">
-                <i class="bi bi-image display-1 mb-3 opacity-25"></i>
-                <p class="fw-semibold opacity-50">Illustration Placeholder</p>
-                </div>
+            <div class="rounded-4 overflow-hidden shadow-lg border border-sb d-flex align-items-center justify-content-center bg-white" style="height: 400px;">
+              <img 
+                src="@/assets/hero.png"
+                alt="StudyBuddy Peer Tutoring Illustration" 
+                class="img-fluid w-100 h-100"
+                style="object-fit: contain; padding: 20px;"
+              >
             </div>
           </div>
         </div>

@@ -316,13 +316,6 @@ class Preference(models.Model):
 
     subjects = models.ManyToManyField(Subjects)
 
-    preferred_mode = models.CharField(
-        max_length=10,
-        choices=MODE_CHOICES
-    )
-
-    hourly_budget = models.IntegerField()
-
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
