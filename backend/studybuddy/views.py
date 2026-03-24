@@ -1053,6 +1053,7 @@ def complete_booking(request, booking_id):
         tutor.save()
 
     return Response({"message": "Session marked as completed successfully."})
+<<<<<<< HEAD
 
 
 @api_view(['POST'])
@@ -1336,3 +1337,5 @@ def payment_methods(request):
     ]
 
     return Response(data)
+=======
+>>>>>>> fc17641cd5f81ae5587bb5382863874b19df40b2

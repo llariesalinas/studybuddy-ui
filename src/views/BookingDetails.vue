@@ -173,6 +173,8 @@ import { useTutorBookingDetailStore } from '@/stores/tutorBookingDetails'
 const route = useRoute()
 const bookingId = route.params.id
 const bookingDetailsStore = useTutorBookingDetailStore()
+const store = useTutorBookingDetailStore()
+
 
 const handleComplete = async () => {
   try {
