@@ -15,23 +15,12 @@ from rest_framework.generics import ListAPIView
 from django.utils.timezone import now
 from django.db.models import Case, When, Value, IntegerField
 from collections import defaultdict
-<<<<<<< HEAD
 # algo
 from .recommender.hybrid import recommend_tutors_hybrid
 from .recommender.CF import build_rating_matrix
-=======
->>>>>>> origin/main
-
-<<<<<<< HEAD
 from .recommender.cbf import recommend_tutors
 from .models import Payment, PaymentMethod, Subjects, TutorAvailability, TutorSubjects, Tutor, Booking,Course,Preference
-=======
-
 from .models import Payment, PaymentMethod, Subjects, TutorAvailability, TutorSubjects, Tutor, Booking, PaymentMethod
-<<<<<<< HEAD
->>>>>>> 32c6f3b (Before Merging to Another Branch)
-=======
->>>>>>> origin/main
 from .serializers import TutorDetailSerializer, TutorSearchSerializer, SubjectSerializer
 
 from .models import (
