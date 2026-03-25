@@ -5,218 +5,204 @@ import { useProfileStore } from '@/stores/profile'
 import Dashboard from '@/views/Dashboard.vue'
 
 const router = createRouter({
-  history: createWebHistory(import.meta.env.BASE_URL),
-  routes: [
+history: createWebHistory(import.meta.env.BASE_URL),
+routes: [
 
-    // ---------- PUBLIC ROUTES ----------
-    {
-      path: '/',
-      name: 'home',
-      component: () => import('@/views/LandingPage.vue')
-    },
-    {
-      path: '/login',
-      name: 'login',
-      component: () => import('@/views/Login.vue')
-    },
-    {
-      path: '/register',
-      name: 'register',
-      component: () => import('@/views/Register.vue')
-    },
+// ---------- PUBLIC ROUTES ----------
+{
+path: '/',
+name: 'home',
+component: () => import('@/views/LandingPage.vue')
+},
+{
+path: '/login',
+name: 'login',
+component: () => import('@/views/Login.vue')
+},
+{
+path: '/register',
+name: 'register',
+component: () => import('@/views/Register.vue')
+},
 
-    // ---------- STUDENT ROUTES ----------
-    {
-      path: '/preferencesetup',
-      name: 'preferencesetup',
-      component: () => import('@/views/PreferenceSetup.vue'),
-      meta: { requiresAuth: true }
-    },
-    {
-      path: '/profile',
-      name: 'profile',
-      component: () => import('@/views/TuteeProfile.vue'),
-      meta: { requiresAuth: true, role: 'Tutee'}
-    },
-    {
-      path: '/dashboard',
-      name: 'dashboard',
-      component: Dashboard,
-      meta: { requiresAuth: true, role: 'Tutee' }
-    },
-    {
-      path: '/tutee-profile',
-      name: 'tutee-profile',
-      component: () => import('@/views/TuteeProfile.vue'),
-      meta: { requiresAuth: true, role: 'Tutee' }
-    },
-    {
-      path: '/tutors',
-      name: 'tutors',
-      component: () => import('@/views/FindTutors.vue'),
-      meta: { requiresAuth: true, role: 'Tutee' }
-    },
-    {
-      path: '/book',
-      name: 'book',
-      component: () => import('@/views/InitialBooking.vue'),
-      meta: { requiresAuth: true, role: 'Tutee' }
-    },
-    {
-      path: '/tutor/:id',
-      name: 'tutor-details',
-      component: () => import('@/views/TutorDetails.vue'),
-      meta: { requiresAuth: true, role: 'Tutee' }
-    },
-    {
-      path: '/payment-tutee/:tutorId',
-      name: 'PaymentTutee',
-      component: () => import('@/views/PaymentScreenTutee.vue'),
-      props: true,
-      meta: { requiresAuth: true, role: 'Tutee' }
-    },
+// ---------- STUDENT ROUTES ----------
+{
+path: '/preferencesetup',
+name: 'preferencesetup',
+component: () => import('@/views/PreferenceSetup.vue'),
+meta: { requiresAuth: true }
+},
+{
+path: '/dashboard',
+name: 'dashboard',
+component: Dashboard,
+meta: { requiresAuth: true, role: 'Tutee' }
+},
+{
+path: '/tutee-profile',
+name: 'tutee-profile',
+component: () => import('@/views/TuteeProfile.vue'),
+meta: { requiresAuth: true, role: 'Tutee' }
+},
+{
+path: '/tutors',
+name: 'tutors',
+component: () => import('@/views/FindTutors.vue'),
+meta: { requiresAuth: true, role: 'Tutee' }
+},
+{
+path: '/book',
+name: 'book',
+component: () => import('@/views/InitialBooking.vue'),
+meta: { requiresAuth: true, role: 'Tutee' }
+},
+{
+path: '/tutor/:id',
+name: 'tutor-details',
+component: () => import('@/views/TutorDetails.vue'),
+meta: { requiresAuth: true, role: 'Tutee' }
+},
+{
+path: '/payment-tutee/:tutorId',
+name: 'PaymentTutee',
+component: () => import('@/views/PaymentScreenTutee.vue'),
+props: true,
+meta: { requiresAuth: true, role: 'Tutee' }
+},
 
-    // ---------- TUTOR ROUTES ----------
-    {
-      path: '/tutor-setup',
-      name: 'tutorpreferencesetup',
-      component: () => import('@/views/TutorPreferenceSetup.vue'),
-<<<<<<< HEAD
-      meta: { requiresAuth: true }
-=======
-      // meta: { requiresAuth: true, role: 'Tutor' }
->>>>>>> origin/main
-    },
-    {
-      path: '/tch-dashboard',
-      name: 'tch-dashboard',
-      component: () => import('@/views/TutorDashboard.vue'),
-      meta: { requiresAuth: true, role: 'Tutor' }
-    },
-    {
-      path: '/tutor-profile',
-      name: 'tutor-profile',
-      component: () => import('@/views/TutorProfile.vue'),
-      meta: { requiresAuth: true, role: 'Tutor' }
-    },
-    {
-      path: '/tch-availability',
-      name: 'tch-availability',
-      component: () => import('@/views/TutorSchedule.vue'),
-      meta: { requiresAuth: true, role: 'Tutor' }
-    },
-    {
-      path: '/tch-payments',
-      name: 'tch-payments',
-      component: () => import('@/views/TutorPaymentScreen.vue'),
-      meta: { requiresAuth: true, role: 'Tutor' }
-    },
-    {
-      path: '/tch-requestedSessions',
-      name: 'tch-requestedSessions',
-      component: () => import('@/views/TutorRequestedSessions.vue'),
-      meta: { requiresAuth: true, role: 'Tutor' }
-    },
-    {
-      path: '/booking-details/:id',
-      name: 'booking-details',
-      component: () => import('@/views/BookingDetails.vue'),
-      meta: { requiresAuth: true, role: 'Tutor' }
-    },
+// ---------- TUTOR ROUTES ----------
+{
+path: '/tutor-setup',
+name: 'tutorpreferencesetup',
+component: () => import('@/views/TutorPreferenceSetup.vue'),
+meta: { requiresAuth: true }
+},
+{
+path: '/tch-dashboard',
+name: 'tch-dashboard',
+component: () => import('@/views/TutorDashboard.vue'),
+meta: { requiresAuth: true, role: 'Tutor' }
+},
+{
+path: '/tutor-profile',
+name: 'tutor-profile',
+component: () => import('@/views/TutorProfile.vue'),
+meta: { requiresAuth: true, role: 'Tutor' }
+},
+{
+path: '/tch-availability',
+name: 'tch-availability',
+component: () => import('@/views/TutorSchedule.vue'),
+meta: { requiresAuth: true, role: 'Tutor' }
+},
+{
+path: '/tch-payments',
+name: 'tch-payments',
+component: () => import('@/views/TutorPaymentScreen.vue'),
+meta: { requiresAuth: true, role: 'Tutor' }
+},
+{
+path: '/tch-requestedSessions',
+name: 'tch-requestedSessions',
+component: () => import('@/views/TutorRequestedSessions.vue'),
+meta: { requiresAuth: true, role: 'Tutor' }
+},
+{
+path: '/booking-details/:id',
+name: 'booking-details',
+component: () => import('@/views/BookingDetails.vue'),
+meta: { requiresAuth: true, role: 'Tutor' }
+},
 
-    // ---------- SHARED ROUTES ----------
-    {
-      path: '/schedule',
-      name: 'schedule',
-      component: () => import('@/views/Schedule.vue'),
-      meta: { requiresAuth: true }
-    },
-    {
-      path: '/reports',
-      name: 'reports',
-      component: () => import('@/views/SessionsReports.vue'),
-      meta: { requiresAuth: true }
-    },
-<<<<<<< HEAD
-    {
-      path: '/profile',
-      name: 'profile',
-      component: () => import('@/views/Profile.vue'),
-      meta: { requiresAuth: true }
-    }
+// ---------- SHARED ROUTES ----------
+{
+path: '/schedule',
+name: 'schedule',
+component: () => import('@/views/Schedule.vue'),
+meta: { requiresAuth: true }
+},
+{
+path: '/reports',
+name: 'reports',
+component: () => import('@/views/SessionsReports.vue'),
+meta: { requiresAuth: true }
+},
+{
+path: '/profile',
+name: 'profile',
+component: () => import('@/views/Profile.vue'),
+meta: { requiresAuth: true }
+}
 
-=======
-    
->>>>>>> origin/main
-  ]
+]
 })
 
 /*
-  GLOBAL NAVIGATION GUARD
+GLOBAL NAVIGATION GUARD
 */
 router.beforeEach(async (to, from, next) => {
 
-  const authStore = useAuthStore()
-  const profileStore = useProfileStore()
+const authStore = useAuthStore()
+const profileStore = useProfileStore()
 
-  // 1️⃣ Protect routes requiring authentication
-  if (to.meta.requiresAuth && !authStore.isAuthenticated) {
-    return next('/login')
-  }
+// 1️⃣ Protect routes requiring authentication
+if (to.meta.requiresAuth && !authStore.isAuthenticated) {
+return next('/login')
+}
 
-  if (authStore.isAuthenticated) {
+if (authStore.isAuthenticated) {
 
-    // Ensure token exists
-    if (!authStore.token) {
-      return next('/login')
-    }
+// Ensure token exists
+if (!authStore.token) {
+return next('/login')
+}
 
-    // 2️⃣ Load profile status
-    if (!profileStore.loaded) {
-      try {
-        await profileStore.checkProfileStatus()
-      } catch (error) {
+// 2️⃣ Load profile status
+if (!profileStore.loaded) {
+try {
+await profileStore.checkProfileStatus()
+} catch (error) {
 
-        console.error("Profile check failed:", error)
+console.error("Profile check failed:", error)
 
-        authStore.logout()
-        return next('/login')
-      }
-    }
+authStore.logout()
+return next('/login')
+}
+}
 
-    // 3️⃣ Profile completion guard
-    if (!profileStore.profileCompleted) {
+// 3️⃣ Profile completion guard
+if (!profileStore.profileCompleted) {
 
-      const role = authStore.userRole
+const role = authStore.userRole
 
-      if (to.path === '/preferencesetup' || to.path === '/tutor-setup') {
-        return next()
-      }
+if (to.path === '/preferencesetup' || to.path === '/tutor-setup') {
+return next()
+}
 
-      if (role === 'Tutor') {
-        return next('/tutor-setup')
-      }
+if (role === 'Tutor') {
+return next('/tutor-setup')
+}
 
-      return next('/preferencesetup')
-    }
+return next('/preferencesetup')
+}
 
-    // 4️⃣ Role protection
-    if (to.meta.role && authStore.userRole !== to.meta.role) {
+// 4️⃣ Role protection
+if (to.meta.role && authStore.userRole !== to.meta.role) {
 
-      if (authStore.userRole === 'Tutor') {
-        return next('/tch-dashboard')
-      }
+if (authStore.userRole === 'Tutor') {
+return next('/tch-dashboard')
+}
 
-      if (authStore.userRole === 'Tutee') {
-        return next('/dashboard')
-      }
+if (authStore.userRole === 'Tutee') {
+return next('/dashboard')
+}
 
-      return next('/')
-    }
+return next('/')
+}
 
-  }
+}
 
-  next()
+next()
 
 })
 
