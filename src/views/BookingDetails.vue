@@ -175,7 +175,6 @@ const bookingId = route.params.id
 const bookingDetailsStore = useTutorBookingDetailStore()
 const store = useTutorBookingDetailStore()
 
-
 const handleComplete = async () => {
   try {
     await bookingDetailsStore.completeSession()

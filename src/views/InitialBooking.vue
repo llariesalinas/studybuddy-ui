@@ -91,48 +91,72 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useInitialBookingPrefsStore } from '@/stores/initialbookingprefs'
-import { onMounted } from 'vue'
 import api from '@/services/api/api'
 
 const router = useRouter()
 const store = useInitialBookingPrefsStore()
+
 const isSubmitting = ref(false)
-
 const subjects = ref([])
-
-onMounted(async () => {
-  const response = await api.get('subjects/')
-  subjects.value = response.data
-})
-
+const tutors = ref([])
 
 const modes = ['Online', 'Face-to-face']
 
-// Submit handler
+
+// Load subjects from backend
+onMounted(async () => {
+
+  try {
+
+    const response = await api.get('/subjects/')
+    subjects.value = response.data
+
+  } catch (error) {
+
+    console.error("Failed to load subjects", error)
+
+  }
+
+})
+
+
+// FIND TUTOR (CBF CALL)
 const findTutor = async () => {
+
   isSubmitting.value = true
 
   try {
-    router.push({
-      name: 'tutors',
-      query: {
-        subject: store.selectedSubject,
-        topic: store.selectedTopic,
-        date: store.selectedDate,
-        mode: store.selectedMode,
-        startTime: store.selectedStartTime,
-        endTime: store.selectedEndTime
-      }
+
+    const res = await api.post('/recommend-tutors/', {
+
+      subject: store.selectedSubject,
+      topic: store.selectedTopic,
+      preferred_mode: store.selectedMode,
+      date: store.selectedDate,
+      start_time: store.selectedStartTime,
+      end_time: store.selectedEndTime
+
     })
 
+    tutors.value = res.data
 
-  } catch (error) {
-    console.error(error)
+    console.log("Recommended tutors:", tutors.value)
+
+    // navigate to tutors page
+    router.push({ name: 'tutors' })
+
+  } catch (err) {
+
+    console.error("Tutor recommendation failed", err)
+
   } finally {
+
     isSubmitting.value = false
+
   }
+
 }
 </script>

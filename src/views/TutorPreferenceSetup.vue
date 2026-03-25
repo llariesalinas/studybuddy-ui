@@ -23,11 +23,11 @@
                 <div class="mb-4">
                   <label class="form-label fw-bold small text-muted d-block">MODALITY</label>
                   <div class="form-check form-switch mb-2">
-                    <input class="form-check-input" type="checkbox" v-model="form.can_Online" id="on">
+                    <input class="form-check-input" type="checkbox" v-model="form.can_online" id="on">
                     <label class="form-check-label" for="on">Online Sessions</label>
                   </div>
                   <div class="form-check form-switch">
-                    <input class="form-check-input" type="checkbox" v-model="form.can_F2F" id="f2f">
+                    <input class="form-check-input" type="checkbox" v-model="form.can_f2f" id="f2f">
                     <label class="form-check-label" for="f2f">Face-to-Face Sessions</label>
                   </div>
                 </div>
@@ -94,16 +94,69 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+<<<<<<< HEAD
+import { useProfileStore } from '@/stores/profile'
+=======
+>>>>>>> origin/main
 import api from '@/services/api/api'
 
 const router = useRouter()
+const profileStore = useProfileStore()
 
 const newSubject = ref('')
 
 const form = ref({
   teaching_level: '',
+<<<<<<< HEAD
+  can_online: true,
+  can_f2f: false,
+  hourly_rate: null
+})
+
+
+/* LOAD EXISTING TUTOR DATA */
+onMounted(async () => {
+
+  try {
+
+    const response = await api.get('/tutor-dashboard/')
+
+    const tutor = response.data
+
+    form.value.teaching_level = tutor.teaching_level
+    form.value.can_online = tutor.can_online
+    form.value.can_f2f = tutor.can_f2f
+    form.value.hourly_rate = tutor.hourly_rate
+
+  } catch (error) {
+
+    console.log("New tutor setup")
+
+  }
+
+})
+
+
+/* SUBMIT PROFILE SETUP */
+const handleCompleteSetup = async () => {
+
+  try {
+
+    await api.post('/tutor/setup/', form.value)
+
+    // update profile guard state
+    profileStore.profileCompleted = true
+
+    router.push({ name: 'tch-dashboard' })
+
+  } catch (error) {
+
+    console.error("Failed to save tutor profile", error)
+    alert("Could not save tutor profile.")
+
+=======
   subjects: [],
   can_Online: true,
   can_F2F: false,
@@ -140,6 +193,7 @@ const handleCompleteSetup = async() => {
     router.push('/tch-dashboard')
   } catch (error) {
     console.error('Failed to save preferences', error)
+>>>>>>> origin/main
   }
 
 }

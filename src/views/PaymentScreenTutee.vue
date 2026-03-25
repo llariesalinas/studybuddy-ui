@@ -262,6 +262,8 @@ onMounted(async () => {
   }
 })
 
+<<<<<<< HEAD
+<<<<<<< HEAD
 
 // ---------------------------
 // CONFIRM PAYMENT
@@ -275,8 +277,28 @@ const ConfirmPayment = async () => {
 
   try {
 
+    await api.post('bookings/confirm/', {
+=======
+
+=======
+
+>>>>>>> origin/main
+// ---------------------------
+// CONFIRM PAYMENT
+// ---------------------------
+const ConfirmPayment = async () => {
+
+  if (!paymentStore.selectedMethod) {
+    alert("Please select a payment method.")
+    return
+  }
+
+  try {
+
     const response = await api.post('bookings/confirm/', {
+>>>>>>> 32c6f3b (Before Merging to Another Branch)
       tutor_id: tutorId,
+      date: bookedSessionStore.bookedSessionDate,
       slots: bookedSessionStore.bookedSessions,
       payment_method: paymentStore.selectedMethod   // real DB method_id
     })
@@ -284,9 +306,16 @@ const ConfirmPayment = async () => {
     alert("Booking Confirmed!")
 
     paymentStore.reset()
-    bookedSessionStore.$reset()
+    bookedSessionStore.resetStore()
 
+<<<<<<< HEAD
+    router.push({
+=======
     await router.push({
+<<<<<<< HEAD
+>>>>>>> 32c6f3b (Before Merging to Another Branch)
+=======
+>>>>>>> origin/main
       name: 'dashboard',
       query: { refresh: Date.now() }
     })

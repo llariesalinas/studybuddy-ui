@@ -60,8 +60,8 @@
             <label class="form-label fw-semibold small text-dark">I want to</label>
             <select v-model="store.newUserType" class="form-select shadow-none" required>
               <option value="" disabled selected>Select your role</option>
-              <option value="tutee">Find a Tutor (Student)</option>
-              <option value="tutor">Become a Tutor</option>
+              <option value="Tutee">Find a Tutor (Student)</option>
+              <option value="Tutor">Become a Tutor</option>
             </select>
           </div>
 
@@ -80,68 +80,98 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useRegistrationInfoStore } from '@/stores/registrationinfo'
+import { useAuthStore } from '@/stores/auth'
 import axios from 'axios'
 
 const router = useRouter()
-const store = useRegistrationInfoStore() //this do: 
+const store = useRegistrationInfoStore()
+const authStore = useAuthStore()
+
 const isSubmitting = ref(false)
 
 const generalError = ref('')
 const emailError = ref('')
 
-generalError.value = ''
-emailError.value = ''
-
 const handleRegister = async () => {
+
+  generalError.value = ''
+  emailError.value = ''
+
+  // 🔹 Basic validation
+  if (!store.newUserFname ||
+      !store.newUserLname ||
+      !store.newUserEmail ||
+      !store.newUserPassword) {
+
+    generalError.value = "Please fill in all required fields."
+    return
+  }
+
+  // 🔹 Role validation
+  if (!store.newUserType) {
+    generalError.value = "Please select your role."
+    return
+  }
+
   isSubmitting.value = true
 
   try {
-    // API_INTEGRATION_POINT: Match this URL to Ry's Django server
-    const DJANGO_URL = 'http://localhost:8000/api/register/' //final
 
-    const response = await axios.post(DJANGO_URL, {
-      // These keys MUST match Ry's Django Serializer exactly
+    const role = store.newUserType
+
+    // 🔹 REGISTER USER
+    await axios.post('http://localhost:8000/api/register/', {
       fname: store.newUserFname,
       mname: store.newUserMname,
       lname: store.newUserLname,
       email: store.newUserEmail,
       password: store.newUserPassword,
-      role: store.newUserType
+      role: role
     })
 
-    console.log('Registration Successful:', response.data)
+    // 🔹 AUTO LOGIN
+    await authStore.login({
+      email: store.newUserEmail,
+      password: store.newUserPassword
+    })
 
-    // Route based on the role stored in Pinia
-    if (store.newUserType === 'tutor') {
+    // 🔹 ROLE BASED REDIRECT
+    if (role === 'Tutor') {
       router.push('/tutor-setup')
     } else {
       router.push('/preferencesetup')
     }
 
   } catch (error) {
-      console.error('Registration Error:', error)
 
-      if (error.response) {
-        const data = error.response.data
+    console.error('Registration Error:', error)
 
-        if (data.email) {
-          emailError.value = data.email[0]
-        }
-        else if (data.detail) {
-          generalError.value = data.detail
-        }
+    if (error.response) {
 
-        else {
-          generalError.value = "Registration failed. Please try again."
-        }
+      const data = error.response.data
 
-      } 
-      else if (error.request) {
-        generalError.value = "Server not responding. Please try again later."
-      } 
-      else {
-        generalError.value = "An unexpected error occurred."
+      if (data.email) {
+        emailError.value = data.email[0]
       }
+
+      else if (data.detail) {
+        generalError.value = data.detail
+      }
+
+      else {
+        generalError.value = "Registration failed. Please try again."
+      }
+
+    }
+
+    else if (error.request) {
+      generalError.value = "Server not responding. Please try again later."
+    }
+
+    else {
+      generalError.value = "An unexpected error occurred."
+    }
+
   } finally {
     isSubmitting.value = false
   }

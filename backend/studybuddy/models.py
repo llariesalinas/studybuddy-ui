@@ -4,21 +4,71 @@ from django.contrib.auth.models import User ### allows the use of auth user mode
 
 # Create your models here.
 
- 
+class Strand(models.Model):
+
+    strand_code = models.CharField(max_length=10, primary_key=True)
+    strand_name = models.CharField(max_length=100)
+
+    def __str__(self):
+        return f"{self.strand_code} - {self.strand_name}"
+    
+class Course(models.Model):
+
+    course_code = models.CharField(max_length=20, primary_key=True)
+    course_name = models.CharField(max_length=100)
+
+    strand = models.ForeignKey(
+        Strand,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True
+    )
+
+    def __str__(self):
+        return f"{self.course_code} - {self.course_name}"
+
+
+
 class UserProfile(models.Model):
+
     user = models.OneToOneField(User, on_delete=models.CASCADE)
+
     fname = models.CharField(max_length=100)
     mname = models.CharField(max_length=100, blank=True)
     lname = models.CharField(max_length=100)
-    course = models.CharField(max_length=100, blank=True)
+
+    course = models.ForeignKey(
+        Course,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True
+    )
+
     year_level = models.IntegerField(null=True, blank=True)
 
     bio = models.TextField(blank=True, null=True)
+
+    profile_completed = models.BooleanField(default=False)
+
     profile_picture = models.ImageField(
         upload_to='profile_pics/',
         blank=True,
         null=True
     )
+
+    ROLE_CHOICES = [
+        ('Tutee', 'Tutee'),
+        ('Tutor', 'Tutor'),
+        ('Admin', 'Admin'),
+    ]
+
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.fname} {self.lname}"
 
     ROLE_CHOICES = [
         ('Tutee', 'Tutee'),
@@ -35,18 +85,28 @@ class UserProfile(models.Model):
     
 #TUTOR TABLE
 class Tutor(models.Model):
+
     profile = models.OneToOneField(
         UserProfile,
         on_delete=models.CASCADE,
         primary_key=True
     )
 
-    teaching_level = models.CharField(max_length=100)
+    # Tutor setup fields (filled later)
+    teaching_level = models.CharField(max_length=100, null=True, blank=True)
+
     can_online = models.BooleanField(default=True)
     can_f2f = models.BooleanField(default=False)
 
     rating_average = models.FloatField(default=0)
-    hourly_rate = models.DecimalField(max_digits=8, decimal_places=2)
+
+    hourly_rate = models.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        null=True,
+        blank=True
+    )
+
     total_sessions = models.IntegerField(default=0)
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -245,3 +305,18 @@ class Rating(models.Model):
     def __str__(self):
         return f"{self.rating_score} ⭐ for {self.tutor.profile.fname}"
     
+class Preference(models.Model):
+
+    MODE_CHOICES = [
+        ('Online', 'Online'),
+        ('F2F', 'Face-to-Face'),
+    ]
+
+    user = models.OneToOneField(UserProfile, on_delete=models.CASCADE)
+
+    subjects = models.ManyToManyField(Subjects)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Preferences for {self.user.fname}"

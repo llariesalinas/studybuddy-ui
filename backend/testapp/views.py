@@ -10,7 +10,7 @@ def test_api(request):
         if request.method == "GET":
             messages = list(TestMessage.objects.all().values())
             return JsonResponse(messages, safe=False)
-
+        
         if request.method == "POST":
             data = json.loads(request.body)
             message_text = data.get("message")
