@@ -33,6 +33,12 @@ const router = createRouter({
       meta: { requiresAuth: true }
     },
     {
+      path: '/profile',
+      name: 'profile',
+      component: () => import('@/views/TuteeProfile.vue'),
+      meta: { requiresAuth: true, role: 'Tutee'}
+    },
+    {
       path: '/dashboard',
       name: 'dashboard',
       component: Dashboard,
@@ -75,7 +81,11 @@ const router = createRouter({
       path: '/tutor-setup',
       name: 'tutorpreferencesetup',
       component: () => import('@/views/TutorPreferenceSetup.vue'),
+<<<<<<< HEAD
       meta: { requiresAuth: true }
+=======
+      // meta: { requiresAuth: true, role: 'Tutor' }
+>>>>>>> origin/main
     },
     {
       path: '/tch-dashboard',
@@ -127,6 +137,7 @@ const router = createRouter({
       component: () => import('@/views/SessionsReports.vue'),
       meta: { requiresAuth: true }
     },
+<<<<<<< HEAD
     {
       path: '/profile',
       name: 'profile',
@@ -134,6 +145,9 @@ const router = createRouter({
       meta: { requiresAuth: true }
     }
 
+=======
+    
+>>>>>>> origin/main
   ]
 })
 

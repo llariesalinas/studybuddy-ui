@@ -50,21 +50,17 @@ urlpatterns = [
     path('bookings/', views.list_bookings),
     path('bookings/<int:booking_id>/', views.booking_detail),
     path('payment-methods/', views.payment_methods),
-<<<<<<< HEAD
-    
-=======
 
->>>>>>> 32c6f3b (Before Merging to Another Branch)
-    #Dynamic
-    
     path('bookings/confirm/', views.confirm_payment_and_book),
     path('template-availability/', template_availability),
     path('template-availability/<int:pk>/', template_availability),
     path('bookings/<int:booking_id>/complete/', complete_booking),
     path('bookings/<int:booking_id>/approve/', views.approve_booking),
     path('bookings/<int:booking_id>/reject/', views.reject_booking),
+
     path('tutor/setup/', views.tutor_setup),
     path('recommend-tutors/', views.recommend_tutors_view),
+
 ]
 
 if settings.DEBUG:

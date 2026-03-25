@@ -263,6 +263,7 @@ onMounted(async () => {
 })
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 // ---------------------------
 // CONFIRM PAYMENT
@@ -279,6 +280,9 @@ const ConfirmPayment = async () => {
     await api.post('bookings/confirm/', {
 =======
 
+=======
+
+>>>>>>> origin/main
 // ---------------------------
 // CONFIRM PAYMENT
 // ---------------------------
@@ -308,7 +312,10 @@ const ConfirmPayment = async () => {
     router.push({
 =======
     await router.push({
+<<<<<<< HEAD
 >>>>>>> 32c6f3b (Before Merging to Another Branch)
+=======
+>>>>>>> origin/main
       name: 'dashboard',
       query: { refresh: Date.now() }
     })

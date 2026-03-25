@@ -306,6 +306,7 @@ class Rating(models.Model):
         return f"{self.rating_score} ⭐ for {self.tutor.profile.fname}"
     
 <<<<<<< HEAD
+<<<<<<< HEAD
 class Preference(models.Model):
 
     MODE_CHOICES = [
@@ -328,3 +329,5 @@ class Preference(models.Model):
     
 =======
 >>>>>>> 32c6f3b (Before Merging to Another Branch)
+=======
+>>>>>>> origin/main

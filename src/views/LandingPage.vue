@@ -1,6 +1,6 @@
 <template>
   <div class="landing-page bg-white min-vh-100 font-inter">
-    
+
     <nav class="navbar navbar-expand-lg bg-white py-3">
       <div class="container">
         <a class="navbar-brand d-flex align-items-center fw-bold fs-4" href="#">
@@ -39,12 +39,18 @@
               </router-link>
             </div>
           </div>
-          
+
           <div class="col-lg-6">
             <div class="rounded-4 overflow-hidden shadow-lg border border-sb d-flex align-items-center justify-content-center bg-white" style="height: 400px;">
+<<<<<<< HEAD
               <img 
                 src="@/assets/hero.png"
                 alt="StudyBuddy Peer Tutoring Illustration" 
+=======
+              <img
+                src="@/assets/hero-tutor.png"
+                alt="StudyBuddy Peer Tutoring Illustration"
+>>>>>>> origin/main
                 class="img-fluid w-100 h-100"
                 style="object-fit: contain; padding: 20px;"
               >

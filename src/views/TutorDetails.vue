@@ -292,6 +292,8 @@ const weekRange = computed(() => {
 
 })
 
+
+
 const toggleSlot = (slot) => {
 
   if (slot.is_booked) return
@@ -303,19 +305,31 @@ const toggleSlot = (slot) => {
     time_slot: slot.time_slot
   }
 
+<<<<<<< HEAD
   // first selection
+=======
+  // First selection
+>>>>>>> origin/main
   if (selectedSlots.value.length === 0) {
     selectedSlots.value.push(slotWithDate)
     return
   }
 
+<<<<<<< HEAD
   // enforce same date
+=======
+  // Enforce same date
+>>>>>>> origin/main
   if (selectedSlots.value[0].session_date !== selectedDate.value) {
     alert("You can only book multiple hours on the same day.")
     return
   }
 
+<<<<<<< HEAD
   // remove if already selected
+=======
+  // If already selected → remove it
+>>>>>>> origin/main
   const exists = selectedSlots.value.some(
     s => s.availability_id === slot.id
   )
@@ -329,6 +343,7 @@ const toggleSlot = (slot) => {
     return
   }
 
+<<<<<<< HEAD
   // ensure consecutive hours
   const allTimes = selectedSlots.value.map(s => s.time_slot)
   allTimes.push(slot.time_slot)
@@ -356,6 +371,31 @@ const toggleSlot = (slot) => {
 
     if (diffInHours !== 1) {
 
+=======
+  
+
+
+  // Robust consecutiveness check
+  const allTimes = selectedSlots.value.map(s => s.time_slot)
+  allTimes.push(slot.time_slot)
+
+  const sortedTimes = allTimes
+    .map(t => {
+      const [h, m] = t.split(':')
+      const d = new Date()
+      d.setHours(parseInt(h))
+      d.setMinutes(parseInt(m))
+      d.setSeconds(0)
+      return d
+    })
+    .sort((a, b) => a - b)
+
+  for (let i = 1; i < sortedTimes.length; i++) {
+    const diffInMs = sortedTimes[i] - sortedTimes[i - 1]
+    const diffInHours = diffInMs / (1000 * 60 * 60)
+
+    if (diffInHours !== 1) {
+>>>>>>> origin/main
       alert("Selected hours must be consecutive.")
       return
 
@@ -363,10 +403,14 @@ const toggleSlot = (slot) => {
 
   }
 
+  // ✅ Add slot after passing validation
   selectedSlots.value.push(slotWithDate)
 
+<<<<<<< HEAD
 }
 
+=======
+>>>>>>> origin/main
 const bookSessions = () => {
 
   console.log("Booking:", selectedSlots.value)
@@ -378,6 +422,7 @@ const bookSessions = () => {
   router.push(`/payment-tutee/${tutorID}`)
 
 }
+
 
 </script>
 
