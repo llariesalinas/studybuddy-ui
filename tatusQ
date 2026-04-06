@@ -1,0 +1,83 @@
+[33m34270f5[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mryan/MidtermsEvalWorkiong[m[33m)[m After Merging origin/main
+[33mb977330[m[33m ([m[1;31morigin/ryan/MidtermsEvalWorkiong[m[33m, [m[1;32mryan/LatestWorking[m[33m)[m working CBF
+[33meac9011[m Before Doing any Progress adding database seeds
+[33m7d79c6e[m Working Full Yes 70%
+[33m32c6f3b[m[33m ([m[1;32mryan/backend-api[m[33m, [m[1;32mmain[m[33m)[m Before Merging to Another Branch
+[33m24f6733[m Before changing tutor_dashboard logic
+[33m44d7a0a[m Merged Regi's stuff
+[33mba1140e[m Added Requested Sessions page. (#34)
+[33m65b9e05[m Added routing to Booking details page in Sessions and Reports page and in tutor dashboard (#33)
+[33mae6b5a5[m Ryan/backend api (#32)
+[33md908671[m Added Booking Details page and tutorBookingDetails store. (#31)
+[33md496ab2[m Fix/added paymentscreen for tutee (#30)
+[33m3f5a15a[m Fix/finish integrating backend to tutor sched (#29)
+[33mdb2dae0[m Ryan/backend api (#28)
+[33m55c0525[m Before Pushing changed
+[33m8106fed[m Merge pull request #25 from llariesalinas/ryan/backend-api
+[33m939134a[m Added Completed Sessions page for tutor (#24)
+[33m18f9d0c[m added full functionality tutordeets and payment
+[33mb478998[m Merge remote-tracking branch 'origin/main' into ryan/backend-api
+[33m7fe1a23[m Integrated the backend to tutor schedule page (#23)
+[33m3fe68b4[m Merge pull request #22 from llariesalinas/fix/Added-paymentscreen-for-tutee
+[33m991b01f[m Finished TutorDetails -> now reflects backend data -> added admin functions that prevents duplicates of time schedules.
+[33m23987a8[m Added payment screen for tutee and payment details store
+[33m791fb3c[m Merge branch 'main' into ryan/backend-api
+[33mf48d5e5[m Before working on Tutordeets
+[33m47b59e6[m Merge pull request #21 from llariesalinas/fix/Finish-backend-integration-for-TutorDetails
+[33m5ace18c[m[33m ([m[1;31morigin/fix/Finish-backend-integration-for-TutorDetails[m[33m)[m Finished integrating backend for Tutor Details page
+[33mf9c9086[m Merge pull request #20 from llariesalinas/ryan/backend-api
+[33m95a21fc[m  Fixed TutorDashboard.vue
+[33m441c83c[m Merge branch 'main' into ryan/backend-api
+[33m913ea6f[m added Tutor dashbaord views and altered urls
+[33m04a4ae7[m Merge pull request #19 from llariesalinas/fix/Fix-findTutors
+[33md609da2[m[33m ([m[1;31morigin/fix/Fix-findTutors[m[33m)[m Fixed Findtutors page and hid the Book Session button in pages where it not needed
+[33md673932[m Merge pull request #18 from llariesalinas/ryan/backend-api
+[33ma42c444[m added tutorlist function fixed preference, Seeded backend data
+[33m6c66633[m Merge branch 'main' into ryan/backend-api
+[33m4ea0e78[m added api connection to Initial booking preparing for Tutorlist
+[33m34cbffe[m Merge pull request #17 from llariesalinas/fix/Integrated-backend-to-tutorDetails
+[33mb002a80[m Integrated backend to tutor details
+[33m0a5a4d1[m Merge pull request #16 from llariesalinas/fix/Adding-log-out-button
+[33m1d1abdf[m[33m ([m[1;31morigin/fix/Adding-log-out-button[m[33m)[m Added log-out button to dashboard
+[33m8566511[m Merge pull request #15 from llariesalinas/ryan/backend-api
+[33m1d433d6[m updated views | fixed tokens | dashboard data now reflects | added all the models to the admin side | changed Dashboard to reflect student name |
+[33mfe13300[m Merge remote-tracking branch 'origin/main' into ryan/backend-api
+[33m574c8f7[m WIP:local model changed before merging main
+[33mf9c7c93[m Merge pull request #14 from llariesalinas/fix/finish-backend-integration-for-tutee-dashboard
+[33mf18eff3[m Made the dashboard page dynamic, and added a recommendations section
+[33m0e84ce3[m updated models with : subjects and tutor and migrations
+[33me5d1e35[m updated models with : subjects and tutor
+[33m38c4d81[m Merge pull request #13 from llariesalinas/fix/Added-more-errorhandling-to-register
+[33ma05cf57[m Merge pull request #12 from llariesalinas/fix/finishing-tutor-list-page
+[33m534b06f[m Merge pull request #11 from llariesalinas/ryan/backend-api
+[33mf1304f8[m Added more error handling for register page
+[33m1547899[m Removed the search bar and added dropdowns
+[33m629584d[m fixed backend added as normal folder
+[33m6fafc89[m Merge pull request #10 from llariesalinas/ryan/backend-api
+[33m5680779[m added backend and auth.js
+[33m1097017[m[33m ([m[1;32mryan/registeradd[m[33m)[m Final auth.js src
+[33m8e2c7df[m Merge pull request #9 from llariesalinas/ryan/registeradd
+[33m90d0d03[m added api, register
+[33m4925030[m[33m ([m[1;32mfeat-register-integration[m[33m)[m Made change to register.Vue and added api
+[33mfaed070[m Merge branch 'main' of https://github.com/llariesalinas/studybuddy-ui
+[33ma415069[m WIP local chages
+[33mf9d760d[m Merge pull request #8 from llariesalinas/fix/align-register-names-to-erd
+[33m2c516e4[m Rename user fields for Django serializer compatibility
+[33mfa2b206[m Aligned store variables and registration fields
+[33mbf84d3a[m Merge pull request #7 from llariesalinas/feat/api-register-integration
+[33mc89fec7[m[33m ([m[1;31morigin/feat/api-register-integration[m[33m)[m feat: standardize API integration, auth state, and store logic across all frontend forms
+[33m335666d[m Merge pull request #3 from llariesalinas/feat/tutor-views-integration
+[33m7708597[m[33m ([m[1;31morigin/feat/tutor-views-integration[m[33m)[m feat: complete Phase 2 frontend shell with RBAC routing, dynamic dashboards, and ERD-aligned booking modal
+[33m14c5740[m feat: complete frontend shell, dynamic sidebars, and role-based routing for Phase 2
+[33mbbce890[m[33m ([m[1;32mry/backendint[m[33m)[m Save chagnes before swithcing branches
+[33m2e23332[m Progress Test API - stores counter
+[33mcf41042[m Merge pull request #2 from llariesalinas/reginald/initialbooking_pinia_integration
+[33m06e6b2d[m Integrated pinia to booking page, and made bookingstore file
+[33me77f1b8[m Merge pull request #1 from llariesalinas/reginald/preferencesetuppage
+[33m90d3a50[m Changes to router and register page
+[33mdaaf4ad[m main.js changes
+[33m5c20161[m PreferenceSetup page added
+[33me6df9f4[m[33m ([m[1;32mry/login-ui[m[33m)[m feat: added initialbooking, paymentscreen, profile, tutordetails
+[33m65e7607[m docs: update README with project objectives and team setup protocol
+[33m85ce6bb[m feat: setup initial UI shell, pending data integration
+[33mda19d2a[m chore: initial Vue scaffold with Router and Pinia
