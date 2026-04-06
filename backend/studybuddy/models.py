@@ -330,8 +330,3 @@ class Preference(models.Model):
 
     def __str__(self):
         return f"Preferences for {self.user.fname}"
-    
-
-
-
-    
