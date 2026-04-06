@@ -144,6 +144,8 @@ router.beforeEach(async (to, from, next) => {
 
   const authStore = useAuthStore()
   const profileStore = useProfileStore()
+  const normalizedUserRole = authStore.userRole?.toLowerCase?.() || null
+  const normalizedRouteRole = to.meta.role?.toLowerCase?.() || null
 
   // 1️⃣ Protect routes requiring authentication
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
@@ -173,13 +175,13 @@ router.beforeEach(async (to, from, next) => {
     // 3️⃣ Profile completion guard
     if (!profileStore.profileCompleted) {
 
-      const role = authStore.userRole
+      const role = normalizedUserRole
 
       if (to.path === '/preferencesetup' || to.path === '/tutor-setup') {
         return next()
       }
 
-      if (role === 'Tutor') {
+      if (role === 'tutor') {
         return next('/tutor-setup')
       }
 
@@ -187,13 +189,13 @@ router.beforeEach(async (to, from, next) => {
     }
 
     // 4️⃣ Role protection
-    if (to.meta.role && authStore.userRole !== to.meta.role) {
+    if (normalizedRouteRole && normalizedUserRole !== normalizedRouteRole) {
 
-      if (authStore.userRole === 'Tutor') {
+      if (normalizedUserRole === 'tutor') {
         return next('/tch-dashboard')
       }
 
-      if (authStore.userRole === 'Tutee') {
+      if (normalizedUserRole === 'tutee') {
         return next('/dashboard')
       }
 

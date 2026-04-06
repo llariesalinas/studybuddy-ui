@@ -2,6 +2,7 @@ import axios from 'axios'
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import api from '@/services/api/api'
+import { useProfileStore } from '@/stores/profile'
 import {
   startIdleSessionTracking,
   stopIdleSessionTracking
@@ -13,6 +14,16 @@ const ACCESS_REFRESH_INTERVAL_MS = 4 * 60 * 1000
 let refreshIntervalId = null
 
 export const useAuthStore = defineStore('auth', () => {
+  const profileStore = useProfileStore()
+
+  const normalizeRole = (role) => {
+    if (!role) {
+      return null
+    }
+
+    return String(role).toLowerCase()
+  }
+
   const handleIdleLogout = () => {
     logout()
 
@@ -111,13 +122,14 @@ export const useAuthStore = defineStore('auth', () => {
 
     user.value = {
       email: response.data.email,
-      role: response.data.role,
+      role: normalizeRole(response.data.role),
       id: response.data.user_id,
       fname: response.data.fname,
       lname: response.data.lname
     }
 
-    localStorage.setItem('user_role', response.data.role)
+    localStorage.setItem('user_role', normalizeRole(response.data.role))
+    profileStore.resetProfileState()
 
     startSessionTracking()
 
@@ -131,6 +143,7 @@ export const useAuthStore = defineStore('auth', () => {
     token.value = null
     refreshToken.value = null
     user.value = null
+    profileStore.resetProfileState()
 
     localStorage.removeItem('access_token')
     localStorage.removeItem('refresh_token')
@@ -150,7 +163,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     if (storedRole) {
       user.value = {
-        role: storedRole
+        role: normalizeRole(storedRole)
       }
     }
   }

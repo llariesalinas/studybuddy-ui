@@ -30,7 +30,8 @@ api.interceptors.request.use(
     const token = authStore.token || localStorage.getItem('access_token')
 
     if (token) {
-      config.headers.Authorization = Bearer 
+      config.headers = config.headers ?? {}
+      config.headers.Authorization = `Bearer ${token}`
     }
 
     return config
@@ -56,7 +57,7 @@ api.interceptors.response.use(
         const newAccessToken = await refreshAccessToken()
 
         originalRequest.headers = originalRequest.headers ?? {}
-        originalRequest.headers.Authorization = Bearer 
+        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`
 
         return api(originalRequest)
       } catch (refreshError) {
