@@ -44,8 +44,26 @@
             <div class="input-group">
               <span class="input-group-text bg-white border-end-0 text-muted"><i class="bi bi-envelope"></i></span>
               <input type="email" v-model="store.newUserEmail" class="form-control border-start-0 ps-0 shadow-none" placeholder="you@university.edu" required>
-              <div v-if="emailError" class="text-danger small mt-1">{{ emailError }}</div>
             </div>
+            <div v-if="emailError" class="text-danger small mt-1">{{ emailError }}</div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold small text-dark">Institution</label>
+            <select v-model="store.selectedInstitutionId" class="form-select shadow-none" required>
+              <option value="" disabled>Select your institution</option>
+              <option
+                v-for="institution in institutions"
+                :key="institution.id"
+                :value="String(institution.id)"
+              >
+                {{ institution.institution_name }} ({{ institution.school_email_domain }})
+              </option>
+            </select>
+            <div v-if="selectedInstitutionDomain" class="form-text small">
+              Allowed email domain: {{ selectedInstitutionDomain }}
+            </div>
+            <div v-if="institutionError" class="text-danger small mt-1">{{ institutionError }}</div>
           </div>
 
           <div class="mb-3">
@@ -77,7 +95,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useRegistrationInfoStore } from '@/stores/registrationinfo'
 import { useAuthStore } from '@/stores/auth'
@@ -88,20 +106,58 @@ const store = useRegistrationInfoStore()
 const authStore = useAuthStore()
 
 const isSubmitting = ref(false)
+const institutions = ref([])
 
 const generalError = ref('')
 const emailError = ref('')
+const institutionError = ref('')
+
+const selectedInstitution = computed(() => {
+  return institutions.value.find(
+    (institution) => String(institution.id) === String(store.selectedInstitutionId)
+  ) || null
+})
+
+const selectedInstitutionDomain = computed(() => {
+  return selectedInstitution.value?.school_email_domain || ''
+})
+
+const emailDomainMatchesInstitution = computed(() => {
+  if (!store.newUserEmail || !selectedInstitutionDomain.value) {
+    return true
+  }
+
+  const parts = store.newUserEmail.split('@')
+
+  if (parts.length !== 2) {
+    return false
+  }
+
+  return parts[1].trim().toLowerCase() === selectedInstitutionDomain.value.toLowerCase()
+})
+
+const loadInstitutions = async () => {
+  try {
+    const response = await axios.get('http://localhost:8000/api/partner-institutions/')
+    institutions.value = response.data
+  } catch (error) {
+    console.error('Failed to load partner institutions:', error)
+    generalError.value = 'Unable to load partner institutions right now. Please try again later.'
+  }
+}
 
 const handleRegister = async () => {
 
   generalError.value = ''
   emailError.value = ''
+  institutionError.value = ''
 
   // 🔹 Basic validation
   if (!store.newUserFname ||
       !store.newUserLname ||
       !store.newUserEmail ||
-      !store.newUserPassword) {
+      !store.newUserPassword ||
+      !store.selectedInstitutionId) {
 
     generalError.value = "Please fill in all required fields."
     return
@@ -110,6 +166,11 @@ const handleRegister = async () => {
   // 🔹 Role validation
   if (!store.newUserType) {
     generalError.value = "Please select your role."
+    return
+  }
+
+  if (!emailDomainMatchesInstitution.value) {
+    institutionError.value = 'Your email domain does not match the selected institution. Please check and try again.'
     return
   }
 
@@ -126,7 +187,8 @@ const handleRegister = async () => {
       lname: store.newUserLname,
       email: store.newUserEmail,
       password: store.newUserPassword,
-      role: role
+      role: role,
+      institution_id: store.selectedInstitutionId
     })
 
     // 🔹 AUTO LOGIN
@@ -150,16 +212,14 @@ const handleRegister = async () => {
 
       const data = error.response.data
 
-      if (data.email) {
-        emailError.value = data.email[0]
-      }
+      const message = data.error || data.detail || "Registration failed. Please try again."
 
-      else if (data.detail) {
-        generalError.value = data.detail
-      }
-
-      else {
-        generalError.value = "Registration failed. Please try again."
+      if (message.toLowerCase().includes('email')) {
+        emailError.value = message
+      } else if (message.toLowerCase().includes('institution')) {
+        institutionError.value = message
+      } else {
+        generalError.value = message
       }
 
     }
@@ -176,4 +236,8 @@ const handleRegister = async () => {
     isSubmitting.value = false
   }
 }
+
+onMounted(() => {
+  loadInstitutions()
+})
 </script>

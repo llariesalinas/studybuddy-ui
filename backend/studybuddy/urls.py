@@ -30,6 +30,7 @@ urlpatterns = [
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('profile/status/', views.profile_status),
     path('preferences/', views.save_preferences),
+    path('partner-institutions/', views.partner_institutions_list),
     path('dashboard/', student_dashboard),
     path('tutee/profile/', views.get_tutee_profile),
     path('tutee/profile/update/', views.update_tutee_profile),

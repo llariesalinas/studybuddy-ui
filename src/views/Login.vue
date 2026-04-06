@@ -13,6 +13,10 @@
           <p class="text-muted small">Log in to your StudyBuddy account</p>
         </div>
 
+        <div v-if="loginError" class="alert alert-danger">
+          {{ loginError }}
+        </div>
+
         <form @submit.prevent="handleLogin">
           <div class="mb-3">
             <label class="form-label fw-semibold small text-dark">University Email</label>
@@ -73,11 +77,13 @@ const authStore = useAuthStore()
 const email = ref('')
 const password = ref('')
 const isSubmitting = ref(false)
+const loginError = ref('')
 
 
 const handleLogin = async () => {
   console.log("Login function triggered")
   isSubmitting.value = true
+  loginError.value = ''
 
   try {
     // API_INTEGRATION_POINT: The actual axios call is delegated to the store
@@ -107,7 +113,7 @@ const handleLogin = async () => {
 
   } catch (error) {
     console.error('Login Error:', error)
-    alert('Login failed. Please check your credentials.')
+    loginError.value = error.response?.data?.error || 'Login failed. Please check your credentials.'
   } finally {
     isSubmitting.value = false
   }

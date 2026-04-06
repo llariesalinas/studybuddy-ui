@@ -20,12 +20,13 @@ from .recommender.hybrid import recommend_tutors_hybrid
 from .recommender.CF import build_rating_matrix
 
 from .recommender.cbf import recommend_tutors
-from .models import Payment, PaymentMethod, Subjects, TutorAvailability, TutorSubjects, Tutor, Booking,Course,Preference
+from .models import Booking, Course, PartnerInstitution, Payment, PaymentMethod, Preference, Subjects, Tutor, TutorAvailability, TutorSubjects
 from .serializers import TutorDetailSerializer, TutorSearchSerializer, SubjectSerializer
 
 from .models import (
     UserProfile,
     Booking,
+    PartnerInstitution,
     Tutor,
     TutorSubjects
 )
@@ -34,6 +35,50 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.contrib.auth.models import User
 from .models import UserProfile, Tutor
+
+
+def normalize_email_domain(email):
+    if not email or '@' not in email:
+        return None
+
+    return email.split('@', 1)[1].strip().lower()
+
+
+def normalize_stored_domain(domain):
+    if not domain:
+        return None
+
+    return domain.strip().lower().lstrip('@')
+
+
+def get_active_institution_by_domain(domain):
+    normalized_domain = normalize_stored_domain(domain)
+
+    if not normalized_domain:
+        return None
+
+    return PartnerInstitution.objects.filter(
+        school_email_domain__iexact=normalized_domain,
+        is_active=True
+    ).first()
+
+
+@api_view(['GET'])
+def partner_institutions_list(request):
+
+    institutions = PartnerInstitution.objects.filter(is_active=True).order_by('institution_name')
+
+    data = [
+        {
+            "id": institution.id,
+            "institution_name": institution.institution_name,
+            "school_email_domain": normalize_stored_domain(institution.school_email_domain),
+            "contact_person": institution.contact_person
+        }
+        for institution in institutions
+    ]
+
+    return Response(data)
 
 
 @api_view(['POST'])
@@ -45,11 +90,29 @@ def register_user(request):
     mname = request.data.get('mname', '')
     lname = request.data.get('lname')
     role = request.data.get('role')
+    institution_id = request.data.get('institution_id')
 
     # Validate required fields
-    if not all([email, password, fname, lname, role]):
+    if not all([email, password, fname, lname, role, institution_id]):
         return Response(
             {"error": "Missing required fields"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        institution = PartnerInstitution.objects.get(id=institution_id, is_active=True)
+    except PartnerInstitution.DoesNotExist:
+        return Response(
+            {"error": "Your institution is not a registered partner. Please contact support."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    email_domain = normalize_email_domain(email)
+    institution_domain = normalize_stored_domain(institution.school_email_domain)
+
+    if email_domain != institution_domain:
+        return Response(
+            {"error": "Your email domain does not match the selected institution. Please check and try again."},
             status=status.HTTP_400_BAD_REQUEST
         )
 
@@ -73,7 +136,8 @@ def register_user(request):
         fname=fname,
         mname=mname,
         lname=lname,
-        role=role
+        role=role,
+        institution=institution
     )
 
     # 🔥 Create Tutor record if role is Tutor
@@ -124,7 +188,41 @@ def login_view(request):
         return Response(
             {"error": "User profile not found"},
             status=status.HTTP_404_NOT_FOUND
-        )   
+        )
+
+    if not profile.is_domain_exempt:
+        email_domain = normalize_email_domain(email)
+        active_institution = get_active_institution_by_domain(email_domain)
+
+        if active_institution is None:
+            institution = profile.institution
+
+            if institution and not institution.is_active:
+                return Response(
+                    {"error": "Your institution's access has been suspended. Please contact support."},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+            return Response(
+                {"error": "Your institution is not a registered partner. Please contact support."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        profile_domain = (
+            normalize_stored_domain(profile.institution.school_email_domain)
+            if profile.institution
+            else None
+        )
+
+        if profile.institution_id and profile_domain != email_domain:
+            return Response(
+                {"error": "Your email domain does not match your registered institution. Please contact support."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        if profile.institution_id != active_institution.id:
+            profile.institution = active_institution
+            profile.save(update_fields=['institution', 'updated_at'])
 
     return Response({
         "access": str(refresh.access_token),
@@ -1335,5 +1433,4 @@ def payment_methods(request):
         for method in methods
     ]
 
-    return Response(data)
     return Response(data)

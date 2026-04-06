@@ -28,6 +28,20 @@ class Course(models.Model):
         return f"{self.course_code} - {self.course_name}"
 
 
+class PartnerInstitution(models.Model):
+    institution_name = models.CharField(max_length=255)
+    school_email_domain = models.CharField(max_length=255, unique=True)
+    is_active = models.BooleanField(default=True)
+    contact_person = models.CharField(max_length=255, blank=True)
+    date_added = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['institution_name']
+
+    def __str__(self):
+        return f"{self.institution_name} ({self.school_email_domain})"
+
+
 
 class UserProfile(models.Model):
 
@@ -56,6 +70,15 @@ class UserProfile(models.Model):
         null=True
     )
 
+    institution = models.ForeignKey(
+        PartnerInstitution,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True
+    )
+
+    is_domain_exempt = models.BooleanField(default=False)
+
     ROLE_CHOICES = [
         ('Tutee', 'Tutee'),
         ('Tutor', 'Tutor'),
@@ -64,19 +87,6 @@ class UserProfile(models.Model):
 
     role = models.CharField(max_length=20, choices=ROLE_CHOICES)
 
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    def __str__(self):
-        return f"{self.fname} {self.lname}"
-
-    ROLE_CHOICES = [
-        ('Tutee', 'Tutee'),
-        ('Tutor', 'Tutor'),
-        ('Admin', 'Admin'),
-    ]
-
-    role = models.CharField(max_length=20, choices=ROLE_CHOICES)  # Tutee, Tutor, Admin
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -305,7 +315,6 @@ class Rating(models.Model):
     def __str__(self):
         return f"{self.rating_score} ⭐ for {self.tutor.profile.fname}"
     
-<<<<<<< HEAD
 class Preference(models.Model):
 
     MODE_CHOICES = [
@@ -326,5 +335,3 @@ class Preference(models.Model):
 
 
     
-=======
->>>>>>> 32c6f3b (Before Merging to Another Branch)
