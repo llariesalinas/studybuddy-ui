@@ -37,3 +37,6 @@ __screenshots__/
 
 # Vite
 *.timestamp-*-*.mjs
+
+# Local handoff notes
+PROJECT_HANDOFF_DUMP.md

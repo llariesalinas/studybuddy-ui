@@ -3,7 +3,6 @@ import { ref } from 'vue'
 
 export const useInitialBookingPrefsStore = defineStore('initialBookingPrefs', () => {
     const selectedSubject = ref('')
-    const selectedTopic = ref('')
     const selectedDate = ref(null)
     const selectedMode = ref('')
     const selectedStartTime = ref(null)
@@ -11,7 +10,6 @@ export const useInitialBookingPrefsStore = defineStore('initialBookingPrefs', ()
 
     const resetPreferences = () => {
         selectedSubject.value = ''
-        selectedTopic.value = ''
         selectedDate.value = null
         selectedMode.value = ''
         selectedStartTime.value = null
@@ -20,7 +18,6 @@ export const useInitialBookingPrefsStore = defineStore('initialBookingPrefs', ()
 
     return {
       selectedSubject,
-      selectedTopic,
       selectedDate,
       selectedMode,
       selectedStartTime,

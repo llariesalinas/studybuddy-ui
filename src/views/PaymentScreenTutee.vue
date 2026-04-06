@@ -207,7 +207,7 @@ const paymentSummary = computed(() => {
   return {
     hours,
     total: `₱${total.toLocaleString()}`,
-    subject: bookedSessionStore.bookedSessionSub,
+    subject: bookedSessionStore.bookedSessionSub || 'Selected sessions',
     tutor: `${tutor.value.fname} ${tutor.value.lname}`
   }
 })
@@ -256,7 +256,7 @@ onMounted(async () => {
   }
 
   // Protect against direct URL access
-  if (!bookedSessionStore.bookedSessionSub) {
+  if (!bookedSessionStore.bookedSessions?.length) {
     alert("No Sessions Selected.")
     router.push('/find-tutors')
   }

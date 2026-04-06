@@ -9,7 +9,6 @@
   <div class="card border-sb shadow-sm rounded-4">
   <div class="card-body p-4 p-md-5">
 
-  <!-- Avatar -->
   <div class="d-flex align-items-center mb-4 pb-4 border-bottom">
     <div
       class="rounded-circle bg-success bg-opacity-10 d-flex justify-content-center align-items-center fw-bold fs-3 me-4"
@@ -28,19 +27,16 @@
 
 <div class="row g-4">
 
-<!-- NAME -->
 <div class="col-md-6">
 <label class="form-label fw-semibold small">Full Name</label>
 <input v-model="profile.fullName" class="form-control">
 </div>
 
-<!-- EMAIL -->
 <div class="col-md-6">
 <label class="form-label fw-semibold small">Email</label>
 <input :value="profile.email" disabled class="form-control bg-light">
 </div>
 
-<!-- COURSE -->
 <div class="col-md-6">
 <label class="form-label fw-semibold small">Course</label>
 
@@ -59,7 +55,6 @@
 </select>
 </div>
 
-<!-- YEAR LEVEL -->
 <div class="col-md-6">
 <label class="form-label fw-semibold small">Year Level</label>
 
@@ -78,21 +73,31 @@
 </select>
 </div>
 
-<!-- HOURLY RATE -->
 <div class="col-md-6">
 <label class="form-label fw-semibold small">Hourly Rate</label>
 <input type="number" v-model="profile.hourly_rate" class="form-control">
 </div>
 
-<!-- TEACHING LEVEL -->
+<div class="col-md-6">
+<label class="form-label fw-semibold small">Response Time</label>
+<select v-model="profile.response_time" class="form-select">
+<option value="">Select response time</option>
+<option
+  v-for="option in responseTimeOptions"
+  :key="option.value"
+  :value="option.value"
+>
+  {{ option.label }}
+</option>
+</select>
+</div>
+
 <div class="col-md-6">
 <label class="form-label fw-semibold small">Teaching Level</label>
 <input v-model="profile.teaching_level" class="form-control">
 </div>
 
-<!-- SESSION MODE -->
 <div class="col-md-6">
-
 <label class="form-label fw-semibold small">Session Mode</label>
 
 <div class="form-check">
@@ -107,61 +112,42 @@
 
 </div>
 
-<!-- SUBJECTS -->
 <div class="col-12">
-
 <label class="form-label fw-semibold small">Subjects</label>
 
-<div class="d-flex flex-wrap gap-2 mb-3">
+<div class="subject-picker-shell">
+  <button
+    type="button"
+    class="btn btn-outline-dark rounded-3 fw-semibold"
+    @click="openSubjectModal"
+  >
+    + Add subjects
+  </button>
 
-<span
-v-for="s in profile.subjects"
-:key="s.subject_code"
-class="badge bg-sb-primary px-3 py-2"
->
+  <div v-if="profile.subjects.length" class="subject-pill-list">
+    <span
+      v-for="subject in profile.subjects"
+      :key="subject.subject_code"
+      class="subject-pill"
+    >
+      {{ subject.subject_name }}
+      <button
+        type="button"
+        class="subject-pill-remove"
+        @click="removeSubject(subject.subject_code)"
+      >
+        ×
+      </button>
+    </span>
+  </div>
 
-{{ s.subject_name }}
+  <p v-else class="text-muted small mb-0">No subjects selected yet.</p>
 
-<button
-type="button"
-class="btn-close btn-close-white ms-2"
-style="font-size:10px"
-@click="removeSubject(s.subject_code)"
-></button>
-
-</span>
-
-</div>
-
-<div class="d-flex gap-2">
-
-<select v-model="newSubject" class="form-select">
-
-<option value="">Select subject</option>
-
-<option
-v-for="s in allSubjects"
-:key="s.subject_code"
-:value="s.subject_code"
->
-{{ s.subject_name }}
-</option>
-
-</select>
-
-<button
-type="button"
-class="btn btn-outline-dark"
-@click="addSubject"
->
-Add
-</button>
-
+  <p class="text-muted small mb-0">Up to 8 subjects.</p>
 </div>
 
 </div>
 
-<!-- BIO -->
 <div class="col-12">
 
 <label class="form-label fw-semibold small">Bio</label>
@@ -186,12 +172,105 @@ Save Changes
 
 </div>
 </div>
+
+<div
+  v-if="isSubjectModalOpen"
+  class="subject-modal-backdrop"
+  @click.self="closeSubjectModal"
+>
+  <div class="subject-modal card border-0 shadow rounded-4">
+    <div class="card-body p-4">
+      <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+        <div>
+          <h5 class="fw-bold mb-1">Pick Subjects</h5>
+          <p class="text-muted small mb-0">Search and filter by category before confirming.</p>
+        </div>
+        <button type="button" class="btn-close" @click="closeSubjectModal"></button>
+      </div>
+
+      <div class="mb-3">
+        <input
+          v-model="subjectSearch"
+          type="text"
+          class="form-control"
+          placeholder="Search subjects"
+        >
+      </div>
+
+      <div class="category-pills mb-3">
+        <button
+          v-for="category in availableCategories"
+          :key="category"
+          type="button"
+          class="category-pill"
+          :class="{ active: activeCategory === category }"
+          @click="activeCategory = category"
+        >
+          {{ category }}
+        </button>
+      </div>
+
+      <div class="subject-modal-list">
+        <div v-if="isLoadingSubjects" class="text-center text-muted py-4">
+          Loading subjects...
+        </div>
+
+        <div v-else-if="subjectsLoadError" class="text-center text-danger py-4">
+          {{ subjectsLoadError }}
+        </div>
+
+        <template v-else>
+          <button
+            v-for="subject in filteredSubjects"
+            :key="subject.subject_code"
+            type="button"
+            class="subject-option"
+            :class="{ selected: isDraftSelected(subject.subject_code) }"
+            @click="toggleDraftSubject(subject.subject_code)"
+          >
+            <div class="subject-option-copy">
+              <span class="subject-option-name">{{ subject.subject_name }}</span>
+              <span class="subject-option-meta">
+                {{ normalizeCategory(subject.category) }}
+              </span>
+            </div>
+
+            <div class="subject-option-check">
+              <input
+                type="checkbox"
+                class="form-check-input"
+                :checked="isDraftSelected(subject.subject_code)"
+                tabindex="-1"
+                @change.prevent
+              >
+            </div>
+          </button>
+
+          <div v-if="!filteredSubjects.length" class="text-center text-muted py-4">
+            No subjects match your filters.
+          </div>
+        </template>
+      </div>
+
+      <div class="subject-modal-footer mt-3">
+        <span class="text-muted small">{{ selectedDraftCountLabel }}</span>
+        <div class="d-flex gap-2">
+          <button type="button" class="btn btn-outline-secondary" @click="closeSubjectModal">
+            Cancel
+          </button>
+          <button type="button" class="btn bg-sb-primary text-white" @click="confirmSubjectSelection">
+            Confirm
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 </div>
 </template>
 
 <script setup>
-
-import { ref, computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import api from '@/services/api/api'
 
 const profile = ref({
@@ -204,50 +283,147 @@ const profile = ref({
   hourly_rate: '',
   teaching_level: '',
   can_online: true,
-  can_f2f: false
+  can_f2f: false,
+  response_time: ''
 })
 
 const courses = ref([])
 const allSubjects = ref([])
-const newSubject = ref('')
+const initialSubjectCodes = ref([])
+const isSubjectModalOpen = ref(false)
+const subjectSearch = ref('')
+const activeCategory = ref('All')
+const draftSubjectCodes = ref([])
+const isLoadingSubjects = ref(false)
+const subjectsLoadError = ref('')
 
-/* YEAR LEVELS */
-const yearLevels = [
-  { label: "Grade 1", value: 1 },
-  { label: "Grade 2", value: 2 },
-  { label: "Grade 3", value: 3 },
-  { label: "Grade 4", value: 4 },
-  { label: "Grade 5", value: 5 },
-  { label: "Grade 6", value: 6 },
-  { label: "Grade 7", value: 7 },
-  { label: "Grade 8", value: 8 },
-  { label: "Grade 9", value: 9 },
-  { label: "Grade 10", value: 10 },
-  { label: "Grade 11", value: 11 },
-  { label: "Grade 12", value: 12 },
-  { label: "1st Year College", value: 13 },
-  { label: "2nd Year College", value: 14 },
-  { label: "3rd Year College", value: 15 },
-  { label: "4th Year College", value: 16 }
+const responseTimeOptions = [
+  { value: 'within_1_hour', label: 'Within 1 hour' },
+  { value: 'within_few_hours', label: 'Within a few hours' },
+  { value: 'within_a_day', label: 'Within a day' }
 ]
 
-/* INITIALS */
-const initials = computed(() => {
+const yearLevels = [
+  { label: 'Grade 1', value: 1 },
+  { label: 'Grade 2', value: 2 },
+  { label: 'Grade 3', value: 3 },
+  { label: 'Grade 4', value: 4 },
+  { label: 'Grade 5', value: 5 },
+  { label: 'Grade 6', value: 6 },
+  { label: 'Grade 7', value: 7 },
+  { label: 'Grade 8', value: 8 },
+  { label: 'Grade 9', value: 9 },
+  { label: 'Grade 10', value: 10 },
+  { label: 'Grade 11', value: 11 },
+  { label: 'Grade 12', value: 12 },
+  { label: '1st Year College', value: 13 },
+  { label: '2nd Year College', value: 14 },
+  { label: '3rd Year College', value: 15 },
+  { label: '4th Year College', value: 16 }
+]
 
+const initials = computed(() => {
   if (!profile.value.fullName) return ''
 
   return profile.value.fullName
     .split(' ')
-    .map(n => n[0])
+    .map(name => name[0])
     .join('')
-
 })
 
-/* LOAD PROFILE */
+const availableCategories = computed(() => {
+  const categories = allSubjects.value
+    .map(subject => normalizeCategory(subject.category))
+    .filter(Boolean)
+
+  return ['All', ...new Set(categories)]
+})
+
+const filteredSubjects = computed(() => {
+  const query = subjectSearch.value.trim().toLowerCase()
+
+  return allSubjects.value.filter(subject => {
+    const category = normalizeCategory(subject.category)
+    const matchesCategory = activeCategory.value === 'All' || category === activeCategory.value
+    const matchesSearch =
+      !query ||
+      subject.subject_name.toLowerCase().includes(query) ||
+      subject.subject_code.toLowerCase().includes(query)
+
+    return matchesCategory && matchesSearch
+  })
+})
+
+const selectedDraftCountLabel = computed(() => {
+  const count = draftSubjectCodes.value.length
+  return `${count} subject${count === 1 ? '' : 's'} selected`
+})
+
+function normalizeCategory(category) {
+  const normalized = category?.trim()
+  return normalized || 'Uncategorized'
+}
+
+function getSubjectByCode(subjectCode) {
+  return allSubjects.value.find(subject => subject.subject_code === subjectCode)
+    || profile.value.subjects.find(subject => subject.subject_code === subjectCode)
+}
+
+function syncProfileSubjectsFromCodes(subjectCodes) {
+  profile.value.subjects = subjectCodes
+    .map(code => getSubjectByCode(code))
+    .filter(Boolean)
+    .sort((left, right) => left.subject_name.localeCompare(right.subject_name))
+}
+
+async function openSubjectModal() {
+  if (!allSubjects.value.length) {
+    await loadSubjects()
+  }
+
+  draftSubjectCodes.value = profile.value.subjects.map(subject => subject.subject_code)
+  subjectSearch.value = ''
+  activeCategory.value = 'All'
+  isSubjectModalOpen.value = true
+}
+
+function closeSubjectModal() {
+  isSubjectModalOpen.value = false
+  subjectSearch.value = ''
+  activeCategory.value = 'All'
+  draftSubjectCodes.value = []
+}
+
+function isDraftSelected(subjectCode) {
+  return draftSubjectCodes.value.includes(subjectCode)
+}
+
+function toggleDraftSubject(subjectCode) {
+  if (isDraftSelected(subjectCode)) {
+    draftSubjectCodes.value = draftSubjectCodes.value.filter(code => code !== subjectCode)
+    return
+  }
+
+  if (draftSubjectCodes.value.length >= 8) {
+    return
+  }
+
+  draftSubjectCodes.value = [...draftSubjectCodes.value, subjectCode]
+}
+
+function confirmSubjectSelection() {
+  syncProfileSubjectsFromCodes(draftSubjectCodes.value)
+  closeSubjectModal()
+}
+
+function removeSubject(subjectCode) {
+  profile.value.subjects = profile.value.subjects.filter(
+    subject => subject.subject_code !== subjectCode
+  )
+}
+
 const loadProfile = async () => {
-
   try {
-
     const res = await api.get('/tutor/profile/')
     const data = res.data
 
@@ -256,64 +432,62 @@ const loadProfile = async () => {
     profile.value.course = data.course
     profile.value.year_level = data.year_level
     profile.value.bio = data.bio
-
     profile.value.hourly_rate = data.hourly_rate
     profile.value.teaching_level = data.teaching_level
     profile.value.can_online = data.can_online
     profile.value.can_f2f = data.can_f2f
+    profile.value.response_time = data.response_time || ''
 
     const subjectRes = await api.get('/tutor/subjects/')
     profile.value.subjects = subjectRes.data
-
+    initialSubjectCodes.value = subjectRes.data.map(subject => subject.subject_code)
   } catch (err) {
+    console.error('Failed to load tutor profile:', err)
+  }
+}
 
-    console.error("Failed to load tutor profile:", err)
-
+const loadSubjects = async () => {
+  if (isLoadingSubjects.value) {
+    return
   }
 
+  isLoadingSubjects.value = true
+  subjectsLoadError.value = ''
+
+  try {
+    const res = await api.get('/subjects/')
+    allSubjects.value = res.data
+  } catch (error) {
+    console.error('Failed to load subjects:', error)
+    subjectsLoadError.value = 'Could not load subjects right now.'
+  } finally {
+    isLoadingSubjects.value = false
+  }
 }
 
-/* LOAD SUBJECTS */
-const loadSubjects = async () => {
-
-  const res = await api.get('/subjects/')
-  allSubjects.value = res.data
-
-}
-
-/* LOAD COURSES */
 const loadCourses = async () => {
-
   const res = await api.get('/courses/')
   courses.value = res.data
-
 }
 
-/* ADD SUBJECT */
-const addSubject = async () => {
+async function syncSubjects() {
+  const currentSubjectCodes = profile.value.subjects.map(subject => subject.subject_code)
+  const addedCodes = currentSubjectCodes.filter(code => !initialSubjectCodes.value.includes(code))
+  const removedCodes = initialSubjectCodes.value.filter(code => !currentSubjectCodes.includes(code))
 
-  if (!newSubject.value) return
+  await Promise.all([
+    ...addedCodes.map(subjectCode =>
+      api.post('/tutor/subjects/add/', { subject_code: subjectCode })
+    ),
+    ...removedCodes.map(subjectCode =>
+      api.delete(`/tutor/subjects/remove/${subjectCode}/`)
+    )
+  ])
 
-  await api.post('/tutor/subjects/add/', {
-    subject_code: newSubject.value
-  })
-
-  newSubject.value = ''
-  await loadProfile()
-
+  initialSubjectCodes.value = [...currentSubjectCodes]
 }
 
-/* REMOVE SUBJECT */
-const removeSubject = async (code) => {
-
-  await api.delete(`/tutor/subjects/remove/${code}/`)
-  await loadProfile()
-
-}
-
-/* SAVE PROFILE */
 const saveProfile = async () => {
-
   const names = profile.value.fullName.split(' ')
 
   const tuteePayload = {
@@ -328,34 +502,155 @@ const saveProfile = async () => {
     hourly_rate: profile.value.hourly_rate,
     teaching_level: profile.value.teaching_level,
     can_online: profile.value.can_online,
-    can_f2f: profile.value.can_f2f
+    can_f2f: profile.value.can_f2f,
+    response_time: profile.value.response_time || null
   }
 
   try {
-
-    // Update profile (UserProfile)
     await api.put('/tutee/profile/update/', tuteePayload)
-
-    // Update tutor info (Tutor model)
     await api.put('/tutor/update/', tutorPayload)
+    await syncSubjects()
 
-    alert("Profile Updated")
-
+    alert('Profile Updated')
   } catch (err) {
-
-    console.error("Profile update failed:", err)
-
+    console.error('Profile update failed:', err)
   }
-
 }
 
-/* MOUNT */
 onMounted(() => {
-
   loadProfile()
   loadSubjects()
   loadCourses()
-
 })
 
 </script>
+
+<style scoped>
+.subject-picker-shell {
+  display: grid;
+  gap: 14px;
+}
+
+.subject-pill-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.subject-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: #0a7a51;
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.subject-pill-remove {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0;
+}
+
+.subject-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1050;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.42);
+}
+
+.subject-modal {
+  width: min(720px, 100%);
+  max-height: min(85vh, 760px);
+  overflow: hidden;
+}
+
+.category-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.category-pill {
+  border: 1px solid #d8e3de;
+  background: #ffffff;
+  color: #315447;
+  border-radius: 999px;
+  padding: 7px 14px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.category-pill.active {
+  background: #e8f7f1;
+  border-color: #0a7a51;
+  color: #0a7a51;
+}
+
+.subject-modal-list {
+  display: grid;
+  gap: 10px;
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.subject-option {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  padding: 14px 16px;
+  border: 1px solid #dde7e2;
+  border-radius: 16px;
+  background: #ffffff;
+  text-align: left;
+}
+
+.subject-option.selected {
+  background: #eef8f4;
+  border-color: #86d0af;
+}
+
+.subject-option-copy {
+  display: grid;
+  gap: 2px;
+}
+
+.subject-option-name {
+  font-weight: 700;
+  color: #163127;
+}
+
+.subject-option-meta {
+  font-size: 0.85rem;
+  color: #6e8178;
+}
+
+.subject-option-check {
+  flex-shrink: 0;
+}
+
+.subject-modal-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 576px) {
+  .subject-modal-footer {
+    align-items: stretch;
+  }
+}
+</style>

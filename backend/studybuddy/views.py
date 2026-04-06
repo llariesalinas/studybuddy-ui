@@ -3,6 +3,7 @@ from django.contrib.auth import authenticate
 from django.utils.timezone import now
 from django.db import transaction
 from datetime import datetime,timedelta, date
+from calendar import monthrange
 from django.shortcuts import get_object_or_404
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -20,8 +21,14 @@ from .recommender.hybrid import recommend_tutors_hybrid
 from .recommender.CF import build_rating_matrix
 
 from .recommender.cbf import recommend_tutors
-from .models import Booking, Course, PartnerInstitution, Payment, PaymentMethod, Preference, Subjects, Tutor, TutorAvailability, TutorSubjects
-from .serializers import TutorDetailSerializer, TutorSearchSerializer, SubjectSerializer
+from .models import Booking, Course, PartnerInstitution, Payment, PaymentMethod, Preference, Rating, Subjects, Tutor, TutorAvailability, TutorSubjects
+from .serializers import (
+    SubjectSerializer,
+    TutorDetailSerializer,
+    TutorProfileSerializer,
+    TutorProfileUpdateSerializer,
+    TutorSearchSerializer,
+)
 
 from .models import (
     UserProfile,
@@ -457,8 +464,6 @@ def build_combined_block(group):
             if first.tutor.profile.course
             else "General"
         ),
-
-        "topic": "",
         "startTime": start_time.strftime("%H:%M"),
         "endTime": end_time.strftime("%H:%M"),
         "duration_hours": duration
@@ -562,32 +567,28 @@ def get_tutor_profile(request):
     profile = request.user.userprofile
 
     try:
-        tutor = Tutor.objects.get(profile=profile)
+        tutor = Tutor.objects.select_related(
+            'profile__user',
+            'profile__course',
+            'pinned_review__student'
+        ).get(profile=profile)
     except Tutor.DoesNotExist:
         return Response({"error": "Tutor not found"}, status=404)
 
-    return Response({
-        "fname": profile.fname,
-        "lname": profile.lname,
-        "email": profile.user.email,
-        "course": profile.course.course_code if profile.course else None,
-        "year_level": profile.year_level,
-        "bio": profile.bio,
-
-        "hourly_rate": tutor.hourly_rate,
-        "teaching_level": tutor.teaching_level,
-        "can_online": tutor.can_online,
-        "can_f2f": tutor.can_f2f,
-        "rating_average": tutor.rating_average,
-        "total_sessions": tutor.total_sessions
-    })
+    serializer = TutorProfileSerializer(tutor)
+    return Response(serializer.data)
 
 #Tutor Detail View
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def tutor_detail(request, profile_id):
     try:
-        tutor = Tutor.objects.select_related('profile').get(profile_id=profile_id)
+        tutor = Tutor.objects.select_related(
+            'profile',
+            'pinned_review__student'
+        ).prefetch_related(
+            'tutorsubjects_set__subject'
+        ).get(profile_id=profile_id)
     except Tutor.DoesNotExist:
         return Response({"error": "Tutor not found"}, status=404)
 
@@ -601,64 +602,91 @@ def tutor_detail(request, profile_id):
 def tutor_availability(request, tutor_id):
 
     tutor = get_object_or_404(Tutor, profile_id=tutor_id)
+    today = date.today()
+    month_offset = int(request.GET.get("month_offset", 0))
 
-    date_str = request.GET.get("date")
-    if not date_str:
-        return Response({"error": "Date parameter is required."}, status=400)
+    total_months = (today.year * 12) + (today.month - 1) + month_offset
+    target_year = total_months // 12
+    target_month = (total_months % 12) + 1
 
-    try:
-        session_date = datetime.strptime(date_str, "%Y-%m-%d").date()
-    except ValueError:
-        return Response({"error": "Invalid date format."}, status=400)
+    month_start = date(target_year, target_month, 1)
+    month_end = date(target_year, target_month, monthrange(target_year, target_month)[1])
 
-    # 🔥 STEP 1 — Calculate week boundaries (Mon–Sun)
-    week_start = session_date - timedelta(days=session_date.weekday())
-    week_end = week_start + timedelta(days=6)
+    calendar_start = month_start - timedelta(days=month_start.weekday())
+    calendar_end = month_end + timedelta(days=(6 - month_end.weekday()))
 
-    # 🔥 STEP 2 — Fetch all bookings for that week
-    weekly_bookings = Booking.objects.filter(
-        tutor=tutor,
-        session_date__range=(week_start, week_end),
-        status__in=["Confirmed", "Pending", "Completed"]
-    )
-
-    # 🔥 STEP 3 — Create fast lookup set
-    booked_map = {
-        (booking.availability_id, booking.session_date)
-        for booking in weekly_bookings
-    }
-
-    # 🔥 STEP 4 — Get recurring weekly availability template
     availability = TutorAvailability.objects.filter(
         tutor=tutor,
         is_active=True
     )
 
-    weekday_order = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]
+    relevant_bookings = Booking.objects.filter(
+        tutor=tutor,
+        session_date__range=(calendar_start, calendar_end),
+        status__in=["Confirmed", "Pending", "Completed"]
+    )
 
-    data = []
+    booked_map = {
+        (booking.availability_id, booking.session_date)
+        for booking in relevant_bookings
+    }
 
-    for slot in availability:
+    weekday_order = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    display_weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
-        # Determine actual date for this slot in selected week
-        slot_weekday_index = weekday_order.index(slot.day)
-        slot_date = week_start + timedelta(days=slot_weekday_index)
+    weeks = []
+    current_week_start = calendar_start
 
-        # 🚫 Block past dates
-        is_past = slot_date < date.today()
+    while current_week_start <= calendar_end:
+        days = []
 
-        # 🔴 Block if booked in DB
-        is_booked = (slot.id, slot_date) in booked_map
+        for weekday_index, weekday_name in enumerate(display_weekdays):
+            current_date = current_week_start + timedelta(days=weekday_index)
+            is_past = current_date < today
+            day_slots = []
 
-        data.append({
-            "id": slot.id,
-            "day": slot.get_day_display(),
-            "date": slot_date,
-            "time_slot": slot.time_slot.strftime("%H:%M"),
-            "is_booked": is_booked or is_past
+            for slot in availability:
+                slot_weekday_index = weekday_order.index(slot.day)
+
+                if slot_weekday_index != weekday_index:
+                    continue
+
+                is_booked = (slot.id, current_date) in booked_map
+
+                day_slots.append({
+                    "id": slot.id,
+                    "time_slot": slot.time_slot.strftime("%H:%M"),
+                    "is_booked": is_booked or is_past
+                })
+
+            day_slots.sort(key=lambda slot: slot["time_slot"])
+
+            days.append({
+                "name": weekday_name,
+                "date": current_date.isoformat(),
+                "in_month": month_start <= current_date <= month_end,
+                "is_past": is_past,
+                "has_available": any(not slot["is_booked"] for slot in day_slots),
+                "slots": day_slots
+            })
+
+        week_end = current_week_start + timedelta(days=6)
+        weeks.append({
+            "week_start": current_week_start.isoformat(),
+            "week_end": week_end.isoformat(),
+            "label": f"{current_week_start.strftime('%m/%d/%Y')} - {week_end.strftime('%m/%d/%Y')}",
+            "days": days
         })
 
-    return Response(data)
+        current_week_start += timedelta(days=7)
+
+    return Response({
+        "month_label": month_start.strftime("%B %Y"),
+        "month_start": month_start.isoformat(),
+        "month_end": month_end.isoformat(),
+        "month_offset": month_offset,
+        "weeks": weeks
+    })
     
 
 #bulk booking request
@@ -1099,8 +1127,6 @@ def booking_detail(request, booking_id):
                 if booking.tutor.profile.course
                 else "General"
             ),
-
-            "topic": "",
             "date": booking.session_date.strftime("%Y-%m-%d"),
 
             "start_time": start_time.strftime("%H:%M"),
@@ -1183,6 +1209,7 @@ def tutor_setup(request):
     tutor.can_f2f = request.data.get("can_f2f", False)
 
     tutor.hourly_rate = request.data.get("hourly_rate")
+    tutor.response_time = request.data.get("response_time", tutor.response_time)
 
     tutor.save()
 
@@ -1405,18 +1432,19 @@ def remove_tutor_subject(request, subject_code):
 def update_tutor_profile(request):
 
     profile = request.user.userprofile
-    tutor = Tutor.objects.get(profile=profile)
+    tutor = Tutor.objects.select_related('pinned_review').get(profile=profile)
 
-    tutor.hourly_rate = request.data.get("hourly_rate", tutor.hourly_rate)
-    tutor.teaching_level = request.data.get("teaching_level", tutor.teaching_level)
-
-    tutor.can_online = request.data.get("can_online", tutor.can_online)
-    tutor.can_f2f = request.data.get("can_f2f", tutor.can_f2f)
-
-    tutor.save()
+    serializer = TutorProfileUpdateSerializer(
+        tutor,
+        data=request.data,
+        partial=True
+    )
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
 
     return Response({
-        "message": "Tutor profile updated successfully"
+        "message": "Tutor profile updated successfully",
+        "tutor": TutorProfileSerializer(tutor).data
     })
 
 @api_view(['GET'])

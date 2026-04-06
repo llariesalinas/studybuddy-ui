@@ -6,7 +6,6 @@ export const useBookedSessionStore = defineStore('bookedSessionDetails', () => {
     const bookedSessionTutorID = ref(null)
     const bookedSessionTutorName = ref('')
     const bookedSessionSub = ref('')
-    const bookedSessionTop = ref('')
     const bookedSessionMode = ref('')
     const bookedSessionDate = ref(null)
     const bookedSessions = ref([])
@@ -15,7 +14,6 @@ export const useBookedSessionStore = defineStore('bookedSessionDetails', () => {
         bookedSessionTutorID.value = null
         bookedSessionTutorName.value = ''
         bookedSessionSub.value = ''
-        bookedSessionTop.value = ''
         bookedSessionMode.value = ''
         bookedSessionDate.value = null
         bookedSessions.value = []
@@ -25,7 +23,6 @@ export const useBookedSessionStore = defineStore('bookedSessionDetails', () => {
         bookedSessionTutorID,
         bookedSessionTutorName,
         bookedSessionSub,
-        bookedSessionTop,
         bookedSessionMode,
         bookedSessionDate,
         bookedSessions,

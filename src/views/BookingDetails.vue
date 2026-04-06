@@ -138,7 +138,6 @@
 
             <div class="row text-center fw-semibold mb-2">
               <div class="col">Subject</div>
-              <div class="col">Topic</div>
               <div class="col">Date</div>
               <div class="col">Time</div>
               <div class="col">Rating</div>
@@ -147,7 +146,6 @@
 
             <div class="row text-center">
               <div class="col">{{ bookingDetailsStore.sessionInfo?.subject || 'N/A' }}</div>
-              <div class="col">{{ bookingDetailsStore.sessionInfo?.topic || 'N/A' }}</div>
               <div class="col">{{ bookingDetailsStore.sessionInfo?.date || 'N/A' }}</div>
               <div class="col">
                 {{ bookingDetailsStore.sessionInfo?.start_time || 'N/A' }} –
