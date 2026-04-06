@@ -184,6 +184,15 @@ const handleComplete = async () => {
   }
 }
 
+const handleComplete = async () => {
+  try {
+    await bookingDetailsStore.completeSession()
+    alert("Session marked as completed.")
+  } catch (error) {
+    alert(error.response?.data?.error || "Failed to complete session.")
+  }
+}
+
 onMounted(() => {
     bookingDetailsStore.fetchBookingDetails(route.params.id)
 })

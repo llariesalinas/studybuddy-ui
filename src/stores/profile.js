@@ -9,6 +9,10 @@ export const useProfileStore = defineStore('profile', {
   }),
 
   actions: {
+    resetProfileState() {
+      this.profileCompleted = false
+      this.loaded = false
+    },
 
     async checkProfileStatus() {
 
