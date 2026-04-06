@@ -2,50 +2,75 @@ import axios from 'axios'
 import { useAuthStore } from '@/stores/auth'
 import router from '@/router'
 
+const API_BASE_URL = 'http://127.0.0.1:8000/api/'
+
 const api = axios.create({
-  baseURL: 'http://127.0.0.1:8000/api/',
+  baseURL: API_BASE_URL,
 })
 
-/*
-  REQUEST INTERCEPTOR
-  Automatically attach JWT token
-*/
-api.interceptors.request.use(
-  (config) => {
+let refreshPromise = null
 
+const refreshAccessToken = async () => {
+  if (!refreshPromise) {
     const authStore = useAuthStore()
 
-    // Get token safely (Pinia OR localStorage)
-    const token = authStore.token?.value || localStorage.getItem('access_token')
+    refreshPromise = authStore
+      .refreshAccessToken()
+      .finally(() => {
+        refreshPromise = null
+      })
+  }
+
+  return refreshPromise
+}
+
+api.interceptors.request.use(
+  (config) => {
+    const authStore = useAuthStore()
+    const token = authStore.token || localStorage.getItem('access_token')
 
     if (token) {
-      config.headers.Authorization = `Bearer ${token}`
+      config.headers.Authorization = Bearer 
     }
 
     return config
   },
-  (error) => {
-    return Promise.reject(error)
-  }
+  (error) => Promise.reject(error)
 )
 
-
-/*
-  RESPONSE INTERCEPTOR
-  Auto logout if token is invalid/expired
-*/
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
+    const originalRequest = error.config
+
+    if (
+      error.response &&
+      error.response.status === 401 &&
+      originalRequest &&
+      !originalRequest._retry &&
+      !originalRequest.url?.includes('token/refresh/')
+    ) {
+      originalRequest._retry = true
+
+      try {
+        const newAccessToken = await refreshAccessToken()
+
+        originalRequest.headers = originalRequest.headers ?? {}
+        originalRequest.headers.Authorization = Bearer 
+
+        return api(originalRequest)
+      } catch (refreshError) {
+        const authStore = useAuthStore()
+        authStore.logout()
+        router.push('/login')
+
+        return Promise.reject(refreshError)
+      }
+    }
 
     if (error.response && error.response.status === 401) {
-
       const authStore = useAuthStore()
-
-      console.warn("🔒 Session expired. Logging out...")
-
       authStore.logout()
-
       router.push('/login')
     }
 
