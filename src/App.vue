@@ -17,9 +17,15 @@
           </router-link>
         </li>
 
+        <li class="nav-item mb-2">
+          <router-link :to="userRole === 'tutor' ?  '/tutor-profile' : 'tutee-profile'" class="nav-link text-white opacity-75 d-flex align-items-center">
+            <i class="bi bi-person me-3"></i> Profile
+          </router-link>
+        </li>
+
         <li class="nav-item mb-2" v-if="userRole === 'tutee'">
-          <router-link to="/tutors" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
-            <i class="bi bi-search me-3"></i> Find Tutors
+          <router-link to="/tuteeSessions" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
+            <i class="bi bi-search me-3"></i> Sessions
           </router-link>
         </li>
 
@@ -27,6 +33,16 @@
           <router-link to="/schedule" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
             <i class="bi bi-calendar3 me-3"></i> Schedule
           </router-link>
+        </li>
+
+        <li class="nav-item mb-2">
+          <button 
+           class="nav-link border-0 shadow-none bg-transparent text-white opacity-75 d-flex align-items-center"
+           data-bs-toggle="modal" 
+           data-bs-target="#logoutModal"
+           >
+            <i class="bi bi-box-arrow-right me-3"></i> Log-out
+          </button>
         </li>
 
         <li class="nav-item mb-2" v-if="userRole === 'tutor'">
@@ -37,10 +53,57 @@
       </ul>
     </aside>
 
+    <div class="modal fade" id="logoutModal" tabindex="-1">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-4">
+          
+          <div class="modal-header border-0">
+            <h5 class="modal-title fw-bold">Confirm Logout</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+
+          <div class="modal-body text-muted">
+            Are you sure you want to log out?
+          </div>
+
+          <div class="modal-footer border-0">
+            <button 
+              class="btn btn-light"
+              data-bs-dismiss="modal"
+            >
+              Cancel
+            </button>
+
+            <button 
+              class="btn bg-sb-primary text-white"
+              @click="logout"
+            >
+              Yes, Log out
+            </button>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
     <main class="flex-grow-1 overflow-auto p-5" style="background-color: var(--sb-bg);">
       <header class="d-flex justify-content-between align-items-center mb-3 pb-3 border-bottom border-sb">
-          <div>
-            </div>
+          
+          <div v-if="route.path === '/dashboard'">
+            <h2 class="fw-bold text-dark">Welcome back, {{ studentName }}!</h2>
+            <p class="text-muted">Here's your tutoring overview for today.</p>
+          </div>
+
+          <div v-if="route.path === '/tuteeSessions'">
+            <h2 class="fw-bold text-dark">Here are your sessions, {{ studentName }}!</h2>
+            <p class="text-muted">Browse and review pending, upcoming, and completed sessions and confirm ongoing sessions here.</p>
+          </div>
+
+          <div v-if="route.path === '/tuteeSessionDetails'">
+            <h2 class="fw-bold text-dark">Session Details</h2>
+            <p class="text-muted">Review your session here.</p>
+          </div>
+
           <div class="d-flex gap-3 align-items-center">
             <router-link v-if="userRole === 'tutee'" to="/book" class="btn bg-sb-primary text-white px-4 py-2 rounded-3 fw-semibold shadow-sm">
               Book Session
