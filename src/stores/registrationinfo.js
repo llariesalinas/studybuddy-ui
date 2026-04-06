@@ -8,6 +8,7 @@ export const useRegistrationInfoStore= defineStore('newUserInfo', () => {
     const newUserEmail = ref('')
     const newUserPassword = ref('')
     const newUserType = ref('')
+    const selectedInstitutionId = ref('')
 
     return {
         newUserFname, 
@@ -15,6 +16,6 @@ export const useRegistrationInfoStore= defineStore('newUserInfo', () => {
         newUserLname, 
         newUserEmail, 
         newUserPassword, 
-        newUserType}
+        newUserType,
+        selectedInstitutionId}
 })
-

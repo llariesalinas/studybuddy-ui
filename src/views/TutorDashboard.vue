@@ -75,17 +75,6 @@
             </thead>
 
             <tbody>
-<<<<<<< HEAD
-=======
-            <tr
-              v-for="booking in upcomingBookings"
-              :key="booking.id"
-              style="border-top: 1px solid var(--sb-card-border);"
-            >
-              <td class="py-3 text-dark">
-                {{ booking.student }}
-              </td>
->>>>>>> origin/main
 
               <tr
                 v-for="booking in upcomingBookings"
@@ -105,7 +94,6 @@
                   </span>
                 </td>
 
-<<<<<<< HEAD
                 <!-- Date -->
                 <td class="py-3 text-dark">
                   {{ new Date(booking.date).toLocaleDateString() }}
@@ -148,18 +136,6 @@
 
             </tbody>
 
-=======
-                <!-- ✅ Complete Button -->
-                <button
-                  class="btn btn-success"
-                  @click="goToBookingDetails(booking.id)"
-                >
-                  View Details
-                </button>
-              </td>
-            </tr>
-          </tbody>
->>>>>>> origin/main
           </table>
 
         </div>
@@ -183,23 +159,16 @@ const totalSessions = ref(0)
 const avgRating = ref(0)
 const earnings = ref(0)
 const upcomingBookings = ref([])
-const router = useRouter()
 
 
 
 
-<<<<<<< HEAD
-=======
-
->>>>>>> origin/main
 const goToBookingDetails = (id) => {
   router.push({
     name: 'booking-details',
     params: { id }
   })
 }
-
-
 
 const loadTutorDashboard = async () => {
 
@@ -209,18 +178,10 @@ const loadTutorDashboard = async () => {
 
     totalSessions.value = response.data.total_sessions
     avgRating.value = response.data.rating_average
-<<<<<<< HEAD
     earnings.value = response.data.total_earnings
 
     // ✅ just assign what backend sends
     upcomingBookings.value = response.data.upcoming_bookings || []
-=======
-    upcomingBookings.value = response.data.upcoming_bookings
-    earnings.value = response.data.total_earnings
-<<<<<<< HEAD
->>>>>>> 32c6f3b (Before Merging to Another Branch)
-=======
->>>>>>> origin/main
 
   } catch (error) {
 
