@@ -48,6 +48,9 @@ urlpatterns = [
     path('bookings/', views.list_bookings),
     path('bookings/<int:booking_id>/', views.booking_detail),
     path('payment-methods/', views.payment_methods),
+    
+    #Dynamic
+    
     path('bookings/confirm/', views.confirm_payment_and_book),
     path('template-availability/', template_availability),
     path('template-availability/<int:pk>/', template_availability),

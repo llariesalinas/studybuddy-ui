@@ -305,6 +305,7 @@ class Rating(models.Model):
     def __str__(self):
         return f"{self.rating_score} ⭐ for {self.tutor.profile.fname}"
     
+<<<<<<< HEAD
 class Preference(models.Model):
 
     MODE_CHOICES = [
@@ -325,3 +326,5 @@ class Preference(models.Model):
 
 
     
+=======
+>>>>>>> 32c6f3b (Before Merging to Another Branch)

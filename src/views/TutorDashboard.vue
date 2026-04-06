@@ -160,6 +160,9 @@ const avgRating = ref(0)
 const earnings = ref(0)
 const upcomingBookings = ref([])
 
+
+
+
 const goToBookingDetails = (id) => {
   router.push({
     name: 'booking-details',
@@ -175,10 +178,15 @@ const loadTutorDashboard = async () => {
 
     totalSessions.value = response.data.total_sessions
     avgRating.value = response.data.rating_average
+<<<<<<< HEAD
     earnings.value = response.data.total_earnings
 
     // ✅ just assign what backend sends
     upcomingBookings.value = response.data.upcoming_bookings || []
+=======
+    upcomingBookings.value = response.data.upcoming_bookings
+    earnings.value = response.data.total_earnings
+>>>>>>> 32c6f3b (Before Merging to Another Branch)
 
   } catch (error) {
 
