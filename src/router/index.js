@@ -51,6 +51,12 @@ const router = createRouter({
       meta: { requiresAuth: true, role: 'Tutee'}
     },
     {
+      path: '/tuteeSessionDetails/:id',
+      name: 'tuteeSessionDetails',
+      component: () => import('@/views/TuteeSessionDetails.vue'),
+      meta: { requiresAuth: true, role: 'Tutee'}
+    },
+    {
       path: '/book',
       name: 'book',
       component: () => import('@/views/InitialBooking.vue'),
