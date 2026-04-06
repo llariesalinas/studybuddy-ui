@@ -22,7 +22,28 @@ export const useSessionsStore = defineStore('sessions', () => {
     }
   }
 
-  
+  const fetchSessionById = async (id) => {
+      const localSession = sessions.value.find(s => String(s.id) === String(id))
+
+      if (localSession) {
+          return localSession
+      }
+
+      loading.value = true
+      error.value = null
+
+      try {
+          const response = await api.get(`/bookings/${id}`)
+          return response.data
+          
+      } catch (err) {
+          console.error("Error fetching session by ID:", err)
+          error.value = "Failed to load session details."
+          throw err 
+      } finally {
+          loading.value = false
+      }
+  }
 
   const normalizeStatus = (status) =>
     status?.toLowerCase() || ''
@@ -70,6 +91,18 @@ export const useSessionsStore = defineStore('sessions', () => {
   }
   } 
 
+  const completeSession = async (id, rating) => {
+    await api.post(`/bookings/${id}/complete/`, { 
+      rating: rating 
+    })
+
+    const session = sessions.value.find(s => s.id === id)
+    if (session) {
+      session.status = "Completed"
+      session.rating = rating
+    }
+  }
+
   return {
     sessions,
     loading,
@@ -80,6 +113,8 @@ export const useSessionsStore = defineStore('sessions', () => {
     cancelledSessions,
     requestedSessions,
     approveSession,
-    rejectSession
+    rejectSession,
+    completeSession,
+    fetchSessionById
   }
 })

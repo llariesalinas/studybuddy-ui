@@ -90,12 +90,12 @@
       <header class="d-flex justify-content-between align-items-center mb-3 pb-3 border-bottom border-sb">
           
           <div v-if="route.path === '/dashboard'">
-            <h2 class="fw-bold text-dark">Welcome back, {{ studentName }}!</h2>
+            <h2 class="fw-bold text-dark">Welcome back, {{ userFname }}!</h2>
             <p class="text-muted">Here's your tutoring overview for today.</p>
           </div>
 
           <div v-if="route.path === '/tuteeSessions'">
-            <h2 class="fw-bold text-dark">Here are your sessions, {{ studentName }}!</h2>
+            <h2 class="fw-bold text-dark">Here are your sessions, {{ userFname}}!</h2>
             <p class="text-muted">Browse and review pending, upcoming, and completed sessions and confirm ongoing sessions here.</p>
           </div>
 
@@ -112,28 +112,6 @@
             <router-link v-if="userRole === 'tutor'" to="/tch-requestedSessions" class="btn bg-sb-primary text-white px-4 py-2 rounded-3 fw-semibold shadow-sm">
               Manage Pending Sessions
             </router-link>
-
-            <div class="profileDropdown">
-              <button 
-              class="btn text-sb-primary fs-3 ms-2 transition-all hover-lift"
-              @click="toggleDropdown"
-              >
-                <i class="bi bi-person-circle"></i>
-              </button>
-              <ul v-if="isOpen" class="dropdown-menu show position-absolute end-0 mt-2 me-2">
-                <li>
-                  <div class="dropdown-item" @click="goToProfile">
-                    Manage your account
-                  </div>
-                </li>
-                <li><hr class="dropdown-divider"></li>
-                <li><button class="btn btn-success dropdown-item text-danger text-center px-4"
-                            @click="logout">
-                      Log-out
-                    </button>
-                </li>
-              </ul>
-            </div>
           </div>
         </header>
       <router-view />
@@ -167,19 +145,6 @@ const logout = () => {
   router.push('/login') // Redirect to login after logout
 
   router.push
-}
-
-const goToProfile = () => {
-
-  if (userRole.value === 'tutee') {
-    router.push('/tutee-profile')
-  }
-
-  if (userRole.value === 'tutor') {
-    router.push('/tutor-profile')
-  }
-
-  isOpen.value = false
 }
 
 const hideSessionButton = computed(() => {
@@ -218,6 +183,7 @@ const isPublicRoute = computed(() => {
 
 // Get the role from the store to control the sidebar links
 const userRole = computed(() => authStore.user?.role?.toLowerCase() || null)
+const userFname =  computed(() => authStore.user?.fname || null)
 </script>
 
 <style>
