@@ -49,13 +49,6 @@
               </div>
 
               <div class="col-md">
-                <small class="text-muted">Topic</small>
-                <div class="fw-semibold">
-                  {{ session.topic || '—' }}
-                </div>
-              </div>
-
-              <div class="col-md">
                 <small class="text-muted">Date</small>
                 <div class="fw-semibold">
                   {{ session.date }}
@@ -76,7 +69,6 @@
                 </div>
               </div>
 
-              <!-- Action Column -->
               <div class="col-md text-md-end mt-3 mt-md-0">
                 <div class="d-grid gap-2">
 
@@ -105,8 +97,6 @@
         </div>
         
     </div>
-
-      
 
   </div>
 </template>

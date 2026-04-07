@@ -21,16 +21,6 @@
                 </select>
             </div>
             <div class="col-md-2">
-                <label class="form-label fw-semibold small">Topic</label>
-                <select v-model="initialbookStore.selectedTopic" class="form-select border-sb shadow-none py-2">
-                    <option value="" disabled>Select Topic</option>
-                    <option 
-                    v-for="topic in filteredTopics"
-                    :key="topic"
-                    :value="topic">{{topic}}</option>
-                </select>
-            </div>
-            <div class="col-md-2">
                 <label class="form-label fw-semibold small">Mode</label>
                 <select v-model="initialbookStore.selectedMode" class="form-select border-sb shadow-none py-2">
                     <option 
@@ -45,11 +35,25 @@
             </div>
             <div class="col" style="flex: 0 0 12.5%; max-width: 12.5%;">
                 <label class="form-label fw-semibold small">From</label>
-                <input type="time" v-model="initialbookStore.selectedStartTime" class="form-control border-sb shadow-none" required />
+                <button
+                  type="button"
+                  class="btn w-100 text-start border-sb shadow-none time-trigger"
+                  :class="{ 'time-trigger-active': activePicker === 'start' }"
+                  @click="openTimePicker('start')"
+                >
+                  {{ selectedStartLabel }}
+                </button>
             </div>
             <div class="col" style="flex: 0 0 12.5%; max-width: 12.5%;">
                 <label class="form-label fw-semibold small">To</label>
-                <input type="time" v-model="initialbookStore.selectedEndTime" class="form-control border-sb shadow-none" required />
+                <button
+                  type="button"
+                  class="btn w-100 text-start border-sb shadow-none time-trigger"
+                  :class="{ 'time-trigger-active': activePicker === 'end' }"
+                  @click="openTimePicker('end')"
+                >
+                  {{ selectedEndLabel }}
+                </button>
             </div>
             <div class="col-md-1">
                 <label class="form-label fw-semibold small invisible">Search</label>
@@ -60,6 +64,56 @@
             </div> 
         </div>
         </form>
+
+        <div v-if="activePicker" class="time-grid-panel border-sb rounded-4 p-3 mb-4">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+              <div class="fw-semibold text-dark">
+                {{ activePicker === 'start' ? 'Choose Start Time' : 'Choose End Time' }}
+              </div>
+              <div class="small text-muted">
+                {{ activePicker === 'start' ? 'Pick when the session begins.' : 'Pick when the session ends.' }}
+              </div>
+            </div>
+            <button
+              type="button"
+              class="btn btn-sm btn-link text-decoration-none text-muted"
+              @click="activePicker = null"
+            >
+              Close
+            </button>
+          </div>
+
+          <div class="segmented-control mb-3">
+            <button
+              v-for="period in ['AM', 'PM']"
+              :key="period"
+              type="button"
+              class="segmented-option"
+              :class="{ 'segmented-option-active': activePeriod === period }"
+              @click="activePeriod = period"
+            >
+              {{ period }}
+            </button>
+          </div>
+
+          <div class="time-grid">
+            <button
+              v-for="slot in visibleTimeSlots"
+              :key="`${activePicker}-${slot.value}`"
+              type="button"
+              class="time-chip"
+              :class="{ 'time-chip-active': isSelectedTime(slot.value) }"
+              @click="selectTime(slot.value)"
+            >
+              {{ slot.label }}
+            </button>
+          </div>
+
+          <p v-if="activePicker === 'end' && !visibleTimeSlots.length" class="small text-muted mb-0 mt-3">
+            Choose a start time first to see valid end times.
+          </p>
+        </div>
         
 
         <div v-if="isLoading" class="text-center py-5">
@@ -121,7 +175,7 @@
 <script setup>
 import { useRoute, useRouter } from 'vue-router'
 import api from '@/services/api/api'
-import { ref, onMounted, watch } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 
 import { useAuthStore } from '@/stores/auth'
 import { useInitialBookingPrefsStore } from '@/stores/initialbookingprefs'
@@ -136,22 +190,117 @@ const bookedSessionStore = useBookedSessionStore()
 
 const isLoading = ref(true)
 const isSubmitting = ref(false)
+const activePicker = ref(null)
+const activePeriod = ref('AM')
 
 const matchedTutors = ref([])
 const subjects = ref([])
 
 const modes = ['Online', 'Face-to-face']
+const timeSlotOptions = computed(() => {
+  const slots = []
 
+  for (let hour = 0; hour < 24; hour += 1) {
+    for (let minute = 0; minute < 60; minute += 30) {
+      const value = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
+      const period = hour >= 12 ? 'PM' : 'AM'
+      const displayHour = hour % 12 || 12
+      const displayMinute = String(minute).padStart(2, '0')
 
-/*
-Reset topic if subject changes
-*/
-watch(
-  () => initialbookStore.selectedSubject,
-  () => {
-    initialbookStore.selectedTopic = ''
+      slots.push({
+        value,
+        label: `${displayHour}:${displayMinute} ${period}`
+      })
+    }
   }
-)
+
+  return slots
+})
+const selectedStartLabel = computed(() => formatTimeLabel(initialbookStore.selectedStartTime, 'Select start time'))
+const selectedEndLabel = computed(() => formatTimeLabel(initialbookStore.selectedEndTime, 'Select end time'))
+const visibleTimeSlots = computed(() => {
+  return timeSlotOptions.value.filter(slot => {
+    const slotPeriod = Number(slot.value.slice(0, 2)) < 12 ? 'AM' : 'PM'
+
+    if (slotPeriod !== activePeriod.value) {
+      return false
+    }
+
+    if (activePicker.value === 'end' && initialbookStore.selectedStartTime) {
+      return slot.value > initialbookStore.selectedStartTime
+    }
+
+    return true
+  })
+})
+
+function formatTimeLabel(value, fallback) {
+  if (!value) {
+    return fallback
+  }
+
+  const slot = timeSlotOptions.value.find(option => option.value === value)
+  return slot ? slot.label : fallback
+}
+
+function isSelectedTime(value) {
+  if (activePicker.value === 'start') {
+    return initialbookStore.selectedStartTime === value
+  }
+
+  return initialbookStore.selectedEndTime === value
+}
+
+function openTimePicker(picker) {
+  activePicker.value = activePicker.value === picker ? null : picker
+
+  const currentValue = picker === 'start'
+    ? initialbookStore.selectedStartTime
+    : initialbookStore.selectedEndTime
+
+  if (currentValue) {
+    activePeriod.value = Number(currentValue.slice(0, 2)) < 12 ? 'AM' : 'PM'
+    return
+  }
+
+  if (picker === 'end' && initialbookStore.selectedStartTime) {
+    activePeriod.value = Number(initialbookStore.selectedStartTime.slice(0, 2)) < 12 ? 'AM' : 'PM'
+    return
+  }
+
+  activePeriod.value = 'AM'
+}
+
+function nextTimeSlot(value) {
+  const index = timeSlotOptions.value.findIndex(slot => slot.value === value)
+
+  if (index === -1 || index === timeSlotOptions.value.length - 1) {
+    return null
+  }
+
+  return timeSlotOptions.value[index + 1].value
+}
+
+function selectTime(value) {
+  if (activePicker.value === 'start') {
+    initialbookStore.selectedStartTime = value
+
+    if (!initialbookStore.selectedEndTime || initialbookStore.selectedEndTime <= value) {
+      initialbookStore.selectedEndTime = nextTimeSlot(value)
+    }
+
+    activePicker.value = 'end'
+
+    if (initialbookStore.selectedEndTime) {
+      activePeriod.value = Number(initialbookStore.selectedEndTime.slice(0, 2)) < 12 ? 'AM' : 'PM'
+    }
+
+    return
+  }
+
+  initialbookStore.selectedEndTime = value
+  activePicker.value = null
+}
 
 
 /*
@@ -167,7 +316,6 @@ const searchTutor = async () => {
     const response = await api.post('/recommend-tutors/', {
 
       subject: initialbookStore.selectedSubject,
-      topic: initialbookStore.selectedTopic,
       preferred_mode: initialbookStore.selectedMode
 
     })
@@ -221,7 +369,6 @@ const toTutorDetails = (tutor) => {
   bookedSessionStore.bookedSessionTutorID = tutor.profile_id
   bookedSessionStore.bookedSessionTutorName = tutor.name
   bookedSessionStore.bookedSessionSub = initialbookStore.selectedSubject
-  bookedSessionStore.bookedSessionTop = initialbookStore.selectedTopic
   bookedSessionStore.bookedSessionMode = initialbookStore.selectedMode
 
   router.push(`/tutor/${tutor.profile_id}`)
@@ -256,3 +403,65 @@ onMounted(async () => {
 
 })
 </script>
+
+<style scoped>
+.time-trigger {
+  min-height: 42px;
+  background: #fff;
+  color: #212529;
+}
+
+.time-trigger-active {
+  border-color: var(--sb-primary, #00895a);
+  box-shadow: 0 0 0 0.15rem rgba(0, 137, 90, 0.12);
+}
+
+.time-grid-panel {
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.95), rgba(255, 255, 255, 1));
+}
+
+.segmented-control {
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(80px, 1fr));
+  padding: 4px;
+  border-radius: 999px;
+  background: #edf2f7;
+  gap: 4px;
+}
+
+.segmented-option {
+  border: 0;
+  background: transparent;
+  border-radius: 999px;
+  padding: 0.5rem 1rem;
+  font-weight: 600;
+  color: #4a5568;
+}
+
+.segmented-option-active {
+  background: #ffffff;
+  color: var(--sb-primary, #00895a);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+}
+
+.time-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 0.65rem;
+}
+
+.time-chip {
+  border: 1px solid #d7dee7;
+  background: #fff;
+  border-radius: 14px;
+  padding: 0.7rem 0.5rem;
+  font-weight: 600;
+  color: #243142;
+}
+
+.time-chip-active {
+  border-color: var(--sb-primary, #00895a);
+  background: rgba(0, 137, 90, 0.1);
+  color: var(--sb-primary, #00895a);
+}
+</style>

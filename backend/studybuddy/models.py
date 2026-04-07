@@ -96,6 +96,18 @@ class UserProfile(models.Model):
 #TUTOR TABLE
 class Tutor(models.Model):
 
+    RESPONSE_TIME_CHOICES = [
+        ('within_1_hour', 'Within 1 hour'),
+        ('within_few_hours', 'Within a few hours'),
+        ('within_a_day', 'Within a day'),
+    ]
+
+    RESPONSE_TIME_LABELS = {
+        'within_1_hour': 'within 1 hour',
+        'within_few_hours': 'within a few hours',
+        'within_a_day': 'within a day',
+    }
+
     profile = models.OneToOneField(
         UserProfile,
         on_delete=models.CASCADE,
@@ -117,9 +129,34 @@ class Tutor(models.Model):
         blank=True
     )
 
+    response_time = models.CharField(
+        max_length=30,
+        choices=RESPONSE_TIME_CHOICES,
+        null=True,
+        blank=True
+    )
+
+    response_time_label = models.CharField(
+        max_length=50,
+        null=True,
+        blank=True
+    )
+
+    pinned_review = models.ForeignKey(
+        'Rating',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='pinned_by_tutor'
+    )
+
     total_sessions = models.IntegerField(default=0)
 
     created_at = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        self.response_time_label = self.RESPONSE_TIME_LABELS.get(self.response_time)
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"Tutor: {self.profile.fname} {self.profile.lname}"
@@ -129,6 +166,7 @@ class Subjects(models.Model):
     subject_code = models.CharField(max_length=20, primary_key=True)
     subject_name = models.CharField(max_length=100)
     department = models.CharField(max_length=100)
+    category = models.CharField(max_length=100, null=True, blank=True)
 
     def __str__(self):
         return f"{self.subject_code} - {self.subject_name}"

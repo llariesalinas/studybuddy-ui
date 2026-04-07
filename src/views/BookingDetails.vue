@@ -138,7 +138,6 @@
 
             <div class="row text-center fw-semibold mb-2">
               <div class="col">Subject</div>
-              <div class="col">Topic</div>
               <div class="col">Date</div>
               <div class="col">Time</div>
               <div class="col">Rating</div>
@@ -147,7 +146,6 @@
 
             <div class="row text-center">
               <div class="col">{{ bookingDetailsStore.sessionInfo?.subject || 'N/A' }}</div>
-              <div class="col">{{ bookingDetailsStore.sessionInfo?.topic || 'N/A' }}</div>
               <div class="col">{{ bookingDetailsStore.sessionInfo?.date || 'N/A' }}</div>
               <div class="col">
                 {{ bookingDetailsStore.sessionInfo?.start_time || 'N/A' }} –
@@ -174,6 +172,15 @@ const route = useRoute()
 const bookingId = route.params.id
 const bookingDetailsStore = useTutorBookingDetailStore()
 const store = useTutorBookingDetailStore()
+
+const handleComplete = async () => {
+  try {
+    await bookingDetailsStore.completeSession()
+    alert("Session marked as completed.")
+  } catch (error) {
+    alert(error.response?.data?.error || "Failed to complete session.")
+  }
+}
 
 const handleComplete = async () => {
   try {
