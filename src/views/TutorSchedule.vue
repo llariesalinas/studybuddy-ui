@@ -100,14 +100,6 @@
                 >
                   Remove Selected ({{ selectedCountForDay(day.code) }})
                 </button>
-
-                <button
-                  type="button"
-                  class="clear-day-btn"
-                  @click="clearDay(day.code)"
-                >
-                  Clear all
-                </button>
               </div>
             </article>
           </div>
@@ -525,16 +517,6 @@ async function clearSelection() {
   selectedSlotIds.value = []
 }
 
-async function clearDay(dayCode) {
-  const slots = [...groupedSlots.value[dayCode]]
-
-  for (const slot of slots) {
-    await tutorSchedStore.deleteSlot(slot.availability_id)
-  }
-
-  await refreshAvailability()
-}
-
 async function removeSelectedSlots(dayCode) {
   const daySlotIds = groupedSlots.value[dayCode].map(slot => slot.availability_id)
   const selectedForDay = selectedSlotIds.value.filter(id => daySlotIds.includes(id))
@@ -887,8 +869,7 @@ function addThirtyMinutes(timeString) {
   align-items: center;
 }
 
-.selected-day-btn,
-.clear-day-btn {
+.selected-day-btn {
   border: 0;
   background: transparent;
   color: #0a7a51;

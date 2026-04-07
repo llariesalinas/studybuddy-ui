@@ -160,15 +160,6 @@
                 >
                   View full schedule
                 </button>
-
-                <button
-                  type="button"
-                  class="btn book-selected-btn"
-                  :disabled="selectedSlots.length === 0"
-                  @click="bookSessions"
-                >
-                  Book Selected ({{ selectedSlots.length }})
-                </button>
               </div>
             </div>
 
@@ -176,7 +167,7 @@
           </section>
         </div>
 
-        <aside ref="paymentSidebar" class="right-column">
+        <aside class="right-column">
           <div class="sticky-sidebar">
             <section class="info-card shadow-sm">
               <h2 class="sidebar-title">Payment Summary</h2>
@@ -261,7 +252,6 @@ const selectedSlots = ref([])
 const monthAvailability = ref(null)
 const showFullSchedule = ref(false)
 const paymentMethods = ref([])
-const paymentSidebar = ref(null)
 const isSubmittingBooking = ref(false)
 
 const currencyFormatter = new Intl.NumberFormat('en-PH', {
@@ -423,16 +413,29 @@ const getTutorDetails = async () => {
 const getPaymentMethods = async () => {
   try {
     const methodsRes = await api.get('payment-methods/')
-    paymentMethods.value = methodsRes.data.map(method => ({
-      id: method.id,
-      label: method.name,
-      icon:
-        method.name === 'GCash'
-          ? 'bi-wallet2'
-          : method.name === 'Cash'
-            ? 'bi-cash-coin'
-            : 'bi-bank'
-    }))
+    let onlinePaymentAdded = false
+
+    paymentMethods.value = methodsRes.data.reduce((methods, method) => {
+      if (method.name === 'Cash') {
+        methods.push({
+          id: method.id,
+          label: 'Cash',
+          icon: 'bi-cash-coin'
+        })
+        return methods
+      }
+
+      if ((method.name === 'GCash' || method.name === 'Bank Transfer') && !onlinePaymentAdded) {
+        methods.push({
+          id: method.id,
+          label: 'Online Payment',
+          icon: 'bi-credit-card'
+        })
+        onlinePaymentAdded = true
+      }
+
+      return methods
+    }, [])
   } catch (error) {
     console.error('Failed to load payment methods.', error)
   }
@@ -542,19 +545,6 @@ function toggleSlot(day, week, slot) {
   }
 
   selectedSlots.value.push(slotWithDate)
-}
-
-const bookSessions = () => {
-  bookedSessionStore.bookedSessions = [...selectedSlots.value]
-  bookedSessionStore.bookedSessionTutorName = tutorProfile.value.name
-  bookedSessionStore.bookedSessionTutorID = tutorID
-  bookedSessionStore.bookedSessionSub = bookedSessionStore.bookedSessionSub || initialBookingStore.selectedSubject
-  bookedSessionStore.bookedSessionMode = bookedSessionStore.bookedSessionMode || initialBookingStore.selectedMode
-
-  paymentSidebar.value?.scrollIntoView({
-    behavior: 'smooth',
-    block: 'start'
-  })
 }
 
 const chooseMethod = (methodId) => {
@@ -1016,7 +1006,6 @@ onMounted(async () => {
   justify-content: center;
 }
 
-.book-selected-btn,
 .confirm-booking-btn {
   background: #00895a;
   color: #ffffff;
@@ -1026,7 +1015,6 @@ onMounted(async () => {
   font-weight: 700;
 }
 
-.book-selected-btn:disabled,
 .confirm-booking-btn:disabled {
   background: #b8c5bf;
   color: #f8faf9;
@@ -1093,7 +1081,8 @@ onMounted(async () => {
 
 .payment-method-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(132px, 132px));
+  justify-content: center;
   gap: 12px;
   margin-bottom: 14px;
 }
@@ -1101,6 +1090,7 @@ onMounted(async () => {
 .payment-method-card {
   display: grid;
   justify-items: center;
+  text-align: center;
   gap: 10px;
   padding: 16px 10px;
   border: 1px solid #e5ebe8;
@@ -1127,12 +1117,19 @@ onMounted(async () => {
 .payment-feedback {
   color: #6c8077;
   margin-bottom: 12px;
+  text-align: center;
 }
 
 .policy-note {
   margin-bottom: 16px;
   color: #6c8077;
   font-size: 0.92rem;
+  text-align: center;
+}
+
+.confirm-booking-btn {
+  display: block;
+  margin: 0 auto;
 }
 
 .empty-schedule {
@@ -1169,6 +1166,7 @@ onMounted(async () => {
 
   .payment-method-grid {
     grid-template-columns: 1fr;
+    justify-content: stretch;
   }
 
   .profile-header {
