@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models import Q
 from django.contrib.auth.models import User ### allows the use of auth user model for authentication and user management
 
 
@@ -208,6 +209,44 @@ class TutorAvailability(models.Model):
 
     def __str__(self):
         return f"{self.tutor.profile.fname} - {self.day} {self.time_slot}"
+
+
+class TutorAvailabilityOverride(models.Model):
+    tutor = models.ForeignKey(
+        Tutor,
+        on_delete=models.CASCADE,
+        related_name='availability_overrides'
+    )
+    override_date = models.DateField()
+    availability = models.ForeignKey(
+        TutorAvailability,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='date_overrides'
+    )
+    is_full_day = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['tutor', 'override_date'],
+                condition=Q(is_full_day=True),
+                name='unique_full_day_override_per_tutor_date'
+            ),
+            models.UniqueConstraint(
+                fields=['tutor', 'override_date', 'availability'],
+                condition=Q(is_full_day=False),
+                name='unique_slot_override_per_tutor_date_slot'
+            ),
+        ]
+
+    def __str__(self):
+        if self.is_full_day:
+            return f"{self.tutor.profile.fname} full-day override on {self.override_date}"
+        return f"{self.tutor.profile.fname} override on {self.override_date} for {self.availability_id}"
     
 class Booking(models.Model):
 

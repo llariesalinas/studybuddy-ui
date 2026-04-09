@@ -4,7 +4,7 @@
       <div class="schedule-header">
         <div>
           <h2 class="schedule-title">My Weekly Availability</h2>
-          <p class="schedule-subtitle">Set recurring weekly time slots while browsing week by week.</p>
+          <p class="schedule-subtitle">Set recurring weekly slots and add one-off date blocks when your schedule changes.</p>
         </div>
       </div>
 
@@ -14,7 +14,7 @@
             <button
               type="button"
               class="week-nav-btn"
-              :disabled="monthOffset <= 0 && weekIndex <= firstAvailableWeekIndex"
+              :disabled="weekIndex <= 0"
               @click="navigateWeek(-1)"
             >
               <i class="bi bi-chevron-left"></i>
@@ -22,6 +22,7 @@
             <button
               type="button"
               class="week-nav-btn"
+              :disabled="weekIndex >= monthWeeks.length - 1"
               @click="navigateWeek(1)"
             >
               <i class="bi bi-chevron-right"></i>
@@ -40,20 +41,24 @@
               v-for="day in currentWeek.days"
               :key="day.date"
               class="day-column"
-              :class="{
-                'day-column-outside': !day.inMonth,
-                'day-column-past': day.isPast
-              }"
             >
               <div class="day-heading">
                 <div class="day-name">{{ day.shortLabel }}</div>
+                <div class="day-date">{{ formatDayDate(day.date) }}</div>
                 <div class="slot-count-row">
                   <span v-if="groupedSlots[day.code].length" class="slot-count-badge">
                     {{ groupedSlots[day.code].length }}
                   </span>
                 </div>
                 <button
-                  v-if="day.inMonth && !day.isPast"
+                  type="button"
+                  class="btn day-block-date-btn"
+                  :class="{ active: isFullDayBlocked(day.date) }"
+                  @click="toggleFullDayOverride(day.date)"
+                >
+                  {{ isFullDayBlocked(day.date) ? 'Unblock Date' : 'Block Date' }}
+                </button>
+                <button
                   type="button"
                   class="btn day-add-slot-btn"
                   @click="openAddModal(day.code)"
@@ -64,34 +69,62 @@
 
               <div
                 class="day-availability-bar"
-                :class="{ 'day-availability-bar-available': groupedSlots[day.code].length }"
+                :class="{
+                  'day-availability-bar-available': groupedSlots[day.code].length,
+                  'day-availability-bar-blocked': isFullDayBlocked(day.date)
+                }"
               ></div>
 
               <div class="day-slots">
+                <div v-if="isFullDayBlocked(day.date)" class="full-day-banner">
+                  This date is blocked.
+                </div>
+
                 <button
                   v-for="slot in groupedSlots[day.code]"
                   :key="slot.availability_id"
                   type="button"
                   class="slot-pill"
-                  :class="{ selected: isSlotSelected(slot.availability_id) }"
-                  :disabled="!day.inMonth || day.isPast"
+                  :class="{
+                    selected: isSlotSelected(slot.availability_id),
+                    blocked: isSlotBlocked(day.date, slot.availability_id)
+                  }"
                   @click="toggleSlotSelection(slot.availability_id)"
                 >
                   <span class="slot-pill-text">{{ slot.time_slot }} - {{ addThirtyMinutes(slot.time_slot) }}</span>
-                  <span v-if="isSlotSelected(slot.availability_id)" class="slot-pill-check">
+                  <span v-if="isSlotBlocked(day.date, slot.availability_id)" class="slot-pill-status">
+                    Blocked
+                  </span>
+                  <span v-else-if="isSlotSelected(slot.availability_id)" class="slot-pill-check">
                     <i class="bi bi-check-lg"></i>
                   </span>
                 </button>
 
                 <div v-if="!groupedSlots[day.code].length" class="empty-day-zone">
-                  <span>No slots yet</span>
+                  <span>{{ isFullDayBlocked(day.date) ? 'Date blocked' : 'No slots yet' }}</span>
                 </div>
               </div>
 
               <div
-                v-if="groupedSlots[day.code].length && day.inMonth && !day.isPast"
+                v-if="groupedSlots[day.code].length"
                 class="day-actions"
               >
+                <button
+                  v-if="selectedUnblockedCount(day) && !isFullDayBlocked(day.date)"
+                  type="button"
+                  class="selected-day-btn"
+                  @click="blockSelectedSlots(day)"
+                >
+                  Block Selected For {{ formatDayDate(day.date) }} ({{ selectedUnblockedCount(day) }})
+                </button>
+                <button
+                  v-if="selectedBlockedCount(day)"
+                  type="button"
+                  class="selected-day-btn unblock-day-btn"
+                  @click="unblockSelectedSlots(day)"
+                >
+                  Unblock Selected ({{ selectedBlockedCount(day) }})
+                </button>
                 <button
                   v-if="selectedCountForDay(day.code)"
                   type="button"
@@ -337,9 +370,6 @@ const monthWeeks = computed(() => {
 
   const weeks = []
   let cursor = new Date(start)
-  const today = new Date()
-  const todayKey = getDateKey(today)
-
   while (cursor <= end) {
     const days = []
 
@@ -352,9 +382,7 @@ const monthWeeks = computed(() => {
         code: dayMeta.code,
         label: dayMeta.label,
         shortLabel: dayMeta.shortLabel,
-        date: dateKey,
-        inMonth: current.getMonth() === monthStart.getMonth(),
-        isPast: dateKey < todayKey
+        date: dateKey
       })
 
       cursor.setDate(cursor.getDate() + 1)
@@ -380,6 +408,16 @@ const firstAvailableWeekIndex = computed(() => {
 })
 
 const currentWeek = computed(() => monthWeeks.value[weekIndex.value] || null)
+const visibleOverrideRange = computed(() => {
+  if (!monthWeeks.value.length) {
+    return null
+  }
+
+  return {
+    start: monthWeeks.value[0].weekStart,
+    end: monthWeeks.value[monthWeeks.value.length - 1].weekEnd,
+  }
+})
 
 const currentMonthLabel = computed(() => {
   return viewedMonthDate.value.toLocaleDateString([], {
@@ -434,6 +472,38 @@ function formatDisplayTime(timeString) {
   return `${hour12}:${String(minutes).padStart(2, '0')} ${suffix}`
 }
 
+function formatDayDate(dateString) {
+  return new Date(dateString).toLocaleDateString([], {
+    month: 'short',
+    day: 'numeric'
+  })
+}
+
+function getOverridesForDate(dateString) {
+  return tutorSchedStore.overrides.filter(override => override.override_date === dateString)
+}
+
+function getFullDayOverride(dateString) {
+  return getOverridesForDate(dateString).find(override => override.is_full_day) || null
+}
+
+function isFullDayBlocked(dateString) {
+  return Boolean(getFullDayOverride(dateString))
+}
+
+function getSlotOverride(dateString, availabilityId) {
+  return tutorSchedStore.overrides.find(
+    override =>
+      override.override_date === dateString
+      && !override.is_full_day
+      && override.availability_id === availabilityId
+  ) || null
+}
+
+function isSlotBlocked(dateString, availabilityId) {
+  return isFullDayBlocked(dateString) || Boolean(getSlotOverride(dateString, availabilityId))
+}
+
 function isSlotSelected(slotId) {
   return selectedSlotIds.value.includes(slotId)
 }
@@ -450,6 +520,20 @@ function toggleSlotSelection(slotId) {
 function selectedCountForDay(dayCode) {
   const daySlotIds = groupedSlots.value[dayCode].map(slot => slot.availability_id)
   return selectedSlotIds.value.filter(id => daySlotIds.includes(id)).length
+}
+
+function selectedUnblockedCount(day) {
+  const daySlotIds = groupedSlots.value[day.code].map(slot => slot.availability_id)
+  return selectedSlotIds.value.filter(
+    id => daySlotIds.includes(id) && !isSlotBlocked(day.date, id)
+  ).length
+}
+
+function selectedBlockedCount(day) {
+  const daySlotIds = groupedSlots.value[day.code].map(slot => slot.availability_id)
+  return selectedSlotIds.value.filter(
+    id => daySlotIds.includes(id) && Boolean(getSlotOverride(day.date, id))
+  ).length
 }
 
 function selectStartTime(time) {
@@ -482,33 +566,22 @@ function closeAddModal() {
 
 function navigateWeek(direction) {
   if (direction < 0) {
-    const minIndex = monthOffset.value === 0 ? firstAvailableWeekIndex.value : 0
-
-    if (weekIndex.value > minIndex) {
+    if (weekIndex.value > 0) {
       weekIndex.value -= 1
-      return
     }
-
-    if (monthOffset.value <= 0) {
-      return
-    }
-
-    monthOffset.value -= 1
-    weekIndex.value = Math.max(monthWeeks.value.length - 1, 0)
     return
   }
 
   if (weekIndex.value < monthWeeks.value.length - 1) {
     weekIndex.value += 1
-    return
   }
-
-  monthOffset.value += 1
-  weekIndex.value = 0
 }
 
 async function refreshAvailability() {
   await tutorSchedStore.fetchAvailability()
+  if (visibleOverrideRange.value) {
+    await tutorSchedStore.fetchOverrides(visibleOverrideRange.value)
+  }
   const availableIds = new Set(tutorSchedStore.availabilities.map(slot => slot.availability_id))
   selectedSlotIds.value = selectedSlotIds.value.filter(id => availableIds.has(id))
 }
@@ -526,6 +599,73 @@ async function removeSelectedSlots(dayCode) {
   }
 
   await refreshAvailability()
+}
+
+async function toggleFullDayOverride(dateString) {
+  try {
+    const existingOverride = getFullDayOverride(dateString)
+
+    if (existingOverride) {
+      await tutorSchedStore.deleteOverride(existingOverride.id)
+    } else {
+      await tutorSchedStore.createFullDayOverride(dateString)
+    }
+
+    selectedSlotIds.value = []
+    await refreshAvailability()
+  } catch (error) {
+    console.error('Failed to toggle full-day override:', error)
+    alert(error.response?.data?.error || 'Unable to update the blocked date.')
+  }
+}
+
+async function blockSelectedSlots(day) {
+  const daySlotIds = groupedSlots.value[day.code].map(slot => slot.availability_id)
+  const selectedForDay = selectedSlotIds.value.filter(
+    id => daySlotIds.includes(id) && !isSlotBlocked(day.date, id)
+  )
+
+  if (!selectedForDay.length) {
+    return
+  }
+
+  try {
+    await tutorSchedStore.createSlotOverrides(day.date, selectedForDay)
+    selectedSlotIds.value = selectedSlotIds.value.filter(id => !selectedForDay.includes(id))
+    await refreshAvailability()
+  } catch (error) {
+    console.error('Failed to block selected slots:', error)
+    alert(error.response?.data?.error || 'Unable to block the selected slots.')
+  }
+}
+
+async function unblockSelectedSlots(day) {
+  const daySlotIds = groupedSlots.value[day.code].map(slot => slot.availability_id)
+  const selectedBlockedSlotIds = selectedSlotIds.value.filter(
+    id => daySlotIds.includes(id) && Boolean(getSlotOverride(day.date, id))
+  )
+  const overrideIds = selectedSlotIds.value
+    .filter(id => daySlotIds.includes(id))
+    .map(id => getSlotOverride(day.date, id)?.id)
+    .filter(Boolean)
+
+  if (!overrideIds.length) {
+    return
+  }
+
+  try {
+    for (const overrideId of overrideIds) {
+      await tutorSchedStore.deleteOverride(overrideId)
+    }
+
+    selectedSlotIds.value = selectedSlotIds.value.filter(
+      id => !selectedBlockedSlotIds.includes(id)
+    )
+    await refreshAvailability()
+  } catch (error) {
+    console.error('Failed to unblock selected slots:', error)
+    alert(error.response?.data?.error || 'Unable to unblock the selected slots.')
+  }
 }
 
 async function saveSlot() {
@@ -718,18 +858,10 @@ function addThirtyMinutes(timeString) {
   align-content: start;
 }
 
-.day-column-outside {
-  opacity: 0.45;
-}
-
-.day-column-past {
-  opacity: 0.7;
-}
-
 .day-heading {
   display: grid;
-  grid-template-rows: auto 22px auto;
-  gap: 8px;
+  grid-template-rows: auto auto 22px auto;
+  gap: 6px;
   justify-items: center;
   text-align: center;
   padding-bottom: 2px;
@@ -740,6 +872,13 @@ function addThirtyMinutes(timeString) {
   color: #687684;
   font-size: 0.9rem;
   font-weight: 600;
+}
+
+.day-date {
+  color: #163127;
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.1;
 }
 
 .slot-count-row {
@@ -774,6 +913,30 @@ function addThirtyMinutes(timeString) {
   font-weight: 700;
 }
 
+.day-block-date-btn {
+  width: 100%;
+  min-height: 38px;
+  background: #fff2f0;
+  color: #b42318;
+  border: 1px dashed #f3b7b0;
+  border-radius: 12px;
+  padding: 7px 10px;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.day-block-date-btn:hover {
+  background: #ffe4df;
+  color: #9f1f15;
+  border-color: #e79d93;
+}
+
+.day-block-date-btn.active {
+  background: #b42318;
+  color: #ffffff;
+  border-color: #b42318;
+}
+
 .day-add-slot-btn:hover {
   background: #dff1e8;
   color: #0a7a51;
@@ -790,10 +953,25 @@ function addThirtyMinutes(timeString) {
   background: #00895a;
 }
 
+.day-availability-bar-blocked {
+  background: #b42318;
+}
+
 .day-slots {
   display: grid;
   gap: 10px;
   align-content: start;
+}
+
+.full-day-banner {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: #fff2f0;
+  color: #b42318;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-align: center;
 }
 
 .slot-pill {
@@ -828,6 +1006,20 @@ function addThirtyMinutes(timeString) {
   box-shadow: 0 10px 20px rgba(0, 137, 90, 0.18);
 }
 
+.slot-pill.blocked {
+  background: #fff2f0;
+  border-color: #f3b7b0;
+  color: #b42318;
+  box-shadow: none;
+}
+
+.slot-pill.blocked.selected {
+  background: #b42318;
+  border-color: #b42318;
+  color: #ffffff;
+  box-shadow: 0 10px 20px rgba(180, 35, 24, 0.18);
+}
+
 .slot-pill:disabled {
   cursor: default;
 }
@@ -847,6 +1039,14 @@ function addThirtyMinutes(timeString) {
   background: rgba(255, 255, 255, 0.18);
   color: #ffffff;
   flex-shrink: 0;
+}
+
+.slot-pill-status {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
 }
 
 .empty-day-zone {
@@ -878,8 +1078,12 @@ function addThirtyMinutes(timeString) {
   padding: 0;
 }
 
-.selected-day-btn {
-  color: #c0392b;
+.selected-day-btn:hover {
+  text-decoration: underline;
+}
+
+.unblock-day-btn {
+  color: #b42318;
 }
 
 .modal-overlay {

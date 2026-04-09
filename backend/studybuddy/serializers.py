@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Preference, Rating, Subjects, Tutor, TutorAvailability
+from .models import Preference, Rating, Subjects, Tutor, TutorAvailability, TutorAvailabilityOverride
 
 # Create Serializers here.
 
@@ -149,3 +149,30 @@ class PreferenceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Preference
         fields = ['subjects']
+
+
+class TutorAvailabilityOverrideSerializer(serializers.ModelSerializer):
+    availability_id = serializers.IntegerField(source='availability.id', read_only=True)
+    time_slot = serializers.SerializerMethodField()
+    day = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TutorAvailabilityOverride
+        fields = [
+            'id',
+            'override_date',
+            'is_full_day',
+            'availability_id',
+            'day',
+            'time_slot',
+        ]
+
+    def get_time_slot(self, obj):
+        if obj.availability is None:
+            return None
+        return obj.availability.time_slot.strftime('%H:%M')
+
+    def get_day(self, obj):
+        if obj.availability is None:
+            return None
+        return obj.availability.day

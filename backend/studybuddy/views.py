@@ -14,17 +14,18 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.views import APIView
 from rest_framework.generics import ListAPIView
 from django.utils.timezone import now
-from django.db.models import Case, When, Value, IntegerField
+from django.db.models import Case, When, Value, IntegerField, Q
 from collections import defaultdict
 # algo
 from .recommender.hybrid import recommend_tutors_hybrid
 from .recommender.CF import build_rating_matrix
 
 from .recommender.cbf import recommend_tutors
-from .models import Booking, Course, PartnerInstitution, Payment, PaymentMethod, Preference, Rating, Subjects, Tutor, TutorAvailability, TutorSubjects
+from .models import Booking, Course, PartnerInstitution, Payment, PaymentMethod, Preference, Rating, Subjects, Tutor, TutorAvailability, TutorAvailabilityOverride, TutorSubjects
 from .serializers import (
     SubjectSerializer,
     TutorDetailSerializer,
+    TutorAvailabilityOverrideSerializer,
     TutorProfileSerializer,
     TutorProfileUpdateSerializer,
     TutorSearchSerializer,
@@ -68,6 +69,67 @@ def get_active_institution_by_domain(domain):
         school_email_domain__iexact=normalized_domain,
         is_active=True
     ).first()
+
+
+WEEKDAY_MAP = {
+    0: "Mon",
+    1: "Tue",
+    2: "Wed",
+    3: "Thu",
+    4: "Fri",
+    5: "Sat",
+    6: "Sun",
+}
+
+
+def parse_request_date(date_string):
+    try:
+        return datetime.strptime(date_string, "%Y-%m-%d").date()
+    except (TypeError, ValueError):
+        return None
+
+
+def get_override_maps(tutor, start_date, end_date):
+    overrides = TutorAvailabilityOverride.objects.filter(
+        tutor=tutor,
+        override_date__range=(start_date, end_date)
+    ).select_related('availability')
+
+    full_day_dates = {
+        override.override_date
+        for override in overrides
+        if override.is_full_day
+    }
+
+    slot_override_keys = {
+        (override.availability_id, override.override_date)
+        for override in overrides
+        if not override.is_full_day and override.availability_id is not None
+    }
+
+    return full_day_dates, slot_override_keys
+
+
+def has_confirmed_or_completed_booking_conflict(tutor, override_date, availability=None):
+    booking_filter = Booking.objects.filter(
+        tutor=tutor,
+        session_date=override_date,
+        status__in=["Confirmed", "Completed"]
+    )
+
+    if availability is not None:
+        booking_filter = booking_filter.filter(availability=availability)
+
+    return booking_filter.exists()
+
+
+def slot_is_overridden(tutor, override_date, availability):
+    return TutorAvailabilityOverride.objects.filter(
+        tutor=tutor,
+        override_date=override_date
+    ).filter(
+        Q(is_full_day=True) | Q(availability=availability)
+    ).exists()
 
 
 @api_view(['GET'])
@@ -625,6 +687,11 @@ def tutor_availability(request, tutor_id):
         session_date__range=(calendar_start, calendar_end),
         status__in=["Confirmed", "Pending", "Completed"]
     )
+    full_day_dates, slot_override_keys = get_override_maps(
+        tutor,
+        calendar_start,
+        calendar_end
+    )
 
     booked_map = {
         (booking.availability_id, booking.session_date)
@@ -651,12 +718,17 @@ def tutor_availability(request, tutor_id):
                 if slot_weekday_index != weekday_index:
                     continue
 
+                is_overridden = (
+                    current_date in full_day_dates
+                    or (slot.id, current_date) in slot_override_keys
+                )
                 is_booked = (slot.id, current_date) in booked_map
 
                 day_slots.append({
                     "id": slot.id,
                     "time_slot": slot.time_slot.strftime("%H:%M"),
-                    "is_booked": is_booked or is_past
+                    "is_booked": is_booked or is_past or is_overridden,
+                    "is_overridden": is_overridden
                 })
 
             day_slots.sort(key=lambda slot: slot["time_slot"])
@@ -761,18 +833,6 @@ def confirm_payment_and_book(request):
 
     created_bookings = []
 
-    weekday_map = {
-        0: "Mon",
-        1: "Tue",
-        2: "Wed",
-        3: "Thu",
-        4: "Fri",
-        5: "Sat",
-        6: "Sun",
-    }
-
-    total_amount = 0  #  accumulate total for multi-slot
-
     with transaction.atomic():
 
         for slot in slots:
@@ -783,12 +843,9 @@ def confirm_payment_and_book(request):
                 tutor=tutor
             )
 
-            # Convert string to date
-            try:
-                session_date = datetime.strptime(
-                    slot["session_date"], "%Y-%m-%d"
-                ).date()
-            except ValueError:
+            session_date = parse_request_date(slot.get("session_date"))
+
+            if session_date is None:
                 return Response(
                     {"error": "Invalid session date format."},
                     status=400
@@ -802,9 +859,15 @@ def confirm_payment_and_book(request):
                 )
 
             # 🚫 Ensure weekday matches availability template
-            if weekday_map[session_date.weekday()] != availability.day:
+            if WEEKDAY_MAP[session_date.weekday()] != availability.day:
                 return Response(
                     {"error": "Selected date does not match availability day."},
+                    status=400
+                )
+
+            if slot_is_overridden(tutor, session_date, availability):
+                return Response(
+                    {"error": "This slot is unavailable on that date."},
                     status=400
                 )
 
@@ -839,8 +902,6 @@ def confirm_payment_and_book(request):
             )
 
             created_bookings.append(booking.id)
-
-            total_amount += tutor.hourly_rate
 
         #  Create ONE payment record per booking
         for booking_id in created_bookings:
@@ -935,7 +996,161 @@ def template_availability(request, pk=None):
         slot.delete()
 
         return Response({"message": "Deleted successfully"})
-    
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def availability_overrides(request):
+
+    profile = request.user.userprofile
+
+    try:
+        tutor = Tutor.objects.get(profile=profile)
+    except Tutor.DoesNotExist:
+        return Response({"error": "Tutor not found"}, status=404)
+
+    if request.method == 'GET':
+        start_date = parse_request_date(request.GET.get('start'))
+        end_date = parse_request_date(request.GET.get('end'))
+
+        if start_date is None or end_date is None:
+            today = date.today()
+            start_date = today.replace(day=1)
+            end_date = date(today.year, today.month, monthrange(today.year, today.month)[1])
+
+        overrides = TutorAvailabilityOverride.objects.filter(
+            tutor=tutor,
+            override_date__range=(start_date, end_date)
+        ).select_related('availability').order_by('override_date', 'availability__time_slot')
+
+        serializer = TutorAvailabilityOverrideSerializer(overrides, many=True)
+        return Response(serializer.data)
+
+    override_date = parse_request_date(request.data.get('override_date'))
+
+    if override_date is None:
+        return Response({"error": "Valid override_date is required."}, status=400)
+
+    if override_date < date.today():
+        return Response({"error": "Cannot create overrides for past dates."}, status=400)
+
+    raw_is_full_day = request.data.get('is_full_day', False)
+    is_full_day = raw_is_full_day if isinstance(raw_is_full_day, bool) else str(raw_is_full_day).lower() == 'true'
+
+    if is_full_day:
+        if has_confirmed_or_completed_booking_conflict(tutor, override_date):
+            return Response(
+                {"error": "Cannot block a date with confirmed or completed bookings."},
+                status=400
+            )
+
+        if TutorAvailabilityOverride.objects.filter(
+            tutor=tutor,
+            override_date=override_date,
+            is_full_day=True
+        ).exists():
+            return Response({"error": "This date is already blocked."}, status=400)
+
+        override = TutorAvailabilityOverride.objects.create(
+            tutor=tutor,
+            override_date=override_date,
+            is_full_day=True
+        )
+
+        serializer = TutorAvailabilityOverrideSerializer(override)
+        return Response(serializer.data, status=201)
+
+    if TutorAvailabilityOverride.objects.filter(
+        tutor=tutor,
+        override_date=override_date,
+        is_full_day=True
+    ).exists():
+        return Response({"error": "This date is already fully blocked."}, status=400)
+
+    slot_ids = request.data.get('availability_ids') or []
+    single_slot_id = request.data.get('availability_id')
+
+    if single_slot_id is not None:
+        slot_ids = [single_slot_id]
+
+    if not slot_ids:
+        return Response({"error": "At least one availability_id is required."}, status=400)
+
+    try:
+        slot_ids = [int(slot_id) for slot_id in slot_ids]
+    except (TypeError, ValueError):
+        return Response({"error": "availability_ids must be numeric."}, status=400)
+
+    availabilities = list(
+        TutorAvailability.objects.filter(
+            tutor=tutor,
+            id__in=slot_ids
+        ).order_by('time_slot')
+    )
+
+    if len(availabilities) != len(set(slot_ids)):
+        return Response({"error": "One or more selected slots do not exist."}, status=400)
+
+    created_overrides = []
+
+    with transaction.atomic():
+        for availability in availabilities:
+            if availability.day != WEEKDAY_MAP[override_date.weekday()]:
+                return Response(
+                    {"error": "Selected slot does not match the chosen date."},
+                    status=400
+                )
+
+            if has_confirmed_or_completed_booking_conflict(tutor, override_date, availability=availability):
+                return Response(
+                    {"error": "Cannot block a slot with confirmed or completed bookings."},
+                    status=400
+                )
+
+            if TutorAvailabilityOverride.objects.filter(
+                tutor=tutor,
+                override_date=override_date,
+                availability=availability,
+                is_full_day=False
+            ).exists():
+                return Response(
+                    {"error": "One or more selected slots are already blocked for this date."},
+                    status=400
+                )
+
+            created_overrides.append(
+                TutorAvailabilityOverride.objects.create(
+                    tutor=tutor,
+                    override_date=override_date,
+                    availability=availability,
+                    is_full_day=False
+                )
+            )
+
+    serializer = TutorAvailabilityOverrideSerializer(created_overrides, many=True)
+    return Response(serializer.data, status=201)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_availability_override(request, override_id):
+
+    profile = request.user.userprofile
+
+    try:
+        tutor = Tutor.objects.get(profile=profile)
+    except Tutor.DoesNotExist:
+        return Response({"error": "Tutor not found"}, status=404)
+
+    override = get_object_or_404(
+        TutorAvailabilityOverride,
+        id=override_id,
+        tutor=tutor
+    )
+
+    override.delete()
+    return Response({"message": "Override removed successfully."})
+
 #accept booking
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
