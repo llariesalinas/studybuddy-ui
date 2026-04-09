@@ -181,11 +181,7 @@ const studentName = computed(() => {
 })
 
 const viewSessionDetails = (sessionId) => {
-  // 1. We log the ID to satisfy ESLint and prep for backend integration
-  console.log(`Navigating to details for session ID: ${sessionId}`)
-
-  // 2. Route to the schedule page for now
-  router.push('/schedule')
+  router.push(`/tuteeSessionDetails/${sessionId}`)
 }
 
 watch(

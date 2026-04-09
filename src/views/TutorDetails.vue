@@ -170,7 +170,7 @@
         <aside class="right-column">
           <div class="sticky-sidebar">
             <section class="info-card shadow-sm">
-              <h2 class="sidebar-title">Payment Summary</h2>
+              <h2 class="sidebar-title">Booking Summary</h2>
 
               <div class="summary-rows">
                 <div class="summary-row">
@@ -193,7 +193,7 @@
             </section>
 
             <section class="info-card shadow-sm">
-              <h2 class="sidebar-title">Payment Options</h2>
+              <h2 class="sidebar-title">Booking Note</h2>
 
               <div class="payment-method-grid">
                 <button
@@ -333,15 +333,8 @@ const paymentSummary = computed(() => {
     tutor: tutorProfile.value.name
   }
 })
-const paymentFeedback = computed(() => {
-  if (!paymentStore.selectedMethod) {
-    return 'Please select a payment method.'
-  }
-
-  const selected = paymentMethods.value.find(method => method.id === paymentStore.selectedMethod)
-  return selected ? `${selected.label} selected.` : 'Please select a payment method.'
-})
-const canConfirmBooking = computed(() => selectedSlots.value.length > 0 && Boolean(paymentStore.selectedMethod))
+const paymentFeedback = computed(() => 'Payment is submitted after the session during completion.')
+const canConfirmBooking = computed(() => selectedSlots.value.length > 0)
 
 const backButton = () => {
   router.back()
@@ -568,7 +561,6 @@ const confirmBooking = async () => {
     await api.post('bookings/confirm/', {
       tutor_id: tutorID,
       slots: selectedSlots.value,
-      payment_method: paymentStore.selectedMethod
     })
 
     alert('Booking Confirmed!')

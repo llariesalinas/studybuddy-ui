@@ -60,7 +60,13 @@
 
                             <td>
                                 <span class="badge rounded-pill px-3 py-1" :class="getStatusClass(session.status)">
-                                    {{ session.status?.toLowerCase() === 'confirmed' ? 'Upcoming' : session.status }}
+                                    {{
+                                      session.status?.toLowerCase() === 'confirmed'
+                                        ? 'Upcoming'
+                                        : session.status?.toLowerCase() === 'awaiting payment verification'
+                                          ? 'Awaiting Verification'
+                                          : session.status
+                                    }}
                                 </span>
                             </td>
 
@@ -207,6 +213,7 @@ const executeConfirmation = async () => {
 const filters = [
     { label: 'All', value: 'all' },
     { label: 'Pending', value: 'pending' },
+    { label: 'Rejected', value: 'rejected' },
     { label: 'Upcoming', value: 'upcoming' }, 
     { label: 'Ongoing', value: 'ongoing' },
     { label: 'Completed', value: 'completed' }
@@ -241,6 +248,7 @@ const getStatusClass = (status) => {
 
     switch (status.toLowerCase()) {
         case 'pending': return 'bg-warning text-dark'
+        case 'rejected': return 'bg-danger text-white'
         case 'confirmed': 
         case 'upcoming': return 'bg-primary text-white'
         case 'ongoing': return 'bg-info text-white'
@@ -249,7 +257,7 @@ const getStatusClass = (status) => {
     }
 }
 
-const goToDetails = (id) => router.push(`/TuteeSessionDetails/${id}`)
+const goToDetails = (id) => router.push(`/tuteeSessionDetails/${id}`)
 </script>
 
 <style scoped>

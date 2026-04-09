@@ -53,7 +53,7 @@ const router = createRouter({
     {
       path: '/tuteeSessionDetails/:id',
       name: 'tuteeSessionDetails',
-      component: () => import('@/views/TuteeSessionDetails.vue'),
+      component: () => import('@/views/TuteeSessionDetailsFlow.vue'),
       meta: { requiresAuth: true, role: 'Tutee'}
     },
     {
@@ -75,9 +75,9 @@ const router = createRouter({
       meta: { requiresAuth: true, role: 'Tutee' }
     },
     {
-      path: '/payment-tutee/:tutorId',
+      path: '/payment-tutee/:bookingId',
       name: 'PaymentTutee',
-      component: () => import('@/views/PaymentScreenTutee.vue'),
+      component: () => import('@/views/PostSessionPaymentView.vue'),
       props: true,
       meta: { requiresAuth: true, role: 'Tutee' }
     },
@@ -122,7 +122,7 @@ const router = createRouter({
     {
       path: '/booking-details/:id',
       name: 'booking-details',
-      component: () => import('@/views/BookingDetails.vue'),
+      component: () => import('@/views/TutorBookingDetailsFlow.vue'),
       meta: { requiresAuth: true, role: 'Tutor' }
     },
 
@@ -136,8 +136,8 @@ const router = createRouter({
     {
       path: '/reports',
       name: 'reports',
-      component: () => import('@/views/SessionsReports.vue'),
-      meta: { requiresAuth: true }
+      component: () => import('@/views/TutorSessionsReports.vue'),
+      meta: { requiresAuth: true, role: 'Tutor' }
     },
 
 

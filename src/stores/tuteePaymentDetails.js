@@ -13,6 +13,7 @@ export const usePaymentStore = defineStore('payment', () => {
   const bankName = ref('')
   const bankAccount = ref('')
   const bankReference = ref('')
+  const receiptImage = ref(null)
 
   const reset = () => {
     selectedMethod.value = null
@@ -25,6 +26,7 @@ export const usePaymentStore = defineStore('payment', () => {
     bankName.value = ''
     bankAccount.value = ''
     bankReference.value = ''
+    receiptImage.value = null
   }
 
   return {
@@ -36,6 +38,7 @@ export const usePaymentStore = defineStore('payment', () => {
     bankName,
     bankAccount,
     bankReference,
+    receiptImage,
     reset
   }
 })
