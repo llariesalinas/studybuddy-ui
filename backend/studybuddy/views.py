@@ -85,7 +85,6 @@ WEEKDAY_MAP = {
 
 SESSION_SLOT_MINUTES = 30
 
-
 def parse_request_date(date_string):
     try:
         return datetime.strptime(date_string, "%Y-%m-%d").date()
@@ -134,7 +133,6 @@ def slot_is_overridden(tutor, override_date, availability):
     ).filter(
         Q(is_full_day=True) | Q(availability=availability)
     ).exists()
-
 
 def get_booking_end_time(booking):
     return (
@@ -250,8 +248,6 @@ def serialize_payment_summary(representative_booking):
         "status": payment.payment_status,
         "receipt_image": payment.receipt_image.url if payment.receipt_image else None,
     }
-
-
 @api_view(['GET'])
 def partner_institutions_list(request):
 
