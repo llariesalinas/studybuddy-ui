@@ -10,7 +10,16 @@
 
       <div class="booking-layout">
         <div class="left-column">
-          <section class="info-card profile-card shadow-sm">
+          <section class="info-card profile-card shadow-sm position-relative">
+            <div class="profile-actions">
+              <button class="action-btn" aria-label="Favorite" @click="toggleFavorite">
+                <i class="bi" :class="isFavorite ? 'bi-heart-fill text-danger' : 'bi-heart'"></i>
+              </button>
+              <button class="action-btn" aria-label="Message">
+                <i class="bi bi-chat-dots"></i>
+              </button>
+            </div>
+
             <div class="profile-header">
               <div class="avatar-fallback">{{ tutorInitials }}</div>
 
@@ -23,58 +32,10 @@
                   </span>
                 </div>
 
-                <div class="rating-row">
-                  <span class="stars" aria-hidden="true">
-                    <i
-                      v-for="star in 5"
-                      :key="star"
-                      class="bi"
-                      :class="star <= filledStars ? 'bi-star-fill' : 'bi-star'"
-                    ></i>
-                  </span>
-                  <span class="rating-score">{{ tutorProfile.rating.toFixed(1) }}</span>
-                  <span class="session-count">{{ tutorProfile.sessionCount }} sessions</span>
+                <div class="bio-container">
+                  <h2 class="section-title">About the Tutor</h2>
+                  <p class="bio-copy">{{ tutorProfile.bio }}</p>
                 </div>
-
-                <p class="hourly-rate">{{ currencyFormatter.format(tutorProfile.hourlyRate) }}/hr</p>
-
-                <div class="subject-pills">
-                  <span
-                    v-for="subject in tutorProfile.subjects"
-                    :key="subject"
-                    class="subject-pill"
-                  >
-                    {{ subject }}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div class="profile-meta">
-              <div>
-                <h2 class="section-title">About the Tutor</h2>
-                <p class="bio-copy">{{ tutorProfile.bio }}</p>
-              </div>
-
-              <p v-if="tutorProfile.responseTimeLabel" class="meta-line">
-                <i class="bi bi-clock-history"></i>
-                Typically replies {{ tutorProfile.responseTimeLabel }}
-              </p>
-
-              <div v-if="tutorProfile.pinnedReview" class="pinned-review">
-                <div class="pinned-review-header">
-                  <span class="pinned-review-badge">Pinned Review</span>
-                  <span class="pinned-review-rating">
-                    <i class="bi bi-star-fill"></i>
-                    {{ tutorProfile.pinnedReview.rating_score }}
-                  </span>
-                </div>
-
-                <blockquote class="review-quote">
-                  "{{ tutorProfile.pinnedReview.comment }}"
-                </blockquote>
-
-                <p class="review-author">- {{ tutorProfile.pinnedReview.student_name }}</p>
               </div>
             </div>
           </section>
@@ -170,52 +131,69 @@
         <aside class="right-column">
           <div class="sticky-sidebar">
             <section class="info-card shadow-sm">
-              <h2 class="sidebar-title">Payment Summary</h2>
+              <h2 class="sidebar-title">Tutor Stats</h2>
 
               <div class="summary-rows">
                 <div class="summary-row">
-                  <span class="summary-label">Hours</span>
-                  <span class="summary-value">{{ paymentSummary.hours }}</span>
+                  <span class="summary-label">Hourly Rate</span>
+                  <span class="summary-value text-success fw-bold">
+                    {{ currencyFormatter.format(tutorProfile.hourlyRate) }}/hr
+                  </span>
                 </div>
                 <div class="summary-row">
-                  <span class="summary-label">Subject</span>
-                  <span class="summary-value">{{ paymentSummary.subject }}</span>
+                  <span class="summary-label">Rating</span>
+                  <span class="summary-value align-items-center d-flex gap-1">
+                    <i class="bi bi-star-fill text-warning"></i>
+                    {{ tutorProfile.rating.toFixed(1) }}
+                  </span>
                 </div>
                 <div class="summary-row">
-                  <span class="summary-label">Tutor</span>
-                  <span class="summary-value">{{ paymentSummary.tutor }}</span>
-                </div>
-                <div class="summary-row summary-total">
-                  <span class="summary-label">Total</span>
-                  <span class="summary-value">{{ paymentSummary.total }}</span>
+                  <span class="summary-label">Total Sessions</span>
+                  <span class="summary-value">{{ tutorProfile.sessionCount }}</span>
                 </div>
               </div>
             </section>
 
             <section class="info-card shadow-sm">
-              <h2 class="sidebar-title">Payment Options</h2>
+              <h2 class="sidebar-title mb-3">Subjects Taught</h2>
 
-              <div class="payment-method-grid">
-                <button
-                  v-for="method in paymentMethods"
-                  :key="method.id"
-                  type="button"
-                  class="payment-method-card"
-                  :class="{ selected: paymentStore.selectedMethod === method.id }"
-                  @click="chooseMethod(method.id)"
+              <div class="subjects-accordion">
+                <div
+                  v-for="(subject, index) in tutorProfile.subjects"
+                  :key="index"
+                  class="subject-accordion-item"
                 >
-                  <i :class="['bi', method.icon, 'payment-method-icon']"></i>
-                  <span>{{ method.label }}</span>
-                </button>
+                  <button 
+                    type="button" 
+                    class="subject-accordion-header"
+                    @click="toggleSubject(index)"
+                  >
+                    <span>{{ subject }}</span>
+                    <i class="bi" :class="expandedSubjects.includes(index) ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
+                  </button>
+                  
+                  <div 
+                    class="subject-accordion-collapse"
+                    :class="{ 'is-expanded': expandedSubjects.includes(index) }"
+                  >
+                    <div class="subject-accordion-body">
+                      <div class="subject-accordion-content">
+                        Comprehensive sessions focusing on {{ subject }}. Tailored exactly to your pace and learning style to help you achieve your goals.
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
               </div>
 
-              <p class="payment-feedback">{{ paymentFeedback }}</p>
+              <hr class="my-4" style="border-color: #edf1ef;" />
+
               <p class="policy-note">Free cancellation up to 24 hours before the session.</p>
 
               <button
                 type="button"
-                class="btn confirm-booking-btn"
-                :disabled="!canConfirmBooking || isSubmittingBooking"
+                class="btn confirm-booking-btn w-100"
+                :disabled="selectedSlots.length === 0 || isSubmittingBooking"
                 @click="confirmBooking"
               >
                 {{ isSubmittingBooking ? 'Confirming...' : 'Confirm Booking' }}
@@ -251,8 +229,10 @@ const weekIndex = ref(0)
 const selectedSlots = ref([])
 const monthAvailability = ref(null)
 const showFullSchedule = ref(false)
-const paymentMethods = ref([])
 const isSubmittingBooking = ref(false)
+
+const expandedSubjects = ref([])
+const isFavorite = ref(false)
 
 const currencyFormatter = new Intl.NumberFormat('en-PH', {
   style: 'currency',
@@ -275,25 +255,21 @@ const tutorDetails = ref({
 const visibleWeeks = computed(() => monthAvailability.value?.weeks || [])
 const firstBookableWeekIndex = computed(() => getInitialWeekIndex(visibleWeeks.value))
 const currentWeek = computed(() => visibleWeeks.value[weekIndex.value] || null)
-const canGoPrevious = computed(() => {
-  if (monthOffset.value > 0) {
-    return true
-  }
 
+const canGoPrevious = computed(() => {
+  if (monthOffset.value > 0) return true
   return weekIndex.value > firstBookableWeekIndex.value
 })
-const canGoNext = computed(() => visibleWeeks.value.length > 0)
-const hasHiddenSlots = computed(() => {
-  if (showFullSchedule.value || !currentWeek.value) {
-    return false
-  }
 
+const canGoNext = computed(() => visibleWeeks.value.length > 0)
+
+const hasHiddenSlots = computed(() => {
+  if (showFullSchedule.value || !currentWeek.value) return false
   return currentWeek.value.days.some(day => day.slots.length > 8)
 })
+
 const currentWeekLabel = computed(() => {
-  if (!currentWeek.value) {
-    return ''
-  }
+  if (!currentWeek.value) return ''
 
   const start = new Date(currentWeek.value.week_start)
   const end = new Date(currentWeek.value.week_end)
@@ -305,6 +281,7 @@ const currentWeekLabel = computed(() => {
     return `${startMonth} ${start.getDate()}-${end.getDate()}, ${year}`
   }
 })
+
 const tutorProfile = computed(() => ({
   name: tutorDetails.value.name || 'Tutor Name',
   hourlyRate: Number(tutorDetails.value.hourly_rate) || 0,
@@ -312,39 +289,41 @@ const tutorProfile = computed(() => ({
   sessionCount: Number(tutorDetails.value.total_sessions) || 124,
   subjects: tutorDetails.value.subjects?.length
     ? tutorDetails.value.subjects
-    : ['Computer Science', 'Beginner Friendly'],
-  bio: tutorDetails.value.bio || 'This tutor brings patient, step-by-step guidance for learners building confidence in technical subjects.',
-  responseTimeLabel: tutorDetails.value.response_time_label || '',
-  pinnedReview: tutorDetails.value.pinned_review
+    : ['Computer Science', 'Beginner Friendly', 'Web Development'],
+  bio: tutorDetails.value.bio || 'This tutor brings patient, step-by-step guidance for learners building confidence in technical subjects. Additional bio content can easily extend here to test the scrollbar constraint and ensure it is functioning correctly. We are dedicated to providing excellent learning experiences for all ages.',
 }))
+
 const tutorInitials = computed(() => {
   const parts = tutorProfile.value.name.split(' ').filter(Boolean)
   return parts.slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'SB'
 })
-const filledStars = computed(() => Math.round(tutorProfile.value.rating))
-const paymentSummary = computed(() => {
-  const hours = selectedSlots.value.length
-  const total = tutorProfile.value.hourlyRate * hours
-
-  return {
-    hours,
-    total: currencyFormatter.format(total),
-    subject: bookedSessionStore.bookedSessionSub || initialBookingStore.selectedSubject || 'Selected sessions',
-    tutor: tutorProfile.value.name
-  }
-})
-const paymentFeedback = computed(() => {
-  if (!paymentStore.selectedMethod) {
-    return 'Please select a payment method.'
-  }
-
-  const selected = paymentMethods.value.find(method => method.id === paymentStore.selectedMethod)
-  return selected ? `${selected.label} selected.` : 'Please select a payment method.'
-})
-const canConfirmBooking = computed(() => selectedSlots.value.length > 0 && Boolean(paymentStore.selectedMethod))
 
 const backButton = () => {
   router.back()
+}
+
+const toggleSubject = (index) => {
+  if (expandedSubjects.value.includes(index)) {
+    expandedSubjects.value = expandedSubjects.value.filter(i => i !== index)
+  } else {
+    expandedSubjects.value.push(index)
+  }
+}
+
+const toggleFavorite = async () => {
+  isFavorite.value = !isFavorite.value
+
+  try {
+    if (isFavorite.value) {
+      await api.post('favorites/add/', { tutor_id: tutorID })
+    } else {
+      await api.delete(`favorites/remove/${tutorID}/`)
+    }
+  } catch (error) {
+    isFavorite.value = !isFavorite.value
+    console.error('Failed to toggle favorite status', error)
+    alert('Could not update favorite status. Please try again.')
+  }
 }
 
 function createLocalDate(dateString, timeString) {
@@ -353,7 +332,6 @@ function createLocalDate(dateString, timeString) {
 
 function formatTime(dateString, time) {
   const slotDate = createLocalDate(dateString, time)
-
   return new Intl.DateTimeFormat('en-US', {
     hour: 'numeric',
     minute: '2-digit',
@@ -373,26 +351,18 @@ function displayedSlots(day) {
   if (showFullSchedule.value) {
     return day.slots
   }
-
   return day.slots.slice(0, 8)
 }
 
 function availabilityBarClass(day) {
-  if (day.is_past) {
-    return 'day-availability-bar-past'
-  }
-
-  if (day.has_available) {
-    return 'day-availability-bar-available'
-  }
-
+  if (day.is_past) return 'day-availability-bar-past'
+  if (day.has_available) return 'day-availability-bar-available'
   return 'day-availability-bar-unavailable'
 }
 
 const getTutorDetails = async () => {
   try {
     const response = await api.get(`tutors/${tutorID}/`)
-
     tutorDetails.value = {
       profile_id: response.data.profile_id,
       name: `${response.data.fname} ${response.data.lname}`,
@@ -405,46 +375,15 @@ const getTutorDetails = async () => {
       pinned_review_id: response.data.pinned_review_id ?? null,
       pinned_review: response.data.pinned_review ?? null
     }
+    
+    isFavorite.value = response.data.is_favorite ?? false
   } catch (error) {
     console.error('Failed to load tutor details.', error)
   }
 }
 
-const getPaymentMethods = async () => {
-  try {
-    const methodsRes = await api.get('payment-methods/')
-    let onlinePaymentAdded = false
-
-    paymentMethods.value = methodsRes.data.reduce((methods, method) => {
-      if (method.name === 'Cash') {
-        methods.push({
-          id: method.id,
-          label: 'Cash',
-          icon: 'bi-cash-coin'
-        })
-        return methods
-      }
-
-      if ((method.name === 'GCash' || method.name === 'Bank Transfer') && !onlinePaymentAdded) {
-        methods.push({
-          id: method.id,
-          label: 'Online Payment',
-          icon: 'bi-credit-card'
-        })
-        onlinePaymentAdded = true
-      }
-
-      return methods
-    }, [])
-  } catch (error) {
-    console.error('Failed to load payment methods.', error)
-  }
-}
-
 function getInitialWeekIndex(weeks) {
-  if (!weeks.length) {
-    return 0
-  }
+  if (!weeks.length) return 0
 
   const today = new Date()
   const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
@@ -458,9 +397,7 @@ function getInitialWeekIndex(weeks) {
 const getTutorSchedule = async () => {
   try {
     const response = await api.get(`tutors/${route.params.id}/availability/`, {
-      params: {
-        month_offset: monthOffset.value
-      }
+      params: { month_offset: monthOffset.value }
     })
 
     monthAvailability.value = response.data
@@ -483,9 +420,7 @@ async function navigateWeek(direction) {
       return
     }
 
-    if (monthOffset.value === 0) {
-      return
-    }
+    if (monthOffset.value === 0) return
 
     monthOffset.value -= 1
     await getTutorSchedule()
@@ -493,7 +428,6 @@ async function navigateWeek(direction) {
     if (monthOffset.value > 0) {
       weekIndex.value = Math.max(visibleWeeks.value.length - 1, 0)
     }
-
     return
   }
 
@@ -516,9 +450,7 @@ function isSlotSelected(day, slot) {
 }
 
 function toggleSlot(day, week, slot) {
-  if (slot.is_booked || day.is_past || !day.in_month) {
-    return
-  }
+  if (slot.is_booked || day.is_past || !day.in_month) return
 
   const slotWithDate = {
     availability_id: slot.id,
@@ -547,14 +479,8 @@ function toggleSlot(day, week, slot) {
   selectedSlots.value.push(slotWithDate)
 }
 
-const chooseMethod = (methodId) => {
-  paymentStore.selectedMethod = methodId
-}
-
 const confirmBooking = async () => {
-  if (!canConfirmBooking.value) {
-    return
-  }
+  if (selectedSlots.value.length === 0) return
 
   isSubmittingBooking.value = true
 
@@ -568,11 +494,10 @@ const confirmBooking = async () => {
     await api.post('bookings/confirm/', {
       tutor_id: tutorID,
       slots: selectedSlots.value,
-      payment_method: paymentStore.selectedMethod
+      payment_method: 1 
     })
 
     alert('Booking Confirmed!')
-    paymentStore.reset()
     bookedSessionStore.resetStore()
     selectedSlots.value = []
 
@@ -592,8 +517,7 @@ onMounted(async () => {
   paymentStore.reset()
   await Promise.all([
     getTutorDetails(),
-    getTutorSchedule(),
-    getPaymentMethods()
+    getTutorSchedule()
   ])
 })
 </script>
@@ -651,6 +575,36 @@ onMounted(async () => {
   gap: 24px;
 }
 
+.profile-actions {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  display: flex;
+  gap: 8px;
+}
+
+.action-btn {
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #315447;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.action-btn:hover {
+  background: #f3f7f5;
+  color: #0a7a51;
+}
+
+.action-btn:hover .text-danger {
+  color: #dc3545 !important;
+}
+
 .profile-header {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -673,6 +627,7 @@ onMounted(async () => {
 .profile-copy {
   display: grid;
   gap: 14px;
+  margin-top: 10px;
 }
 
 .name-row {
@@ -701,123 +656,40 @@ onMounted(async () => {
   font-weight: 600;
 }
 
-.rating-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-  color: #51685e;
+.bio-container {
+  max-height: 96px;
+  overflow-y: auto;
+  padding-right: 8px;
 }
 
-.stars {
-  display: inline-flex;
-  gap: 4px;
-  color: #ffb703;
+.bio-container::-webkit-scrollbar {
+  width: 6px;
 }
 
-.rating-score {
-  font-weight: 700;
-  color: #163127;
+.bio-container::-webkit-scrollbar-track {
+  background: transparent;
 }
 
-.session-count {
-  color: #6d8178;
+.bio-container::-webkit-scrollbar-thumb {
+  background: #dbe6e1;
+  border-radius: 10px;
 }
 
-.hourly-rate {
-  margin: 0;
-  font-size: 1.15rem;
-  font-weight: 700;
-  color: #0a7a51;
-}
-
-.subject-pills {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.subject-pill {
-  padding: 8px 12px;
-  border-radius: 999px;
-  background: #f3f7f5;
-  color: #315447;
-  font-size: 0.9rem;
-  font-weight: 600;
-}
-
-.profile-meta {
-  display: grid;
-  gap: 16px;
+.bio-container::-webkit-scrollbar-thumb:hover {
+  background: #c4d4cc;
 }
 
 .section-title {
   font-size: 1rem;
   font-weight: 700;
   color: #163127;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
-.bio-copy,
-.review-quote {
+.bio-copy {
   margin: 0;
   color: #53665e;
-  line-height: 1.7;
-}
-
-.meta-line {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0;
-  color: #315447;
-  font-weight: 600;
-}
-
-.review-quote {
-  padding-left: 16px;
-  border-left: 3px solid #d3ebe0;
-  font-style: italic;
-}
-
-.pinned-review {
-  display: grid;
-  gap: 10px;
-  padding: 16px;
-  border-radius: 16px;
-  background: #f6fbf8;
-  border: 1px solid #e1efe7;
-}
-
-.pinned-review-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.pinned-review-badge,
-.pinned-review-rating {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.85rem;
-  font-weight: 700;
-}
-
-.pinned-review-badge {
-  color: #0a7a51;
-}
-
-.pinned-review-rating {
-  color: #c98300;
-}
-
-.review-author {
-  margin: 0;
-  color: #315447;
-  font-weight: 600;
+  line-height: 1.6;
 }
 
 .schedule-card {
@@ -1006,20 +878,6 @@ onMounted(async () => {
   justify-content: center;
 }
 
-.confirm-booking-btn {
-  background: #00895a;
-  color: #ffffff;
-  border: 0;
-  border-radius: 14px;
-  padding: 12px 18px;
-  font-weight: 700;
-}
-
-.confirm-booking-btn:disabled {
-  background: #b8c5bf;
-  color: #f8faf9;
-}
-
 .availability-legend {
   display: flex;
   flex-wrap: wrap;
@@ -1044,6 +902,12 @@ onMounted(async () => {
   background: rgba(0, 137, 90, 0.12);
   color: #00895a;
   border: 1px solid rgba(0, 137, 90, 0.2);
+}
+
+.empty-schedule {
+  color: #7a8f86;
+  text-align: center;
+  padding: 32px 0;
 }
 
 .summary-rows {
@@ -1073,51 +937,57 @@ onMounted(async () => {
   text-align: right;
 }
 
-.summary-total .summary-label,
-.summary-total .summary-value {
-  font-size: 1.05rem;
-  font-weight: 700;
-}
-
-.payment-method-grid {
+.subjects-accordion {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(132px, 132px));
-  justify-content: center;
-  gap: 12px;
-  margin-bottom: 14px;
-}
-
-.payment-method-card {
-  display: grid;
-  justify-items: center;
-  text-align: center;
   gap: 10px;
-  padding: 16px 10px;
+}
+
+.subject-accordion-item {
   border: 1px solid #e5ebe8;
-  border-radius: 16px;
-  background: #ffffff;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.subject-accordion-header {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  background: #fcfdfc;
+  border: 0;
   color: #315447;
-  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, box-shadow 150ms ease;
+  font-weight: 600;
+  text-align: left;
+  transition: background-color 150ms ease;
+  cursor: pointer;
 }
 
-.payment-method-card:hover {
-  background: #f4f7f6;
+.subject-accordion-header:hover {
+  background: #f3f7f5;
 }
 
-.payment-method-card.selected {
-  border-color: #00895a;
-  color: #00895a;
-  box-shadow: 0 10px 20px rgba(0, 137, 90, 0.12);
+.subject-accordion-collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 250ms ease-in-out;
 }
 
-.payment-method-icon {
-  font-size: 1.4rem;
+.subject-accordion-collapse.is-expanded {
+  grid-template-rows: 1fr;
 }
 
-.payment-feedback {
+.subject-accordion-body {
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.subject-accordion-content {
+  padding: 14px 16px;
   color: #6c8077;
-  margin-bottom: 12px;
-  text-align: center;
+  font-size: 0.92rem;
+  border-top: 1px solid #e5ebe8;
+  line-height: 1.6;
 }
 
 .policy-note {
@@ -1128,21 +998,25 @@ onMounted(async () => {
 }
 
 .confirm-booking-btn {
+  background: #00895a;
+  color: #ffffff;
+  border: 0;
+  border-radius: 14px;
+  padding: 12px 18px;
+  font-weight: 700;
   display: block;
   margin: 0 auto;
 }
 
-.empty-schedule {
-  color: #7a8f86;
-  text-align: center;
-  padding: 32px 0;
+.confirm-booking-btn:disabled {
+  background: #b8c5bf;
+  color: #f8faf9;
 }
 
 @media (max-width: 1199px) {
   .booking-layout {
     grid-template-columns: 1fr;
   }
-
   .right-column {
     position: static;
   }
@@ -1153,7 +1027,6 @@ onMounted(async () => {
     grid-template-columns: 1fr;
     justify-items: start;
   }
-
   .week-range {
     text-align: left;
   }
@@ -1163,12 +1036,6 @@ onMounted(async () => {
   .week-columns {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-
-  .payment-method-grid {
-    grid-template-columns: 1fr;
-    justify-content: stretch;
-  }
-
   .profile-header {
     grid-template-columns: 1fr;
   }
