@@ -63,6 +63,12 @@ const router = createRouter({
       meta: { requiresAuth: true, role: 'Tutee' }
     },
     {
+      path: '/find-tutors',
+      name: 'tutors',
+      component: () => import('@/views/FindTutors.vue'),
+      meta: { requiresAuth: true, role: 'Tutee' }
+    },
+    {
       path: '/tutor/:id',
       name: 'tutor-details',
       component: () => import('@/views/TutorDetails.vue'),

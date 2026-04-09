@@ -297,8 +297,8 @@ const findTutor = async () => {
 
     console.log("Recommended tutors:", tutors.value)
 
-    // navigate to tutors page
-    router.push({ name: 'tutors' })
+    // Navigate to the tutor results page after saving the current search inputs.
+    router.push('/find-tutors')
 
   } catch (err) {
 
