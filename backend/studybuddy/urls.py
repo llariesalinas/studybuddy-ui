@@ -54,6 +54,8 @@ urlpatterns = [
     path('bookings/confirm/', views.confirm_payment_and_book),
     path('template-availability/', template_availability),
     path('template-availability/<int:pk>/', template_availability),
+    path('availability-overrides/', views.availability_overrides),
+    path('availability-overrides/<int:override_id>/', views.delete_availability_override),
     path('bookings/<int:booking_id>/complete/', complete_booking),
     path('bookings/<int:booking_id>/approve/', views.approve_booking),
     path('bookings/<int:booking_id>/reject/', views.reject_booking),

@@ -30,7 +30,11 @@
         </li>
 
         <li class="nav-item mb-2">
-          <router-link to="/schedule" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
+          <router-link
+            :to="userRole === 'tutor' ? '/tch-availability' : '/schedule'"
+            class="nav-link text-white opacity-75 d-flex align-items-center"
+            active-class="active-nav"
+          >
             <i class="bi bi-calendar3 me-3"></i> Schedule
           </router-link>
         </li>

@@ -4,6 +4,7 @@ import api from '@/services/api/api'
 export const useTutorSchedStore = defineStore('tutorAvailability', {
   state: () => ({
     availabilities: [],
+    overrides: [],
     isLoading: false
   }),
 
@@ -20,6 +21,21 @@ export const useTutorSchedStore = defineStore('tutorAvailability', {
         this.availabilities = res.data
       } catch (error) {
         console.error('Failed to fetch availability:', error)
+      } finally {
+        this.isLoading = false
+      }
+    },
+
+    async fetchOverrides(params = {}) {
+      this.isLoading = true
+
+      try {
+        const res = await api.get('/availability-overrides/', {
+          params,
+        })
+        this.overrides = res.data
+      } catch (error) {
+        console.error('Failed to fetch overrides:', error)
       } finally {
         this.isLoading = false
       }
@@ -53,6 +69,32 @@ export const useTutorSchedStore = defineStore('tutorAvailability', {
       } catch (error) {
         console.error('Failed to delete slot:', error)
       }
+    },
+
+    async createFullDayOverride(overrideDate) {
+      const res = await api.post('/availability-overrides/', {
+        override_date: overrideDate,
+        is_full_day: true,
+      })
+
+      this.overrides.push(res.data)
+      return res.data
+    },
+
+    async createSlotOverrides(overrideDate, availabilityIds) {
+      const res = await api.post('/availability-overrides/', {
+        override_date: overrideDate,
+        is_full_day: false,
+        availability_ids: availabilityIds,
+      })
+
+      this.overrides = [...this.overrides, ...res.data]
+      return res.data
+    },
+
+    async deleteOverride(id) {
+      await api.delete(`/availability-overrides/${id}/`)
+      this.overrides = this.overrides.filter(override => override.id !== id)
     }
   }
 })

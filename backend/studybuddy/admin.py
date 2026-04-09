@@ -11,6 +11,7 @@ from .models import (
     Subjects,
     Tutor,
     TutorAvailability,
+    TutorAvailabilityOverride,
     TutorSubjects,
     UserProfile,
 )
@@ -18,6 +19,7 @@ from .models import (
 admin.site.register(UserProfile)
 admin.site.register(Tutor)
 admin.site.register(TutorAvailability)
+admin.site.register(TutorAvailabilityOverride)
 admin.site.register(Booking)
 admin.site.register(Payment)
 admin.site.register(Rating)
