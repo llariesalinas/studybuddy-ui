@@ -1,225 +1,220 @@
 <template>
   <div class="p-4">
-    <div class="mb-4">
-      <h2 class="fw-bold text-dark">Welcome back, {{ studentName }}!</h2>
-      <p class="text-muted">Here's your tutoring overview for today.</p>
-    </div>
-
     <div class="row g-4 mb-5">
-      <div class="col-md-6">
+      <div v-for="(stat, index) in stats" :key="index" class="col-md-3">
         <div class="card border-sb shadow-sm rounded-4 h-100 p-3 d-flex flex-row align-items-center">
-          <div class="bg-success bg-opacity-10 p-3 rounded-4 me-3">
-            <i class="bi bi-calendar-event text-sb-primary fs-3"></i>
+          <div :class="[stat.bgClass, 'p-3 rounded-4 me-3']">
+            <i :class="[stat.icon, 'text-sb-primary fs-3']"></i>
           </div>
           <div>
-            <h6 class="text-muted small fw-bold mb-1">Upcoming Sessions</h6>
-            <h2 class="fw-bold mb-0">{{ upcomingCount }}</h2>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-6">
-        <div class="card border-sb shadow-sm rounded-4 h-100 p-3 d-flex flex-row align-items-center">
-          <div class="bg-success bg-opacity-10 p-3 rounded-4 me-3">
-            <i class="bi bi-book text-sb-primary fs-3"></i>
-          </div>
-          <div>
-            <h6 class="text-muted small fw-bold mb-1">Completed Sessions</h6>
-            <h2 class="fw-bold mb-0">{{ completedCount }}</h2>
+            <h6 class="text-muted small fw-bold mb-1">{{ stat.label }}</h6>
+            <h2 class="fw-bold mb-0">{{ stat.count }}</h2>
           </div>
         </div>
       </div>
     </div>
 
     <div class="row g-4">
-      <div class="col-md-6">
-        <h5 class="fw-bold mb-3 d-flex align-items-center">
-          <i class="bi bi-clock text-sb-primary me-2"></i> Upcoming Sessions
-        </h5>
+      <div class="col-md-8">
+        <div class="card border-sb border-1 shadow-sm rounded-4" style="height: 520px;">
+          <div class="card-body p-4 p-md-5 d-flex flex-column h-100 overflow-hidden">
+            <header class="d-flex justify-content-between align-items-end mb-4 flex-shrink-0">
+              <h4 class="fw-bold mb-1 d-flex align-items-center">
+                <i class="bi bi-file-earmark-text text-sb-primary me-3"></i>Academic Agenda
+              </h4>
+              <p class="text-muted mb-0 small">{{ formattedToday }}</p>
+            </header>
 
-        <div v-if="loading" class="text-muted">Loading upcoming sessions...</div>
+            <div class="flex-grow-1 overflow-auto pe-2 custom-scrollbar">
+              <div class="d-flex position-relative mt-2 w-100" :style="{ minHeight: (agendaRange.timeLabels.length * 80) + 'px' }">
+                
+                <div class="d-flex flex-column text-end pe-3 border-end text-muted small fw-bold text-uppercase" 
+                     style="width: 90px; justify-content: space-between; font-size: 0.7rem;">
+                  <div v-for="hour in agendaRange.timeLabels" :key="hour" style="height: 80px;">
+                    {{ formatHour(hour) }}
+                  </div>
+                </div>
 
-        <div v-else>
-          <div 
-          v-for="session in upcomingSessions"
-          :key="session.id"
-          @click="viewSessionDetails(session.id)" 
-          class="card border-sb shadow-sm rounded-4 mb-3 session-card">
-            <div class="card-body d-flex justify-content-between align-items-center">
-              <div>
-                <h6 class="fw-bold text-dark mb-1">{{ session.subject }}</h6>
-                <p class="text-muted small mb-0">with {{ session.tutor }}</p>
-              </div>
-              <div class="text-end">
-                <h6 class="fw-bold text-dark mb-1">{{ session.date }}</h6>
-                <p class="text-muted small mb-0">{{session.time}}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-        
+                <div class="position-relative flex-grow-1 ms-3">
+                  <div class="position-absolute w-100 h-100 d-flex flex-column justify-content-between pointer-events-none" style="z-index: 0;">
+                    <div v-for="hour in agendaRange.timeLabels" :key="'line-'+hour" class="border-bottom w-100 opacity-25" style="height: 80px;"></div>
+                  </div>
 
-      </div>
+                  <div v-for="session in todaySessions" 
+                       :key="session.id"
+                       class="position-absolute start-0 w-100 border-start border-4 rounded-4 p-3 d-flex justify-content-between align-items-center shadow-sm session-card"
+                       :class="{
+                          'bg-success bg-opacity-10 border-success': session.status.toLowerCase() === 'completed',
+                          'bg-warning bg-opacity-10 border-warning': session.status.toLowerCase() === 'ongoing',
+                          'bg-primary bg-opacity-10 border-primary': session.status.toLowerCase() === 'confirmed' || session.status.toLowerCase() === 'upcoming'
+                       }"
+                       :style="getSessionStyle(session)"
+                       @click="goToDetails(session.id)">
+                    
+                    <div class="flex-grow-1">
+                      <div class="d-flex align-items-center gap-2 mb-1">
+                        <span v-if="session.status.toLowerCase() === 'ongoing'" class="spinner-grow spinner-grow-sm text-warning" style="width: 8px; height: 8px;"></span>
+                        <span class="fw-bold text-uppercase" style="font-size: 0.65rem; letter-spacing: 1px;">{{ session.status }}</span>
+                      </div>
+                      <h6 class="fw-bold text-dark mb-1">{{ session.subject }}</h6>
+                      <p class="text-muted small mb-0">{{ session.startTime }} - {{ session.endTime }} • {{ session.tutor }}</p>
+                    </div>
 
-      <div class="col-md-6">
-        <h5 class="fw-bold mb-3 d-flex align-items-center">
-          <i class="bi bi-star text-warning me-2"></i> Recent Sessions
-        </h5>
-
-        <div v-if="loading" class="text-muted">Loading completed sessions...</div>
-
-        <div v-else>
-          <div 
-          v-for="session in completedSessions"
-          :key="session.id"
-          @click="viewSessionDetails(session.id)" 
-          class="card border-sb shadow-sm rounded-4 mb-3 session-card">
-            <div class="card-body d-flex justify-content-between align-items-center">
-              <div>
-                <h6 class="fw-bold text-dark mb-1">{{ session.subject }}</h6>
-                <p class="text-muted small mb-0">{{ session.tutor }}</p>
-              </div>
-              <div class="d-flex gap-2">
-                <span class="badge bg-light text-dark border border-sb d-flex align-items-center">
-                  <i class="bi bi-star-fill text-dark me-1 small"></i> 5
-                </span>
-                <span class="badge bg-light text-dark border border-sb d-flex align-items-center">₱130</span>
+                    <i v-if="session.status.toLowerCase() === 'completed'" class="bi bi-check-circle-fill text-success fs-5"></i>
+                    <i v-else-if="session.status.toLowerCase() === 'ongoing'" class="bi bi-play-circle-fill text-warning fs-5"></i>
+                    <i v-else class="bi bi-calendar-event text-primary fs-5"></i>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </div>
-        
       </div>
-    </div>
 
-    <div class="mt-3">
-      <h4 class="fw-bold"
-      >Try out these tutors</h4>
-
-      <div class="row g-3">
-        <template v-if="loading">
-          <div class="col-12 text-muted">
-            Loading tutors...
-          </div>
-        </template>
-
-        <template v-else>
-          <div 
-            v-for="tutor in recommendedTutors"
-            :key="tutor.id"
-            class="col-md-4"
-          >
-            <div 
-              class="card border-sb shadow-sm h-100 p-3 tutor-card"
-              @click="bookTutor(tutor.id)"
-            >
-              <div class="card-body">
-                <h3>{{ tutor.name }}</h3>
-                <p class="text-muted small mb-2">⭐ {{ tutor.rating }}</p>
-                <p class="small mb-2">
-                  Subjects: {{ tutor.subjects?.join(', ') }}
-                </p>
-                <p class="fw-bold text-sb-primary mb-0">
-                  ₱{{ tutor.hourlyRate }}/hr
-                </p>
-              </div>
+      <div class="col-md-4">
+        <div class="card border-sb shadow-sm rounded-4" style="height: 520px;">
+          <div class="card-body p-4 d-flex flex-column" style="height: 100%;">
+            <h4 class="fw-bold mb-3">Try out these tutors</h4>
+            
+            <div class="flex-grow-1 d-flex flex-column overflow-hidden">
+              <div v-if="loading" class="text-muted">Loading tutors...</div>
+              
+              <template v-else>
+                <div class="flex-grow-1 pe-2">
+                  <div class="list-group list-group-flush">
+                    <div v-if="pagedTutors.length === 0" class="text-muted small py-3">
+                      No recommended tutors available at the moment.
+                    </div>
+                    
+                    <div 
+                      v-for="tutor in pagedTutors" 
+                      :key="tutor.id" 
+                      class="list-group-item d-flex justify-content-between align-items-center py-2" 
+                      @click="bookTutor(tutor.id)" 
+                      style="cursor: pointer;"
+                    >
+                      <div>
+                        <h6 class="mb-1">{{ tutor.name }}</h6>
+                        <p class="mb-0 text-muted small">⭐ {{ tutor.rating || 'N/A' }} · {{ tutor.subjects?.join(', ') || 'Various Subjects' }}</p>
+                      </div>
+                      <div class="fw-bold text-sb-primary">₱{{ tutor.hourlyRate || 0 }}/hr</div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top flex-shrink-0">
+                  <button class="btn bg-sb-primary text-white btn-sm" @click="prevPage" :disabled="page === 1">Prev</button>
+                  <span class="small text-muted">Page {{ page }} of {{ totalPages || 1 }}</span>
+                  <button class="btn bg-sb-primary text-white btn-sm" @click="nextPage" :disabled="page >= totalPages">Next</button>
+                </div>
+              </template>
             </div>
           </div>
-        </template>
+        </div>
       </div>
-
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
-import api from '@/services/api/api' 
-import { useAuthStore } from '@/stores/auth'
+import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { useSessionsStore } from '@/stores/completedSessions'
 
 const router = useRouter()
-const route = useRoute()
-const recommendedTutors = ref([])
-const upcomingSessions = ref([])
-const completedSessions = ref([])
+const sessionsStore = useSessionsStore()
 const loading = ref(false)
 
-const bookTutor = (tutorId) => {
-  router.push(`/tutor/${tutorId}`)
-}
-
-const fetchSessions = async() => {
-  try{
-    loading.value = true
-   const response = await api.get('dashboard/')
-
-    recommendedTutors.value = response.data.recommendations
-    upcomingSessions.value = response.data.upcoming
-    completedSessions.value = response.data.completed
-  }
-  catch(error) {
-    console.error('Error loading sessions:', error)
-  }
-  finally{
-    loading.value = false
-  }
-}
-
-onMounted(() => {
-  fetchSessions()
+onMounted(async () => {
+  loading.value = true
+  
+  await Promise.all([
+    sessionsStore.fetchSessions(),
+    sessionsStore.fetchRecommendations()
+  ])
+  
+  loading.value = false
 })
 
-const upcomingCount = computed(() => upcomingSessions.value.length)
-const completedCount = computed(() => completedSessions.value.length)
+const todayObj = new Date()
+const today = todayObj.toISOString().split('T')[0]
+const formattedToday = todayObj.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 
-const authStore = useAuthStore()
-
-const studentName = computed(() => {
-  return authStore.user
-    ? authStore.user.fname
-    : 'Student'
+const todaySessions = computed(() => {
+  return sessionsStore.sessions.filter(s => 
+    s.date === today && 
+    !['pending', 'cancelled'].includes(s.status.toLowerCase())
+  )
 })
 
-const viewSessionDetails = (sessionId) => {
-  // 1. We log the ID to satisfy ESLint and prep for backend integration
-  console.log(`Navigating to details for session ID: ${sessionId}`)
+const agendaRange = computed(() => {
+  if (todaySessions.value.length === 0) return { start: 9, end: 17, timeLabels: [9, 10, 11, 12, 13, 14, 15, 16, 17] }
 
-  // 2. Route to the schedule page for now
-  router.push('/schedule')
+  const hours = todaySessions.value.flatMap(s => [
+    parseInt(s.startTime.split(':')[0]),
+    parseInt(s.endTime.split(':')[0])
+  ])
+
+  const start = Math.max(0, Math.min(...hours) - 1)
+  const end = Math.min(23, Math.max(...hours) + 1)
+  
+  const timeLabels = []
+  for (let i = start; i <= end; i++) timeLabels.push(i)
+  return { start, end, timeLabels }
+})
+
+const formatHour = (h) => {
+  const suffix = h >= 12 ? "PM" : "AM"
+  const hour = h % 12 || 12
+  return `${String(hour).padStart(2, '0')}:00 ${suffix}`
 }
 
-watch(
-  () => route.query.updated,
-  () => {
-    fetchSessions()
+const getSessionStyle = (session) => {
+  const parseTime = (timeStr) => {
+    const [h, m] = timeStr.split(':').map(Number)
+    return h * 60 + m
   }
-)
+  
+  const agendaStartMins = agendaRange.value.start * 60
+  
+  const sessionStartMins = parseTime(session.startTime)
+  const sessionEndMins = parseTime(session.endTime)
+  
+  const top = ((sessionStartMins - agendaStartMins) / 60) * 80
+  const height = ((sessionEndMins - sessionStartMins) / 60) * 80
 
-const completeSession = async (bookingId) => {
-  try {
-    await api.post(`bookings/${bookingId}/complete/`)
-    alert("Session marked as completed.")
-
-    // Refresh dashboard data
-    await loadTutorDashboard()
-
-  } catch (error) {
-    console.error(error)
-    alert("Failed to complete session.")
-  }
+  return { top: `${top}px`, height: `${height}px` }
 }
 
+// STATS
+const stats = computed(() => [
+  { label: 'Pending', count: sessionsStore.requestedSessions.length, icon: 'bi-clock', bgClass: 'bg-warning bg-opacity-10' },
+  { label: 'Upcoming', count: sessionsStore.upcomingSessions.length, icon: 'bi-calendar-event', bgClass: 'bg-success bg-opacity-10' },
+  { label: 'Ongoing', count: sessionsStore.ongoingSessions.length, icon: 'bi-play-circle', bgClass: 'bg-primary bg-opacity-10' },
+  { label: 'Completed', count: sessionsStore.completedSessions.length, icon: 'bi-check-square', bgClass: 'bg-success bg-opacity-10' }
+])
+
+const page = ref(1)
+const pageSize = 6
+
+const totalPages = computed(() => Math.ceil(sessionsStore.recommendedTutors.length / pageSize))
+
+const pagedTutors = computed(() => {
+  const start = (page.value - 1) * pageSize
+  const end = start + pageSize
+  return sessionsStore.recommendedTutors.slice(start, end)
+})
+
+const nextPage = () => { if (page.value < totalPages.value) page.value++ }
+const prevPage = () => { if (page.value > 1) page.value-- }
+
+const goToDetails = (id) => router.push(`/session/${id}`)
+const bookTutor = (id) => router.push(`/tutor/${id}`)
 </script>
 
 <style scoped>
-/* Hover effect to make cards feel clickable */
-.session-card {
-  cursor: pointer;
-  transition: all 0.2s ease-in-out;
-}
-.session-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 8px 15px rgba(0, 137, 90, 0.1) !important;
-  border-color: var(--sb-primary) !important;
-}
+.custom-scrollbar::-webkit-scrollbar { width: 6px; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+.session-card { cursor: pointer; transition: all 0.2s ease-in-out; }
+.session-card:hover { transform: translateY(-3px); box-shadow: 0 8px 15px rgba(0, 0, 0, 0.08) !important; }
 </style>

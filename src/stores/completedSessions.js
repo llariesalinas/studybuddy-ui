@@ -7,6 +7,7 @@ export const useSessionsStore = defineStore('sessions', () => {
   const sessions = ref([])
   const loading = ref(false)
   const error = ref(null)
+  const recommendedTutors = ref([])
 
   const fetchSessions = async () => {
     loading.value = true
@@ -19,6 +20,17 @@ export const useSessionsStore = defineStore('sessions', () => {
       error.value = 'Failed to load sessions.'
     } finally {
       loading.value = false
+    }
+  }
+
+  const fetchRecommendations = async () => {
+    try{
+      const response = await api.get('/dashboard')
+
+      recommendedTutors.value = response.data.recommendation
+    }
+    catch(error){
+      console.error('Error loading recommended tutors.', error)
     }
   }
 
@@ -72,6 +84,12 @@ export const useSessionsStore = defineStore('sessions', () => {
     .sort((a, b) => new Date(a.date) - new Date(b.date))
   )
 
+  const ongoingSessions = computed(() =>
+  sessions.value
+    .filter(s => normalizeStatus(s.status) === 'ongoing')
+    .sort((a, b) => new Date(a.date) - new Date(b.date))
+  )
+
   const approveSession = async (id) => {
   await api.post(`/bookings/${id}/approve/`)
 
@@ -107,11 +125,14 @@ export const useSessionsStore = defineStore('sessions', () => {
     sessions,
     loading,
     error,
+    recommendedTutors,
+    fetchRecommendations,
     fetchSessions,
     completedSessions,
     upcomingSessions,
     cancelledSessions,
     requestedSessions,
+    ongoingSessions,
     approveSession,
     rejectSession,
     completeSession,
