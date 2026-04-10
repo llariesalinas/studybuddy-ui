@@ -292,6 +292,12 @@ class Booking(models.Model):
         db_index=True,
         default=None
     )
+    booking_request_id = models.UUIDField(
+        null=True,
+        blank=True,
+        db_index=True,
+        default=None
+    )
 
     tutee_confirmed = models.BooleanField(default=False)
     tutor_confirmed = models.BooleanField(default=False)
@@ -324,6 +330,7 @@ class PaymentMethod(models.Model):
         ('CASH', 'Cash'),
         ('GCASH', 'GCash'),
         ('BANK', 'Bank Transfer'),
+        ('online', 'Online Payment'),
     ]
 
     method_id = models.AutoField(primary_key=True)
