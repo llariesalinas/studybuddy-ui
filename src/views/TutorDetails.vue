@@ -252,25 +252,21 @@ const tutorDetails = ref({
 const visibleWeeks = computed(() => monthAvailability.value?.weeks || [])
 const firstBookableWeekIndex = computed(() => getInitialWeekIndex(visibleWeeks.value))
 const currentWeek = computed(() => visibleWeeks.value[weekIndex.value] || null)
-const canGoPrevious = computed(() => {
-  if (monthOffset.value > 0) {
-    return true
-  }
 
+const canGoPrevious = computed(() => {
+  if (monthOffset.value > 0) return true
   return weekIndex.value > firstBookableWeekIndex.value
 })
-const canGoNext = computed(() => visibleWeeks.value.length > 0)
-const hasHiddenSlots = computed(() => {
-  if (showFullSchedule.value || !currentWeek.value) {
-    return false
-  }
 
+const canGoNext = computed(() => visibleWeeks.value.length > 0)
+
+const hasHiddenSlots = computed(() => {
+  if (showFullSchedule.value || !currentWeek.value) return false
   return currentWeek.value.days.some(day => day.slots.length > 8)
 })
+
 const currentWeekLabel = computed(() => {
-  if (!currentWeek.value) {
-    return ''
-  }
+  if (!currentWeek.value) return ''
 
   const start = new Date(currentWeek.value.week_start)
   const end = new Date(currentWeek.value.week_end)
@@ -282,6 +278,7 @@ const currentWeekLabel = computed(() => {
     return `${startMonth} ${start.getDate()}-${end.getDate()}, ${year}`
   }
 })
+
 const tutorProfile = computed(() => ({
   name: tutorDetails.value.name || 'Tutor Name',
   hourlyRate: Number(tutorDetails.value.hourly_rate) || 0,
@@ -292,6 +289,7 @@ const tutorProfile = computed(() => ({
     : ['Computer Science', 'Beginner Friendly', 'Web Development'],
   bio: tutorDetails.value.bio || 'This tutor brings patient, step-by-step guidance for learners building confidence in technical subjects. Additional bio content can easily extend here to test the scrollbar constraint and ensure it is functioning correctly. We are dedicated to providing excellent learning experiences for all ages.',
 }))
+
 const tutorInitials = computed(() => {
   const parts = tutorProfile.value.name.split(' ').filter(Boolean)
   return parts.slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'SB'
@@ -331,7 +329,6 @@ function createLocalDate(dateString, timeString) {
 
 function formatTime(dateString, time) {
   const slotDate = createLocalDate(dateString, time)
-
   return new Intl.DateTimeFormat('en-US', {
     hour: 'numeric',
     minute: '2-digit',
@@ -351,26 +348,18 @@ function displayedSlots(day) {
   if (showFullSchedule.value) {
     return day.slots
   }
-
   return day.slots.slice(0, 8)
 }
 
 function availabilityBarClass(day) {
-  if (day.is_past) {
-    return 'day-availability-bar-past'
-  }
-
-  if (day.has_available) {
-    return 'day-availability-bar-available'
-  }
-
+  if (day.is_past) return 'day-availability-bar-past'
+  if (day.has_available) return 'day-availability-bar-available'
   return 'day-availability-bar-unavailable'
 }
 
 const getTutorDetails = async () => {
   try {
     const response = await api.get(`tutors/${tutorID}/`)
-
     tutorDetails.value = {
       profile_id: response.data.profile_id,
       name: `${response.data.fname} ${response.data.lname}`,
@@ -383,7 +372,6 @@ const getTutorDetails = async () => {
       pinned_review_id: response.data.pinned_review_id ?? null,
       pinned_review: response.data.pinned_review ?? null
     }
-
     isFavorite.value = response.data.is_favorite ?? false
   } catch (error) {
     console.error('Failed to load tutor details.', error)
@@ -391,9 +379,7 @@ const getTutorDetails = async () => {
 }
 
 function getInitialWeekIndex(weeks) {
-  if (!weeks.length) {
-    return 0
-  }
+  if (!weeks.length) return 0
 
   const today = new Date()
   const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
@@ -407,9 +393,7 @@ function getInitialWeekIndex(weeks) {
 const getTutorSchedule = async () => {
   try {
     const response = await api.get(`tutors/${route.params.id}/availability/`, {
-      params: {
-        month_offset: monthOffset.value
-      }
+      params: { month_offset: monthOffset.value }
     })
 
     monthAvailability.value = response.data
@@ -432,9 +416,7 @@ async function navigateWeek(direction) {
       return
     }
 
-    if (monthOffset.value === 0) {
-      return
-    }
+    if (monthOffset.value === 0) return
 
     monthOffset.value -= 1
     await getTutorSchedule()
@@ -442,7 +424,6 @@ async function navigateWeek(direction) {
     if (monthOffset.value > 0) {
       weekIndex.value = Math.max(visibleWeeks.value.length - 1, 0)
     }
-
     return
   }
 
@@ -465,9 +446,7 @@ function isSlotSelected(day, slot) {
 }
 
 function toggleSlot(day, week, slot) {
-  if (slot.is_booked || day.is_past || !day.in_month) {
-    return
-  }
+  if (slot.is_booked || day.is_past || !day.in_month) return
 
   const slotWithDate = {
     availability_id: slot.id,
@@ -517,7 +496,6 @@ const confirmBooking = async () => {
     })
 
     alert('Booking Confirmed!')
-    paymentStore.reset()
     bookedSessionStore.resetStore()
     selectedSlots.value = []
 
@@ -898,20 +876,6 @@ onMounted(async () => {
   justify-content: center;
 }
 
-.confirm-booking-btn {
-  background: #00895a;
-  color: #ffffff;
-  border: 0;
-  border-radius: 14px;
-  padding: 12px 18px;
-  font-weight: 700;
-}
-
-.confirm-booking-btn:disabled {
-  background: #b8c5bf;
-  color: #f8faf9;
-}
-
 .availability-legend {
   display: flex;
   flex-wrap: wrap;
@@ -936,6 +900,12 @@ onMounted(async () => {
   background: rgba(0, 137, 90, 0.12);
   color: #00895a;
   border: 1px solid rgba(0, 137, 90, 0.2);
+}
+
+.empty-schedule {
+  color: #7a8f86;
+  text-align: center;
+  padding: 32px 0;
 }
 
 .summary-rows {
@@ -1026,21 +996,25 @@ onMounted(async () => {
 }
 
 .confirm-booking-btn {
+  background: #00895a;
+  color: #ffffff;
+  border: 0;
+  border-radius: 14px;
+  padding: 12px 18px;
+  font-weight: 700;
   display: block;
   margin: 0 auto;
 }
 
-.empty-schedule {
-  color: #7a8f86;
-  text-align: center;
-  padding: 32px 0;
+.confirm-booking-btn:disabled {
+  background: #b8c5bf;
+  color: #f8faf9;
 }
 
 @media (max-width: 1199px) {
   .booking-layout {
     grid-template-columns: 1fr;
   }
-
   .right-column {
     position: static;
   }
@@ -1051,7 +1025,6 @@ onMounted(async () => {
     grid-template-columns: 1fr;
     justify-items: start;
   }
-
   .week-range {
     text-align: left;
   }
@@ -1061,7 +1034,6 @@ onMounted(async () => {
   .week-columns {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-
   .profile-header {
     grid-template-columns: 1fr;
   }
