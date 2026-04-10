@@ -1,3 +1,5 @@
+import uuid
+
 from django.db import models
 from django.db.models import Q
 from django.contrib.auth.models import User ### allows the use of auth user model for authentication and user management
@@ -253,7 +255,9 @@ class Booking(models.Model):
     STATUS_CHOICES = [
         ('Pending', 'Pending'),
         ('Confirmed', 'Confirmed'),
+        ('Awaiting Payment Verification', 'Awaiting Payment Verification'),
         ('Completed', 'Completed'),
+        ('Rejected', 'Rejected'),
         ('Cancelled', 'Cancelled'),
     ]
 
@@ -282,8 +286,18 @@ class Booking(models.Model):
         choices=[('Online', 'Online'), ('F2F', 'Face-to-Face')]
     )
 
+    session_group_id = models.UUIDField(
+        null=True,
+        blank=True,
+        db_index=True,
+        default=None
+    )
+
+    tutee_confirmed = models.BooleanField(default=False)
+    tutor_confirmed = models.BooleanField(default=False)
+
     status = models.CharField(
-        max_length=15,
+        max_length=40,
         choices=STATUS_CHOICES,
         default="Pending"
     )
@@ -291,7 +305,18 @@ class Booking(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ('availability', 'session_date')
+        constraints = [
+            models.UniqueConstraint(
+                fields=['availability', 'session_date'],
+                condition=Q(status__in=[
+                    'Pending',
+                    'Confirmed',
+                    'Awaiting Payment Verification',
+                    'Completed',
+                ]),
+                name='unique_active_booking_per_slot_date',
+            ),
+        ]
 
 class PaymentMethod(models.Model):
 
@@ -354,6 +379,12 @@ class Payment(models.Model):
         null=True
     )
 
+    receipt_image = models.ImageField(
+        upload_to='payment_receipts/',
+        blank=True,
+        null=True
+    )
+
     paid_at = models.DateTimeField(
         null=True,
         blank=True
@@ -363,6 +394,25 @@ class Payment(models.Model):
 
     def __str__(self):
         return f"Payment for Booking {self.booking.id} - {self.payment_status}"
+
+
+class Notification(models.Model):
+
+    recipient = models.ForeignKey(
+        UserProfile,
+        on_delete=models.CASCADE,
+        related_name='notifications'
+    )
+
+    message = models.CharField(max_length=255)
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Notification for {self.recipient} - {'Read' if self.is_read else 'Unread'}"
     
 class Rating(models.Model):
 

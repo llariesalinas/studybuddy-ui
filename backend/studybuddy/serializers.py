@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Preference, Rating, Subjects, Tutor, TutorAvailability, TutorAvailabilityOverride
+from .models import Notification, Preference, Rating, Subjects, Tutor, TutorAvailability, TutorAvailabilityOverride
 
 # Create Serializers here.
 
@@ -176,3 +176,10 @@ class TutorAvailabilityOverrideSerializer(serializers.ModelSerializer):
         if obj.availability is None:
             return None
         return obj.availability.day
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Notification
+        fields = ['id', 'message', 'is_read', 'created_at']

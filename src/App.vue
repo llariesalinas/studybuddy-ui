@@ -18,7 +18,7 @@
         </li>
 
         <li class="nav-item mb-2">
-          <router-link :to="userRole === 'tutor' ?  '/tutor-profile' : 'tutee-profile'" class="nav-link text-white opacity-75 d-flex align-items-center">
+          <router-link :to="userRole === 'tutor' ? '/tutor-profile' : '/tutee-profile'" class="nav-link text-white opacity-75 d-flex align-items-center">
             <i class="bi bi-person me-3"></i> Profile
           </router-link>
         </li>
@@ -91,7 +91,7 @@
     </div>
 
     <main class="flex-grow-1 overflow-auto p-5" style="background-color: var(--sb-bg);">
-      <header class="d-flex justify-content-between align-items-center mb-3 pb-3 border-bottom border-sb">
+        <header class="d-flex justify-content-between align-items-center mb-3 pb-3 border-bottom border-sb">
           
           <div v-if="route.path === '/dashboard'">
             <h2 class="fw-bold text-dark">Welcome back, {{ userFname }}!</h2>
@@ -103,12 +103,14 @@
             <p class="text-muted">Browse and review pending, upcoming, and completed sessions and confirm ongoing sessions here.</p>
           </div>
 
-          <div v-if="route.path === '/tuteeSessionDetails'">
+          <div v-if="route.path.startsWith('/tuteeSessionDetails/')">
             <h2 class="fw-bold text-dark">Session Details</h2>
             <p class="text-muted">Review your session here.</p>
           </div>
 
           <div class="d-flex gap-3 align-items-center">
+            <NotificationBell v-if="authStore.isAuthenticated && !isPublicRoute" />
+
             <router-link v-if="userRole === 'tutee'" to="/book" class="btn bg-sb-primary text-white px-4 py-2 rounded-3 fw-semibold shadow-sm">
               Book Session
             </router-link>
@@ -118,31 +120,24 @@
             </router-link>
           </div>
         </header>
+      <RatingReminderBanner v-if="authStore.isAuthenticated && !isPublicRoute && userRole === 'tutee'" />
       <router-view />
     </main>
   </div>
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth' // Import auth store
+import NotificationBell from '@/components/NotificationBell.vue'
+import RatingReminderBanner from '@/components/RatingReminderBanner.vue'
+import { useNotificationsStore } from '@/stores/notifications'
 import router from './router'
 
 const route = useRoute()
 const authStore = useAuthStore()
-const isOpen = ref(false)
-
-const toggleDropdown = () => {
-  isOpen.value = !isOpen.value
-}
-
-const manageAccount = () => {
-  setTimeout(() => {
-    router.push('/profile')
-  }, 500)
-}
-
+const notificationsStore = useNotificationsStore()
 const logout = () => {
 
   authStore.logout()
@@ -188,6 +183,12 @@ const isPublicRoute = computed(() => {
 // Get the role from the store to control the sidebar links
 const userRole = computed(() => authStore.user?.role?.toLowerCase() || null)
 const userFname =  computed(() => authStore.user?.fname || null)
+
+onMounted(() => {
+  if (authStore.isAuthenticated) {
+    notificationsStore.fetchNotifications()
+  }
+})
 </script>
 
 <style>
