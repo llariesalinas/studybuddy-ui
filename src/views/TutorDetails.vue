@@ -163,16 +163,16 @@
                   :key="index"
                   class="subject-accordion-item"
                 >
-                  <button 
-                    type="button" 
+                  <button
+                    type="button"
                     class="subject-accordion-header"
                     @click="toggleSubject(index)"
                   >
                     <span>{{ subject }}</span>
                     <i class="bi" :class="expandedSubjects.includes(index) ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
                   </button>
-                  
-                  <div 
+
+                  <div
                     class="subject-accordion-collapse"
                     :class="{ 'is-expanded': expandedSubjects.includes(index) }"
                   >
@@ -182,12 +182,10 @@
                       </div>
                     </div>
                   </div>
-
                 </div>
               </div>
 
               <hr class="my-4" style="border-color: #edf1ef;" />
-
               <p class="policy-note">Free cancellation up to 24 hours before the session.</p>
 
               <button
@@ -230,7 +228,6 @@ const selectedSlots = ref([])
 const monthAvailability = ref(null)
 const showFullSchedule = ref(false)
 const isSubmittingBooking = ref(false)
-
 const expandedSubjects = ref([])
 const isFavorite = ref(false)
 
@@ -375,7 +372,6 @@ const getTutorDetails = async () => {
       pinned_review_id: response.data.pinned_review_id ?? null,
       pinned_review: response.data.pinned_review ?? null
     }
-    
     isFavorite.value = response.data.is_favorite ?? false
   } catch (error) {
     console.error('Failed to load tutor details.', error)
@@ -480,7 +476,9 @@ function toggleSlot(day, week, slot) {
 }
 
 const confirmBooking = async () => {
-  if (selectedSlots.value.length === 0) return
+  if (selectedSlots.value.length === 0) {
+    return
+  }
 
   isSubmittingBooking.value = true
 
@@ -494,7 +492,7 @@ const confirmBooking = async () => {
     await api.post('bookings/confirm/', {
       tutor_id: tutorID,
       slots: selectedSlots.value,
-      payment_method: 1 
+      payment_method: 1
     })
 
     alert('Booking Confirmed!')
