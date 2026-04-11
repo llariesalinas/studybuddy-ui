@@ -196,9 +196,10 @@ const today = todayObj.toISOString().split('T')[0]
 const formattedToday = todayObj.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 
 const todaySessions = computed(() => {
-  return sessionsStore.sessions.filter(s => 
+  const allSessions = sessionsStore.sessions || []
+  return allSessions.filter(s => 
     s.date === today && 
-    !['pending', 'cancelled'].includes(s.status.toLowerCase())
+    !['pending', 'cancelled'].includes(s?.status?.toLowerCase())
   )
 })
 
@@ -243,21 +244,25 @@ const getSessionStyle = (session) => {
 
 // STATS
 const stats = computed(() => [
-  { label: 'Pending', count: sessionsStore.requestedSessions.length, icon: 'bi-clock', bgClass: 'bg-warning bg-opacity-10' },
-  { label: 'Upcoming', count: sessionsStore.upcomingSessions.length, icon: 'bi-calendar-event', bgClass: 'bg-info bg-opacity-10' },
-  { label: 'Ongoing', count: sessionsStore.ongoingSessions.length, icon: 'bi-play-circle', bgClass: 'bg-primary bg-opacity-10' },
-  { label: 'Completed', count: sessionsStore.completedSessions.length, icon: 'bi-check-square', bgClass: 'bg-success bg-opacity-10' }
+  { label: 'Pending', count: sessionsStore.requestedSessions?.length || 0, icon: 'bi-clock', bgClass: 'bg-warning bg-opacity-10' },
+  { label: 'Upcoming', count: sessionsStore.upcomingSessions?.length || 0, icon: 'bi-calendar-event', bgClass: 'bg-info bg-opacity-10' },
+  { label: 'Ongoing', count: sessionsStore.ongoingSessions?.length || 0, icon: 'bi-play-circle', bgClass: 'bg-primary bg-opacity-10' },
+  { label: 'Completed', count: sessionsStore.completedSessions?.length || 0, icon: 'bi-check-square', bgClass: 'bg-success bg-opacity-10' }
 ])
 
 const page = ref(1)
 const pageSize = 6
 
-const totalPages = computed(() => Math.ceil(sessionsStore.recommendedTutors.length / pageSize))
+const totalPages = computed(() => {
+  const total = sessionsStore.recommendedTutors?.length || 0
+  return Math.ceil(total / pageSize) || 1
+})
 
 const pagedTutors = computed(() => {
+  const tutors = sessionsStore.recommendedTutors || []
   const start = (page.value - 1) * pageSize
   const end = start + pageSize
-  return sessionsStore.recommendedTutors.slice(start, end)
+  return tutors.slice(start, end)
 })
 
 const nextPage = () => { if (page.value < totalPages.value) page.value++ }

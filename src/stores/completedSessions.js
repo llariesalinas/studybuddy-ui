@@ -6,9 +6,34 @@ export const useSessionsStore = defineStore('sessions', () => {
   const sessions = ref([])
   const loading = ref(false)
   const error = ref(null)
+  const seenPendingRequestIds = ref([])
   const recommendedTutors = ref([])
 
+  if (typeof window !== 'undefined') {
+    try {
+      const storedIds = JSON.parse(
+        window.localStorage.getItem('studybuddy_seen_pending_request_ids') || '[]'
+      )
+      seenPendingRequestIds.value = Array.isArray(storedIds)
+        ? storedIds.map(id => String(id))
+        : []
+    } catch {
+      seenPendingRequestIds.value = []
+    }
+  }
+
   const normalizeStatus = (status) => String(status || '').toLowerCase()
+
+  const fetchRecommendations = async () => {
+    try{
+      const response = await api.get('/dashboard')
+
+      recommendedTutors.value = response.data.recommendation
+    }
+    catch(error){
+      console.error('Error loading recommended tutors.', error)
+    }
+  }
 
   const toMinutes = (timeValue) => {
     if (!timeValue) return 0
@@ -26,6 +51,17 @@ export const useSessionsStore = defineStore('sessions', () => {
     const minutes = safeMinutes % 60
 
     return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
+  }
+
+  const compareSessionsByDateTime = (left, right, direction = 'asc') => {
+    const dateDifference = new Date(left.date) - new Date(right.date)
+
+    if (dateDifference !== 0) {
+      return direction === 'asc' ? dateDifference : -dateDifference
+    }
+
+    const timeDifference = toMinutes(left.startTime) - toMinutes(right.startTime)
+    return direction === 'asc' ? timeDifference : -timeDifference
   }
 
   const mergeGroupedSessions = (rawSessions = []) => {
@@ -102,17 +138,6 @@ export const useSessionsStore = defineStore('sessions', () => {
     }
   }
 
-  const fetchRecommendations = async () => {
-    try{
-      const response = await api.get('/recommend-tutors/')
-
-      recommendedTutors.value = response.data.recommendation
-    }
-    catch(error){
-      console.error('Error loading recommended tutors.', error)
-    }
-  }
-
   const fetchSessionById = async (id) => {
     loading.value = true
     error.value = null
@@ -164,76 +189,90 @@ export const useSessionsStore = defineStore('sessions', () => {
   const completedSessions = computed(() =>
     sessions.value
       .filter(session => normalizeStatus(session.status) === 'completed')
-      .sort((left, right) => new Date(right.date) - new Date(left.date))
+      .sort((left, right) => compareSessionsByDateTime(left, right, 'desc'))
   )
 
   const upcomingSessions = computed(() =>
     sessions.value
-      .filter(session => ['confirmed', 'awaiting payment verification'].includes(normalizeStatus(session.status)))
-      .sort((left, right) => new Date(left.date) - new Date(right.date))
+      .filter(session => ['upcoming', 'ongoing', 'payment required', 'awaiting verification'].includes(normalizeStatus(session.status)))
+      .sort((left, right) => compareSessionsByDateTime(left, right, 'asc'))
+  )
+
+  const ongoingSessions = computed(() =>
+    sessions.value
+      .filter(session => normalizeStatus(session.status) === 'ongoing')
+      .sort((left, right) => compareSessionsByDateTime(left, right, 'asc'))
   )
 
   const requestedSessions = computed(() =>
     sessions.value
       .filter(session => normalizeStatus(session.status) === 'pending')
-      .sort((left, right) => new Date(left.date) - new Date(right.date))
+      .sort((left, right) => compareSessionsByDateTime(left, right, 'asc'))
+  )
+
+  const currentPendingRequestIds = computed(() =>
+    requestedSessions.value.map(session => String(session.id))
+  )
+
+  const unseenPendingRequestIds = computed(() =>
+    currentPendingRequestIds.value.filter(id => !seenPendingRequestIds.value.includes(id))
+  )
+
+  const hasNewPendingRequests = computed(() =>
+    unseenPendingRequestIds.value.length > 0
   )
 
   const rejectedSessions = computed(() =>
     sessions.value
       .filter(session => normalizeStatus(session.status) === 'rejected')
-      .sort((left, right) => new Date(right.date) - new Date(left.date))
+      .sort((left, right) => compareSessionsByDateTime(left, right, 'desc'))
   )
 
-  const ongoingSessions = computed(() =>
-  sessions.value
-    .filter(s => normalizeStatus(s.status) === 'ongoing')
-    .sort((a, b) => new Date(a.date) - new Date(b.date))
+  const cancelledSessions = computed(() =>
+    sessions.value
+      .filter(session => normalizeStatus(session.status) === 'cancelled')
+      .sort((left, right) => compareSessionsByDateTime(left, right, 'desc'))
   )
 
-  const approveSession = async (id) => {
-  await api.post(`/bookings/${id}/approve/`)
-
-  const session = sessions.value.find(s => s.id === id)
-  if (session) {
-    session.status = "Confirmed"
-  }
-
-  }
-
-  const rejectSession = async (id) => {
-  await api.post(`/bookings/${id}/reject/`)
-
-  const session = sessions.value.find(s => s.id === id)
-  if (session) {
-    session.status = "Cancelled"
-  }
-  } 
-
-  const completeSession = async (id, rating) => {
-    await api.post(`/bookings/${id}/complete/`, { 
-      rating: rating 
-    })
+  const unratedCompletedSessions = computed(() =>
+    completedSessions.value.filter(session => !session.rating_submitted)
+  )
 
   const hasUnratedCompletedSessions = computed(() =>
-    sessions.value.some(
-      session => normalizeStatus(session.status) === 'completed' && !session.rating_submitted
-    )
+    unratedCompletedSessions.value.length > 0
   )
+
+  const markPendingRequestsSeen = () => {
+    seenPendingRequestIds.value = [...currentPendingRequestIds.value]
+
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(
+        'studybuddy_seen_pending_request_ids',
+        JSON.stringify(seenPendingRequestIds.value)
+      )
+    }
+  }
 
   return {
     sessions,
     loading,
     error,
-    recommendedTutors,
-    fetchRecommendations,
-    fetchSessions,
     completedSessions,
+    unratedCompletedSessions,
     upcomingSessions,
-    requestedSessions,
     ongoingSessions,
+    requestedSessions,
+    unseenPendingRequestIds,
+    hasNewPendingRequests,
+    rejectedSessions,
+    cancelledSessions,
+    hasUnratedCompletedSessions,
+    fetchSessions,
+    fetchRecommendations,
+    fetchSessionById,
     approveSession,
     rejectSession,
+    markPendingRequestsSeen,
     submitPayment,
     submitRating,
   }
