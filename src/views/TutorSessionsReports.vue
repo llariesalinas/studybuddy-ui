@@ -86,7 +86,7 @@
             <thead>
               <tr class="text-muted small align-bottom reports-header-row">
                 <th class="fw-semibold pb-3">Subject</th>
-                <th class="fw-semibold pb-3">Tutor</th>
+                <th class="fw-semibold pb-3">Tutee</th>
                 <th class="fw-semibold pb-3">Date</th>
                 <th class="fw-semibold pb-3">Duration</th>
                 <th class="fw-semibold pb-3">Status</th>
@@ -111,7 +111,7 @@
                   class="session-row"
                 >
                   <td class="py-3 fw-bold">{{ session.subject }}</td>
-                  <td class="py-3">{{ session.tutor }}</td>
+                  <td class="py-3">{{ session.tutee }}</td>
                   <td class="py-3">{{ session.date }}</td>
                   <td class="py-3">{{ session.startTime }} - {{ session.endTime }}</td>
                   <td class="py-3">
