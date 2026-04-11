@@ -73,81 +73,34 @@
                 </button>
             </div>
 
-            <div v-else-if="selectedMethodName === 'GCash'">
-                <div class="mb-3">
-                <label class="form-label">Account Name</label>
-                <input
-                    type="text"
-                    class="form-control"
-                    v-model="paymentStore.gCashName"
-                    placeholder="Enter GCash name"
-                />
-                </div>
-
-                <div class="mb-3">
-                <label class="form-label">GCash Number</label>
-                <input
-                    type="tel"
-                    class="form-control"
-                    v-model="paymentStore.gCashNumber"
-                    placeholder="09XXXXXXXXX"
-                />
-                </div>
-
-                <div class="mb-3">
-                <label class="form-label">Reference Number</label>
-                <input
-                    type="text"
-                    class="form-control"
-                    v-model="paymentStore.gCashReference"
-                    placeholder="Transaction reference"
-                />
-                </div>
-
-                <button
-                class="btn btn-primary bg-sb-primary w-100"
-                style="border-color: #00895A;"
-                >
-                Submit GCash Payment
-                </button>
-            </div>
-
-            <div v-else-if="selectedMethodName === 'Bank Transfer'">
-                <div class="mb-3">
-                <label class="form-label">Account Holder Name</label>
-                <input
-                    type="text"
-                    class="form-control"
-                    v-model="paymentStore.bankName"
-                    placeholder="Enter account name"
-                />
-                </div>
-
-                <div class="mb-3">
-                <label class="form-label">Account Number</label>
-                <input
-                    type="text"
-                    class="form-control"
-                    v-model="paymentStore.bankAccount"
-                    placeholder="Enter account number"
-                />
-                </div>
-
+            <div v-else-if="selectedMethodName === 'Online Payment'">
                 <div class="mb-3">
                 <label class="form-label">Transaction Reference</label>
                 <input
                     type="text"
                     class="form-control"
-                    v-model="paymentStore.bankReference"
-                    placeholder="Reference number"
+                    v-model="transactionReference"
+                    placeholder="Enter the transfer reference"
+                />
+                </div>
+
+                <div class="mb-3">
+                <label class="form-label">Receipt Image</label>
+                <input
+                    type="file"
+                    class="form-control"
+                    accept="image/*"
+                    @change="handleReceiptChange"
                 />
                 </div>
 
                 <button
                 class="btn btn-primary bg-sb-primary w-100"
                 style="border-color: #00895A;"
+                :disabled="!canSubmitOnlinePayment"
+                @click="ConfirmPayment"
                 >
-                Confirm Payment
+                Submit Online Payment
                 </button>
             </div>
 
@@ -186,6 +139,7 @@ const tutorId = route.params.tutorId
 
 const tutor = ref(null)
 const paymentMethods = ref([])
+const transactionReference = ref('')
 
 const selectedMethodName = computed(() => {
   const method = paymentMethods.value.find(
@@ -194,6 +148,12 @@ const selectedMethodName = computed(() => {
   return method ? method.label : null
 })
 
+const canSubmitOnlinePayment = computed(() =>
+  Boolean(paymentStore.receiptImage) && Boolean(transactionReference.value.trim())
+)
+
+const SESSION_SLOT_HOURS = 0.5
+
 // ---------------------------
 // PAYMENT SUMMARY
 // ---------------------------
@@ -201,7 +161,8 @@ const paymentSummary = computed(() => {
   if (!tutor.value) return null
 
   const hourlyRate = parseFloat(tutor.value.hourly_rate)
-  const hours = bookedSessionStore.bookedSessions?.length || 0
+  const slotCount = bookedSessionStore.bookedSessions?.length || 0
+  const hours = slotCount * SESSION_SLOT_HOURS
   const total = hourlyRate * hours
 
   return {
@@ -229,6 +190,10 @@ const chooseMethod = (methodId) => {
   paymentStore.selectedMethod = methodId
 }
 
+const handleReceiptChange = (event) => {
+  paymentStore.receiptImage = event.target.files?.[0] || null
+}
+
 
 // ---------------------------
 // LOAD DATA
@@ -244,10 +209,7 @@ onMounted(async () => {
     paymentMethods.value = methodsRes.data.map(m => ({
       id: m.id,
       label: m.name,
-      icon:
-        m.name === 'GCash' ? 'bi-wallet2' :
-        m.name === 'Cash' ? 'bi-cash-coin' :
-        'bi-credit-card'
+      icon: m.code === 'CASH' ? 'bi-cash-coin' : 'bi-credit-card'
     }))
 
   } catch (error) {
@@ -272,18 +234,31 @@ const ConfirmPayment = async () => {
     return
   }
 
-  try {
+  if (selectedMethodName.value === 'Online Payment' && !canSubmitOnlinePayment.value) {
+    alert("Please attach a receipt and enter the transaction reference.")
+    return
+  }
 
-    await api.post('bookings/confirm/', {
-      tutor_id: tutorId,
-      date: bookedSessionStore.bookedSessionDate,
-      slots: bookedSessionStore.bookedSessions,
-      payment_method: paymentStore.selectedMethod   // real DB method_id
-    })
+  try {
+    const formData = new FormData()
+    formData.append('tutor_id', tutorId)
+    formData.append('slots', JSON.stringify(bookedSessionStore.bookedSessions))
+    formData.append('payment_method', paymentStore.selectedMethod)
+
+    if (transactionReference.value.trim()) {
+      formData.append('transaction_reference', transactionReference.value.trim())
+    }
+
+    if (paymentStore.receiptImage) {
+      formData.append('receipt_image', paymentStore.receiptImage)
+    }
+
+    await api.post('bookings/confirm/', formData)
 
     alert("Booking Confirmed!")
 
     paymentStore.reset()
+    transactionReference.value = ''
     bookedSessionStore.resetStore()
 
     router.push({

@@ -83,12 +83,12 @@
         <div class="card shadow-sm p-4 h-100">
           <h5 class="fw-bold mb-3">Next Action</h5>
 
-          <template v-if="isConfirmed">
+          <template v-if="canSubmitPayment">
             <p class="text-muted">
-              Confirm the session by submitting your post-session payment details.
+              Your session has ended. Submit your post-session payment details so your tutor can verify them.
             </p>
             <button class="btn bg-sb-primary text-white w-100" @click="goToPayment">
-              Confirm Session
+              Submit Payment
             </button>
           </template>
 
@@ -107,8 +107,7 @@
             </p>
             <button
               class="btn bg-sb-primary text-white w-100"
-              data-bs-toggle="modal"
-              data-bs-target="#ratingModal"
+              @click="isRatingModalOpen = true"
             >
               Leave a Rating
             </button>
@@ -123,60 +122,21 @@
       </div>
     </div>
 
-    <div ref="ratingModalRef" class="modal fade" id="ratingModal" tabindex="-1" aria-hidden="true">
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content rounded-4">
-          <div class="modal-header border-0">
-            <h5 class="modal-title fw-bold">Rate Your Session</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-          </div>
-
-          <div class="modal-body text-center py-4">
-            <p class="text-muted mb-4">
-              How was your session with {{ sessionDetail?.tutor?.name || 'your tutor' }}?
-            </p>
-
-            <div class="d-flex justify-content-center gap-2 mb-3 text-warning fs-1">
-              <i
-                v-for="star in 5"
-                :key="star"
-                class="bi"
-                :class="currentRating >= star ? 'bi-star-fill' : 'bi-star'"
-                style="cursor: pointer;"
-                @click="currentRating = star"
-              ></i>
-            </div>
-
-            <textarea
-              v-model="ratingComment"
-              class="form-control"
-              rows="3"
-              placeholder="Add an optional comment"
-            ></textarea>
-          </div>
-
-          <div class="modal-footer border-0">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Skip for Now</button>
-            <button
-              type="button"
-              class="btn bg-sb-primary text-white"
-              :disabled="currentRating === 0 || isSubmittingRating"
-              @click="submitRating"
-            >
-              {{ isSubmittingRating ? 'Submitting...' : 'Submit Rating' }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <RatingStackModal
+      :open="isRatingModalOpen"
+      :sessions="sessionsStore.unratedCompletedSessions"
+      :initial-session-id="route.params.id"
+      @close="isRatingModalOpen = false"
+      @rated="handleRated"
+    />
   </div>
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import * as bootstrap from 'bootstrap'
 import { useSessionsStore } from '@/stores/completedSessions'
+import RatingStackModal from '@/components/RatingStackModal.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -185,14 +145,11 @@ const sessionsStore = useSessionsStore()
 const sessionDetail = ref(null)
 const loading = ref(true)
 const errorMessage = ref('')
-const currentRating = ref(0)
-const ratingComment = ref('')
-const isSubmittingRating = ref(false)
-const ratingModalRef = ref(null)
+const isRatingModalOpen = ref(false)
 
 const normalizedStatus = computed(() => String(sessionDetail.value?.session?.status || '').toLowerCase())
-const isConfirmed = computed(() => normalizedStatus.value === 'confirmed')
-const isAwaitingPaymentVerification = computed(() => normalizedStatus.value === 'awaiting payment verification')
+const canSubmitPayment = computed(() => normalizedStatus.value === 'payment required')
+const isAwaitingPaymentVerification = computed(() => normalizedStatus.value === 'awaiting verification')
 const isCompleted = computed(() => normalizedStatus.value === 'completed')
 
 const tutorInitials = computed(() => {
@@ -224,12 +181,19 @@ const statusClass = computed(() => {
   switch (normalizedStatus.value) {
     case 'pending':
       return 'bg-warning text-dark'
-    case 'confirmed':
+    case 'upcoming':
       return 'bg-primary text-white'
-    case 'awaiting payment verification':
+    case 'ongoing':
+      return 'bg-info text-white'
+    case 'payment required':
+      return 'bg-warning-subtle text-dark'
+    case 'awaiting verification':
       return 'bg-info text-dark'
     case 'completed':
       return 'bg-success text-white'
+    case 'rejected':
+    case 'cancelled':
+      return 'bg-danger text-white'
     default:
       return 'bg-secondary text-white'
   }
@@ -238,7 +202,11 @@ const statusClass = computed(() => {
 const loadSession = async () => {
   try {
     loading.value = true
-    sessionDetail.value = await sessionsStore.fetchSessionById(route.params.id)
+    const [detail] = await Promise.all([
+      sessionsStore.fetchSessionById(route.params.id),
+      sessionsStore.fetchSessions()
+    ])
+    sessionDetail.value = detail
   } catch (error) {
     console.error('Failed to load session detail:', error)
     errorMessage.value = 'Failed to load session details.'
@@ -251,57 +219,15 @@ const goToPayment = () => {
   router.push({ name: 'PaymentTutee', params: { bookingId: route.params.id } })
 }
 
-const cleanupRatingModalArtifacts = () => {
-  document.body.classList.remove('modal-open')
-  document.body.style.removeProperty('padding-right')
+const handleRated = async () => {
+  await loadSession()
 
-  document.querySelectorAll('.modal-backdrop').forEach((backdrop) => {
-    backdrop.remove()
-  })
-}
-
-const hideRatingModal = () => {
-  const modalElement = ratingModalRef.value
-
-  if (!modalElement) {
-    cleanupRatingModalArtifacts()
-    return
-  }
-
-  const modalInstance = bootstrap.Modal.getInstance(modalElement) || bootstrap.Modal.getOrCreateInstance(modalElement)
-  modalInstance.hide()
-
-  window.setTimeout(() => {
-    cleanupRatingModalArtifacts()
-  }, 200)
-}
-
-const submitRating = async () => {
-  if (!currentRating.value) {
-    return
-  }
-
-  isSubmittingRating.value = true
-
-  try {
-    sessionDetail.value = await sessionsStore.submitRating(
-      route.params.id,
-      currentRating.value,
-      ratingComment.value
-    )
-    hideRatingModal()
-    currentRating.value = 0
-    ratingComment.value = ''
-  } catch (error) {
-    console.error('Failed to submit rating:', error)
-    alert(error.response?.data?.error || 'Failed to submit rating.')
-  } finally {
-    isSubmittingRating.value = false
+  if (!sessionsStore.unratedCompletedSessions.length) {
+    isRatingModalOpen.value = false
   }
 }
 
 onMounted(loadSession)
-onBeforeUnmount(cleanupRatingModalArtifacts)
 </script>
 
 <style scoped>

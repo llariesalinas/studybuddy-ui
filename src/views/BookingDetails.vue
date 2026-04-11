@@ -87,15 +87,9 @@
 
             <div
             class="row mb-2"
-            v-if="bookingDetailsStore.paymentInfo?.method === 'GCash' || bookingDetailsStore.paymentInfo?.method === 'Bank Transfer'"
+            v-if="Number(bookingDetailsStore.paymentInfo?.transaction_fee || 0) > 0"
             >
-                <div class="col-5 text-muted">
-                    {{
-                    bookingDetailsStore.paymentInfo?.method === 'GCash'
-                        ? 'GCash Fee'
-                        : 'Bank Fee'
-                    }}
-                </div>
+                <div class="col-5 text-muted">Transaction Fee</div>
                 <div class="col-7 text-end fw-semibold">
                     ₱{{ bookingDetailsStore.paymentInfo?.transaction_fee?.toFixed(2) || '0.00' }}
                 </div>
@@ -120,7 +114,7 @@
 
           <div class="d-flex justify-content-end">
             <button
-              v-if="bookingDetailsStore.sessionInfo?.status === 'Confirmed'"
+              v-if="bookingDetailsStore.sessionInfo?.status === 'Awaiting Verification'"
               class="btn btn-success"
               @click="handleComplete"
             >

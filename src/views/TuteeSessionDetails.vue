@@ -100,8 +100,9 @@
                   class="badge"
                   :class="{
                     'bg-warning text-dark': session.status?.toLowerCase() === 'pending',
-                    'bg-primary': session.status?.toLowerCase() === 'confirmed',
-                    'bg-info': session.status?.toLowerCase() === 'ongoing',
+                    'bg-primary': session.status?.toLowerCase() === 'upcoming',
+                    'bg-info': session.status?.toLowerCase() === 'ongoing' || session.status?.toLowerCase() === 'awaiting verification',
+                    'text-dark bg-warning-subtle': session.status?.toLowerCase() === 'payment required',
                     'bg-success': session.status?.toLowerCase() === 'completed'
                   }"
                 >

@@ -1,3 +1,4 @@
+import json
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
 from django.utils.timezone import now
@@ -84,6 +85,14 @@ WEEKDAY_MAP = {
 }
 
 SESSION_SLOT_MINUTES = 30
+
+
+def get_duration_hours_from_slot_count(slot_count):
+    return round((slot_count * SESSION_SLOT_MINUTES) / 60, 2)
+
+
+def get_duration_hours_for_bookings(bookings):
+    return get_duration_hours_from_slot_count(len(bookings))
 
 def parse_request_date(date_string):
     try:
@@ -201,15 +210,120 @@ def get_session_group_bookings(booking):
     return sort_bookings_for_session_group(booking_group)
 
 
+def get_booking_request_bookings(booking):
+    if booking.booking_request_id is None:
+        return get_session_group_bookings(booking)
+
+    booking_group = list(
+        Booking.objects.filter(booking_request_id=booking.booking_request_id)
+        .select_related(
+            'student__course',
+            'tutor__profile__course',
+            'tutor__profile__user',
+            'availability',
+            'payment__method',
+            'rating'
+        )
+        .order_by('session_date', 'availability__time_slot', 'id')
+    )
+
+    return sort_bookings_for_session_group(booking_group)
+
+
 def get_representative_booking(bookings):
     sorted_group = sort_bookings_for_session_group(bookings)
     return sorted_group[0] if sorted_group else None
+
+
+def get_session_notification_context(bookings):
+    representative_booking = get_representative_booking(bookings)
+
+    if not representative_booking:
+        return {
+            "subject": "session",
+            "date": "an upcoming date",
+            "tutor_name": "your tutor",
+        }
+
+    subject = (
+        representative_booking.tutor.profile.course.course_name
+        if representative_booking.tutor.profile.course else "General"
+    )
+    date_label = representative_booking.session_date.strftime("%Y-%m-%d")
+    tutor_name = f"{representative_booking.tutor.profile.fname} {representative_booking.tutor.profile.lname}"
+
+    return {
+        "subject": subject,
+        "date": date_label,
+        "tutor_name": tutor_name,
+    }
+
+
+def get_display_status(raw_status, session_date, start_time, end_time):
+    normalized = str(raw_status or '').lower()
+
+    if normalized == 'confirmed':
+        timezone_now = timezone.localtime()
+        timezone_info = timezone.get_current_timezone()
+        start_at = timezone.make_aware(datetime.combine(session_date, start_time), timezone_info)
+        end_at = timezone.make_aware(datetime.combine(session_date, end_time), timezone_info)
+
+        if timezone_now < start_at:
+            return 'Upcoming'
+
+        if start_at <= timezone_now < end_at:
+            return 'Ongoing'
+
+        return 'Payment Required'
+
+    if normalized == 'awaiting payment verification':
+        return 'Awaiting Verification'
+
+    return raw_status
+
+
+def create_booking_status_notification(recipient, status_key, bookings):
+    context = get_session_notification_context(bookings)
+
+    messages = {
+        "pending": f"New booking request received for {context['subject']} on {context['date']}. Please review and respond.",
+        "confirmed": f"Your booking for {context['subject']} with {context['tutor_name']} has been accepted. The session is now upcoming.",
+        "rejected": f"Your booking for {context['subject']} with {context['tutor_name']} on {context['date']} was rejected.",
+        "awaiting_payment_verification": f"A tutee has confirmed their {context['subject']} session on {context['date']} and sent payment for review.",
+        "completed": f"Your session for {context['subject']} with {context['tutor_name']} was marked complete. You can rate it anytime.",
+    }
+
+    message = messages.get(status_key)
+
+    if not message:
+        return
+
+    Notification.objects.create(
+        recipient=recipient,
+        message=message
+    )
 
 
 def update_tutor_rating_average(tutor):
     aggregate = Rating.objects.filter(tutor=tutor).aggregate(average=Avg('rating_score'))
     tutor.rating_average = round(aggregate['average'] or 0, 2)
     tutor.save(update_fields=['rating_average'])
+
+
+def get_payment_method_code(payment):
+    return getattr(getattr(payment, 'method', None), 'code', None)
+
+
+def get_payment_method_label(payment):
+    method = getattr(payment, 'method', None)
+
+    if not method:
+        return None
+
+    if method.code in {'GCASH', 'BANK', 'online'}:
+        return 'Online Payment'
+
+    return method.method_name
 
 
 def serialize_payment_summary(representative_booking):
@@ -228,10 +342,11 @@ def serialize_payment_summary(representative_booking):
         }
 
     amount_paid = float(payment.amount)
-    method = payment.method.method_name if payment.method else None
+    method = get_payment_method_label(payment)
+    method_code = get_payment_method_code(payment)
     platform_fee = round(amount_paid * 0.16, 2)
 
-    if method == "GCash":
+    if method_code == "GCASH":
         transaction_fee = round(amount_paid * 0.04, 2)
     else:
         transaction_fee = 0
@@ -628,16 +743,24 @@ def build_combined_block(group):
         + timedelta(minutes=SESSION_SLOT_MINUTES)
     ).time()
 
-    duration = len(group)
+    duration = get_duration_hours_for_bookings(sorted_group)
 
     # ensure correct status
     group_status = first.status
-
+    display_status = get_display_status(
+        group_status,
+        first.session_date,
+        start_time,
+        end_time
+    )
     return {
         "id": representative_booking.id,
         "session_group_id": str(representative_booking.session_group_id) if representative_booking.session_group_id else None,
-        "status": group_status,
+        "booking_request_id": str(representative_booking.booking_request_id) if representative_booking.booking_request_id else None,
+        "status": display_status,
+        "raw_status": group_status,
         "date": first.session_date,
+        "student": f"{first.student.fname} {first.student.lname}",
         "tuteeName": f"{first.student.fname} {first.student.lname}",
         "tutor": f"{first.tutor.profile.fname} {first.tutor.profile.lname}",
         "tutee_confirmed": representative_booking.tutee_confirmed,
@@ -653,6 +776,102 @@ def build_combined_block(group):
         "startTime": start_time.strftime("%H:%M"),
         "endTime": end_time.strftime("%H:%M"),
         "duration_hours": duration
+    }
+
+
+def build_time_block_payload(bookings):
+
+    sorted_bookings = sort_bookings_for_session_group(bookings)
+    first_booking = sorted_bookings[0]
+    last_booking = sorted_bookings[-1]
+
+    start_time = first_booking.availability.time_slot
+    end_time = (
+        datetime.combine(first_booking.session_date, last_booking.availability.time_slot)
+        + timedelta(minutes=SESSION_SLOT_MINUTES)
+    ).time()
+
+    return {
+        "date": first_booking.session_date.strftime("%Y-%m-%d"),
+        "startTime": start_time.strftime("%H:%M"),
+        "endTime": end_time.strftime("%H:%M"),
+        "duration_hours": get_duration_hours_for_bookings(sorted_bookings),
+        "session_group_id": str(first_booking.session_group_id) if first_booking.session_group_id else None,
+    }
+
+
+def split_bookings_into_time_blocks(bookings):
+
+    sorted_bookings = sort_bookings_for_session_group(bookings)
+
+    if not sorted_bookings:
+        return []
+
+    grouped_blocks = []
+    current_block = [sorted_bookings[0]]
+
+    for booking in sorted_bookings[1:]:
+        previous_booking = current_block[-1]
+        previous_end = (
+            datetime.combine(previous_booking.session_date, previous_booking.availability.time_slot)
+            + timedelta(minutes=SESSION_SLOT_MINUTES)
+        ).time()
+
+        same_session_group = (
+            previous_booking.session_group_id is not None
+            and booking.session_group_id is not None
+            and previous_booking.session_group_id == booking.session_group_id
+        )
+        is_contiguous = (
+            previous_booking.session_date == booking.session_date
+            and previous_end == booking.availability.time_slot
+        )
+
+        if same_session_group or is_contiguous:
+            current_block.append(booking)
+            continue
+
+        grouped_blocks.append(current_block)
+        current_block = [booking]
+
+    grouped_blocks.append(current_block)
+
+    return [build_time_block_payload(block) for block in grouped_blocks]
+
+
+def build_booking_request_block(group):
+
+    sorted_group = sort_bookings_for_session_group(group)
+    representative_booking = get_representative_booking(sorted_group)
+    first_booking = sorted_group[0]
+    time_blocks = split_bookings_into_time_blocks(sorted_group)
+    primary_block = time_blocks[0]
+    group_status = first_booking.status
+
+    return {
+        "id": representative_booking.id,
+        "session_group_id": str(representative_booking.session_group_id) if representative_booking.session_group_id else None,
+        "booking_request_id": str(representative_booking.booking_request_id) if representative_booking.booking_request_id else None,
+        "status": group_status,
+        "raw_status": group_status,
+        "date": first_booking.session_date,
+        "student": f"{first_booking.student.fname} {first_booking.student.lname}",
+        "tuteeName": f"{first_booking.student.fname} {first_booking.student.lname}",
+        "tutor": f"{first_booking.tutor.profile.fname} {first_booking.tutor.profile.lname}",
+        "tutee_confirmed": representative_booking.tutee_confirmed,
+        "tutor_confirmed": representative_booking.tutor_confirmed,
+        "rating": representative_booking.rating.rating_score if hasattr(representative_booking, "rating") else None,
+        "rating_submitted": hasattr(representative_booking, "rating"),
+        "subject": (
+            first_booking.tutor.profile.course.course_name
+            if first_booking.tutor.profile.course
+            else "General"
+        ),
+        "startTime": primary_block["startTime"],
+        "endTime": primary_block["endTime"],
+        "duration_hours": get_duration_hours_for_bookings(sorted_group),
+        "timeBlocks": time_blocks,
+        "hasMultipleTimeBlocks": len(time_blocks) > 1,
     }
 
 #Tutor Dashboard View
@@ -684,9 +903,9 @@ def tutor_dashboard(request):
 
             platform_fee = amount * 0.16
 
-            method = b.payment.method.method_name if b.payment.method else None
+            method_code = get_payment_method_code(b.payment)
 
-            if method == "GCash":
+            if method_code == "GCASH":
                 transaction_fee = amount * 0.04
             else:
                 transaction_fee = 0
@@ -862,6 +1081,7 @@ def tutor_availability(request, tutor_id):
                 "date": current_date.isoformat(),
                 "in_month": month_start <= current_date <= month_end,
                 "is_past": is_past,
+                "is_blocked": current_date in full_day_dates,
                 "has_available": any(not slot["is_booked"] for slot in day_slots),
                 "slots": day_slots
             })
@@ -939,9 +1159,46 @@ def confirm_payment_and_book(request):
 
     tutor_id = request.data.get("tutor_id")
     slots = request.data.get("slots")
+    method_id = request.data.get("payment_method")
+
+    if isinstance(slots, str):
+        try:
+            slots = json.loads(slots)
+        except json.JSONDecodeError:
+            return Response({"error": "Invalid slots payload."}, status=400)
 
     if not slots:
         return Response({"error": "No slots selected"}, status=400)
+
+    # Enforce that a booking request can only include slots from one date.
+    requested_dates = {
+        parse_request_date(slot.get("session_date"))
+        for slot in slots
+    }
+
+    if None in requested_dates:
+        return Response({"error": "Invalid session date format."}, status=400)
+
+    if len(requested_dates) > 1:
+        return Response(
+            {"error": "You can only book multiple sessions on the same day."},
+            status=400
+        )
+
+    if method_id:
+        try:
+            method = PaymentMethod.objects.get(method_id=method_id, is_active=True)
+        except PaymentMethod.DoesNotExist:
+            return Response({"error": "Invalid payment method."}, status=400)
+
+        receipt_image = request.FILES.get('receipt_image')
+        transaction_reference = request.data.get('transaction_reference')
+
+        if method.code == 'online' and receipt_image is None:
+            return Response({"error": "Receipt image is required for online payments."}, status=400)
+
+        if method.code == 'online' and not str(transaction_reference or '').strip():
+            return Response({"error": "Transaction reference is required for online payments."}, status=400)
 
     tutor = get_object_or_404(Tutor, profile_id=tutor_id)
     normalized_slots = []
@@ -1017,6 +1274,9 @@ def confirm_payment_and_book(request):
 
         created_bookings = []
 
+        booking_request_id = uuid4()
+        request_bookings = []
+
         for slot_group in group_slot_requests(normalized_slots):
             session_group_id = uuid4()
 
@@ -1028,9 +1288,17 @@ def confirm_payment_and_book(request):
                     session_date=slot_request["session_date"],
                     session_mode=slot_request["session_mode"],
                     session_group_id=session_group_id,
+                    booking_request_id=booking_request_id,
                     status="Pending"
                 )
                 created_bookings.append(booking.id)
+                request_bookings.append(booking)
+
+        create_booking_status_notification(
+            tutor.profile,
+            "pending",
+            request_bookings
+        )
 
     return Response({
         "message": "Booking successful",
@@ -1275,7 +1543,7 @@ def delete_availability_override(request, override_id):
 def approve_booking(request, booking_id):
 
     booking = get_object_or_404(Booking, id=booking_id)
-    session_group_bookings = get_session_group_bookings(booking)
+    session_group_bookings = get_booking_request_bookings(booking) if booking.status == "Pending" else get_session_group_bookings(booking)
 
     # Ensure tutor owns booking
     if request.user.userprofile != booking.tutor.profile:
@@ -1290,6 +1558,12 @@ def approve_booking(request, booking_id):
         tutor_confirmed=False,
     )
 
+    create_booking_status_notification(
+        booking.student,
+        "confirmed",
+        session_group_bookings
+    )
+
     return Response({"message": "Booking confirmed successfully."})
 
 #Reject booking
@@ -1298,7 +1572,7 @@ def approve_booking(request, booking_id):
 def reject_booking(request, booking_id):
 
     booking = get_object_or_404(Booking, id=booking_id)
-    session_group_bookings = get_session_group_bookings(booking)
+    session_group_bookings = get_booking_request_bookings(booking) if booking.status == "Pending" else get_session_group_bookings(booking)
 
     if request.user.userprofile != booking.tutor.profile:
         return Response({"error": "Unauthorized"}, status=403)
@@ -1310,6 +1584,12 @@ def reject_booking(request, booking_id):
         status="Rejected",
         tutee_confirmed=False,
         tutor_confirmed=False,
+    )
+
+    create_booking_status_notification(
+        booking.student,
+        "rejected",
+        session_group_bookings
     )
 
     return Response({"message": "Booking rejected successfully."})
@@ -1337,13 +1617,21 @@ def list_bookings(request):
     grouped_bookings = defaultdict(list)
 
     for booking in bookings:
-        group_key = str(booking.session_group_id) if booking.session_group_id else f"booking-{booking.id}"
+        if booking.status == "Pending" and booking.booking_request_id:
+            group_key = f"request-{booking.booking_request_id}"
+        else:
+            group_key = str(booking.session_group_id) if booking.session_group_id else f"booking-{booking.id}"
         grouped_bookings[group_key].append(booking)
 
     final_data = []
 
     for group in grouped_bookings.values():
-        final_data.append(build_combined_block(group))
+        representative_booking = get_representative_booking(group)
+
+        if representative_booking and representative_booking.status == "Pending" and representative_booking.booking_request_id:
+            final_data.append(build_booking_request_block(group))
+        else:
+            final_data.append(build_combined_block(group))
 
     final_data.sort(key=lambda booking: (booking["date"], booking["startTime"]))
 
@@ -1396,9 +1684,15 @@ def build_booking_detail_payload(session_group_bookings):
             "date": representative_booking.session_date.strftime("%Y-%m-%d"),
             "start_time": start_time.strftime("%H:%M"),
             "end_time": end_time.strftime("%H:%M"),
-            "duration_hours": len(session_group_bookings),
+            "duration_hours": get_duration_hours_for_bookings(session_group_bookings),
             "rating": representative_booking.rating.rating_score if hasattr(representative_booking, "rating") else None,
-            "status": representative_booking.status,
+            "status": get_display_status(
+                representative_booking.status,
+                representative_booking.session_date,
+                start_time,
+                end_time
+            ),
+            "raw_status": representative_booking.status,
             "session_mode": representative_booking.session_mode,
         },
         "payment": serialize_payment_summary(representative_booking),
@@ -1465,17 +1759,23 @@ def submit_session_payment(request, booking_id):
     receipt_image = request.FILES.get('receipt_image')
     transaction_reference = request.data.get('transaction_reference')
 
-    if method.code in ["GCASH", "BANK"] and receipt_image is None:
+    is_online_payment = method.code == 'online'
+
+    if is_online_payment and receipt_image is None:
         return Response({"error": "Receipt image is required for online payments."}, status=400)
 
-    amount = representative_booking.tutor.hourly_rate * len(session_group_bookings)
+    if is_online_payment and not str(transaction_reference or '').strip():
+        return Response({"error": "Transaction reference is required for online payments."}, status=400)
+
+    duration_hours = get_duration_hours_for_bookings(session_group_bookings)
+    amount = round(float(representative_booking.tutor.hourly_rate or 0) * duration_hours, 2)
 
     with transaction.atomic():
         Payment.objects.create(
             booking=representative_booking,
             amount=amount,
             method=method,
-            transaction_reference=transaction_reference,
+            transaction_reference=str(transaction_reference or '').strip() or None,
             receipt_image=receipt_image,
             payment_status="Pending",
             paid_at=now()
@@ -1486,9 +1786,10 @@ def submit_session_payment(request, booking_id):
             status="Awaiting Payment Verification"
         )
 
-        Notification.objects.create(
-            recipient=representative_booking.tutor.profile,
-            message="A tutee has confirmed their session and sent payment. Please review and mark as complete."
+        create_booking_status_notification(
+            representative_booking.tutor.profile,
+            "awaiting_payment_verification",
+            session_group_bookings
         )
 
     return Response({"message": "Payment submitted successfully."}, status=201)
@@ -1534,6 +1835,12 @@ def tutor_confirm_booking(request, booking_id):
             tutor = representative_booking.tutor
             tutor.total_sessions += 1
             tutor.save(update_fields=['total_sessions'])
+
+        create_booking_status_notification(
+            representative_booking.student,
+            "completed",
+            session_group_bookings
+        )
 
     return Response({"message": "Session marked as completed successfully."})
 

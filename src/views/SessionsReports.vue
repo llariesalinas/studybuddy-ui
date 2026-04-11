@@ -120,7 +120,7 @@
                 <td class="py-3">{{ session.startTime }} - {{ session.endTime }}</td>
                 <td class="py-3">
                   <span class="badge rounded-pill px-3 py-1 fw-normal" :class="getStatusClass(session.status)">
-                    {{ session.status?.toLowerCase() === 'awaiting payment verification' ? 'Awaiting Verification' : session.status }}
+                    {{ session.status }}
                   </span>
                 </td>
                 <td class="py-3">
@@ -237,8 +237,12 @@ const filteredSessions = computed(() => {
 
 const getStatusClass = (status) => {
   switch (status?.toLowerCase()) {
-    case 'confirmed':
-    case 'awaiting payment verification':
+    case 'upcoming':
+      return 'bg-primary text-white'
+    case 'ongoing':
+      return 'bg-info text-white'
+    case 'payment required':
+    case 'awaiting verification':
       return 'bg-warning bg-opacity-25 text-dark'
     case 'completed':
       return 'bg-sb-primary text-white'

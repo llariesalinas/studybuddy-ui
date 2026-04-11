@@ -106,7 +106,7 @@
           </div>
 
           <div v-if="isAwaitingVerification" class="alert alert-info mt-4 mb-3">
-            Tutee has confirmed and sent payment.
+            The tutoring session has ended and the tutee has submitted payment for review.
           </div>
 
           <p v-if="isAwaitingVerification" class="small text-muted mb-3">
@@ -139,7 +139,7 @@ const notificationsStore = useNotificationsStore()
 const isSubmitting = ref(false)
 
 const normalizedStatus = computed(() => String(bookingDetailsStore.sessionInfo?.status || '').toLowerCase())
-const isAwaitingVerification = computed(() => normalizedStatus.value === 'awaiting payment verification')
+const isAwaitingVerification = computed(() => normalizedStatus.value === 'awaiting verification')
 
 const amountPaid = computed(() => {
   const value = Number(bookingDetailsStore.paymentInfo?.amount_paid || 0)
@@ -157,12 +157,19 @@ const statusClass = computed(() => {
   switch (normalizedStatus.value) {
     case 'pending':
       return 'bg-warning text-dark'
-    case 'confirmed':
+    case 'upcoming':
       return 'bg-primary text-white'
-    case 'awaiting payment verification':
+    case 'ongoing':
+      return 'bg-info text-white'
+    case 'payment required':
+      return 'bg-warning-subtle text-dark'
+    case 'awaiting verification':
       return 'bg-info text-dark'
     case 'completed':
       return 'bg-success text-white'
+    case 'rejected':
+    case 'cancelled':
+      return 'bg-danger text-white'
     default:
       return 'bg-secondary text-white'
   }
