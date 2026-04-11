@@ -54,9 +54,14 @@ import { useNotificationsStore } from '@/stores/notifications'
 const notificationsStore = useNotificationsStore()
 const isOpen = ref(false)
 const wrapperRef = ref(null)
+let refreshIntervalId = null
 
-const toggleDropdown = () => {
+const toggleDropdown = async () => {
   isOpen.value = !isOpen.value
+
+  if (isOpen.value) {
+    await notificationsStore.fetchNotifications()
+  }
 }
 
 const markAsRead = async (notificationId) => {
@@ -83,12 +88,28 @@ const handleClickOutside = (event) => {
   }
 }
 
+const handleVisibilityChange = async () => {
+  if (!document.hidden) {
+    await notificationsStore.fetchNotifications()
+  }
+}
+
 onMounted(() => {
   window.addEventListener('click', handleClickOutside)
+  document.addEventListener('visibilitychange', handleVisibilityChange)
+  notificationsStore.fetchNotifications()
+  refreshIntervalId = window.setInterval(() => {
+    notificationsStore.fetchNotifications()
+  }, 15000)
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('click', handleClickOutside)
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
+
+  if (refreshIntervalId) {
+    window.clearInterval(refreshIntervalId)
+  }
 })
 </script>
 

@@ -85,6 +85,7 @@
                   v-model="transactionReference"
                   placeholder="Enter the transfer reference"
                 />
+                <div class="form-text">Enter the reference from your online transfer.</div>
               </div>
 
               <div class="mb-3">
@@ -100,7 +101,7 @@
 
               <button
                 class="btn bg-sb-primary text-white w-100"
-                :disabled="isSubmitting || !paymentStore.receiptImage"
+                :disabled="isSubmitting || !canSubmitOnlinePayment"
                 @click="submitPayment"
               >
                 {{ isSubmitting ? 'Submitting...' : 'Submit Payment Receipt' }}
@@ -144,6 +145,10 @@ const selectedMethod = computed(() => {
   return paymentMethods.value.find(method => method.id === paymentStore.selectedMethod) || null
 })
 
+const canSubmitOnlinePayment = computed(() =>
+  Boolean(paymentStore.receiptImage) && Boolean(transactionReference.value.trim())
+)
+
 const totalAmount = computed(() => {
   if (!bookingDetail.value) {
     return 'PHP 0.00'
@@ -170,6 +175,11 @@ const handleReceiptChange = (event) => {
 const submitPayment = async () => {
   if (!paymentStore.selectedMethod) {
     alert('Please select a payment method.')
+    return
+  }
+
+  if (selectedMethod.value?.code === 'online' && !canSubmitOnlinePayment.value) {
+    alert('Please attach a receipt and enter the transaction reference.')
     return
   }
 
@@ -214,12 +224,7 @@ onMounted(async () => {
       id: method.id,
       label: method.name,
       code: method.code,
-      icon:
-        method.name === 'GCash'
-          ? 'bi-wallet2'
-          : method.name === 'Cash'
-            ? 'bi-cash-coin'
-            : 'bi-credit-card'
+      icon: method.code === 'CASH' ? 'bi-cash-coin' : 'bi-credit-card'
     }))
   } catch (error) {
     console.error('Failed to load payment page:', error)
