@@ -2,6 +2,7 @@ from django.contrib import admin
 from .models import (
     Booking,
     Course,
+    Notification,
     PartnerInstitution,
     Payment,
     PaymentMethod,
@@ -21,6 +22,7 @@ admin.site.register(Tutor)
 admin.site.register(TutorAvailability)
 admin.site.register(TutorAvailabilityOverride)
 admin.site.register(Booking)
+admin.site.register(Notification)
 admin.site.register(Payment)
 admin.site.register(Rating)
 admin.site.register(Subjects)

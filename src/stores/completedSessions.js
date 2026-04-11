@@ -1,13 +1,91 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { computed, ref } from 'vue'
 import api from '@/services/api/api'
 
 export const useSessionsStore = defineStore('sessions', () => {
-
   const sessions = ref([])
   const loading = ref(false)
   const error = ref(null)
   const recommendedTutors = ref([])
+
+  const normalizeStatus = (status) => String(status || '').toLowerCase()
+
+  const toMinutes = (timeValue) => {
+    if (!timeValue) return 0
+
+    const [hours = 0, minutes = 0] = String(timeValue)
+      .split(':')
+      .map((part) => Number.parseInt(part, 10) || 0)
+
+    return (hours * 60) + minutes
+  }
+
+  const formatMinutes = (totalMinutes) => {
+    const safeMinutes = Math.max(0, totalMinutes)
+    const hours = Math.floor(safeMinutes / 60)
+    const minutes = safeMinutes % 60
+
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
+  }
+
+  const mergeGroupedSessions = (rawSessions = []) => {
+    const groupedSessions = new Map()
+
+    rawSessions.forEach((session) => {
+      const groupKey = session.session_group_id || `booking-${session.id}`
+      const existingSession = groupedSessions.get(groupKey)
+
+      if (!existingSession) {
+        groupedSessions.set(groupKey, { ...session })
+        return
+      }
+
+      const existingStart = toMinutes(existingSession.startTime)
+      const nextStart = toMinutes(session.startTime)
+      const existingEnd = toMinutes(existingSession.endTime)
+      const nextEnd = toMinutes(session.endTime)
+
+      groupedSessions.set(groupKey, {
+        ...existingSession,
+        id: existingStart <= nextStart ? existingSession.id : session.id,
+        date: existingSession.date <= session.date ? existingSession.date : session.date,
+        startTime: formatMinutes(Math.min(existingStart, nextStart)),
+        endTime: formatMinutes(Math.max(existingEnd, nextEnd)),
+        duration_hours: (existingSession.duration_hours || 0) + (session.duration_hours || 0),
+        tutee_confirmed: existingSession.tutee_confirmed || session.tutee_confirmed,
+        tutor_confirmed: existingSession.tutor_confirmed || session.tutor_confirmed,
+        rating: existingSession.rating ?? session.rating,
+        rating_submitted: existingSession.rating_submitted || session.rating_submitted,
+      })
+    })
+
+    return Array.from(groupedSessions.values()).sort((left, right) => {
+      const dateComparison = new Date(left.date) - new Date(right.date)
+
+      if (dateComparison !== 0) {
+        return dateComparison
+      }
+
+      return toMinutes(left.startTime) - toMinutes(right.startTime)
+    })
+  }
+
+  const syncSessionSummary = (updatedSession) => {
+    const index = sessions.value.findIndex(session => String(session.id) === String(updatedSession.id))
+
+    if (index === -1) {
+      return
+    }
+
+    sessions.value[index] = {
+      ...sessions.value[index],
+      status: updatedSession.session?.status || sessions.value[index].status,
+      tutee_confirmed: updatedSession.tutee_confirmed,
+      tutor_confirmed: updatedSession.tutor_confirmed,
+      rating: updatedSession.session?.rating,
+      rating_submitted: updatedSession.rating_submitted,
+    }
+  }
 
   const fetchSessions = async () => {
     loading.value = true
@@ -15,8 +93,9 @@ export const useSessionsStore = defineStore('sessions', () => {
 
     try {
       const response = await api.get('/bookings/')
-      sessions.value = response.data
+      sessions.value = mergeGroupedSessions(response.data)
     } catch (err) {
+      console.error('Failed to load sessions:', err)
       error.value = 'Failed to load sessions.'
     } finally {
       loading.value = false
@@ -35,53 +114,75 @@ export const useSessionsStore = defineStore('sessions', () => {
   }
 
   const fetchSessionById = async (id) => {
-      const localSession = sessions.value.find(s => String(s.id) === String(id))
+    loading.value = true
+    error.value = null
 
-      if (localSession) {
-          return localSession
-      }
-
-      loading.value = true
-      error.value = null
-
-      try {
-          const response = await api.get(`/bookings/${id}`)
-          return response.data
-          
-      } catch (err) {
-          console.error("Error fetching session by ID:", err)
-          error.value = "Failed to load session details."
-          throw err 
-      } finally {
-          loading.value = false
-      }
+    try {
+      const response = await api.get(`/bookings/${id}/`)
+      syncSessionSummary(response.data)
+      return response.data
+    } catch (err) {
+      console.error('Error fetching session by ID:', err)
+      error.value = 'Failed to load session details.'
+      throw err
+    } finally {
+      loading.value = false
+    }
   }
 
-  const normalizeStatus = (status) =>
-    status?.toLowerCase() || ''
+  const approveSession = async (id) => {
+    await api.post(`/bookings/${id}/approve/`)
+    await fetchSessions()
+  }
+
+  const rejectSession = async (id) => {
+    await api.post(`/bookings/${id}/reject/`)
+    await fetchSessions()
+  }
+
+  const submitPayment = async (id, payload) => {
+    await api.post(`/bookings/${id}/submit-payment/`, payload, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+
+    await fetchSessions()
+    return fetchSessionById(id)
+  }
+
+  const submitRating = async (id, ratingScore, comment = '') => {
+    await api.post(`/bookings/${id}/rating/`, {
+      rating_score: ratingScore,
+      comment
+    })
+
+    await fetchSessions()
+    return fetchSessionById(id)
+  }
 
   const completedSessions = computed(() =>
     sessions.value
-      .filter(s => normalizeStatus(s.status) === 'completed')
-      .sort((a, b) => new Date(b.date) - new Date(a.date))
+      .filter(session => normalizeStatus(session.status) === 'completed')
+      .sort((left, right) => new Date(right.date) - new Date(left.date))
   )
 
   const upcomingSessions = computed(() =>
     sessions.value
-      .filter(s => normalizeStatus(s.status) === 'confirmed')
-      .sort((a, b) => new Date(a.date) - new Date(b.date))
-  )
-
-  const cancelledSessions = computed(() =>
-    sessions.value
-      .filter(s => normalizeStatus(s.status) === 'cancelled')
-      .sort((a, b) => new Date(b.date) - new Date(a.date))
+      .filter(session => ['confirmed', 'awaiting payment verification'].includes(normalizeStatus(session.status)))
+      .sort((left, right) => new Date(left.date) - new Date(right.date))
   )
 
   const requestedSessions = computed(() =>
-  sessions.value
-    .filter(s => normalizeStatus(s.status) === 'pending')
-    .sort((a, b) => new Date(a.date) - new Date(b.date))
+    sessions.value
+      .filter(session => normalizeStatus(session.status) === 'pending')
+      .sort((left, right) => new Date(left.date) - new Date(right.date))
+  )
+
+  const rejectedSessions = computed(() =>
+    sessions.value
+      .filter(session => normalizeStatus(session.status) === 'rejected')
+      .sort((left, right) => new Date(right.date) - new Date(left.date))
   )
 
   const ongoingSessions = computed(() =>
@@ -114,12 +215,11 @@ export const useSessionsStore = defineStore('sessions', () => {
       rating: rating 
     })
 
-    const session = sessions.value.find(s => s.id === id)
-    if (session) {
-      session.status = "Completed"
-      session.rating = rating
-    }
-  }
+  const hasUnratedCompletedSessions = computed(() =>
+    sessions.value.some(
+      session => normalizeStatus(session.status) === 'completed' && !session.rating_submitted
+    )
+  )
 
   return {
     sessions,
@@ -130,12 +230,11 @@ export const useSessionsStore = defineStore('sessions', () => {
     fetchSessions,
     completedSessions,
     upcomingSessions,
-    cancelledSessions,
     requestedSessions,
     ongoingSessions,
     approveSession,
     rejectSession,
-    completeSession,
-    fetchSessionById
+    submitPayment,
+    submitRating,
   }
 })

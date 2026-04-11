@@ -8,8 +8,8 @@ export const useTutorBookingDetailStore = defineStore('tutorBookingDetail', () =
   const isLoading = ref(false)
   const error = ref(null)
 
-  // ✅ These now match backend response structure EXACTLY
   const tuteeProfile = computed(() => booking.value?.tutee || null)
+  const tutorProfile = computed(() => booking.value?.tutor || null)
   const sessionInfo = computed(() => booking.value?.session || null)
   const paymentInfo = computed(() => booking.value?.payment || null)
 
@@ -34,23 +34,24 @@ export const useTutorBookingDetailStore = defineStore('tutorBookingDetail', () =
   }
 
   const completeSession = async () => {
-  const id = booking.value?.id || booking.value?.session?.id
-
-  console.log("Completing booking ID:", id)
-
-  if (!id) {
-    console.log("NO ID FOUND")
-    return
+    await confirmCompletion()
   }
 
-  try {
-    await api.post(`/bookings/${id}/complete/`)
-    await fetchBookingDetails(id)
-  } catch (err) {
-    console.error("Failed to complete session:", err)
-    throw err
+  const confirmCompletion = async () => {
+    const id = booking.value?.id
+
+    if (!id) {
+      return
+    }
+
+    try {
+      await api.post(`/bookings/${id}/tutor-confirm/`)
+      await fetchBookingDetails(id)
+    } catch (err) {
+      console.error('Failed to confirm completion:', err)
+      throw err
+    }
   }
-}
 
 
   const confirmPayment = async () => {
@@ -81,10 +82,12 @@ export const useTutorBookingDetailStore = defineStore('tutorBookingDetail', () =
     isLoading,
     error,
     tuteeProfile,
+    tutorProfile,
     sessionInfo,
     paymentInfo,
     bookingId,
     fetchBookingDetails,
+    confirmCompletion,
     confirmPayment,
     resetStore,
     completeSession,
