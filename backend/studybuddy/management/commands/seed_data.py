@@ -1,10 +1,15 @@
-from faker import Faker
-fake = Faker()
-from django.core.management.base import BaseCommand
-from studybuddy.models import Strand, Course, PartnerInstitution
-from studybuddy.models import Strand, Course, PartnerInstitution, Subjects
 from django.contrib.auth.models import User
-from studybuddy.models import Strand, Course, PartnerInstitution, Subjects, UserProfile, Tutor
+from django.core.management.base import BaseCommand
+from faker import Faker
+from studybuddy.models import (
+    Strand, Course, PartnerInstitution, Subjects,
+    UserProfile, Tutor, TutorSubjects, TutorAvailability,
+    Booking, Payment, PaymentMethod, Rating, Preference
+)
+import datetime
+import random
+
+fake = Faker()
 
 class Command(BaseCommand):
     help = 'Seeds the database with initial CPU Strands, Courses, and Institutions'
@@ -208,6 +213,123 @@ class Command(BaseCommand):
                         defaults={'is_active': True, 'is_booked': False}
                     )
                     availability_pool.append(slot)
+                    
+        # 9. Seed PaymentMethods
+        payment_methods_data = [
+            {'code': 'CASH', 'name': 'Cash'},
+            {'code': 'ONLINE', 'name': 'Online Payment'},
+        ]
+
+        for pm in payment_methods_data:
+            obj, created = PaymentMethod.objects.get_or_create(
+                code=pm['code'],
+                defaults={'method_name': pm['name'], 'is_active': True}
+            )
+            self.stdout.write(f"  - PaymentMethod {pm['code']}: {'Created' if created else 'Exists'}")
+
+        payment_methods = list(PaymentMethod.objects.all())
+        
+        # 10. Seed Bookings + Payments
+        import random
+        from datetime import date, timedelta
+
+        BOOKING_COUNT = 40
+        bookings_created = []
+
+        for _ in range(BOOKING_COUNT):
+            tutee = fake.random_element(tutee_profiles)
+            tutor = fake.random_element(tutors)
+
+            # Pick a random availability slot belonging to this tutor
+            tutor_slots = [s for s in availability_pool if s.tutor == tutor]
+            if not tutor_slots:
+                continue
+
+            slot = fake.random_element(tutor_slots)
+
+            # Random session date in the past 90 days
+            session_date = date.today() - timedelta(days=fake.random_int(min=1, max=90))
+
+            # Weighted status — Completed appears most often
+            status = random.choices(
+                ['Completed', 'Confirmed', 'Pending', 'Cancelled'],
+                weights=[60, 20, 15, 5],
+                k=1
+            )[0]
+
+            # Skip if this slot + date combo already exists (unique_together constraint)
+            if Booking.objects.filter(availability=slot, session_date=session_date).exists():
+                continue
+
+            session_mode = 'Online' if tutor.can_online else 'F2F'
+
+            booking = Booking.objects.create(
+                student=tutee,
+                tutor=tutor,
+                availability=slot,
+                session_date=session_date,
+                session_mode=session_mode,
+                status=status,
+                tutee_confirmed=True,
+                tutor_confirmed=True,
+            )
+            bookings_created.append(booking)
+
+            # Create a Payment for every booking
+            payment_status = 'Paid' if status == 'Completed' else 'Pending'
+            Payment.objects.create(
+                booking=booking,
+                method=fake.random_element(payment_methods),
+                amount=tutor.hourly_rate,
+                payment_status=payment_status,
+            )
+
+        self.stdout.write(f"  - Bookings created: {len(bookings_created)}")
+        
+        # 11. Seed Ratings (bell curve, only for Completed bookings)
+        completed_bookings = [b for b in bookings_created if b.status == 'Completed']
+        ratings_created = 0
+
+        for booking in completed_bookings:
+            # Bell curve: 4-star most common, 1-star very rare
+            score = random.choices(
+                [1, 2, 3, 4, 5],
+                weights=[2, 5, 20, 40, 33],
+                k=1
+            )[0]
+
+            Rating.objects.create(
+                booking=booking,
+                student=booking.student,
+                tutor=booking.tutor,
+                rating_score=score,
+                comment=fake.sentence(nb_words=10) if score >= 3 else '',
+            )
+            ratings_created += 1
+
+        self.stdout.write(f"  - Ratings created: {ratings_created}")
+
+        # 12. Update each tutor's rating_average and total_sessions
+        for tutor in tutors:
+            tutor_ratings = Rating.objects.filter(tutor=tutor)
+            completed = Booking.objects.filter(tutor=tutor, status='Completed').count()
+
+            if tutor_ratings.exists():
+                avg = sum(r.rating_score for r in tutor_ratings) / tutor_ratings.count()
+                tutor.rating_average = round(avg, 2)
+
+            tutor.total_sessions = completed
+            tutor.save()
+            self.stdout.write(f"  - Updated {tutor.profile.fname}: {tutor.rating_average}⭐ / {tutor.total_sessions} sessions")
+            
+        # 13. Seed Preferences
+        for tutee in tutee_profiles:
+            pref, created = Preference.objects.get_or_create(user=tutee)
+            preferred_subjects = fake.random_elements(subjects, length=fake.random_int(min=2, max=3), unique=True)
+            pref.subjects.set(preferred_subjects)
+            pref.save()
+
+        self.stdout.write(f"  - Preferences seeded for {len(tutee_profiles)} tutees")
 
         self.stdout.write(f"  - Total availability slots created: {len(availability_pool)}")
         self.stdout.write(self.style.SUCCESS("✅ Database successfully seeded!"))
