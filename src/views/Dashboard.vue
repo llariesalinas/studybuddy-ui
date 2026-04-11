@@ -6,9 +6,16 @@
           <div :class="[stat.bgClass, 'p-3 rounded-4 me-3']">
             <i :class="[stat.icon, 'text-sb-primary fs-3']"></i>
           </div>
-          <div>
+          <div class="flex-grow-1">
             <h6 class="text-muted small fw-bold mb-1">{{ stat.label }}</h6>
-            <h2 class="fw-bold mb-0">{{ stat.count }}</h2>
+            <Transition name="fade" mode="out-in">
+  
+              <h2 v-if="loading" class="fw-bold mb-0 placeholder-glow">
+              <span class="placeholder col-6 rounded"></span>
+            </h2>
+            <h2 v-else class="fw-bold mb-0">{{ stat.count }}</h2>
+
+            </Transition>
           </div>
         </div>
       </div>
@@ -17,15 +24,40 @@
     <div class="row g-4">
       <div class="col-md-8">
         <div class="card border-sb border-1 shadow-sm rounded-4" style="height: 520px;">
-          <div class="card-body p-4 p-md-5 d-flex flex-column h-100 overflow-hidden">
+          <div class="card-body p-4 p-md-4 d-flex flex-column h-100 overflow-hidden">
             <header class="d-flex justify-content-between align-items-end mb-4 flex-shrink-0">
-              <h4 class="fw-bold mb-1 d-flex align-items-center">
-                <i class="bi bi-file-earmark-text text-sb-primary me-3"></i>Academic Agenda
-              </h4>
-              <p class="text-muted mb-0 small">{{ formattedToday }}</p>
+              <div>
+                <h4 class="fw-bold mb-1 d-flex align-items-center">
+                  <i class="bi bi-file-earmark-text text-sb-primary me-3"></i>Today's schedule
+                </h4>
+              </div>
+              <div><p class="text-muted mb-0 small">{{ formattedToday }}</p></div>
             </header>
 
-            <div class="flex-grow-1 overflow-auto pe-2 custom-scrollbar">
+            <Transition name="fade" mode="out-in">
+  
+              <div v-if="loading" class="flex-grow-1 w-100 placeholder-glow overflow-hidden">
+              <div class="d-flex position-relative w-100 h-100">
+                <div class="d-flex flex-column text-end pe-3 border-end" style="width: 90px; justify-content: space-between;">
+                  <div v-for="i in 4" :key="'skel-time-'+i" style="height: 80px;">
+                    <span class="placeholder col-10 rounded"></span>
+                  </div>
+                </div>
+                <div class="flex-grow-1 ms-3 position-relative">
+                  <div v-for="i in 4" :key="'skel-line-'+i" class="border-bottom w-100 opacity-25" style="height: 80px;"></div>
+                  <div class="position-absolute start-0 w-100 rounded-4 p-3 bg-secondary bg-opacity-10 border-start border-4 border-secondary" style="top: 30px; height: 90px;">
+                    <span class="placeholder col-3 rounded mb-2"></span><br>
+                    <span class="placeholder col-6 rounded"></span>
+                  </div>
+                  <div class="position-absolute start-0 w-100 rounded-4 p-3 bg-secondary bg-opacity-10 border-start border-4 border-secondary" style="top: 180px; height: 70px;">
+                    <span class="placeholder col-2 rounded mb-2"></span><br>
+                    <span class="placeholder col-5 rounded"></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div v-else class="flex-grow-1 overflow-auto pe-2 custom-scrollbar">
               <div class="d-flex position-relative mt-2 w-100" :style="{ minHeight: (agendaRange.timeLabels.length * 80) + 'px' }">
                 
                 <div class="d-flex flex-column text-end pe-3 border-end text-muted small fw-bold text-uppercase" 
@@ -46,7 +78,7 @@
                        :class="{
                           'bg-success bg-opacity-10 border-success': session.status.toLowerCase() === 'completed',
                           'bg-warning bg-opacity-10 border-warning': session.status.toLowerCase() === 'ongoing',
-                          'bg-primary bg-opacity-10 border-primary': session.status.toLowerCase() === 'confirmed' || session.status.toLowerCase() === 'upcoming'
+                          'bg-info bg-opacity-10 border-primary': session.status.toLowerCase() === 'confirmed' || session.status.toLowerCase() === 'upcoming'
                        }"
                        :style="getSessionStyle(session)"
                        @click="goToDetails(session.id)">
@@ -67,6 +99,10 @@
                 </div>
               </div>
             </div>
+
+            </Transition>
+
+            
           </div>
         </div>
       </div>
@@ -77,9 +113,24 @@
             <h4 class="fw-bold mb-3">Try out these tutors</h4>
             
             <div class="flex-grow-1 d-flex flex-column overflow-hidden">
-              <div v-if="loading" class="text-muted">Loading tutors...</div>
+
+              <Transition name="fade" mode="out-in">
+  
+                <div v-if="loading" class="flex-grow-1 pe-2">
+                <div class="list-group list-group-flush placeholder-glow">
+                  <div v-for="i in 6" :key="'skel-tutor-'+i" class="list-group-item d-flex justify-content-between align-items-center py-2">
+                    <div class="w-75">
+                      <h6 class="mb-1"><span class="placeholder col-8 rounded"></span></h6>
+                      <p class="mb-0"><span class="placeholder col-5 rounded"></span></p>
+                    </div>
+                    <div class="w-25 text-end">
+                      <span class="placeholder col-10 rounded"></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
               
-              <template v-else>
+              <div v-else class="d-flex flex-column h-100">
                 <div class="flex-grow-1 pe-2">
                   <div class="list-group list-group-flush">
                     <div v-if="pagedTutors.length === 0" class="text-muted small py-3">
@@ -107,7 +158,11 @@
                   <span class="small text-muted">Page {{ page }} of {{ totalPages || 1 }}</span>
                   <button class="btn bg-sb-primary text-white btn-sm" @click="nextPage" :disabled="page >= totalPages">Next</button>
                 </div>
-              </template>
+              </div>
+
+              </Transition>
+              
+              
             </div>
           </div>
         </div>
@@ -189,7 +244,7 @@ const getSessionStyle = (session) => {
 // STATS
 const stats = computed(() => [
   { label: 'Pending', count: sessionsStore.requestedSessions.length, icon: 'bi-clock', bgClass: 'bg-warning bg-opacity-10' },
-  { label: 'Upcoming', count: sessionsStore.upcomingSessions.length, icon: 'bi-calendar-event', bgClass: 'bg-success bg-opacity-10' },
+  { label: 'Upcoming', count: sessionsStore.upcomingSessions.length, icon: 'bi-calendar-event', bgClass: 'bg-info bg-opacity-10' },
   { label: 'Ongoing', count: sessionsStore.ongoingSessions.length, icon: 'bi-play-circle', bgClass: 'bg-primary bg-opacity-10' },
   { label: 'Completed', count: sessionsStore.completedSessions.length, icon: 'bi-check-square', bgClass: 'bg-success bg-opacity-10' }
 ])
@@ -208,11 +263,28 @@ const pagedTutors = computed(() => {
 const nextPage = () => { if (page.value < totalPages.value) page.value++ }
 const prevPage = () => { if (page.value > 1) page.value-- }
 
-const goToDetails = (id) => router.push(`/session/${id}`)
-const bookTutor = (id) => router.push(`/tutor/${id}`)
+const goToDetails = (id) => {
+  router.push({ 
+    name: 'tuteeSessionDetails', 
+    params: { id: id } 
+  })
+}
+
+const bookTutor = (id) => router.push({
+  name: 'tutor-details',
+  params: {id: id}
+})
 </script>
 
 <style scoped>
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease-in-out;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
 .custom-scrollbar::-webkit-scrollbar { width: 6px; }
 .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
 .session-card { cursor: pointer; transition: all 0.2s ease-in-out; }

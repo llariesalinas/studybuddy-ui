@@ -25,7 +25,7 @@ export const useSessionsStore = defineStore('sessions', () => {
 
   const fetchRecommendations = async () => {
     try{
-      const response = await api.get('/dashboard')
+      const response = await api.get('/recommend-tutors/')
 
       recommendedTutors.value = response.data.recommendation
     }
