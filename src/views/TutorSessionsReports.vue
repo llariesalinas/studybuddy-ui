@@ -228,20 +228,16 @@ const filteredSessions = computed(() => {
   }
 })
 
-const formatStatus = (status) => {
-  const normalized = String(status || '').toLowerCase()
-
-  if (normalized === 'awaiting payment verification') {
-    return 'Awaiting Verification'
-  }
-
-  return status
-}
+const formatStatus = (status) => status
 
 const getStatusClass = (status) => {
   switch (String(status || '').toLowerCase()) {
-    case 'confirmed':
-    case 'awaiting payment verification':
+    case 'upcoming':
+      return 'bg-primary text-white'
+    case 'ongoing':
+      return 'bg-info text-white'
+    case 'payment required':
+    case 'awaiting verification':
       return 'bg-warning bg-opacity-25 text-dark'
     case 'completed':
       return 'bg-sb-primary text-white'

@@ -1127,6 +1127,12 @@ function addThirtyMinutes(timeString) {
   color: #163127;
   font-size: 0.92rem;
   padding: 0;
+  transition: color 150ms ease, transform 150ms ease;
+}
+
+.time-picker-close:hover {
+  color: #0a7a51;
+  transform: translateY(-1px);
 }
 
 .time-picker-block {
@@ -1163,6 +1169,13 @@ function addThirtyMinutes(timeString) {
   color: #315447;
   font-weight: 700;
   padding: 8px 0;
+  transition: background-color 150ms ease, color 150ms ease, transform 150ms ease, box-shadow 150ms ease;
+}
+
+.time-period-btn:hover:not(.active) {
+  background: rgba(255, 255, 255, 0.72);
+  color: #0a7a51;
+  transform: translateY(-1px);
 }
 
 .time-period-btn.active {
@@ -1185,12 +1198,43 @@ function addThirtyMinutes(timeString) {
   padding: 10px 12px;
   font-weight: 600;
   text-align: center;
+  transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease, transform 150ms ease, box-shadow 150ms ease;
+}
+
+.time-grid-btn:hover:not(.active) {
+  background: #f4fbf8;
+  color: #0a7a51;
+  border-color: #b7d9cc;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 16px rgba(8, 80, 65, 0.08);
 }
 
 .time-grid-btn.active {
   background: #e1f5ee;
   color: #085041;
   border-color: #9fe1cb;
+}
+
+.modal-box :deep(select.form-control) {
+  transition: border-color 150ms ease, box-shadow 150ms ease, background-color 150ms ease;
+}
+
+.modal-box :deep(select.form-control:hover) {
+  border-color: #9fe1cb;
+  background-color: #f8fcfa;
+  box-shadow: 0 0 0 4px rgba(10, 122, 81, 0.06);
+}
+
+.modal-box :deep(.btn-secondary),
+.modal-box :deep(.btn-success) {
+  transition: transform 150ms ease, box-shadow 150ms ease, filter 150ms ease;
+}
+
+.modal-box :deep(.btn-secondary:hover),
+.modal-box :deep(.btn-success:hover) {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 18px rgba(15, 23, 42, 0.12);
+  filter: saturate(1.03);
 }
 
 .selected-time-card {

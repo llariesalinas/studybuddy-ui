@@ -44,11 +44,12 @@
             <div class="schedule-header">
               <div>
                 <h2 class="schedule-title">{{ tutorProfile.name }}'s Schedule</h2>
-                <p class="schedule-subtitle">Pick one or more slots within the same week.</p>
+                <p class="schedule-subtitle">Pick one or more slots on the same day.</p>
               </div>
 
               <div class="availability-legend">
                 <span class="legend-pill legend-pill-available">Available</span>
+                <span class="legend-pill legend-pill-blocked">Blocked</span>
                 <span class="legend-pill legend-pill-selected">Selected</span>
               </div>
             </div>
@@ -84,7 +85,8 @@
                   class="day-column"
                   :class="{
                     'day-column-outside': !day.in_month,
-                    'day-column-past': day.is_past
+                    'day-column-past': day.is_past,
+                    'day-column-blocked': day.is_blocked
                   }"
                 >
                   <div class="day-heading">
@@ -100,14 +102,24 @@
                       :key="`${day.date}-${slot.id}-${slot.time_slot}`"
                       type="button"
                       class="slot-link"
-                      :class="{ selected: isSlotSelected(day, slot) }"
-                      :disabled="slot.is_booked || day.is_past || !day.in_month"
+                      :class="{
+                        selected: isSlotSelected(day, slot),
+                        'range-held': isSlotHeldBySelection(day, slot),
+                        blocked: slot.is_overridden || day.is_blocked
+                      }"
+                      :disabled="slot.is_booked || day.is_past || !day.in_month || isSlotHeldBySelection(day, slot)"
                       @click="toggleSlot(day, currentWeek, slot)"
                     >
                       {{ formatTime(day.date, slot.time_slot) }}
                     </button>
 
-                    <div v-if="!day.slots.length" class="empty-day">No slots</div>
+                    <div
+                      v-if="!day.slots.length"
+                      class="empty-day"
+                      :class="{ 'empty-day-blocked': day.is_blocked }"
+                    >
+                      {{ day.is_blocked ? 'Blocked' : 'No slots' }}
+                    </div>
                   </div>
                 </article>
               </div>
@@ -186,6 +198,16 @@
               </div>
 
               <hr class="my-4" style="border-color: #edf1ef;" />
+
+              <div class="cost-counter" :class="{ 'cost-counter-active': selectedSessionCount > 0 }">
+                <div class="cost-counter-header">Estimated Total</div>
+                <div class="cost-counter-amount">{{ formattedEstimatedCost }}</div>
+                <div class="cost-counter-meta">
+                  {{ selectedSessionCount }} slot{{ selectedSessionCount === 1 ? '' : 's' }}
+                  ({{ selectedSessionHours }} hour{{ selectedSessionHours === 1 ? '' : 's' }})
+                </div>
+              </div>
+
               <p class="policy-note">Free cancellation up to 24 hours before the session.</p>
 
               <button
@@ -295,6 +317,86 @@ const tutorInitials = computed(() => {
   return parts.slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'SB'
 })
 
+const effectiveSelectedSlots = computed(() => {
+  if (!currentWeek.value) {
+    return selectedSlots.value
+  }
+
+  const expandedSlots = []
+
+  currentWeek.value.days.forEach((day) => {
+    const explicitDaySelections = selectedSlots.value
+      .filter(selected => selected.session_date === day.date)
+      .sort((left, right) => left.time_slot.localeCompare(right.time_slot))
+
+    if (!explicitDaySelections.length) {
+      return
+    }
+
+    const explicitSlotIds = new Set(explicitDaySelections.map(slot => slot.availability_id))
+    const selectableDaySlots = [...day.slots]
+      .filter(slot => !slot.is_booked)
+      .sort((left, right) => left.time_slot.localeCompare(right.time_slot))
+
+    selectableDaySlots.forEach((slot) => {
+      const matchingSelection = explicitDaySelections.find(
+        selected => selected.availability_id === slot.id
+      )
+
+      if (matchingSelection) {
+        expandedSlots.push(matchingSelection)
+        return
+      }
+
+      const previousExplicit = [...explicitDaySelections]
+        .reverse()
+        .find(selected => selected.time_slot < slot.time_slot)
+      const nextExplicit = explicitDaySelections.find(selected => selected.time_slot > slot.time_slot)
+
+      if (!previousExplicit || !nextExplicit) {
+        return
+      }
+
+      const slotsBetween = selectableDaySlots.filter(
+        candidate => candidate.time_slot > previousExplicit.time_slot && candidate.time_slot < nextExplicit.time_slot
+      )
+
+      const isContinuousRange = slotsBetween.every((candidate, index) => {
+        const previousTime = index === 0 ? previousExplicit.time_slot : slotsBetween[index - 1].time_slot
+        return addThirtyMinutes(previousTime) === candidate.time_slot
+      }) && addThirtyMinutes(slotsBetween.at(-1)?.time_slot || previousExplicit.time_slot) === nextExplicit.time_slot
+
+      if (!isContinuousRange) {
+        return
+      }
+
+      expandedSlots.push({
+        availability_id: slot.id,
+        session_date: day.date,
+        session_mode: bookingPrefsStore.selectedMode || initialBookingStore.selectedMode || 'Online',
+        time_slot: slot.time_slot,
+        week_start: currentWeek.value.week_start
+      })
+    })
+  })
+
+  return expandedSlots.sort((left, right) => {
+    const dateComparison = left.session_date.localeCompare(right.session_date)
+    if (dateComparison !== 0) return dateComparison
+    return left.time_slot.localeCompare(right.time_slot)
+  })
+})
+
+const SESSION_SLOT_HOURS = 0.5
+
+const selectedSessionCount = computed(() => effectiveSelectedSlots.value.length)
+
+const selectedSessionHours = computed(() => selectedSessionCount.value * SESSION_SLOT_HOURS)
+
+const estimatedCost = computed(() => selectedSessionHours.value * tutorProfile.value.hourlyRate)
+
+const formattedEstimatedCost = computed(() => currencyFormatter.format(estimatedCost.value))
+
 const backButton = () => {
   router.back()
 }
@@ -344,6 +446,15 @@ function formatDayHeaderDate(dateString) {
   return new Date(dateString).getDate()
 }
 
+function addThirtyMinutes(timeString) {
+  const [hours, minutes] = timeString.split(':').map(Number)
+  const totalMinutes = (hours * 60) + minutes + 30
+  const normalizedHours = Math.floor(totalMinutes / 60) % 24
+  const normalizedMinutes = totalMinutes % 60
+
+  return `${String(normalizedHours).padStart(2, '0')}:${String(normalizedMinutes).padStart(2, '0')}`
+}
+
 function displayedSlots(day) {
   if (showFullSchedule.value) {
     return day.slots
@@ -353,6 +464,7 @@ function displayedSlots(day) {
 
 function availabilityBarClass(day) {
   if (day.is_past) return 'day-availability-bar-past'
+  if (day.is_blocked) return 'day-availability-bar-blocked'
   if (day.has_available) return 'day-availability-bar-available'
   return 'day-availability-bar-unavailable'
 }
@@ -445,8 +557,48 @@ function isSlotSelected(day, slot) {
   )
 }
 
+function isSlotHeldBySelection(day, slot) {
+  if (isSlotSelected(day, slot)) {
+    return false
+  }
+
+  return effectiveSelectedSlots.value.some(
+    selected => selected.availability_id === slot.id && selected.session_date === day.date
+  )
+}
+
+function canExpandSelectionWithinDay(day, explicitSelections) {
+  if (explicitSelections.length <= 1) {
+    return true
+  }
+
+  const orderedSelections = [...explicitSelections].sort((left, right) => left.time_slot.localeCompare(right.time_slot))
+  const availableSlots = [...day.slots]
+    .filter(slot => !slot.is_booked)
+    .sort((left, right) => left.time_slot.localeCompare(right.time_slot))
+
+  for (let index = 0; index < orderedSelections.length - 1; index += 1) {
+    const currentSelection = orderedSelections[index]
+    const nextSelection = orderedSelections[index + 1]
+
+    let expectedTime = addThirtyMinutes(currentSelection.time_slot)
+
+    while (expectedTime < nextSelection.time_slot) {
+      const hasIntermediateSlot = availableSlots.some(slot => slot.time_slot === expectedTime)
+
+      if (!hasIntermediateSlot) {
+        return false
+      }
+
+      expectedTime = addThirtyMinutes(expectedTime)
+    }
+  }
+
+  return true
+}
+
 function toggleSlot(day, week, slot) {
-  if (slot.is_booked || day.is_past || !day.in_month) return
+  if (slot.is_booked || day.is_past || !day.in_month || isSlotHeldBySelection(day, slot)) return
 
   const slotWithDate = {
     availability_id: slot.id,
@@ -472,7 +624,20 @@ function toggleSlot(day, week, slot) {
     return
   }
 
-  selectedSlots.value.push(slotWithDate)
+  if (selectedSlots.value.length > 0 && selectedSlots.value[0].session_date !== day.date) {
+    alert('You can only book multiple sessions on the same day.')
+    return
+  }
+
+  const nextSelections = [...selectedSlots.value, slotWithDate]
+  const daySelections = nextSelections.filter(selected => selected.session_date === day.date)
+
+  if (!canExpandSelectionWithinDay(day, daySelections)) {
+    alert('The selected range includes unavailable in-between time slots.')
+    return
+  }
+
+  selectedSlots.value = nextSelections
 }
 
 const confirmBooking = async () => {
@@ -483,7 +648,7 @@ const confirmBooking = async () => {
   isSubmittingBooking.value = true
 
   try {
-    bookedSessionStore.bookedSessions = [...selectedSlots.value]
+    bookedSessionStore.bookedSessions = [...effectiveSelectedSlots.value]
     bookedSessionStore.bookedSessionTutorName = tutorProfile.value.name
     bookedSessionStore.bookedSessionTutorID = tutorID
     bookedSessionStore.bookedSessionSub = bookedSessionStore.bookedSessionSub || initialBookingStore.selectedSubject
@@ -491,8 +656,7 @@ const confirmBooking = async () => {
 
     await api.post('bookings/confirm/', {
       tutor_id: tutorID,
-      slots: selectedSlots.value,
-      payment_method: 1
+      slots: effectiveSelectedSlots.value
     })
 
     alert('Booking Confirmed!')
@@ -785,6 +949,16 @@ onMounted(async () => {
   opacity: 0.7;
 }
 
+.day-column-blocked .day-name,
+.day-column-blocked .day-date {
+  color: #a16207;
+}
+
+.day-column-blocked .day-heading {
+  background: linear-gradient(180deg, rgba(250, 204, 21, 0.12), transparent);
+  border-radius: 12px;
+}
+
 .day-heading {
   display: grid;
   gap: 0;
@@ -814,6 +988,10 @@ onMounted(async () => {
 
 .day-availability-bar-available {
   background: #00895a;
+}
+
+.day-availability-bar-blocked {
+  background: #eab308;
 }
 
 .day-availability-bar-unavailable {
@@ -856,6 +1034,13 @@ onMounted(async () => {
   cursor: not-allowed;
 }
 
+.slot-link.blocked,
+.slot-link.blocked:disabled {
+  color: #a16207;
+  background: #fef9c3;
+  border-color: #f4d96b;
+}
+
 .slot-link.selected {
   color: #ffffff;
   background: #00895a;
@@ -864,9 +1049,22 @@ onMounted(async () => {
   transform: translateY(-1px);
 }
 
+.slot-link.range-held,
+.slot-link.range-held:disabled {
+  color: #94a3b8;
+  background: #f1f5f9;
+  border-color: #dbe4ee;
+  cursor: not-allowed;
+}
+
 .empty-day {
   color: #9aa7b3;
   font-size: 0.9rem;
+}
+
+.empty-day-blocked {
+  color: #a16207;
+  font-weight: 700;
 }
 
 .schedule-actions {
@@ -894,6 +1092,12 @@ onMounted(async () => {
 .legend-pill-available {
   background: #e8f7f1;
   color: #00895a;
+}
+
+.legend-pill-blocked {
+  background: #fef3c7;
+  color: #a16207;
+  border: 1px solid rgba(234, 179, 8, 0.35);
 }
 
 .legend-pill-selected {
@@ -986,6 +1190,41 @@ onMounted(async () => {
   font-size: 0.92rem;
   border-top: 1px solid #e5ebe8;
   line-height: 1.6;
+}
+
+.cost-counter {
+  border: 1px solid #dce9e2;
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  background: #f7fbf9;
+}
+
+.cost-counter-active {
+  border-color: #8cc9b2;
+  background: #eef8f3;
+}
+
+.cost-counter-header {
+  color: #4f685d;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.cost-counter-amount {
+  color: #0e4d35;
+  font-size: 1.25rem;
+  font-weight: 800;
+  line-height: 1.2;
+  margin-top: 3px;
+}
+
+.cost-counter-meta {
+  color: #587266;
+  font-size: 0.86rem;
+  margin-top: 4px;
 }
 
 .policy-note {

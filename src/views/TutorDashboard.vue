@@ -77,7 +77,7 @@
 
                 <!-- Student -->
                 <td class="py-3 text-dark">
-                  {{ booking.student }}
+                  {{ booking.student || booking.tuteeName || 'N/A' }}
                 </td>
 
                 <!-- Subject -->
@@ -101,11 +101,20 @@
                       'bg-warning bg-opacity-10 text-warning border border-warning':
                         booking.status === 'Pending',
 
-                      'bg-success bg-opacity-10 text-success border border-success':
-                        booking.status === 'Confirmed',
+                      'bg-primary bg-opacity-10 text-primary border border-primary':
+                        booking.status === 'Upcoming',
+
+                      'bg-info bg-opacity-10 text-info border border-info':
+                        booking.status === 'Ongoing' || booking.status === 'Awaiting Verification',
+
+                      'bg-warning bg-opacity-10 text-warning border border-warning':
+                        booking.status === 'Payment Required',
 
                       'bg-secondary bg-opacity-10 text-secondary border border-secondary':
-                        booking.status === 'Completed'
+                        booking.status === 'Completed',
+
+                      'bg-danger bg-opacity-10 text-danger border border-danger':
+                        booking.status === 'Rejected' || booking.status === 'Cancelled'
                     }"
                   >
                     {{ booking.status }}

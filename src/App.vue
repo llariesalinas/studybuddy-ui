@@ -115,8 +115,20 @@
               Book Session
             </router-link>
 
-            <router-link v-if="userRole === 'tutor'" to="/tch-requestedSessions" class="btn bg-sb-primary text-white px-4 py-2 rounded-3 fw-semibold shadow-sm">
-              Manage Pending Sessions
+            <router-link
+              v-if="userRole === 'tutor'"
+              to="/tch-requestedSessions"
+              class="btn bg-sb-primary text-white px-4 py-2 rounded-3 fw-semibold shadow-sm pending-request-btn d-inline-flex align-items-center gap-2"
+            >
+              <span v-if="sessionStore.hasNewPendingRequests" class="pending-request-dot" aria-hidden="true"></span>
+              <span>Manage Pending Sessions</span>
+              <span
+                v-if="sessionStore.requestedSessions.length > 0"
+                class="pending-request-count badge rounded-pill bg-light text-sb-primary border border-sb"
+                :aria-label="`${sessionStore.requestedSessions.length} pending session request${sessionStore.requestedSessions.length === 1 ? '' : 's'}`"
+              >
+                {{ sessionStore.requestedSessions.length }}
+              </span>
             </router-link>
           </div>
         </header>
@@ -130,6 +142,7 @@
 import { computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth' // Import auth store
+import { useSessionsStore } from '@/stores/completedSessions'
 import NotificationBell from '@/components/NotificationBell.vue'
 import RatingReminderBanner from '@/components/RatingReminderBanner.vue'
 import { useNotificationsStore } from '@/stores/notifications'
@@ -138,6 +151,7 @@ import router from './router'
 const route = useRoute()
 const authStore = useAuthStore()
 const notificationsStore = useNotificationsStore()
+const sessionStore = useSessionsStore()
 const logout = () => {
 
   authStore.logout()
@@ -183,10 +197,12 @@ const isPublicRoute = computed(() => {
 // Get the role from the store to control the sidebar links
 const userRole = computed(() => authStore.user?.role?.toLowerCase() || null)
 const userFname =  computed(() => authStore.user?.fname || null)
-
 onMounted(() => {
   if (authStore.isAuthenticated) {
     notificationsStore.fetchNotifications()
+    if (userRole.value === 'tutor') {
+      sessionStore.fetchSessions()
+    }
   }
 })
 </script>
@@ -223,6 +239,37 @@ body {
 .btn.bg-sb-primary:hover {
   background-color: var(--sb-primary-hover) !important;
   color: #ffffff !important;
+}
+
+.pending-request-btn {
+  position: relative;
+  transition: transform 180ms ease, box-shadow 180ms ease, filter 180ms ease;
+}
+
+.pending-request-count {
+  font-size: 0.75rem;
+  line-height: 1;
+  min-width: 1.6rem;
+  padding: 0.4rem 0.5rem;
+}
+
+.pending-request-btn:has(.pending-request-dot) {
+  box-shadow: 0 0 0 3px rgba(0, 137, 90, 0.18), 0 10px 20px rgba(0, 137, 90, 0.18);
+}
+
+.pending-request-btn:has(.pending-request-dot):hover {
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.12);
+}
+
+.pending-request-dot {
+  position: absolute;
+  top: 7px;
+  right: 8px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.18);
 }
 
 /* --- Sidebar Navigation Styles --- */
