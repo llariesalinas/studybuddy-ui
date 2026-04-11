@@ -44,7 +44,7 @@
             <div class="schedule-header">
               <div>
                 <h2 class="schedule-title">{{ tutorProfile.name }}'s Schedule</h2>
-                <p class="schedule-subtitle">Pick one or more slots within the same week.</p>
+                <p class="schedule-subtitle">Pick one or more slots on the same day.</p>
               </div>
 
               <div class="availability-legend">
@@ -198,6 +198,16 @@
               </div>
 
               <hr class="my-4" style="border-color: #edf1ef;" />
+
+              <div class="cost-counter" :class="{ 'cost-counter-active': selectedSessionCount > 0 }">
+                <div class="cost-counter-header">Estimated Total</div>
+                <div class="cost-counter-amount">{{ formattedEstimatedCost }}</div>
+                <div class="cost-counter-meta">
+                  {{ selectedSessionCount }} slot{{ selectedSessionCount === 1 ? '' : 's' }}
+                  ({{ selectedSessionHours }} hour{{ selectedSessionHours === 1 ? '' : 's' }})
+                </div>
+              </div>
+
               <p class="policy-note">Free cancellation up to 24 hours before the session.</p>
 
               <button
@@ -376,6 +386,16 @@ const effectiveSelectedSlots = computed(() => {
     return left.time_slot.localeCompare(right.time_slot)
   })
 })
+
+const SESSION_SLOT_HOURS = 0.5
+
+const selectedSessionCount = computed(() => effectiveSelectedSlots.value.length)
+
+const selectedSessionHours = computed(() => selectedSessionCount.value * SESSION_SLOT_HOURS)
+
+const estimatedCost = computed(() => selectedSessionHours.value * tutorProfile.value.hourlyRate)
+
+const formattedEstimatedCost = computed(() => currencyFormatter.format(estimatedCost.value))
 
 const backButton = () => {
   router.back()
@@ -601,6 +621,11 @@ function toggleSlot(day, week, slot) {
 
   if (selectedSlots.value.length > 0 && selectedSlots.value[0].week_start !== week.week_start) {
     alert('You can book multiple slots only within the same week.')
+    return
+  }
+
+  if (selectedSlots.value.length > 0 && selectedSlots.value[0].session_date !== day.date) {
+    alert('You can only book multiple sessions on the same day.')
     return
   }
 
@@ -1165,6 +1190,41 @@ onMounted(async () => {
   font-size: 0.92rem;
   border-top: 1px solid #e5ebe8;
   line-height: 1.6;
+}
+
+.cost-counter {
+  border: 1px solid #dce9e2;
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  background: #f7fbf9;
+}
+
+.cost-counter-active {
+  border-color: #8cc9b2;
+  background: #eef8f3;
+}
+
+.cost-counter-header {
+  color: #4f685d;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.cost-counter-amount {
+  color: #0e4d35;
+  font-size: 1.25rem;
+  font-weight: 800;
+  line-height: 1.2;
+  margin-top: 3px;
+}
+
+.cost-counter-meta {
+  color: #587266;
+  font-size: 0.86rem;
+  margin-top: 4px;
 }
 
 .policy-note {

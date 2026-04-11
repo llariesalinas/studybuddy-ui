@@ -55,22 +55,37 @@
 
               <div class="col-md">
                 <small class="text-muted">Date</small>
-                <div class="fw-semibold">
-                  {{ session.date }}
+                <div class="fw-semibold schedule-stack">
+                  <div
+                    v-for="(block, index) in getTimeBlocks(session)"
+                    :key="`${session.id}-date-${block.date}-${index}`"
+                  >
+                    {{ formatDisplayDate(block.date) }}
+                  </div>
                 </div>
               </div>
 
               <div class="col-md">
                 <small class="text-muted">Start Time</small>
-                <div class="fw-semibold">
-                  {{ session.startTime }}
+                <div class="fw-semibold schedule-stack">
+                  <div
+                    v-for="(block, index) in getTimeBlocks(session)"
+                    :key="`${session.id}-start-${block.startTime}-${index}`"
+                  >
+                    {{ formatDisplayTime(block.startTime) }}
+                  </div>
                 </div>
               </div>
 
               <div class="col-md">
                 <small class="text-muted">End Time</small>
-                <div class="fw-semibold">
-                  {{ session.endTime }}
+                <div class="fw-semibold schedule-stack">
+                  <div
+                    v-for="(block, index) in getTimeBlocks(session)"
+                    :key="`${session.id}-end-${block.endTime}-${index}`"
+                  >
+                    {{ formatDisplayTime(block.endTime) }}
+                  </div>
                 </div>
               </div>
 
@@ -130,6 +145,51 @@ const clearHighlight = (sessionId) => {
   highlightedRequestIds.value = highlightedRequestIds.value.filter(id => id !== String(sessionId))
 }
 
+const getTimeBlocks = (session) => {
+  if (Array.isArray(session.timeBlocks) && session.timeBlocks.length > 0) {
+    return session.timeBlocks
+  }
+
+  return [{
+    date: session.date,
+    startTime: session.startTime,
+    endTime: session.endTime
+  }]
+}
+
+const formatDisplayDate = (dateValue) => {
+  if (!dateValue) {
+    return 'N/A'
+  }
+
+  const displayDate = new Date(`${dateValue}T00:00:00`)
+
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric'
+  }).format(displayDate)
+}
+
+const formatDisplayTime = (timeValue) => {
+  if (!timeValue) {
+    return 'N/A'
+  }
+
+  const [hours = 0, minutes = 0] = String(timeValue)
+    .split(':')
+    .map(part => Number.parseInt(part, 10) || 0)
+
+  const displayDate = new Date()
+  displayDate.setHours(hours, minutes, 0, 0)
+
+  return new Intl.DateTimeFormat('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  }).format(displayDate)
+}
+
 
 const confirmSession = async (id) => {
   confirmingId.value = id
@@ -148,7 +208,7 @@ const filteredSessions = computed(() => {
 
   if (selectedDate.value) {
     sessions = sessions.filter(session =>
-      session.date === selectedDate.value
+      getTimeBlocks(session).some(block => block.date === selectedDate.value)
     )
   }
 
@@ -169,6 +229,11 @@ const filteredSessions = computed(() => {
 
 .request-card {
   transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease, background-color 180ms ease;
+}
+
+.schedule-stack {
+  display: grid;
+  gap: 0.2rem;
 }
 
 .request-card-attention {

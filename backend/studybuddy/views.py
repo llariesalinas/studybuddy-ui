@@ -778,6 +778,102 @@ def build_combined_block(group):
         "duration_hours": duration
     }
 
+
+def build_time_block_payload(bookings):
+
+    sorted_bookings = sort_bookings_for_session_group(bookings)
+    first_booking = sorted_bookings[0]
+    last_booking = sorted_bookings[-1]
+
+    start_time = first_booking.availability.time_slot
+    end_time = (
+        datetime.combine(first_booking.session_date, last_booking.availability.time_slot)
+        + timedelta(minutes=SESSION_SLOT_MINUTES)
+    ).time()
+
+    return {
+        "date": first_booking.session_date.strftime("%Y-%m-%d"),
+        "startTime": start_time.strftime("%H:%M"),
+        "endTime": end_time.strftime("%H:%M"),
+        "duration_hours": get_duration_hours_for_bookings(sorted_bookings),
+        "session_group_id": str(first_booking.session_group_id) if first_booking.session_group_id else None,
+    }
+
+
+def split_bookings_into_time_blocks(bookings):
+
+    sorted_bookings = sort_bookings_for_session_group(bookings)
+
+    if not sorted_bookings:
+        return []
+
+    grouped_blocks = []
+    current_block = [sorted_bookings[0]]
+
+    for booking in sorted_bookings[1:]:
+        previous_booking = current_block[-1]
+        previous_end = (
+            datetime.combine(previous_booking.session_date, previous_booking.availability.time_slot)
+            + timedelta(minutes=SESSION_SLOT_MINUTES)
+        ).time()
+
+        same_session_group = (
+            previous_booking.session_group_id is not None
+            and booking.session_group_id is not None
+            and previous_booking.session_group_id == booking.session_group_id
+        )
+        is_contiguous = (
+            previous_booking.session_date == booking.session_date
+            and previous_end == booking.availability.time_slot
+        )
+
+        if same_session_group or is_contiguous:
+            current_block.append(booking)
+            continue
+
+        grouped_blocks.append(current_block)
+        current_block = [booking]
+
+    grouped_blocks.append(current_block)
+
+    return [build_time_block_payload(block) for block in grouped_blocks]
+
+
+def build_booking_request_block(group):
+
+    sorted_group = sort_bookings_for_session_group(group)
+    representative_booking = get_representative_booking(sorted_group)
+    first_booking = sorted_group[0]
+    time_blocks = split_bookings_into_time_blocks(sorted_group)
+    primary_block = time_blocks[0]
+    group_status = first_booking.status
+
+    return {
+        "id": representative_booking.id,
+        "session_group_id": str(representative_booking.session_group_id) if representative_booking.session_group_id else None,
+        "booking_request_id": str(representative_booking.booking_request_id) if representative_booking.booking_request_id else None,
+        "status": group_status,
+        "raw_status": group_status,
+        "date": first_booking.session_date,
+        "student": f"{first_booking.student.fname} {first_booking.student.lname}",
+        "tuteeName": f"{first_booking.student.fname} {first_booking.student.lname}",
+        "tutor": f"{first_booking.tutor.profile.fname} {first_booking.tutor.profile.lname}",
+        "tutee_confirmed": representative_booking.tutee_confirmed,
+        "tutor_confirmed": representative_booking.tutor_confirmed,
+        "rating": representative_booking.rating.rating_score if hasattr(representative_booking, "rating") else None,
+        "rating_submitted": hasattr(representative_booking, "rating"),
+        "subject": (
+            first_booking.tutor.profile.course.course_name
+            if first_booking.tutor.profile.course
+            else "General"
+        ),
+        "startTime": primary_block["startTime"],
+        "endTime": primary_block["endTime"],
+        "duration_hours": get_duration_hours_for_bookings(sorted_group),
+        "timeBlocks": time_blocks,
+        "hasMultipleTimeBlocks": len(time_blocks) > 1,
+    }
+
 #Tutor Dashboard View
 
 @api_view(['GET'])
@@ -1073,6 +1169,21 @@ def confirm_payment_and_book(request):
 
     if not slots:
         return Response({"error": "No slots selected"}, status=400)
+
+    # Enforce that a booking request can only include slots from one date.
+    requested_dates = {
+        parse_request_date(slot.get("session_date"))
+        for slot in slots
+    }
+
+    if None in requested_dates:
+        return Response({"error": "Invalid session date format."}, status=400)
+
+    if len(requested_dates) > 1:
+        return Response(
+            {"error": "You can only book multiple sessions on the same day."},
+            status=400
+        )
 
     if method_id:
         try:
@@ -1515,7 +1626,12 @@ def list_bookings(request):
     final_data = []
 
     for group in grouped_bookings.values():
-        final_data.append(build_combined_block(group))
+        representative_booking = get_representative_booking(group)
+
+        if representative_booking and representative_booking.status == "Pending" and representative_booking.booking_request_id:
+            final_data.append(build_booking_request_block(group))
+        else:
+            final_data.append(build_combined_block(group))
 
     final_data.sort(key=lambda booking: (booking["date"], booking["startTime"]))
 

@@ -118,10 +118,17 @@
             <router-link
               v-if="userRole === 'tutor'"
               to="/tch-requestedSessions"
-              class="btn bg-sb-primary text-white px-4 py-2 rounded-3 fw-semibold shadow-sm pending-request-btn"
+              class="btn bg-sb-primary text-white px-4 py-2 rounded-3 fw-semibold shadow-sm pending-request-btn d-inline-flex align-items-center gap-2"
             >
               <span v-if="sessionStore.hasNewPendingRequests" class="pending-request-dot" aria-hidden="true"></span>
-              Manage Pending Sessions
+              <span>Manage Pending Sessions</span>
+              <span
+                v-if="sessionStore.requestedSessions.length > 0"
+                class="pending-request-count badge rounded-pill bg-light text-sb-primary border border-sb"
+                :aria-label="`${sessionStore.requestedSessions.length} pending session request${sessionStore.requestedSessions.length === 1 ? '' : 's'}`"
+              >
+                {{ sessionStore.requestedSessions.length }}
+              </span>
             </router-link>
           </div>
         </header>
@@ -237,6 +244,13 @@ body {
 .pending-request-btn {
   position: relative;
   transition: transform 180ms ease, box-shadow 180ms ease, filter 180ms ease;
+}
+
+.pending-request-count {
+  font-size: 0.75rem;
+  line-height: 1;
+  min-width: 1.6rem;
+  padding: 0.4rem 0.5rem;
 }
 
 .pending-request-btn:has(.pending-request-dot) {
