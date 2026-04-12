@@ -116,7 +116,8 @@ onBeforeUnmount(() => {
 <style scoped>
 .notification-wrapper {
   position: relative;
-  z-index: 40;
+  display: inline-flex;
+  align-items: center;
 }
 
 .notification-trigger {
@@ -129,6 +130,9 @@ onBeforeUnmount(() => {
   color: #153326;
   box-shadow: 0 12px 24px rgba(15, 23, 42, 0.06);
   transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .notification-trigger:hover {
@@ -156,13 +160,15 @@ onBeforeUnmount(() => {
 .notification-dropdown {
   position: absolute;
   top: calc(100% + 14px);
-  left: 0;
+  right: 0;
+  left: auto;
   width: min(360px, calc(100vw - 48px));
   background: #ffffff;
   border: 1px solid #dbe4dd;
   border-radius: 22px;
   overflow: hidden;
   box-shadow: 0 24px 60px rgba(15, 23, 42, 0.16);
+  z-index: 1040;
 }
 
 .notification-header {

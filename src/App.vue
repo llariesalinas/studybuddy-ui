@@ -90,8 +90,8 @@
       </div>
     </div>
 
-    <main class="flex-grow-1 overflow-auto p-5" style="background-color: var(--sb-bg);">
-        <header class="d-flex justify-content-between align-items-center mb-3 pb-3 border-bottom border-sb">
+    <main class="app-main flex-grow-1 overflow-auto p-5 position-relative" style="background-color: var(--sb-bg);">
+        <header class="app-page-header d-flex justify-content-between align-items-center mb-3 pb-3 border-bottom border-sb">
           
           <div v-if="route.path === '/dashboard'">
             <h2 class="fw-bold text-dark">Welcome back, {{ userFname }}!</h2>
@@ -108,9 +108,7 @@
             <p class="text-muted">Review your session here.</p>
           </div>
 
-          <div class="d-flex gap-3 align-items-center">
-            <NotificationBell v-if="authStore.isAuthenticated && !isPublicRoute" />
-
+          <div class="d-flex gap-3 align-items-center ms-auto">
             <router-link v-if="userRole === 'tutee'" to="/book" class="btn bg-sb-primary text-white px-4 py-2 rounded-3 fw-semibold shadow-sm">
               Book Session
             </router-link>
@@ -130,6 +128,10 @@
                 {{ sessionStore.requestedSessions.length }}
               </span>
             </router-link>
+
+            <div v-if="authStore.isAuthenticated && !isPublicRoute" class="ms-auto">
+              <NotificationBell />
+            </div>
           </div>
         </header>
       <RatingReminderBanner v-if="authStore.isAuthenticated && !isPublicRoute && userRole === 'tutee'" />
@@ -139,7 +141,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted } from 'vue'
+import { computed, onBeforeUnmount, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth' // Import auth store
 import { useSessionsStore } from '@/stores/completedSessions'
@@ -152,6 +154,7 @@ const route = useRoute()
 const authStore = useAuthStore()
 const notificationsStore = useNotificationsStore()
 const sessionStore = useSessionsStore()
+let pendingSessionsRefreshId = null
 const logout = () => {
 
   authStore.logout()
@@ -197,12 +200,39 @@ const isPublicRoute = computed(() => {
 // Get the role from the store to control the sidebar links
 const userRole = computed(() => authStore.user?.role?.toLowerCase() || null)
 const userFname =  computed(() => authStore.user?.fname || null)
+
+const refreshTutorPendingSessions = async () => {
+  if (!authStore.isAuthenticated || userRole.value !== 'tutor') {
+    return
+  }
+
+  await sessionStore.fetchSessions()
+}
+
+const handleVisibilityChange = async () => {
+  if (!document.hidden) {
+    await refreshTutorPendingSessions()
+  }
+}
+
 onMounted(() => {
   if (authStore.isAuthenticated) {
     notificationsStore.fetchNotifications()
     if (userRole.value === 'tutor') {
       sessionStore.fetchSessions()
+      document.addEventListener('visibilitychange', handleVisibilityChange)
+      pendingSessionsRefreshId = window.setInterval(() => {
+        refreshTutorPendingSessions()
+      }, 15000)
     }
+  }
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
+
+  if (pendingSessionsRefreshId) {
+    window.clearInterval(pendingSessionsRefreshId)
   }
 })
 </script>
@@ -215,6 +245,10 @@ onMounted(() => {
   --sb-primary-hover: #00704A; /* Slightly darker for button hovers */
   --sb-bg: #F8F9FA;
   --sb-card-border: #EAEAEA;
+  --sb-topbar-height: 60px;
+  --sb-bell-size: 52px;
+  --sb-bell-gap: 1.5rem;
+  --sb-main-padding: 3rem;
 }
 
 body {
@@ -282,5 +316,13 @@ body {
 }
 .nav-link:hover {
   opacity: 1 !important;
+}
+
+.app-main {
+  min-width: 0;
+}
+
+.app-page-header {
+  min-height: var(--sb-topbar-height);
 }
 </style>

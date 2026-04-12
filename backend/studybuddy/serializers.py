@@ -65,9 +65,16 @@ class TutorDetailSerializer(serializers.ModelSerializer):
         ]
 
     def get_subjects(self, obj):
-        return list(
-            obj.tutorsubjects_set.select_related('subject').values_list('subject__subject_name', flat=True)
-        )
+        tutor_subjects = obj.tutorsubjects_set.select_related('subject').all()
+
+        return [
+            {
+                'subject_code': tutor_subject.subject.subject_code,
+                'subject_name': tutor_subject.subject.subject_name,
+                'description': tutor_subject.description or ''
+            }
+            for tutor_subject in tutor_subjects
+        ]
 
 
 class TutorProfileSerializer(serializers.ModelSerializer):

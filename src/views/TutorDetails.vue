@@ -172,7 +172,7 @@
               <div class="subjects-accordion">
                 <div
                   v-for="(subject, index) in tutorProfile.subjects"
-                  :key="index"
+                  :key="subject.subject_code || index"
                   class="subject-accordion-item"
                 >
                   <button
@@ -180,7 +180,7 @@
                     class="subject-accordion-header"
                     @click="toggleSubject(index)"
                   >
-                    <span>{{ subject }}</span>
+                    <span>{{ subject.subject_name }}</span>
                     <i class="bi" :class="expandedSubjects.includes(index) ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
                   </button>
 
@@ -190,7 +190,7 @@
                   >
                     <div class="subject-accordion-body">
                       <div class="subject-accordion-content">
-                        Comprehensive sessions focusing on {{ subject }}. Tailored exactly to your pace and learning style to help you achieve your goals.
+                        {{ subject.description || `Comprehensive sessions focusing on ${subject.subject_name}. Tailored exactly to your pace and learning style to help you achieve your goals.` }}
                       </div>
                     </div>
                   </div>
@@ -308,7 +308,23 @@ const tutorProfile = computed(() => ({
   sessionCount: Number(tutorDetails.value.total_sessions) || 124,
   subjects: tutorDetails.value.subjects?.length
     ? tutorDetails.value.subjects
-    : ['Computer Science', 'Beginner Friendly', 'Web Development'],
+    : [
+        {
+          subject_code: 'fallback-1',
+          subject_name: 'Computer Science',
+          description: ''
+        },
+        {
+          subject_code: 'fallback-2',
+          subject_name: 'Beginner Friendly',
+          description: ''
+        },
+        {
+          subject_code: 'fallback-3',
+          subject_name: 'Web Development',
+          description: ''
+        }
+      ],
   bio: tutorDetails.value.bio || 'This tutor brings patient, step-by-step guidance for learners building confidence in technical subjects. Additional bio content can easily extend here to test the scrollbar constraint and ensure it is functioning correctly. We are dedicated to providing excellent learning experiences for all ages.',
 }))
 
@@ -475,7 +491,7 @@ const getTutorDetails = async () => {
     tutorDetails.value = {
       profile_id: response.data.profile_id,
       name: `${response.data.fname} ${response.data.lname}`,
-      subjects: response.data.subjects,
+      subjects: Array.isArray(response.data.subjects) ? response.data.subjects : [],
       rating: response.data.rating_average ?? 4.7,
       bio: response.data.bio,
       hourly_rate: response.data.hourly_rate ?? 350,

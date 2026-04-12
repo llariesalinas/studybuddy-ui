@@ -136,12 +136,56 @@
         class="subject-pill-remove"
         @click="removeSubject(subject.subject_code)"
       >
-        ×
+        Ã—
       </button>
     </span>
   </div>
 
   <p v-else class="text-muted small mb-0">No subjects selected yet.</p>
+
+  <div v-if="profile.subjects.length" class="subject-accordion-list">
+    <article
+      v-for="subject in profile.subjects"
+      :key="`${subject.subject_code}-accordion`"
+      class="subject-accordion-card"
+      :class="{ 'subject-accordion-card-open': openSubjectCode === subject.subject_code }"
+    >
+      <button
+        type="button"
+        class="subject-accordion-header"
+        @click="toggleSubjectAccordion(subject.subject_code)"
+      >
+        <span
+          class="subject-accordion-icon"
+          :class="{ 'subject-accordion-icon-open': openSubjectCode === subject.subject_code }"
+        >
+          <i class="bi bi-journal-bookmark-fill"></i>
+        </span>
+
+        <span
+          class="subject-accordion-title"
+          :class="{ 'subject-accordion-title-open': openSubjectCode === subject.subject_code }"
+        >
+          {{ subject.subject_name }}
+        </span>
+
+        <i
+          class="bi ms-auto subject-accordion-chevron"
+          :class="openSubjectCode === subject.subject_code ? 'bi-chevron-up' : 'bi-chevron-down'"
+        ></i>
+      </button>
+
+      <div v-if="openSubjectCode === subject.subject_code" class="subject-accordion-body">
+        <label class="subject-accordion-label">Subject Syllabus &amp; Approach</label>
+        <textarea
+          v-model="subject.description"
+          rows="4"
+          class="subject-description-input"
+          placeholder="Describe your methodology for this specific subject..."
+        ></textarea>
+      </div>
+    </article>
+  </div>
 
   <p class="text-muted small mb-0">Up to 8 subjects.</p>
 </div>
@@ -163,8 +207,12 @@ class="form-control"
 </div>
 
 <div class="text-end mt-4">
-<button class="btn bg-sb-primary text-white px-4">
-Save Changes
+<button
+  class="btn bg-sb-primary text-white px-4 d-inline-flex align-items-center gap-2"
+  :disabled="isSavingProfile"
+>
+<span v-if="isSavingProfile" class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+{{ isSavingProfile ? 'Saving...' : 'Save Changes' }}
 </button>
 </div>
 
@@ -290,12 +338,15 @@ const profile = ref({
 const courses = ref([])
 const allSubjects = ref([])
 const initialSubjectCodes = ref([])
+const initialSubjectDescriptions = ref(new Map())
 const isSubjectModalOpen = ref(false)
 const subjectSearch = ref('')
 const activeCategory = ref('All')
 const draftSubjectCodes = ref([])
+const openSubjectCode = ref(null)
 const isLoadingSubjects = ref(false)
 const subjectsLoadError = ref('')
+const isSavingProfile = ref(false)
 
 const responseTimeOptions = [
   { value: 'within_1_hour', label: 'Within 1 hour' },
@@ -370,8 +421,29 @@ function getSubjectByCode(subjectCode) {
 }
 
 function syncProfileSubjectsFromCodes(subjectCodes) {
+  const existingSubjects = new Map(
+    profile.value.subjects.map(subject => [
+      subject.subject_code,
+      {
+        ...subject,
+        description: subject.description || ''
+      }
+    ])
+  )
+
   profile.value.subjects = subjectCodes
-    .map(code => getSubjectByCode(code))
+    .map(code => {
+      const baseSubject = getSubjectByCode(code)
+
+      if (!baseSubject) {
+        return null
+      }
+
+      return {
+        ...baseSubject,
+        description: existingSubjects.get(code)?.description || ''
+      }
+    })
     .filter(Boolean)
     .sort((left, right) => left.subject_name.localeCompare(right.subject_name))
 }
@@ -420,6 +492,14 @@ function removeSubject(subjectCode) {
   profile.value.subjects = profile.value.subjects.filter(
     subject => subject.subject_code !== subjectCode
   )
+
+  if (openSubjectCode.value === subjectCode) {
+    openSubjectCode.value = null
+  }
+}
+
+function toggleSubjectAccordion(subjectCode) {
+  openSubjectCode.value = openSubjectCode.value === subjectCode ? null : subjectCode
 }
 
 const loadProfile = async () => {
@@ -439,8 +519,14 @@ const loadProfile = async () => {
     profile.value.response_time = data.response_time || ''
 
     const subjectRes = await api.get('/tutor/subjects/')
-    profile.value.subjects = subjectRes.data
-    initialSubjectCodes.value = subjectRes.data.map(subject => subject.subject_code)
+    profile.value.subjects = subjectRes.data.map(subject => ({
+      ...subject,
+      description: subject.description || ''
+    }))
+    initialSubjectCodes.value = profile.value.subjects.map(subject => subject.subject_code)
+    initialSubjectDescriptions.value = new Map(
+      profile.value.subjects.map(subject => [subject.subject_code, subject.description || ''])
+    )
   } catch (err) {
     console.error('Failed to load tutor profile:', err)
   }
@@ -471,13 +557,34 @@ const loadCourses = async () => {
 }
 
 async function syncSubjects() {
-  const currentSubjectCodes = profile.value.subjects.map(subject => subject.subject_code)
+  const currentSubjects = profile.value.subjects.map(subject => ({
+    ...subject,
+    description: subject.description || ''
+  }))
+  const currentSubjectCodes = currentSubjects.map(subject => subject.subject_code)
   const addedCodes = currentSubjectCodes.filter(code => !initialSubjectCodes.value.includes(code))
   const removedCodes = initialSubjectCodes.value.filter(code => !currentSubjectCodes.includes(code))
+  const changedDescriptions = currentSubjects.filter(subject => {
+    if (addedCodes.includes(subject.subject_code)) {
+      return false
+    }
+
+    return (initialSubjectDescriptions.value.get(subject.subject_code) || '') !== (subject.description || '')
+  })
 
   await Promise.all([
-    ...addedCodes.map(subjectCode =>
-      api.post('/tutor/subjects/add/', { subject_code: subjectCode })
+    ...addedCodes.map(subjectCode => {
+      const subject = currentSubjects.find(item => item.subject_code === subjectCode)
+
+      return api.post('/tutor/subjects/add/', {
+        subject_code: subjectCode,
+        description: subject?.description || ''
+      })
+    }),
+    ...changedDescriptions.map(subject =>
+      api.patch(`/tutor/subjects/update/${subject.subject_code}/`, {
+        description: subject.description || ''
+      })
     ),
     ...removedCodes.map(subjectCode =>
       api.delete(`/tutor/subjects/remove/${subjectCode}/`)
@@ -485,9 +592,16 @@ async function syncSubjects() {
   ])
 
   initialSubjectCodes.value = [...currentSubjectCodes]
+  initialSubjectDescriptions.value = new Map(
+    currentSubjects.map(subject => [subject.subject_code, subject.description || ''])
+  )
 }
 
 const saveProfile = async () => {
+  if (isSavingProfile.value) {
+    return
+  }
+
   const names = profile.value.fullName.split(' ')
 
   const tuteePayload = {
@@ -507,6 +621,7 @@ const saveProfile = async () => {
   }
 
   try {
+    isSavingProfile.value = true
     await api.put('/tutee/profile/update/', tuteePayload)
     await api.put('/tutor/update/', tutorPayload)
     await syncSubjects()
@@ -514,6 +629,9 @@ const saveProfile = async () => {
     alert('Profile Updated')
   } catch (err) {
     console.error('Profile update failed:', err)
+    alert('Profile update failed. Please try again.')
+  } finally {
+    isSavingProfile.value = false
   }
 }
 
@@ -556,6 +674,101 @@ onMounted(() => {
   font-size: 1rem;
   line-height: 1;
   padding: 0;
+}
+
+.subject-accordion-list {
+  display: grid;
+  gap: 12px;
+}
+
+.subject-accordion-card {
+  border: 1px solid #dbe7e1;
+  border-radius: 20px;
+  background: #f6f8f7;
+  overflow: hidden;
+  transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+}
+
+.subject-accordion-card-open {
+  border-color: #9fd0ba;
+  background: #eef7f3;
+  box-shadow: 0 12px 24px rgba(10, 122, 81, 0.08);
+}
+
+.subject-accordion-header {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  text-align: left;
+}
+
+.subject-accordion-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #dfe5e2;
+  color: #65756d;
+  flex-shrink: 0;
+  transition: background-color 180ms ease, color 180ms ease;
+}
+
+.subject-accordion-icon-open {
+  background: #0a7a51;
+  color: #ffffff;
+}
+
+.subject-accordion-title {
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: #1f2f2a;
+  transition: color 180ms ease;
+}
+
+.subject-accordion-title-open {
+  color: #0a7a51;
+}
+
+.subject-accordion-chevron {
+  color: #5d7168;
+  font-size: 1rem;
+}
+
+.subject-accordion-body {
+  padding: 0 18px 18px;
+  display: grid;
+  gap: 10px;
+}
+
+.subject-accordion-label {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #6d8178;
+}
+
+.subject-description-input {
+  width: 100%;
+  min-height: 120px;
+  border: 0;
+  border-radius: 18px;
+  background: #ffffff;
+  padding: 14px 16px;
+  color: #183129;
+  resize: vertical;
+  box-shadow: inset 0 0 0 1px rgba(224, 231, 227, 0.85);
+}
+
+.subject-description-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(10, 122, 81, 0.14);
 }
 
 .subject-modal-backdrop {
