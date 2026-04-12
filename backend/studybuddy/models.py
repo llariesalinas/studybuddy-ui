@@ -308,6 +308,8 @@ class Booking(models.Model):
         choices=STATUS_CHOICES,
         default="Pending"
     )
+    tutee_confirmed = models.BooleanField(default=False)
+    tutor_confirmed = models.BooleanField(default=False)
 
     created_at = models.DateTimeField(auto_now_add=True)
 

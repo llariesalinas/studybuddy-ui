@@ -214,7 +214,6 @@ const handleVisibilityChange = async () => {
     await refreshTutorPendingSessions()
   }
 }
-
 onMounted(() => {
   if (authStore.isAuthenticated) {
     notificationsStore.fetchNotifications()
