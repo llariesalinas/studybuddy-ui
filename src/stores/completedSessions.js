@@ -7,6 +7,7 @@ export const useSessionsStore = defineStore('sessions', () => {
   const loading = ref(false)
   const error = ref(null)
   const seenPendingRequestIds = ref([])
+  const recommendedTutors = ref([])
 
   if (typeof window !== 'undefined') {
     try {
@@ -22,6 +23,17 @@ export const useSessionsStore = defineStore('sessions', () => {
   }
 
   const normalizeStatus = (status) => String(status || '').toLowerCase()
+
+  const fetchRecommendations = async () => {
+    try{
+      const response = await api.get('/dashboard')
+
+      recommendedTutors.value = response.data.recommendation
+    }
+    catch(error){
+      console.error('Error loading recommended tutors.', error)
+    }
+  }
 
   const toMinutes = (timeValue) => {
     if (!timeValue) return 0
@@ -256,6 +268,7 @@ export const useSessionsStore = defineStore('sessions', () => {
     cancelledSessions,
     hasUnratedCompletedSessions,
     fetchSessions,
+    fetchRecommendations,
     fetchSessionById,
     approveSession,
     rejectSession,
