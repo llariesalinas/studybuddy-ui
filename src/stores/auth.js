@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import api from '@/services/api/api'
 import { useProfileStore } from '@/stores/profile'
+import { useFindTutorsStore } from '@/stores/findTutors'
 import {
   startIdleSessionTracking,
   stopIdleSessionTracking
@@ -15,6 +16,7 @@ let refreshIntervalId = null
 
 export const useAuthStore = defineStore('auth', () => {
   const profileStore = useProfileStore()
+  const findTutorsStore = useFindTutorsStore()
 
   const normalizeRole = (role) => {
     if (!role) {
@@ -148,6 +150,7 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('access_token')
     localStorage.removeItem('refresh_token')
     localStorage.removeItem('user_role')
+    findTutorsStore.reset()
   }
 
   const initializeAuth = () => {

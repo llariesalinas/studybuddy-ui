@@ -181,6 +181,7 @@ class TutorSubjects(models.Model):
     subject = models.ForeignKey(Subjects, on_delete=models.CASCADE)
     
     expertise_level = models.IntegerField()  # e.g., Beginner, Intermediate, Advanced
+    description = models.TextField(blank=True, default='')
 
     def __str__(self):
         return f"{self.tutor.profile.fname} {self.tutor.profile.lname} - {self.subject.subject_code}"

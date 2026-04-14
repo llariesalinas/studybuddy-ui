@@ -25,12 +25,11 @@ export const useSessionsStore = defineStore('sessions', () => {
   const normalizeStatus = (status) => String(status || '').toLowerCase()
 
   const fetchRecommendations = async () => {
-    try{
+    try {
       const response = await api.get('/dashboard')
-
-      recommendedTutors.value = response.data.recommendation
-    }
-    catch(error){
+      recommendedTutors.value = response.data.recommendations || []
+    } catch (error) {
+      recommendedTutors.value = []
       console.error('Error loading recommended tutors.', error)
     }
   }
@@ -257,6 +256,7 @@ export const useSessionsStore = defineStore('sessions', () => {
     sessions,
     loading,
     error,
+    recommendedTutors,
     completedSessions,
     unratedCompletedSessions,
     upcomingSessions,

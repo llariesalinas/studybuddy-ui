@@ -42,6 +42,7 @@ urlpatterns = [
     path('tutor/profile/', views.get_tutor_profile),
     path('tutor/subjects/', views.get_tutor_subjects),
     path('tutor/subjects/add/', views.add_tutor_subject),
+    path('tutor/subjects/update/<str:subject_code>/', views.update_tutor_subject),
     path('tutor/subjects/remove/<str:subject_code>/', views.remove_tutor_subject),
     path('search-tutors/', SearchTutorsView.as_view(), name='search-tutors'),
     path('subjects/',SubjectListView.as_view(), name='subjects'),

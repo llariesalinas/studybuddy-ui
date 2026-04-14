@@ -67,6 +67,15 @@
             </div>
           </div>
 
+          <div class="budget-card border-sb rounded-4 p-3 p-md-4 mb-4">
+            <BudgetRangeSlider
+              v-model:min-value="store.selectedBudgetMin"
+              v-model:max-value="store.selectedBudgetMax"
+              :min-limit="INITIAL_BUDGET_MIN"
+              :max-limit="INITIAL_BUDGET_MAX"
+            />
+          </div>
+
           <div v-if="activePicker" class="time-grid-panel border-sb rounded-4 p-3 mb-4">
             <div class="d-flex justify-content-between align-items-center mb-3">
               <div>
@@ -136,15 +145,21 @@
 <script setup>
 import { computed, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useInitialBookingPrefsStore } from '@/stores/initialbookingprefs'
+import BudgetRangeSlider from '@/components/BudgetRangeSlider.vue'
+import {
+  INITIAL_BUDGET_MAX,
+  INITIAL_BUDGET_MIN,
+  useInitialBookingPrefsStore
+} from '@/stores/initialbookingprefs'
+import { useFindTutorsStore } from '@/stores/findTutors'
 import api from '@/services/api/api'
 
 const router = useRouter()
 const store = useInitialBookingPrefsStore()
+const findTutorsStore = useFindTutorsStore()
 
 const isSubmitting = ref(false)
 const subjects = ref([])
-const tutors = ref([])
 const activePicker = ref(null)
 const activePeriod = ref('AM')
 
@@ -282,23 +297,20 @@ const findTutor = async () => {
   isSubmitting.value = true
 
   try {
-
-    const res = await api.post('/recommend-tutors/', {
-
+    // Explicit new search: clear old cached tutor results and persist fresh filters.
+    findTutorsStore.reset()
+    findTutorsStore.setFilters({
       subject: store.selectedSubject,
-      preferred_mode: store.selectedMode,
+      mode: store.selectedMode,
       date: store.selectedDate,
-      start_time: store.selectedStartTime,
-      end_time: store.selectedEndTime
-
+      startTime: store.selectedStartTime,
+      endTime: store.selectedEndTime,
+      minRate: store.selectedBudgetMin,
+      maxRate: store.selectedBudgetMax,
     })
 
-    tutors.value = res.data
-
-    console.log("Recommended tutors:", tutors.value)
-
     // Navigate to the tutor results page after saving the current search inputs.
-    router.push('/find-tutors')
+    await router.push('/find-tutors')
 
   } catch (err) {
 
@@ -318,6 +330,10 @@ const findTutor = async () => {
   min-height: 42px;
   background: #fff;
   color: #212529;
+}
+
+.budget-card {
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.96), #ffffff);
 }
 
 .time-trigger-active {

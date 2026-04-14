@@ -84,6 +84,7 @@
                   :key="day.date"
                   class="day-column"
                   :class="{
+                    'day-column-today': isToday(day.date),
                     'day-column-outside': !day.in_month,
                     'day-column-past': day.is_past,
                     'day-column-blocked': day.is_blocked
@@ -172,7 +173,7 @@
               <div class="subjects-accordion">
                 <div
                   v-for="(subject, index) in tutorProfile.subjects"
-                  :key="index"
+                  :key="subject.subject_code || index"
                   class="subject-accordion-item"
                 >
                   <button
@@ -180,7 +181,7 @@
                     class="subject-accordion-header"
                     @click="toggleSubject(index)"
                   >
-                    <span>{{ subject }}</span>
+                    <span>{{ subject.subject_name }}</span>
                     <i class="bi" :class="expandedSubjects.includes(index) ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
                   </button>
 
@@ -190,7 +191,7 @@
                   >
                     <div class="subject-accordion-body">
                       <div class="subject-accordion-content">
-                        Comprehensive sessions focusing on {{ subject }}. Tailored exactly to your pace and learning style to help you achieve your goals.
+                        {{ subject.description || `Comprehensive sessions focusing on ${subject.subject_name}. Tailored exactly to your pace and learning style to help you achieve your goals.` }}
                       </div>
                     </div>
                   </div>
@@ -308,7 +309,23 @@ const tutorProfile = computed(() => ({
   sessionCount: Number(tutorDetails.value.total_sessions) || 124,
   subjects: tutorDetails.value.subjects?.length
     ? tutorDetails.value.subjects
-    : ['Computer Science', 'Beginner Friendly', 'Web Development'],
+    : [
+        {
+          subject_code: 'fallback-1',
+          subject_name: 'Computer Science',
+          description: ''
+        },
+        {
+          subject_code: 'fallback-2',
+          subject_name: 'Beginner Friendly',
+          description: ''
+        },
+        {
+          subject_code: 'fallback-3',
+          subject_name: 'Web Development',
+          description: ''
+        }
+      ],
   bio: tutorDetails.value.bio || 'This tutor brings patient, step-by-step guidance for learners building confidence in technical subjects. Additional bio content can easily extend here to test the scrollbar constraint and ensure it is functioning correctly. We are dedicated to providing excellent learning experiences for all ages.',
 }))
 
@@ -446,6 +463,14 @@ function formatDayHeaderDate(dateString) {
   return new Date(dateString).getDate()
 }
 
+function getDateKey(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+function isToday(dateString) {
+  return dateString === getDateKey(new Date())
+}
+
 function addThirtyMinutes(timeString) {
   const [hours, minutes] = timeString.split(':').map(Number)
   const totalMinutes = (hours * 60) + minutes + 30
@@ -475,7 +500,7 @@ const getTutorDetails = async () => {
     tutorDetails.value = {
       profile_id: response.data.profile_id,
       name: `${response.data.fname} ${response.data.lname}`,
-      subjects: response.data.subjects,
+      subjects: Array.isArray(response.data.subjects) ? response.data.subjects : [],
       rating: response.data.rating_average ?? 4.7,
       bio: response.data.bio,
       hourly_rate: response.data.hourly_rate ?? 350,
@@ -935,6 +960,7 @@ onMounted(async () => {
 
 .day-column {
   min-width: 0;
+  position: relative;
   display: grid;
   grid-template-rows: auto auto 1fr;
   gap: 8px;
@@ -952,6 +978,30 @@ onMounted(async () => {
 .day-column-blocked .day-name,
 .day-column-blocked .day-date {
   color: #a16207;
+}
+
+.day-column-today {
+  isolation: isolate;
+}
+
+.day-column-today::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  background: linear-gradient(180deg, rgba(0, 137, 90, 0.08), rgba(0, 137, 90, 0.03));
+  border-radius: 20px;
+  box-shadow: 0 0 0 1px rgba(0, 137, 90, 0.14), 0 0 24px rgba(0, 137, 90, 0.18);
+  z-index: -1;
+  pointer-events: none;
+}
+
+.day-column-today .day-name {
+  color: #0a7a51;
+}
+
+.day-column-today .day-date {
+  color: #0a7a51;
+  text-shadow: 0 0 10px rgba(0, 137, 90, 0.2);
 }
 
 .day-column-blocked .day-heading {

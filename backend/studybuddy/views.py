@@ -2124,7 +2124,8 @@ def get_tutor_subjects(request):
     data = [
         {
             "subject_code": ts.subject.subject_code,
-            "subject_name": ts.subject.subject_name
+            "subject_name": ts.subject.subject_name,
+            "description": ts.description or ''
         }
         for ts in subjects
     ]
@@ -2139,19 +2140,42 @@ def add_tutor_subject(request):
     tutor = Tutor.objects.get(profile=profile)
 
     subject_code = request.data.get("subject_code")
+    description = request.data.get("description", '')
 
     try:
         subject = Subjects.objects.get(subject_code=subject_code)
     except Subjects.DoesNotExist:
         return Response({"error": "Invalid subject"}, status=400)
 
-    TutorSubjects.objects.get_or_create(
+    tutor_subject, created = TutorSubjects.objects.get_or_create(
         tutor=tutor,
         subject=subject,
-        defaults={"expertise_level": 3}
+        defaults={"expertise_level": 3, "description": description or ''}
     )
 
+    if not created and description is not None:
+        tutor_subject.description = description or ''
+        tutor_subject.save(update_fields=['description'])
+
     return Response({"message": "Subject added"})
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def update_tutor_subject(request, subject_code):
+
+    profile = request.user.userprofile
+    tutor = Tutor.objects.get(profile=profile)
+
+    tutor_subject = get_object_or_404(
+        TutorSubjects,
+        tutor=tutor,
+        subject__subject_code=subject_code
+    )
+
+    tutor_subject.description = request.data.get("description", '') or ''
+    tutor_subject.save(update_fields=['description'])
+
+    return Response({"message": "Subject updated"})
 
 @api_view(['DELETE'])
 @permission_classes([IsAuthenticated])
