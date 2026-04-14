@@ -1,11 +1,5 @@
 <template>
 <div class="profile-content">
-
-  <div class="mb-4">
-    <h2 class="fw-bold text-dark">My Profile</h2>
-    <p class="text-muted">Manage your tutoring information.</p>
-  </div>
-
   <div class="card border-sb shadow-sm rounded-4">
   <div class="card-body p-4 p-md-5">
 
