@@ -84,6 +84,7 @@
                   :key="day.date"
                   class="day-column"
                   :class="{
+                    'day-column-today': isToday(day.date),
                     'day-column-outside': !day.in_month,
                     'day-column-past': day.is_past,
                     'day-column-blocked': day.is_blocked
@@ -460,6 +461,14 @@ function formatShortDay(dayName) {
 
 function formatDayHeaderDate(dateString) {
   return new Date(dateString).getDate()
+}
+
+function getDateKey(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+function isToday(dateString) {
+  return dateString === getDateKey(new Date())
 }
 
 function addThirtyMinutes(timeString) {
@@ -951,6 +960,7 @@ onMounted(async () => {
 
 .day-column {
   min-width: 0;
+  position: relative;
   display: grid;
   grid-template-rows: auto auto 1fr;
   gap: 8px;
@@ -968,6 +978,30 @@ onMounted(async () => {
 .day-column-blocked .day-name,
 .day-column-blocked .day-date {
   color: #a16207;
+}
+
+.day-column-today {
+  isolation: isolate;
+}
+
+.day-column-today::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  background: linear-gradient(180deg, rgba(0, 137, 90, 0.08), rgba(0, 137, 90, 0.03));
+  border-radius: 20px;
+  box-shadow: 0 0 0 1px rgba(0, 137, 90, 0.14), 0 0 24px rgba(0, 137, 90, 0.18);
+  z-index: -1;
+  pointer-events: none;
+}
+
+.day-column-today .day-name {
+  color: #0a7a51;
+}
+
+.day-column-today .day-date {
+  color: #0a7a51;
+  text-shadow: 0 0 10px rgba(0, 137, 90, 0.2);
 }
 
 .day-column-blocked .day-heading {
