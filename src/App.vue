@@ -98,6 +98,23 @@
             <p class="text-muted">Here's your tutoring overview for today.</p>
           </div>
 
+          <div v-if="route.path === '/tutee-profile'">
+            <h2 class="fw-bold text-dark">My Profile</h2>
+            <p class="text-muted">Manage your personal information and tutoring preferences.</p>
+          </div>
+
+          <div v-if="route.path === '/book'">
+            <h2 class="fw-bold text-dark">Book a Session</h2>
+            <p class="text-muted">
+              Tell us what you need help with, and we'll match you with the right tutor.
+            </p>
+          </div>
+
+          <div v-if="route.path === '/find-tutors'">
+            <h2 class="fw-bold text-dark">Find Tutors</h2>
+            <p class="text-muted">Browse peer tutors matched to your learning needs.</p>
+        </div>
+
           <div v-if="route.path === '/tuteeSessions'">
             <h2 class="fw-bold text-dark">Here are your sessions, {{ userFname}}!</h2>
             <p class="text-muted">Browse and review pending, upcoming, and completed sessions and confirm ongoing sessions here.</p>
@@ -108,13 +125,33 @@
             <p class="text-muted">Review your session here.</p>
           </div>
 
+          <div v-if="route.path === '/tch-dashboard'">
+            <h2 class="fw-bold text-dark">Welcome back, {{ userFname }}!</h2>
+            <p class="text-muted">Here's your tutoring overview for today.</p>
+          </div>
+
+          <div v-if="route.path === '/tutor-profile'">
+            <h2 class="fw-bold text-dark">My Profile</h2>
+            <p class="text-muted">Manage your personal information and tutoring preferences.</p>
+          </div>
+
+          <div v-if="route.path === '/tch-requestedSessions'">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              <h2 class="fw-bold mb-1">Requested Sessions</h2>
+              <span v-if="sessionStore.hasNewPendingRequests" class="request-alert-dot" aria-label="New requests available"></span>
+            </div>
+            <p class="text-muted mb-0">
+                Manage pending session requests.
+            </p>
+          </div>
+
           <div class="d-flex gap-3 align-items-center ms-auto">
-            <router-link v-if="userRole === 'tutee'" to="/book" class="btn bg-sb-primary text-white px-4 py-2 rounded-3 fw-semibold shadow-sm">
+            <router-link v-if="userRole === 'tutee' && route.path !== '/book'" to="/book" class="btn bg-sb-primary text-white px-4 py-2 rounded-3 fw-semibold shadow-sm">
               Book Session
             </router-link>
 
             <router-link
-              v-if="userRole === 'tutor'"
+              v-if="userRole === 'tutor' && route.path !== '/tch-requestedSessions'"
               to="/tch-requestedSessions"
               class="btn bg-sb-primary text-white px-4 py-2 rounded-3 fw-semibold shadow-sm pending-request-btn d-inline-flex align-items-center gap-2"
             >

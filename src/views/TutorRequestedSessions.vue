@@ -2,16 +2,6 @@
   <div class="p-1">
 
     <div class="d-flex mb-4 justify-content-between align-items-center">
-        <div>
-        <div class="d-flex align-items-center gap-2 flex-wrap">
-          <h2 class="fw-bold mb-1">Requested Sessions</h2>
-          <span v-if="sessionStore.hasNewPendingRequests" class="request-alert-dot" aria-label="New requests available"></span>
-        </div>
-        <p class="text-muted mb-0">
-            Manage pending session requests.
-        </p>
-        </div>
-
         <div style="width: 200px;">
           <input
             type="date"
