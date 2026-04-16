@@ -13,6 +13,11 @@
             </select>
           </div>
 
+          <div class="d-flex flex-column mb-3">
+            <label class="form-label fw-semibold small">Preffered Location</label>
+            <input v-model="store.selectedLocation" type="text" class="form-control shadow-none px-2.5" placeholder="e.g. Starbucks..." required>
+          </div>
+
           <div class="row g-3 mb-3">
             <div class="col-md-6">
               <label class="form-label fw-semibold small">Date</label>
@@ -58,15 +63,6 @@
                 {{ selectedEndLabel }}
               </button>
             </div>
-          </div>
-
-          <div class="budget-card border-sb rounded-4 p-3 p-md-4 mb-4">
-            <BudgetRangeSlider
-              v-model:min-value="store.selectedBudgetMin"
-              v-model:max-value="store.selectedBudgetMax"
-              :min-limit="INITIAL_BUDGET_MIN"
-              :max-limit="INITIAL_BUDGET_MAX"
-            />
           </div>
 
           <div v-if="activePicker" class="time-grid-panel border-sb rounded-4 p-3 mb-4">
@@ -145,7 +141,7 @@
 </template>
 
 <script setup>
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import BudgetRangeSlider from '@/components/BudgetRangeSlider.vue'
 import {
@@ -168,7 +164,6 @@ const activePeriod = ref('AM')
 const modes = ['Online', 'Face-to-face']
 const timeSlotOptions = computed(() => {
   const slots = []
-
   for (let hour = 0; hour < 24; hour += 1) {
     for (let minute = 0; minute < 60; minute += 30) {
       const value = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
@@ -182,11 +177,12 @@ const timeSlotOptions = computed(() => {
       })
     }
   }
-
   return slots
 })
+
 const selectedStartLabel = computed(() => formatTimeLabel(store.selectedStartTime, 'Select start time'))
 const selectedEndLabel = computed(() => formatTimeLabel(store.selectedEndTime, 'Select end time'))
+
 const visibleTimeSlots = computed(() => {
   const slots = timeSlotOptions.value.filter(slot => {
     const slotPeriod = Number(slot.value.slice(0, 2)) < 12 ? 'AM' : 'PM'
@@ -201,15 +197,11 @@ const visibleTimeSlots = computed(() => {
 
     return true
   })
-
   return slots
 })
 
 function formatTimeLabel(value, fallback) {
-  if (!value) {
-    return fallback
-  }
-
+  if (!value) return fallback
   const slot = timeSlotOptions.value.find(option => option.value === value)
   return slot ? slot.label : fallback
 }
@@ -218,13 +210,11 @@ function isSelectedTime(value) {
   if (activePicker.value === 'start') {
     return store.selectedStartTime === value
   }
-
   return store.selectedEndTime === value
 }
 
 function openTimePicker(picker) {
   activePicker.value = activePicker.value === picker ? null : picker
-
   const currentValue = picker === 'start' ? store.selectedStartTime : store.selectedEndTime
 
   if (currentValue) {
@@ -236,17 +226,12 @@ function openTimePicker(picker) {
     activePeriod.value = Number(store.selectedStartTime.slice(0, 2)) < 12 ? 'AM' : 'PM'
     return
   }
-
   activePeriod.value = 'AM'
 }
 
 function nextTimeSlot(value) {
   const index = timeSlotOptions.value.findIndex(slot => slot.value === value)
-
-  if (index === -1 || index === timeSlotOptions.value.length - 1) {
-    return null
-  }
-
+  if (index === -1 || index === timeSlotOptions.value.length - 1) return null
   return timeSlotOptions.value[index + 1].value
 }
 
@@ -257,52 +242,45 @@ function selectTime(value) {
     if (!store.selectedEndTime || store.selectedEndTime <= value) {
       store.selectedEndTime = nextTimeSlot(value)
     }
-
     activePicker.value = 'end'
-
     if (store.selectedEndTime) {
       activePeriod.value = Number(store.selectedEndTime.slice(0, 2)) < 12 ? 'AM' : 'PM'
     }
-
     return
   }
-
   store.selectedEndTime = value
   activePicker.value = null
 }
 
-
-// Load subjects from backend
 onMounted(async () => {
+  // Changed from localStorage to sessionStorage
+  const saved = sessionStorage.getItem('booking_prefs')
+  if (saved) Object.assign(store, JSON.parse(saved))
 
   try {
-
     const response = await api.get('/subjects/')
     subjects.value = response.data
-
   } catch (error) {
-
     console.error("Failed to load subjects", error)
-
   }
-
 })
 
+watch(() => store.$state, (newState) => {
+  // Changed from localStorage to sessionStorage
+  sessionStorage.setItem('booking_prefs', JSON.stringify(newState))
+}, { deep: true })
 
 // FIND TUTOR (CBF CALL)
 const findTutor = async () => {
-
-  if (!store.selectedStartTime || !store.selectedEndTime) {
-    return
-  }
+  if (!store.selectedStartTime || !store.selectedEndTime) return
 
   isSubmitting.value = true
 
   try {
-    // Explicit new search: clear old cached tutor results and persist fresh filters.
     findTutorsStore.reset()
     findTutorsStore.setFilters({
       subject: store.selectedSubject,
+      location: store.selectedLocation,
       mode: store.selectedMode,
       date: store.selectedDate,
       startTime: store.selectedStartTime,
@@ -311,19 +289,13 @@ const findTutor = async () => {
       maxRate: store.selectedBudgetMax,
     })
 
-    // Navigate to the tutor results page after saving the current search inputs.
     await router.push('/find-tutors')
 
   } catch (err) {
-
     console.error("Tutor recommendation failed", err)
-
   } finally {
-
     isSubmitting.value = false
-
   }
-
 }
 </script>
 

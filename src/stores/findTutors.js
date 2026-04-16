@@ -5,6 +5,7 @@ import { INITIAL_BUDGET_MAX, INITIAL_BUDGET_MIN } from '@/stores/initialbookingp
 const createDefaultFilters = () => ({
   query: '',
   subject: '',
+  location: '',
   mode: '',
   date: null,
   startTime: null,

@@ -1,8 +1,8 @@
 <template>
     <div class="p-4">
         <form @submit.prevent="searchTutor">
-            <div class="row mb-5 g-3 align-items-start">
-                <div class="col-lg-3 col-md-5 subject-filter-column">
+            <div class="row mb-3 g-3 align-items-start">
+                <div class="col-lg-3 col-md-5">
                     <label class="form-label fw-semibold small">Subject</label>
                     <select v-model="subjectModel" class="form-select">
                         <option disabled value="">Select Subject</option>
@@ -14,28 +14,6 @@
                             {{ subject.subject_name }}
                         </option>
                     </select>
-
-                    <div class="budget-filter-wrap mt-3">
-                        <button
-                          type="button"
-                          class="btn w-100 budget-toggle-btn shadow-none rounded-4"
-                          :class="{ 'budget-toggle-btn-active': showBudgetFilter }"
-                          @click="showBudgetFilter = !showBudgetFilter"
-                        >
-                          <span class="budget-toggle-inline">{{ budgetSummary }}</span>
-                          <i class="bi" :class="showBudgetFilter ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
-                        </button>
-
-                        <div v-if="showBudgetFilter" class="budget-dropdown-panel">
-                          <BudgetRangeSlider
-                            v-model:min-value="minRateModel"
-                            v-model:max-value="maxRateModel"
-                            :min-limit="INITIAL_BUDGET_MIN"
-                            :max-limit="INITIAL_BUDGET_MAX"
-                            variant="dropdown"
-                          />
-                        </div>
-                    </div>
                 </div>
 
                 <div class="col-lg-2 col-md-3">
@@ -89,6 +67,43 @@
                     >
                         Search
                     </button>
+                </div>
+            </div>
+
+            <div class="row mb-5 g-3 align-items-start">
+                <div class="col-lg-3 col-md-5">
+                    <label class="form-label fw-semibold small">Location</label>
+                    <input
+                        v-model="locationModel"
+                        type="text"
+                        class="form-control border-sb shadow-none"
+                        placeholder="e.g. Starbucks..."
+                    />
+                </div>
+
+                <div class="col-lg-3 col-md-5 subject-filter-column">
+                    <label class="form-label fw-semibold small">Budget</label>
+                    <div class="budget-filter-wrap">
+                        <button
+                          type="button"
+                          class="btn w-100 budget-toggle-btn shadow-none rounded-4"
+                          :class="{ 'budget-toggle-btn-active': showBudgetFilter }"
+                          @click="showBudgetFilter = !showBudgetFilter"
+                        >
+                          <span class="budget-toggle-inline">{{ budgetSummary }}</span>
+                          <i class="bi" :class="showBudgetFilter ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
+                        </button>
+
+                        <div v-if="showBudgetFilter" class="budget-dropdown-panel">
+                          <BudgetRangeSlider
+                            v-model:min-value="minRateModel"
+                            v-model:max-value="maxRateModel"
+                            :min-limit="INITIAL_BUDGET_MIN"
+                            :max-limit="INITIAL_BUDGET_MAX"
+                            variant="dropdown"
+                          />
+                        </div>
+                    </div>
                 </div>
             </div>
         </form>
@@ -211,7 +226,7 @@
 <script setup>
 import { useRoute, useRouter, onBeforeRouteUpdate } from 'vue-router'
 import api from '@/services/api/api'
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, onMounted, watch } from 'vue'
 import BudgetRangeSlider from '@/components/BudgetRangeSlider.vue'
 
 import {
@@ -229,7 +244,7 @@ const initialbookStore = useInitialBookingPrefsStore()
 const bookedSessionStore = useBookedSessionStore()
 const findTutorsStore = useFindTutorsStore()
 
-const isLoading = ref(true)
+const isLoading = ref(false)
 const isSubmitting = ref(false)
 const activePicker = ref(null)
 const activePeriod = ref('AM')
@@ -262,6 +277,9 @@ const syncInitialBookingPrefs = (fields) => {
   if (Object.prototype.hasOwnProperty.call(fields, 'subject')) {
     initialbookStore.selectedSubject = fields.subject
   }
+  if (Object.prototype.hasOwnProperty.call(fields, 'location')) {
+    initialbookStore.selectedLocation = fields.location
+  }
   if (Object.prototype.hasOwnProperty.call(fields, 'mode')) {
     initialbookStore.selectedMode = fields.mode
   }
@@ -290,6 +308,11 @@ const updateFindTutorsFilters = (fields) => {
 const subjectModel = computed({
   get: () => findTutorsStore.filters.subject,
   set: (value) => updateFindTutorsFilters({ subject: value })
+})
+
+const locationModel = computed({
+  get: () => findTutorsStore.filters.location,
+  set: (value) => updateFindTutorsFilters({ location: value })
 })
 
 const modeModel = computed({
@@ -458,19 +481,10 @@ const ensureFindTutorsData = async () => {
   await runRecommendation()
 }
 
-const getNavigationFilters = (routeLike) => ({
-  subject: String(routeLike.query.subject || initialbookStore.selectedSubject || findTutorsStore.filters.subject || ''),
-  mode: initialbookStore.selectedMode || findTutorsStore.filters.mode || '',
-  date: initialbookStore.selectedDate || findTutorsStore.filters.date || null,
-  startTime: initialbookStore.selectedStartTime || findTutorsStore.filters.startTime || null,
-  endTime: initialbookStore.selectedEndTime || findTutorsStore.filters.endTime || null,
-  minRate: initialbookStore.selectedBudgetMin ?? findTutorsStore.filters.minRate ?? INITIAL_BUDGET_MIN,
-  maxRate: initialbookStore.selectedBudgetMax ?? findTutorsStore.filters.maxRate ?? INITIAL_BUDGET_MAX,
-})
-
 const searchTutor = async () => {
   const currentFilters = {
     subject: findTutorsStore.filters.subject,
+    location: findTutorsStore.filters.location,
     mode: findTutorsStore.filters.mode,
     date: findTutorsStore.filters.date,
     startTime: findTutorsStore.filters.startTime,
@@ -479,7 +493,7 @@ const searchTutor = async () => {
     maxRate: findTutorsStore.filters.maxRate,
   }
 
-  // Explicit search should invalidate old cache and refetch.
+  // Explicit search invalidates old cache and refetches
   findTutorsStore.reset()
   updateFindTutorsFilters(currentFilters)
 
@@ -487,7 +501,7 @@ const searchTutor = async () => {
   isLoading.value = true
 
   try {
-    await ensureFindTutorsData()
+    await runRecommendation()
   } catch (error) {
     console.error('CBF search failed:', error)
   } finally {
@@ -505,11 +519,42 @@ const toTutorDetails = (tutor) => {
   router.push(`/tutor/${tutor.profile_id}`)
 }
 
+// Save filters only (not results) to sessionStorage on every change
+watch(() => findTutorsStore.filters, (newFilters) => {
+  sessionStorage.setItem('find_tutors_filters', JSON.stringify(newFilters))
+}, { deep: true })
+
+// Save booking prefs when edited from this page
+watch(() => initialbookStore.$state, (newState) => {
+  sessionStorage.setItem('booking_prefs', JSON.stringify(newState))
+}, { deep: true })
+
 onMounted(async () => {
-  if (!findTutorsStore.hasFetched) {
-    updateFindTutorsFilters(getNavigationFilters(route))
+  // Restore filters from sessionStorage
+  const savedFilters = sessionStorage.getItem('find_tutors_filters')
+  if (savedFilters) {
+    findTutorsStore.setFilters(JSON.parse(savedFilters))
   }
 
+  // Fallback to booking prefs if no filters saved
+  if (!findTutorsStore.filters.subject) {
+    const savedPrefs = sessionStorage.getItem('booking_prefs')
+    if (savedPrefs) {
+      const parsed = JSON.parse(savedPrefs)
+      findTutorsStore.setFilters({
+        subject: parsed.selectedSubject,
+        location: parsed.selectedLocation,
+        mode: parsed.selectedMode,
+        date: parsed.selectedDate,
+        startTime: parsed.selectedStartTime,
+        endTime: parsed.selectedEndTime,
+        minRate: parsed.selectedBudgetMin,
+        maxRate: parsed.selectedBudgetMax,
+      })
+    }
+  }
+
+  // Load subjects
   try {
     const res = await api.get('/subjects/')
     subjects.value = res.data
@@ -517,25 +562,20 @@ onMounted(async () => {
     console.error('Failed to load subjects', error)
   }
 
+  // Fetch tutors if we have a subject (ensureFindTutorsData already prevents duplicate fetches)
   if (findTutorsStore.filters.subject) {
+    isLoading.value = true
     try {
       await ensureFindTutorsData()
     } catch (error) {
       console.error('CBF search failed:', error)
+    } finally {
+      isLoading.value = false
     }
-    isLoading.value = false
-  } else {
-    isLoading.value = false
   }
 })
 
 onBeforeRouteUpdate(async (to, from, next) => {
-  if (to.name === 'tutors') {
-    if (!findTutorsStore.hasFetched) {
-      updateFindTutorsFilters(getNavigationFilters(to))
-    }
-  }
-
   if (to.name === 'tutors' && findTutorsStore.filters.subject && !findTutorsStore.hasFetched) {
     isLoading.value = true
     try {

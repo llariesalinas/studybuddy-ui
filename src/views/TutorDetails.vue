@@ -688,6 +688,9 @@ const confirmBooking = async () => {
     bookedSessionStore.resetStore()
     selectedSlots.value = []
 
+    sessionStorage.removeItem('booking_prefs')
+    sessionStorage.removeItem('find_tutors_filters')
+
     router.push({
       name: 'dashboard',
       query: { refresh: Date.now() }

@@ -6,6 +6,7 @@ export const INITIAL_BUDGET_MAX = 1000
 
 export const useInitialBookingPrefsStore = defineStore('initialBookingPrefs', () => {
     const selectedSubject = ref('')
+    const selectedLocation = ref('')
     const selectedDate = ref(null)
     const selectedMode = ref('')
     const selectedStartTime = ref(null)
@@ -15,6 +16,7 @@ export const useInitialBookingPrefsStore = defineStore('initialBookingPrefs', ()
 
     const resetPreferences = () => {
         selectedSubject.value = ''
+        selectedLocation.value = ''
         selectedDate.value = null
         selectedMode.value = ''
         selectedStartTime.value = null
@@ -25,6 +27,7 @@ export const useInitialBookingPrefsStore = defineStore('initialBookingPrefs', ()
 
     return {
       selectedSubject,
+      selectedLocation,
       selectedDate,
       selectedMode,
       selectedStartTime,
