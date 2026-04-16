@@ -1,10 +1,5 @@
 <template>
     <div class="p-4">
-        <div class="mb-4">
-            <h2 class="fw-bold text-dark">Find Tutors</h2>
-            <p class="text-muted">Browse peer tutors matched to your learning needs.</p>
-        </div>
-
         <form @submit.prevent="searchTutor">
             <div class="row mb-5 g-3 align-items-start">
                 <div class="col-lg-3 col-md-5 subject-filter-column">
