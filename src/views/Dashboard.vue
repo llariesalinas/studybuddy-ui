@@ -1,8 +1,8 @@
 <template>
-  <div class="p-4">
+  <div class="dashboard-page p-4">
     <div class="row g-4 mb-5">
       <div v-for="(stat, index) in stats" :key="index" class="col-md-3">
-        <div class="card border-sb shadow-sm rounded-4 h-100 p-3 d-flex flex-row align-items-center">
+        <div class="card border-sb shadow-sm rounded-4 h-100 p-3 d-flex flex-row align-items-center stat-card">
           <div :class="[stat.bgClass, 'p-3 rounded-4 me-3']">
             <i :class="[stat.icon, 'text-sb-primary fs-3']"></i>
           </div>
@@ -19,33 +19,37 @@
       </div>
     </div>
 
-    <div class="row g-4">
-      <div class="col-md-8">
-        <div class="card border-sb border-1 shadow-sm rounded-4" style="height: 520px;">
-          <div class="card-body p-4 p-md-4 d-flex flex-column h-100 overflow-hidden">
-            <header class="d-flex justify-content-between align-items-end mb-4 flex-shrink-0">
+    <div class="row g-4 align-items-stretch">
+      <div class="col-xl-8">
+        <div class="card border-0 shadow-sm rounded-4 weekly-board-card h-100">
+          <div class="card-body p-4 p-xl-4 d-flex flex-column h-100">
+            <header class="weekly-board-header d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
               <div>
-                <h4 class="fw-bold mb-1 d-flex align-items-center">
-                  <i class="bi bi-file-earmark-text text-sb-primary me-3"></i>This week's schedule
-                </h4>
+                <p class="weekly-board-kicker mb-2">Weekly Schedule</p>
+                <h4 class="weekly-board-title mb-1">Your Sessions This Week</h4>
+                <p class="weekly-board-subtitle mb-0">
+                  Review your booked sessions across the week and open any session details in one click.
+                </p>
               </div>
-              <div class="d-flex align-items-center gap-2">
+              <div class="d-flex align-items-center gap-2 align-self-start align-self-lg-auto weekly-board-nav">
                 <button
                   type="button"
                   class="schedule-nav-btn"
-                  :disabled="selectedDayIndex === 0"
-                  @click="goToPreviousDay"
-                  aria-label="Previous day"
+                  :disabled="!canGoToPreviousWeek"
+                  @click="goToPreviousWeek"
+                  aria-label="Previous week"
                 >
                   <i class="bi bi-chevron-left"></i>
                 </button>
-                <p class="text-muted mb-0 small schedule-date-label">{{ formattedSelectedDate }}</p>
+                <div class="week-range-pill">
+                  {{ formattedWeekRange }}
+                </div>
                 <button
                   type="button"
                   class="schedule-nav-btn"
-                  :disabled="selectedDayIndex === 6"
-                  @click="goToNextDay"
-                  aria-label="Next day"
+                  :disabled="!canGoToNextWeek"
+                  @click="goToNextWeek"
+                  aria-label="Next week"
                 >
                   <i class="bi bi-chevron-right"></i>
                 </button>
@@ -53,80 +57,62 @@
             </header>
 
             <Transition name="fade" mode="out-in">
-              <div v-if="loading" class="flex-grow-1 w-100 placeholder-glow overflow-hidden">
-                <div class="d-flex position-relative w-100 h-100">
-                  <div class="d-flex flex-column text-end pe-3 border-end" style="width: 90px; justify-content: space-between;">
-                    <div v-for="i in 4" :key="'skel-time-' + i" style="height: 80px;">
-                      <span class="placeholder col-10 rounded"></span>
+              <div v-if="loading" class="weekly-board-skeleton flex-grow-1">
+                <div class="weekly-grid">
+                  <div v-for="i in 7" :key="'skeleton-day-' + i" class="day-column day-column-skeleton">
+                    <div class="day-header">
+                      <span class="placeholder col-5 rounded mb-2"></span>
+                      <span class="placeholder col-7 rounded"></span>
                     </div>
-                  </div>
-                  <div class="flex-grow-1 ms-3 position-relative">
-                    <div v-for="i in 4" :key="'skel-line-' + i" class="border-bottom w-100 opacity-25" style="height: 80px;"></div>
-                    <div class="position-absolute start-0 w-100 rounded-4 p-3 bg-secondary bg-opacity-10 border-start border-4 border-secondary" style="top: 30px; height: 90px;">
-                      <span class="placeholder col-3 rounded mb-2"></span><br>
-                      <span class="placeholder col-6 rounded"></span>
-                    </div>
-                    <div class="position-absolute start-0 w-100 rounded-4 p-3 bg-secondary bg-opacity-10 border-start border-4 border-secondary" style="top: 180px; height: 70px;">
-                      <span class="placeholder col-2 rounded mb-2"></span><br>
-                      <span class="placeholder col-5 rounded"></span>
+                    <div class="day-body">
+                      <div v-for="j in 2" :key="'skeleton-card-' + i + '-' + j" class="session-card-skeleton placeholder-glow">
+                        <span class="placeholder col-4 rounded mb-2"></span>
+                        <span class="placeholder col-8 rounded mb-2"></span>
+                        <span class="placeholder col-6 rounded"></span>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div v-else class="flex-grow-1 overflow-auto pe-2 custom-scrollbar">
-                <div class="d-flex position-relative mt-2 w-100" :style="{ minHeight: `${agendaRange.timeLabels.length * HOUR_ROW_HEIGHT}px` }">
-                  <div
-                    class="d-flex flex-column text-end pe-3 border-end text-muted small fw-bold text-uppercase"
-                    style="width: 90px; justify-content: space-between; font-size: 0.7rem;"
+              <div v-else class="weekly-board-scroll custom-scrollbar flex-grow-1">
+                <div class="weekly-grid">
+                  <article
+                    v-for="day in weekDays"
+                    :key="day.key"
+                    class="day-column"
+                    :class="{ 'day-column-today': day.isToday }"
                   >
-                    <div v-for="hour in agendaRange.timeLabels" :key="hour" :style="{ height: `${HOUR_ROW_HEIGHT}px` }">
-                      {{ formatHour(hour) }}
-                    </div>
-                  </div>
-
-                  <div class="position-relative flex-grow-1 ms-3">
-                    <div class="position-absolute w-100 h-100 d-flex flex-column justify-content-between pointer-events-none" style="z-index: 0;">
-                      <div
-                        v-for="hour in agendaRange.timeLabels"
-                        :key="'line-' + hour"
-                        class="border-bottom w-100 opacity-25"
-                        :style="{ height: `${HOUR_ROW_HEIGHT}px` }"
-                      ></div>
+                    <div class="day-header">
+                      <p class="day-name mb-1">{{ day.shortName }}</p>
+                      <p class="day-date mb-0">{{ day.date.getDate() }}</p>
                     </div>
 
-                    <div
-                      v-for="session in selectedScheduleCards"
-                      :key="session.id"
-                      class="position-absolute border-start border-4 rounded-4 p-3 d-flex justify-content-between align-items-start shadow-sm session-card"
-                      :class="getSessionCardClasses(session.status)"
-                      :style="getSessionStyle(session)"
-                      @click="goToDetails(session.id)"
-                    >
-                      <div class="flex-grow-1 min-w-0">
-                        <div class="d-flex align-items-center gap-2 mb-1">
-                          <span
-                            v-if="session.status.toLowerCase() === 'ongoing'"
-                            class="spinner-grow spinner-grow-sm text-warning"
-                            style="width: 8px; height: 8px;"
-                          ></span>
-                          <span class="fw-bold text-uppercase session-card-label">{{ session.status }}</span>
+                    <div class="day-body">
+                      <button
+                        v-for="session in daySessionsMap[day.key]"
+                        :key="session.id"
+                        type="button"
+                        class="weekly-session-card"
+                        :class="getWeeklySessionCardClasses(session.status)"
+                        :style="getSessionCardStyle(session)"
+                        @click="goToDetails(session.id)"
+                      >
+                        <p class="weekly-session-time mb-2">{{ formatSessionTime(session) }}</p>
+                        <h6 class="weekly-session-title mb-1">{{ session.subject }}</h6>
+                        <p class="weekly-session-tutor mb-2">{{ session.tutor }}</p>
+                        <div class="d-flex align-items-center justify-content-between gap-2">
+                          <span class="weekly-session-status">{{ session.status }}</span>
+                          <span class="weekly-session-duration">{{ getSessionSlotSpan(session) }} slot{{ getSessionSlotSpan(session) === 1 ? '' : 's' }}</span>
                         </div>
-                        <h6 class="fw-bold text-dark mb-1 session-card-title">{{ session.subject }}</h6>
-                        <p class="text-muted small mb-0 session-card-meta">
-                          {{ session.startTime }} - {{ session.endTime }} | {{ session.tutor }}
-                        </p>
+                      </button>
+
+                      <div v-if="!daySessionsMap[day.key]?.length" class="day-empty-state">
+                        <i :class="getEmptyStateIcon(day.index)"></i>
+                        <span>{{ getEmptyStateLabel(day.index) }}</span>
                       </div>
-
-                      <i v-if="session.status.toLowerCase() === 'completed'" class="bi bi-check-circle-fill text-success fs-5 ms-2"></i>
-                      <i v-else-if="session.status.toLowerCase() === 'ongoing'" class="bi bi-play-circle-fill text-warning fs-5 ms-2"></i>
-                      <i v-else class="bi bi-calendar-event text-primary fs-5 ms-2"></i>
                     </div>
-
-                    <div v-if="selectedScheduleCards.length === 0" class="h-100 d-flex align-items-center justify-content-center text-center text-muted small px-4">
-                      No sessions scheduled for {{ selectedDayName.toLowerCase() }}.
-                    </div>
-                  </div>
+                  </article>
                 </div>
               </div>
             </Transition>
@@ -134,10 +120,14 @@
         </div>
       </div>
 
-      <div class="col-md-4">
-        <div class="card border-sb shadow-sm rounded-4" style="height: 520px;">
-          <div class="card-body p-4 d-flex flex-column" style="height: 100%;">
-            <h4 class="fw-bold mb-3">Try out these tutors</h4>
+      <div class="col-xl-4">
+        <div class="card border-sb shadow-sm rounded-4 recommendations-card h-100">
+          <div class="card-body p-4 d-flex flex-column h-100">
+            <div class="mb-3">
+              <p class="weekly-board-kicker mb-2">Discover</p>
+              <h4 class="fw-bold mb-1">Try out these tutors</h4>
+              <p class="text-muted small mb-0">Browse recommended tutors without leaving your dashboard rhythm.</p>
+            </div>
 
             <div class="flex-grow-1 d-flex flex-column overflow-hidden">
               <Transition name="fade" mode="out-in">
@@ -165,9 +155,8 @@
                       <div
                         v-for="tutor in pagedTutors"
                         :key="tutor.id"
-                        class="list-group-item d-flex justify-content-between align-items-center py-2"
+                        class="list-group-item d-flex justify-content-between align-items-center py-2 tutor-list-item"
                         @click="bookTutor(tutor.id)"
-                        style="cursor: pointer;"
                       >
                         <div>
                           <h6 class="mb-1">{{ tutor.name }}</h6>
@@ -198,13 +187,10 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useSessionsStore } from '@/stores/completedSessions'
 
-const HOUR_ROW_HEIGHT = 80
-const MIN_SESSION_CARD_HEIGHT = 76
-
 const router = useRouter()
 const sessionsStore = useSessionsStore()
 const loading = ref(false)
-const selectedDayIndex = ref(0)
+const weekOffset = ref(0)
 
 onMounted(async () => {
   loading.value = true
@@ -233,38 +219,83 @@ const getStartOfWeek = (date) => {
   return start
 }
 
+const addDays = (date, days) => {
+  const next = new Date(date)
+  next.setDate(next.getDate() + days)
+  return next
+}
+
+const getEndOfMonth = (date) => {
+  return new Date(date.getFullYear(), date.getMonth() + 1, 0)
+}
+
 const getDateKey = (date) => `${date.getFullYear()}-${padNumber(date.getMonth() + 1)}-${padNumber(date.getDate())}`
 
-const now = new Date()
-const startOfWeek = getStartOfWeek(now)
-selectedDayIndex.value = Math.max(0, Math.min(6, (now.getDay() + 6) % 7))
+const today = new Date()
+const monthStart = new Date(today.getFullYear(), today.getMonth(), 1)
+const monthEnd = getEndOfMonth(today)
+const baseStartOfWeek = getStartOfWeek(today)
+const minVisibleWeekStart = getStartOfWeek(monthStart)
+const maxVisibleWeekStart = getStartOfWeek(monthEnd)
+const MS_PER_WEEK = 7 * 24 * 60 * 60 * 1000
+const minWeekOffset = Math.round((minVisibleWeekStart.getTime() - baseStartOfWeek.getTime()) / MS_PER_WEEK)
+const maxWeekOffset = Math.round((maxVisibleWeekStart.getTime() - baseStartOfWeek.getTime()) / MS_PER_WEEK)
+
+const visibleStartOfWeek = computed(() => addDays(baseStartOfWeek, weekOffset.value * 7))
+const visibleEndOfWeek = computed(() => addDays(visibleStartOfWeek.value, 6))
+const canGoToPreviousWeek = computed(() => weekOffset.value > minWeekOffset)
+const canGoToNextWeek = computed(() => weekOffset.value < maxWeekOffset)
 
 const weekDays = computed(() =>
   Array.from({ length: 7 }, (_, index) => {
-    const date = new Date(startOfWeek)
-    date.setDate(startOfWeek.getDate() + index)
+    const date = addDays(visibleStartOfWeek.value, index)
 
     return {
       index,
       date,
       key: getDateKey(date),
-      dayName: date.toLocaleDateString('en-US', { weekday: 'long' }),
-      label: date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+      isToday: getDateKey(date) === getDateKey(today),
+      shortName: date.toLocaleDateString('en-US', { weekday: 'short' }),
+      headerLabel: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
     }
   })
 )
 
-const selectedWeekDay = computed(() => weekDays.value[selectedDayIndex.value] || weekDays.value[0])
-const selectedDateKey = computed(() => selectedWeekDay.value?.key || '')
-const selectedDayName = computed(() => selectedWeekDay.value?.dayName || 'Today')
-const formattedSelectedDate = computed(() => selectedWeekDay.value?.label || '')
+const formattedWeekRange = computed(() => {
+  const start = visibleStartOfWeek.value
+  const end = visibleEndOfWeek.value
 
-const selectedDaySessions = computed(() => {
+  const startMonth = start.toLocaleDateString('en-US', { month: 'short' })
+  const endMonth = end.toLocaleDateString('en-US', { month: 'short' })
+  const year = end.getFullYear()
+
+  if (startMonth === endMonth) {
+    return `${startMonth} ${start.getDate()} - ${end.getDate()}, ${year}`
+  }
+
+  return `${startMonth} ${start.getDate()} - ${endMonth} ${end.getDate()}, ${year}`
+})
+
+const visibleSessions = computed(() => {
+  const startKey = getDateKey(visibleStartOfWeek.value)
+  const endKey = getDateKey(visibleEndOfWeek.value)
   const allSessions = sessionsStore.sessions || []
 
   return allSessions
-    .filter((session) => session.date === selectedDateKey.value && !['pending', 'cancelled', 'rejected'].includes(session?.status?.toLowerCase()))
+    .filter((session) => {
+      const normalizedStatus = String(session?.status || '').toLowerCase()
+
+      return (
+        session.date >= startKey
+        && session.date <= endKey
+        && !['pending', 'cancelled', 'rejected'].includes(normalizedStatus)
+      )
+    })
     .sort((left, right) => {
+      if (left.date !== right.date) {
+        return new Date(left.date) - new Date(right.date)
+      }
+
       const startDifference = parseTimeToMinutes(left.startTime) - parseTimeToMinutes(right.startTime)
 
       if (startDifference !== 0) {
@@ -275,110 +306,131 @@ const selectedDaySessions = computed(() => {
     })
 })
 
-const agendaRange = computed(() => {
-  if (selectedDaySessions.value.length === 0) {
-    return { start: 9, end: 17, timeLabels: [9, 10, 11, 12, 13, 14, 15, 16, 17] }
-  }
+const mergeSessionsForDisplay = (sessions = []) => {
+  const mergedSessions = []
 
-  const hours = selectedDaySessions.value.flatMap((session) => [
-    Math.floor(parseTimeToMinutes(session.startTime) / 60),
-    Math.ceil(parseTimeToMinutes(session.endTime) / 60)
-  ])
+  sessions.forEach((session) => {
+    const previousSession = mergedSessions.at(-1)
 
-  const start = Math.max(0, Math.min(...hours) - 1)
-  const end = Math.min(23, Math.max(...hours) + 1)
-  const timeLabels = []
-
-  for (let hour = start; hour <= end; hour += 1) {
-    timeLabels.push(hour)
-  }
-
-  return { start, end, timeLabels }
-})
-
-const formatHour = (hourValue) => {
-  const suffix = hourValue >= 12 ? 'PM' : 'AM'
-  const hour = hourValue % 12 || 12
-  return `${String(hour).padStart(2, '0')}:00 ${suffix}`
-}
-
-const selectedScheduleCards = computed(() => {
-  const laneEndTimes = []
-
-  const cards = selectedDaySessions.value.map((session) => {
-    const sessionStartMins = parseTimeToMinutes(session.startTime)
-    const sessionEndMins = parseTimeToMinutes(session.endTime)
-
-    let lane = laneEndTimes.findIndex((endTime) => endTime <= sessionStartMins)
-
-    if (lane === -1) {
-      lane = laneEndTimes.length
-      laneEndTimes.push(sessionEndMins)
-    } else {
-      laneEndTimes[lane] = sessionEndMins
+    if (!previousSession) {
+      mergedSessions.push({ ...session })
+      return
     }
 
-    return {
-      ...session,
-      lane,
-      top: ((sessionStartMins - (agendaRange.value.start * 60)) / 60) * HOUR_ROW_HEIGHT,
-      height: Math.max(((sessionEndMins - sessionStartMins) / 60) * HOUR_ROW_HEIGHT, MIN_SESSION_CARD_HEIGHT),
-    }
-  })
-
-  return cards.map((card) => {
-    const overlappingCards = cards.filter((otherCard) =>
-      parseTimeToMinutes(otherCard.startTime) < parseTimeToMinutes(card.endTime)
-      && parseTimeToMinutes(otherCard.endTime) > parseTimeToMinutes(card.startTime)
+    const sameDay = previousSession.date === session.date
+    const previousEndsAt = parseTimeToMinutes(previousSession.endTime)
+    const nextStartsAt = parseTimeToMinutes(session.startTime)
+    const isContinuous = previousEndsAt === nextStartsAt
+    const sameGroup = previousSession.session_group_id && previousSession.session_group_id === session.session_group_id
+    const sameSessionMeta = (
+      previousSession.subject === session.subject
+      && previousSession.tutor === session.tutor
+      && String(previousSession.status || '').toLowerCase() === String(session.status || '').toLowerCase()
     )
 
-    return {
-      ...card,
-      laneCount: Math.max(...overlappingCards.map((otherCard) => otherCard.lane + 1), 1),
+    if (sameDay && isContinuous && (sameGroup || sameSessionMeta)) {
+      previousSession.endTime = session.endTime
+      previousSession.duration_hours = (previousSession.duration_hours || 0) + (session.duration_hours || 0)
+      return
+    }
+
+    mergedSessions.push({ ...session })
+  })
+
+  return mergedSessions
+}
+
+const daySessionsMap = computed(() => {
+  const groupedSessions = {}
+
+  weekDays.value.forEach((day) => {
+    groupedSessions[day.key] = []
+  })
+
+  mergeSessionsForDisplay(visibleSessions.value).forEach((session) => {
+    if (groupedSessions[session.date]) {
+      groupedSessions[session.date].push(session)
     }
   })
+
+  return groupedSessions
 })
 
-const getSessionCardClasses = (status) => {
+const formatDisplayTime = (timeStr = '00:00') => {
+  const [hours = 0, minutes = 0] = String(timeStr).split(':').map(Number)
+  const suffix = hours >= 12 ? 'PM' : 'AM'
+  const hour = hours % 12 || 12
+  return `${hour}:${String(minutes).padStart(2, '0')} ${suffix}`
+}
+
+const formatSessionTime = (session) => `${formatDisplayTime(session.startTime)} - ${formatDisplayTime(session.endTime)}`
+
+const getSessionDurationMinutes = (session) => {
+  const duration = parseTimeToMinutes(session.endTime) - parseTimeToMinutes(session.startTime)
+  return duration > 0 ? duration : 30
+}
+
+const getSessionSlotSpan = (session) => Math.max(1, Math.ceil(getSessionDurationMinutes(session) / 30))
+
+const getSessionCardStyle = (session) => ({
+  minHeight: `${Math.max(74, getSessionSlotSpan(session) * 42)}px`
+})
+
+const getEmptyStateLabel = (dayIndex) => {
+  if (dayIndex === 5) {
+    return 'No Sessions'
+  }
+
+  if (dayIndex === 6) {
+    return 'Open Day'
+  }
+
+  return 'No sessions'
+}
+
+const getEmptyStateIcon = (dayIndex) => {
+  if (dayIndex === 5) {
+    return 'bi bi-moon-stars'
+  }
+
+  if (dayIndex === 6) {
+    return 'bi bi-book'
+  }
+
+  return 'bi bi-calendar2-x'
+}
+
+const getWeeklySessionCardClasses = (status) => {
   const normalizedStatus = String(status || '').toLowerCase()
 
+  if (normalizedStatus === 'pending') {
+    return 'weekly-session-card-pending'
+  }
+
   if (normalizedStatus === 'completed') {
-    return 'bg-success bg-opacity-10 border-success'
+    return 'weekly-session-card-completed'
   }
 
   if (normalizedStatus === 'ongoing') {
-    return 'bg-warning bg-opacity-10 border-warning'
+    return 'weekly-session-card-ongoing'
   }
 
   if (normalizedStatus === 'awaiting verification' || normalizedStatus === 'payment required') {
-    return 'bg-secondary bg-opacity-10 border-secondary'
+    return 'weekly-session-card-verification'
   }
 
-  return 'bg-info bg-opacity-10 border-primary'
+  return 'weekly-session-card-upcoming'
 }
 
-const getSessionStyle = (session) => {
-  const gap = 12
-  const width = `calc((100% - ${(session.laneCount - 1) * gap}px) / ${session.laneCount})`
-  const left = `calc((${width} + ${gap}px) * ${session.lane})`
-
-  return {
-    top: `${session.top}px`,
-    left,
-    width,
-    height: `${session.height}px`
+const goToPreviousWeek = () => {
+  if (canGoToPreviousWeek.value) {
+    weekOffset.value -= 1
   }
 }
 
-const goToPreviousDay = () => {
-  if (selectedDayIndex.value > 0) {
-    selectedDayIndex.value -= 1
-  }
-}
-
-const goToNextDay = () => {
-  if (selectedDayIndex.value < 6) {
-    selectedDayIndex.value += 1
+const goToNextWeek = () => {
+  if (canGoToNextWeek.value) {
+    weekOffset.value += 1
   }
 }
 
@@ -439,32 +491,86 @@ const bookTutor = (id) => router.push({
   opacity: 0;
 }
 
-.custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
+.dashboard-page {
+  color: #163127;
 }
 
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #e2e8f0;
-  border-radius: 10px;
+.stat-card,
+.recommendations-card,
+.weekly-board-card {
+  background:
+    radial-gradient(circle at top right, rgba(111, 251, 190, 0.12), transparent 32%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), #ffffff);
 }
 
-.schedule-nav-btn {
-  width: 34px;
-  height: 34px;
-  border: 1px solid #dbe6e1;
-  border-radius: 999px;
+.weekly-board-card {
+  min-height: 500px;
   background: #ffffff;
-  color: #0a7a51;
+}
+
+.weekly-board-kicker {
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #6b7d74;
+}
+
+.weekly-board-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #111827;
+}
+
+.weekly-board-subtitle {
+  color: #6b7280;
+  font-size: 0.9rem;
+}
+
+.weekly-board-header {
+  padding-bottom: 0.5rem;
+}
+
+.weekly-board-nav {
+  background: #f2f4f6;
+  border-radius: 999px;
+  padding: 0.3rem;
+}
+
+.week-range-pill {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  min-width: 180px;
+  min-height: 38px;
+  padding: 0.45rem 0.85rem;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #111827;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-align: center;
+  box-shadow: 0 1px 2px rgba(17, 24, 39, 0.06);
+}
+
+.schedule-nav-btn {
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #4b5563;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 
 .schedule-nav-btn:hover:not(:disabled) {
-  background: #edf7f2;
-  border-color: #b8ddcc;
-  box-shadow: 0 6px 14px rgba(0, 137, 90, 0.12);
+  background: #ffffff;
+  color: #111827;
+  box-shadow: 0 1px 2px rgba(17, 24, 39, 0.08);
 }
 
 .schedule-nav-btn:disabled {
@@ -473,30 +579,264 @@ const bookTutor = (id) => router.push({
   cursor: not-allowed;
 }
 
-.schedule-date-label {
-  min-width: 160px;
+.custom-scrollbar::-webkit-scrollbar {
+  height: 8px;
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #d6e2dd;
+  border-radius: 999px;
+}
+
+.weekly-board-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 4px;
+}
+
+.weekly-board-skeleton {
+  overflow: hidden;
+}
+
+.weekly-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+  min-width: 0;
+  align-items: start;
+}
+
+.day-column {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-height: 380px;
+  min-width: 0;
+  border-radius: 18px;
+  background: transparent;
+  overflow: hidden;
+}
+
+.day-column:nth-child(odd) .day-body {
+  background: rgba(242, 244, 246, 0.42);
+}
+
+.day-column:nth-child(even) .day-body {
+  background: #f2f4f6;
+}
+
+.day-column-today {
+  border-radius: 18px;
+}
+
+.day-column-today .day-date {
+  color: #0f172a;
+}
+
+.day-header {
+  padding: 0 0.3rem 0.65rem;
+  background: transparent;
   text-align: center;
 }
 
-.session-card {
-  cursor: pointer;
-  transition: all 0.2s ease-in-out;
+.day-name {
+  font-size: 0.62rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: #8a9099;
+}
+
+.day-date {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #111827;
+  line-height: 1;
+}
+
+.day-body {
+  display: grid;
+  align-content: start;
+  gap: 0.55rem;
+  padding: 0.55rem;
+  border-radius: 14px;
+  min-height: 332px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-width: 0;
+}
+
+.weekly-session-card {
+  width: 100%;
+  border: 0;
+  border-radius: 12px;
+  padding: 0.7rem 0.65rem;
+  text-align: left;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+  box-shadow: 0 1px 2px rgba(17, 24, 39, 0.08);
+  min-width: 0;
   overflow: hidden;
 }
 
-.session-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 8px 15px rgba(0, 0, 0, 0.08) !important;
+.weekly-session-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgba(17, 24, 39, 0.08);
 }
 
-.session-card-label {
-  font-size: 0.65rem;
-  letter-spacing: 1px;
+.weekly-session-card-upcoming {
+  background: #f8fbff;
+  border-left: 4px solid #0dcaf0;
 }
 
-.session-card-title,
-.session-card-meta {
+.weekly-session-card-ongoing {
+  background: #f5f9ff;
+  border-left: 4px solid #0d6efd;
+}
+
+.weekly-session-card-completed {
+  background: #f2fbf5;
+  border-left: 4px solid #198754;
+}
+
+.weekly-session-card-verification {
+  background: #fff9ef;
+  border-left: 4px solid #ffc107;
+}
+
+.weekly-session-card-pending {
+  background: #fff9ef;
+  border-left: 4px solid #ffc107;
+}
+
+.weekly-session-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: #f3f4f6;
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #4b5563;
+}
+
+.weekly-session-card-upcoming .weekly-session-status {
+  background: rgba(13, 202, 240, 0.12);
+  color: #087990;
+}
+
+.weekly-session-card-ongoing .weekly-session-status {
+  background: rgba(13, 110, 253, 0.12);
+  color: #0a58ca;
+}
+
+.weekly-session-card-completed .weekly-session-status {
+  background: rgba(25, 135, 84, 0.12);
+  color: #146c43;
+}
+
+.weekly-session-card-verification .weekly-session-status,
+.weekly-session-card-pending .weekly-session-status {
+  background: rgba(255, 193, 7, 0.18);
+  color: #997404;
+}
+
+.weekly-session-title {
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.3;
+  color: #111827;
+  word-break: break-word;
+}
+
+.weekly-session-time {
+  font-size: 0.62rem;
+  font-weight: 800;
+  color: #006c49;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.weekly-session-tutor {
+  font-size: 0.66rem;
+  color: #6b7280;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.weekly-session-duration {
+  font-size: 0.58rem;
+  font-weight: 700;
+  color: #6b7280;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+
+.day-empty-state {
+  min-height: 110px;
+  border: 1px dashed #d2d7de;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.72);
+  display: grid;
+  place-items: center;
+  gap: 0.45rem;
+  padding: 0.75rem;
+  text-align: center;
+  color: #8a9099;
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.day-empty-state i {
+  font-size: 1rem;
+}
+
+.session-card-skeleton {
+  width: 100%;
+  padding: 0.75rem;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 8px 20px rgba(19, 41, 34, 0.04);
+}
+
+.tutor-list-item {
+  cursor: pointer;
+}
+
+@media (max-width: 1199px) {
+  .weekly-grid {
+    grid-template-columns: repeat(7, minmax(118px, 1fr));
+    min-width: 860px;
+  }
+}
+
+@media (max-width: 991px) {
+  .week-range-pill {
+    min-width: 160px;
+  }
+}
+
+@media (max-width: 767px) {
+  .dashboard-page {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  .weekly-grid {
+    grid-template-columns: repeat(7, minmax(150px, 1fr));
+    min-width: 1080px;
+  }
+
+  .weekly-board-header {
+    align-items: flex-start !important;
+  }
 }
 </style>
