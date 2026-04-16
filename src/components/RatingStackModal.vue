@@ -43,27 +43,34 @@
           </div>
 
           <p class="rating-stack-copy">
-            How was your session with {{ activeSession.tutor || 'your tutor' }}?
+            How was your experience with <strong>{{ activeSession.tutor || 'your tutor' }}</strong>?
           </p>
 
-          <div class="rating-stars">
-            <button
-              v-for="star in 5"
-              :key="star"
-              type="button"
-              class="rating-star-btn"
-              :class="{ active: currentRating >= star }"
-              @click="currentRating = star"
-            >
-              <i class="bi" :class="currentRating >= star ? 'bi-star-fill' : 'bi-star'"></i>
-            </button>
+          <div class="rating-sections">
+            <div v-for="cat in ratingCategories" :key="cat.id" class="rating-category-item">
+              <div class="rating-stars">
+                <button
+                  v-for="star in 5"
+                  :key="star"
+                  type="button"
+                  class="rating-star-btn-sm"
+                  :class="{ active: ratings[cat.id] >= star }"
+                  @click="ratings[cat.id] = star"
+                >
+                  <i class="bi" :class="ratings[cat.id] >= star ? 'bi-star-fill' : 'bi-star'"></i>
+                </button>
+              </div>
+              <span class="rating-category-label" :class="{ 'text-dark': ratings[cat.id] > 0 }">
+                {{ cat.label }}
+              </span>
+            </div>
           </div>
 
           <textarea
             v-model="ratingComment"
             class="form-control rating-stack-textarea"
-            rows="3"
-            placeholder="Add an optional comment"
+            rows="2"
+            placeholder="Additional feedback (optional)..."
           ></textarea>
         </div>
 
@@ -74,17 +81,17 @@
             :disabled="activeIndex === 0"
             @click="goToPrevious"
           >
-            Newer
+            Previous
           </button>
 
           <div class="rating-stack-actions">
             <button type="button" class="btn btn-outline-secondary" @click="goToNextOrClose">
-              Skip for Now
+              Skip
             </button>
             <button
               type="button"
               class="btn bg-sb-primary text-white"
-              :disabled="currentRating === 0 || isSubmitting"
+              :disabled="!isFormValid || isSubmitting"
               @click="submitRating"
             >
               {{ isSubmitting ? 'Submitting...' : 'Submit Rating' }}
@@ -97,108 +104,91 @@
 </template>
 
 <script setup>
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch, onUnmounted } from 'vue'
 import { useSessionsStore } from '@/stores/completedSessions'
 
 const props = defineProps({
-  open: {
-    type: Boolean,
-    default: false
-  },
-  sessions: {
-    type: Array,
-    default: () => []
-  },
-  initialSessionId: {
-    type: [String, Number],
-    default: null
-  }
+  open: { type: Boolean, default: false },
+  sessions: { type: Array, default: () => [] },
+  initialSessionId: { type: [String, Number], default: null }
 })
 
 const emit = defineEmits(['close', 'rated'])
-
 const sessionsStore = useSessionsStore()
+
 const activeIndex = ref(0)
-const currentRating = ref(0)
 const ratingComment = ref('')
 const isSubmitting = ref(false)
 
+const ratingCategories = [
+  { id: 'preparation', label: 'Preparation' },
+  { id: 'clarity', label: 'Clarity' },
+  { id: 'punctuality', label: 'Punctuality' },
+  { id: 'overall', label: 'Overall Experience'}
+]
+
+const ratings = ref(
+  ratingCategories.reduce((acc, cat) => ({ ...acc, [cat.id]: 0 }), {})
+)
+
 const activeSession = computed(() => props.sessions[activeIndex.value] || null)
 
+const isFormValid = computed(() => {
+  return ratingCategories.every(cat => ratings.value[cat.id] > 0)
+})
+
 const resetDraft = () => {
-  currentRating.value = 0
+  Object.keys(ratings.value).forEach(key => (ratings.value[key] = 0))
   ratingComment.value = ''
 }
 
 const setInitialIndex = () => {
-  if (!props.sessions.length) {
-    activeIndex.value = 0
-    return
-  }
-
+  if (!props.sessions.length) return
   if (props.initialSessionId != null) {
-    const matchedIndex = props.sessions.findIndex(
-      session => String(session.id) === String(props.initialSessionId)
-    )
-
-    activeIndex.value = matchedIndex >= 0 ? matchedIndex : 0
-    return
+    const idx = props.sessions.findIndex(s => String(s.id) === String(props.initialSessionId))
+    activeIndex.value = idx >= 0 ? idx : 0
+  } else {
+    activeIndex.value = 0
   }
-
-  activeIndex.value = 0
 }
 
 const goToPrevious = () => {
-  if (activeIndex.value === 0) {
-    return
+  if (activeIndex.value > 0) {
+    activeIndex.value--
+    resetDraft()
   }
-
-  activeIndex.value -= 1
-  resetDraft()
 }
 
 const goToNextOrClose = () => {
   if (activeIndex.value < props.sessions.length - 1) {
-    activeIndex.value += 1
+    activeIndex.value++
     resetDraft()
-    return
+  } else {
+    emit('close')
   }
-
-  emit('close')
 }
 
 const submitRating = async () => {
-  if (!activeSession.value || !currentRating.value) {
-    return
-  }
-
+  if (!activeSession.value || !isFormValid.value) return
   isSubmitting.value = true
 
   try {
     await sessionsStore.submitRating(
       activeSession.value.id,
-      currentRating.value,
+      { ...ratings.value },
       ratingComment.value
     )
 
     emit('rated', activeSession.value.id)
     resetDraft()
-
     await nextTick()
 
-    if (!props.sessions.length) {
-      emit('close')
-      return
-    }
-
-    activeIndex.value = Math.min(activeIndex.value, props.sessions.length - 1)
-
-    if (!props.sessions[activeIndex.value]) {
+    if (!props.sessions.length || activeIndex.value >= props.sessions.length) {
       emit('close')
     }
   } catch (error) {
     console.error('Failed to submit rating:', error)
-    alert(error.response?.data?.error || 'Failed to submit rating.')
+    alert('Failed to submit rating.')
   } finally {
     isSubmitting.value = false
   }
@@ -208,15 +198,21 @@ watch(
   () => [props.open, props.initialSessionId, props.sessions.length],
   ([open]) => {
     if (!open) {
+      document.body.style.overflow = '' 
       resetDraft()
       return
     }
-
+    
+    document.body.style.overflow = 'hidden' 
     setInitialIndex()
     resetDraft()
   },
   { immediate: true }
 )
+
+onUnmounted(() => {
+  document.body.style.overflow = ''
+})
 </script>
 
 <style scoped>
@@ -224,189 +220,104 @@ watch(
   position: fixed;
   inset: 0;
   z-index: 1100;
-  background: rgba(10, 25, 22, 0.45);
+  background: rgba(10, 25, 22, 0.5);
   display: grid;
   place-items: center;
-  padding: 24px;
+  padding: 20px;
 }
 
 .rating-stack-modal {
-  width: min(100%, 620px);
-  max-height: min(90vh, 760px);
-  overflow: auto;
+  width: min(100%, 540px);
+  max-height: 98vh; 
+  overflow-y: auto;
   background: #ffffff;
-  border-radius: 28px;
-  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.22);
+  border-radius: 24px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15);
   padding: 24px;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 20px;
 }
 
-.rating-stack-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: start;
-  gap: 16px;
+.rating-stack-header { display: flex; justify-content: space-between; align-items: flex-start; }
+.rating-stack-close { 
+  width: 36px; height: 36px; border: 0; border-radius: 50%; 
+  background: #f4f6f8; color: #667085; transition: 0.2s;
 }
+.rating-stack-close:hover { background: #e4e7ec; color: #101828; }
+.rating-stack-eyebrow { font-size: 11px; font-weight: 800; color: #b42318; text-transform: uppercase; margin-bottom: 4px; letter-spacing: 0.5px; }
+.rating-stack-title { font-weight: 700; color: #101828; margin: 0; }
 
-.rating-stack-close {
-  width: 42px;
-  height: 42px;
-  border: 0;
-  border-radius: 50%;
-  background: #f4f6f5;
-  color: #344054;
+.rating-stack-progress { display: flex; justify-content: space-between; align-items: center; }
+.rating-stack-badge { background: #fef3f2; color: #b42318; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 700; display: flex; gap: 6px; }
+.rating-stack-count { font-size: 13px; font-weight: 600; color: #667085; }
+
+.rating-stack-card { 
+  background: linear-gradient(180deg, #fffaf9 0%, #ffffff 100%);
+  border: 1px solid #f2f4f7; border-radius: 20px; padding: 20px;
+}
+.rating-stack-meta { display: flex; justify-content: space-between; margin-bottom: 16px; border-bottom: 1px solid #f2f4f7; padding-bottom: 12px; }
+.rating-stack-subject { font-weight: 700; color: #101828; font-size: 16px; }
+.rating-stack-tutor { color: #667085; font-size: 14px; }
+.rating-stack-schedule { text-align: right; color: #667085; font-size: 12px; font-weight: 500; }
+
+.rating-stack-copy { font-size: 14px; color: #475467; text-align: center; margin-bottom: 16px; }
+
+.rating-sections {
   display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  transition: background-color 150ms ease, color 150ms ease, transform 150ms ease;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px 12px;
+  margin-bottom: 20px;
 }
 
-.rating-stack-close:hover {
-  background: #e7ece9;
-  color: #101828;
-  transform: scale(1.03);
-}
-
-.rating-stack-eyebrow {
-  margin: 0 0 4px;
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: #8c3a32;
-  font-weight: 700;
-}
-
-.rating-stack-title {
-  margin: 0;
-  font-weight: 700;
-  color: #18332a;
-}
-
-.rating-stack-progress {
+.rating-category-item {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-}
-
-.rating-stack-badge {
-  display: inline-flex;
+  flex-direction: column;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
-  border-radius: 999px;
-  background: #fde8e5;
-  color: #b42318;
-  font-weight: 700;
 }
 
-.rating-stack-count {
-  color: #667085;
-  font-weight: 600;
-}
+.rating-stars { display: flex; gap: 6px; }
 
-.rating-stack-card {
-  border-radius: 24px;
-  padding: 20px;
-  background:
-    radial-gradient(circle at top right, rgba(180, 35, 24, 0.08), transparent 30%),
-    linear-gradient(180deg, #fffaf9 0%, #ffffff 100%);
-  border: 1px solid #f2ddda;
-  display: grid;
-  gap: 18px;
-}
-
-.rating-stack-meta {
+.rating-star-btn-sm {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 50%; 
+  background: #f4f6f8;
+  color: #8c9bb0;
+  font-size: 18px;
   display: flex;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.rating-stack-subject {
-  font-size: 1.15rem;
-  font-weight: 700;
-  color: #18332a;
-}
-
-.rating-stack-tutor,
-.rating-stack-schedule {
-  color: #667085;
-}
-
-.rating-stack-schedule {
-  text-align: right;
-  font-weight: 600;
-}
-
-.rating-stack-copy {
-  margin: 0;
-  color: #475467;
-}
-
-.rating-stars {
-  display: flex;
+  align-items: center;
   justify-content: center;
-  gap: 8px;
+  transition: transform 0.1s ease, color 0.2s;
+  cursor: pointer;
 }
 
-.rating-star-btn {
-  width: 56px;
-  height: 56px;
-  border: 0;
-  border-radius: 50%;
-  background: #f5f7f6;
-  color: #98a2b3;
-  font-size: 1.6rem;
-  transition: transform 150ms ease, background-color 150ms ease, color 150ms ease;
+.rating-star-btn-sm:hover { transform: scale(1.1); }
+.rating-star-btn-sm.active { color: #fdb022; }
+
+.rating-category-label {
+  font-size: 12px; font-weight: bold; color: #98a2b3;
+  transition: color 0.2s;
 }
 
-.rating-star-btn:hover,
-.rating-star-btn.active {
-  background: #fff3d6;
-  color: #f59e0b;
-  transform: translateY(-2px);
+.text-dark { color: #344054 !important; }
+
+.rating-stack-textarea { 
+  border-radius: 12px; border: 1px solid #d0d5dd; font-size: 14px; 
 }
 
-.rating-stack-textarea {
-  border-radius: 16px;
-}
+.rating-stack-footer { display: flex; justify-content: space-between; align-items: center; padding-top: 8px; }
+.rating-stack-actions { display: flex; gap: 10px; }
 
-.rating-stack-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-}
+.btn { font-weight: 600; border-radius: 10px; padding: 8px 16px; }
 
-.rating-stack-actions {
-  display: flex;
-  gap: 12px;
-}
-
-@media (max-width: 640px) {
-  .rating-stack-modal {
-    padding: 20px;
-  }
-
-  .rating-stack-meta,
-  .rating-stack-footer {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .rating-stack-schedule {
-    text-align: left;
-  }
-
-  .rating-stack-actions {
-    width: 100%;
-    justify-content: stretch;
-  }
-
-  .rating-stack-actions .btn,
-  .rating-stack-footer > .btn {
-    width: 100%;
-  }
+@media (max-width: 480px) {
+  .rating-sections { grid-template-columns: 1fr; }
+  .rating-stack-footer { flex-direction: column; gap: 12px; }
+  .rating-stack-actions { width: 100%; }
+  .rating-stack-actions .btn { flex: 1; }
+  .rating-stack-footer > .btn { width: 100%; order: 2; }
 }
 </style>
