@@ -120,6 +120,7 @@ const filters = [
     { label: 'All', value: 'all' },
     { label: 'Pending', value: 'pending' },
     { label: 'Rejected', value: 'rejected' },
+    { label: 'Cancelled', value: 'cancelled' },
     { label: 'Upcoming', value: 'upcoming' },
     { label: 'Ongoing', value: 'ongoing' },
     { label: 'Completed', value: 'completed' }

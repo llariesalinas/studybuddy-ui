@@ -60,6 +60,15 @@
             </div>
           </div>
 
+          <div class="budget-card border-sb rounded-4 p-3 p-md-4 mb-4">
+            <BudgetRangeSlider
+              v-model:min-value="store.selectedBudgetMin"
+              v-model:max-value="store.selectedBudgetMax"
+              :min-limit="INITIAL_BUDGET_MIN"
+              :max-limit="INITIAL_BUDGET_MAX"
+            />
+          </div>
+
           <div v-if="activePicker" class="time-grid-panel border-sb rounded-4 p-3 mb-4">
             <div class="d-flex justify-content-between align-items-center mb-3">
               <div>

@@ -3,6 +3,7 @@ from django.conf.urls.static import static
 from django.conf import settings
 from rest_framework_simplejwt.views import TokenRefreshView
 from .views import(
+                   cancel_booking,
                    complete_booking,
                    list_courses,
                    login_view, 
@@ -61,6 +62,7 @@ urlpatterns = [
     path('bookings/<int:booking_id>/submit-payment/', submit_session_payment),
     path('bookings/<int:booking_id>/tutor-confirm/', tutor_confirm_booking),
     path('bookings/<int:booking_id>/rating/', submit_session_rating),
+    path('bookings/<int:booking_id>/cancel/', cancel_booking),
     path('template-availability/', template_availability),
     path('template-availability/<int:pk>/', template_availability),
     path('availability-overrides/', views.availability_overrides),
