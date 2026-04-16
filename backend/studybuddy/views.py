@@ -243,6 +243,7 @@ def get_session_notification_context(bookings):
             "subject": "session",
             "date": "an upcoming date",
             "tutor_name": "your tutor",
+            "tutee_name": "the tutee",
         }
 
     subject = (
@@ -251,11 +252,13 @@ def get_session_notification_context(bookings):
     )
     date_label = representative_booking.session_date.strftime("%Y-%m-%d")
     tutor_name = f"{representative_booking.tutor.profile.fname} {representative_booking.tutor.profile.lname}"
+    tutee_name = f"{representative_booking.student.fname} {representative_booking.student.lname}"
 
     return {
         "subject": subject,
         "date": date_label,
         "tutor_name": tutor_name,
+        "tutee_name": tutee_name,
     }
 
 
@@ -282,7 +285,7 @@ def get_display_status(raw_status, session_date, start_time, end_time):
     return raw_status
 
 
-def create_booking_status_notification(recipient, status_key, bookings):
+def create_booking_status_notification(recipient, status_key, bookings, recipient_role=None):
     context = get_session_notification_context(bookings)
 
     messages = {
@@ -293,7 +296,15 @@ def create_booking_status_notification(recipient, status_key, bookings):
         "completed": f"Your session for {context['subject']} with {context['tutor_name']} was marked complete. You can rate it anytime.",
     }
 
-    message = messages.get(status_key)
+    if status_key == "cancelled":
+        if recipient_role == "tutor":
+            message = f"{context['tutee_name']} has cancelled your {context['subject']} session on {context['date']}."
+        elif recipient_role == "tutee":
+            message = f"Your {context['subject']} session on {context['date']} has been successfully cancelled"
+        else:
+            message = None
+    else:
+        message = messages.get(status_key)
 
     if not message:
         return
@@ -1593,6 +1604,75 @@ def reject_booking(request, booking_id):
     )
 
     return Response({"message": "Booking rejected successfully."})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def cancel_booking(request, booking_id):
+
+    profile = request.user.userprofile
+    booking = get_object_or_404(
+        Booking.objects.select_related(
+            'student__course',
+            'student__user',
+            'tutor__profile__course',
+            'tutor__profile__user',
+            'availability'
+        ),
+        id=booking_id
+    )
+
+    if profile != booking.student:
+        return Response({"error": "Unauthorized"}, status=403)
+
+    session_group_bookings = get_session_group_bookings(booking)
+    representative_booking = get_representative_booking(session_group_bookings)
+
+    if not representative_booking:
+        return Response({"error": "Booking not found."}, status=404)
+
+    first_booking = session_group_bookings[0]
+    last_booking = session_group_bookings[-1]
+    start_time = first_booking.availability.time_slot
+    end_time = (
+        datetime.combine(first_booking.session_date, last_booking.availability.time_slot)
+        + timedelta(minutes=SESSION_SLOT_MINUTES)
+    ).time()
+
+    display_status = get_display_status(
+        representative_booking.status,
+        representative_booking.session_date,
+        start_time,
+        end_time
+    )
+
+    if display_status != "Upcoming":
+        return Response({"error": "Only upcoming sessions can be cancelled."}, status=400)
+
+    if representative_booking.session_date <= timezone.localdate():
+        return Response({"error": "Only future sessions can be cancelled before the session date."}, status=400)
+
+    with transaction.atomic():
+        Booking.objects.filter(id__in=[group_booking.id for group_booking in session_group_bookings]).update(
+            status="Cancelled",
+            tutee_confirmed=False,
+            tutor_confirmed=False,
+        )
+
+        create_booking_status_notification(
+            representative_booking.tutor.profile,
+            "cancelled",
+            session_group_bookings,
+            recipient_role="tutor"
+        )
+        create_booking_status_notification(
+            representative_booking.student,
+            "cancelled",
+            session_group_bookings,
+            recipient_role="tutee"
+        )
+
+    return Response({"message": "Session cancelled successfully."}, status=200)
 
 
 

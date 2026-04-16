@@ -113,6 +113,19 @@
             </button>
           </template>
 
+          <template v-else-if="showCancelAction">
+            <p class="text-muted mb-3">
+              {{ cancelActionMessage }}
+            </p>
+            <button
+              class="btn btn-outline-danger w-100"
+              :disabled="isCancelling || !canCancelSession"
+              @click="isCancelModalOpen = true"
+            >
+              {{ isCancelling ? 'Cancelling...' : 'Cancel Session' }}
+            </button>
+          </template>
+
           <template v-else>
             <p class="text-muted mb-0">
               No pending action for this session right now.
@@ -129,6 +142,59 @@
       @close="isRatingModalOpen = false"
       @rated="handleRated"
     />
+
+    <div
+      v-if="isCancelModalOpen"
+      class="modal fade show d-block"
+      tabindex="-1"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content border-0 shadow">
+          <div class="modal-header">
+            <h5 class="modal-title fw-bold">Cancel Session</h5>
+            <button
+              type="button"
+              class="btn-close"
+              aria-label="Close"
+              :disabled="isCancelling"
+              @click="closeCancelModal"
+            ></button>
+          </div>
+
+          <div class="modal-body">
+            <p class="mb-0">Are you sure you want to cancel this session?</p>
+          </div>
+
+          <div class="modal-footer">
+            <button
+              type="button"
+              class="btn btn-outline-secondary"
+              :disabled="isCancelling"
+              @click="closeCancelModal"
+            >
+              Keep Session
+            </button>
+            <button
+              type="button"
+              class="btn btn-danger"
+              :disabled="isCancelling"
+              @click="handleCancelSession"
+            >
+              <span
+                v-if="isCancelling"
+                class="spinner-border spinner-border-sm me-2"
+                role="status"
+                aria-hidden="true"
+              ></span>
+              {{ isCancelling ? 'Cancelling...' : 'Yes, Cancel Session' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div v-if="isCancelModalOpen" class="modal-backdrop fade show"></div>
   </div>
 </template>
 
@@ -136,21 +202,45 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useSessionsStore } from '@/stores/completedSessions'
+import { useNotificationsStore } from '@/stores/notifications'
 import RatingStackModal from '@/components/RatingStackModal.vue'
 
 const route = useRoute()
 const router = useRouter()
 const sessionsStore = useSessionsStore()
+const notificationsStore = useNotificationsStore()
 
 const sessionDetail = ref(null)
 const loading = ref(true)
 const errorMessage = ref('')
 const isRatingModalOpen = ref(false)
+const isCancelModalOpen = ref(false)
+const isCancelling = ref(false)
 
 const normalizedStatus = computed(() => String(sessionDetail.value?.session?.status || '').toLowerCase())
 const canSubmitPayment = computed(() => normalizedStatus.value === 'payment required')
 const isAwaitingPaymentVerification = computed(() => normalizedStatus.value === 'awaiting verification')
 const isCompleted = computed(() => normalizedStatus.value === 'completed')
+const isUpcoming = computed(() => normalizedStatus.value === 'upcoming')
+const todayKey = computed(() => {
+  const today = new Date()
+  const year = today.getFullYear()
+  const month = String(today.getMonth() + 1).padStart(2, '0')
+  const day = String(today.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+})
+const showCancelAction = computed(() => isUpcoming.value)
+const canCancelSession = computed(() => (
+  isUpcoming.value
+  && String(sessionDetail.value?.session?.date || '') > todayKey.value
+))
+const cancelActionMessage = computed(() => {
+  if (canCancelSession.value) {
+    return 'This upcoming session can still be cancelled before the session date.'
+  }
+
+  return 'Cancellation is only available before the session date.'
+})
 
 const tutorInitials = computed(() => {
   const parts = String(sessionDetail.value?.tutor?.name || '')
@@ -215,8 +305,36 @@ const loadSession = async () => {
   }
 }
 
+const closeCancelModal = () => {
+  if (isCancelling.value) {
+    return
+  }
+
+  isCancelModalOpen.value = false
+}
+
 const goToPayment = () => {
   router.push({ name: 'PaymentTutee', params: { bookingId: route.params.id } })
+}
+
+const handleCancelSession = async () => {
+  if (!canCancelSession.value) {
+    return
+  }
+
+  isCancelling.value = true
+
+  try {
+    const updatedDetail = await sessionsStore.cancelSession(route.params.id)
+    sessionDetail.value = updatedDetail
+    isCancelModalOpen.value = false
+    await notificationsStore.fetchNotifications()
+    alert('Session cancelled successfully.')
+  } catch (error) {
+    alert(error.response?.data?.error || 'Failed to cancel session.')
+  } finally {
+    isCancelling.value = false
+  }
 }
 
 const handleRated = async () => {
@@ -262,6 +380,10 @@ onMounted(loadSession)
   border-radius: 16px;
   padding: 16px;
   height: 100%;
+}
+
+.modal {
+  background: rgba(17, 24, 39, 0.35);
 }
 
 .info-label {

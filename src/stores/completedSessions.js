@@ -164,6 +164,12 @@ export const useSessionsStore = defineStore('sessions', () => {
     await fetchSessions()
   }
 
+  const cancelSession = async (id) => {
+    await api.post(`/bookings/${id}/cancel/`)
+    await fetchSessions()
+    return fetchSessionById(id)
+  }
+
   const submitPayment = async (id, payload) => {
     await api.post(`/bookings/${id}/submit-payment/`, payload, {
       headers: {
@@ -272,6 +278,7 @@ export const useSessionsStore = defineStore('sessions', () => {
     fetchSessionById,
     approveSession,
     rejectSession,
+    cancelSession,
     markPendingRequestsSeen,
     submitPayment,
     submitRating,
