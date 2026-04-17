@@ -216,7 +216,7 @@
             </div>
         </div>
 
-        <div v-else class="empty-state border-sb rounded-4 shadow-sm text-center py-5 px-4 bg-white">
+        <div v-else-if="isLoading" class="empty-state border-sb rounded-4 shadow-sm text-center py-5 px-4 bg-white">
           <h5 class="fw-bold text-dark mb-2">No tutors match this budget range</h5>
           <p class="text-muted mb-0">Try widening the slider range to see more tutor options.</p>
         </div>

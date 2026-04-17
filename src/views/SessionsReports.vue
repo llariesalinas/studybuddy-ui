@@ -167,22 +167,20 @@ const currentFilter = ref('all')
 
 const filters = computed(() => [
   {
-    label: `All (${sessionStore.sessions.length})`,
+    label: `All (${sessionStore.upcomingSessions.length + sessionStore.completedSessions.length})`,
     value: 'all'
-  },
-  { 
-    label: `Completed (${sessionStore.completedSessions.length})`, 
-    value: 'completed' 
   },
   { 
     label: `Upcoming (${sessionStore.upcomingSessions.length})`, 
     value: 'upcoming' 
   },
-  {
-    label: `Rejected (${sessionStore.rejectedSessions.length})`,
-    value: 'rejected'
+  { 
+    label: `Completed (${sessionStore.completedSessions.length})`, 
+    value: 'completed' 
   }
 ])
+
+
 
 onMounted(() => {
   sessionStore.fetchSessions()
@@ -228,8 +226,6 @@ const filteredSessions = computed(() => {
       return sessionStore.completedSessions
     case 'upcoming':
       return sessionStore.upcomingSessions
-    case 'rejected':
-      return sessionStore.rejectedSessions
     default:
       return sessionStore.sessions
   }

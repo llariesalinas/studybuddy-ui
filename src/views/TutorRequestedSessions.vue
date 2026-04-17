@@ -27,7 +27,7 @@
         >
           <div class="card-body py-3">
 
-            <div class="row align-items-center text-center text-md-start">
+            <div class="row align-items-start text-center text-md-start">
 
               <div class="col-md">
                 <small class="text-muted">Tutee</small>
@@ -36,6 +36,13 @@
                 </div>
               </div>
 
+              <div class="col-md">
+                <small class="text-muted">Location</small>
+                <div class="fw-semibold">
+                  {{ session.location }}
+                </div>
+              </div>
+              
               <div class="col-md">
                 <small class="text-muted">Subject</small>
                 <div class="fw-semibold">
@@ -79,7 +86,7 @@
                 </div>
               </div>
 
-              <div class="col-md text-md-end mt-3 mt-md-0">
+              <div class="col-md align-self-center text-md-end mt-3 mt-md-0">
                 <div class="d-grid gap-2">
 
                 <button
