@@ -1,4 +1,5 @@
 import json
+import logging
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
 from django.utils.timezone import now
@@ -41,6 +42,8 @@ from .models import (
     Tutor,
     TutorSubjects
 )
+
+logger = logging.getLogger(__name__)
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
@@ -393,6 +396,7 @@ def partner_institutions_list(request):
 
 
 @api_view(['POST'])
+@transaction.atomic
 def register_user(request):
 
     email = request.data.get('email')
@@ -427,21 +431,31 @@ def register_user(request):
             status=status.HTTP_400_BAD_REQUEST
         )
 
-    # Prevent duplicate users
-    if User.objects.filter(username=email).exists():
+    existing_user = User.objects.filter(username=email).first()
+
+    if existing_user and hasattr(existing_user, 'userprofile'):
         return Response(
             {"error": "User already exists"},
             status=status.HTTP_400_BAD_REQUEST
         )
 
-    # Create Django User
-    user = User.objects.create_user(
-        username=email,
-        email=email,
-        password=password
-    )
+    if existing_user:
+        logger.warning(
+            "Recovering orphaned auth_user without profile: email=%s user_id=%s",
+            email,
+            existing_user.id,
+        )
+        user = existing_user
+        user.email = email
+        user.set_password(password)
+        user.save(update_fields=["email", "password"])
+    else:
+        user = User.objects.create_user(
+            username=email,
+            email=email,
+            password=password
+        )
 
-    # Create UserProfile
     profile = UserProfile.objects.create(
         user=user,
         fname=fname,
@@ -455,10 +469,20 @@ def register_user(request):
     if role == "Tutor":
         Tutor.objects.create(profile=profile)
 
+    logger.info(
+        "Registered user in database: email=%s user_id=%s profile_id=%s role=%s institution_id=%s",
+        email,
+        user.id,
+        profile.id,
+        role,
+        institution_id,
+    )
+
     return Response(
         {"message": "User registered successfully"},
         status=status.HTTP_201_CREATED
     )
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])

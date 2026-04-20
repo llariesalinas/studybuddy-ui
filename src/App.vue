@@ -57,7 +57,7 @@
       </ul>
     </aside>
 
-    <div class="modal fade" id="logoutModal" tabindex="-1">
+    <div ref="logoutModalRef" class="modal fade" id="logoutModal" tabindex="-1">
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content rounded-4">
           
@@ -178,7 +178,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth' // Import auth store
 import { useSessionsStore } from '@/stores/completedSessions'
@@ -186,18 +186,35 @@ import NotificationBell from '@/components/NotificationBell.vue'
 import RatingReminderBanner from '@/components/RatingReminderBanner.vue'
 import { useNotificationsStore } from '@/stores/notifications'
 import router from './router'
+import * as bootstrap from 'bootstrap'
 
 const route = useRoute()
 const authStore = useAuthStore()
 const notificationsStore = useNotificationsStore()
 const sessionStore = useSessionsStore()
+const logoutModalRef = ref(null)
 let pendingSessionsRefreshId = null
-const logout = () => {
 
+const closeLogoutModal = () => {
+  const modalElement = logoutModalRef.value
+
+  if (!modalElement) {
+    return
+  }
+
+  const modalInstance = bootstrap.Modal.getInstance(modalElement)
+  modalInstance?.hide()
+
+  document.body.classList.remove('modal-open')
+  document.body.style.removeProperty('overflow')
+  document.body.style.removeProperty('padding-right')
+  document.querySelectorAll('.modal-backdrop').forEach(backdrop => backdrop.remove())
+}
+
+const logout = async () => {
+  closeLogoutModal()
   authStore.logout()
-  router.push('/login') // Redirect to login after logout
-
-  router.push
+  await router.push('/login')
 }
 
 const hideSessionButton = computed(() => {
@@ -265,6 +282,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  closeLogoutModal()
   document.removeEventListener('visibilitychange', handleVisibilityChange)
 
   if (pendingSessionsRefreshId) {
