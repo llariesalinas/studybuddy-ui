@@ -1,10 +1,11 @@
 <template>
     <div class="p-4">
-        <form @submit.prevent="searchTutor">
-            <div class="row mb-5 g-3 align-items-start">
-                <div class="col-lg-3 col-md-5 subject-filter-column">
-                    <label class="form-label fw-semibold small">Subject</label>
-                    <select v-model="subjectModel" class="form-select">
+        <form @submit.prevent="searchTutor" class="mb-5">
+            <div class="row g-3 align-items-end">
+                <!-- Subject -->
+                <div class="col-lg-4 col-md-6">
+                    <label class="form-label fw-semibold small text-muted">Subject</label>
+                    <select v-model="subjectModel" class="form-select border-sb shadow-none py-2 rounded-3">
                         <option disabled value="">Select Subject</option>
                         <option
                             v-for="subject in subjects"
@@ -14,11 +15,46 @@
                             {{ subject.subject_name }}
                         </option>
                     </select>
+                </div>
 
-                    <div class="budget-filter-wrap mt-3">
+                <!-- Mode -->
+                <div class="col-lg-2 col-md-3">
+                    <label class="form-label fw-semibold small text-muted">Mode</label>
+                    <select v-model="modeModel" class="form-select border-sb shadow-none py-2 rounded-3">
+                        <option
+                          v-for="mode in modes"
+                          :key="mode"
+                          :value="mode"
+                        >
+                          {{ mode }}
+                        </option>
+                    </select>
+                </div>
+
+                <!-- Location -->
+                <div v-if="modeModel === 'Face-to-face'" class="col-lg-3 col-md-3">
+                    <label class="form-label fw-semibold small text-muted">Location</label>
+                    <input
+                      type="text"
+                      v-model="locationModel"
+                      class="form-control border-sb shadow-none py-2 rounded-3"
+                      placeholder="e.g. Library"
+                    />
+                </div>
+
+                <!-- Date -->
+                <div class="col-lg-3 col-md-6">
+                    <label class="form-label fw-semibold small text-muted">Date</label>
+                    <input type="date" v-model="dateModel" class="form-control border-sb shadow-none py-2 rounded-3" required />
+                </div>
+
+                <!-- Budget -->
+                <div class="col-lg-3 col-md-6 subject-filter-column">
+                    <label class="form-label fw-semibold small text-muted">Budget Range</label>
+                    <div class="budget-filter-wrap">
                         <button
                           type="button"
-                          class="btn w-100 budget-toggle-btn shadow-none rounded-4"
+                          class="btn w-100 budget-toggle-btn shadow-none rounded-3"
                           :class="{ 'budget-toggle-btn-active': showBudgetFilter }"
                           @click="showBudgetFilter = !showBudgetFilter"
                         >
@@ -38,39 +74,12 @@
                     </div>
                 </div>
 
-                <div class="col-lg-2 col-md-3">
-                    <label class="form-label fw-semibold small">Mode</label>
-                    <select v-model="modeModel" class="form-select border-sb shadow-none py-2">
-                        <option
-                          v-for="mode in modes"
-                          :key="mode"
-                          :value="mode"
-                        >
-                          {{ mode }}
-                        </option>
-                    </select>
-                </div>
-
-                <div v-if="modeModel === 'Face-to-face'" class="col-lg-2 col-md-3">
-                    <label class="form-label fw-semibold small">Location</label>
-                    <input
-                      type="text"
-                      v-model="locationModel"
-                      class="form-control border-sb shadow-none py-2"
-                      placeholder="e.g. Library"
-                    />
-                </div>
-
-                <div class="col-lg-2 col-md-4">
-                    <label class="form-label fw-semibold small">Date</label>
-                    <input type="date" v-model="dateModel" class="form-control border-sb shadow-none" required />
-                </div>
-
-                <div class="col-lg-2 col-md-3">
-                    <label class="form-label fw-semibold small">From</label>
+                <!-- From -->
+                <div class="col-lg-3 col-md-6">
+                    <label class="form-label fw-semibold small text-muted">Start Time</label>
                     <button
                       type="button"
-                      class="btn w-100 text-start border-sb shadow-none time-trigger"
+                      class="btn w-100 text-start border-sb shadow-none time-trigger rounded-3"
                       :class="{ 'time-trigger-active': activePicker === 'start' }"
                       @click="openTimePicker('start')"
                     >
@@ -78,11 +87,12 @@
                     </button>
                 </div>
 
-                <div class="col-lg-2 col-md-3">
-                    <label class="form-label fw-semibold small">To</label>
+                <!-- To -->
+                <div class="col-lg-3 col-md-6">
+                    <label class="form-label fw-semibold small text-muted">End Time</label>
                     <button
                       type="button"
-                      class="btn w-100 text-start border-sb shadow-none time-trigger"
+                      class="btn w-100 text-start border-sb shadow-none time-trigger rounded-3"
                       :class="{ 'time-trigger-active': activePicker === 'end' }"
                       @click="openTimePicker('end')"
                     >
@@ -90,14 +100,14 @@
                     </button>
                 </div>
 
-                <div class="col-lg-1 col-md-2">
-                    <label class="form-label fw-semibold small invisible">Search</label>
+                <!-- Search Action -->
+                <div class="col-lg-3 col-md-6">
                     <button
                       type="submit"
-                      class="btn bg-sb-primary text-white px-3 rounded-3 fw-semibold shadow-sm"
+                      class="btn bg-sb-primary text-white w-100 py-2 rounded-3 fw-bold shadow-sm"
                       :disabled="isSubmitting"
                     >
-                        Search
+                        <i class="bi bi-search me-2"></i>Search Tutors
                     </button>
                 </div>
             </div>
@@ -265,7 +275,7 @@ const budgetSummary = computed(() => {
     ? `${maxRate.toLocaleString('en-PH')}+`
     : maxRate.toLocaleString('en-PH')
 
-  return `Budget: ${minLabel}-${maxLabel} per hour`
+  return `₱${minLabel} - ₱${maxLabel}`
 })
 
 const syncInitialBookingPrefs = (fields) => {

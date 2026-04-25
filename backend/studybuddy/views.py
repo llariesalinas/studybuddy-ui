@@ -16,7 +16,6 @@ from django.utils import timezone
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.views import APIView
 from rest_framework.generics import ListAPIView
-from django.utils.timezone import now
 from django.db.models import Avg, Case, When, Value, IntegerField, Q
 from collections import defaultdict
 # algo
@@ -1047,7 +1046,8 @@ def tutor_detail(request, profile_id):
 def tutor_availability(request, tutor_id):
 
     tutor = get_object_or_404(Tutor, profile_id=tutor_id)
-    today = date.today()
+    current_now = timezone.localtime(timezone.now())
+    today = current_now.date()
     month_offset = int(request.GET.get("month_offset", 0))
 
     total_months = (today.year * 12) + (today.month - 1) + month_offset
@@ -1092,7 +1092,7 @@ def tutor_availability(request, tutor_id):
 
         for weekday_index, weekday_name in enumerate(display_weekdays):
             current_date = current_week_start + timedelta(days=weekday_index)
-            is_past = current_date < today
+            is_past_day = current_date < today
             day_slots = []
 
             for slot in availability:
@@ -1107,10 +1107,13 @@ def tutor_availability(request, tutor_id):
                 )
                 is_booked = (slot.id, current_date) in booked_map
 
+                # Check if the slot time has already passed today
+                is_slot_past = is_past_day or (current_date == today and slot.time_slot < current_now.time())
+
                 day_slots.append({
                     "id": slot.id,
                     "time_slot": slot.time_slot.strftime("%H:%M"),
-                    "is_booked": is_booked or is_past or is_overridden,
+                    "is_booked": is_booked or is_slot_past or is_overridden,
                     "is_overridden": is_overridden
                 })
 
@@ -1120,7 +1123,7 @@ def tutor_availability(request, tutor_id):
                 "name": weekday_name,
                 "date": current_date.isoformat(),
                 "in_month": month_start <= current_date <= month_end,
-                "is_past": is_past,
+                "is_past": is_past_day,
                 "is_blocked": current_date in full_day_dates,
                 "has_available": any(not slot["is_booked"] for slot in day_slots),
                 "slots": day_slots
@@ -1266,10 +1269,16 @@ def confirm_payment_and_book(request):
                     status=400
                 )
 
-            # 🚫 Prevent booking past dates
-            if session_date < now().date():
+            # 🚫 Prevent booking past dates/times
+            current_now = timezone.localtime(timezone.now())
+            if session_date < current_now.date():
                 return Response(
                     {"error": "Cannot book a past date."},
+                    status=400
+                )
+            if session_date == current_now.date() and availability.time_slot < current_now.time():
+                return Response(
+                    {"error": "Cannot book a past time slot."},
                     status=400
                 )
 

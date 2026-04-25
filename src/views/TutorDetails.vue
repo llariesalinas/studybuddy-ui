@@ -198,6 +198,17 @@
                 </div>
               </div>
 
+              <div v-if="isFaceToFace" class="mb-4">
+                <label class="form-label fw-bold small text-muted">Preferred Location</label>
+                <input
+                  type="text"
+                  v-model="bookedSessionStore.bookedSessionLocation"
+                  class="form-control border-sb shadow-none py-2 rounded-3"
+                  placeholder="e.g. Library Room 3"
+                  required
+                />
+              </div>
+
               <hr class="my-4" style="border-color: #edf1ef;" />
 
               <div class="cost-counter" :class="{ 'cost-counter-active': selectedSessionCount > 0 }">
@@ -345,6 +356,11 @@ const tutorProfile = computed(() => ({
 const tutorInitials = computed(() => {
   const parts = tutorProfile.value.name.split(' ').filter(Boolean)
   return parts.slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'SB'
+})
+
+const isFaceToFace = computed(() => {
+  const mode = bookingPrefsStore.selectedMode || initialBookingStore.selectedMode || 'Online'
+  return mode === 'Face-to-face' || mode === 'F2F'
 })
 
 const effectiveSelectedSlots = computed(() => {
@@ -694,7 +710,8 @@ const confirmBooking = async () => {
 
     await api.post('bookings/confirm/', {
       tutor_id: tutorID,
-      slots: effectiveSelectedSlots.value
+      slots: effectiveSelectedSlots.value,
+      preferred_location: bookedSessionStore.bookedSessionLocation
     })
 
     alert('Booking Confirmed!')
