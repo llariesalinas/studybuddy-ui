@@ -51,6 +51,16 @@
                     </select>
                 </div>
 
+                <div v-if="modeModel === 'Face-to-face'" class="col-lg-2 col-md-3">
+                    <label class="form-label fw-semibold small">Location</label>
+                    <input
+                      type="text"
+                      v-model="locationModel"
+                      class="form-control border-sb shadow-none py-2"
+                      placeholder="e.g. Library"
+                    />
+                </div>
+
                 <div class="col-lg-2 col-md-4">
                     <label class="form-label fw-semibold small">Date</label>
                     <input type="date" v-model="dateModel" class="form-control border-sb shadow-none" required />
@@ -265,6 +275,9 @@ const syncInitialBookingPrefs = (fields) => {
   if (Object.prototype.hasOwnProperty.call(fields, 'mode')) {
     initialbookStore.selectedMode = fields.mode
   }
+  if (Object.prototype.hasOwnProperty.call(fields, 'location')) {
+    initialbookStore.selectedLocation = fields.location
+  }
   if (Object.prototype.hasOwnProperty.call(fields, 'date')) {
     initialbookStore.selectedDate = fields.date
   }
@@ -295,6 +308,11 @@ const subjectModel = computed({
 const modeModel = computed({
   get: () => findTutorsStore.filters.mode,
   set: (value) => updateFindTutorsFilters({ mode: value })
+})
+
+const locationModel = computed({
+  get: () => findTutorsStore.filters.location,
+  set: (value) => updateFindTutorsFilters({ location: value })
 })
 
 const dateModel = computed({
@@ -461,6 +479,7 @@ const ensureFindTutorsData = async () => {
 const getNavigationFilters = (routeLike) => ({
   subject: String(routeLike.query.subject || initialbookStore.selectedSubject || findTutorsStore.filters.subject || ''),
   mode: initialbookStore.selectedMode || findTutorsStore.filters.mode || '',
+  location: initialbookStore.selectedLocation || findTutorsStore.filters.location || '',
   date: initialbookStore.selectedDate || findTutorsStore.filters.date || null,
   startTime: initialbookStore.selectedStartTime || findTutorsStore.filters.startTime || null,
   endTime: initialbookStore.selectedEndTime || findTutorsStore.filters.endTime || null,
@@ -472,6 +491,7 @@ const searchTutor = async () => {
   const currentFilters = {
     subject: findTutorsStore.filters.subject,
     mode: findTutorsStore.filters.mode,
+    location: findTutorsStore.filters.location,
     date: findTutorsStore.filters.date,
     startTime: findTutorsStore.filters.startTime,
     endTime: findTutorsStore.filters.endTime,
@@ -501,6 +521,7 @@ const toTutorDetails = (tutor) => {
   bookedSessionStore.bookedSessionTutorName = tutor.name
   bookedSessionStore.bookedSessionSub = findTutorsStore.filters.subject
   bookedSessionStore.bookedSessionMode = findTutorsStore.filters.mode
+  bookedSessionStore.bookedSessionLocation = findTutorsStore.filters.location
 
   router.push(`/tutor/${tutor.profile_id}`)
 }

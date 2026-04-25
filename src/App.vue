@@ -166,7 +166,12 @@
               </span>
             </router-link>
 
-            <div v-if="authStore.isAuthenticated && !isPublicRoute" class="ms-auto">
+            <div v-if="authStore.isAuthenticated && !isPublicRoute" class="d-flex align-items-center gap-2 ms-auto">
+              <router-link to="/chat" class="chat-icon-btn" aria-label="Open chat">
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                </svg>
+              </router-link>
               <NotificationBell />
             </div>
           </div>
@@ -378,5 +383,25 @@ body {
 
 .app-page-header {
   min-height: var(--sb-topbar-height);
+}
+
+.chat-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--sb-bell-size);
+  height: var(--sb-bell-size);
+  border-radius: 50%;
+  border: 1.5px solid #dee2e6;
+  background: #fff;
+  color: #495057;
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.chat-icon-btn:hover,
+.chat-icon-btn.router-link-active {
+  background: var(--sb-primary);
+  color: #fff;
+  border-color: var(--sb-primary);
 }
 </style>

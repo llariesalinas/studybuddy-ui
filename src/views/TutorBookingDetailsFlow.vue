@@ -68,6 +68,20 @@
                 </div>
               </div>
             </div>
+            <div class="col-sm-6">
+              <div class="info-card">
+                <span class="info-label">Session Mode</span>
+                <div class="info-value">{{ bookingDetailsStore.sessionInfo?.session_mode || 'N/A' }}</div>
+              </div>
+            </div>
+            <div class="col-sm-6">
+              <div class="info-card">
+                <span class="info-label">Preferred Location</span>
+                <div class="info-value">
+                  {{ bookingDetailsStore.sessionInfo?.preferred_location || (bookingDetailsStore.sessionInfo?.session_mode === 'Online' ? 'Online' : 'N/A') }}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

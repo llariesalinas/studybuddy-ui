@@ -8,6 +8,7 @@ export const useInitialBookingPrefsStore = defineStore('initialBookingPrefs', ()
     const selectedSubject = ref('')
     const selectedDate = ref(null)
     const selectedMode = ref('')
+    const selectedLocation = ref('')
     const selectedStartTime = ref(null)
     const selectedEndTime = ref(null)
     const selectedBudgetMin = ref(INITIAL_BUDGET_MIN)
@@ -17,6 +18,7 @@ export const useInitialBookingPrefsStore = defineStore('initialBookingPrefs', ()
         selectedSubject.value = ''
         selectedDate.value = null
         selectedMode.value = ''
+        selectedLocation.value = ''
         selectedStartTime.value = null
         selectedEndTime.value = null
         selectedBudgetMin.value = INITIAL_BUDGET_MIN
@@ -27,6 +29,7 @@ export const useInitialBookingPrefsStore = defineStore('initialBookingPrefs', ()
       selectedSubject,
       selectedDate,
       selectedMode,
+      selectedLocation,
       selectedStartTime,
       selectedEndTime,
       selectedBudgetMin,

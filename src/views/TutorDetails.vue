@@ -233,6 +233,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useBookingPrefsStore } from '@/stores/selectedSessions'
 import { useBookedSessionStore } from '@/stores/bookedSessionDetails'
 import { useInitialBookingPrefsStore } from '@/stores/initialbookingprefs'
+import { useFindTutorsStore } from '@/stores/findTutors'
 import { usePaymentStore } from '@/stores/tuteePaymentDetails'
 import { useChatStore } from '@/stores/chat'
 import api from '@/services/api/api'
@@ -243,6 +244,7 @@ const route = useRoute()
 const bookingPrefsStore = useBookingPrefsStore()
 const bookedSessionStore = useBookedSessionStore()
 const initialBookingStore = useInitialBookingPrefsStore()
+const findTutorsStore = useFindTutorsStore()
 const paymentStore = usePaymentStore()
 const chatStore = useChatStore()
 
@@ -713,6 +715,7 @@ const confirmBooking = async () => {
 
 onMounted(async () => {
   paymentStore.reset()
+  bookedSessionStore.bookedSessionLocation = findTutorsStore.filters.location || ''
   await Promise.all([
     getTutorDetails(),
     getTutorSchedule()

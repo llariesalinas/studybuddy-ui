@@ -245,6 +245,10 @@ const ConfirmPayment = async () => {
     formData.append('slots', JSON.stringify(bookedSessionStore.bookedSessions))
     formData.append('payment_method', paymentStore.selectedMethod)
 
+    if (bookedSessionStore.bookedSessionLocation) {
+      formData.append('preferred_location', bookedSessionStore.bookedSessionLocation)
+    }
+
     if (transactionReference.value.trim()) {
       formData.append('transaction_reference', transactionReference.value.trim())
     }

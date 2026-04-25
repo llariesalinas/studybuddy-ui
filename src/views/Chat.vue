@@ -30,7 +30,12 @@
         <div class="chat-header">
           <div class="partner-info">
             <div class="partner-avatar">{{ getRoomInitials(chatStore.currentRoom) }}</div>
-            <div class="partner-name">{{ getRoomPartnerName(chatStore.currentRoom) }}</div>
+            <div class="partner-name">
+              {{ getRoomPartnerName(chatStore.currentRoom) }}
+              <span class="connection-status" :class="{ connected: chatStore.isConnected }">
+                {{ chatStore.isConnected ? '● Connected' : '○ Reconnecting...' }}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -41,6 +46,9 @@
             class="message-wrapper"
             :class="{ 'is-me': msg.is_me }"
           >
+            <div v-if="!msg.is_me" class="message-sender">
+              {{ msg.sender_name }}
+            </div>
             <div class="message-bubble">
               <div class="message-content">{{ msg.content }}</div>
               <div class="message-time">{{ formatTime(msg.created_at) }}</div>
@@ -106,7 +114,7 @@ const scrollToBottom = () => {
 }
 
 const getRoomPartnerName = (room) => {
-  const isTutor = authStore.user?.role === 'Tutor'
+  const isTutor = authStore.user?.role === 'tutor'
   return isTutor ? room.tutee_name : room.tutor_name
 }
 
@@ -251,6 +259,18 @@ onUnmounted(() => {
 .partner-name {
   font-weight: 600;
   color: #163127;
+  display: flex;
+  flex-direction: column;
+}
+
+.connection-status {
+  font-size: 0.75rem;
+  font-weight: normal;
+  color: #999;
+}
+
+.connection-status.connected {
+  color: #00895a;
 }
 
 .message-list {
@@ -266,10 +286,12 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   max-width: 70%;
+  align-self: flex-start;
 }
 
 .message-wrapper.is-me {
   align-self: flex-end;
+  align-items: flex-end;
 }
 
 .message-bubble {
@@ -278,6 +300,7 @@ onUnmounted(() => {
   background: #fff;
   border: 1px solid #eee;
   position: relative;
+  width: fit-content;
 }
 
 .is-me .message-bubble {
@@ -286,11 +309,23 @@ onUnmounted(() => {
   border: none;
 }
 
+.message-content {
+  word-wrap: break-word;
+  word-break: break-word;
+}
+
 .message-time {
   font-size: 0.7rem;
   margin-top: 4px;
   opacity: 0.7;
   text-align: right;
+}
+
+.message-sender {
+  font-size: 0.75rem;
+  color: #666;
+  margin-bottom: 2px;
+  margin-left: 4px;
 }
 
 .chat-input-area {

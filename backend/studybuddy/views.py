@@ -563,7 +563,8 @@ def login_view(request):
         "access": str(refresh.access_token),
         "refresh": str(refresh),
         "role": profile.role,
-        "user_id": profile.id,
+        "user_id": user.id,
+        "profile_id": profile.id,
         "email": user.email,
         "fname": profile.fname,
         "lname": profile.lname
@@ -810,7 +811,9 @@ def build_combined_block(group):
         ),
         "startTime": start_time.strftime("%H:%M"),
         "endTime": end_time.strftime("%H:%M"),
-        "duration_hours": duration
+        "duration_hours": duration,
+        "preferred_location": first.preferred_location,
+        "session_mode": first.session_mode
     }
 
 
@@ -905,7 +908,9 @@ def build_booking_request_block(group):
         "startTime": primary_block["startTime"],
         "endTime": primary_block["endTime"],
         "duration_hours": get_duration_hours_for_bookings(sorted_group),
-        "timeBlocks": time_blocks,
+        "preferred_location": first_booking.preferred_location,
+        "session_mode": first_booking.session_mode,
+        "time_blocks": time_blocks,
         "hasMultipleTimeBlocks": len(time_blocks) > 1,
     }
 
@@ -1195,6 +1200,7 @@ def confirm_payment_and_book(request):
     tutor_id = request.data.get("tutor_id")
     slots = request.data.get("slots")
     method_id = request.data.get("payment_method")
+    preferred_location = request.data.get('preferred_location', '').strip()
 
     if isinstance(slots, str):
         try:
@@ -1219,6 +1225,12 @@ def confirm_payment_and_book(request):
             {"error": "You can only book multiple sessions on the same day."},
             status=400
         )
+
+    # Determine session mode from first slot
+    first_slot_mode = slots[0].get('session_mode', '')
+    is_f2f = first_slot_mode in ['F2F', 'Face-to-face']
+    if is_f2f and not preferred_location:
+        return Response({"error": "Preferred location is required for Face-to-face sessions."}, status=400)
 
     if method_id:
         try:
@@ -1322,6 +1334,7 @@ def confirm_payment_and_book(request):
                     availability=slot_request["availability"],
                     session_date=slot_request["session_date"],
                     session_mode=slot_request["session_mode"],
+                    preferred_location=preferred_location,
                     session_group_id=session_group_id,
                     booking_request_id=booking_request_id,
                     status="Pending"
@@ -1798,6 +1811,7 @@ def build_booking_detail_payload(session_group_bookings):
             ),
             "raw_status": representative_booking.status,
             "session_mode": representative_booking.session_mode,
+            "preferred_location": representative_booking.preferred_location,
         },
         "payment": serialize_payment_summary(representative_booking),
     }
@@ -2331,3 +2345,28 @@ def payment_methods(request):
     ]
 
     return Response(data)
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def update_booking_location(request, booking_request_id):
+    profile = request.user.userprofile
+    try:
+        tutor = Tutor.objects.get(profile=profile)
+    except Tutor.DoesNotExist:
+        return Response({"error": "Not a tutor"}, status=403)
+
+    new_location = request.data.get('preferred_location', '').strip()
+
+    if not new_location:
+        return Response({"error": "Location cannot be empty for Face-to-Face sessions."}, status=400)
+
+    updated = Booking.objects.filter(
+        booking_request_id=booking_request_id,
+        tutor=tutor,
+        status="Pending"
+    ).update(preferred_location=new_location)
+
+    if not updated:
+        return Response({"error": "No matching pending bookings found."}, status=404)
+
+    return Response({"message": "Location updated."})

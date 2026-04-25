@@ -68,6 +68,7 @@ urlpatterns = [
     path('availability-overrides/', views.availability_overrides),
     path('availability-overrides/<int:override_id>/', views.delete_availability_override),
     path('bookings/<int:booking_id>/complete/', complete_booking),
+    path('bookings/<uuid:booking_request_id>/location/', views.update_booking_location),
     path('bookings/<int:booking_id>/approve/', views.approve_booking),
     path('bookings/<int:booking_id>/reject/', views.reject_booking),
     path('notifications/', list_notifications),

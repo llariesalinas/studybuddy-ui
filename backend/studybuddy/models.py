@@ -287,6 +287,8 @@ class Booking(models.Model):
         choices=[('Online', 'Online'), ('F2F', 'Face-to-Face')]
     )
 
+    preferred_location = models.CharField(max_length=255, null=True, blank=True)
+
     session_group_id = models.UUIDField(
         null=True,
         blank=True,
@@ -299,9 +301,6 @@ class Booking(models.Model):
         db_index=True,
         default=None
     )
-
-    tutee_confirmed = models.BooleanField(default=False)
-    tutor_confirmed = models.BooleanField(default=False)
 
     status = models.CharField(
         max_length=40,

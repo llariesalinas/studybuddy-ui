@@ -11,12 +11,16 @@ class MessageSerializer(serializers.ModelSerializer):
         fields = ['id', 'sender', 'sender_name', 'content', 'created_at', 'is_read', 'is_me']
 
     def get_sender_name(self, obj):
-        return f"{obj.sender.first_name} {obj.sender.last_name}"
+        try:
+            profile = obj.sender.userprofile
+            return f"{profile.fname} {profile.lname}"
+        except Exception:
+            return obj.sender.username
 
     def get_is_me(self, obj):
         request = self.context.get('request')
         if request and request.user.is_authenticated:
-            return obj.sender == request.user
+            return obj.sender_id == request.user.id
         return False
 
 class ChatRoomSerializer(serializers.ModelSerializer):

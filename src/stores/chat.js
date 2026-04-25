@@ -13,7 +13,8 @@ export const useChatStore = defineStore('chat', () => {
     const intentionalDisconnect = ref(false)
 
     const wsUrl = computed(() => {
-        const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api/'
+        let baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api/'
+        if (!baseUrl.endsWith('/')) baseUrl += '/'
         return baseUrl.replace(/^http/, 'ws').replace('/api/', '/ws/chat/')
     })
 
@@ -21,6 +22,7 @@ export const useChatStore = defineStore('chat', () => {
         try {
             const response = await api.get('chat/rooms/')
             rooms.value = response.data
+            console.log('Fetched rooms:', rooms.value.length)
         } catch (error) {
             console.error('Error fetching chat rooms:', error)
         }
@@ -28,8 +30,10 @@ export const useChatStore = defineStore('chat', () => {
 
     async function fetchHistory(roomId) {
         try {
+            messages.value = [] // Clear current messages while loading
             const response = await api.get(`chat/rooms/${roomId}/history/`)
             messages.value = response.data
+            console.log('Fetched history:', messages.value.length, 'messages')
         } catch (error) {
             console.error('Error fetching message history:', error)
         }
@@ -38,7 +42,11 @@ export const useChatStore = defineStore('chat', () => {
     async function startInquiry(tutorProfileId) {
         try {
             const response = await api.post(`chat/start/${tutorProfileId}/`)
-            return response.data
+            const room = response.data
+            // Refresh rooms list to include the new one
+            await fetchRooms()
+            currentRoom.value = room
+            return room
         } catch (error) {
             console.error('Error starting inquiry chat:', error)
             throw error
@@ -51,25 +59,46 @@ export const useChatStore = defineStore('chat', () => {
         }
         intentionalDisconnect.value = false
 
-        const url = `${wsUrl.value}${roomId}/?token=${authStore.token}`
+        // Ensure we have a token
+        const token = authStore.token
+        if (!token) {
+            console.error('No token found for WebSocket connection')
+            return
+        }
+
+        const url = `${wsUrl.value}${roomId}/?token=${token}`
+        console.log('Connecting to WebSocket:', url)
         socket.value = new WebSocket(url)
 
         socket.value.onopen = () => {
+            console.log('WebSocket connected')
             isConnected.value = true
         }
 
         socket.value.onmessage = (event) => {
             const data = JSON.parse(event.data)
-            const isMyMessage = data.sender_id === authStore.user?.id
+            
+            // Identifying if the message is mine using both possible ID types
+            const senderUserId = Number(data.sender_id)
+            const senderProfileId = Number(data.sender_profile_id)
+            
+            const myUserId = Number(authStore.user?.id || localStorage.getItem('user_id'))
+            const myProfileId = Number(authStore.user?.profile_id || localStorage.getItem('profile_id'))
+            
+            const isMyMessage = (senderUserId === myUserId) || (senderProfileId === myProfileId)
+
+            console.log('Received message:', data, 'isMyMessage:', isMyMessage)
 
             if (isMyMessage) {
                 // Replace the matching optimistic message with server-confirmed data
+                // We match by content and pending status
                 const pendingIdx = messages.value.findIndex(
                     m => m.pending && m.content === data.message
                 )
                 if (pendingIdx !== -1) {
                     messages.value[pendingIdx] = {
                         ...messages.value[pendingIdx],
+                        id: data.id || messages.value[pendingIdx].id,
                         created_at: data.created_at,
                         pending: false
                     }
@@ -77,8 +106,10 @@ export const useChatStore = defineStore('chat', () => {
                 }
             }
 
+            // If we're here, it's either someone else's message OR a message we sent 
+            // from another tab/connection that wasn't in our local optimistic state.
             messages.value.push({
-                id: Date.now(),
+                id: data.id || Date.now(),
                 content: data.message,
                 sender_name: data.sender_name,
                 sender: data.sender_id,
@@ -87,9 +118,11 @@ export const useChatStore = defineStore('chat', () => {
             })
         }
 
-        socket.value.onclose = () => {
+        socket.value.onclose = (event) => {
             isConnected.value = false
+            console.log('WebSocket disconnected', event.code, event.reason)
             if (!intentionalDisconnect.value && currentRoom.value?.id === roomId) {
+                console.log('Reconnecting in 3s...')
                 setTimeout(() => connectToRoom(roomId), 3000)
             }
         }
@@ -100,7 +133,10 @@ export const useChatStore = defineStore('chat', () => {
     }
 
     function sendMessage(content) {
-        if (!socket.value || !isConnected.value) return
+        if (!socket.value || !isConnected.value) {
+            console.error('Cannot send message: WebSocket not connected')
+            return
+        }
 
         // Optimistic update — show immediately, replace on server echo
         messages.value.push({

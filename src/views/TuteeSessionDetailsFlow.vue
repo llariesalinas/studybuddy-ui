@@ -75,6 +75,20 @@
                 </div>
               </div>
             </div>
+            <div class="col-sm-6">
+              <div class="info-card">
+                <span class="info-label">Session Mode</span>
+                <div class="info-value">{{ sessionDetail.session?.session_mode || 'N/A' }}</div>
+              </div>
+            </div>
+            <div class="col-sm-6">
+              <div class="info-card">
+                <span class="info-label">Preferred Location</span>
+                <div class="info-value">
+                  {{ sessionDetail.session?.preferred_location || (sessionDetail.session?.session_mode === 'Online' ? 'Online' : 'N/A') }}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

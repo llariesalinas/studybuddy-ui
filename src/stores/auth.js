@@ -125,13 +125,15 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = {
       email: response.data.email,
       role: normalizeRole(response.data.role),
-      id: response.data.user_id,
+      id: Number(response.data.user_id),
+      profile_id: Number(response.data.profile_id),
       fname: response.data.fname,
       lname: response.data.lname
     }
 
     localStorage.setItem('user_role', normalizeRole(response.data.role))
     localStorage.setItem('user_id', response.data.user_id)
+    localStorage.setItem('profile_id', response.data.profile_id)
     profileStore.resetProfileState()
 
     startSessionTracking()
@@ -152,6 +154,7 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('refresh_token')
     localStorage.removeItem('user_role')
     localStorage.removeItem('user_id')
+    localStorage.removeItem('profile_id')
     findTutorsStore.reset()
   }
 
@@ -168,9 +171,11 @@ export const useAuthStore = defineStore('auth', () => {
 
     if (storedRole) {
       const storedUserId = localStorage.getItem('user_id')
+      const storedProfileId = localStorage.getItem('profile_id')
       user.value = {
         role: normalizeRole(storedRole),
-        id: storedUserId ? parseInt(storedUserId) : undefined
+        id: storedUserId ? parseInt(storedUserId) : undefined,
+        profile_id: storedProfileId ? parseInt(storedProfileId) : undefined
       }
     }
   }
