@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import path, include
 from django.conf.urls.static import static
 from django.conf import settings
 from rest_framework_simplejwt.views import TokenRefreshView
@@ -74,6 +74,7 @@ urlpatterns = [
     path('notifications/<int:notification_id>/read/', mark_notification_read),
     path('tutor/setup/', views.tutor_setup),
     path('recommend-tutors/', views.recommend_tutors_view),
+    path('chat/', include('studybuddy.chat.urls')),
 ]
 
 if settings.DEBUG:

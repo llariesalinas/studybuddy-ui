@@ -131,6 +131,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     localStorage.setItem('user_role', normalizeRole(response.data.role))
+    localStorage.setItem('user_id', response.data.user_id)
     profileStore.resetProfileState()
 
     startSessionTracking()
@@ -150,6 +151,7 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('access_token')
     localStorage.removeItem('refresh_token')
     localStorage.removeItem('user_role')
+    localStorage.removeItem('user_id')
     findTutorsStore.reset()
   }
 
@@ -165,8 +167,10 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     if (storedRole) {
+      const storedUserId = localStorage.getItem('user_id')
       user.value = {
-        role: normalizeRole(storedRole)
+        role: normalizeRole(storedRole),
+        id: storedUserId ? parseInt(storedUserId) : undefined
       }
     }
   }

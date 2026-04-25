@@ -139,6 +139,12 @@ const router = createRouter({
       component: () => import('@/views/TutorSessionsReports.vue'),
       meta: { requiresAuth: true, role: 'Tutor' }
     },
+    {
+      path: '/chat',
+      name: 'chat',
+      component: () => import('@/views/Chat.vue'),
+      meta: { requiresAuth: true }
+    },
 
 
   ]

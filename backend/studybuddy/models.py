@@ -467,3 +467,6 @@ class Preference(models.Model):
 
     def __str__(self):
         return f"Preferences for {self.user.fname}"
+
+# Import chat models to register them with the studybuddy app
+from .chat.models import ChatRoom, Message

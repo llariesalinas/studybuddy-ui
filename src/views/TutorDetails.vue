@@ -15,7 +15,7 @@
               <button class="action-btn" aria-label="Favorite" @click="toggleFavorite">
                 <i class="bi" :class="isFavorite ? 'bi-heart-fill text-danger' : 'bi-heart'"></i>
               </button>
-              <button class="action-btn" aria-label="Message">
+              <button class="action-btn" aria-label="Message" @click="openChat">
                 <i class="bi bi-chat-dots"></i>
               </button>
             </div>
@@ -234,6 +234,7 @@ import { useBookingPrefsStore } from '@/stores/selectedSessions'
 import { useBookedSessionStore } from '@/stores/bookedSessionDetails'
 import { useInitialBookingPrefsStore } from '@/stores/initialbookingprefs'
 import { usePaymentStore } from '@/stores/tuteePaymentDetails'
+import { useChatStore } from '@/stores/chat'
 import api from '@/services/api/api'
 
 const router = useRouter()
@@ -243,6 +244,7 @@ const bookingPrefsStore = useBookingPrefsStore()
 const bookedSessionStore = useBookedSessionStore()
 const initialBookingStore = useInitialBookingPrefsStore()
 const paymentStore = usePaymentStore()
+const chatStore = useChatStore()
 
 const tutorID = route.params.id
 const monthOffset = ref(0)
@@ -253,6 +255,15 @@ const showFullSchedule = ref(false)
 const isSubmittingBooking = ref(false)
 const expandedSubjects = ref([])
 const isFavorite = ref(false)
+
+const openChat = async () => {
+  try {
+    const room = await chatStore.startInquiry(tutorID)
+    router.push({ name: 'chat', query: { room: room.id } })
+  } catch (error) {
+    console.error('Failed to open chat:', error)
+  }
+}
 
 const currencyFormatter = new Intl.NumberFormat('en-PH', {
   style: 'currency',
