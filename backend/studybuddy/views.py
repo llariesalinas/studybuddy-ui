@@ -236,8 +236,20 @@ def get_booking_request_bookings(booking):
 
 
 def get_representative_booking(bookings):
-    sorted_group = sort_bookings_for_session_group(bookings)
-    return sorted_group[0] if sorted_group else None
+    if bookings is None:
+        return None
+
+    if hasattr(bookings, "first"):
+        return bookings.first()
+
+    if isinstance(bookings, (list, tuple)):
+        sorted_group = sort_bookings_for_session_group(bookings)
+        return sorted_group[0] if sorted_group else None
+
+    for booking in bookings:
+        return booking
+
+    return None
 
 
 def get_session_notification_context(bookings):
@@ -2396,31 +2408,6 @@ def update_booking_location(request, booking_request_id):
 # --- WALLET & PAYMENT VIEWS ---
 from django.conf import settings
 from .models import Transaction, WithdrawalRequest
-
-def get_session_group_bookings(booking):
-    """Helper to get all bookings in the same request/group."""
-    if booking.booking_request_id:
-        return Booking.objects.filter(booking_request_id=booking.booking_request_id)
-    elif booking.session_group_id:
-        return Booking.objects.filter(session_group_id=booking.session_group_id)
-    return Booking.objects.filter(id=booking.id)
-
-def get_representative_booking(bookings):
-    """Returns one booking to represent the whole group for payments."""
-    if bookings is None:
-        return None
-
-    if hasattr(bookings, "first"):
-        return bookings.first()
-
-    if isinstance(bookings, (list, tuple)):
-        sorted_group = sort_bookings_for_session_group(bookings)
-        return sorted_group[0] if sorted_group else None
-
-    for booking in bookings:
-        return booking
-
-    return None
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
