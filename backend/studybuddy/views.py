@@ -2407,7 +2407,20 @@ def get_session_group_bookings(booking):
 
 def get_representative_booking(bookings):
     """Returns one booking to represent the whole group for payments."""
-    return bookings.first()
+    if bookings is None:
+        return None
+
+    if hasattr(bookings, "first"):
+        return bookings.first()
+
+    if isinstance(bookings, (list, tuple)):
+        sorted_group = sort_bookings_for_session_group(bookings)
+        return sorted_group[0] if sorted_group else None
+
+    for booking in bookings:
+        return booking
+
+    return None
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
