@@ -54,6 +54,12 @@
             <i class="bi bi-file-earmark-text me-3"></i> Sessions & Reports
           </router-link>
         </li>
+
+        <li class="nav-item mb-2" v-if="userRole === 'tutor'">
+          <router-link to="/tch-wallet" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
+            <i class="bi bi-wallet2 me-3"></i> Wallet
+          </router-link>
+        </li>
       </ul>
     </aside>
 
@@ -133,6 +139,11 @@
           <div v-if="route.path === '/tutor-profile'">
             <h2 class="fw-bold text-dark">My Profile</h2>
             <p class="text-muted">Manage your personal information and tutoring preferences.</p>
+          </div>
+
+          <div v-if="route.path === '/tch-wallet'">
+            <h2 class="fw-bold text-dark">My Wallet</h2>
+            <p class="text-muted">Manage your earnings and withdrawal requests.</p>
           </div>
 
           <div v-if="route.path === '/tch-requestedSessions'">

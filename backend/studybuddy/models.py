@@ -2,7 +2,9 @@ import uuid
 
 from django.db import models
 from django.db.models import Q
-from django.contrib.auth.models import User ### allows the use of auth user model for authentication and user management
+from django.contrib.auth.models import User
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 
 
 # Create your models here.
@@ -163,6 +165,59 @@ class Tutor(models.Model):
 
     def __str__(self):
         return f"Tutor: {self.profile.fname} {self.profile.lname}"
+
+class Wallet(models.Model):
+    tutor = models.OneToOneField(Tutor, on_delete=models.CASCADE, related_name='wallet')
+    balance = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    pending_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    last_updated = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Wallet - {self.tutor.profile.fname} (₱{self.balance})"
+
+class Transaction(models.Model):
+    TRANSACTION_TYPES = [
+        ('session_credit', 'Session Credit'),
+        ('withdrawal', 'Withdrawal'),
+        ('withdrawal_reversal', 'Withdrawal Reversal'),
+        ('commission_deduction', 'Commission Deduction'),
+    ]
+    
+    wallet = models.ForeignKey(Wallet, on_delete=models.CASCADE, related_name='transactions')
+    transaction_type = models.CharField(max_length=20, choices=TRANSACTION_TYPES)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    description = models.TextField()
+    reference_id = models.CharField(max_length=100, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+class WithdrawalRequest(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('processed', 'Processed'),
+        ('rejected', 'Rejected'),
+    ]
+    METHOD_CHOICES = [
+        ('gcash', 'GCash'),
+        ('bank', 'Bank Transfer'),
+    ]
+
+    tutor = models.ForeignKey(Tutor, on_delete=models.CASCADE)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    method = models.CharField(max_length=10, choices=METHOD_CHOICES)
+    account_number = models.CharField(max_length=50)
+    account_name = models.CharField(max_length=100)
+    bank_name = models.CharField(max_length=100, blank=True, null=True)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
+    requested_at = models.DateTimeField(auto_now_add=True)
+    processed_at = models.DateTimeField(null=True, blank=True)
+
+@receiver(post_save, sender=Tutor)
+def create_tutor_wallet(sender, instance, created, **kwargs):
+    if created:
+        Wallet.objects.get_or_create(tutor=instance)
 
 #Subjects Table 
 class Subjects(models.Model):

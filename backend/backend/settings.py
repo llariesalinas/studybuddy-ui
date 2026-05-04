@@ -23,7 +23,7 @@ load_dotenv(BASE_DIR / ".env")
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-p@^2u1gzwyov3&bo_2td(e8i-#m3(97ai@f^jg$l&k-0e%+fhc'
+SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-p@^2u1gzwyov3&bo_2td(e8i-#m3(97ai@f^jg$l&k-0e%+fhc')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -152,3 +152,7 @@ CHANNEL_LAYERS = {
         'BACKEND': 'channels.layers.InMemoryChannelLayer',
     },
 }
+
+# PayMongo & Integration Settings
+PAYMONGO_SECRET_KEY = os.getenv("PAYMONGO_SECRET_KEY", "sk_test_placeholder")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")

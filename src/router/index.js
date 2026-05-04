@@ -114,6 +114,12 @@ const router = createRouter({
       meta: { requiresAuth: true, role: 'Tutor' }
     },
     {
+      path: '/tch-wallet',
+      name: 'tch-wallet',
+      component: () => import('@/views/TutorWallet.vue'),
+      meta: { requiresAuth: true, role: 'Tutor' }
+    },
+    {
       path: '/tch-requestedSessions',
       name: 'tch-requestedSessions',
       component: () => import('@/views/TutorRequestedSessions.vue'),
