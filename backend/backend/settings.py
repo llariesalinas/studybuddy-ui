@@ -23,7 +23,7 @@ load_dotenv(BASE_DIR / ".env")
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-p@^2u1gzwyov3&bo_2td(e8i-#m3(97ai@f^jg$l&k-0e%+fhc'
+SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-p@^2u1gzwyov3&bo_2td(e8i-#m3(97ai@f^jg$l&k-0e%+fhc')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -45,6 +45,8 @@ SIMPLE_JWT = {
 # Application definition
 
 INSTALLED_APPS = [
+    'daphne',
+    'channels',
     'rest_framework',
     'corsheaders',
     'django.contrib.admin',
@@ -92,20 +94,6 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
 
-""" 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'studybuddy_db',
-        'USER': 'postgres',
-        'PASSWORD':'sysadmin2003',
-        'HOST': 'localhost',
-        'PORT': '5432',
-    }
-}
-"""
-
-
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
@@ -141,7 +129,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Asia/Manila'
 
 USE_I18N = True
 
@@ -156,3 +144,15 @@ CORS_ALLOW_ALL_ORIGINS = True
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+ASGI_APPLICATION = 'backend.asgi.application'
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',
+    },
+}
+
+# PayMongo & Integration Settings
+PAYMONGO_SECRET_KEY = os.getenv("PAYMONGO_SECRET_KEY", "sk_test_placeholder")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")

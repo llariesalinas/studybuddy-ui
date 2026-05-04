@@ -1,4 +1,8 @@
 import json
+import logging
+import decimal
+import base64
+import requests
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
 from django.utils.timezone import now
@@ -15,7 +19,6 @@ from django.utils import timezone
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.views import APIView
 from rest_framework.generics import ListAPIView
-from django.utils.timezone import now
 from django.db.models import Avg, Case, When, Value, IntegerField, Q
 from collections import defaultdict
 # algo
@@ -23,7 +26,7 @@ from .recommender.hybrid import recommend_tutors_hybrid
 from .recommender.CF import build_rating_matrix
 
 from .recommender.cbf import recommend_tutors
-from .models import Booking, Course, Notification, PartnerInstitution, Payment, PaymentMethod, Preference, Rating, Subjects, Tutor, TutorAvailability, TutorAvailabilityOverride, TutorSubjects
+from .models import Booking, Course, Notification, PartnerInstitution, Payment, PaymentMethod, Preference, Rating, Subjects, Tutor, TutorAvailability, TutorAvailabilityOverride, TutorSubjects, Wallet
 from .serializers import (
     NotificationSerializer,
     SubjectSerializer,
@@ -41,6 +44,8 @@ from .models import (
     Tutor,
     TutorSubjects
 )
+
+logger = logging.getLogger(__name__)
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
@@ -393,6 +398,7 @@ def partner_institutions_list(request):
 
 
 @api_view(['POST'])
+@transaction.atomic
 def register_user(request):
 
     email = request.data.get('email')
@@ -427,21 +433,31 @@ def register_user(request):
             status=status.HTTP_400_BAD_REQUEST
         )
 
-    # Prevent duplicate users
-    if User.objects.filter(username=email).exists():
+    existing_user = User.objects.filter(username=email).first()
+
+    if existing_user and hasattr(existing_user, 'userprofile'):
         return Response(
             {"error": "User already exists"},
             status=status.HTTP_400_BAD_REQUEST
         )
 
-    # Create Django User
-    user = User.objects.create_user(
-        username=email,
-        email=email,
-        password=password
-    )
+    if existing_user:
+        logger.warning(
+            "Recovering orphaned auth_user without profile: email=%s user_id=%s",
+            email,
+            existing_user.id,
+        )
+        user = existing_user
+        user.email = email
+        user.set_password(password)
+        user.save(update_fields=["email", "password"])
+    else:
+        user = User.objects.create_user(
+            username=email,
+            email=email,
+            password=password
+        )
 
-    # Create UserProfile
     profile = UserProfile.objects.create(
         user=user,
         fname=fname,
@@ -455,10 +471,20 @@ def register_user(request):
     if role == "Tutor":
         Tutor.objects.create(profile=profile)
 
+    logger.info(
+        "Registered user in database: email=%s user_id=%s profile_id=%s role=%s institution_id=%s",
+        email,
+        user.id,
+        profile.id,
+        role,
+        institution_id,
+    )
+
     return Response(
         {"message": "User registered successfully"},
         status=status.HTTP_201_CREATED
     )
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -539,7 +565,8 @@ def login_view(request):
         "access": str(refresh.access_token),
         "refresh": str(refresh),
         "role": profile.role,
-        "user_id": profile.id,
+        "user_id": user.id,
+        "profile_id": profile.id,
         "email": user.email,
         "fname": profile.fname,
         "lname": profile.lname
@@ -786,7 +813,9 @@ def build_combined_block(group):
         ),
         "startTime": start_time.strftime("%H:%M"),
         "endTime": end_time.strftime("%H:%M"),
-        "duration_hours": duration
+        "duration_hours": duration,
+        "preferred_location": first.preferred_location,
+        "session_mode": first.session_mode
     }
 
 
@@ -881,7 +910,9 @@ def build_booking_request_block(group):
         "startTime": primary_block["startTime"],
         "endTime": primary_block["endTime"],
         "duration_hours": get_duration_hours_for_bookings(sorted_group),
-        "timeBlocks": time_blocks,
+        "preferred_location": first_booking.preferred_location,
+        "session_mode": first_booking.session_mode,
+        "time_blocks": time_blocks,
         "hasMultipleTimeBlocks": len(time_blocks) > 1,
     }
 
@@ -1018,7 +1049,8 @@ def tutor_detail(request, profile_id):
 def tutor_availability(request, tutor_id):
 
     tutor = get_object_or_404(Tutor, profile_id=tutor_id)
-    today = date.today()
+    current_now = timezone.localtime(timezone.now())
+    today = current_now.date()
     month_offset = int(request.GET.get("month_offset", 0))
 
     total_months = (today.year * 12) + (today.month - 1) + month_offset
@@ -1063,7 +1095,7 @@ def tutor_availability(request, tutor_id):
 
         for weekday_index, weekday_name in enumerate(display_weekdays):
             current_date = current_week_start + timedelta(days=weekday_index)
-            is_past = current_date < today
+            is_past_day = current_date < today
             day_slots = []
 
             for slot in availability:
@@ -1078,10 +1110,13 @@ def tutor_availability(request, tutor_id):
                 )
                 is_booked = (slot.id, current_date) in booked_map
 
+                # Check if the slot time has already passed today
+                is_slot_past = is_past_day or (current_date == today and slot.time_slot < current_now.time())
+
                 day_slots.append({
                     "id": slot.id,
                     "time_slot": slot.time_slot.strftime("%H:%M"),
-                    "is_booked": is_booked or is_past or is_overridden,
+                    "is_booked": is_booked or is_slot_past or is_overridden,
                     "is_overridden": is_overridden
                 })
 
@@ -1091,7 +1126,7 @@ def tutor_availability(request, tutor_id):
                 "name": weekday_name,
                 "date": current_date.isoformat(),
                 "in_month": month_start <= current_date <= month_end,
-                "is_past": is_past,
+                "is_past": is_past_day,
                 "is_blocked": current_date in full_day_dates,
                 "has_available": any(not slot["is_booked"] for slot in day_slots),
                 "slots": day_slots
@@ -1171,6 +1206,7 @@ def confirm_payment_and_book(request):
     tutor_id = request.data.get("tutor_id")
     slots = request.data.get("slots")
     method_id = request.data.get("payment_method")
+    preferred_location = request.data.get('preferred_location', '').strip()
 
     if isinstance(slots, str):
         try:
@@ -1195,6 +1231,12 @@ def confirm_payment_and_book(request):
             {"error": "You can only book multiple sessions on the same day."},
             status=400
         )
+
+    # Determine session mode from first slot
+    first_slot_mode = slots[0].get('session_mode', '')
+    is_f2f = first_slot_mode in ['F2F', 'Face-to-face']
+    if is_f2f and not preferred_location:
+        return Response({"error": "Preferred location is required for Face-to-face sessions."}, status=400)
 
     if method_id:
         try:
@@ -1230,10 +1272,16 @@ def confirm_payment_and_book(request):
                     status=400
                 )
 
-            # 🚫 Prevent booking past dates
-            if session_date < now().date():
+            # 🚫 Prevent booking past dates/times
+            current_now = timezone.localtime(timezone.now())
+            if session_date < current_now.date():
                 return Response(
                     {"error": "Cannot book a past date."},
+                    status=400
+                )
+            if session_date == current_now.date() and availability.time_slot < current_now.time():
+                return Response(
+                    {"error": "Cannot book a past time slot."},
                     status=400
                 )
 
@@ -1298,6 +1346,7 @@ def confirm_payment_and_book(request):
                     availability=slot_request["availability"],
                     session_date=slot_request["session_date"],
                     session_mode=slot_request["session_mode"],
+                    preferred_location=preferred_location,
                     session_group_id=session_group_id,
                     booking_request_id=booking_request_id,
                     status="Pending"
@@ -1560,6 +1609,13 @@ def approve_booking(request, booking_id):
     if request.user.userprofile != booking.tutor.profile:
         return Response({"error": "Unauthorized"}, status=403)
 
+    wallet, _ = Wallet.objects.get_or_create(tutor=booking.tutor)
+    if wallet.balance < 0:
+        return Response(
+            {"error": "You cannot accept bookings while your wallet balance is negative."},
+            status=400
+        )
+
     if booking.status != "Pending":
         return Response({"error": "Only pending bookings can be approved."}, status=400)
 
@@ -1774,6 +1830,7 @@ def build_booking_detail_payload(session_group_bookings):
             ),
             "raw_status": representative_booking.status,
             "session_mode": representative_booking.session_mode,
+            "preferred_location": representative_booking.preferred_location,
         },
         "payment": serialize_payment_summary(representative_booking),
     }
@@ -1921,6 +1978,9 @@ def tutor_confirm_booking(request, booking_id):
             "completed",
             session_group_bookings
         )
+
+        # Credit the tutor's wallet if payment was online
+        credit_tutor_wallet(representative_booking)
 
     return Response({"message": "Session marked as completed successfully."})
 
@@ -2307,3 +2367,274 @@ def payment_methods(request):
     ]
 
     return Response(data)
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def update_booking_location(request, booking_request_id):
+    profile = request.user.userprofile
+    try:
+        tutor = Tutor.objects.get(profile=profile)
+    except Tutor.DoesNotExist:
+        return Response({"error": "Not a tutor"}, status=403)
+
+    new_location = request.data.get('preferred_location', '').strip()
+
+    if not new_location:
+        return Response({"error": "Location cannot be empty for Face-to-Face sessions."}, status=400)
+
+    updated = Booking.objects.filter(
+        booking_request_id=booking_request_id,
+        tutor=tutor,
+        status="Pending"
+    ).update(preferred_location=new_location)
+
+    if not updated:
+        return Response({"error": "No matching pending bookings found."}, status=404)
+
+    return Response({"message": "Location updated."})
+
+# --- WALLET & PAYMENT VIEWS ---
+from django.conf import settings
+from .models import Transaction, WithdrawalRequest
+
+def get_session_group_bookings(booking):
+    """Helper to get all bookings in the same request/group."""
+    if booking.booking_request_id:
+        return Booking.objects.filter(booking_request_id=booking.booking_request_id)
+    elif booking.session_group_id:
+        return Booking.objects.filter(session_group_id=booking.session_group_id)
+    return Booking.objects.filter(id=booking.id)
+
+def get_representative_booking(bookings):
+    """Returns one booking to represent the whole group for payments."""
+    return bookings.first()
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def wallet_status(request):
+    """Returns the tutor's wallet balance and pending amount."""
+    try:
+        tutor = Tutor.objects.get(profile__user=request.user)
+    except Tutor.DoesNotExist:
+        return Response({"error": "Not a tutor"}, status=403)
+        
+    wallet, created = Wallet.objects.get_or_create(tutor=tutor)
+    
+    return Response({
+        "balance": float(wallet.balance),
+        "pending_amount": float(wallet.pending_amount),
+        "currency": "PHP"
+    })
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def wallet_transactions(request):
+    """Returns the history of credits and withdrawals."""
+    try:
+        tutor = Tutor.objects.get(profile__user=request.user)
+    except Tutor.DoesNotExist:
+        return Response({"error": "Not a tutor"}, status=403)
+        
+    wallet, _ = Wallet.objects.get_or_create(tutor=tutor)
+    transactions = Transaction.objects.filter(wallet=wallet).order_by('-created_at')
+    
+    data = []
+    for tx in transactions:
+        data.append({
+            "id": tx.id,
+            "transaction_type": tx.transaction_type,
+            "amount": float(tx.amount),
+            "description": tx.description,
+            "reference_id": tx.reference_id,
+            "created_at": tx.created_at
+        })
+    return Response(data)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def list_withdrawals(request):
+    """Returns the tutor's withdrawal history."""
+    try:
+        tutor = Tutor.objects.get(profile__user=request.user)
+    except Tutor.DoesNotExist:
+        return Response({"error": "Not a tutor"}, status=403)
+        
+    withdrawals = WithdrawalRequest.objects.filter(tutor=tutor).order_by('-requested_at')
+    
+    data = []
+    for w in withdrawals:
+        data.append({
+            "id": w.id,
+            "amount": float(w.amount),
+            "method": w.method,
+            "account_number": w.account_number,
+            "account_name": w.account_name,
+            "status": w.status,
+            "requested_at": w.requested_at,
+            "processed_at": w.processed_at
+        })
+    return Response(data)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def request_withdrawal(request):
+    """Creates a new withdrawal request."""
+    try:
+        tutor = Tutor.objects.get(profile__user=request.user)
+    except Tutor.DoesNotExist:
+        return Response({"error": "Not a tutor"}, status=403)
+        
+    wallet, _ = Wallet.objects.get_or_create(tutor=tutor)
+    
+    amount = request.data.get('amount')
+    if not amount or decimal.Decimal(str(amount)) > wallet.balance:
+        return Response({"error": "Insufficient balance"}, status=400)
+    
+    if decimal.Decimal(str(amount)) < 500:
+        return Response({"error": "Minimum withdrawal is ₱500"}, status=400)
+
+    with transaction.atomic():
+        withdrawal = WithdrawalRequest.objects.create(
+            tutor=tutor,
+            amount=amount,
+            method=request.data.get('method'),
+            account_number=request.data.get('account_number'),
+            account_name=request.data.get('account_name'),
+            bank_name=request.data.get('bank_name', ''),
+            status='pending'
+        )
+        
+        wallet.balance -= decimal.Decimal(str(amount))
+        wallet.save()
+        
+        Transaction.objects.create(
+            wallet=wallet,
+            transaction_type='withdrawal',
+            amount=-decimal.Decimal(str(amount)),
+            description=f"Withdrawal request via {withdrawal.get_method_display()}",
+            reference_id=f"WD-{withdrawal.id}"
+        )
+
+    return Response({"status": "pending", "id": withdrawal.id})
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def initiate_online_payment(request):
+    """Creates a PayMongo Checkout Session."""
+    booking_id = request.data.get('booking_id')
+    booking = get_object_or_404(Booking, id=booking_id, student__user=request.user)
+    
+    # Calculate amount: Hourly Rate * Duration (sum of slots)
+    group_bookings = get_session_group_bookings(booking)
+    duration_hours = get_duration_hours_for_bookings(group_bookings)
+    total_amount = float(booking.tutor.hourly_rate) * duration_hours
+    
+    # PayMongo amount in centavos
+    amount_cents = int(total_amount * 100)
+
+    # Prepare PayMongo Authentication
+    secret_key = getattr(settings, 'PAYMONGO_SECRET_KEY', 'sk_test_placeholder')
+    auth_str = f"{secret_key}:"
+    encoded_auth = base64.b64encode(auth_str.encode()).decode()
+
+    url = "https://api.paymongo.com/v1/checkout_sessions"
+    payload = {
+        "data": {
+            "attributes": {
+                "send_email_receipt": True,
+                "show_description": True,
+                "show_line_items": True,
+                "description": f"StudyBuddy Session with {booking.tutor.profile.fname}",
+                "line_items": [
+                    {
+                        "currency": "PHP",
+                        "amount": amount_cents,
+                        "description": "Tutoring Session Fee",
+                        "name": f"Session on {booking.session_date}",
+                        "quantity": 1
+                    }
+                ],
+                "payment_method_types": ["gcash", "card", "paymaya"],
+                "success_url": f"{settings.FRONTEND_URL}/tuteeSessionDetails/{booking.id}?payment=success",
+                "cancel_url": f"{settings.FRONTEND_URL}/payment-tutee/{booking.id}?payment=cancelled",
+            }
+        }
+    }
+    
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Basic {encoded_auth}"
+    }
+
+    try:
+        response = requests.post(url, json=payload, headers=headers)
+        res_data = response.json()
+        
+        if response.status_code == 201:
+            checkout_url = res_data['data']['attributes']['checkout_url']
+            
+            # Store payment record
+            method_online, _ = PaymentMethod.objects.get_or_create(
+                code='PAYMONGO',
+                defaults={'method_name': 'Pay Online (GCash / Card)', 'is_active': True}
+            )
+            
+            payment, _ = Payment.objects.get_or_create(
+                booking=booking, 
+                defaults={
+                    'amount': total_amount,
+                    'method': method_online,
+                    'payment_status': 'Pending'
+                }
+            )
+            payment.transaction_reference = res_data['data']['id']
+            payment.save()
+            
+            return Response({"payment_url": checkout_url})
+        else:
+            logger.error(f"PayMongo Error: {res_data}")
+            return Response({"error": "Failed to create checkout session"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    except Exception as e:
+        logger.error(f"Payment Initiation Exception: {str(e)}")
+        return Response({"error": "Internal server error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+def credit_tutor_wallet(booking):
+    session_group = get_session_group_bookings(booking)
+    rep_booking = get_representative_booking(session_group)
+
+    payment = getattr(rep_booking, 'payment', None)
+    if not payment or payment.payment_status != 'Paid':
+        return
+
+    ref_id = f"BK-{rep_booking.id}"
+    if Transaction.objects.filter(reference_id=ref_id).exists():
+        return
+
+    COMMISSION_RATE = decimal.Decimal('0.10')
+    total_amount = payment.amount
+    commission = total_amount * COMMISSION_RATE
+
+    with transaction.atomic():
+        wallet, _ = Wallet.objects.get_or_create(tutor=rep_booking.tutor)
+
+        if payment.method.code == 'online':
+            tutor_share = total_amount - commission
+            wallet.balance += tutor_share
+            wallet.save()
+            Transaction.objects.create(
+                wallet=wallet,
+                transaction_type='session_credit',
+                amount=tutor_share,
+                description=f"Session Credit for {rep_booking.session_date} (Less 10% Platform Fee)",
+                reference_id=ref_id
+            )
+        elif payment.method.code == 'CASH':
+            wallet.balance -= commission
+            wallet.save()
+            Transaction.objects.create(
+                wallet=wallet,
+                transaction_type='commission_deduction',
+                amount=-commission,
+                description=f"Platform Commission for {rep_booking.session_date} (10% of ₱{total_amount})",
+                reference_id=ref_id
+            )

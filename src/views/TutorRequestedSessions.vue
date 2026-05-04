@@ -79,6 +79,20 @@
                 </div>
               </div>
 
+              <div class="col-md">
+                <small class="text-muted">Location</small>
+                <div v-if="session.session_mode === 'Online'" class="text-muted small">Online</div>
+                <div v-else class="d-flex gap-2 align-items-center mt-1">
+                  <input
+                    type="text"
+                    class="form-control form-control-sm border-sb shadow-none"
+                    :value="session.preferred_location || ''"
+                    @change="saveLocation(session.booking_request_id || session.id, $event.target.value)"
+                    placeholder="No location set"
+                  />
+                </div>
+              </div>
+
               <div class="col-md text-md-end mt-3 mt-md-0">
                 <div class="d-grid gap-2">
 
@@ -114,6 +128,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useSessionsStore } from '@/stores/completedSessions'
+import api from '@/services/api/api'
 
 const confirmingId = ref(null)
 const rejectingId = ref(null)
@@ -127,6 +142,15 @@ onMounted(async () => {
   highlightedRequestIds.value = [...sessionStore.unseenPendingRequestIds]
   sessionStore.markPendingRequestsSeen()
 })
+
+const saveLocation = async (id, newLocation) => {
+  try {
+    await api.patch(`/bookings/${id}/location/`, { preferred_location: newLocation })
+  } catch (err) {
+    console.error('Failed to update location', err)
+    alert(err.response?.data?.error || 'Failed to save location. Please try again.')
+  }
+}
 
 const isHighlightedRequest = (sessionId) =>
   highlightedRequestIds.value.includes(String(sessionId))

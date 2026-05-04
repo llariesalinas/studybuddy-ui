@@ -38,5 +38,14 @@ __screenshots__/
 # Vite
 *.timestamp-*-*.mjs
 
-# Local handoff notes
+# Local handoff notes and plans
 PROJECT_HANDOFF_DUMP.md
+*project handoff*.md
+plans and handoffs/
+plans/
+handoffs/
+.claude/
+.gemini/
+.mcp.json
+# Added by code-review-graph
+.code-review-graph/

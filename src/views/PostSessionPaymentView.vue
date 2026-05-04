@@ -76,6 +76,20 @@
               </button>
             </template>
 
+            <template v-else-if="selectedMethod?.code === 'PAYMONGO'">
+              <div class="alert alert-info mb-3 small">
+                <i class="bi bi-shield-check me-2"></i>
+                You will be redirected to a secure payment page. Accepted: GCash, Maya, Visa, Mastercard.
+              </div>
+              <button
+                class="btn bg-sb-primary text-white w-100"
+                :disabled="isSubmitting"
+                @click="initiateOnlinePayment"
+              >
+                {{ isSubmitting ? 'Redirecting...' : 'Pay Online' }}
+              </button>
+            </template>
+
             <template v-else-if="selectedMethod">
               <div class="mb-3">
                 <label class="form-label">Transaction Reference</label>
@@ -172,6 +186,18 @@ const handleReceiptChange = (event) => {
   paymentStore.receiptImage = event.target.files?.[0] || null
 }
 
+const initiateOnlinePayment = async () => {
+  isSubmitting.value = true
+  try {
+    const { data } = await api.post('payments/initiate/', { booking_id: bookingId })
+    window.location.href = data.payment_url
+  } catch (error) {
+    console.error('Online payment initiation error:', error)
+    alert(error.response?.data?.error || 'Unable to initiate payment. Please try again.')
+    isSubmitting.value = false
+  }
+}
+
 const submitPayment = async () => {
   if (!paymentStore.selectedMethod) {
     alert('Please select a payment method.')
@@ -224,7 +250,7 @@ onMounted(async () => {
       id: method.id,
       label: method.name,
       code: method.code,
-      icon: method.code === 'CASH' ? 'bi-cash-coin' : 'bi-credit-card'
+      icon: method.code === 'CASH' ? 'bi-cash-coin' : method.code === 'PAYMONGO' ? 'bi-phone' : 'bi-credit-card'
     }))
   } catch (error) {
     console.error('Failed to load payment page:', error)

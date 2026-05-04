@@ -9,7 +9,7 @@ import {
   stopIdleSessionTracking
 } from '@/services/auth/idleSession'
 
-const API_BASE_URL = 'http://127.0.0.1:8000/api/'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api/'
 const ACCESS_REFRESH_INTERVAL_MS = 4 * 60 * 1000
 
 let refreshIntervalId = null
@@ -125,12 +125,15 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = {
       email: response.data.email,
       role: normalizeRole(response.data.role),
-      id: response.data.user_id,
+      id: Number(response.data.user_id),
+      profile_id: Number(response.data.profile_id),
       fname: response.data.fname,
       lname: response.data.lname
     }
 
     localStorage.setItem('user_role', normalizeRole(response.data.role))
+    localStorage.setItem('user_id', response.data.user_id)
+    localStorage.setItem('profile_id', response.data.profile_id)
     profileStore.resetProfileState()
 
     startSessionTracking()
@@ -150,6 +153,8 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('access_token')
     localStorage.removeItem('refresh_token')
     localStorage.removeItem('user_role')
+    localStorage.removeItem('user_id')
+    localStorage.removeItem('profile_id')
     findTutorsStore.reset()
   }
 
@@ -165,8 +170,12 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     if (storedRole) {
+      const storedUserId = localStorage.getItem('user_id')
+      const storedProfileId = localStorage.getItem('profile_id')
       user.value = {
-        role: normalizeRole(storedRole)
+        role: normalizeRole(storedRole),
+        id: storedUserId ? parseInt(storedUserId) : undefined,
+        profile_id: storedProfileId ? parseInt(storedProfileId) : undefined
       }
     }
   }

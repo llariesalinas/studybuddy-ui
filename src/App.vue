@@ -54,10 +54,16 @@
             <i class="bi bi-file-earmark-text me-3"></i> Sessions & Reports
           </router-link>
         </li>
+
+        <li class="nav-item mb-2" v-if="userRole === 'tutor'">
+          <router-link to="/tch-wallet" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
+            <i class="bi bi-wallet2 me-3"></i> Wallet
+          </router-link>
+        </li>
       </ul>
     </aside>
 
-    <div class="modal fade" id="logoutModal" tabindex="-1">
+    <div ref="logoutModalRef" class="modal fade" id="logoutModal" tabindex="-1">
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content rounded-4">
           
@@ -135,6 +141,11 @@
             <p class="text-muted">Manage your personal information and tutoring preferences.</p>
           </div>
 
+          <div v-if="route.path === '/tch-wallet'">
+            <h2 class="fw-bold text-dark">My Wallet</h2>
+            <p class="text-muted">Manage your earnings and withdrawal requests.</p>
+          </div>
+
           <div v-if="route.path === '/tch-requestedSessions'">
             <div class="d-flex align-items-center gap-2 flex-wrap">
               <h2 class="fw-bold mb-1">Requested Sessions</h2>
@@ -166,7 +177,12 @@
               </span>
             </router-link>
 
-            <div v-if="authStore.isAuthenticated && !isPublicRoute" class="ms-auto">
+            <div v-if="authStore.isAuthenticated && !isPublicRoute" class="d-flex align-items-center gap-2 ms-auto">
+              <router-link to="/chat" class="chat-icon-btn" aria-label="Open chat">
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                </svg>
+              </router-link>
               <NotificationBell />
             </div>
           </div>
@@ -178,7 +194,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth' // Import auth store
 import { useSessionsStore } from '@/stores/completedSessions'
@@ -186,18 +202,35 @@ import NotificationBell from '@/components/NotificationBell.vue'
 import RatingReminderBanner from '@/components/RatingReminderBanner.vue'
 import { useNotificationsStore } from '@/stores/notifications'
 import router from './router'
+import * as bootstrap from 'bootstrap'
 
 const route = useRoute()
 const authStore = useAuthStore()
 const notificationsStore = useNotificationsStore()
 const sessionStore = useSessionsStore()
+const logoutModalRef = ref(null)
 let pendingSessionsRefreshId = null
-const logout = () => {
 
+const closeLogoutModal = () => {
+  const modalElement = logoutModalRef.value
+
+  if (!modalElement) {
+    return
+  }
+
+  const modalInstance = bootstrap.Modal.getInstance(modalElement)
+  modalInstance?.hide()
+
+  document.body.classList.remove('modal-open')
+  document.body.style.removeProperty('overflow')
+  document.body.style.removeProperty('padding-right')
+  document.querySelectorAll('.modal-backdrop').forEach(backdrop => backdrop.remove())
+}
+
+const logout = async () => {
+  closeLogoutModal()
   authStore.logout()
-  router.push('/login') // Redirect to login after logout
-
-  router.push
+  await router.push('/login')
 }
 
 const hideSessionButton = computed(() => {
@@ -265,6 +298,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  closeLogoutModal()
   document.removeEventListener('visibilitychange', handleVisibilityChange)
 
   if (pendingSessionsRefreshId) {
@@ -360,5 +394,25 @@ body {
 
 .app-page-header {
   min-height: var(--sb-topbar-height);
+}
+
+.chat-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--sb-bell-size);
+  height: var(--sb-bell-size);
+  border-radius: 50%;
+  border: 1.5px solid #dee2e6;
+  background: #fff;
+  color: #495057;
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.chat-icon-btn:hover,
+.chat-icon-btn.router-link-active {
+  background: var(--sb-primary);
+  color: #fff;
+  border-color: var(--sb-primary);
 }
 </style>

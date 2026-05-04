@@ -101,6 +101,7 @@ import { useRegistrationInfoStore } from '@/stores/registrationinfo'
 import { useAuthStore } from '@/stores/auth'
 import axios from 'axios'
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/'
 const router = useRouter()
 const store = useRegistrationInfoStore()
 const authStore = useAuthStore()
@@ -138,7 +139,7 @@ const emailDomainMatchesInstitution = computed(() => {
 
 const loadInstitutions = async () => {
   try {
-    const response = await axios.get('http://localhost:8000/api/partner-institutions/')
+    const response = await axios.get(`${API_BASE_URL}partner-institutions/`)
     institutions.value = response.data
   } catch (error) {
     console.error('Failed to load partner institutions:', error)
@@ -181,7 +182,7 @@ const handleRegister = async () => {
     const role = store.newUserType
 
     // 🔹 REGISTER USER
-    await axios.post('http://localhost:8000/api/register/', {
+    await axios.post(`${API_BASE_URL}register/`, {
       fname: store.newUserFname,
       mname: store.newUserMname,
       lname: store.newUserLname,

@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import path, include
 from django.conf.urls.static import static
 from django.conf import settings
 from rest_framework_simplejwt.views import TokenRefreshView
@@ -68,12 +68,19 @@ urlpatterns = [
     path('availability-overrides/', views.availability_overrides),
     path('availability-overrides/<int:override_id>/', views.delete_availability_override),
     path('bookings/<int:booking_id>/complete/', complete_booking),
+    path('bookings/<uuid:booking_request_id>/location/', views.update_booking_location),
     path('bookings/<int:booking_id>/approve/', views.approve_booking),
     path('bookings/<int:booking_id>/reject/', views.reject_booking),
     path('notifications/', list_notifications),
     path('notifications/<int:notification_id>/read/', mark_notification_read),
+    path('wallet/', views.wallet_status),
+    path('wallet/transactions/', views.wallet_transactions),
+    path('wallet/withdraw/', views.request_withdrawal),
+    path('wallet/withdrawals/', views.list_withdrawals),
+    path('payments/initiate/', views.initiate_online_payment),
     path('tutor/setup/', views.tutor_setup),
     path('recommend-tutors/', views.recommend_tutors_view),
+    path('chat/', include('studybuddy.chat.urls')),
 ]
 
 if settings.DEBUG:

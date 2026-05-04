@@ -34,6 +34,17 @@
             </div>
           </div>
 
+          <div v-if="store.selectedMode === 'Face-to-face'" class="mb-3">
+            <label class="form-label fw-semibold small">Preferred Location</label>
+            <input
+              type="text"
+              v-model="store.selectedLocation"
+              class="form-control border-sb shadow-none"
+              placeholder="e.g. Library Room 3, Cafeteria..."
+              required
+            />
+          </div>
+
           <div class="row g-3 mb-4">
             <div class="col-6">
               <label class="form-label fw-semibold small">Time From</label>
@@ -295,6 +306,7 @@ const findTutor = async () => {
     findTutorsStore.setFilters({
       subject: store.selectedSubject,
       mode: store.selectedMode,
+      location: store.selectedLocation,
       date: store.selectedDate,
       startTime: store.selectedStartTime,
       endTime: store.selectedEndTime,

@@ -6,6 +6,7 @@ const createDefaultFilters = () => ({
   query: '',
   subject: '',
   mode: '',
+  location: '',
   date: null,
   startTime: null,
   endTime: null,

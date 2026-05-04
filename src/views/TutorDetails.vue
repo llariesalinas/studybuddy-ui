@@ -15,7 +15,7 @@
               <button class="action-btn" aria-label="Favorite" @click="toggleFavorite">
                 <i class="bi" :class="isFavorite ? 'bi-heart-fill text-danger' : 'bi-heart'"></i>
               </button>
-              <button class="action-btn" aria-label="Message">
+              <button class="action-btn" aria-label="Message" @click="openChat">
                 <i class="bi bi-chat-dots"></i>
               </button>
             </div>
@@ -198,6 +198,17 @@
                 </div>
               </div>
 
+              <div v-if="isFaceToFace" class="mb-4">
+                <label class="form-label fw-bold small text-muted">Preferred Location</label>
+                <input
+                  type="text"
+                  v-model="bookedSessionStore.bookedSessionLocation"
+                  class="form-control border-sb shadow-none py-2 rounded-3"
+                  placeholder="e.g. Library Room 3"
+                  required
+                />
+              </div>
+
               <hr class="my-4" style="border-color: #edf1ef;" />
 
               <div class="cost-counter" :class="{ 'cost-counter-active': selectedSessionCount > 0 }">
@@ -233,7 +244,9 @@ import { useRouter, useRoute } from 'vue-router'
 import { useBookingPrefsStore } from '@/stores/selectedSessions'
 import { useBookedSessionStore } from '@/stores/bookedSessionDetails'
 import { useInitialBookingPrefsStore } from '@/stores/initialbookingprefs'
+import { useFindTutorsStore } from '@/stores/findTutors'
 import { usePaymentStore } from '@/stores/tuteePaymentDetails'
+import { useChatStore } from '@/stores/chat'
 import api from '@/services/api/api'
 
 const router = useRouter()
@@ -242,7 +255,9 @@ const route = useRoute()
 const bookingPrefsStore = useBookingPrefsStore()
 const bookedSessionStore = useBookedSessionStore()
 const initialBookingStore = useInitialBookingPrefsStore()
+const findTutorsStore = useFindTutorsStore()
 const paymentStore = usePaymentStore()
+const chatStore = useChatStore()
 
 const tutorID = route.params.id
 const monthOffset = ref(0)
@@ -253,6 +268,15 @@ const showFullSchedule = ref(false)
 const isSubmittingBooking = ref(false)
 const expandedSubjects = ref([])
 const isFavorite = ref(false)
+
+const openChat = async () => {
+  try {
+    const room = await chatStore.startInquiry(tutorID)
+    router.push({ name: 'chat', query: { room: room.id } })
+  } catch (error) {
+    console.error('Failed to open chat:', error)
+  }
+}
 
 const currencyFormatter = new Intl.NumberFormat('en-PH', {
   style: 'currency',
@@ -332,6 +356,11 @@ const tutorProfile = computed(() => ({
 const tutorInitials = computed(() => {
   const parts = tutorProfile.value.name.split(' ').filter(Boolean)
   return parts.slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'SB'
+})
+
+const isFaceToFace = computed(() => {
+  const mode = bookingPrefsStore.selectedMode || initialBookingStore.selectedMode || 'Online'
+  return mode === 'Face-to-face' || mode === 'F2F'
 })
 
 const effectiveSelectedSlots = computed(() => {
@@ -681,7 +710,8 @@ const confirmBooking = async () => {
 
     await api.post('bookings/confirm/', {
       tutor_id: tutorID,
-      slots: effectiveSelectedSlots.value
+      slots: effectiveSelectedSlots.value,
+      preferred_location: bookedSessionStore.bookedSessionLocation
     })
 
     alert('Booking Confirmed!')
@@ -702,6 +732,7 @@ const confirmBooking = async () => {
 
 onMounted(async () => {
   paymentStore.reset()
+  bookedSessionStore.bookedSessionLocation = findTutorsStore.filters.location || ''
   await Promise.all([
     getTutorDetails(),
     getTutorSchedule()
