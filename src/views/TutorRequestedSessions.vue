@@ -11,13 +11,11 @@
         </div>
     </div>
 
-
     <div v-if="filteredSessions.length === 0" class="text-center text-muted py-5">
         No pending session requests found.
     </div>
     
     <div v-else>
-    
         <div
           v-for="session in filteredSessions"
           :key="session.id"
@@ -26,100 +24,138 @@
           @mouseenter="clearHighlight(session.id)"
         >
           <div class="card-body py-3">
+            
+            <div class="row text-center">
 
-            <div class="row align-items-center text-center text-md-start">
-
-              <div class="col-md">
-                <small class="text-muted">Tutee</small>
-                <div class="fw-semibold">
-                  {{ session.tuteeName }}
-                </div>
+              <div class="col-md mb-3 mb-md-0 d-flex flex-column">
+                <small class="text-muted mb-2">Tutee</small>
+                <div class="fw-semibold my-auto">{{ session.tuteeName }}</div>
               </div>
 
-              <div class="col-md">
-                <small class="text-muted">Subject</small>
-                <div class="fw-semibold">
-                  {{ session.subject }}
-                </div>
+              <div class="col-md mb-3 mb-md-0 d-flex flex-column">
+                <small class="text-muted mb-2">Subject</small>
+                <div class="fw-semibold my-auto">{{ session.subject }}</div>
               </div>
 
-              <div class="col-md">
-                <small class="text-muted">Date</small>
-                <div class="fw-semibold schedule-stack">
-                  <div
-                    v-for="(block, index) in getTimeBlocks(session)"
-                    :key="`${session.id}-date-${block.date}-${index}`"
-                  >
+              <div class="col-md mb-3 mb-md-0 d-flex flex-column">
+                <small class="text-muted mb-2">Date</small>
+                <div class="fw-semibold schedule-stack my-auto">
+                  <div v-for="(block, index) in getTimeBlocks(session)" :key="`${session.id}-date-${block.date}-${index}`">
                     {{ formatDisplayDate(block.date) }}
                   </div>
                 </div>
               </div>
 
-              <div class="col-md">
-                <small class="text-muted">Start Time</small>
-                <div class="fw-semibold schedule-stack">
-                  <div
-                    v-for="(block, index) in getTimeBlocks(session)"
-                    :key="`${session.id}-start-${block.startTime}-${index}`"
-                  >
+              <div class="col-md mb-3 mb-md-0 d-flex flex-column">
+                <small class="text-muted mb-2">Start Time</small>
+                <div class="fw-semibold schedule-stack my-auto">
+                  <div v-for="(block, index) in getTimeBlocks(session)" :key="`${session.id}-start-${block.startTime}-${index}`">
                     {{ formatDisplayTime(block.startTime) }}
                   </div>
                 </div>
               </div>
 
-              <div class="col-md">
-                <small class="text-muted">End Time</small>
-                <div class="fw-semibold schedule-stack">
-                  <div
-                    v-for="(block, index) in getTimeBlocks(session)"
-                    :key="`${session.id}-end-${block.endTime}-${index}`"
-                  >
+              <div class="col-md mb-3 mb-md-0 d-flex flex-column">
+                <small class="text-muted mb-2">End Time</small>
+                <div class="fw-semibold schedule-stack my-auto">
+                  <div v-for="(block, index) in getTimeBlocks(session)" :key="`${session.id}-end-${block.endTime}-${index}`">
                     {{ formatDisplayTime(block.endTime) }}
                   </div>
                 </div>
               </div>
 
-              <div class="col-md">
-                <small class="text-muted">Location</small>
-                <div v-if="session.session_mode === 'Online'" class="text-muted small">Online</div>
-                <div v-else class="d-flex gap-2 align-items-center mt-1">
-                  <input
-                    type="text"
-                    class="form-control form-control-sm border-sb shadow-none"
-                    :value="session.preferred_location || ''"
-                    @change="saveLocation(session.booking_request_id || session.id, $event.target.value)"
-                    placeholder="No location set"
-                  />
+              <div class="col-md mb-3 mb-md-0 d-flex flex-column">
+                <small class="text-muted mb-2">Location</small>
+                <div class="my-auto">
+                  <div v-if="session.session_mode === 'Online'" class="text-muted small">Online</div>
+                  <div v-else class="d-flex align-items-center gap-2 justify-content-center">
+                    <span :class="{ 'text-muted small': !session.preferred_location }">
+                      {{ session.preferred_location || 'No location set' }}
+                    </span>
+                    
+                    <button 
+                      class="btn btn-sm btn-link p-0 text-decoration-none text-muted" 
+                      @click="openLocationModal(session)"
+                      title="Edit location"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" class="bi bi-pencil-square" viewBox="0 0 16 16">
+                        <path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/>
+                        <path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5v11z"/>
+                      </svg>
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              <div class="col-md text-md-end mt-3 mt-md-0">
-                <div class="d-grid gap-2">
-
-                <button
-                  class="btn btn-sm btn-success"
-                  :disabled="confirmingId === session.id"
-                  @click="confirmSession(session.id)"
-                >
-                  {{ confirmingId === session.id ? "Confirming..." : "Confirm" }}
-                </button>
-
-                  <button
-                    class="btn btn-sm btn-danger"
-                    :disabled="rejectingId === session.id"
-                    @click="rejectSession(session.id)"
+              <div class="col-md d-flex flex-column">
+                <small class="text-muted mb-2 d-none d-md-block">Actions</small> <div class="d-flex gap-2 justify-content-center my-auto">
+                  
+                  <button 
+                    class="btn btn-sm btn-outline-success rounded-circle d-flex align-items-center justify-content-center" 
+                    style="width: 42px; height: 42px;"
+                    :disabled="confirmingId === session.id" 
+                    @click="confirmSession(session.id)"
+                    title="Confirm Session"
+                    aria-label="Confirm Session"
                   >
-                    {{ rejectingId === session.id ? "Rejecting..." : "Reject" }}
+                    <span v-if="confirmingId === session.id" class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                    <svg v-else xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-check-lg" viewBox="0 0 16 16">
+                      <path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/>
+                    </svg>
+                  </button>
+
+                  <button 
+                    class="btn btn-sm btn-outline-danger rounded-circle d-flex align-items-center justify-content-center" 
+                    style="width: 42px; height: 42px;"
+                    :disabled="rejectingId === session.id" 
+                    @click="rejectSession(session.id)"
+                    title="Reject Session"
+                    aria-label="Reject Session"
+                  >
+                    <span v-if="rejectingId === session.id" class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                    <svg v-else xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-x-lg" viewBox="0 0 16 16">
+                      <path d="M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8 2.146 2.854Z"/>
+                    </svg>
                   </button>
 
                 </div>
               </div>
 
             </div>
-
           </div>
         </div>
-        
+    </div>
+
+    <div ref="locationModalRef" class="modal fade" id="locationModal" tabindex="-1">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-4">
+          
+          <div class="modal-header border-0 pb-0">
+            <h5 class="modal-title fw-bold">Edit Location</h5>
+            <button type="button" class="btn-close" @click="closeLocationModal" aria-label="Close"></button>
+          </div>
+          
+          <div class="modal-body text-muted">
+            <p class="mb-3">
+              Set location for session with <span class="fw-semibold text-dark">{{ activeSession?.tuteeName }}</span>
+            </p>
+            <input
+              type="text"
+              class="form-control shadow-none"
+              v-model="tempLocation"
+              @keyup.enter="saveLocation"
+              @keyup.esc="closeLocationModal"
+              placeholder="Enter location (e.g. Library, Cafe)"
+            />
+          </div>
+          
+          <div class="modal-footer border-0 pt-0">
+            <button type="button" class="btn btn-light" @click="closeLocationModal">Cancel</button>
+            <button type="button" class="btn bg-sb-primary text-white" @click="saveLocation">Save Location</button>
+          </div>
+          
+        </div>
+      </div>
     </div>
 
   </div>
@@ -129,13 +165,18 @@
 import { ref, computed, onMounted } from 'vue'
 import { useSessionsStore } from '@/stores/completedSessions'
 import api from '@/services/api/api'
+import * as bootstrap from 'bootstrap'
 
 const confirmingId = ref(null)
 const rejectingId = ref(null)
 const sessionStore = useSessionsStore()
 const highlightedRequestIds = ref([])
-
 const selectedDate = ref('')
+
+// Modal Refs
+const locationModalRef = ref(null)
+const activeSession = ref(null)
+const tempLocation = ref('')
 
 onMounted(async () => {
   await sessionStore.fetchSessions()
@@ -143,9 +184,38 @@ onMounted(async () => {
   sessionStore.markPendingRequestsSeen()
 })
 
-const saveLocation = async (id, newLocation) => {
+const openLocationModal = (session) => {
+  activeSession.value = session
+  tempLocation.value = session.preferred_location || ''
+  
+  if (locationModalRef.value) {
+    const modalInstance = bootstrap.Modal.getOrCreateInstance(locationModalRef.value)
+    modalInstance.show()
+  }
+}
+
+const closeLocationModal = () => {
+  if (locationModalRef.value) {
+    const modalInstance = bootstrap.Modal.getInstance(locationModalRef.value)
+    modalInstance?.hide()
+  }
+  
+  activeSession.value = null
+  tempLocation.value = ''
+}
+
+const saveLocation = async () => {
+  if (!activeSession.value) return;
+
+  const session = activeSession.value;
+  const id = session.booking_request_id || session.id;
+
   try {
-    await api.patch(`/bookings/${id}/location/`, { preferred_location: newLocation })
+    await api.patch(`/bookings/${id}/location/`, { preferred_location: tempLocation.value })
+    
+    session.preferred_location = tempLocation.value
+    
+    closeLocationModal() 
   } catch (err) {
     console.error('Failed to update location', err)
     alert(err.response?.data?.error || 'Failed to save location. Please try again.')
@@ -172,12 +242,8 @@ const getTimeBlocks = (session) => {
 }
 
 const formatDisplayDate = (dateValue) => {
-  if (!dateValue) {
-    return 'N/A'
-  }
-
+  if (!dateValue) return 'N/A'
   const displayDate = new Date(`${dateValue}T00:00:00`)
-
   return new Intl.DateTimeFormat('en-US', {
     month: 'short',
     day: 'numeric',
@@ -186,14 +252,8 @@ const formatDisplayDate = (dateValue) => {
 }
 
 const formatDisplayTime = (timeValue) => {
-  if (!timeValue) {
-    return 'N/A'
-  }
-
-  const [hours = 0, minutes = 0] = String(timeValue)
-    .split(':')
-    .map(part => Number.parseInt(part, 10) || 0)
-
+  if (!timeValue) return 'N/A'
+  const [hours = 0, minutes = 0] = String(timeValue).split(':').map(part => Number.parseInt(part, 10) || 0)
   const displayDate = new Date()
   displayDate.setHours(hours, minutes, 0, 0)
 
@@ -203,7 +263,6 @@ const formatDisplayTime = (timeValue) => {
     hour12: true
   }).format(displayDate)
 }
-
 
 const confirmSession = async (id) => {
   confirmingId.value = id
