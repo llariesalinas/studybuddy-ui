@@ -3,8 +3,7 @@
     <section class="schedule-card shadow-sm">
       <div class="schedule-header">
         <div>
-          <h2 class="schedule-title">My Weekly Availability</h2>
-          <p class="schedule-subtitle">Set recurring weekly slots and add one-off date blocks when your schedule changes.</p>
+          <h2 class="schedule-title">Weekly Availability</h2>
         </div>
       </div>
 

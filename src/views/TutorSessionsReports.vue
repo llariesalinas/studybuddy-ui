@@ -1,11 +1,7 @@
 <template>
   <div class="reports-content">
-    <div class="mb-4">
-      <h2 class="fw-bold text-dark">Sessions & Reports</h2>
-      <p class="text-muted">Track your tutoring history, earnings, and performance.</p>
-    </div>
 
-    <div class="row g-4 mb-5">
+    <div class="row g-4 mb-3">
       <div class="col-md-3">
         <div class="card border-sb shadow-sm h-100 rounded-4">
           <div class="card-body d-flex flex-column justify-content-center text-center py-4">
