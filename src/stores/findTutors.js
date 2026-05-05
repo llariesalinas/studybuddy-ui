@@ -50,4 +50,10 @@ export const useFindTutorsStore = defineStore('findTutors', () => {
     setFilters,
     reset,
   }
+}, {
+  persist: {
+    storage: sessionStorage,
+    key: 'sb-find-tutors',
+    pick: ['filters', 'results', 'hasFetched'],
+  }
 })
