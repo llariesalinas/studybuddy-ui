@@ -11,6 +11,10 @@
         </div>
     </div>
 
+    <div v-if="actionError" class="alert alert-danger rounded-4 border-0 mb-3">
+      {{ actionError }}
+    </div>
+
     <div v-if="filteredSessions.length === 0" class="text-center text-muted py-5">
         No pending session requests found.
     </div>
@@ -172,6 +176,7 @@ const rejectingId = ref(null)
 const sessionStore = useSessionsStore()
 const highlightedRequestIds = ref([])
 const selectedDate = ref('')
+const actionError = ref('')
 
 // Modal Refs
 const locationModalRef = ref(null)
@@ -266,14 +271,34 @@ const formatDisplayTime = (timeValue) => {
 
 const confirmSession = async (id) => {
   confirmingId.value = id
-  await sessionStore.approveSession(id)
-  confirmingId.value = null
+  actionError.value = ''
+
+  try {
+    await sessionStore.approveSession(id)
+  } catch (error) {
+    actionError.value =
+      error.response?.data?.error || 'Unable to confirm this session. Please refresh and try again.'
+
+    await sessionStore.fetchSessions()
+  } finally {
+    confirmingId.value = null
+  }
 }
 
 const rejectSession = async (id) => {
   rejectingId.value = id
-  await sessionStore.rejectSession(id)
-  rejectingId.value = null
+  actionError.value = ''
+
+  try {
+    await sessionStore.rejectSession(id)
+  } catch (error) {
+    actionError.value =
+      error.response?.data?.error || 'Unable to reject this session. Please refresh and try again.'
+
+    await sessionStore.fetchSessions()
+  } finally {
+    rejectingId.value = null
+  }
 }
 
 const filteredSessions = computed(() => {

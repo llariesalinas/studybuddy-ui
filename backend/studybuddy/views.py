@@ -1637,6 +1637,9 @@ def approve_booking(request, booking_id):
             status=400
         )
 
+    if booking.status == "Confirmed":
+        return Response({"message": "Booking is already confirmed."})
+
     if booking.status != "Pending":
         return Response({"error": "Only pending bookings can be approved."}, status=400)
 
