@@ -146,6 +146,16 @@
             <p class="text-muted">Manage your earnings and withdrawal requests.</p>
           </div>
 
+          <div v-if="route.path === '/reports'">
+            <h2 class="fw-bold text-dark">Sessions & Reports</h2>
+            <p class="text-muted">Track your tutoring history, earnings, and performance.</p>
+          </div>
+
+          <div v-if="route.path === '/tch-availability'">
+            <h2 class="fw-bold text-dark">Your Schedule</h2>
+            <p class="text-muted">Set recurring weekly slots and add one-off date blocks when your schedule changes.</p>
+          </div>
+
           <div v-if="route.path === '/tch-requestedSessions'">
             <div class="d-flex align-items-center gap-2 flex-wrap">
               <h2 class="fw-bold mb-1">Requested Sessions</h2>

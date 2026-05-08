@@ -241,6 +241,7 @@ import {
 } from '@/stores/initialbookingprefs'
 import { useBookedSessionStore } from '@/stores/bookedSessionDetails'
 import { useFindTutorsStore } from '@/stores/findTutors'
+import { defineStore } from 'pinia'
 
 const route = useRoute()
 const router = useRouter()

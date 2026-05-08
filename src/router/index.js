@@ -134,12 +134,6 @@ const router = createRouter({
 
     // ---------- SHARED ROUTES ----------
     {
-      path: '/schedule',
-      name: 'schedule',
-      component: () => import('@/views/Schedule.vue'),
-      meta: { requiresAuth: true }
-    },
-    {
       path: '/reports',
       name: 'reports',
       component: () => import('@/views/TutorSessionsReports.vue'),

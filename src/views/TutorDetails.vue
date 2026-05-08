@@ -715,7 +715,8 @@ const confirmBooking = async () => {
     })
 
     alert('Booking Confirmed!')
-    bookedSessionStore.resetStore()
+    initialBookingStore.$reset()
+    findTutorsStore.reset()
     selectedSlots.value = []
 
     router.push({
