@@ -4,8 +4,11 @@ import router from '@/router'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api/'
 
+const isNgrok = API_BASE_URL.includes('ngrok')
+
 const api = axios.create({
   baseURL: API_BASE_URL,
+  headers: isNgrok ? { 'ngrok-skip-browser-warning': 'true' } : {},
 })
 
 let refreshPromise = null
@@ -43,13 +46,18 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config
+    const authStore = useAuthStore()
+    const refreshTokenValue = authStore.refreshToken || localStorage.getItem('refresh_token')
+    const requestUrl = originalRequest?.url || ''
 
     if (
       error.response &&
       error.response.status === 401 &&
       originalRequest &&
       !originalRequest._retry &&
-      !originalRequest.url?.includes('token/refresh/')
+      !requestUrl.includes('token/refresh/') &&
+      !requestUrl.includes('login/') &&
+      refreshTokenValue
     ) {
       originalRequest._retry = true
 
@@ -70,7 +78,6 @@ api.interceptors.response.use(
     }
 
     if (error.response && error.response.status === 401) {
-      const authStore = useAuthStore()
       authStore.logout()
       router.push('/login')
     }

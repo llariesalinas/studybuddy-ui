@@ -15,6 +15,9 @@ from .models import (
     TutorAvailabilityOverride,
     TutorSubjects,
     UserProfile,
+    Wallet,
+    Transaction,
+    WithdrawalRequest,
 )
 
 admin.site.register(UserProfile)
@@ -31,6 +34,29 @@ admin.site.register(PaymentMethod)
 admin.site.register(Preference)
 admin.site.register(Strand)
 admin.site.register(Course)
+
+
+admin.site.register(Wallet)
+admin.site.register(Transaction)
+
+
+@admin.register(WithdrawalRequest)
+class WithdrawalRequestAdmin(admin.ModelAdmin):
+    list_display = ('tutor', 'amount', 'method', 'account_number', 'account_name', 'status', 'requested_at', 'processed_at')
+    list_filter = ('status', 'method')
+    search_fields = ('tutor__profile__fname', 'tutor__profile__lname', 'account_number', 'account_name')
+    readonly_fields = ('tutor', 'amount', 'method', 'account_number', 'account_name', 'bank_name', 'requested_at')
+    actions = ['mark_processed', 'mark_rejected']
+
+    def mark_processed(self, request, queryset):
+        from django.utils import timezone
+        queryset.update(status='processed', processed_at=timezone.now())
+    mark_processed.short_description = 'Mark selected withdrawals as Processed'
+
+    def mark_rejected(self, request, queryset):
+        from django.utils import timezone
+        queryset.update(status='rejected', processed_at=timezone.now())
+    mark_rejected.short_description = 'Mark selected withdrawals as Rejected'
 
 
 @admin.register(PartnerInstitution)

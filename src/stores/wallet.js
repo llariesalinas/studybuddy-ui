@@ -41,6 +41,15 @@ export const useWalletStore = defineStore('wallet', () => {
     }
   }
 
+  async function devAddFunds(amount) {
+    await api.post('dev/wallet/add/', { amount })
+  }
+
+  async function devRemoveFunds(amount) {
+    await api.post('dev/wallet/remove/', { amount })
+  }
+
   return { balance, pendingAmount, transactions, withdrawals, loading,
-           fetchWallet, fetchTransactions, fetchWithdrawals, requestWithdrawal }
+           fetchWallet, fetchTransactions, fetchWithdrawals, requestWithdrawal, devAddFunds,
+           devRemoveFunds }
 })

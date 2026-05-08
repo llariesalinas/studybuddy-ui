@@ -68,9 +68,13 @@ export const useAuthStore = defineStore('auth', () => {
       throw new Error('No refresh token available.')
     }
 
+    const ngrokHeaders = API_BASE_URL.includes('ngrok')
+      ? { 'ngrok-skip-browser-warning': 'true' }
+      : {}
+
     const response = await axios.post(`${API_BASE_URL}token/refresh/`, {
       refresh: storedRefreshToken
-    })
+    }, { headers: ngrokHeaders })
 
     const newAccessToken = response.data.access
 

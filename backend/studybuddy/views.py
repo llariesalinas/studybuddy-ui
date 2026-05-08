@@ -10,6 +10,7 @@ from django.db import transaction
 from datetime import datetime,timedelta, date
 from calendar import monthrange
 from uuid import uuid4
+from django.conf import settings
 from django.shortcuts import get_object_or_404
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -803,6 +804,14 @@ def build_combined_block(group):
         start_time,
         end_time
     )
+
+    if (
+        settings.DEBUG
+        and representative_booking.status == "Confirmed"
+        and representative_booking.tutor_confirmed
+    ):
+        display_status = "Payment Required"
+
     return {
         "id": representative_booking.id,
         "session_group_id": str(representative_booking.session_group_id) if representative_booking.session_group_id else None,
@@ -971,8 +980,8 @@ def tutor_dashboard(request):
     # 📌 Upcoming confirmed bookings
     upcoming = Booking.objects.filter(
         tutor=tutor,
-        status="Confirmed",
-        session_date__gte=timezone.now()
+        status__in=["Pending", "Confirmed", "Awaiting Payment Verification"],
+        session_date__gte=timezone.now().date()
     ).select_related(
         "student",
         "tutor__profile__course",
@@ -1628,6 +1637,9 @@ def approve_booking(request, booking_id):
             status=400
         )
 
+    if booking.status == "Confirmed":
+        return Response({"message": "Booking is already confirmed."})
+
     if booking.status != "Pending":
         return Response({"error": "Only pending bookings can be approved."}, status=400)
 
@@ -1796,6 +1808,19 @@ def build_booking_detail_payload(session_group_bookings):
         datetime.combine(first_booking.session_date, last_booking.availability.time_slot)
         + timedelta(minutes=SESSION_SLOT_MINUTES)
     ).time()
+    display_status = get_display_status(
+        representative_booking.status,
+        representative_booking.session_date,
+        start_time,
+        end_time
+    )
+
+    if (
+        settings.DEBUG
+        and representative_booking.status == "Confirmed"
+        and representative_booking.tutor_confirmed
+    ):
+        display_status = "Payment Required"
 
     return {
         "id": representative_booking.id,
@@ -1834,12 +1859,7 @@ def build_booking_detail_payload(session_group_bookings):
             "end_time": end_time.strftime("%H:%M"),
             "duration_hours": get_duration_hours_for_bookings(session_group_bookings),
             "rating": representative_booking.rating.rating_score if hasattr(representative_booking, "rating") else None,
-            "status": get_display_status(
-                representative_booking.status,
-                representative_booking.session_date,
-                start_time,
-                end_time
-            ),
+            "status": display_status,
             "raw_status": representative_booking.status,
             "session_mode": representative_booking.session_mode,
             "preferred_location": representative_booking.preferred_location,
@@ -2001,6 +2021,39 @@ def tutor_confirm_booking(request, booking_id):
 @permission_classes([IsAuthenticated])
 def complete_booking(request, booking_id):
     return tutor_confirm_booking(request, booking_id)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def dev_mark_booking_ready_for_payment(request, booking_id):
+    if not settings.DEBUG:
+        return Response(status=404)
+
+    profile = request.user.userprofile
+    booking = get_object_or_404(
+        Booking.objects.select_related('tutor', 'tutor__profile', 'availability'),
+        id=booking_id
+    )
+
+    if profile != booking.tutor.profile:
+        return Response({"error": "Unauthorized"}, status=403)
+
+    session_group_bookings = get_session_group_bookings(booking)
+
+    if any(group_booking.status != "Confirmed" for group_booking in session_group_bookings):
+        return Response(
+            {"error": "Only confirmed sessions can be made ready for payment."},
+            status=400
+        )
+
+    with transaction.atomic():
+        Booking.objects.filter(
+            id__in=[group_booking.id for group_booking in session_group_bookings]
+        ).update(tutor_confirmed=True)
+
+    refreshed_group = get_session_group_bookings(booking)
+
+    return Response(build_booking_detail_payload(refreshed_group))
 
 
 @api_view(['POST'])
@@ -2406,7 +2459,6 @@ def update_booking_location(request, booking_request_id):
     return Response({"message": "Location updated."})
 
 # --- WALLET & PAYMENT VIEWS ---
-from django.conf import settings
 from .models import Transaction, WithdrawalRequest
 
 @api_view(['GET'])
@@ -2638,3 +2690,54 @@ def credit_tutor_wallet(booking):
                 description=f"Platform Commission for {rep_booking.session_date} (10% of ₱{total_amount})",
                 reference_id=ref_id
             )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def dev_add_wallet_funds(request):
+    if not settings.DEBUG:
+        return Response(status=404)
+    try:
+        tutor = request.user.userprofile.tutor
+    except Exception:
+        return Response({'error': 'No tutor profile found for this user.'}, status=400)
+    amount = decimal.Decimal(str(request.data.get('amount', 500)))
+    if amount <= 0:
+        return Response({'error': 'Amount must be positive.'}, status=400)
+    with transaction.atomic():
+        wallet, _ = Wallet.objects.get_or_create(tutor=tutor)
+        wallet.balance += amount
+        wallet.save()
+        Transaction.objects.create(
+            wallet=wallet,
+            transaction_type='session_credit',
+            amount=amount,
+            description='Dev credit (testing only)',
+            reference_id=f'DEV-{timezone.now().timestamp()}'
+        )
+    return Response({'balance': str(wallet.balance)})
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def dev_remove_wallet_funds(request):
+    if not settings.DEBUG:
+        return Response(status=404)
+    try:
+        tutor = request.user.userprofile.tutor
+    except Exception:
+        return Response({'error': 'No tutor profile found for this user.'}, status=400)
+    amount = decimal.Decimal(str(request.data.get('amount', 500)))
+    if amount <= 0:
+        return Response({'error': 'Amount must be positive.'}, status=400)
+    with transaction.atomic():
+        wallet, _ = Wallet.objects.get_or_create(tutor=tutor)
+        wallet.balance -= amount
+        wallet.save()
+        Transaction.objects.create(
+            wallet=wallet,
+            transaction_type='commission_deduction',
+            amount=-amount,
+            description='Dev debit (testing only)',
+            reference_id=f'DEV-{timezone.now().timestamp()}'
+        )
+    return Response({'balance': str(wallet.balance)})
