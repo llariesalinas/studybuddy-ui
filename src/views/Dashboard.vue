@@ -53,16 +53,6 @@
                 >
                   <i class="bi bi-chevron-right"></i>
                 </button>
-                <button
-                  v-if="nextSessionWeekOffset !== null && weekOffset !== nextSessionWeekOffset"
-                  type="button"
-                  class="btn btn-sm ms-1"
-                  style="font-size: 0.75rem; color: var(--sb-primary); border: 1px solid var(--sb-primary); white-space: nowrap;"
-                  @click="weekOffset = nextSessionWeekOffset"
-                  aria-label="Jump to next session"
-                >
-                  <i class="bi bi-calendar2-event me-1"></i>Next session
-                </button>
               </div>
             </header>
 
@@ -193,65 +183,16 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useSessionsStore } from '@/stores/completedSessions'
 
 const router = useRouter()
-const route = useRoute()
 const sessionsStore = useSessionsStore()
 const loading = ref(false)
 const weekOffset = ref(0)
 
-const getSessionDateKey = (session) => {
-  const rawDate = session?.date
-
-  if (!rawDate) {
-    return ''
-  }
-
-  const rawString = String(rawDate)
-
-  if (/^\d{4}-\d{2}-\d{2}$/.test(rawString)) {
-    return rawString
-  }
-
-  const parsedDate = new Date(rawString)
-
-  if (Number.isNaN(parsedDate.getTime())) {
-    return rawString.slice(0, 10)
-  }
-
-  return getDateKey(parsedDate)
-}
-
-const hasVisibleWeekSessions = () => {
-  const startKey = getDateKey(visibleStartOfWeek.value)
-  const endKey = getDateKey(visibleEndOfWeek.value)
-
-  return (sessionsStore.sessions || []).some((session) => {
-    const normalizedStatus = String(session?.status || '').toLowerCase()
-    const sessionDateKey = getSessionDateKey(session)
-
-    return (
-      sessionDateKey >= startKey
-      && sessionDateKey <= endKey
-      && !['cancelled', 'rejected'].includes(normalizedStatus)
-    )
-  })
-}
-
-const ensureWeekContainsSessions = () => {
-  if (nextSessionWeekOffset.value === null) {
-    return
-  }
-
-  if (!hasVisibleWeekSessions()) {
-    weekOffset.value = nextSessionWeekOffset.value
-  }
-}
-
-const refreshDashboard = async () => {
+onMounted(async () => {
   loading.value = true
 
   await Promise.all([
@@ -260,25 +201,7 @@ const refreshDashboard = async () => {
   ])
 
   loading.value = false
-
-  ensureWeekContainsSessions()
-}
-
-onMounted(refreshDashboard)
-
-watch(
-  () => route.query.refresh,
-  () => {
-    refreshDashboard()
-  }
-)
-
-watch(
-  () => sessionsStore.sessions,
-  () => {
-    ensureWeekContainsSessions()
-  }
-)
+})
 
 const padNumber = (value) => String(value).padStart(2, '0')
 
@@ -310,22 +233,13 @@ const getDateKey = (date) => `${date.getFullYear()}-${padNumber(date.getMonth() 
 
 const today = new Date()
 const monthStart = new Date(today.getFullYear(), today.getMonth(), 1)
-const monthEnd = new Date(today.getFullYear(), today.getMonth() + 3, 0)
+const monthEnd = getEndOfMonth(today)
 const baseStartOfWeek = getStartOfWeek(today)
 const minVisibleWeekStart = getStartOfWeek(monthStart)
 const maxVisibleWeekStart = getStartOfWeek(monthEnd)
 const MS_PER_WEEK = 7 * 24 * 60 * 60 * 1000
 const minWeekOffset = Math.round((minVisibleWeekStart.getTime() - baseStartOfWeek.getTime()) / MS_PER_WEEK)
 const maxWeekOffset = Math.round((maxVisibleWeekStart.getTime() - baseStartOfWeek.getTime()) / MS_PER_WEEK)
-
-const nextSessionWeekOffset = computed(() => {
-  const upcoming = sessionsStore.upcomingSessions
-  if (!upcoming || upcoming.length === 0) return null
-  const nearestDate = new Date(upcoming[0].date)
-  const nearestWeekStart = getStartOfWeek(nearestDate)
-  const offset = Math.round((nearestWeekStart.getTime() - baseStartOfWeek.getTime()) / MS_PER_WEEK)
-  return Math.min(Math.max(offset, minWeekOffset), maxWeekOffset)
-})
 
 const visibleStartOfWeek = computed(() => addDays(baseStartOfWeek, weekOffset.value * 7))
 const visibleEndOfWeek = computed(() => addDays(visibleStartOfWeek.value, 6))
@@ -365,21 +279,21 @@ const formattedWeekRange = computed(() => {
 const visibleSessions = computed(() => {
   const startKey = getDateKey(visibleStartOfWeek.value)
   const endKey = getDateKey(visibleEndOfWeek.value)
-  const allSessions = (sessionsStore.sessions || []).map((session) => ({
-    ...session,
-    dateKey: getSessionDateKey(session)
-  }))
+  const allSessions = sessionsStore.sessions || []
 
   return allSessions
     .filter((session) => {
+      const normalizedStatus = String(session?.status || '').toLowerCase()
+
       return (
-        session.dateKey >= startKey
-        && session.dateKey <= endKey
+        session.date >= startKey
+        && session.date <= endKey
+        && !['pending', 'cancelled', 'rejected'].includes(normalizedStatus)
       )
     })
     .sort((left, right) => {
-      if (left.dateKey !== right.dateKey) {
-        return new Date(left.dateKey) - new Date(right.dateKey)
+      if (left.date !== right.date) {
+        return new Date(left.date) - new Date(right.date)
       }
 
       const startDifference = parseTimeToMinutes(left.startTime) - parseTimeToMinutes(right.startTime)
@@ -403,9 +317,7 @@ const mergeSessionsForDisplay = (sessions = []) => {
       return
     }
 
-    const previousDateKey = previousSession.dateKey || previousSession.date
-    const nextDateKey = session.dateKey || session.date
-    const sameDay = previousDateKey === nextDateKey
+    const sameDay = previousSession.date === session.date
     const previousEndsAt = parseTimeToMinutes(previousSession.endTime)
     const nextStartsAt = parseTimeToMinutes(session.startTime)
     const isContinuous = previousEndsAt === nextStartsAt
@@ -436,9 +348,8 @@ const daySessionsMap = computed(() => {
   })
 
   mergeSessionsForDisplay(visibleSessions.value).forEach((session) => {
-    const sessionDateKey = session.dateKey || session.date
-    if (groupedSessions[sessionDateKey]) {
-      groupedSessions[sessionDateKey].push(session)
+    if (groupedSessions[session.date]) {
+      groupedSessions[session.date].push(session)
     }
   })
 
@@ -490,15 +401,24 @@ const getEmptyStateIcon = (dayIndex) => {
 }
 
 const getWeeklySessionCardClasses = (status) => {
-  const s = String(status || '').toLowerCase()
-  if (s === 'pending')               return 'weekly-session-card-pending'
-  if (s === 'upcoming')              return 'weekly-session-card-upcoming'
-  if (s === 'ongoing')               return 'weekly-session-card-ongoing'
-  if (s === 'awaiting verification') return 'weekly-session-card-verification'
-  if (s === 'payment required')      return 'weekly-session-card-payment-required'
-  if (s === 'completed')             return 'weekly-session-card-completed'
-  if (s === 'rejected')              return 'weekly-session-card-rejected'
-  if (s === 'cancelled')             return 'weekly-session-card-cancelled'
+  const normalizedStatus = String(status || '').toLowerCase()
+
+  if (normalizedStatus === 'pending') {
+    return 'weekly-session-card-pending'
+  }
+
+  if (normalizedStatus === 'completed') {
+    return 'weekly-session-card-completed'
+  }
+
+  if (normalizedStatus === 'ongoing') {
+    return 'weekly-session-card-ongoing'
+  }
+
+  if (normalizedStatus === 'awaiting verification' || normalizedStatus === 'payment required') {
+    return 'weekly-session-card-verification'
+  }
+
   return 'weekly-session-card-upcoming'
 }
 
@@ -779,28 +699,13 @@ const bookTutor = (id) => router.push({
 }
 
 .weekly-session-card-verification {
-  background: #fff7ed;
-  border-left: 4px solid #f97316;
+  background: #fff9ef;
+  border-left: 4px solid #ffc107;
 }
 
 .weekly-session-card-pending {
-  background: #fffbeb;
-  border-left: 4px solid #fbbf24;
-}
-
-.weekly-session-card-payment-required {
-  background: #fff1f2;
-  border-left: 4px solid #ef4444;
-}
-
-.weekly-session-card-rejected {
-  background: #fef2f2;
-  border-left: 4px solid #dc2626;
-}
-
-.weekly-session-card-cancelled {
-  background: #f9fafb;
-  border-left: 4px solid #9ca3af;
+  background: #fff9ef;
+  border-left: 4px solid #ffc107;
 }
 
 .weekly-session-status {
@@ -832,29 +737,10 @@ const bookTutor = (id) => router.push({
   color: #146c43;
 }
 
-.weekly-session-card-verification .weekly-session-status {
-  background: rgba(249, 115, 22, 0.15);
-  color: #c2410c;
-}
-
+.weekly-session-card-verification .weekly-session-status,
 .weekly-session-card-pending .weekly-session-status {
-  background: rgba(251, 191, 36, 0.18);
-  color: #92400e;
-}
-
-.weekly-session-card-payment-required .weekly-session-status {
-  background: rgba(239, 68, 68, 0.12);
-  color: #b91c1c;
-}
-
-.weekly-session-card-rejected .weekly-session-status {
-  background: rgba(220, 38, 38, 0.12);
-  color: #991b1b;
-}
-
-.weekly-session-card-cancelled .weekly-session-status {
-  background: rgba(156, 163, 175, 0.18);
-  color: #6b7280;
+  background: rgba(255, 193, 7, 0.18);
+  color: #997404;
 }
 
 .weekly-session-title {
