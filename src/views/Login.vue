@@ -1,75 +1,57 @@
 <template>
-  <div class="min-vh-100 d-flex align-items-center justify-content-center py-5">
-    <div class="card border-sb shadow-sm rounded-4" style="max-width: 400px; width: 100%">
-      <div class="card-body p-4 p-md-5">
-        <div class="text-center mb-4">
-          <div
-            class="d-inline-flex align-items-center justify-content-center bg-success bg-opacity-10 rounded-3 mb-3"
-            style="width: 48px; height: 48px"
-          >
-            <i class="bi bi-box-arrow-in-right text-sb-primary fs-4"></i>
-          </div>
-          <h3 class="fw-bold text-dark">Welcome Back</h3>
-          <p class="text-muted small">Log in to your StudyBuddy account</p>
-        </div>
+  <AuthShell>
+    <template #icon>
+      <i class="bi bi-box-arrow-in-right"></i>
+    </template>
+    <template #title>Welcome Back</template>
+    <template #subtitle>Log in to your StudyBuddy account</template>
 
-        <div v-if="loginError" class="alert alert-danger">
-          {{ loginError }}
-        </div>
+    <div v-if="loginError" class="sb-auth-alert">{{ loginError }}</div>
 
-        <form @submit.prevent="handleLogin">
-          <div class="mb-3">
-            <label class="form-label fw-semibold small text-dark">University Email</label>
-            <input
-              type="email"
-              v-model="email"
-              class="form-control shadow-none"
-              placeholder="you@university.edu"
-              required
-            />
-          </div>
-
-          <div class="mb-4">
-            <div class="d-flex justify-content-between align-items-center">
-              <label class="form-label fw-semibold small text-dark mb-0">Password</label>
-              <a href="#" class="text-sb-primary small text-decoration-none fw-semibold">Forgot?</a>
-            </div>
-            <input
-              type="password"
-              v-model="password"
-              class="form-control shadow-none mt-2"
-              placeholder="••••••••"
-              required
-            />
-          </div>
-
-          <button
-            type="submit"
-            class="btn bg-sb-primary text-white w-100 py-2 rounded-3 fw-semibold shadow-sm d-flex justify-content-center align-items-center gap-2"
-            :disabled="isSubmitting"
-          >
-            <span v-if="isSubmitting" class="spinner-border spinner-border-sm me-2"></span>
-            {{ isSubmitting ? 'Signing In...' : 'Sign In' }}
-          </button>
-        </form>
-
-        <div class="text-center mt-4">
-          <p class="text-muted small mb-0">
-            No account?
-            <router-link to="/register" class="text-sb-primary fw-bold text-decoration-none">
-              Create one
-            </router-link>
-          </p>
-        </div>
+    <form @submit.prevent="handleLogin">
+      <div class="sb-auth-field">
+        <label class="sb-auth-label">University Email</label>
+        <input
+          type="email"
+          v-model="email"
+          class="sb-auth-input"
+          placeholder="you@university.edu"
+          required
+        />
       </div>
-    </div>
-  </div>
+
+      <div class="sb-auth-field">
+        <div class="sb-auth-label-row">
+          <label class="sb-auth-label">Password</label>
+          <a href="#" class="sb-auth-link sb-auth-link-sm">Forgot?</a>
+        </div>
+        <input
+          type="password"
+          v-model="password"
+          class="sb-auth-input"
+          placeholder="••••••••"
+          required
+        />
+      </div>
+
+      <button type="submit" class="sb-btn-pill sb-auth-submit" :disabled="isSubmitting">
+        <span v-if="isSubmitting" class="sb-spinner" aria-hidden="true"></span>
+        {{ isSubmitting ? 'Signing In...' : 'Sign In' }}
+      </button>
+    </form>
+
+    <p class="sb-auth-footer-text">
+      No account?
+      <router-link to="/register" class="sb-auth-link">Create one</router-link>
+    </p>
+  </AuthShell>
 </template>
 
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import AuthShell from '@/components/AuthShell.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -79,43 +61,150 @@ const password = ref('')
 const isSubmitting = ref(false)
 const loginError = ref('')
 
-
 const handleLogin = async () => {
-  console.log("Login function triggered")
   isSubmitting.value = true
   loginError.value = ''
 
   try {
-    // API_INTEGRATION_POINT: The actual axios call is delegated to the store
-    const role = await authStore.login({
-      email: email.value,
-      password: password.value
-    })
-
-    console.log("Role from backend:", role)
-
+    const role = await authStore.login({ email: email.value, password: password.value })
     const normalizedRole = role?.toLowerCase()
 
-    console.log("Normalized Role:", normalizedRole)
-    // Route to dashboard based on user role
-    if (normalizedRole === 'tutor') {
-      console.log("Routing to tutor dashboard")
-      router.push('/tch-dashboard')
-    } 
-    else if (normalizedRole === 'tutee') {
-       console.log("Routing to student dashboard")
-      router.push('/dashboard')
-    } 
-    else {
-       console.log("Routing to fallback")
-      router.push('/')
-    }
-
+    if (normalizedRole === 'tutor') router.push('/tch-dashboard')
+    else if (normalizedRole === 'tutee') router.push('/dashboard')
+    else router.push('/')
   } catch (error) {
-    console.error('Login Error:', error)
     loginError.value = error.response?.data?.error || 'Login failed. Please check your credentials.'
   } finally {
     isSubmitting.value = false
   }
 }
 </script>
+
+<style scoped>
+.sb-auth-field {
+  margin-bottom: 16px;
+}
+
+.sb-auth-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1d1d1f;
+  margin-bottom: 6px;
+}
+
+.sb-auth-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.sb-auth-label-row .sb-auth-label {
+  margin-bottom: 0;
+}
+
+.sb-auth-input {
+  width: 100%;
+  padding: 10px 14px;
+  font-size: 14px;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  background: #fff;
+  color: #1d1d1f;
+  outline: none;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.sb-auth-input:focus {
+  border-color: #00895a;
+  box-shadow: 0 0 0 3px rgba(0, 137, 90, 0.12);
+}
+
+.sb-auth-alert {
+  background: #fff5f5;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 13px;
+  margin-bottom: 18px;
+}
+
+.sb-btn-pill {
+  background: #00895a;
+  color: #fff;
+  padding: 11px 28px;
+  border-radius: 9999px;
+  font-size: 14px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    transform 0.15s ease;
+}
+
+.sb-btn-pill:hover:not(:disabled) {
+  background: #00704a;
+}
+
+.sb-btn-pill:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.sb-btn-pill:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.sb-auth-submit {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  margin-bottom: 20px;
+}
+
+.sb-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: sb-spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes sb-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.sb-auth-link {
+  color: #00895a;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.sb-auth-link:hover {
+  text-decoration: underline;
+}
+
+.sb-auth-link-sm {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.sb-auth-footer-text {
+  text-align: center;
+  font-size: 13px;
+  color: #6e6e73;
+  margin: 0;
+}
+</style>
