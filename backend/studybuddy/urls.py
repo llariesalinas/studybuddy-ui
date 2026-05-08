@@ -85,3 +85,11 @@ urlpatterns = [
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    urlpatterns += [path('dev/wallet/add/', views.dev_add_wallet_funds)]
+    urlpatterns += [path('dev/wallet/remove/', views.dev_remove_wallet_funds)]
+    urlpatterns += [
+        path(
+            'dev/bookings/<int:booking_id>/ready-for-payment/',
+            views.dev_mark_booking_ready_for_payment
+        )
+    ]

@@ -3,7 +3,6 @@ import { ref, computed } from 'vue'
 import api from '@/services/api/api'
 
 export const useTutorBookingDetailStore = defineStore('tutorBookingDetail', () => {
-
   const booking = ref(null)
   const isLoading = ref(false)
   const error = ref(null)
@@ -53,18 +52,32 @@ export const useTutorBookingDetailStore = defineStore('tutorBookingDetail', () =
     }
   }
 
+  const devMarkReadyForPayment = async () => {
+    const id = booking.value?.id
+
+    if (!id) {
+      return
+    }
+
+    try {
+      const response = await api.post(`/dev/bookings/${id}/ready-for-payment/`)
+      booking.value = response.data
+    } catch (err) {
+      console.error('Failed to mark session ready for payment:', err)
+      throw err
+    }
+  }
 
   const confirmPayment = async () => {
     if (!booking.value?.id) return
 
     try {
       await api.post(`/bookings/confirm/`, {
-        booking_id: booking.value.id
+        booking_id: booking.value.id,
       })
 
       // Refresh data after confirming
       await fetchBookingDetails(booking.value.id)
-
     } catch (err) {
       console.error('Failed to confirm payment:', err)
       throw err
@@ -88,6 +101,7 @@ export const useTutorBookingDetailStore = defineStore('tutorBookingDetail', () =
     bookingId,
     fetchBookingDetails,
     confirmCompletion,
+    devMarkReadyForPayment,
     confirmPayment,
     resetStore,
     completeSession,

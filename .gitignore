@@ -46,6 +46,7 @@ plans/
 handoffs/
 .claude/
 .gemini/
+.superpowers/
 .mcp.json
 # Added by code-review-graph
 .code-review-graph/

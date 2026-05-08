@@ -26,21 +26,32 @@
 
             <div class="flex-grow-1">
               <h3 class="fw-bold mb-2">{{ bookingDetailsStore.tuteeProfile?.name || 'N/A' }}</h3>
-              <p class="text-muted mb-1"><strong>Email:</strong> {{ bookingDetailsStore.tuteeProfile?.email || 'N/A' }}</p>
-              <p class="text-muted mb-1"><strong>Course:</strong> {{ bookingDetailsStore.tuteeProfile?.course || 'N/A' }}</p>
-              <p class="text-muted mb-1"><strong>Year Level:</strong> {{ bookingDetailsStore.tuteeProfile?.year_level || 'N/A' }}</p>
-              <p class="text-muted mb-0"><strong>Bio:</strong> {{ bookingDetailsStore.tuteeProfile?.bio || 'N/A' }}</p>
+              <p class="text-muted mb-1">
+                <strong>Email:</strong> {{ bookingDetailsStore.tuteeProfile?.email || 'N/A' }}
+              </p>
+              <p class="text-muted mb-1">
+                <strong>Course:</strong> {{ bookingDetailsStore.tuteeProfile?.course || 'N/A' }}
+              </p>
+              <p class="text-muted mb-1">
+                <strong>Year Level:</strong>
+                {{ bookingDetailsStore.tuteeProfile?.year_level || 'N/A' }}
+              </p>
+              <p class="text-muted mb-0">
+                <strong>Bio:</strong> {{ bookingDetailsStore.tuteeProfile?.bio || 'N/A' }}
+              </p>
             </div>
           </div>
 
-          <hr class="my-4">
+          <hr class="my-4" />
 
           <h5 class="fw-bold mb-3">Session Information</h5>
           <div class="row g-3">
             <div class="col-sm-6">
               <div class="info-card">
                 <span class="info-label">Subject</span>
-                <div class="info-value">{{ bookingDetailsStore.sessionInfo?.subject || 'N/A' }}</div>
+                <div class="info-value">
+                  {{ bookingDetailsStore.sessionInfo?.subject || 'N/A' }}
+                </div>
               </div>
             </div>
             <div class="col-sm-6">
@@ -71,14 +82,19 @@
             <div class="col-sm-6">
               <div class="info-card">
                 <span class="info-label">Session Mode</span>
-                <div class="info-value">{{ bookingDetailsStore.sessionInfo?.session_mode || 'N/A' }}</div>
+                <div class="info-value">
+                  {{ bookingDetailsStore.sessionInfo?.session_mode || 'N/A' }}
+                </div>
               </div>
             </div>
             <div class="col-sm-6">
               <div class="info-card">
                 <span class="info-label">Preferred Location</span>
                 <div class="info-value">
-                  {{ bookingDetailsStore.sessionInfo?.preferred_location || (bookingDetailsStore.sessionInfo?.session_mode === 'Online' ? 'Online' : 'N/A') }}
+                  {{
+                    bookingDetailsStore.sessionInfo?.preferred_location ||
+                    (bookingDetailsStore.sessionInfo?.session_mode === 'Online' ? 'Online' : 'N/A')
+                  }}
                 </div>
               </div>
             </div>
@@ -92,12 +108,16 @@
 
           <div class="summary-row">
             <span class="summary-label">Transaction ID</span>
-            <span class="summary-value">{{ bookingDetailsStore.paymentInfo?.transaction_id || 'N/A' }}</span>
+            <span class="summary-value">{{
+              bookingDetailsStore.paymentInfo?.transaction_id || 'N/A'
+            }}</span>
           </div>
 
           <div class="summary-row">
             <span class="summary-label">Method</span>
-            <span class="summary-value">{{ bookingDetailsStore.paymentInfo?.method || 'N/A' }}</span>
+            <span class="summary-value">{{
+              bookingDetailsStore.paymentInfo?.method || 'N/A'
+            }}</span>
           </div>
 
           <div class="summary-row">
@@ -107,7 +127,9 @@
 
           <div class="summary-row">
             <span class="summary-label">Payment Status</span>
-            <span class="summary-value">{{ bookingDetailsStore.paymentInfo?.status || 'Pending' }}</span>
+            <span class="summary-value">{{
+              bookingDetailsStore.paymentInfo?.status || 'Pending'
+            }}</span>
           </div>
 
           <div v-if="bookingDetailsStore.paymentInfo?.receipt_image" class="mt-4">
@@ -126,6 +148,22 @@
           <p v-if="isAwaitingVerification" class="small text-muted mb-3">
             If payment cannot be verified, contact support.
           </p>
+
+          <div v-if="showDevReadyForPayment" class="alert alert-warning mt-4 mb-3">
+            <div class="fw-bold mb-1">Dev option</div>
+            <div class="small">
+              End this session now so the tutee can open the post-session payment flow.
+            </div>
+          </div>
+
+          <button
+            v-if="showDevReadyForPayment"
+            class="btn btn-warning fw-bold mb-3"
+            :disabled="isDevSubmitting"
+            @click="handleDevReadyForPayment"
+          >
+            {{ isDevSubmitting ? 'Updating...' : 'Dev: End Session Now' }}
+          </button>
 
           <button
             v-if="isAwaitingVerification"
@@ -151,9 +189,22 @@ const route = useRoute()
 const bookingDetailsStore = useTutorBookingDetailStore()
 const notificationsStore = useNotificationsStore()
 const isSubmitting = ref(false)
+const isDevSubmitting = ref(false)
+const isDev = import.meta.env.DEV
 
-const normalizedStatus = computed(() => String(bookingDetailsStore.sessionInfo?.status || '').toLowerCase())
+const normalizedStatus = computed(() =>
+  String(bookingDetailsStore.sessionInfo?.status || '').toLowerCase(),
+)
+const normalizedRawStatus = computed(() =>
+  String(bookingDetailsStore.sessionInfo?.raw_status || '').toLowerCase(),
+)
 const isAwaitingVerification = computed(() => normalizedStatus.value === 'awaiting verification')
+const showDevReadyForPayment = computed(
+  () =>
+    isDev &&
+    normalizedRawStatus.value === 'confirmed' &&
+    !bookingDetailsStore.booking?.tutor_confirmed,
+)
 
 const amountPaid = computed(() => {
   const value = Number(bookingDetailsStore.paymentInfo?.amount_paid || 0)
@@ -164,7 +215,13 @@ const tuteeInitials = computed(() => {
   const parts = String(bookingDetailsStore.tuteeProfile?.name || '')
     .split(' ')
     .filter(Boolean)
-  return parts.slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'SB'
+  return (
+    parts
+      .slice(0, 2)
+      .map((part) => part[0])
+      .join('')
+      .toUpperCase() || 'SB'
+  )
 })
 
 const statusClass = computed(() => {
@@ -200,6 +257,20 @@ const handleComplete = async () => {
     alert(error.response?.data?.error || 'Failed to complete session.')
   } finally {
     isSubmitting.value = false
+  }
+}
+
+const handleDevReadyForPayment = async () => {
+  isDevSubmitting.value = true
+
+  try {
+    await bookingDetailsStore.devMarkReadyForPayment()
+    await notificationsStore.fetchNotifications()
+    alert('Dev: session is ready for tutee payment.')
+  } catch (error) {
+    alert(error.response?.data?.error || 'Failed to make session ready for payment.')
+  } finally {
+    isDevSubmitting.value = false
   }
 }
 

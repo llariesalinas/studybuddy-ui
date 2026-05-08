@@ -92,6 +92,19 @@
         </div>
       </div>
 
+      <!-- Dev Tools (dev server only) -->
+      <div v-if="isDev" class="col-12">
+        <div class="card border-warning border-2 rounded-4 p-4">
+          <h6 class="fw-bold text-warning mb-3">Dev Tools — not visible in production</h6>
+          <div class="d-flex flex-wrap gap-2 align-items-center">
+            <span class="input-group-text bg-light border-0">₱</span>
+            <input v-model.number="devAmount" type="number" min="1" class="form-control bg-light border-0" style="max-width:140px" />
+            <button @click="addDevFunds" class="btn btn-warning fw-bold px-4">Add Funds</button>
+            <button @click="removeDevFunds" class="btn btn-outline-danger fw-bold px-4">Remove Funds</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Withdrawal History -->
       <div class="col-12">
         <div class="card border-0 rounded-4 shadow-sm overflow-hidden">
@@ -147,9 +160,12 @@
                 <label class="form-label small fw-bold text-muted">Amount to Withdraw</label>
                 <div class="input-group">
                   <span class="input-group-text bg-light border-0">₱</span>
-                  <input v-model.number="withdrawForm.amount" type="number" step="0.01" class="form-control bg-light border-0" required :max="walletStore.balance" min="500">
+                  <input v-model.number="withdrawForm.amount" type="number" step="0.01" class="form-control bg-light border-0" required :max="withdrawMax" :min="withdrawMin">
                 </div>
                 <div class="form-text text-end">Max: ₱ {{ walletStore.balance.toLocaleString() }}</div>
+                <div v-if="withdrawForm.amount < 500" class="form-text text-danger">
+                  Insufficient balance. Minimum withdrawal is ₱ 500.00.
+                </div>
               </div>
 
               <div class="mb-3">
@@ -183,7 +199,7 @@
             </div>
             <div class="modal-footer border-0 px-4 pb-4">
               <button type="button" class="btn btn-light rounded-3 px-4" @click="showWithdrawModal = false">Cancel</button>
-              <button type="submit" class="btn bg-sb-primary text-white rounded-3 px-4" :disabled="isSubmitting">
+              <button type="submit" class="btn bg-sb-primary text-white rounded-3 px-4" :disabled="isSubmitting || !canSubmitWithdrawal">
                 {{ isSubmitting ? 'Processing...' : 'Confirm Withdrawal' }}
               </button>
             </div>
@@ -195,12 +211,24 @@
 </template>
 
 <script setup>
-import { onMounted, ref, reactive } from 'vue'
+import { computed, onMounted, ref, reactive, watch } from 'vue'
 import { useWalletStore } from '@/stores/wallet'
 
 const walletStore = useWalletStore()
 const showWithdrawModal = ref(false)
 const isSubmitting = ref(false)
+const isDev = import.meta.env.DEV
+const devAmount = ref(500)
+
+const addDevFunds = async () => {
+  await walletStore.devAddFunds(devAmount.value)
+  await refreshData()
+}
+
+const removeDevFunds = async () => {
+  await walletStore.devRemoveFunds(devAmount.value)
+  await refreshData()
+}
 
 const withdrawForm = reactive({
   amount: 0,
@@ -208,6 +236,20 @@ const withdrawForm = reactive({
   account_number: '',
   account_name: '',
   bank_name: ''
+})
+
+const balanceValue = computed(() => Number(walletStore.balance) || 0)
+const hasMinimumBalance = computed(() => balanceValue.value >= 500)
+const withdrawMax = computed(() => Math.max(balanceValue.value, 0))
+const withdrawMin = computed(() => (hasMinimumBalance.value ? 500 : 0))
+const canSubmitWithdrawal = computed(() => {
+  const amount = Number(withdrawForm.amount) || 0
+
+  if (amount < 500) {
+    return false
+  }
+
+  return amount <= balanceValue.value
 })
 
 const refreshData = async () => {
@@ -219,7 +261,10 @@ const refreshData = async () => {
 }
 
 const handleWithdraw = async () => {
-  if (withdrawForm.amount > walletStore.balance) return alert('Insufficient balance')
+  if (!hasMinimumBalance.value) {
+    return alert('Minimum withdrawal is ₱500')
+  }
+  if (withdrawForm.amount > balanceValue.value) return alert('Insufficient balance')
   if (withdrawForm.amount < 500) return alert('Minimum withdrawal is ₱500')
   
   isSubmitting.value = true
@@ -243,7 +288,8 @@ const getTypeBadgeClass = (type) => {
   const classes = {
     'session_credit': 'badge bg-success-subtle text-success border border-success',
     'withdrawal': 'badge bg-primary-subtle text-primary border border-primary',
-    'withdrawal_reversal': 'badge bg-warning-subtle text-warning border border-warning'
+    'withdrawal_reversal': 'badge bg-warning-subtle text-warning border border-warning',
+    'commission_deduction': 'badge bg-danger-subtle text-danger border border-danger'
   }
   return classes[type] || 'badge bg-secondary'
 }
@@ -263,6 +309,27 @@ const getWithdrawalStatusClass = (status) => {
 
 onMounted(() => {
   refreshData()
+})
+
+watch(showWithdrawModal, async (isOpen) => {
+  if (isOpen) {
+    await refreshData()
+  }
+})
+
+watch([showWithdrawModal, balanceValue], () => {
+  if (!showWithdrawModal.value) {
+    return
+  }
+
+  if (!hasMinimumBalance.value) {
+    withdrawForm.amount = 0
+    return
+  }
+
+  if (withdrawForm.amount < 500) {
+    withdrawForm.amount = Math.min(500, withdrawMax.value)
+  }
 })
 </script>
 

@@ -15,7 +15,9 @@ export const useChatStore = defineStore('chat', () => {
     const wsUrl = computed(() => {
         let baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api/'
         if (!baseUrl.endsWith('/')) baseUrl += '/'
-        return baseUrl.replace(/^http/, 'ws').replace('/api/', '/ws/chat/')
+        const serverRoot = baseUrl.replace(/^https?:\/\//, '').replace(/\/api\/$/, '')
+        const scheme = (typeof window !== 'undefined' && window.location.protocol === 'https:') ? 'wss' : 'ws'
+        return `${scheme}://${serverRoot}/ws/chat/`
     })
 
     async function fetchRooms() {
