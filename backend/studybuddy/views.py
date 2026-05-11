@@ -20,7 +20,7 @@ from django.utils import timezone
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.views import APIView
 from rest_framework.generics import ListAPIView
-from django.db.models import Avg, Case, When, Value, IntegerField, Q
+from django.db.models import Avg, Case, When, Value, IntegerField, Q, Count
 from collections import defaultdict
 # algo
 from .recommender.hybrid import recommend_tutors_hybrid
@@ -2165,6 +2165,123 @@ def tutor_setup(request):
     return Response({"message": "Tutor profile updated"})
 
 
+RECOMMENDATION_BLOCKING_STATUSES = [
+    'Pending',
+    'Confirmed',
+    'Awaiting Payment Verification',
+    'Completed',
+]
+
+
+def parse_recommendation_time(time_string):
+    if not time_string:
+        return None
+
+    for time_format in ("%H:%M", "%H:%M:%S"):
+        try:
+            return datetime.strptime(str(time_string), time_format).time()
+        except ValueError:
+            continue
+
+    return None
+
+
+def get_recommendation_time_slots(start_time_string, end_time_string):
+    start_time = parse_recommendation_time(start_time_string)
+    end_time = parse_recommendation_time(end_time_string)
+
+    if not start_time or not end_time or end_time <= start_time:
+        return None
+
+    current = datetime.combine(date.today(), start_time)
+    end_at = datetime.combine(date.today(), end_time)
+    slots = []
+
+    while current < end_at:
+        slots.append(current.time())
+        current += timedelta(minutes=SESSION_SLOT_MINUTES)
+
+    return slots
+
+
+def get_recommendation_candidate_tutors(
+    subject,
+    preferred_mode=None,
+    min_budget=None,
+    max_budget=None,
+    requested_date=None,
+    start_time=None,
+    end_time=None,
+):
+    candidates = Tutor.objects.filter(
+        tutorsubjects__subject__subject_code=subject
+    )
+
+    if preferred_mode == "Online":
+        candidates = candidates.filter(can_online=True)
+    elif preferred_mode in ["Face-to-face", "F2F"]:
+        candidates = candidates.filter(can_f2f=True)
+
+    if min_budget not in [None, ""]:
+        candidates = candidates.filter(hourly_rate__gte=min_budget)
+
+    if max_budget not in [None, ""]:
+        candidates = candidates.filter(hourly_rate__lte=max_budget)
+
+    session_date = parse_request_date(requested_date)
+    required_slots = get_recommendation_time_slots(start_time, end_time)
+
+    if session_date and required_slots:
+        weekday = WEEKDAY_MAP[session_date.weekday()]
+
+        candidates = candidates.filter(
+            tutoravailability__day=weekday,
+            tutoravailability__time_slot__in=required_slots,
+            tutoravailability__is_active=True,
+        ).annotate(
+            matching_available_slots=Count(
+                "tutoravailability__time_slot",
+                filter=Q(
+                    tutoravailability__day=weekday,
+                    tutoravailability__time_slot__in=required_slots,
+                    tutoravailability__is_active=True,
+                ),
+                distinct=True,
+            )
+        ).filter(
+            matching_available_slots=len(required_slots)
+        )
+
+        conflicting_tutor_ids = Booking.objects.filter(
+            session_date=session_date,
+            status__in=RECOMMENDATION_BLOCKING_STATUSES,
+            availability__day=weekday,
+            availability__time_slot__in=required_slots,
+        ).values_list("tutor_id", flat=True)
+
+        full_day_override_tutor_ids = TutorAvailabilityOverride.objects.filter(
+            override_date=session_date,
+            is_full_day=True,
+        ).values_list("tutor_id", flat=True)
+
+        slot_override_tutor_ids = TutorAvailabilityOverride.objects.filter(
+            override_date=session_date,
+            is_full_day=False,
+            availability__day=weekday,
+            availability__time_slot__in=required_slots,
+        ).values_list("tutor_id", flat=True)
+
+        candidates = candidates.exclude(
+            profile_id__in=conflicting_tutor_ids
+        ).exclude(
+            profile_id__in=full_day_override_tutor_ids
+        ).exclude(
+            profile_id__in=slot_override_tutor_ids
+        )
+
+    return candidates.distinct()
+
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def recommend_tutors_view(request):
@@ -2173,6 +2290,11 @@ def recommend_tutors_view(request):
 
     subject = request.data.get("subject")
     preferred_mode = request.data.get("preferred_mode")
+    min_budget = request.data.get("min_budget")
+    max_budget = request.data.get("max_budget")
+    requested_date = request.data.get("date")
+    start_time = request.data.get("start_time")
+    end_time = request.data.get("end_time")
 
     if not subject:
         return Response(
@@ -2180,31 +2302,29 @@ def recommend_tutors_view(request):
             status=400
         )
 
-    # Build rating matrix for CF
     ratings = build_rating_matrix()
+    candidate_qs = get_recommendation_candidate_tutors(
+        subject,
+        preferred_mode=preferred_mode,
+        min_budget=min_budget,
+        max_budget=max_budget,
+        requested_date=requested_date,
+        start_time=start_time,
+        end_time=end_time,
+    )
 
-    # Run Hybrid algorithm
     results = recommend_tutors_hybrid(
         ratings,
         student_profile,
-        subject
+        subject,
+        candidate_qs=candidate_qs,
     )
 
-    # ⭐ DEBUG CONSOLE OUTPUT
-    print("\n===================================")
-    print(" HYBRID RECOMMENDATION RESULTS")
-    print("===================================")
-
-    for i, r in enumerate(results[:10], start=1):
-
-        tutor = r["tutor"]
-        score = r["score"]
-
-        print(
-            f"{i}. {tutor.profile.fname} {tutor.profile.lname} — Score: {score:.3f}"
-        )
-
-    print("===================================\n")
+    logger.debug(
+        "Recommendation request for subject %s scored %s candidate tutors",
+        subject,
+        len(results),
+    )
 
     data = []
 
@@ -2213,9 +2333,7 @@ def recommend_tutors_view(request):
         tutor = r["tutor"]
         score = r["score"]
 
-        tutor_subjects = TutorSubjects.objects.filter(
-            tutor=tutor
-        ).select_related("subject")
+        tutor_subjects = tutor.tutorsubjects_set.all()
 
         subjects = [
             ts.subject.subject_name

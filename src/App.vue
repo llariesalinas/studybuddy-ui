@@ -29,9 +29,9 @@
           </router-link>
         </li>
 
-        <li class="nav-item mb-2">
+        <li class="nav-item mb-2" v-if="userRole === 'tutor'">
           <router-link
-            :to="userRole === 'tutor' ? '/tch-availability' : '/schedule'"
+            to="/tch-availability"
             class="nav-link text-white opacity-75 d-flex align-items-center"
             active-class="active-nav"
           >

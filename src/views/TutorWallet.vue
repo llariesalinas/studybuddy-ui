@@ -29,16 +29,36 @@
         </div>
       </div>
 
-      <!-- Quick Stats / Info -->
+      <!-- Earnings Breakdown -->
       <div class="col-12 col-lg-7">
         <div class="card border-0 rounded-4 shadow-sm p-4 h-100">
-          <h5 class="fw-bold mb-3">Wallet Information</h5>
+          <h5 class="fw-bold mb-3">Earnings Breakdown</h5>
+          <div class="row g-3 mb-3">
+            <div class="col-4">
+              <div class="p-3 rounded-3 bg-light border-start border-3 border-secondary h-100">
+                <p class="text-muted small mb-1">Gross Earned</p>
+                <p class="fw-bold mb-0">₱ {{ walletStore.grossEarned.toLocaleString() }}</p>
+              </div>
+            </div>
+            <div class="col-4">
+              <div class="p-3 rounded-3 bg-light border-start border-3 border-danger h-100">
+                <p class="text-muted small mb-1">Deducted (10%)</p>
+                <p class="fw-bold text-danger mb-0">- ₱ {{ walletStore.totalDeductions.toLocaleString() }}</p>
+              </div>
+            </div>
+            <div class="col-4">
+              <div class="p-3 rounded-3 bg-light border-start border-3 border-success h-100">
+                <p class="text-muted small mb-1">Net Gained</p>
+                <p class="fw-bold text-sb-primary mb-0">₱ {{ walletStore.netEarned.toLocaleString() }}</p>
+              </div>
+            </div>
+          </div>
           <div class="alert alert-info border-0 rounded-3 small mb-0">
             <i class="bi bi-info-circle-fill me-2"></i>
-            Online payments are automatically credited to your wallet minus the platform commission (10%). Cash payments must still be verified manually and do not affect your wallet balance.
+            Online payments are automatically credited minus the platform commission (10%). Cash payments must be verified manually and do not affect your wallet balance.
           </div>
           <div class="mt-3">
-            <p class="text-muted small">Minimum withdrawal: ₱ 500.00</p>
+            <p class="text-muted small mb-0">Minimum withdrawal: ₱ 500.00</p>
           </div>
         </div>
       </div>
@@ -46,48 +66,63 @@
       <!-- Transaction History -->
       <div class="col-12">
         <div class="card border-0 rounded-4 shadow-sm overflow-hidden">
-          <div class="card-header bg-white border-0 p-4">
+          <div class="card-header bg-white border-0 p-4 pb-2">
             <h5 class="fw-bold mb-0">Recent Transactions</h5>
           </div>
-          <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-              <thead class="bg-light text-muted small text-uppercase">
-                <tr>
-                  <th class="px-4 border-0">Description</th>
-                  <th class="border-0">Type</th>
-                  <th class="border-0">Amount</th>
-                  <th class="border-0">Date</th>
-                  <th class="px-4 border-0 text-end">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="tx in walletStore.transactions" :key="tx.id">
-                  <td class="px-4">
-                    <div class="fw-semibold">{{ tx.description }}</div>
-                    <div class="text-muted small" v-if="tx.reference_id">Ref: {{ tx.reference_id }}</div>
-                  </td>
-                  <td>
-                    <span :class="getTypeBadgeClass(tx.transaction_type)">
-                      {{ formatType(tx.transaction_type) }}
-                    </span>
-                  </td>
-                  <td :class="tx.amount > 0 ? 'text-success' : 'text-danger'" class="fw-bold">
-                    {{ tx.amount > 0 ? '+' : '' }} ₱ {{ tx.amount.toLocaleString() }}
-                  </td>
-                  <td class="text-muted small">
-                    {{ new Date(tx.created_at).toLocaleDateString() }}
-                  </td>
-                  <td class="px-4 text-end">
-                    <span class="badge bg-success-subtle text-success">Completed</span>
-                  </td>
-                </tr>
-                <tr v-if="walletStore.transactions.length === 0">
-                  <td colspan="5" class="text-center py-5 text-muted">
-                    No transactions found.
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+          <div class="p-4 pt-3">
+            <div v-if="walletStore.transactions.length === 0" class="text-center py-5 text-muted">
+              No transactions found.
+            </div>
+            <div v-else class="tx-card-list">
+              <div
+                v-for="tx in walletStore.transactions"
+                :key="tx.id"
+                class="tx-card"
+              >
+                <!-- Date block -->
+                <div class="tx-date-block">
+                  <span class="tx-month">{{ formatMonth(tx.created_at) }}</span>
+                  <span class="tx-day">{{ formatDay(tx.created_at) }}</span>
+                </div>
+
+                <!-- Session info -->
+                <div class="tx-info">
+                  <div class="fw-semibold text-dark">{{ tx.description }}</div>
+                  <span :class="getTypeBadgeClass(tx.transaction_type)" class="mt-1 d-inline-block">
+                    {{ formatType(tx.transaction_type) }}
+                  </span>
+                  <div v-if="tx.reference_id" class="text-muted mt-1" style="font-size:11px;">
+                    Ref: {{ tx.reference_id }}
+                  </div>
+                </div>
+
+                <!-- Breakdown panels (fixed-width wrapper keeps tx-info consistent) -->
+                <div class="tx-breakdown-wrapper">
+                  <template v-if="tx.transaction_type === 'session_credit'">
+                    <div class="tx-breakdown-item tx-gross">
+                      <span class="tx-bl">Gross</span>
+                      <span class="tx-bv">₱ {{ grossForCredit(tx).toLocaleString() }}</span>
+                    </div>
+                    <div class="tx-breakdown-item tx-deduct">
+                      <span class="tx-bl">Deducted</span>
+                      <span class="tx-bv">-₱ {{ deductForCredit(tx).toLocaleString() }}</span>
+                    </div>
+                    <div class="tx-breakdown-item tx-net">
+                      <span class="tx-bl">Net Earned</span>
+                      <span class="tx-bv">₱ {{ Number(tx.amount).toLocaleString() }}</span>
+                    </div>
+                  </template>
+                  <template v-else>
+                    <div class="tx-breakdown-item tx-net tx-single">
+                      <span class="tx-bl">Amount</span>
+                      <span class="tx-bv" :class="tx.amount < 0 ? 'text-danger' : ''">
+                        {{ tx.amount > 0 ? '+' : '' }}₱ {{ Math.abs(Number(tx.amount)).toLocaleString() }}
+                      </span>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -284,6 +319,15 @@ const handleWithdraw = async () => {
   }
 }
 
+const formatMonth = (dateStr) =>
+  new Date(dateStr).toLocaleString('default', { month: 'short' }).toUpperCase()
+
+const formatDay = (dateStr) =>
+  new Date(dateStr).getDate()
+
+const deductForCredit = (tx) => Math.round(Number(tx.amount) / 0.9 * 0.1)
+const grossForCredit = (tx) => Number(tx.amount) + deductForCredit(tx)
+
 const getTypeBadgeClass = (type) => {
   const classes = {
     'session_credit': 'badge bg-success-subtle text-success border border-success',
@@ -353,6 +397,104 @@ watch([showWithdrawModal, balanceValue], () => {
   from { transform: rotate(0deg); }
   to { transform: rotate(359deg); }
 }
+
+/* Transaction card rows */
+.tx-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tx-card {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid #eee;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fafafa;
+}
+
+.tx-date-block {
+  background: var(--sb-dark);
+  color: #fff;
+  width: 68px;
+  min-width: 68px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 14px 8px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.tx-month {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  opacity: 0.65;
+  line-height: 1;
+}
+
+.tx-day {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.tx-info {
+  flex: 1;
+  padding: 12px 16px;
+  border-right: 1px solid #eee;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+}
+
+.tx-breakdown-wrapper {
+  display: flex;
+  align-items: stretch;
+  width: 300px;
+  flex-shrink: 0;
+}
+
+.tx-breakdown-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 18px;
+  border-right: 1px solid #eee;
+  flex-shrink: 0;
+}
+
+.tx-breakdown-item:last-child {
+  border-right: none;
+}
+
+.tx-bl {
+  font-size: 11px;
+  color: #aaa;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 3px;
+  white-space: nowrap;
+}
+
+.tx-bv {
+  font-weight: 700;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.tx-single {
+  flex: 1;
+}
+
+.tx-gross .tx-bv { color: #555; }
+.tx-deduct .tx-bv { color: #dc3545; }
+.tx-net .tx-bv { color: var(--sb-primary); font-size: 15px; }
 
 .modal-backdrop {
   z-index: 1050;

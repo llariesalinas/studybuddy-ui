@@ -1,4 +1,4 @@
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import api from '@/services/api/api'
 
@@ -8,6 +8,28 @@ export const useWalletStore = defineStore('wallet', () => {
   const transactions = ref([])
   const withdrawals = ref([])
   const loading = ref(false)
+
+  const grossEarned = computed(() => {
+    const credits = transactions.value
+      .filter(t => t.transaction_type === 'session_credit')
+      .reduce((sum, t) => sum + Number(t.amount), 0)
+    const deductions = transactions.value
+      .filter(t => t.transaction_type === 'commission_deduction')
+      .reduce((sum, t) => sum + Math.abs(Number(t.amount)), 0)
+    return credits + deductions
+  })
+
+  const totalDeductions = computed(() =>
+    transactions.value
+      .filter(t => t.transaction_type === 'commission_deduction')
+      .reduce((sum, t) => sum + Math.abs(Number(t.amount)), 0)
+  )
+
+  const netEarned = computed(() =>
+    transactions.value
+      .filter(t => t.transaction_type === 'session_credit')
+      .reduce((sum, t) => sum + Number(t.amount), 0)
+  )
 
   async function fetchWallet() {
     loading.value = true
@@ -50,6 +72,7 @@ export const useWalletStore = defineStore('wallet', () => {
   }
 
   return { balance, pendingAmount, transactions, withdrawals, loading,
+           grossEarned, totalDeductions, netEarned,
            fetchWallet, fetchTransactions, fetchWithdrawals, requestWithdrawal, devAddFunds,
            devRemoveFunds }
 })

@@ -191,7 +191,6 @@ import {
 } from '@/stores/initialbookingprefs'
 import { useBookedSessionStore } from '@/stores/bookedSessionDetails'
 import { useFindTutorsStore } from '@/stores/findTutors'
-import { defineStore } from 'pinia'
 
 const route = useRoute()
 const router = useRouter()
@@ -374,6 +373,10 @@ const runRecommendation = async () => {
     preferred_mode: findTutorsStore.filters.mode,
     min_budget: findTutorsStore.filters.minRate,
     max_budget: findTutorsStore.filters.maxRate,
+    date: findTutorsStore.filters.date,
+    start_time: findTutorsStore.filters.startTime,
+    end_time: findTutorsStore.filters.endTime,
+    location: findTutorsStore.filters.location,
   })
 
   const mappedTutors = response.data.map((tutor) => ({

@@ -263,6 +263,9 @@ class TutorAvailability(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
+        indexes = [
+            models.Index(fields=['day', 'time_slot', 'is_active']),
+        ]
         unique_together = ('tutor', 'day', 'time_slot')
 
     def __str__(self):
@@ -368,6 +371,9 @@ class Booking(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
+        indexes = [
+            models.Index(fields=['session_date', 'availability', 'status']),
+        ]
         constraints = [
             models.UniqueConstraint(
                 fields=['availability', 'session_date'],
