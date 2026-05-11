@@ -5,6 +5,14 @@ import router from '@/router'
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api/'
 
 const isNgrok = API_BASE_URL.includes('ngrok')
+const PUBLIC_ENDPOINTS = [
+  'login/',
+  'register/',
+  'token/refresh/',
+  'partner-institutions/',
+  'courses/',
+  'subjects/',
+]
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -12,6 +20,20 @@ const api = axios.create({
 })
 
 let refreshPromise = null
+
+const getApiPath = (requestUrl = '') => {
+  return String(requestUrl)
+    .replace(API_BASE_URL, '')
+    .replace(/^https?:\/\/[^/]+\/api\/?/i, '')
+    .replace(/^\/api\/?/i, '')
+    .replace(/^\/+/, '')
+}
+
+const isPublicEndpoint = (requestUrl = '') => {
+  const path = getApiPath(requestUrl)
+
+  return PUBLIC_ENDPOINTS.some((endpoint) => path === endpoint || path.startsWith(`${endpoint}?`))
+}
 
 const refreshAccessToken = async () => {
   if (!refreshPromise) {
@@ -32,7 +54,7 @@ api.interceptors.request.use(
     const authStore = useAuthStore()
     const token = authStore.token || localStorage.getItem('access_token')
 
-    if (token) {
+    if (token && !isPublicEndpoint(config.url)) {
       config.headers = config.headers ?? {}
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -49,14 +71,14 @@ api.interceptors.response.use(
     const authStore = useAuthStore()
     const refreshTokenValue = authStore.refreshToken || localStorage.getItem('refresh_token')
     const requestUrl = originalRequest?.url || ''
+    const isPublicRequest = isPublicEndpoint(requestUrl)
 
     if (
       error.response &&
       error.response.status === 401 &&
       originalRequest &&
       !originalRequest._retry &&
-      !requestUrl.includes('token/refresh/') &&
-      !requestUrl.includes('login/') &&
+      !isPublicRequest &&
       refreshTokenValue
     ) {
       originalRequest._retry = true
@@ -77,7 +99,7 @@ api.interceptors.response.use(
       }
     }
 
-    if (error.response && error.response.status === 401) {
+    if (error.response && error.response.status === 401 && !isPublicRequest) {
       authStore.logout()
       router.push('/login')
     }

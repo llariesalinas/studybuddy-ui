@@ -12,7 +12,7 @@ from calendar import monthrange
 from uuid import uuid4
 from django.conf import settings
 from django.shortcuts import get_object_or_404
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
@@ -393,6 +393,7 @@ def serialize_payment_summary(representative_booking):
         "receipt_image": payment.receipt_image.url if payment.receipt_image else None,
     }
 @api_view(['GET'])
+@authentication_classes([])
 def partner_institutions_list(request):
 
     institutions = PartnerInstitution.objects.filter(is_active=True).order_by('institution_name')
@@ -411,6 +412,7 @@ def partner_institutions_list(request):
 
 
 @api_view(['POST'])
+@authentication_classes([])
 @transaction.atomic
 def register_user(request):
 
@@ -511,6 +513,7 @@ def profile_status(request):
     })
 
 @api_view(['POST'])
+@authentication_classes([])
 def login_view(request):
 
     email = request.data.get("email")
