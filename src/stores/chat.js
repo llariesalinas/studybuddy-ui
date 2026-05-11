@@ -15,8 +15,16 @@ export const useChatStore = defineStore('chat', () => {
     const wsUrl = computed(() => {
         let baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api/'
         if (!baseUrl.endsWith('/')) baseUrl += '/'
-        const serverRoot = baseUrl.replace(/^https?:\/\//, '').replace(/\/api\/$/, '')
-        const scheme = (typeof window !== 'undefined' && window.location.protocol === 'https:') ? 'wss' : 'ws'
+
+        if (baseUrl.startsWith('http')) {
+            const apiUrl = new URL(baseUrl)
+            const scheme = apiUrl.protocol === 'https:' ? 'wss' : 'ws'
+            return `${scheme}://${apiUrl.host}/ws/chat/`
+        }
+
+        const serverRoot = typeof window !== 'undefined' ? window.location.host : '127.0.0.1:8000'
+        const scheme =
+            typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss' : 'ws'
         return `${scheme}://${serverRoot}/ws/chat/`
     })
 
