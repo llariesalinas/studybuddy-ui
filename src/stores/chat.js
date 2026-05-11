@@ -19,7 +19,9 @@ export const useChatStore = defineStore('chat', () => {
         if (baseUrl.startsWith('http')) {
             const apiUrl = new URL(baseUrl)
             const scheme = apiUrl.protocol === 'https:' ? 'wss' : 'ws'
-            return `${scheme}://${apiUrl.host}/ws/chat/`
+            // If the base URL includes /api/, we strip it for the WS path
+            const host = apiUrl.host
+            return `${scheme}://${host}/ws/chat/`
         }
 
         const serverRoot = typeof window !== 'undefined' ? window.location.host : '127.0.0.1:8000'
