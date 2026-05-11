@@ -37,6 +37,9 @@ __screenshots__/
 
 # Vite
 *.timestamp-*-*.mjs
+.env
+.env.*
+!.env.example
 
 # Local handoff notes and plans
 PROJECT_HANDOFF_DUMP.md
