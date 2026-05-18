@@ -132,6 +132,39 @@ const router = createRouter({
       meta: { requiresAuth: true, role: 'Tutor' }
     },
 
+    // ---------- ADMIN ROUTES ----------
+    {
+      path: '/admin/dashboard',
+      name: 'admin-dashboard',
+      component: () => import('@/views/AdminDashboard.vue'),
+      meta: { requiresAuth: true, role: 'Admin' }
+    },
+    {
+      path: '/admin/withdrawals',
+      name: 'admin-withdrawals',
+      component: () => import('@/views/AdminWithdrawals.vue'),
+      meta: { requiresAuth: true, role: 'Admin' }
+    },
+    {
+      path: '/admin/users',
+      name: 'admin-users',
+      component: () => import('@/views/AdminUsers.vue'),
+      meta: { requiresAuth: true, role: 'Admin' }
+    },
+    {
+      path: '/admin/institutions',
+      name: 'admin-institutions',
+      component: () => import('@/views/AdminInstitutions.vue'),
+      meta: { requiresAuth: true, role: 'Admin' }
+    },
+    {
+      path: '/admin/reports',
+      name: 'admin-reports',
+      component: () => import('@/views/AdminReports.vue'),
+      meta: { requiresAuth: true, role: 'Admin' }
+    },
+
+
     // ---------- SHARED ROUTES ----------
     {
       path: '/reports',
@@ -198,6 +231,10 @@ router.beforeEach(async (to, from, next) => {
         return next('/tutor-setup')
       }
 
+      if (role === 'admin') {
+        return next()
+      }
+
       return next('/preferencesetup')
     }
 
@@ -210,6 +247,10 @@ router.beforeEach(async (to, from, next) => {
 
       if (normalizedUserRole === 'tutee') {
         return next('/dashboard')
+      }
+
+      if (normalizedUserRole === 'admin') {
+        return next('/admin/dashboard')
       }
 
       return next('/')

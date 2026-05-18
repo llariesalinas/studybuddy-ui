@@ -71,6 +71,7 @@ const handleLogin = async () => {
 
     if (normalizedRole === 'tutor') router.push('/tch-dashboard')
     else if (normalizedRole === 'tutee') router.push('/dashboard')
+    else if (normalizedRole === 'admin') router.push('/admin/dashboard')
     else router.push('/')
   } catch (error) {
     loginError.value = error.response?.data?.error || 'Login failed. Please check your credentials.'

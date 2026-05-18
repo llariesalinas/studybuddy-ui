@@ -26,11 +26,25 @@ from .views import(
                     profile_status,
                     get_tutor_profile
                    )
+from .admin_views import (
+    AdminStatsView, AdminWithdrawalListView, AdminWithdrawalDetailView,
+    AdminUserListView, AdminInstitutionView, AdminAnalyticsView
+)
 from . import views
 
 print("STUDYBUDDY URLS LOADED")
 
 urlpatterns = [
+    # Admin Routes
+    path('admin/stats/', AdminStatsView.as_view()),
+    path('admin/withdrawals/', AdminWithdrawalListView.as_view()),
+    path('admin/withdrawals/<int:pk>/', AdminWithdrawalDetailView.as_view()),
+    path('admin/users/', AdminUserListView.as_view()),
+    path('admin/users/<int:pk>/', AdminUserListView.as_view()),
+    path('admin/institutions/', AdminInstitutionView.as_view()),
+    path('admin/institutions/<int:pk>/', AdminInstitutionView.as_view()),
+    path('admin/analytics/', AdminAnalyticsView.as_view()),
+
     path('register/', register_user),
     path('login/', login_view),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
