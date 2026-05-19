@@ -27,7 +27,7 @@ from .recommender.hybrid import recommend_tutors_hybrid
 from .recommender.CF import build_rating_matrix
 
 from .recommender.cbf import recommend_tutors
-from .models import Booking, Course, Notification, PartnerInstitution, Payment, PaymentMethod, Preference, Rating, Subjects, Tutor, TutorAvailability, TutorAvailabilityOverride, TutorSubjects, Wallet
+from .models import Booking, Course, Notification, PartnerInstitution, Payment, PaymentMethod, Preference, Rating, Subjects, Tutor, TutorAvailability, TutorAvailabilityOverride, TutorSubjects, Wallet, PlatformActivity, Transaction
 from .serializers import (
     NotificationSerializer,
     SubjectSerializer,
@@ -484,6 +484,11 @@ def register_user(request):
     if role == "Tutor":
         Tutor.objects.create(profile=profile)
 
+    PlatformActivity.objects.create(
+        activity_type='registration',
+        message=f"New {role} registered: {fname} {lname} ({email})"
+    )
+
     logger.info(
         "Registered user in database: email=%s user_id=%s profile_id=%s role=%s institution_id=%s",
         email,
@@ -540,7 +545,13 @@ def login_view(request):
             status=status.HTTP_404_NOT_FOUND
         )
 
-    if not profile.is_domain_exempt:
+    if profile.is_suspended:
+        return Response(
+            {"error": "Your account has been suspended. Please contact administration for more details."},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    if not profile.is_domain_exempt and profile.role != 'Admin':
         email_domain = normalize_email_domain(email)
         active_institution = get_active_institution_by_domain(email_domain)
 
@@ -2013,6 +2024,11 @@ def tutor_confirm_booking(request, booking_id):
 
         # Credit the tutor's wallet if payment was online
         credit_tutor_wallet(representative_booking)
+
+        PlatformActivity.objects.create(
+            activity_type='booking_completed',
+            message=f"Session completed: {representative_booking.student.fname} with {representative_booking.tutor.profile.fname}"
+        )
 
     return Response({"message": "Session marked as completed successfully."})
 

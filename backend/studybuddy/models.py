@@ -68,6 +68,7 @@ class UserProfile(models.Model):
     bio = models.TextField(blank=True, null=True)
 
     profile_completed = models.BooleanField(default=False)
+    is_suspended = models.BooleanField(default=False)
 
     profile_picture = models.ImageField(
         upload_to='profile_pics/',
@@ -198,6 +199,8 @@ class WithdrawalRequest(models.Model):
         ('pending', 'Pending'),
         ('processed', 'Processed'),
         ('rejected', 'Rejected'),
+        ('failed', 'Failed'),
+        ('flagged', 'Flagged'),
     ]
     METHOD_CHOICES = [
         ('gcash', 'GCash'),
@@ -211,8 +214,29 @@ class WithdrawalRequest(models.Model):
     account_name = models.CharField(max_length=100)
     bank_name = models.CharField(max_length=100, blank=True, null=True)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
+    failure_reason = models.TextField(blank=True, null=True)
     requested_at = models.DateTimeField(auto_now_add=True)
     processed_at = models.DateTimeField(null=True, blank=True)
+
+class PlatformActivity(models.Model):
+    ACTIVITY_TYPES = [
+        ('registration', 'New User Registration'),
+        ('booking_completed', 'Session Completed'),
+        ('institution_added', 'New Institution Request'),
+        ('withdrawal_failed', 'Withdrawal Failure'),
+        ('admin_action', 'Admin Action'),
+    ]
+
+    activity_type = models.CharField(max_length=30, choices=ACTIVITY_TYPES)
+    message = models.CharField(max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name_plural = "Platform Activities"
+
+    def __str__(self):
+        return f"{self.activity_type} - {self.created_at}"
 
 @receiver(post_save, sender=Tutor)
 def create_tutor_wallet(sender, instance, created, **kwargs):

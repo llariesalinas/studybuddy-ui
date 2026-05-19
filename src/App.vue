@@ -11,13 +11,13 @@
       </div>
 
       <ul class="nav nav-pills flex-column mb-auto">
-        <li class="nav-item mb-2">
+        <li v-if="userRole!== 'admin'" class="nav-item mb-2">
           <router-link :to="userRole === 'tutor' ? '/tch-dashboard' : '/dashboard'" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
             <i class="bi bi-grid-1x2 me-3"></i> Dashboard
           </router-link>
         </li>
 
-        <li class="nav-item mb-2">
+        <li v-if="userRole!== 'admin'" class="nav-item mb-2">
           <router-link :to="userRole === 'tutor' ? '/tutor-profile' : '/tutee-profile'" class="nav-link text-white opacity-75 d-flex align-items-center">
             <i class="bi bi-person me-3"></i> Profile
           </router-link>
@@ -29,7 +29,7 @@
           </router-link>
         </li>
 
-        <li class="nav-item mb-2">
+        <li v-if="userRole!== 'admin'" class="nav-item mb-2">
           <router-link
             :to="userRole === 'tutor' ? '/tch-availability' : '/schedule'"
             class="nav-link text-white opacity-75 d-flex align-items-center"
@@ -37,16 +37,6 @@
           >
             <i class="bi bi-calendar3 me-3"></i> Schedule
           </router-link>
-        </li>
-
-        <li class="nav-item mb-2">
-          <button 
-           class="nav-link border-0 shadow-none bg-transparent text-white opacity-75 d-flex align-items-center"
-           data-bs-toggle="modal" 
-           data-bs-target="#logoutModal"
-           >
-            <i class="bi bi-box-arrow-right me-3"></i> Log-out
-          </button>
         </li>
 
         <li class="nav-item mb-2" v-if="userRole === 'tutor'">
@@ -59,6 +49,46 @@
           <router-link to="/tch-wallet" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
             <i class="bi bi-wallet2 me-3"></i> Wallet
           </router-link>
+        </li>
+
+        <li class="nav-item mb-2" v-if="userRole === 'admin'">
+          <router-link to="/admin/dashboard" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
+            <i class="bi bi-grid-1x2 me-3"></i> Dashboard
+          </router-link>
+        </li>
+
+        <li class="nav-item mb-2" v-if="userRole === 'admin'">
+          <router-link to="/admin/withdrawals" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
+            <i class="bi bi-wallet2 me-3"></i> Withdrawals
+          </router-link>
+        </li>
+
+        <li class="nav-item mb-2" v-if="userRole === 'admin'">
+          <router-link to="/admin/users" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
+            <i class="bi bi-people me-3"></i> Users
+          </router-link>
+        </li>
+
+        <li class="nav-item mb-2" v-if="userRole === 'admin'">
+          <router-link to="/admin/institutions" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
+            <i class="bi bi-building me-3"></i> Institutions
+          </router-link>
+        </li>
+
+        <li class="nav-item mb-2" v-if="userRole === 'admin'">
+          <router-link to="/admin/reports" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
+            <i class="bi bi-bar-chart-line me-3"></i> Reports
+          </router-link>
+        </li>
+
+        <li class="nav-item mb-2">
+          <button 
+           class="nav-link border-0 shadow-none bg-transparent text-white opacity-75 d-flex align-items-center"
+           data-bs-toggle="modal" 
+           data-bs-target="#logoutModal"
+           >
+            <i class="bi bi-box-arrow-right me-3"></i> Log-out
+          </button>
         </li>
       </ul>
     </aside>
@@ -154,6 +184,31 @@
           <div v-if="route.path === '/tch-availability'">
             <h2 class="fw-bold text-dark">Your Schedule</h2>
             <p class="text-muted">Set recurring weekly slots and add one-off date blocks when your schedule changes.</p>
+          </div>
+
+          <div v-if="route.path === '/admin/dashboard'">
+            <h2 class="fw-bold text-dark">Admin Dashboard</h2>
+            <p class="text-muted">Platform overview and key performance metrics.</p>
+          </div>
+
+          <div v-if="route.path === '/admin/users'">
+            <h2 class="fw-bold text-dark">Users</h2>
+            <p class="text-muted">Search, filter, and manage all platform users.</p>
+          </div>
+
+          <div v-if="route.path === '/admin/withdrawals'">
+            <h2 class="fw-bold text-dark">Withdrawals</h2>
+            <p class="text-muted">Search, filter, and manage all user withdrawals.</p>
+          </div>
+
+          <div v-if="route.path === '/admin/institutions'">
+            <h2 class="fw-bold text-dark">Institutions</h2>
+            <p class="text-muted">View and manage requests from partnered institutions.</p>
+          </div>
+
+          <div v-if="route.path === '/admin/reports'">
+            <h2 class="fw-bold text-dark">Reports</h2>
+            <p class="text-muted">View and review platform analytics.</p>
           </div>
 
           <div v-if="route.path === '/tch-requestedSessions'">
