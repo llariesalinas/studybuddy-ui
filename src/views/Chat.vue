@@ -16,7 +16,7 @@
           v-for="room in chatStore.sortedRooms"
           :key="room.id"
           type="button"
-          class="room-item"
+          class="room-item sb-interactive"
           :class="{ active: chatStore.currentRoom?.id === room.id }"
           @click="selectRoom(room)"
         >
@@ -43,102 +43,106 @@
     </aside>
 
     <section class="chat-main">
-      <template v-if="chatStore.currentRoom">
-        <header class="chat-header">
-          <div class="partner-info">
-            <div class="partner-avatar">{{ getRoomInitials(chatStore.currentRoom) }}</div>
-            <div>
-              <h3>{{ chatStore.getRoomPartnerName(chatStore.currentRoom) }}</h3>
-              <p :class="{ connected: chatStore.isConnected }">
-                {{ chatStore.isConnected ? 'Connected' : 'Reconnecting...' }}
-              </p>
-            </div>
-          </div>
-        </header>
-
-        <div class="message-list" ref="messageList">
-          <BookingCard
-            v-if="chatStore.currentRoom.current_booking"
-            :booking="chatStore.currentRoom.current_booking"
-            :is-tutor="isTutor"
-            @location-saved="handleLocationSaved"
-          />
-
-          <TransitionGroup :name="historyLoaded ? 'msg' : ''" tag="div" class="messages-group">
-            <div
-              v-for="msg in chatStore.messages"
-              :key="msg.id"
-              class="message-wrapper"
-              :class="{
-                'is-me': msg.is_me,
-                'is-system': msg.message_type !== 'text',
-                'is-pending': msg.status === 'pending' || msg.pending === true,
-              }"
-            >
-              <div v-if="!msg.is_me && msg.message_type === 'text'" class="message-sender">
-                {{ msg.sender_name }}
-              </div>
-
-              <div v-if="msg.message_type === 'booking_event'" class="system-event">
-                <i class="bi bi-calendar-check"></i>
+      <Transition name="room-switch" mode="out-in">
+        <div :key="chatStore.currentRoom?.id ?? 'empty'" class="chat-main-inner">
+          <template v-if="chatStore.currentRoom">
+            <header class="chat-header">
+              <div class="partner-info">
+                <div class="partner-avatar">{{ getRoomInitials(chatStore.currentRoom) }}</div>
                 <div>
-                  <strong>{{ msg.content }}</strong>
-                  <BookingCard
-                    v-if="msg.metadata?.booking"
-                    :booking="msg.metadata.booking"
-                    :is-tutor="isTutor"
-                    compact
-                    @location-saved="handleLocationSaved"
-                  />
+                  <h3>{{ chatStore.getRoomPartnerName(chatStore.currentRoom) }}</h3>
+                  <p :class="{ connected: chatStore.isConnected }">
+                    {{ chatStore.isConnected ? 'Connected' : 'Reconnecting...' }}
+                  </p>
                 </div>
               </div>
+            </header>
 
-              <div v-else class="message-bubble">
-                <div class="message-content">{{ msg.content }}</div>
-                <div class="message-meta">
-                  <span>{{ formatTime(msg.created_at) }}</span>
-                  <span v-if="msg.pending" class="send-status">
-                    <span class="send-indicator-dot" aria-hidden="true"></span>
-                    Sending
-                  </span>
-                  <span
-                    v-else-if="msg.is_me && msg.is_read"
-                    :class="{ 'sb-pop-active': poppingMessages.has(msg.id) }"
-                  >
-                    Read
-                  </span>
-                  <span v-else-if="msg.is_me">Sent</span>
+            <div class="message-list" ref="messageList">
+              <BookingCard
+                v-if="chatStore.currentRoom.current_booking"
+                :booking="chatStore.currentRoom.current_booking"
+                :is-tutor="isTutor"
+                @location-saved="handleLocationSaved"
+              />
+
+              <TransitionGroup :name="historyLoaded ? 'msg' : ''" tag="div" class="messages-group">
+                <div
+                  v-for="msg in chatStore.messages"
+                  :key="msg.id"
+                  class="message-wrapper"
+                  :class="{
+                    'is-me': msg.is_me,
+                    'is-system': msg.message_type !== 'text',
+                    'is-pending': msg.status === 'pending' || msg.pending === true,
+                  }"
+                >
+                  <div v-if="!msg.is_me && msg.message_type === 'text'" class="message-sender">
+                    {{ msg.sender_name }}
+                  </div>
+
+                  <div v-if="msg.message_type === 'booking_event'" class="system-event">
+                    <i class="bi bi-calendar-check"></i>
+                    <div>
+                      <strong>{{ msg.content }}</strong>
+                      <BookingCard
+                        v-if="msg.metadata?.booking"
+                        :booking="msg.metadata.booking"
+                        :is-tutor="isTutor"
+                        compact
+                        @location-saved="handleLocationSaved"
+                      />
+                    </div>
+                  </div>
+
+                  <div v-else class="message-bubble">
+                    <div class="message-content">{{ msg.content }}</div>
+                    <div class="message-meta">
+                      <span>{{ formatTime(msg.created_at) }}</span>
+                      <span v-if="msg.pending" class="send-status">
+                        <span class="send-indicator-dot" aria-hidden="true"></span>
+                        Sending
+                      </span>
+                      <span
+                        v-else-if="msg.is_me && msg.is_read"
+                        :class="{ 'sb-pop-active': poppingMessages.has(msg.id) }"
+                      >
+                        Read
+                      </span>
+                      <span v-else-if="msg.is_me">Sent</span>
+                    </div>
+                  </div>
                 </div>
+              </TransitionGroup>
+
+              <div v-if="chatStore.activeTypingUsers.length" class="typing-indicator">
+                {{ typingLabel }}
               </div>
             </div>
-          </TransitionGroup>
 
-          <div v-if="chatStore.activeTypingUsers.length" class="typing-indicator">
-            {{ typingLabel }}
+            <form class="chat-input-area" @submit.prevent="handleSend" :class="{ 'sb-shake-active': composerShaking }">
+              <input
+                v-model="newMessage"
+                type="text"
+                :placeholder="chatStore.isConnected ? 'Type a message...' : 'Connecting...'"
+                class="message-input"
+                :disabled="!chatStore.isConnected"
+                @input="chatStore.sendTyping(true)"
+              />
+              <button type="submit" class="send-btn sb-btn" :disabled="!newMessage.trim() || !chatStore.isConnected">
+                <i class="bi bi-send-fill"></i>
+              </button>
+            </form>
+          </template>
+
+          <div v-else class="no-chat-selected">
+            <div class="empty-state">
+              <i class="bi bi-chat-dots"></i>
+              <p>Select a conversation to start chatting</p>
+            </div>
           </div>
         </div>
-
-        <form class="chat-input-area" @submit.prevent="handleSend" :class="{ 'sb-shake-active': composerShaking }">
-          <input
-            v-model="newMessage"
-            type="text"
-            :placeholder="chatStore.isConnected ? 'Type a message...' : 'Connecting...'"
-            class="message-input"
-            :disabled="!chatStore.isConnected"
-            @input="chatStore.sendTyping(true)"
-          />
-          <button type="submit" class="send-btn sb-btn" :disabled="!newMessage.trim() || !chatStore.isConnected">
-            <i class="bi bi-send-fill"></i>
-          </button>
-        </form>
-      </template>
-
-      <div v-else class="no-chat-selected">
-        <div class="empty-state">
-          <i class="bi bi-chat-dots"></i>
-          <p>Select a conversation to start chatting</p>
-        </div>
-      </div>
+      </Transition>
     </section>
   </div>
 </template>
@@ -471,6 +475,7 @@ onUnmounted(() => {
   width: 100%;
   border: 0;
   border-bottom: 1px solid #f1f3f5;
+  border-left: 3px solid transparent;
   background: #fff;
   display: flex;
   gap: 12px;
@@ -482,6 +487,10 @@ onUnmounted(() => {
 .room-item:hover,
 .room-item.active {
   background: #edf7f3;
+}
+
+.room-item.active {
+  border-left-color: #00895a;
 }
 
 .room-avatar,
@@ -561,6 +570,32 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   background: #fcfdfc;
+}
+
+.chat-main-inner {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.room-switch-enter-active {
+  transition:
+    opacity var(--sb-t-normal) var(--sb-spring),
+    transform var(--sb-t-normal) var(--sb-spring);
+}
+
+.room-switch-enter-from {
+  opacity: 0;
+  transform: translateX(16px);
+}
+
+.room-switch-leave-active {
+  transition: opacity 150ms ease;
+}
+
+.room-switch-leave-to {
+  opacity: 0;
 }
 
 .chat-header {
