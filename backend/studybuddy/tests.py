@@ -4,8 +4,10 @@ from uuid import uuid4
 from django.contrib.auth.models import User
 from rest_framework.test import APITestCase
 
+from .chat.services import get_current_booking_context
 from .models import (
     Booking,
+    Rating,
     Subjects,
     Tutor,
     TutorAvailability,
@@ -233,6 +235,95 @@ class ChatFeatureTests(APITestCase):
             booking_request_id=self.booking_request_id,
             status="Pending",
         )
+
+    def make_booking(self, status, session_mode='F2F', preferred_location='Library',
+                     session_date=None, days_ago=0):
+        from datetime import date, timedelta
+        from uuid import uuid4
+        # Cancel the setUp booking so it doesn't interfere with this test's query
+        self.booking.status = 'Cancelled'
+        self.booking.session_date = date.today() - timedelta(days=8)
+        self.booking.save(update_fields=['status', 'session_date'])
+        d = session_date or (date.today() - timedelta(days=days_ago))
+        return Booking.objects.create(
+            student=self.tutee_profile,
+            tutor=self.tutor,
+            availability=self.availability,
+            session_date=d,
+            session_mode=session_mode,
+            preferred_location=preferred_location,
+            booking_request_id=uuid4(),
+            status=status,
+        )
+
+    def test_status_intent_pending_f2f_returns_pending_location(self):
+        room = ChatRoom.objects.create(tutee=self.tutee_profile, tutor=self.tutor_profile)
+        booking = self.make_booking('Pending', session_mode='F2F')
+        context = get_current_booking_context(room)
+        self.assertIsNotNone(context)
+        self.assertEqual(context['status_intent'], 'pending_location')
+
+    def test_status_intent_pending_online_returns_pending(self):
+        room = ChatRoom.objects.create(tutee=self.tutee_profile, tutor=self.tutor_profile)
+        booking = self.make_booking('Pending', session_mode='Online')
+        context = get_current_booking_context(room)
+        self.assertIsNotNone(context)
+        self.assertEqual(context['status_intent'], 'pending')
+
+    def test_status_intent_confirmed_returns_confirmed(self):
+        from datetime import date
+        room = ChatRoom.objects.create(tutee=self.tutee_profile, tutor=self.tutor_profile)
+        self.make_booking('Confirmed', session_date=date(2026, 6, 10))
+        context = get_current_booking_context(room)
+        self.assertIsNotNone(context)
+        self.assertEqual(context['status_intent'], 'confirmed')
+
+    def test_status_intent_awaiting_payment_returns_awaiting_payment(self):
+        from datetime import date
+        room = ChatRoom.objects.create(tutee=self.tutee_profile, tutor=self.tutor_profile)
+        self.make_booking('Awaiting Payment Verification', session_date=date(2026, 6, 10))
+        context = get_current_booking_context(room)
+        self.assertIsNotNone(context)
+        self.assertEqual(context['status_intent'], 'awaiting_payment')
+
+    def test_status_intent_completed_unrated_returns_review_pending(self):
+        room = ChatRoom.objects.create(tutee=self.tutee_profile, tutor=self.tutor_profile)
+        self.make_booking('Completed', days_ago=1)
+        context = get_current_booking_context(room)
+        self.assertIsNotNone(context)
+        self.assertEqual(context['status_intent'], 'review_pending')
+
+    def test_status_intent_completed_rated_returns_none(self):
+        room = ChatRoom.objects.create(tutee=self.tutee_profile, tutor=self.tutor_profile)
+        booking = self.make_booking('Completed', days_ago=1)
+        Rating.objects.create(
+            booking=booking,
+            student=self.tutee_profile,
+            tutor=self.tutor,
+            rating_score=5,
+        )
+        context = get_current_booking_context(room)
+        self.assertIsNone(context)
+
+    def test_status_intent_rejected_recent_returns_rejected(self):
+        room = ChatRoom.objects.create(tutee=self.tutee_profile, tutor=self.tutor_profile)
+        self.make_booking('Rejected', days_ago=2)
+        context = get_current_booking_context(room)
+        self.assertIsNotNone(context)
+        self.assertEqual(context['status_intent'], 'rejected')
+
+    def test_status_intent_cancelled_recent_returns_cancelled(self):
+        room = ChatRoom.objects.create(tutee=self.tutee_profile, tutor=self.tutor_profile)
+        self.make_booking('Cancelled', days_ago=3)
+        context = get_current_booking_context(room)
+        self.assertIsNotNone(context)
+        self.assertEqual(context['status_intent'], 'cancelled')
+
+    def test_status_intent_terminal_older_than_7_days_returns_none(self):
+        room = ChatRoom.objects.create(tutee=self.tutee_profile, tutor=self.tutor_profile)
+        self.make_booking('Rejected', days_ago=8)
+        context = get_current_booking_context(room)
+        self.assertIsNone(context)
 
     def test_room_read_endpoint_marks_other_user_messages_read(self):
         room = ChatRoom.objects.create(tutee=self.tutee_profile, tutor=self.tutor_profile)

@@ -162,6 +162,7 @@ def serialize_booking_context(booking):
 
 def get_current_booking_context(room):
     current_date = timezone.localdate()
+
     booking = (
         Booking.objects
         .filter(
@@ -175,10 +176,69 @@ def get_current_booking_context(room):
         .first()
     )
 
-    if not booking:
-        return None
+    if booking:
+        context = serialize_booking_context(booking)
 
-    return serialize_booking_context(booking)
+        if context is None:
+            return None
+
+        if booking.status == 'Pending':
+            context['status_intent'] = (
+                'pending_location' if booking.session_mode == 'F2F' else 'pending'
+            )
+        elif booking.status == 'Confirmed':
+            context['status_intent'] = 'confirmed'
+        else:
+            context['status_intent'] = 'awaiting_payment'
+
+        return context
+
+    completed = (
+        Booking.objects
+        .filter(
+            student=room.tutee,
+            tutor__profile=room.tutor,
+            status='Completed',
+        )
+        .exclude(rating__isnull=False)
+        .select_related('availability', 'student', 'tutor__profile__course')
+        .order_by('-session_date', '-availability__time_slot', '-id')
+        .first()
+    )
+
+    if completed:
+        context = serialize_booking_context(completed)
+
+        if context is None:
+            return None
+
+        context['status_intent'] = 'review_pending'
+        return context
+
+    week_ago = current_date - timedelta(days=7)
+    terminal = (
+        Booking.objects
+        .filter(
+            student=room.tutee,
+            tutor__profile=room.tutor,
+            status__in=['Rejected', 'Cancelled'],
+            session_date__gte=week_ago,
+        )
+        .select_related('availability', 'student', 'tutor__profile__course')
+        .order_by('-session_date', '-availability__time_slot', '-id')
+        .first()
+    )
+
+    if terminal:
+        context = serialize_booking_context(terminal)
+
+        if context is None:
+            return None
+
+        context['status_intent'] = terminal.status.lower()
+        return context
+
+    return None
 
 
 def serialize_message_payload(message, user=None):

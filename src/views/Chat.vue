@@ -64,60 +64,74 @@
               </div>
             </header>
 
-            <div class="message-list" ref="messageList">
-              <BookingCard
-                v-if="chatStore.currentRoom.current_booking"
-                :booking="chatStore.currentRoom.current_booking"
-                :is-tutor="isTutor"
-                @location-saved="handleLocationSaved"
-              />
+            <ChatBanner
+              v-if="chatStore.currentRoom.current_booking"
+              :banner-context="chatStore.currentRoom.current_booking"
+              :is-tutor="isTutor"
+              @location-saved="handleLocationSaved"
+              @rate="openRatingModal"
+            />
 
+            <div class="message-list" ref="messageList">
               <TransitionGroup :name="historyLoaded ? 'msg' : ''" tag="div" class="messages-group">
                 <div
-                  v-for="msg in chatStore.messages"
-                  :key="msg.id"
-                  class="message-wrapper"
-                  :class="{
-                    'is-me': msg.is_me,
-                    'is-system': msg.message_type !== 'text',
-                    'is-pending': msg.status === 'pending' || msg.pending === true,
-                  }"
+                  v-for="item in groupedMessages"
+                  :key="item.type === 'date-separator' ? item.key : item.id"
+                  :class="
+                    item.type === 'date-separator'
+                      ? 'date-separator-row'
+                      : [
+                          'message-wrapper',
+                          {
+                            'is-me': item.is_me,
+                            'is-system': item.message_type !== 'text',
+                            'is-pending': item.status === 'pending' || item.pending === true,
+                          },
+                        ]
+                  "
                 >
-                  <div v-if="!msg.is_me && msg.message_type === 'text'" class="message-sender">
-                    {{ msg.sender_name }}
-                  </div>
+                  <template v-if="item.type === 'date-separator'">
+                    <span class="date-separator-label">{{ item.label }}</span>
+                  </template>
 
-                  <div v-if="msg.message_type === 'booking_event'" class="system-event">
-                    <i class="bi bi-calendar-check"></i>
-                    <div>
-                      <strong>{{ msg.content }}</strong>
-                      <BookingCard
-                        v-if="msg.metadata?.booking"
-                        :booking="msg.metadata.booking"
-                        :is-tutor="isTutor"
-                        compact
-                        @location-saved="handleLocationSaved"
-                      />
+                  <template v-else>
+                    <div v-if="item.message_type === 'booking_event'" class="system-event">
+                      <i class="bi bi-calendar-check"></i>
+                      <div>
+                        <strong>{{ item.content }}</strong>
+                        <BookingCard
+                          v-if="item.metadata?.booking"
+                          :booking="item.metadata.booking"
+                          :is-tutor="isTutor"
+                          compact
+                          @location-saved="handleLocationSaved"
+                        />
+                      </div>
                     </div>
-                  </div>
 
-                  <div v-else class="message-bubble">
-                    <div class="message-content">{{ msg.content }}</div>
-                    <div class="message-meta">
-                      <span>{{ formatTime(msg.created_at) }}</span>
-                      <span v-if="msg.pending" class="send-status">
-                        <span class="send-indicator-dot" aria-hidden="true"></span>
-                        Sending
-                      </span>
-                      <span
-                        v-else-if="msg.is_me && msg.is_read"
-                        :class="{ 'sb-pop-active': poppingMessages.has(msg.id) }"
-                      >
-                        Read
-                      </span>
-                      <span v-else-if="msg.is_me">Sent</span>
-                    </div>
-                  </div>
+                    <template v-else>
+                      <div v-if="!item.is_me" class="message-avatar-sm">
+                        {{ getInitials(item.sender_name) }}
+                      </div>
+                      <div class="message-bubble-col">
+                        <div
+                          class="message-bubble"
+                          :class="{ 'sb-pop-active': poppingMessages.has(item.id) }"
+                        >
+                          <div class="message-content">{{ item.content }}</div>
+                          <div class="message-meta">
+                            <span>{{ formatTime(item.created_at) }}</span>
+                            <span v-if="item.pending" class="send-status">
+                              <span class="send-indicator-dot" aria-hidden="true"></span>
+                              Sending
+                            </span>
+                            <span v-else-if="item.is_me && item.is_read">Read</span>
+                            <span v-else-if="item.is_me">Sent</span>
+                          </div>
+                        </div>
+                      </div>
+                    </template>
+                  </template>
                 </div>
               </TransitionGroup>
 
@@ -150,6 +164,13 @@
         </div>
       </Transition>
     </section>
+
+    <RatingStackModal
+      :open="ratingModalOpen"
+      :sessions="sessionsStore.unratedCompletedSessions"
+      @close="ratingModalOpen = false"
+      @rated="ratingModalOpen = sessionsStore.unratedCompletedSessions.length > 0"
+    />
   </div>
 </template>
 
@@ -158,6 +179,9 @@ import { computed, defineComponent, h, nextTick, onMounted, onUnmounted, reactiv
 import { RouterLink, useRoute } from 'vue-router'
 import { useChatStore } from '@/stores/chat'
 import { useAuthStore } from '@/stores/auth'
+import { useSessionsStore } from '@/stores/completedSessions'
+import ChatBanner from '@/components/ChatBanner.vue'
+import RatingStackModal from '@/components/RatingStackModal.vue'
 
 const BookingCard = defineComponent({
   props: {
@@ -272,9 +296,11 @@ const BookingCard = defineComponent({
 
 const chatStore = useChatStore()
 const authStore = useAuthStore()
+const sessionsStore = useSessionsStore()
 const route = useRoute()
 const newMessage = ref('')
 const messageList = ref(null)
+const ratingModalOpen = ref(false)
 const composerShaking = ref(false)
 const historyLoaded = ref(false)
 const poppingMessages = reactive(new Set())
@@ -284,6 +310,15 @@ const isTutor = computed(() => {
   const role = authStore.user?.role || localStorage.getItem('user_role')
   return String(role || '').toLowerCase() === 'tutor'
 })
+
+async function openRatingModal() {
+  if (!sessionsStore.sessions.length) {
+    await sessionsStore.fetchSessions()
+  }
+
+  ratingModalOpen.value = true
+}
+
 const typingLabel = computed(() => {
   const names = chatStore.activeTypingUsers.map((user) => user.name).filter(Boolean)
   return `${names[0] || 'They'} ${names.length > 1 ? 'are' : 'is'} typing...`
@@ -340,6 +375,55 @@ const formatTime = (timestamp) => {
   }
 
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+}
+
+function getDateLabel(timestamp) {
+  const date = new Date(timestamp)
+
+  if (Number.isNaN(date.getTime())) {
+    return ''
+  }
+
+  const today = new Date()
+  const yesterday = new Date(today)
+  yesterday.setDate(yesterday.getDate() - 1)
+
+  if (date.toDateString() === today.toDateString()) return 'TODAY'
+  if (date.toDateString() === yesterday.toDateString()) return 'YESTERDAY'
+
+  return date.toLocaleDateString('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  })
+}
+
+const groupedMessages = computed(() => {
+  const result = []
+  let lastLabel = null
+
+  for (const msg of chatStore.messages) {
+    const label = getDateLabel(msg.created_at)
+
+    if (label && label !== lastLabel) {
+      result.push({ type: 'date-separator', label, key: `sep-${label}` })
+      lastLabel = label
+    }
+
+    result.push(msg)
+  }
+
+  return result
+})
+
+function getInitials(name) {
+  return String(name || '')
+    .split(' ')
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase()
 }
 
 watch(() => chatStore.messages.length, scrollToBottom)
@@ -659,12 +743,15 @@ onUnmounted(() => {
 
 .message-wrapper {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  gap: 8px;
   max-width: 72%;
   align-self: flex-start;
+  align-items: flex-end;
 }
 
 .message-wrapper.is-me {
+  flex-direction: column;
   align-self: flex-end;
   align-items: flex-end;
 }
@@ -691,10 +778,44 @@ onUnmounted(() => {
   border-radius: 50%;
 }
 
-.message-sender {
-  color: #6c757d;
-  font-size: 12px;
-  margin: 0 0 3px 4px;
+.date-separator-row {
+  display: flex;
+  align-items: center;
+  align-self: stretch;
+  justify-content: center;
+  margin: 8px 0;
+  max-width: 100%;
+}
+
+.date-separator-label {
+  background: #fcfdfc;
+  color: #7f8a92;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 0 12px;
+  text-transform: uppercase;
+}
+
+.message-avatar-sm {
+  align-self: flex-end;
+  background: var(--sb-primary, #00895a);
+  border-radius: 50%;
+  color: #ffffff;
+  display: inline-flex;
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 800;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+}
+
+.message-bubble-col {
+  display: flex;
+  flex-direction: column;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .message-bubble {
