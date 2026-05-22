@@ -101,7 +101,12 @@
                     <span class="send-indicator-dot" aria-hidden="true"></span>
                     Sending
                   </span>
-                  <span v-else-if="msg.is_me && msg.is_read">Read</span>
+                  <span
+                    v-else-if="msg.is_me && msg.is_read"
+                    :class="{ 'sb-pop-active': poppingMessages.has(msg.id) }"
+                  >
+                    Read
+                  </span>
                   <span v-else-if="msg.is_me">Sent</span>
                 </div>
               </div>
@@ -139,7 +144,7 @@
 </template>
 
 <script setup>
-import { computed, defineComponent, h, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, defineComponent, h, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { useChatStore } from '@/stores/chat'
 import { useAuthStore } from '@/stores/auth'
@@ -262,6 +267,7 @@ const newMessage = ref('')
 const messageList = ref(null)
 const composerShaking = ref(false)
 const historyLoaded = ref(false)
+const poppingMessages = reactive(new Set())
 
 const isTutor = computed(() => {
   const role = authStore.user?.role || localStorage.getItem('user_role')
@@ -342,6 +348,22 @@ watch(
         historyLoaded.value = true
       })
     }
+  },
+)
+
+watch(
+  () => chatStore.messages.map((message) => message.is_read),
+  (newVals, oldVals) => {
+    if (!oldVals) return
+
+    newVals.forEach((isRead, index) => {
+      const msg = chatStore.messages[index]
+
+      if (isRead && oldVals[index] === false && msg?.id) {
+        poppingMessages.add(msg.id)
+        setTimeout(() => poppingMessages.delete(msg.id), 600)
+      }
+    })
   },
 )
 
@@ -644,6 +666,11 @@ onUnmounted(() => {
   width: 6px;
   height: 6px;
   background: currentColor;
+  display: inline-block;
+}
+
+.sb-pop-active {
+  animation: sb-pop 300ms var(--sb-spring-fast) both;
   display: inline-block;
 }
 
