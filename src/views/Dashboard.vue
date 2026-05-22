@@ -225,32 +225,6 @@ const getSessionDateKey = (session) => {
   return getDateKey(parsedDate)
 }
 
-const hasVisibleWeekSessions = () => {
-  const startKey = getDateKey(visibleStartOfWeek.value)
-  const endKey = getDateKey(visibleEndOfWeek.value)
-
-  return (sessionsStore.sessions || []).some((session) => {
-    const normalizedStatus = String(session?.status || '').toLowerCase()
-    const sessionDateKey = getSessionDateKey(session)
-
-    return (
-      sessionDateKey >= startKey
-      && sessionDateKey <= endKey
-      && !['cancelled', 'rejected'].includes(normalizedStatus)
-    )
-  })
-}
-
-const ensureWeekContainsSessions = () => {
-  if (nextSessionWeekOffset.value === null) {
-    return
-  }
-
-  if (!hasVisibleWeekSessions()) {
-    weekOffset.value = nextSessionWeekOffset.value
-  }
-}
-
 const refreshDashboard = async () => {
   loading.value = true
 
@@ -260,8 +234,6 @@ const refreshDashboard = async () => {
   ])
 
   loading.value = false
-
-  ensureWeekContainsSessions()
 }
 
 onMounted(refreshDashboard)
@@ -270,13 +242,6 @@ watch(
   () => route.query.refresh,
   () => {
     refreshDashboard()
-  }
-)
-
-watch(
-  () => sessionsStore.sessions,
-  () => {
-    ensureWeekContainsSessions()
   }
 )
 
@@ -300,10 +265,6 @@ const addDays = (date, days) => {
   const next = new Date(date)
   next.setDate(next.getDate() + days)
   return next
-}
-
-const getEndOfMonth = (date) => {
-  return new Date(date.getFullYear(), date.getMonth() + 1, 0)
 }
 
 const getDateKey = (date) => `${date.getFullYear()}-${padNumber(date.getMonth() + 1)}-${padNumber(date.getDate())}`

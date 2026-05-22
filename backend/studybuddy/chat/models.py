@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+from django.utils import timezone
 from studybuddy.models import Booking, UserProfile
 
 class ChatRoom(models.Model):
@@ -12,6 +13,7 @@ class ChatRoom(models.Model):
     booking = models.OneToOneField(Booking, on_delete=models.CASCADE, related_name='chat_room', null=True, blank=True)
     
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(default=timezone.now)
 
     class Meta:
         constraints = [
@@ -29,11 +31,20 @@ class ChatRoom(models.Model):
         return f"Inquiry Chat: {self.tutee.fname} & {self.tutor.fname}"
 
 class Message(models.Model):
+    MESSAGE_TYPES = [
+        ('text', 'Text'),
+        ('system', 'System'),
+        ('booking_event', 'Booking event'),
+    ]
+
     room = models.ForeignKey(ChatRoom, on_delete=models.CASCADE, related_name='messages')
     sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='sent_messages')
     content = models.TextField()
+    message_type = models.CharField(max_length=20, choices=MESSAGE_TYPES, default='text')
+    metadata = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     is_read = models.BooleanField(default=False)
+    read_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ['created_at']

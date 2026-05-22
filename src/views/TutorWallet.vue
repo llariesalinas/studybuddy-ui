@@ -88,7 +88,7 @@
                 <!-- Session info -->
                 <div class="tx-info">
                   <div class="fw-semibold text-dark">{{ tx.description }}</div>
-                  <span :class="getTypeBadgeClass(tx.transaction_type)" class="mt-1 d-inline-block">
+                  <span :class="getTypeBadgeClass(tx.transaction_type)" class="tx-type-badge mt-1">
                     {{ formatType(tx.transaction_type) }}
                   </span>
                   <div v-if="tx.reference_id" class="text-muted mt-1" style="font-size:11px;">
@@ -450,6 +450,18 @@ watch([showWithdrawModal, balanceValue], () => {
   flex-direction: column;
   justify-content: center;
   min-width: 0;
+}
+
+.tx-type-badge {
+  align-self: flex-start;
+  width: auto;
+  max-width: 100%;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: left;
+  white-space: normal;
 }
 
 .tx-breakdown-wrapper {

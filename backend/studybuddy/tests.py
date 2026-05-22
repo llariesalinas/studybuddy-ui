@@ -1,4 +1,5 @@
 from datetime import date, time
+from uuid import uuid4
 
 from django.contrib.auth.models import User
 from rest_framework.test import APITestCase
@@ -12,6 +13,7 @@ from .models import (
     TutorSubjects,
     UserProfile,
 )
+from .chat.models import ChatRoom, Message
 
 
 class RecommendTutorsViewTests(APITestCase):
@@ -179,3 +181,90 @@ class RecommendTutorsViewTests(APITestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(self.response_ids(response), {tutor.profile_id})
+
+
+class ChatFeatureTests(APITestCase):
+    def setUp(self):
+        self.tutee_user = User.objects.create_user(
+            username="chat-tutee",
+            email="chat-tutee@example.com",
+            password="password",
+        )
+        self.tutee_profile = UserProfile.objects.create(
+            user=self.tutee_user,
+            fname="Chat",
+            mname="",
+            lname="Tutee",
+            role="Tutee",
+        )
+        self.tutor_user = User.objects.create_user(
+            username="chat-tutor",
+            email="chat-tutor@example.com",
+            password="password",
+        )
+        self.tutor_profile = UserProfile.objects.create(
+            user=self.tutor_user,
+            fname="Chat",
+            mname="",
+            lname="Tutor",
+            role="Tutor",
+        )
+        self.tutor = Tutor.objects.create(
+            profile=self.tutor_profile,
+            hourly_rate=250,
+            can_online=True,
+            can_f2f=True,
+            teaching_level="SHS",
+        )
+        self.availability = TutorAvailability.objects.create(
+            tutor=self.tutor,
+            day="Mon",
+            time_slot=time(14, 0),
+            is_active=True,
+        )
+        self.booking_request_id = uuid4()
+        self.booking = Booking.objects.create(
+            student=self.tutee_profile,
+            tutor=self.tutor,
+            availability=self.availability,
+            session_date=date(2026, 5, 18),
+            session_mode="F2F",
+            preferred_location="Library",
+            booking_request_id=self.booking_request_id,
+            status="Pending",
+        )
+
+    def test_room_read_endpoint_marks_other_user_messages_read(self):
+        room = ChatRoom.objects.create(tutee=self.tutee_profile, tutor=self.tutor_profile)
+        message = Message.objects.create(
+            room=room,
+            sender=self.tutor_user,
+            content="Please confirm the location.",
+        )
+        self.client.force_authenticate(user=self.tutee_user)
+
+        response = self.client.post(f"/api/chat/rooms/{room.id}/read/")
+
+        message.refresh_from_db()
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(message.is_read)
+        self.assertIsNotNone(message.read_at)
+
+    def test_pending_location_update_posts_booking_event_to_canonical_room(self):
+        self.client.force_authenticate(user=self.tutor_user)
+
+        response = self.client.patch(
+            f"/api/bookings/{self.booking_request_id}/location/",
+            {"preferred_location": "Study Hall 2"},
+            format="json",
+        )
+
+        self.booking.refresh_from_db()
+        room = ChatRoom.objects.get(tutee=self.tutee_profile, tutor=self.tutor_profile)
+        message = room.messages.latest("created_at")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.booking.preferred_location, "Study Hall 2")
+        self.assertEqual(message.message_type, "booking_event")
+        self.assertEqual(message.metadata["event_type"], "location_updated")
+        self.assertEqual(message.metadata["booking"]["preferred_location"], "Study Hall 2")

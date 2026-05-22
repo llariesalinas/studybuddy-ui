@@ -37,6 +37,7 @@ from .serializers import (
     TutorProfileUpdateSerializer,
     TutorSearchSerializer,
 )
+from .chat.services import create_booking_event
 
 from .models import (
     UserProfile,
@@ -1384,6 +1385,14 @@ def confirm_payment_and_book(request):
             request_bookings
         )
 
+    if request_bookings:
+        create_booking_event(
+            request_bookings[0],
+            request.user,
+            "New booking request sent.",
+            "booking_requested"
+        )
+
     return Response({
         "message": "Booking successful",
         "booking_ids": created_bookings
@@ -1658,6 +1667,14 @@ def approve_booking(request, booking_id):
         session_group_bookings
     )
 
+    booking.refresh_from_db()
+    create_booking_event(
+        booking,
+        request.user,
+        "Booking request approved.",
+        "booking_approved"
+    )
+
     return Response({"message": "Booking confirmed successfully."})
 
 #Reject booking
@@ -1684,6 +1701,14 @@ def reject_booking(request, booking_id):
         booking.student,
         "rejected",
         session_group_bookings
+    )
+
+    booking.refresh_from_db()
+    create_booking_event(
+        booking,
+        request.user,
+        "Booking request rejected.",
+        "booking_rejected"
     )
 
     return Response({"message": "Booking rejected successfully."})
@@ -2568,14 +2593,26 @@ def update_booking_location(request, booking_request_id):
     if not new_location:
         return Response({"error": "Location cannot be empty for Face-to-Face sessions."}, status=400)
 
-    updated = Booking.objects.filter(
+    pending_bookings = Booking.objects.filter(
         booking_request_id=booking_request_id,
         tutor=tutor,
         status="Pending"
-    ).update(preferred_location=new_location)
+    )
+
+    booking = pending_bookings.select_related('student', 'tutor__profile', 'availability').first()
+    updated = pending_bookings.update(preferred_location=new_location)
 
     if not updated:
         return Response({"error": "No matching pending bookings found."}, status=404)
+
+    if booking:
+        booking.preferred_location = new_location
+        create_booking_event(
+            booking,
+            request.user,
+            f"Face-to-face location updated to {new_location}.",
+            "location_updated"
+        )
 
     return Response({"message": "Location updated."})
 
