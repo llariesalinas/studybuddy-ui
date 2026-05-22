@@ -24,7 +24,13 @@
           <span class="room-info">
             <span class="room-title-row">
               <span class="room-name">{{ chatStore.getRoomPartnerName(room) }}</span>
-              <span v-if="room.unread_count" class="unread-badge">{{ room.unread_count }}</span>
+              <span
+                v-if="room.unread_count"
+                class="unread-badge"
+                :class="{ 'pulse-once': pulsingRooms.has(room.id) }"
+              >
+                {{ room.unread_count }}
+              </span>
             </span>
             <span class="last-message">
               {{ formatLastMessage(room.last_message) }}
@@ -272,6 +278,7 @@ const messageList = ref(null)
 const composerShaking = ref(false)
 const historyLoaded = ref(false)
 const poppingMessages = reactive(new Set())
+const pulsingRooms = reactive(new Set())
 
 const isTutor = computed(() => {
   const role = authStore.user?.role || localStorage.getItem('user_role')
@@ -369,6 +376,28 @@ watch(
       }
     })
   },
+)
+
+watch(
+  () => chatStore.sortedRooms.map((room) => ({
+    id: room.id,
+    unread: Number(room.unread_count || 0),
+  })),
+  (newVals, oldVals) => {
+    if (!oldVals) return
+
+    const previousUnreadByRoom = new Map(oldVals.map((room) => [room.id, room.unread]))
+
+    newVals.forEach((room) => {
+      const previousUnread = previousUnreadByRoom.get(room.id)
+
+      if (previousUnread !== undefined && room.unread > previousUnread) {
+        pulsingRooms.add(room.id)
+        setTimeout(() => pulsingRooms.delete(room.id), 600)
+      }
+    })
+  },
+  { deep: true },
 )
 
 watch(
@@ -562,6 +591,11 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+
+.pulse-once {
+  animation: sb-pulse-dot 600ms ease forwards;
+  border-radius: 50%;
 }
 
 .chat-main {
