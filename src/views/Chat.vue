@@ -64,43 +64,49 @@
             @location-saved="handleLocationSaved"
           />
 
-          <div
-            v-for="msg in chatStore.messages"
-            :key="msg.id"
-            class="message-wrapper"
-            :class="{
-              'is-me': msg.is_me,
-              'is-system': msg.message_type !== 'text',
-            }"
-          >
-            <div v-if="!msg.is_me && msg.message_type === 'text'" class="message-sender">
-              {{ msg.sender_name }}
-            </div>
+          <TransitionGroup :name="historyLoaded ? 'msg' : ''" tag="div" class="messages-group">
+            <div
+              v-for="msg in chatStore.messages"
+              :key="msg.id"
+              class="message-wrapper"
+              :class="{
+                'is-me': msg.is_me,
+                'is-system': msg.message_type !== 'text',
+                'is-pending': msg.status === 'pending' || msg.pending === true,
+              }"
+            >
+              <div v-if="!msg.is_me && msg.message_type === 'text'" class="message-sender">
+                {{ msg.sender_name }}
+              </div>
 
-            <div v-if="msg.message_type === 'booking_event'" class="system-event">
-              <i class="bi bi-calendar-check"></i>
-              <div>
-                <strong>{{ msg.content }}</strong>
-                <BookingCard
-                  v-if="msg.metadata?.booking"
-                  :booking="msg.metadata.booking"
-                  :is-tutor="isTutor"
-                  compact
-                  @location-saved="handleLocationSaved"
-                />
+              <div v-if="msg.message_type === 'booking_event'" class="system-event">
+                <i class="bi bi-calendar-check"></i>
+                <div>
+                  <strong>{{ msg.content }}</strong>
+                  <BookingCard
+                    v-if="msg.metadata?.booking"
+                    :booking="msg.metadata.booking"
+                    :is-tutor="isTutor"
+                    compact
+                    @location-saved="handleLocationSaved"
+                  />
+                </div>
+              </div>
+
+              <div v-else class="message-bubble">
+                <div class="message-content">{{ msg.content }}</div>
+                <div class="message-meta">
+                  <span>{{ formatTime(msg.created_at) }}</span>
+                  <span v-if="msg.pending" class="send-status">
+                    <span class="send-indicator-dot" aria-hidden="true"></span>
+                    Sending
+                  </span>
+                  <span v-else-if="msg.is_me && msg.is_read">Read</span>
+                  <span v-else-if="msg.is_me">Sent</span>
+                </div>
               </div>
             </div>
-
-            <div v-else class="message-bubble">
-              <div class="message-content">{{ msg.content }}</div>
-              <div class="message-meta">
-                <span>{{ formatTime(msg.created_at) }}</span>
-                <span v-if="msg.pending">Sending</span>
-                <span v-else-if="msg.is_me && msg.is_read">Read</span>
-                <span v-else-if="msg.is_me">Sent</span>
-              </div>
-            </div>
-          </div>
+          </TransitionGroup>
 
           <div v-if="chatStore.activeTypingUsers.length" class="typing-indicator">
             {{ typingLabel }}
@@ -255,6 +261,7 @@ const route = useRoute()
 const newMessage = ref('')
 const messageList = ref(null)
 const composerShaking = ref(false)
+const historyLoaded = ref(false)
 
 const isTutor = computed(() => {
   const role = authStore.user?.role || localStorage.getItem('user_role')
@@ -319,6 +326,24 @@ const formatTime = (timestamp) => {
 }
 
 watch(() => chatStore.messages.length, scrollToBottom)
+
+watch(
+  () => chatStore.currentRoom?.id,
+  () => {
+    historyLoaded.value = false
+  },
+)
+
+watch(
+  () => chatStore.messages.length,
+  (len) => {
+    if (len > 0 && !historyLoaded.value) {
+      nextTick(() => {
+        historyLoaded.value = true
+      })
+    }
+  },
+)
 
 watch(
   () => route.query.room,
@@ -558,6 +583,23 @@ onUnmounted(() => {
   align-self: stretch;
 }
 
+.msg-enter-active {
+  animation: sb-bubble-in var(--sb-t-normal) var(--sb-spring) both;
+}
+
+.messages-group {
+  display: contents;
+}
+
+.is-pending .message-bubble {
+  opacity: 0.55;
+}
+
+.is-pending .send-indicator-dot {
+  animation: sb-pulse-dot 1s ease infinite;
+  border-radius: 50%;
+}
+
 .message-sender {
   color: #6c757d;
   font-size: 12px;
@@ -590,6 +632,19 @@ onUnmounted(() => {
   margin-top: 5px;
   font-size: 11px;
   opacity: 0.75;
+}
+
+.send-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.send-indicator-dot {
+  width: 6px;
+  height: 6px;
+  background: currentColor;
+  display: inline-block;
 }
 
 .system-event {
