@@ -96,7 +96,11 @@
       </div>
     </div>
 
-    <main class="app-main flex-grow-1 overflow-auto p-5 position-relative" style="background-color: var(--sb-bg);">
+    <main
+      class="app-main flex-grow-1 overflow-auto p-5 position-relative"
+      :class="{ 'app-main-chat': route.name === 'chat' }"
+      style="background-color: var(--sb-bg);"
+    >
         <header class="app-page-header d-flex justify-content-between align-items-center mb-3 pb-3 border-bottom border-sb">
           
           <div v-if="route.path === '/dashboard'">
@@ -192,6 +196,21 @@
                 <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
                 </svg>
+                <span
+                  v-if="chatStore.totalUnread"
+                  class="chat-unread-count"
+                  :aria-label="`${chatStore.totalUnread} unread chat message${chatStore.totalUnread === 1 ? '' : 's'}`"
+                >
+                  {{ chatStore.totalUnread > 9 ? '9+' : chatStore.totalUnread }}
+                </span>
+              </router-link>
+              <router-link
+                v-if="chatStore.recentPopup && route.name !== 'chat'"
+                :to="{ name: 'chat', query: { room: chatStore.recentPopup.roomId } }"
+                class="chat-toast"
+              >
+                <strong>{{ chatStore.recentPopup.partnerName }}</strong>
+                <span>{{ chatStore.recentPopup.content }}</span>
               </router-link>
               <NotificationBell />
             </div>
@@ -211,12 +230,14 @@ import { useSessionsStore } from '@/stores/completedSessions'
 import NotificationBell from '@/components/NotificationBell.vue'
 import RatingReminderBanner from '@/components/RatingReminderBanner.vue'
 import { useNotificationsStore } from '@/stores/notifications'
+import { useChatStore } from '@/stores/chat'
 import router from './router'
 import * as bootstrap from 'bootstrap'
 
 const route = useRoute()
 const authStore = useAuthStore()
 const notificationsStore = useNotificationsStore()
+const chatStore = useChatStore()
 const sessionStore = useSessionsStore()
 const logoutModalRef = ref(null)
 let pendingSessionsRefreshId = null
@@ -239,39 +260,10 @@ const closeLogoutModal = () => {
 
 const logout = async () => {
   closeLogoutModal()
+  chatStore.disconnectAll()
   authStore.logout()
   await router.push('/login')
 }
-
-const hideSessionButton = computed(() => {
-  const hiddenPages = [
-    'book',
-    'tutors',
-    'tutor-details',
-    'payment',
-    'tch-dashboard',
-    'tutorpreferencesetup',
-    'tch-availability',
-    'tch-availability',
-    'tch-payments',
-    'tch-requestedSessions',
-    'booking-details'
-  ]
-  return !hiddenPages.includes(route.name)
-})
-
-const hideReqSessionsButton = computed(() => {
-  const hiddenPages = [
-    'book',
-    'tutors',
-    'tutor-details',
-    'paymentTutee',
-    'preferencesetup',
-    'dashboard',
-    'tch-requestedSessions'
-  ]
-  return !hiddenPages.includes(route.name)
-})
 
 const isPublicRoute = computed(() => {
   return ['home', 'login', 'register', 'preferencesetup', 'tutorpreferencesetup'].includes(route.name)
@@ -297,6 +289,8 @@ const handleVisibilityChange = async () => {
 onMounted(() => {
   if (authStore.isAuthenticated) {
     notificationsStore.fetchNotifications()
+    chatStore.fetchRooms()
+    chatStore.connectUpdates()
     if (userRole.value === 'tutor') {
       sessionStore.fetchSessions()
       document.addEventListener('visibilitychange', handleVisibilityChange)
@@ -314,6 +308,8 @@ onBeforeUnmount(() => {
   if (pendingSessionsRefreshId) {
     window.clearInterval(pendingSessionsRefreshId)
   }
+
+  chatStore.disconnectAll()
 })
 </script>
 
@@ -329,6 +325,10 @@ onBeforeUnmount(() => {
   --sb-bell-size: 52px;
   --sb-bell-gap: 1.5rem;
   --sb-main-padding: 3rem;
+  --sb-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  --sb-spring-fast: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --sb-t-quick: 120ms;
+  --sb-t-normal: 250ms;
 }
 
 body {
@@ -402,6 +402,12 @@ body {
   min-width: 0;
 }
 
+.app-main-chat {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
 .app-page-header {
   min-height: var(--sb-topbar-height);
 }
@@ -418,11 +424,148 @@ body {
   color: #495057;
   text-decoration: none;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
+  position: relative;
 }
 .chat-icon-btn:hover,
 .chat-icon-btn.router-link-active {
   background: var(--sb-primary);
   color: #fff;
   border-color: var(--sb-primary);
+}
+
+.chat-unread-count {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #dc3545;
+  color: #ffffff;
+  border: 2px solid #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 16px;
+  text-align: center;
+}
+
+.chat-toast {
+  position: absolute;
+  top: calc(var(--sb-topbar-height) + 12px);
+  right: calc(var(--sb-bell-size) + var(--sb-bell-gap) + 70px);
+  z-index: 20;
+  width: min(320px, calc(100vw - 48px));
+  background: #ffffff;
+  border: 1px solid var(--sb-card-border);
+  border-radius: 8px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
+  padding: 12px 14px;
+  color: #163127;
+  text-decoration: none;
+}
+
+.chat-toast strong,
+.chat-toast span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-toast strong {
+  font-size: 13px;
+}
+
+.chat-toast span {
+  margin-top: 3px;
+  color: #6c757d;
+  font-size: 12px;
+}
+
+/* --- Button Haptics Utility --- */
+.sb-btn {
+  transition: transform var(--sb-t-quick) var(--sb-spring-fast),
+              box-shadow var(--sb-t-quick) var(--sb-spring-fast),
+              background-color var(--sb-t-quick) var(--sb-spring-fast);
+  cursor: pointer;
+}
+.sb-btn:hover:not(:disabled) {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+}
+.sb-btn:active:not(:disabled) {
+  transform: scale(0.96) translateY(0);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  transition-duration: 60ms;
+}
+.sb-btn:disabled,
+.sb-btn[disabled] {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* --- Interactive Card/Item Haptics Utility --- */
+.sb-interactive {
+  transition: transform var(--sb-t-normal) var(--sb-spring),
+              box-shadow var(--sb-t-normal) var(--sb-spring),
+              border-color var(--sb-t-normal) var(--sb-spring),
+              background-color var(--sb-t-normal) var(--sb-spring);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+.sb-interactive:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+  background-color: rgba(255, 255, 255, 0.08);
+  border-bottom-color: var(--sb-primary);
+}
+.sb-interactive:active {
+  transform: scale(0.98) translateY(0);
+  transition-duration: 60ms;
+}
+
+/* --- Animation Keyframes --- */
+@keyframes sb-bubble-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes sb-pulse-dot {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(0, 137, 90, 0.6);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(0, 137, 90, 0);
+  }
+}
+
+@keyframes sb-pop {
+  0% {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.3);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes sb-shake {
+  0%, 100% { transform: translateX(0); }
+  20%       { transform: translateX(-5px); }
+  40%       { transform: translateX(5px); }
+  60%       { transform: translateX(-5px); }
+  80%       { transform: translateX(5px); }
 }
 </style>
