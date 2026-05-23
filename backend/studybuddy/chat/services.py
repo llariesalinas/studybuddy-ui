@@ -5,7 +5,7 @@ from channels.layers import get_channel_layer
 from django.db.models import Q
 from django.utils import timezone
 
-from studybuddy.models import Booking, Tutor, UserProfile
+from studybuddy.models import Booking, Tutor, TutorSubjects, UserProfile
 
 from .models import ChatRoom, Message
 
@@ -241,6 +241,69 @@ def get_current_booking_context(room):
     return None
 
 
+def get_completed_session_key(booking):
+    return str(booking.session_group_id or booking.booking_request_id or booking.id)
+
+
+def get_partner_context(room, user=None):
+    tutor = Tutor.objects.filter(profile=room.tutor).select_related('profile__course').first()
+    completed_bookings = list(
+        Booking.objects
+        .filter(
+            student=room.tutee,
+            tutor=tutor,
+            status='Completed',
+        )
+        .select_related('availability', 'tutor__profile__course')
+        .order_by('session_date', 'availability__time_slot', 'id')
+    ) if tutor else []
+    session_keys = {get_completed_session_key(booking) for booking in completed_bookings}
+    topics = []
+
+    if tutor:
+        topics = list(
+            TutorSubjects.objects
+            .filter(tutor=tutor)
+            .select_related('subject')
+            .order_by('subject__subject_name')
+            .values_list('subject__subject_name', flat=True)
+            .distinct()
+        )
+
+    if not topics:
+        current_booking = get_current_booking_context(room)
+        if current_booking and current_booking.get('subject') != 'General':
+            topics = [current_booking['subject']]
+
+    partner = room.tutor
+    if user and user.is_authenticated:
+        try:
+            user_profile = user.userprofile
+            if user_profile.id == room.tutor_id:
+                partner = room.tutee
+        except Exception:
+            partner = room.tutor
+
+    subtitle_parts = []
+    if partner.role:
+        subtitle_parts.append(partner.role)
+    if partner.course:
+        subtitle_parts.append(partner.course.course_name)
+    elif partner.year_level:
+        subtitle_parts.append(f'Year {partner.year_level}')
+
+    return {
+        'partner_name': full_name(partner),
+        'partner_initials': ''.join(
+            part[0] for part in full_name(partner).split() if part
+        )[:2].upper(),
+        'partner_subtitle': ' - '.join(subtitle_parts),
+        'sessions_together': len(session_keys),
+        'focused_hours': len(completed_bookings) * (SESSION_SLOT_MINUTES / 60),
+        'topics': topics[:6],
+    }
+
+
 def serialize_message_payload(message, user=None):
     sender_name = ''
     sender_profile_id = None
@@ -266,7 +329,7 @@ def serialize_message_payload(message, user=None):
         'created_at': message.created_at.isoformat(),
         'is_read': message.is_read,
         'read_at': message.read_at.isoformat() if message.read_at else None,
-        'is_me': message.sender_id == user.id if user and user.is_authenticated else False,
+        'is_me': message.sender_id == user.id if user and user.is_authenticated else None,
     }
 
 
@@ -289,6 +352,7 @@ def serialize_room_payload(room, user=None):
         'last_message': serialize_message_payload(last_message, user) if last_message else None,
         'unread_count': unread_count,
         'current_booking': get_current_booking_context(room),
+        'partner_context': get_partner_context(room, user),
     }
 
 
