@@ -152,6 +152,7 @@ const filteredSessions = computed(() => {
 const getStatusClass = (status) => {
     switch (String(status || '').toLowerCase()) {
         case 'pending':
+        case 'pending location':
             return 'bg-warning text-dark'
         case 'rejected':
         case 'cancelled':
@@ -163,6 +164,7 @@ const getStatusClass = (status) => {
         case 'payment required':
             return 'bg-warning-subtle text-dark'
         case 'awaiting verification':
+        case 'review pending':
             return 'bg-info text-dark'
         case 'completed':
             return 'bg-success text-white'

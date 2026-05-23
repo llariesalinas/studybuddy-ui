@@ -17,6 +17,12 @@
             }}
           </span>
         </div>
+        <span
+          v-if="statusBadge.label"
+          class="chat-banner__badge"
+          :class="`chat-banner__badge--${statusBadge.variant}`"
+          >{{ statusBadge.label }}</span
+        >
       </div>
 
       <div class="chat-banner__action">
@@ -64,18 +70,51 @@
           <span class="chat-banner__label">Session Request Pending</span>
           <span class="chat-banner__sub">Waiting for confirmation.</span>
         </div>
+        <span
+          v-if="statusBadge.label"
+          class="chat-banner__badge"
+          :class="`chat-banner__badge--${statusBadge.variant}`"
+          >{{ statusBadge.label }}</span
+        >
       </div>
     </template>
 
-    <template v-else-if="bannerContext.status_intent === 'confirmed'">
+    <template
+      v-else-if="
+        ['confirmed', 'ongoing', 'payment_required'].includes(bannerContext.status_intent)
+      "
+    >
       <div class="chat-banner__body">
-        <i class="bi bi-calendar-check-fill chat-banner__icon"></i>
+        <i
+          class="bi chat-banner__icon"
+          :class="
+            bannerContext.status_intent === 'confirmed'
+              ? 'bi-calendar-check-fill'
+              : bannerContext.status_intent === 'ongoing'
+                ? 'bi-play-circle-fill'
+                : 'bi-exclamation-triangle-fill'
+          "
+        ></i>
         <div class="chat-banner__text">
-          <span class="chat-banner__label">Session Confirmed</span>
+          <span class="chat-banner__label">
+            {{
+              bannerContext.status_intent === 'confirmed'
+                ? 'Session Confirmed'
+                : bannerContext.status_intent === 'ongoing'
+                  ? 'Session Ongoing'
+                  : 'Payment Required'
+            }}
+          </span>
           <span class="chat-banner__sub">
             {{ bannerContext.date }} - {{ bannerContext.startTime }}-{{ bannerContext.endTime }}
           </span>
         </div>
+        <span
+          v-if="statusBadge.label"
+          class="chat-banner__badge"
+          :class="`chat-banner__badge--${statusBadge.variant}`"
+          >{{ statusBadge.label }}</span
+        >
       </div>
 
       <RouterLink
@@ -94,6 +133,12 @@
           <span class="chat-banner__label">Payment Submitted</span>
           <span class="chat-banner__sub">Awaiting payment verification.</span>
         </div>
+        <span
+          v-if="statusBadge.label"
+          class="chat-banner__badge"
+          :class="`chat-banner__badge--${statusBadge.variant}`"
+          >{{ statusBadge.label }}</span
+        >
       </div>
     </template>
 
@@ -107,6 +152,12 @@
           </span>
           <span v-else class="chat-banner__sub">Waiting for the student rating.</span>
         </div>
+        <span
+          v-if="statusBadge.label"
+          class="chat-banner__badge"
+          :class="`chat-banner__badge--${statusBadge.variant}`"
+          >{{ statusBadge.label }}</span
+        >
       </div>
 
       <button
@@ -126,6 +177,12 @@
           <span class="chat-banner__label">Booking Rejected</span>
           <span class="chat-banner__sub">This booking was not accepted.</span>
         </div>
+        <span
+          v-if="statusBadge.label"
+          class="chat-banner__badge"
+          :class="`chat-banner__badge--${statusBadge.variant}`"
+          >{{ statusBadge.label }}</span
+        >
       </div>
 
       <button
@@ -145,6 +202,12 @@
           <span class="chat-banner__label">Session Cancelled</span>
           <span class="chat-banner__sub">This session was cancelled.</span>
         </div>
+        <span
+          v-if="statusBadge.label"
+          class="chat-banner__badge"
+          :class="`chat-banner__badge--${statusBadge.variant}`"
+          >{{ statusBadge.label }}</span
+        >
       </div>
 
       <button
@@ -177,6 +240,21 @@ const props = defineProps({
 
 const emit = defineEmits(['location-saved', 'rate'])
 const chatStore = useChatStore()
+
+const statusBadge = computed(() => {
+  const map = {
+    pending: { label: 'Pending', variant: 'warning' },
+    pending_location: { label: 'Pending', variant: 'warning' },
+    confirmed: { label: 'Upcoming', variant: 'primary' },
+    ongoing: { label: 'Ongoing', variant: 'info' },
+    payment_required: { label: 'Payment Required', variant: 'warning' },
+    awaiting_payment: { label: 'Awaiting Payment', variant: 'info' },
+    review_pending: { label: 'Review Pending', variant: 'info' },
+    rejected: { label: 'Rejected', variant: 'danger' },
+    cancelled: { label: 'Cancelled', variant: 'danger' },
+  }
+  return map[props.bannerContext?.status_intent] ?? { label: '', variant: 'secondary' }
+})
 
 const editing = ref(false)
 const locationDraft = ref(props.bannerContext?.preferred_location || '')
@@ -243,23 +321,34 @@ async function saveLocation() {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 20px;
-  border-bottom: 1px solid #e8e8e8;
-  background: #f8f9fa;
+  padding: 14px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.86);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.66);
+  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.06);
+  backdrop-filter: blur(22px);
   flex-shrink: 0;
 }
 
-.chat-banner--review_pending {
-  background: linear-gradient(90deg, #edf7f3 0%, #f0f4ff 100%);
+.chat-banner--pending,
+.chat-banner--pending_location,
+.chat-banner--payment_required {
+  background: rgba(255, 193, 7, 0.15);
+}
+
+.chat-banner--confirmed {
+  background: rgba(13, 110, 253, 0.12);
+}
+
+.chat-banner--awaiting_payment,
+.chat-banner--review_pending,
+.chat-banner--ongoing {
+  background: rgba(13, 202, 240, 0.15);
 }
 
 .chat-banner--rejected,
 .chat-banner--cancelled {
-  background: #fff8f6;
-}
-
-.chat-banner--confirmed {
-  background: #edf7f3;
+  background: rgba(220, 53, 69, 0.12);
 }
 
 .chat-banner__body {
@@ -269,10 +358,56 @@ async function saveLocation() {
   min-width: 0;
 }
 
+.chat-banner__badge {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 20px;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.chat-banner__badge--warning {
+  background: #ffc107;
+  color: #212529;
+}
+
+.chat-banner__badge--primary {
+  background: #0d6efd;
+  color: #fff;
+}
+
+.chat-banner__badge--info {
+  background: #0dcaf0;
+  color: #212529;
+}
+
+.chat-banner__badge--danger {
+  background: #dc3545;
+  color: #fff;
+}
+
 .chat-banner__icon {
   color: var(--sb-primary, #00895a);
   flex-shrink: 0;
   font-size: 16px;
+}
+
+.chat-banner--pending .chat-banner__icon,
+.chat-banner--pending_location .chat-banner__icon,
+.chat-banner--payment_required .chat-banner__icon {
+  color: #997404;
+}
+
+.chat-banner--confirmed .chat-banner__icon {
+  color: #0d6efd;
+}
+
+.chat-banner--awaiting_payment .chat-banner__icon,
+.chat-banner--review_pending .chat-banner__icon,
+.chat-banner--ongoing .chat-banner__icon {
+  color: #0a58ca;
 }
 
 .chat-banner--rejected .chat-banner__icon,

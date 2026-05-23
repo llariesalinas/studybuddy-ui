@@ -4,7 +4,7 @@ from uuid import uuid4
 from django.contrib.auth.models import User
 from rest_framework.test import APITestCase
 
-from .chat.services import get_current_booking_context
+from .chat.services import get_current_booking_context, get_partner_context
 from .models import (
     Booking,
     Rating,
@@ -218,6 +218,16 @@ class ChatFeatureTests(APITestCase):
             can_f2f=True,
             teaching_level="SHS",
         )
+        self.subject = Subjects.objects.create(
+            subject_code="ETH101",
+            subject_name="Ethics",
+            department="Humanities",
+        )
+        TutorSubjects.objects.create(
+            tutor=self.tutor,
+            subject=self.subject,
+            expertise_level=5,
+        )
         self.availability = TutorAvailability.objects.create(
             tutor=self.tutor,
             day="Mon",
@@ -278,6 +288,55 @@ class ChatFeatureTests(APITestCase):
         self.assertIsNotNone(context)
         self.assertEqual(context['status_intent'], 'confirmed')
 
+    def test_confirmed_future_session_returns_upcoming(self):
+        from datetime import date, timedelta
+        room = ChatRoom.objects.create(tutee=self.tutee_profile, tutor=self.tutor_profile)
+        future_date = date.today() + timedelta(days=2)
+        self.make_booking('Confirmed', session_date=future_date)
+        context = get_current_booking_context(room)
+        self.assertIsNotNone(context)
+        self.assertEqual(context['status_intent'], 'confirmed')
+        self.assertEqual(context['status'], 'Upcoming')
+
+    def test_confirmed_active_session_returns_ongoing(self):
+        from django.utils import timezone
+        from datetime import timedelta
+        from uuid import uuid4
+        room = ChatRoom.objects.create(tutee=self.tutee_profile, tutor=self.tutor_profile)
+        now_local = timezone.localtime(timezone.now())
+        active_availability = TutorAvailability.objects.create(
+            tutor=self.tutor,
+            day="Mon",
+            time_slot=(now_local - timedelta(minutes=10)).time(),
+            is_active=True,
+        )
+        self.booking.status = 'Cancelled'
+        self.booking.save()
+
+        Booking.objects.create(
+            student=self.tutee_profile,
+            tutor=self.tutor,
+            availability=active_availability,
+            session_date=now_local.date(),
+            session_mode='Online',
+            booking_request_id=uuid4(),
+            status='Confirmed',
+        )
+        context = get_current_booking_context(room)
+        self.assertIsNotNone(context)
+        self.assertEqual(context['status_intent'], 'ongoing')
+        self.assertEqual(context['status'], 'Ongoing')
+
+    def test_confirmed_past_session_returns_payment_required(self):
+        from datetime import date, timedelta
+        room = ChatRoom.objects.create(tutee=self.tutee_profile, tutor=self.tutor_profile)
+        past_date = date.today() - timedelta(days=1)
+        self.make_booking('Confirmed', session_date=past_date)
+        context = get_current_booking_context(room)
+        self.assertIsNotNone(context)
+        self.assertEqual(context['status_intent'], 'payment_required')
+        self.assertEqual(context['status'], 'Payment Required')
+
     def test_status_intent_awaiting_payment_returns_awaiting_payment(self):
         from datetime import date
         room = ChatRoom.objects.create(tutee=self.tutee_profile, tutor=self.tutor_profile)
@@ -325,6 +384,55 @@ class ChatFeatureTests(APITestCase):
         context = get_current_booking_context(room)
         self.assertIsNone(context)
 
+    def test_partner_context_counts_completed_session_groups_and_hours(self):
+        room = ChatRoom.objects.create(tutee=self.tutee_profile, tutor=self.tutor_profile)
+        second_slot = TutorAvailability.objects.create(
+            tutor=self.tutor,
+            day="Mon",
+            time_slot=time(14, 30),
+            is_active=True,
+        )
+        first_group_id = uuid4()
+        self.booking.status = 'Cancelled'
+        self.booking.save(update_fields=['status'])
+        Booking.objects.create(
+            student=self.tutee_profile,
+            tutor=self.tutor,
+            availability=self.availability,
+            session_date=date(2026, 5, 19),
+            session_mode="Online",
+            session_group_id=first_group_id,
+            status="Completed",
+        )
+        Booking.objects.create(
+            student=self.tutee_profile,
+            tutor=self.tutor,
+            availability=second_slot,
+            session_date=date(2026, 5, 19),
+            session_mode="Online",
+            session_group_id=first_group_id,
+            status="Completed",
+        )
+        Booking.objects.create(
+            student=self.tutee_profile,
+            tutor=self.tutor,
+            availability=self.availability,
+            session_date=date(2026, 5, 20),
+            session_mode="Online",
+            status="Completed",
+        )
+
+        context = get_partner_context(room, self.tutee_user)
+
+        self.assertEqual(context['sessions_together'], 2)
+        self.assertEqual(context['focused_hours'], 1.5)
+
+    def test_partner_context_returns_tutor_topics(self):
+        room = ChatRoom.objects.create(tutee=self.tutee_profile, tutor=self.tutor_profile)
+        context = get_partner_context(room, self.tutee_user)
+
+        self.assertEqual(context['topics'], ['Ethics'])
+
     def test_room_read_endpoint_marks_other_user_messages_read(self):
         room = ChatRoom.objects.create(tutee=self.tutee_profile, tutor=self.tutor_profile)
         message = Message.objects.create(
@@ -359,3 +467,82 @@ class ChatFeatureTests(APITestCase):
         self.assertEqual(message.message_type, "booking_event")
         self.assertEqual(message.metadata["event_type"], "location_updated")
         self.assertEqual(message.metadata["booking"]["preferred_location"], "Study Hall 2")
+
+    def test_tutee_can_send_message_via_rest(self):
+        room = ChatRoom.objects.create(tutee=self.tutee_profile, tutor=self.tutor_profile)
+        self.client.force_authenticate(user=self.tutee_user)
+
+        response = self.client.post(
+            f"/api/chat/rooms/{room.id}/messages/",
+            {"message": "Hello!", "temp_id": "temp-1"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(Message.objects.filter(room=room, message_type="text").count(), 1)
+        self.assertEqual(response.data["message"]["content"], "Hello!")
+        self.assertEqual(response.data["message"]["temp_id"], "temp-1")
+        self.assertTrue(response.data["message"]["is_me"])
+        self.assertEqual(response.data["room"]["id"], room.id)
+        self.assertEqual(response.data["room"]["last_message"]["content"], "Hello!")
+
+    def test_tutor_can_send_message_via_rest(self):
+        room = ChatRoom.objects.create(tutee=self.tutee_profile, tutor=self.tutor_profile)
+        self.client.force_authenticate(user=self.tutor_user)
+
+        response = self.client.post(
+            f"/api/chat/rooms/{room.id}/messages/",
+            {"message": "Hi!"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(Message.objects.filter(room=room, message_type="text").count(), 1)
+
+    def test_non_member_cannot_send_message_via_rest(self):
+        other_user = User.objects.create_user(
+            username="chat-other",
+            email="chat-other@example.com",
+            password="password",
+        )
+        UserProfile.objects.create(
+            user=other_user,
+            fname="Chat",
+            mname="",
+            lname="Other",
+            role="Tutee",
+        )
+        room = ChatRoom.objects.create(tutee=self.tutee_profile, tutor=self.tutor_profile)
+        self.client.force_authenticate(user=other_user)
+
+        response = self.client.post(
+            f"/api/chat/rooms/{room.id}/messages/",
+            {"message": "Nope"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(Message.objects.filter(room=room, message_type="text").count(), 0)
+
+    def test_empty_rest_message_returns_400(self):
+        room = ChatRoom.objects.create(tutee=self.tutee_profile, tutor=self.tutor_profile)
+        self.client.force_authenticate(user=self.tutee_user)
+
+        response = self.client.post(
+            f"/api/chat/rooms/{room.id}/messages/",
+            {"message": "   "},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_unauthenticated_rest_message_returns_401(self):
+        room = ChatRoom.objects.create(tutee=self.tutee_profile, tutor=self.tutor_profile)
+
+        response = self.client.post(
+            f"/api/chat/rooms/{room.id}/messages/",
+            {"message": "Hello!"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 401)

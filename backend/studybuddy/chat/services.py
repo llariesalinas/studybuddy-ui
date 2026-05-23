@@ -170,7 +170,7 @@ def get_current_booking_context(room):
             tutor__profile=room.tutor,
             status__in=['Pending', 'Confirmed', 'Awaiting Payment Verification'],
         )
-        .filter(Q(status='Pending') | Q(session_date__gte=current_date))
+        .filter(Q(status='Pending') | Q(status='Confirmed') | Q(session_date__gte=current_date))
         .select_related('availability', 'student', 'tutor__profile__course')
         .order_by('session_date', 'availability__time_slot', 'id')
         .first()
@@ -187,7 +187,21 @@ def get_current_booking_context(room):
                 'pending_location' if booking.session_mode == 'F2F' else 'pending'
             )
         elif booking.status == 'Confirmed':
-            context['status_intent'] = 'confirmed'
+            session_naive = datetime.combine(booking.session_date, booking.availability.time_slot)
+            session_start = timezone.make_aware(session_naive)
+            duration_minutes = context.get('duration_hours', 0.5) * 60
+            session_end = session_start + timedelta(minutes=duration_minutes)
+            now = timezone.now()
+
+            if now < session_start:
+                context['status_intent'] = 'confirmed'
+                context['status'] = 'Upcoming'
+            elif session_start <= now <= session_end:
+                context['status_intent'] = 'ongoing'
+                context['status'] = 'Ongoing'
+            else:
+                context['status_intent'] = 'payment_required'
+                context['status'] = 'Payment Required'
         else:
             context['status_intent'] = 'awaiting_payment'
 
@@ -385,7 +399,15 @@ def touch_room(room):
     room.save(update_fields=['updated_at'])
 
 
-def create_chat_message(room, sender, content, message_type='text', metadata=None, broadcast=True):
+def create_chat_message(
+    room,
+    sender,
+    content,
+    message_type='text',
+    metadata=None,
+    broadcast=True,
+    temp_id=None,
+):
     message = Message.objects.create(
         room=room,
         sender=sender,
@@ -396,16 +418,20 @@ def create_chat_message(room, sender, content, message_type='text', metadata=Non
     touch_room(room)
 
     if broadcast:
-        broadcast_message(room, message)
+        broadcast_message(room, message, temp_id=temp_id)
 
     return message
 
 
-def broadcast_message(room, message):
+def broadcast_message(room, message, temp_id=None):
+    message_payload = serialize_message_payload(message)
+    if temp_id:
+        message_payload['temp_id'] = temp_id
+
     event = {
         'type': 'message',
         'room_id': room.id,
-        'message': serialize_message_payload(message),
+        'message': message_payload,
         'room': serialize_room_payload(room),
     }
     broadcast_to_room_and_users(room, event)
