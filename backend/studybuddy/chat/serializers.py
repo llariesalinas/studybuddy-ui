@@ -1,9 +1,10 @@
 from rest_framework import serializers
 from .models import ChatRoom, Message
-from .services import get_current_booking_context
+from .services import get_current_booking_context, get_partner_context
 
 class MessageSerializer(serializers.ModelSerializer):
     sender_name = serializers.SerializerMethodField()
+    sender_profile_id = serializers.SerializerMethodField()
     is_me = serializers.SerializerMethodField()
 
     class Meta:
@@ -13,6 +14,7 @@ class MessageSerializer(serializers.ModelSerializer):
             'room',
             'sender',
             'sender_name',
+            'sender_profile_id',
             'content',
             'message_type',
             'metadata',
@@ -29,11 +31,17 @@ class MessageSerializer(serializers.ModelSerializer):
         except Exception:
             return obj.sender.username
 
+    def get_sender_profile_id(self, obj):
+        try:
+            return obj.sender.userprofile.id
+        except Exception:
+            return None
+
     def get_is_me(self, obj):
         request = self.context.get('request')
         if request and request.user.is_authenticated:
             return obj.sender_id == request.user.id
-        return False
+        return None
 
 class ChatRoomSerializer(serializers.ModelSerializer):
     tutee_name = serializers.SerializerMethodField()
@@ -41,6 +49,7 @@ class ChatRoomSerializer(serializers.ModelSerializer):
     last_message = serializers.SerializerMethodField()
     unread_count = serializers.SerializerMethodField()
     current_booking = serializers.SerializerMethodField()
+    partner_context = serializers.SerializerMethodField()
 
     class Meta:
         model = ChatRoom
@@ -56,6 +65,7 @@ class ChatRoomSerializer(serializers.ModelSerializer):
             'last_message',
             'unread_count',
             'current_booking',
+            'partner_context',
         ]
 
     def get_tutee_name(self, obj):
@@ -78,3 +88,8 @@ class ChatRoomSerializer(serializers.ModelSerializer):
 
     def get_current_booking(self, obj):
         return get_current_booking_context(obj)
+
+    def get_partner_context(self, obj):
+        request = self.context.get('request')
+        user = request.user if request and request.user.is_authenticated else None
+        return get_partner_context(obj, user)
