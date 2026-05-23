@@ -71,13 +71,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
             return
 
         message = str(data.get('message') or '').strip()
+        temp_id = data.get('temp_id')
 
         if not message:
             return
 
         # Save message to DB
         saved_msg = await self.save_message(self.user, self.room_id, message)
-        await self.broadcast_saved_message(saved_msg.id)
+        await self.broadcast_saved_message(saved_msg.id, temp_id)
 
     async def chat_event(self, event):
         # Send message to WebSocket
@@ -158,9 +159,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
         return message
 
     @database_sync_to_async
-    def broadcast_saved_message(self, message_id):
+    def broadcast_saved_message(self, message_id, temp_id=None):
         message = Message.objects.select_related('room', 'sender').get(id=message_id)
-        broadcast_message(message.room, message)
+        broadcast_message(message.room, message, temp_id=temp_id)
 
     @database_sync_to_async
     def mark_messages_read(self):

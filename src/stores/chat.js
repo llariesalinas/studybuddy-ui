@@ -130,20 +130,23 @@ export const useChatStore = defineStore('chat', () => {
 
   const addOrReplaceMessage = (incoming) => {
     const message = withMeFlag(incoming)
-    const pendingIndex = messages.value.findIndex(
-      (candidate) => candidate.pending && candidate.content === message.content && message.is_me
-    )
+    const pendingIndex = message.temp_id
+      ? messages.value.findIndex((candidate) => candidate.pending && candidate.temp_id === message.temp_id)
+      : messages.value.findIndex(
+        (candidate) => candidate.pending && candidate.content === message.content && message.is_me
+      )
 
     if (pendingIndex !== -1) {
       messages.value[pendingIndex] = {
         ...messages.value[pendingIndex],
         ...message,
         pending: false,
+        failed: false,
       }
       return
     }
 
-    if (messages.value.some((candidate) => candidate.id === message.id)) {
+    if (message.id && messages.value.some((candidate) => candidate.id === message.id && !candidate.pending)) {
       messages.value = messages.value.map((candidate) => (
         candidate.id === message.id ? { ...candidate, ...message } : candidate
       ))
@@ -352,12 +355,15 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   function sendMessage(content) {
-    if (!socket.value || !isConnected.value) return Promise.reject(new Error('Not connected'))
+    const trimmed = String(content || '').trim()
+    if (!trimmed || !currentRoom.value?.id) return Promise.resolve()
+    const tempId = `temp_${Date.now()}_${Math.random().toString(36).slice(2)}`
 
     const optimisticMessage = {
-      id: `temp_${Date.now()}`,
+      id: tempId,
+      temp_id: tempId,
       room: currentRoom.value?.id,
-      content,
+      content: trimmed,
       sender: myUserId(),
       sender_id: myUserId(),
       created_at: new Date().toISOString(),
@@ -365,16 +371,72 @@ export const useChatStore = defineStore('chat', () => {
       metadata: {},
       is_me: true,
       pending: true,
+      failed: false,
     }
 
     messages.value.push(optimisticMessage)
-    try {
-      socket.value.send(JSON.stringify({ type: 'message', message: content }))
-    } catch (err) {
-      return Promise.reject(err)
+
+    if (socket.value?.readyState === WebSocket.OPEN && isConnected.value) {
+      try {
+        socket.value.send(JSON.stringify({ type: 'message', message: trimmed, temp_id: tempId }))
+        sendTyping(false)
+        return Promise.resolve()
+      } catch (error) {
+        console.error('WebSocket send failed, falling back to REST:', error)
+      }
     }
+
     sendTyping(false)
-    return Promise.resolve()
+    return sendViaRest(currentRoom.value.id, trimmed, tempId)
+  }
+
+  async function sendViaRest(roomId, content, tempId) {
+    try {
+      const response = await api.post(`chat/rooms/${roomId}/messages/`, {
+        message: content,
+        temp_id: tempId,
+      })
+      const savedMessage = withMeFlag(response.data.message)
+      const index = messages.value.findIndex((message) => message.temp_id === tempId)
+
+      if (index !== -1) {
+        messages.value[index] = {
+          ...savedMessage,
+          temp_id: tempId,
+          pending: false,
+          failed: false,
+        }
+      } else {
+        addOrReplaceMessage(savedMessage)
+      }
+
+      if (response.data.room) {
+        upsertRoom(response.data.room)
+      }
+    } catch (error) {
+      const index = messages.value.findIndex((message) => message.temp_id === tempId)
+      if (index !== -1) {
+        messages.value[index] = {
+          ...messages.value[index],
+          pending: false,
+          failed: true,
+        }
+      }
+      console.error('REST chat send failed:', error)
+    }
+  }
+
+  function retryMessage(tempId) {
+    const message = messages.value.find((candidate) => candidate.temp_id === tempId && candidate.failed)
+    if (!message || !currentRoom.value?.id) return Promise.resolve()
+
+    messages.value = messages.value.map((candidate) => (
+      candidate.temp_id === tempId
+        ? { ...candidate, pending: true, failed: false }
+        : candidate
+    ))
+
+    return sendViaRest(currentRoom.value.id, message.content, tempId)
   }
 
   function sendTyping(isTyping = true) {
@@ -444,6 +506,7 @@ export const useChatStore = defineStore('chat', () => {
     connectUpdates,
     connectToRoom,
     sendMessage,
+    retryMessage,
     sendTyping,
     updatePendingLocation,
     getRoomPartnerName,

@@ -7,7 +7,7 @@ from django.utils import timezone
 from .models import ChatRoom, Message
 from .serializers import ChatRoomSerializer, MessageSerializer
 from studybuddy.models import UserProfile, Tutor
-from .services import broadcast_room_updated, get_canonical_room
+from .services import broadcast_message, broadcast_room_updated, create_chat_message, get_canonical_room
 
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
@@ -76,3 +76,40 @@ def start_inquiry_chat(request, tutor_profile_id):
     
     serializer = ChatRoomSerializer(room, context={'request': request})
     return Response(serializer.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def send_message(request, room_id):
+    """REST fallback for sending a message when WebSocket is unavailable."""
+    user_profile = request.user.userprofile
+    room = get_object_or_404(ChatRoom, id=room_id)
+
+    if room.tutee != user_profile and room.tutor != user_profile:
+        return Response({"error": "Unauthorized"}, status=status.HTTP_403_FORBIDDEN)
+
+    content = str(request.data.get('message') or '').strip()
+    if not content:
+        return Response({"error": "Message cannot be empty."}, status=status.HTTP_400_BAD_REQUEST)
+
+    temp_id = request.data.get('temp_id')
+    message = create_chat_message(
+        room,
+        request.user,
+        content,
+        message_type='text',
+        metadata={},
+        broadcast=False,
+    )
+    broadcast_message(room, message, temp_id=temp_id)
+
+    message_data = MessageSerializer(message, context={'request': request}).data
+    if temp_id:
+        message_data['temp_id'] = temp_id
+
+    return Response(
+        {
+            'message': message_data,
+            'room': ChatRoomSerializer(room, context={'request': request}).data,
+        },
+        status=status.HTTP_201_CREATED,
+    )
