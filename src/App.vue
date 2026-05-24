@@ -391,6 +391,7 @@ onBeforeUnmount(() => {
   --sb-spring-fast: cubic-bezier(0.34, 1.56, 0.64, 1);
   --sb-t-quick: 120ms;
   --sb-t-normal: 250ms;
+  --sb-t-slow: 400ms;
 }
 
 body {
@@ -631,5 +632,77 @@ body {
   60%  { transform: translateX(2px); }
   75%  { transform: translateX(-1px); }
   100% { transform: translateX(0); }
+}
+
+/* --- Layer A/B/C Keyframes --- */
+@keyframes sb-stagger-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes sb-scale-in {
+  from { opacity: 0; transform: scale(0.94); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes sb-shimmer {
+  0%   { background-position: -600px 0; }
+  100% { background-position:  600px 0; }
+}
+
+@keyframes sb-tab-indicator {
+  from { transform: scaleX(0); opacity: 0; }
+  to   { transform: scaleX(1); opacity: 1; }
+}
+
+@keyframes sb-toast-in {
+  from { opacity: 0; transform: translateY(-14px) scale(0.95); }
+  to   { opacity: 1; transform: translateY(0)   scale(1); }
+}
+
+@keyframes sb-success-border {
+  0%   { box-shadow: 0 0 0 0 rgba(0, 137, 90, 0.5); }
+  60%  { box-shadow: 0 0 0 6px rgba(0, 137, 90, 0); }
+  100% { box-shadow: none; }
+}
+
+/* --- Layer A: Stagger entrance --- */
+.sb-stagger-item {
+  animation: sb-stagger-in var(--sb-t-normal) var(--sb-spring) both;
+  opacity: 0;
+}
+
+/* --- Layer A: Modal scale-in (all Bootstrap modals, no per-modal changes needed) --- */
+.modal.show .modal-content {
+  animation: sb-scale-in var(--sb-t-normal) var(--sb-spring) both;
+}
+
+/* --- Layer B: Skeleton shimmer --- */
+.sb-skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(226, 232, 240, 0.8) 25%,
+    rgba(203, 213, 225, 0.9) 50%,
+    rgba(226, 232, 240, 0.8) 75%
+  );
+  background-size: 600px 100%;
+  animation: sb-shimmer 1.6s ease-in-out infinite;
+  border-radius: 12px;
+}
+
+/* --- Layer C: Success card border pulse --- */
+.sb-success-card {
+  animation: sb-success-border 600ms var(--sb-spring) both;
+}
+
+/* --- Accessibility: kill all motion for users who ask --- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 1ms !important;
+  }
 }
 </style>
