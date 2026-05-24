@@ -1,7 +1,85 @@
 from rest_framework import serializers
-from .models import Notification, Preference, Rating, Subjects, Tutor, TutorAvailability, TutorAvailabilityOverride
+from .models import Notification, Preference, Rating, Subjects, Tutor, TutorAvailability, TutorAvailabilityOverride, WithdrawalRequest, UserProfile, PartnerInstitution, PlatformActivity, Wallet
 
 # Create Serializers here.
+
+class PlatformActivitySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PlatformActivity
+        fields = ['id', 'activity_type', 'message', 'created_at']
+
+class AdminWithdrawalSerializer(serializers.ModelSerializer):
+    tutor_name = serializers.SerializerMethodField()
+    email = serializers.SerializerMethodField()
+
+    class Meta:
+        model = WithdrawalRequest
+        fields = [
+            'id',
+            'tutor',
+            'tutor_name',
+            'email',
+            'amount',
+            'method',
+            'account_number',
+            'account_name',
+            'bank_name',
+            'status',
+            'failure_reason',
+            'requested_at',
+            'processed_at'
+        ]
+
+    def get_tutor_name(self, obj):
+        return f"{obj.tutor.profile.fname} {obj.tutor.profile.lname}"
+
+    def get_email(self, obj):
+        return obj.tutor.profile.user.email
+
+class AdminUserSerializer(serializers.ModelSerializer):
+    email = serializers.EmailField(source='user.email')
+    full_name = serializers.SerializerMethodField()
+    institution_name = serializers.CharField(source='institution.institution_name', read_only=True)
+    wallet_balance = serializers.SerializerMethodField()
+
+    class Meta:
+        model = UserProfile
+        fields = [
+            'id',
+            'email',
+            'fname',
+            'lname',
+            'full_name',
+            'role',
+            'institution_name',
+            'profile_completed',
+            'is_suspended',
+            'wallet_balance',
+            'created_at'
+        ]
+
+    def get_full_name(self, obj):
+        return f"{obj.fname} {obj.lname}"
+
+    def get_wallet_balance(self, obj):
+        if obj.role == 'Tutor':
+            try:
+                return float(obj.tutor.wallet.balance)
+            except Exception:
+                return 0.0
+        return None
+
+class PartnerInstitutionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PartnerInstitution
+        fields = [
+            'id',
+            'institution_name',
+            'school_email_domain',
+            'is_active',
+            'contact_person',
+            'date_added'
+        ]
 
 class TutorSearchSerializer(serializers.ModelSerializer):
 
