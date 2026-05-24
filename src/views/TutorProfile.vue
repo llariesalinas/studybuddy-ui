@@ -112,7 +112,7 @@
 <div class="subject-picker-shell">
   <button
     type="button"
-    class="btn btn-outline-dark rounded-3 fw-semibold"
+    class="btn btn-outline-dark rounded-3 fw-semibold sb-btn"
     @click="openSubjectModal"
   >
     + Add subjects
@@ -127,7 +127,7 @@
       {{ subject.subject_name }}
       <button
         type="button"
-        class="subject-pill-remove"
+        class="subject-pill-remove sb-btn"
         @click="removeSubject(subject.subject_code)"
       >
         ×
@@ -146,7 +146,7 @@
     >
       <button
         type="button"
-        class="subject-accordion-header"
+        class="subject-accordion-header sb-btn"
         @click="toggleSubjectAccordion(subject.subject_code)"
       >
         <span
@@ -202,7 +202,7 @@ class="form-control"
 
 <div class="text-end mt-4">
 <button
-  class="btn bg-sb-primary text-white px-4 d-inline-flex align-items-center gap-2"
+  class="btn bg-sb-primary text-white px-4 d-inline-flex align-items-center gap-2 sb-btn"
   :disabled="isSavingProfile"
 >
 <span v-if="isSavingProfile" class="spinner-border spinner-border-sm" aria-hidden="true"></span>
@@ -244,7 +244,7 @@ class="form-control"
           v-for="category in availableCategories"
           :key="category"
           type="button"
-          class="category-pill"
+          class="category-pill sb-btn"
           :class="{ active: activeCategory === category }"
           @click="activeCategory = category"
         >
@@ -266,7 +266,7 @@ class="form-control"
             v-for="subject in filteredSubjects"
             :key="subject.subject_code"
             type="button"
-            class="subject-option"
+            class="subject-option sb-btn"
             :class="{ selected: isDraftSelected(subject.subject_code) }"
             @click="toggleDraftSubject(subject.subject_code)"
           >
@@ -297,10 +297,10 @@ class="form-control"
       <div class="subject-modal-footer mt-3">
         <span class="text-muted small">{{ selectedDraftCountLabel }}</span>
         <div class="d-flex gap-2">
-          <button type="button" class="btn btn-outline-secondary" @click="closeSubjectModal">
+          <button type="button" class="btn btn-outline-secondary sb-btn" @click="closeSubjectModal">
             Cancel
           </button>
-          <button type="button" class="btn bg-sb-primary text-white" @click="confirmSubjectSelection">
+          <button type="button" class="btn bg-sb-primary text-white sb-btn" @click="confirmSubjectSelection">
             Confirm
           </button>
         </div>

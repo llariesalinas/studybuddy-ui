@@ -119,7 +119,7 @@
                 <td class="py-3 text-end">
 
                   <button
-                    class="btn btn-success btn-sm"
+                    class="btn btn-success btn-sm sb-btn"
                     @click="goToBookingDetails(booking.id)"
                   >
                     View Details
