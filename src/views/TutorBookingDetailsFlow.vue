@@ -158,7 +158,7 @@
 
           <button
             v-if="showDevReadyForPayment"
-            class="btn btn-warning fw-bold mb-3"
+            class="btn btn-warning fw-bold mb-3 sb-btn"
             :disabled="isDevSubmitting"
             @click="handleDevReadyForPayment"
           >
@@ -167,7 +167,7 @@
 
           <button
             v-if="isAwaitingVerification"
-            class="btn btn-success mt-auto"
+            class="btn btn-success mt-auto sb-btn"
             :disabled="isSubmitting"
             @click="handleComplete"
           >

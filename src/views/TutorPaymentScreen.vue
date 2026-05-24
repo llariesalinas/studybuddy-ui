@@ -19,7 +19,7 @@
               <td class="fw-bold">₱{{ pay.amount }}</td>
               <td><span class="badge bg-warning-subtle text-warning border border-warning">Pending</span></td>
               <td class="text-end pe-4">
-                <button @click="verify(pay.id)" class="btn btn-sm bg-sb-primary text-white px-3 fw-bold">Verify Paid</button>
+                <button @click="verify(pay.id)" class="btn btn-sm bg-sb-primary text-white px-3 fw-bold sb-btn">Verify Paid</button>
               </td>
             </tr>
           </tbody>

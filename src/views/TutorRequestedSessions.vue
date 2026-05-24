@@ -78,7 +78,7 @@
                     </span>
                     
                     <button 
-                      class="btn btn-sm btn-link p-0 text-decoration-none text-muted" 
+                      class="btn btn-sm btn-link p-0 text-decoration-none text-muted sb-btn" 
                       @click="openLocationModal(session)"
                       title="Edit location"
                     >
@@ -95,7 +95,7 @@
                 <small class="text-muted mb-2 d-none d-md-block">Actions</small> <div class="d-flex gap-2 justify-content-center my-auto">
                   
                   <button 
-                    class="btn btn-sm btn-outline-success rounded-circle d-flex align-items-center justify-content-center" 
+                    class="btn btn-sm btn-outline-success rounded-circle d-flex align-items-center justify-content-center sb-btn" 
                     style="width: 42px; height: 42px;"
                     :disabled="confirmingId === session.id" 
                     @click="confirmSession(session.id)"
@@ -109,7 +109,7 @@
                   </button>
 
                   <button 
-                    class="btn btn-sm btn-outline-danger rounded-circle d-flex align-items-center justify-content-center" 
+                    class="btn btn-sm btn-outline-danger rounded-circle d-flex align-items-center justify-content-center sb-btn" 
                     style="width: 42px; height: 42px;"
                     :disabled="rejectingId === session.id" 
                     @click="rejectSession(session.id)"
@@ -154,8 +154,8 @@
           </div>
           
           <div class="modal-footer border-0 pt-0">
-            <button type="button" class="btn btn-light" @click="closeLocationModal">Cancel</button>
-            <button type="button" class="btn bg-sb-primary text-white" @click="saveLocation">Save Location</button>
+            <button type="button" class="btn btn-light sb-btn" @click="closeLocationModal">Cancel</button>
+            <button type="button" class="btn bg-sb-primary text-white sb-btn" @click="saveLocation">Save Location</button>
           </div>
           
         </div>
