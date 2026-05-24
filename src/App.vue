@@ -82,9 +82,9 @@
         </li>
 
         <li class="nav-item mb-2">
-          <button 
-           class="nav-link border-0 shadow-none bg-transparent text-white opacity-75 d-flex align-items-center"
-           data-bs-toggle="modal" 
+          <button
+           class="nav-link border-0 shadow-none bg-transparent text-white opacity-75 d-flex align-items-center sb-btn"
+           data-bs-toggle="modal"
            data-bs-target="#logoutModal"
            >
             <i class="bi bi-box-arrow-right me-3"></i> Log-out
@@ -107,15 +107,15 @@
           </div>
 
           <div class="modal-footer border-0">
-            <button 
-              class="btn btn-light"
+            <button
+              class="btn btn-light sb-btn"
               data-bs-dismiss="modal"
             >
               Cancel
             </button>
 
-            <button 
-              class="btn bg-sb-primary text-white"
+            <button
+              class="btn bg-sb-primary text-white sb-btn"
               @click="logout"
             >
               Yes, Log out
@@ -177,7 +177,7 @@
 
           <div v-if="route.path === '/tch-wallet'">
             <h2 class="fw-bold text-dark">My Wallet</h2>
-            <p class="text-muted">Manage your earnings and withdrawal requests.</p>
+            <p class="text-muted">Manage your earnings and cash-out requests.</p>
           </div>
 
           <div v-if="route.path === '/reports'">
@@ -201,8 +201,8 @@
           </div>
 
           <div v-if="route.path === '/admin/withdrawals'">
-            <h2 class="fw-bold text-dark">Withdrawals</h2>
-            <p class="text-muted">Search, filter, and manage all user withdrawals.</p>
+            <h2 class="fw-bold text-dark">Cash Outs</h2>
+            <p class="text-muted">Search, filter, and manage all user cash-outs.</p>
           </div>
 
           <div v-if="route.path === '/admin/institutions'">
@@ -374,7 +374,13 @@ onBeforeUnmount(() => {
 :root {
   --sb-dark: #0A1916;
   --sb-primary: #00895A; /* Your exact Figma Green */
+  --sb-primary-dark: #0A7A51;
+  --sb-primary-mid: #18A36C;
   --sb-primary-hover: #00704A; /* Slightly darker for button hovers */
+  --sb-text-main: #163127;
+  --sb-text-muted: #6B7280;
+  --sb-text-secondary: #495057;
+  --sb-text-dark: #212529;
   --sb-bg: #F8F9FA;
   --sb-card-border: #EAEAEA;
   --sb-topbar-height: 60px;
