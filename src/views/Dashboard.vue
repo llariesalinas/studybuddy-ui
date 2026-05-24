@@ -34,7 +34,7 @@
               <div class="d-flex align-items-center gap-2 align-self-start align-self-lg-auto weekly-board-nav">
                 <button
                   type="button"
-                  class="schedule-nav-btn"
+                  class="schedule-nav-btn sb-btn"
                   :disabled="!canGoToPreviousWeek"
                   @click="goToPreviousWeek"
                   aria-label="Previous week"
@@ -46,7 +46,7 @@
                 </div>
                 <button
                   type="button"
-                  class="schedule-nav-btn"
+                  class="schedule-nav-btn sb-btn"
                   :disabled="!canGoToNextWeek"
                   @click="goToNextWeek"
                   aria-label="Next week"
@@ -56,7 +56,7 @@
                 <button
                   v-if="nextSessionWeekOffset !== null && weekOffset !== nextSessionWeekOffset"
                   type="button"
-                  class="btn btn-sm ms-1"
+                  class="btn btn-sm ms-1 sb-btn"
                   style="font-size: 0.75rem; color: var(--sb-primary); border: 1px solid var(--sb-primary); white-space: nowrap;"
                   @click="weekOffset = nextSessionWeekOffset"
                   aria-label="Jump to next session"
@@ -103,7 +103,7 @@
                         v-for="session in daySessionsMap[day.key]"
                         :key="session.id"
                         type="button"
-                        class="weekly-session-card"
+                        class="weekly-session-card sb-interactive"
                         :class="getWeeklySessionCardClasses(session.status)"
                         :style="getSessionCardStyle(session)"
                         @click="goToDetails(session.id)"
@@ -165,7 +165,7 @@
                       <div
                         v-for="tutor in pagedTutors"
                         :key="tutor.id"
-                        class="list-group-item d-flex justify-content-between align-items-center py-2 tutor-list-item"
+                        class="list-group-item d-flex justify-content-between align-items-center py-2 tutor-list-item sb-interactive"
                         @click="bookTutor(tutor.id)"
                       >
                         <div>
@@ -178,9 +178,9 @@
                   </div>
 
                   <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top flex-shrink-0">
-                    <button class="btn bg-sb-primary text-white btn-sm" @click="prevPage" :disabled="page === 1">Prev</button>
+                    <button class="btn bg-sb-primary text-white btn-sm sb-btn" @click="prevPage" :disabled="page === 1">Prev</button>
                     <span class="small text-muted">Page {{ page }} of {{ totalPages || 1 }}</span>
-                    <button class="btn bg-sb-primary text-white btn-sm" @click="nextPage" :disabled="page >= totalPages">Next</button>
+                    <button class="btn bg-sb-primary text-white btn-sm sb-btn" @click="nextPage" :disabled="page >= totalPages">Next</button>
                   </div>
                 </div>
               </Transition>
