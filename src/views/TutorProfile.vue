@@ -169,15 +169,24 @@
         ></i>
       </button>
 
-      <div v-if="openSubjectCode === subject.subject_code" class="subject-accordion-body">
-        <label class="subject-accordion-label">Subject Syllabus &amp; Approach</label>
-        <textarea
-          v-model="subject.description"
-          rows="4"
-          class="subject-description-input"
-          placeholder="Describe your methodology for this specific subject..."
-        ></textarea>
-      </div>
+      <Transition
+        @before-enter="el => { el.style.maxHeight = '0'; el.style.opacity = '0' }"
+        @enter="el => { el.offsetHeight; el.style.maxHeight = el.scrollHeight + 'px'; el.style.opacity = '1' }"
+        @after-enter="el => { el.style.maxHeight = ''; el.style.opacity = '' }"
+        @before-leave="el => { el.style.maxHeight = el.scrollHeight + 'px'; el.style.opacity = '1' }"
+        @leave="el => { el.offsetHeight; el.style.maxHeight = '0'; el.style.opacity = '0' }"
+        @after-leave="el => { el.style.maxHeight = ''; el.style.opacity = '' }"
+      >
+        <div v-if="openSubjectCode === subject.subject_code" class="subject-accordion-body">
+          <label class="subject-accordion-label">Subject Syllabus &amp; Approach</label>
+          <textarea
+            v-model="subject.description"
+            rows="4"
+            class="subject-description-input"
+            placeholder="Describe your methodology for this specific subject..."
+          ></textarea>
+        </div>
+      </Transition>
     </article>
   </div>
 
@@ -738,6 +747,9 @@ onMounted(() => {
   padding: 0 18px 18px;
   display: grid;
   gap: 10px;
+  overflow: hidden;
+  transition: max-height var(--sb-t-slow) var(--sb-spring),
+              opacity var(--sb-t-normal) ease;
 }
 
 .subject-accordion-label {
