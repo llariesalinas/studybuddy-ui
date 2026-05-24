@@ -24,7 +24,7 @@
         <button
         @click="fetchWithdrawals(true)"
         :disabled="store.loading.withdrawals"
-        class="btn bg-sb-primary text-white btn-sm rounded-pill ms-auto"
+        class="btn bg-sb-primary text-white btn-sm rounded-pill ms-auto sb-btn"
       >
         <span v-if="store.loading.withdrawals" class="spinner-border spinner-border-sm me-1" role="status"></span>
         <i v-else class="bi bi-arrow-clockwise me-1"></i>
@@ -74,7 +74,7 @@
 
         <button
           @click="openActionModal(w)"
-          class="btn btn-sm btn-danger rounded-pill px-4"
+          class="btn btn-sm btn-danger rounded-pill px-4 sb-btn"
         >
           Take Action
         </button>
@@ -178,7 +178,7 @@
         class="text-center py-5 text-muted"
       >
         <i class="bi bi-inbox fs-1 d-block mb-2"></i>
-        No withdrawal records found.
+        No cash-out records found.
       </div>
 
       <!-- DATA -->
@@ -196,6 +196,7 @@
                 <th class="ps-4 py-3 fw-semibold">Tutor</th>
                 <th class="py-3 fw-semibold">Amount</th>
                 <th class="py-3 fw-semibold">Method</th>
+                <th class="py-3 fw-semibold">Provider</th>
                 <th class="py-3 fw-semibold">Account Details</th>
                 <th class="py-3 fw-semibold">Status</th>
                 <th class="py-3 fw-semibold">Date Requested</th>
@@ -233,6 +234,19 @@
                   <span class="text-uppercase small fw-bold">
                     {{ w?.method || '-' }}
                   </span>
+                </td>
+
+                <!-- Provider -->
+                <td class="small">
+                  <p class="mb-0 fw-semibold text-uppercase">
+                    {{ w?.rail || '-' }}
+                  </p>
+                  <p class="mb-0 text-muted">
+                    {{ w?.provider_status || 'pending' }}
+                  </p>
+                  <p class="mb-0 font-monospace text-muted">
+                    {{ w?.provider_reference_number || '-' }}
+                  </p>
                 </td>
 
                 <!-- Account -->
@@ -273,14 +287,14 @@
                   <button
                     v-if="w?.status === 'pending'"
                     @click="markProcessed(w)"
-                    class="btn btn-sm btn-outline-success rounded-pill px-3 me-2"
+                    class="btn btn-sm btn-outline-success rounded-pill px-3 me-2 sb-btn"
                   >
                     Mark Processed
                   </button>
 
                   <button
                     @click="openActionModal(w)"
-                    class="btn btn-sm btn-light rounded-circle"
+                    class="btn btn-sm btn-light rounded-circle sb-btn"
                   >
                     <i class="bi bi-eye"></i>
                   </button>
@@ -317,7 +331,7 @@
           <div class="modal-header border-0 bg-light rounded-top-4">
 
             <h5 class="modal-title fw-bold">
-              Withdrawal Exception Details
+              Cash-Out Exception Details
             </h5>
 
             <button
@@ -394,6 +408,39 @@
 
             </div>
 
+            <div class="bg-light rounded-3 p-3 mb-4">
+
+              <p class="small text-muted mb-2 text-uppercase fw-bold">
+                Provider Details
+              </p>
+
+              <p class="mb-1">
+                <strong>Rail:</strong>
+                {{ activeWithdrawal?.rail || '-' }}
+              </p>
+
+              <p class="mb-1">
+                <strong>Status:</strong>
+                {{ activeWithdrawal?.provider_status || '-' }}
+              </p>
+
+              <p class="mb-1">
+                <strong>Reference:</strong>
+                {{ activeWithdrawal?.provider_reference_number || '-' }}
+              </p>
+
+              <p class="mb-1">
+                <strong>Wallet Transaction:</strong>
+                {{ activeWithdrawal?.provider_wallet_transaction_id || '-' }}
+              </p>
+
+              <p class="mb-0">
+                <strong>Fee:</strong>
+                PHP {{ activeWithdrawal?.provider_fee || 0 }}
+              </p>
+
+            </div>
+
             <div
               v-if="['failed', 'flagged'].includes(activeWithdrawal?.status)"
               class="mb-4"
@@ -417,7 +464,7 @@
               <button
                 v-if="['failed', 'flagged', 'pending'].includes(activeWithdrawal?.status)"
                 @click="updateStatus('processed')"
-                class="btn btn-success rounded-pill py-2"
+                class="btn btn-success rounded-pill py-2 sb-btn"
               >
                 Retry & Mark Processed
               </button>
@@ -425,7 +472,7 @@
               <button
                 v-if="['failed', 'flagged', 'pending'].includes(activeWithdrawal?.status)"
                 @click="updateStatus('rejected')"
-                class="btn btn-outline-danger rounded-pill py-2"
+                class="btn btn-outline-danger rounded-pill py-2 sb-btn"
               >
                 Reject & Refund Balance
               </button>
@@ -433,7 +480,7 @@
               <button
                 v-if="activeWithdrawal?.status === 'pending'"
                 @click="updateStatus('flagged')"
-                class="btn btn-warning rounded-pill py-2"
+                class="btn btn-warning rounded-pill py-2 sb-btn"
               >
                 Flag for Review
               </button>

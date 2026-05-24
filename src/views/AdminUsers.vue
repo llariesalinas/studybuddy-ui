@@ -89,7 +89,7 @@
                 </td>
                 <td class="small text-muted">{{ formatDate(user.created_at) }}</td>
                 <td class="pe-4 text-end">
-                  <button @click="openDetail(user)"class="btn btn-sm btn-light rounded-circle"
+                  <button @click="openDetail(user)"class="btn btn-sm btn-light rounded-circle sb-btn"
                   >
                     <i class="bi bi-eye"></i></button>
                 </td>
@@ -156,7 +156,7 @@
           <button 
             @click="toggleSuspension(selectedUser)" 
             :disabled="suspending"
-            class="btn w-100 mb-2 rounded-pill py-2" 
+            class="btn w-100 mb-2 rounded-pill py-2 sb-btn" 
             :class="selectedUser.is_suspended ? 'btn-success' : 'btn-outline-danger'"
           >
             <span v-if="suspending" class="spinner-border spinner-border-sm me-2"></span>

@@ -7,7 +7,7 @@
         <p class="mb-0 fw-bold">Failed to load platform data</p>
         <p class="small mb-0">{{ store.error.stats }}</p>
       </div>
-      <button @click="store.fetchStats(true)" class="btn btn-sm btn-danger ms-auto rounded-pill px-3">Retry</button>
+      <button @click="store.fetchStats(true)" class="btn btn-sm btn-danger ms-auto rounded-pill px-3 sb-btn">Retry</button>
     </div>
 
     <!-- Health Widgets -->
@@ -93,7 +93,7 @@
             </div>
             <div v-else>
               <h2 class="fw-bold mb-0 text-danger">{{ store.stats?.failed_withdrawals || 0 }}</h2>
-              <p class="small text-muted mb-0">Failed payouts needing attention</p>
+              <p class="small text-muted mb-0">Failed cash-outs needing attention</p>
             </div>
           </Transition>
         </div>
@@ -141,7 +141,7 @@
         <div class="card border-0 shadow-sm rounded-4 p-4 mb-4">
           <h5 class="fw-bold mb-4">Quick Actions</h5>
           <div class="d-grid gap-3">
-            <router-link to="/admin/institutions" class="btn btn-light border-0 text-start rounded-3 p-3 shadow-none position-relative">
+            <router-link to="/admin/institutions" class="btn btn-light border-0 text-start rounded-3 p-3 shadow-none position-relative sb-btn">
               <div class="d-flex align-items-center">
                 <i class="bi bi-building fs-4 me-3 text-primary"></i>
                 <div>
@@ -151,12 +151,12 @@
               </div>
             </router-link>
 
-            <router-link to="/admin/withdrawals" class="btn btn-light border-0 text-start rounded-3 p-3 shadow-none position-relative">
+            <router-link to="/admin/withdrawals" class="btn btn-light border-0 text-start rounded-3 p-3 shadow-none position-relative sb-btn">
               <div class="d-flex align-items-center">
                 <i class="bi bi-cash-stack fs-4 me-3 text-success"></i>
                 <div>
-                  <p class="fw-bold mb-0">Audit Withdrawals</p>
-                  <p class="small text-muted mb-0">Review payouts and handle exceptions</p>
+                  <p class="fw-bold mb-0">Audit Cash Outs</p>
+                  <p class="small text-muted mb-0">Review provider payouts and exceptions</p>
                 </div>
               </div>
               <span v-if="store.stats?.failed_withdrawals" class="badge bg-danger rounded-pill position-absolute top-0 end-0 translate-middle-y mt-3 me-3">
@@ -164,7 +164,7 @@
               </span>
             </router-link>
 
-            <router-link to="/admin/users" class="btn btn-light border-0 text-start rounded-3 p-3 shadow-none">
+            <router-link to="/admin/users" class="btn btn-light border-0 text-start rounded-3 p-3 shadow-none sb-btn">
               <div class="d-flex align-items-center">
                 <i class="bi bi-shield-lock fs-4 me-3 text-warning"></i>
                 <div>
