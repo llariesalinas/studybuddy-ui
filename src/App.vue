@@ -477,7 +477,7 @@ body {
   border-radius: 50%;
   border: 1.5px solid #dee2e6;
   background: #fff;
-  color: var(--sb-text-secondary);
+  color: var(--sb-text-muted);
   text-decoration: none;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
   position: relative;
@@ -535,7 +535,7 @@ body {
 
 .chat-toast span {
   margin-top: 3px;
-  color: var(--sb-text-secondary);
+  color: var(--sb-text-muted);
   font-size: 12px;
 }
 
