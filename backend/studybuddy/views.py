@@ -344,16 +344,37 @@ def get_payment_method_code(payment):
     return getattr(getattr(payment, 'method', None), 'code', None)
 
 
+ONLINE_WALLET_PAYMENT_CODES = {'online', 'PAYMONGO', 'GCASH', 'BANK'}
+
+
 def get_payment_method_label(payment):
     method = getattr(payment, 'method', None)
 
     if not method:
         return None
 
-    if method.code in {'GCASH', 'BANK', 'online'}:
+    if method.code in ONLINE_WALLET_PAYMENT_CODES:
         return 'Online Payment'
 
     return method.method_name
+
+
+def get_wallet_transaction_payment_reference(wallet_transaction):
+    reference_id = wallet_transaction.reference_id or ''
+
+    if not reference_id.startswith('BK-'):
+        return None
+
+    try:
+        booking_id = int(reference_id.removeprefix('BK-'))
+    except ValueError:
+        return None
+
+    payment = Payment.objects.filter(booking_id=booking_id).only('transaction_reference').first()
+    if not payment:
+        return None
+
+    return payment.transaction_reference
 
 
 def serialize_payment_summary(representative_booking):
@@ -1744,7 +1765,7 @@ def cancel_booking(request, booking_id):
     if profile != booking.student:
         return Response({"error": "Unauthorized"}, status=403)
 
-    session_group_bookings = get_session_group_bookings(booking)
+    session_group_bookings = get_booking_request_bookings(booking)
     representative_booking = get_representative_booking(session_group_bookings)
 
     if not representative_booking:
@@ -1927,7 +1948,7 @@ def booking_detail(request, booking_id):
     if request.user.userprofile not in (booking.tutor.profile, booking.student):
         return Response({"error": "Unauthorized"}, status=403)
 
-    session_group_bookings = get_session_group_bookings(booking)
+    session_group_bookings = get_booking_request_bookings(booking)
     return Response(build_booking_detail_payload(session_group_bookings))
 
 
@@ -1944,7 +1965,7 @@ def submit_session_payment(request, booking_id):
     if profile != booking.student:
         return Response({"error": "Unauthorized"}, status=403)
 
-    session_group_bookings = get_session_group_bookings(booking)
+    session_group_bookings = get_booking_request_bookings(booking)
 
     if any(group_booking.status != "Confirmed" for group_booking in session_group_bookings):
         return Response({"error": "All session slots must be confirmed before payment submission."}, status=400)
@@ -2016,7 +2037,7 @@ def tutor_confirm_booking(request, booking_id):
     if profile != booking.tutor.profile:
         return Response({"error": "Unauthorized"}, status=403)
 
-    session_group_bookings = get_session_group_bookings(booking)
+    session_group_bookings = get_booking_request_bookings(booking)
 
     if any(group_booking.status != "Awaiting Payment Verification" for group_booking in session_group_bookings):
         return Response({"error": "This session is not awaiting payment verification."}, status=400)
@@ -2082,7 +2103,7 @@ def dev_mark_booking_ready_for_payment(request, booking_id):
     if profile != booking.tutor.profile:
         return Response({"error": "Unauthorized"}, status=403)
 
-    session_group_bookings = get_session_group_bookings(booking)
+    session_group_bookings = get_booking_request_bookings(booking)
 
     if any(group_booking.status != "Confirmed" for group_booking in session_group_bookings):
         return Response(
@@ -2095,7 +2116,7 @@ def dev_mark_booking_ready_for_payment(request, booking_id):
             id__in=[group_booking.id for group_booking in session_group_bookings]
         ).update(tutor_confirmed=True)
 
-    refreshed_group = get_session_group_bookings(booking)
+    refreshed_group = get_booking_request_bookings(booking)
 
     return Response(build_booking_detail_payload(refreshed_group))
 
@@ -2113,7 +2134,7 @@ def submit_session_rating(request, booking_id):
     if profile != booking.student:
         return Response({"error": "Unauthorized"}, status=403)
 
-    session_group_bookings = get_session_group_bookings(booking)
+    session_group_bookings = get_booking_request_bookings(booking)
 
     if any(group_booking.status != "Completed" for group_booking in session_group_bookings):
         return Response({"error": "You can only rate completed sessions."}, status=400)
@@ -2581,8 +2602,22 @@ def update_tutor_profile(request):
 
 @api_view(['GET'])
 def payment_methods(request):
+    active_methods = list(PaymentMethod.objects.filter(is_active=True).order_by('method_id'))
+    has_paymongo = any(method.code == 'PAYMONGO' for method in active_methods)
+    methods = []
+    seen_codes = set()
 
-    methods = PaymentMethod.objects.filter(is_active=True)
+    for method in active_methods:
+        code = method.code
+
+        if has_paymongo and str(code).lower() == 'online':
+            continue
+
+        if code in seen_codes:
+            continue
+
+        seen_codes.add(code)
+        methods.append(method)
 
     data = [
         {
@@ -2594,6 +2629,80 @@ def payment_methods(request):
     ]
 
     return Response(data)
+
+
+def get_paymongo_error_message(response_body):
+    errors = response_body.get("errors") if isinstance(response_body, dict) else None
+
+    if isinstance(errors, list) and errors:
+        first_error = errors[0]
+
+        if isinstance(first_error, dict):
+            return (
+                first_error.get("detail")
+                or first_error.get("message")
+                or first_error.get("code")
+                or "PayMongo rejected the checkout session."
+            )
+
+    return "PayMongo rejected the checkout session."
+
+
+def get_paymongo_auth_headers():
+    secret_key = settings.PAYMONGO_SECRET_KEY
+    auth_str = f"{secret_key}:"
+    encoded_auth = base64.b64encode(auth_str.encode()).decode()
+
+    return {
+        "Content-Type": "application/json",
+        "Authorization": f"Basic {encoded_auth}"
+    }
+
+
+def get_paymongo_payment_statuses(response_body):
+    if not isinstance(response_body, dict):
+        return []
+
+    data = response_body.get('data') or {}
+    attributes = data.get('attributes') or {}
+    statuses = [
+        attributes.get('status'),
+        attributes.get('payment_status'),
+    ]
+
+    payment_intent = attributes.get('payment_intent') or data.get('payment_intent')
+
+    if isinstance(payment_intent, dict):
+        payment_intent_attributes = payment_intent.get('attributes') or {}
+        statuses.extend([
+            payment_intent.get('status'),
+            payment_intent_attributes.get('status'),
+            payment_intent_attributes.get('payment_status'),
+        ])
+
+    payments = attributes.get('payments') or data.get('payments') or []
+
+    if isinstance(payments, dict):
+        payments = payments.get('data') or []
+
+    for payment in payments if isinstance(payments, list) else []:
+        if not isinstance(payment, dict):
+            continue
+
+        payment_attributes = payment.get('attributes') or {}
+        statuses.extend([
+            payment.get('status'),
+            payment_attributes.get('status'),
+            payment_attributes.get('payment_status'),
+        ])
+
+    return [str(value).lower() for value in statuses if value]
+
+
+def is_paymongo_checkout_paid(response_body):
+    paid_statuses = {'paid', 'succeeded', 'success', 'completed'}
+    return any(status_value in paid_statuses for status_value in get_paymongo_payment_statuses(response_body))
+
 
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated])
@@ -2666,12 +2775,14 @@ def wallet_transactions(request):
     
     data = []
     for tx in transactions:
+        payment_transaction_id = get_wallet_transaction_payment_reference(tx)
         data.append({
             "id": tx.id,
             "transaction_type": tx.transaction_type,
             "amount": float(tx.amount),
             "description": tx.description,
             "reference_id": tx.reference_id,
+            "payment_transaction_id": payment_transaction_id,
             "created_at": tx.created_at
         })
     return Response(data)
@@ -2751,17 +2862,16 @@ def initiate_online_payment(request):
     booking = get_object_or_404(Booking, id=booking_id, student__user=request.user)
     
     # Calculate amount: Hourly Rate * Duration (sum of slots)
-    group_bookings = get_session_group_bookings(booking)
+    group_bookings = get_booking_request_bookings(booking)
+    representative_booking = get_representative_booking(group_bookings)
     duration_hours = get_duration_hours_for_bookings(group_bookings)
-    total_amount = float(booking.tutor.hourly_rate) * duration_hours
+    total_amount = decimal.Decimal(str(representative_booking.tutor.hourly_rate)) * decimal.Decimal(
+        str(duration_hours)
+    )
     
     # PayMongo amount in centavos
-    amount_cents = int(total_amount * 100)
-
-    # Prepare PayMongo Authentication
-    secret_key = getattr(settings, 'PAYMONGO_SECRET_KEY', 'sk_test_placeholder')
-    auth_str = f"{secret_key}:"
-    encoded_auth = base64.b64encode(auth_str.encode()).decode()
+    amount_cents = int(total_amount * decimal.Decimal("100"))
+    reference_code = f"SB-BK-{representative_booking.id}"
 
     url = "https://api.paymongo.com/v1/checkout_sessions"
     payload = {
@@ -2770,34 +2880,57 @@ def initiate_online_payment(request):
                 "send_email_receipt": True,
                 "show_description": True,
                 "show_line_items": True,
-                "description": f"StudyBuddy Session with {booking.tutor.profile.fname}",
+                "description": (
+                    f"StudyBuddy {reference_code} - Session with "
+                    f"{representative_booking.tutor.profile.fname}"
+                ),
                 "line_items": [
                     {
                         "currency": "PHP",
                         "amount": amount_cents,
-                        "description": "Tutoring Session Fee",
-                        "name": f"Session on {booking.session_date}",
+                        "description": f"Tutoring Session Fee ({reference_code})",
+                        "name": f"StudyBuddy {reference_code}",
                         "quantity": 1
                     }
                 ],
                 "payment_method_types": ["gcash", "card", "paymaya"],
-                "success_url": f"{settings.FRONTEND_URL}/tuteeSessionDetails/{booking.id}?payment=success",
-                "cancel_url": f"{settings.FRONTEND_URL}/payment-tutee/{booking.id}?payment=cancelled",
+                "success_url": f"{settings.FRONTEND_URL}/tuteeSessionDetails/{representative_booking.id}?payment=success",
+                "cancel_url": f"{settings.FRONTEND_URL}/payment-tutee/{representative_booking.id}?payment=cancelled",
             }
         }
     }
     
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Basic {encoded_auth}"
-    }
-
     try:
-        response = requests.post(url, json=payload, headers=headers)
-        res_data = response.json()
+        response = requests.post(url, json=payload, headers=get_paymongo_auth_headers())
+        try:
+            res_data = response.json()
+        except ValueError:
+            res_data = {"raw": getattr(response, "text", "")}
+
+        logger.info(
+            "PayMongo checkout response status=%s",
+            response.status_code,
+        )
         
-        if response.status_code == 201:
-            checkout_url = res_data['data']['attributes']['checkout_url']
+        if response.status_code in (200, 201):
+            checkout_url = (
+                res_data
+                .get('data', {})
+                .get('attributes', {})
+                .get('checkout_url')
+            )
+
+            if not checkout_url:
+                logger.error("PayMongo checkout response missing checkout_url: %s", res_data)
+                error_response = {
+                    "error": "Payment provider did not return a checkout URL.",
+                }
+
+                if settings.DEBUG:
+                    error_response["provider_status"] = response.status_code
+                    error_response["provider_error"] = res_data
+
+                return Response(error_response, status=status.HTTP_502_BAD_GATEWAY)
             
             # Store payment record
             method_online, _ = PaymentMethod.objects.get_or_create(
@@ -2806,23 +2939,154 @@ def initiate_online_payment(request):
             )
             
             payment, _ = Payment.objects.get_or_create(
-                booking=booking, 
+                booking=representative_booking,
                 defaults={
                     'amount': total_amount,
                     'method': method_online,
                     'payment_status': 'Pending'
                 }
             )
-            payment.transaction_reference = res_data['data']['id']
-            payment.save()
+            payment.amount = total_amount
+            payment.method = method_online
+            payment.payment_status = 'Pending'
+            payment.transaction_reference = res_data.get('data', {}).get('id')
+            payment.save(update_fields=[
+                'amount',
+                'method',
+                'payment_status',
+                'transaction_reference',
+            ])
             
             return Response({"payment_url": checkout_url})
+
+        provider_message = get_paymongo_error_message(res_data)
+        logger.error(
+            "PayMongo checkout failed status=%s error=%s body=%s",
+            response.status_code,
+            provider_message,
+            res_data,
+        )
+
+        if response.status_code == 401:
+            error_response = {
+                "error": "Payment provider authentication failed. Check the PayMongo secret key.",
+            }
+            response_status = status.HTTP_502_BAD_GATEWAY
         else:
-            logger.error(f"PayMongo Error: {res_data}")
-            return Response({"error": "Failed to create checkout session"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            error_response = {"error": provider_message}
+            response_status = (
+                status.HTTP_400_BAD_REQUEST
+                if response.status_code == 400
+                else status.HTTP_502_BAD_GATEWAY
+            )
+
+        if settings.DEBUG:
+            error_response["provider_status"] = response.status_code
+            error_response["provider_error"] = res_data
+
+        return Response(error_response, status=response_status)
     except Exception as e:
         logger.error(f"Payment Initiation Exception: {str(e)}")
         return Response({"error": "Internal server error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def verify_online_payment(request, booking_id):
+    profile = request.user.userprofile
+    booking = get_object_or_404(
+        Booking.objects.select_related('availability', 'tutor', 'tutor__profile'),
+        id=booking_id
+    )
+
+    if profile != booking.student:
+        return Response({"error": "Unauthorized"}, status=403)
+
+    session_group_bookings = get_booking_request_bookings(booking)
+    representative_booking = get_representative_booking(session_group_bookings)
+    payment = getattr(representative_booking, 'payment', None)
+
+    if not payment or getattr(payment.method, 'code', None) != 'PAYMONGO':
+        return Response({"error": "No PayMongo checkout is pending for this session."}, status=400)
+
+    if not payment.transaction_reference:
+        return Response({"error": "Missing PayMongo checkout session reference."}, status=400)
+
+    url = f"https://api.paymongo.com/v1/checkout_sessions/{payment.transaction_reference}"
+
+    try:
+        response = requests.get(url, headers=get_paymongo_auth_headers())
+
+        try:
+            res_data = response.json()
+        except ValueError:
+            res_data = {"raw": getattr(response, "text", "")}
+
+        logger.info(
+            "PayMongo checkout retrieve response status=%s",
+            response.status_code,
+        )
+
+        if response.status_code != 200:
+            provider_message = get_paymongo_error_message(res_data)
+            logger.error(
+                "PayMongo checkout retrieve failed status=%s error=%s body=%s",
+                response.status_code,
+                provider_message,
+                res_data,
+            )
+            error_response = {"error": provider_message}
+
+            if settings.DEBUG:
+                error_response["provider_status"] = response.status_code
+                error_response["provider_error"] = res_data
+
+            return Response(error_response, status=status.HTTP_502_BAD_GATEWAY)
+
+        if not is_paymongo_checkout_paid(res_data):
+            error_response = {
+                "error": "Online payment has not been completed yet.",
+                "provider_payment_statuses": get_paymongo_payment_statuses(res_data),
+            }
+
+            if settings.DEBUG:
+                error_response["provider_status"] = response.status_code
+                error_response["provider_error"] = res_data
+
+            return Response(error_response, status=status.HTTP_400_BAD_REQUEST)
+
+        already_submitted = all(
+            group_booking.status == "Awaiting Payment Verification"
+            and group_booking.tutee_confirmed
+            for group_booking in session_group_bookings
+        )
+
+        with transaction.atomic():
+            payment.payment_status = "Paid"
+            payment.paid_at = now()
+            payment.save(update_fields=['payment_status', 'paid_at'])
+
+            Booking.objects.filter(
+                id__in=[group_booking.id for group_booking in session_group_bookings]
+            ).update(
+                tutee_confirmed=True,
+                status="Awaiting Payment Verification"
+            )
+
+            if not already_submitted:
+                create_booking_status_notification(
+                    representative_booking.tutor.profile,
+                    "awaiting_payment_verification",
+                    session_group_bookings
+                )
+
+        representative_booking.refresh_from_db()
+        refreshed_group = get_session_group_bookings(representative_booking)
+        return Response(build_booking_detail_payload(refreshed_group))
+    except Exception as e:
+        logger.error(f"Payment Verification Exception: {str(e)}")
+        return Response({"error": "Internal server error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 def credit_tutor_wallet(booking):
     session_group = get_session_group_bookings(booking)
@@ -2843,15 +3107,20 @@ def credit_tutor_wallet(booking):
     with transaction.atomic():
         wallet, _ = Wallet.objects.get_or_create(tutor=rep_booking.tutor)
 
-        if payment.method.code == 'online':
+        if payment.method.code in ONLINE_WALLET_PAYMENT_CODES:
             tutor_share = total_amount - commission
             wallet.balance += tutor_share
-            wallet.save()
+            wallet.save(update_fields=['balance'])
+            payment_reference = payment.transaction_reference
+            reference_note = f" - Transaction ID: {payment_reference}" if payment_reference else ""
             Transaction.objects.create(
                 wallet=wallet,
                 transaction_type='session_credit',
                 amount=tutor_share,
-                description=f"Session Credit for {rep_booking.session_date} (Less 10% Platform Fee)",
+                description=(
+                    f"Session Credit for {rep_booking.session_date} "
+                    f"(Less 10% Platform Fee){reference_note}"
+                ),
                 reference_id=ref_id
             )
         elif payment.method.code == 'CASH':

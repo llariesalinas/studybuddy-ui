@@ -23,10 +23,12 @@ load_dotenv(BASE_DIR / ".env")
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-p@^2u1gzwyov3&bo_2td(e8i-#m3(97ai@f^jg$l&k-0e%+fhc')
+SECRET_KEY = os.getenv('SECRET_KEY')
+if not SECRET_KEY:
+    raise RuntimeError("SECRET_KEY env var is required but not set")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv('DEBUG', 'false').lower() == 'true'
 
 ALLOWED_HOSTS = []
 
@@ -175,5 +177,7 @@ CHANNEL_LAYERS = {
 }
 
 # PayMongo & Integration Settings
-PAYMONGO_SECRET_KEY = os.getenv("PAYMONGO_SECRET_KEY", "sk_test_placeholder")
+PAYMONGO_SECRET_KEY = os.getenv("PAYMONGO_SECRET_KEY")
+if not PAYMONGO_SECRET_KEY:
+    raise RuntimeError("PAYMONGO_SECRET_KEY env var is required but not set")
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
