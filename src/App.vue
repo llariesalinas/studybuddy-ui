@@ -279,6 +279,8 @@
       </Transition>
     </main>
   </div>
+
+  <SbToast />
 </template>
 
 <script setup>
@@ -293,6 +295,7 @@ import { useChatStore } from '@/stores/chat'
 import router from './router'
 import * as bootstrap from 'bootstrap'
 import { SESSION_POLL_INTERVAL_MS } from './config.js'
+import SbToast from '@/components/SbToast.vue'
 
 const route = useRoute()
 const authStore = useAuthStore()
