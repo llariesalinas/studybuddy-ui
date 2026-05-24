@@ -45,7 +45,7 @@
               >
 
                 <div
-                  class="card border rounded-4 p-3 text-center h-100 subject-card"
+                  class="card border rounded-4 p-3 text-center h-100 subject-card sb-interactive"
                   style="cursor:pointer"
                   :class="store.selectedSubjects.includes(subject.subject_code)
                     ? 'border-success bg-success bg-opacity-10'
@@ -66,7 +66,7 @@
             <div class="d-flex justify-content-end">
 
               <button
-                class="btn btn-success px-4"
+                class="btn btn-success px-4 sb-btn"
                 :disabled="store.selectedSubjects.length === 0"
                 @click="nextCard"
               >
@@ -107,7 +107,7 @@
             <div class="d-flex justify-content-end">
 
               <button
-                class="btn btn-success px-4"
+                class="btn btn-success px-4 sb-btn"
                 :disabled="!yearLevel"
                 @click="nextCard"
               >
@@ -148,7 +148,7 @@
             <div class="d-flex justify-content-end">
 
               <button
-                class="btn btn-success px-4"
+                class="btn btn-success px-4 sb-btn"
                 :disabled="!selectedCourse || isSubmitting"
                 @click="finish"
               >
