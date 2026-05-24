@@ -91,8 +91,15 @@
                   <span :class="getTypeBadgeClass(tx.transaction_type)" class="tx-type-badge mt-1">
                     {{ formatType(tx.transaction_type) }}
                   </span>
+                  <div
+                    v-if="tx.student_name"
+                    class="text-muted mt-1"
+                    style="font-size:11px;"
+                  >
+                    Student: {{ tx.student_name }}
+                  </div>
                   <div v-if="tx.reference_id" class="text-muted mt-1" style="font-size:11px;">
-                    Ref: {{ tx.reference_id }}
+                    Ledger Ref: {{ tx.reference_id }}
                   </div>
                 </div>
 

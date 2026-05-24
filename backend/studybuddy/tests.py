@@ -902,7 +902,8 @@ class OnlinePaymentInitiationTests(APITestCase):
         self.assertEqual(wallet.balance, Decimal("252.00"))
         self.assertEqual(transaction.transaction_type, "session_credit")
         self.assertEqual(transaction.amount, Decimal("252.00"))
-        self.assertIn("Transaction ID: cs_test_wallet", transaction.description)
+        self.assertIn("Student: Payment Tutee", transaction.description)
+        self.assertNotIn("Transaction ID", transaction.description)
 
     def test_wallet_transactions_include_paymongo_transaction_id(self):
         self.booking.status = "Awaiting Payment Verification"
@@ -922,12 +923,21 @@ class OnlinePaymentInitiationTests(APITestCase):
         )
         self.client.force_authenticate(user=self.tutor_user)
         self.client.post(f"/api/bookings/{self.booking.id}/tutor-confirm/")
+        Transaction.objects.filter(reference_id=f"BK-{self.booking.id}").update(
+            description=(
+                "Session Credit for 2026-04-12 (Less 10% Platform Fee) "
+                "- Transaction ID: cs_test_wallet"
+            )
+        )
 
         response = self.client.get("/api/wallet/transactions/")
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data[0]["reference_id"], f"BK-{self.booking.id}")
         self.assertEqual(response.data[0]["payment_transaction_id"], "cs_test_wallet")
+        self.assertEqual(response.data[0]["student_name"], "Payment Tutee")
+        self.assertIn("Student: Payment Tutee", response.data[0]["description"])
+        self.assertNotIn("Transaction ID", response.data[0]["description"])
 
     def test_tutor_completion_does_not_duplicate_wallet_credit(self):
         self.booking.status = "Awaiting Payment Verification"

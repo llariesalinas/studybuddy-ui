@@ -92,6 +92,7 @@ urlpatterns = [
     path('wallet/withdraw/', views.request_withdrawal),
     path('wallet/withdrawals/', views.list_withdrawals),
     path('payments/initiate/', views.initiate_online_payment),
+    path('bookings/<int:booking_id>/verify-online-payment/', views.verify_online_payment),
     path('tutor/setup/', views.tutor_setup),
     path('recommend-tutors/', views.recommend_tutors_view),
     path('chat/', include('studybuddy.chat.urls')),

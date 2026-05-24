@@ -382,6 +382,35 @@ def get_wallet_transaction_payment_reference(wallet_transaction):
     return payment.transaction_reference
 
 
+def get_wallet_transaction_student_name(wallet_transaction):
+    reference_id = wallet_transaction.reference_id or ''
+
+    if not reference_id.startswith('BK-'):
+        return None
+
+    try:
+        booking_id = int(reference_id.removeprefix('BK-'))
+    except ValueError:
+        return None
+
+    booking = Booking.objects.filter(id=booking_id).select_related('student').first()
+    if not booking:
+        return None
+
+    return f"{booking.student.fname} {booking.student.lname}".strip() or None
+
+
+def get_wallet_transaction_description(wallet_transaction, student_name=None):
+    description = wallet_transaction.description
+
+    if wallet_transaction.transaction_type != 'session_credit' or not student_name:
+        return description
+
+    base_description = description.split(' - Transaction ID:', 1)[0]
+    base_description = base_description.split(' - Student:', 1)[0]
+    return f"{base_description} - Student: {student_name}"
+
+
 def serialize_payment_summary(representative_booking):
     payment = getattr(representative_booking, 'payment', None)
 
@@ -2781,13 +2810,16 @@ def wallet_transactions(request):
     data = []
     for tx in transactions:
         payment_transaction_id = get_wallet_transaction_payment_reference(tx)
+        student_name = get_wallet_transaction_student_name(tx)
+        description = get_wallet_transaction_description(tx, student_name)
         data.append({
             "id": tx.id,
             "transaction_type": tx.transaction_type,
             "amount": float(tx.amount),
-            "description": tx.description,
+            "description": description,
             "reference_id": tx.reference_id,
             "payment_transaction_id": payment_transaction_id,
+            "student_name": student_name,
             "created_at": tx.created_at
         })
     return Response(data)
@@ -3116,15 +3148,15 @@ def credit_tutor_wallet(booking):
             tutor_share = total_amount - commission
             wallet.balance += tutor_share
             wallet.save(update_fields=['balance'])
-            payment_reference = payment.transaction_reference
-            reference_note = f" - Transaction ID: {payment_reference}" if payment_reference else ""
+            student_name = f"{rep_booking.student.fname} {rep_booking.student.lname}".strip()
+            student_note = f" - Student: {student_name}" if student_name else ""
             Transaction.objects.create(
                 wallet=wallet,
                 transaction_type='session_credit',
                 amount=tutor_share,
                 description=(
                     f"Session Credit for {rep_booking.session_date} "
-                    f"(Less 10% Platform Fee){reference_note}"
+                    f"(Less 10% Platform Fee){student_note}"
                 ),
                 reference_id=ref_id
             )

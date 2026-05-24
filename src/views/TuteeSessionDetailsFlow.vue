@@ -9,9 +9,25 @@
       {{ errorMessage || 'Booking not found.' }}
     </div>
 
-    <div v-else class="row g-4">
-      <div class="col-12 col-lg-8">
-        <div class="card shadow-sm p-4 h-100">
+    <template v-else>
+      <div
+        v-if="paymentReturnMessage"
+        class="alert d-flex align-items-center gap-2"
+        :class="paymentReturnAlertClass"
+      >
+        <span
+          v-if="paymentSyncing"
+          class="spinner-border spinner-border-sm"
+          role="status"
+          aria-hidden="true"
+        ></span>
+        <i v-else class="bi" :class="paymentReturnIcon"></i>
+        <span>{{ paymentReturnMessage }}</span>
+      </div>
+
+      <div class="row g-4">
+        <div class="col-12 col-lg-8">
+          <div class="card shadow-sm p-4 h-100">
           <div class="d-flex gap-3 align-items-start">
             <div class="avatar-shell">
               <img
@@ -90,11 +106,11 @@
               </div>
             </div>
           </div>
+          </div>
         </div>
-      </div>
 
-      <div class="col-12 col-lg-4">
-        <div class="card shadow-sm p-4 h-100">
+        <div class="col-12 col-lg-4">
+          <div class="card shadow-sm p-4 h-100">
           <h5 class="fw-bold mb-3">Next Action</h5>
 
           <template v-if="canSubmitPayment">
@@ -148,6 +164,7 @@
         </div>
       </div>
     </div>
+    </template>
 
     <RatingStackModal
       :open="isRatingModalOpen"
@@ -230,6 +247,9 @@ const errorMessage = ref('')
 const isRatingModalOpen = ref(false)
 const isCancelModalOpen = ref(false)
 const isCancelling = ref(false)
+const paymentSyncing = ref(false)
+const paymentReturnMessage = ref('')
+const paymentReturnState = ref('info')
 
 const normalizedStatus = computed(() => String(sessionDetail.value?.session?.status || '').toLowerCase())
 const canSubmitPayment = computed(() => normalizedStatus.value === 'payment required')
@@ -254,6 +274,16 @@ const cancelActionMessage = computed(() => {
   }
 
   return 'Cancellation is only available before the session date.'
+})
+const paymentReturnAlertClass = computed(() => {
+  if (paymentReturnState.value === 'success') return 'alert-success'
+  if (paymentReturnState.value === 'warning') return 'alert-warning'
+  return 'alert-info'
+})
+const paymentReturnIcon = computed(() => {
+  if (paymentReturnState.value === 'success') return 'bi-check-circle-fill'
+  if (paymentReturnState.value === 'warning') return 'bi-exclamation-triangle-fill'
+  return 'bi-info-circle-fill'
 })
 
 const tutorInitials = computed(() => {
@@ -319,6 +349,29 @@ const loadSession = async () => {
   }
 }
 
+const syncReturnedOnlinePayment = async () => {
+  if (route.query.payment !== 'success') {
+    return
+  }
+
+  paymentSyncing.value = true
+  paymentReturnState.value = 'info'
+  paymentReturnMessage.value = 'Confirming your online payment...'
+
+  try {
+    sessionDetail.value = await sessionsStore.verifyOnlinePayment(route.params.id)
+    await notificationsStore.fetchNotifications()
+    paymentReturnState.value = 'success'
+    paymentReturnMessage.value = 'Payment confirmed. Waiting for tutor verification.'
+    router.replace({ name: 'tuteeSessionDetails', params: route.params, query: {} })
+  } catch (error) {
+    paymentReturnState.value = 'warning'
+    paymentReturnMessage.value = error.response?.data?.error || 'Unable to confirm the online payment yet.'
+  } finally {
+    paymentSyncing.value = false
+  }
+}
+
 const closeCancelModal = () => {
   if (isCancelling.value) {
     return
@@ -359,7 +412,10 @@ const handleRated = async () => {
   }
 }
 
-onMounted(loadSession)
+onMounted(async () => {
+  await loadSession()
+  await syncReturnedOnlinePayment()
+})
 </script>
 
 <style scoped>
