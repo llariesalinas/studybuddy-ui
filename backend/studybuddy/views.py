@@ -344,7 +344,12 @@ def get_payment_method_code(payment):
     return getattr(getattr(payment, 'method', None), 'code', None)
 
 
-ONLINE_WALLET_PAYMENT_CODES = {'online', 'PAYMONGO', 'GCASH', 'BANK'}
+# All codes that the UI labels as "Online Payment"
+ONLINE_LABEL_CODES = {'online', 'PAYMONGO', 'GCASH', 'BANK'}
+
+# Codes whose payments are settled via PayMongo and should auto-credit the tutor wallet.
+# GCASH and BANK are excluded: they may be settled via a separate manual or external flow.
+PAYMONGO_SETTLED_CODES = {'online', 'PAYMONGO'}
 
 
 def get_payment_method_label(payment):
@@ -353,7 +358,7 @@ def get_payment_method_label(payment):
     if not method:
         return None
 
-    if method.code in ONLINE_WALLET_PAYMENT_CODES:
+    if method.code in ONLINE_LABEL_CODES:
         return 'Online Payment'
 
     return method.method_name
@@ -3107,7 +3112,7 @@ def credit_tutor_wallet(booking):
     with transaction.atomic():
         wallet, _ = Wallet.objects.get_or_create(tutor=rep_booking.tutor)
 
-        if payment.method.code in ONLINE_WALLET_PAYMENT_CODES:
+        if payment.method.code in PAYMONGO_SETTLED_CODES:
             tutor_share = total_amount - commission
             wallet.balance += tutor_share
             wallet.save(update_fields=['balance'])
