@@ -369,27 +369,27 @@ async function saveLocation() {
 }
 
 .chat-banner__badge--warning {
-  background: #ffc107;
-  color: #212529;
+  background: var(--sb-warning-bg);
+  color: var(--sb-text-dark);
 }
 
 .chat-banner__badge--primary {
-  background: #0d6efd;
+  background: var(--sb-link);
   color: #fff;
 }
 
 .chat-banner__badge--info {
-  background: #0dcaf0;
-  color: #212529;
+  background: var(--sb-info-bg);
+  color: var(--sb-text-dark);
 }
 
 .chat-banner__badge--danger {
-  background: #dc3545;
+  background: var(--sb-danger-bs);
   color: #fff;
 }
 
 .chat-banner__icon {
-  color: var(--sb-primary, #00895a);
+  color: var(--sb-primary);
   flex-shrink: 0;
   font-size: 16px;
 }
@@ -397,11 +397,11 @@ async function saveLocation() {
 .chat-banner--pending .chat-banner__icon,
 .chat-banner--pending_location .chat-banner__icon,
 .chat-banner--payment_required .chat-banner__icon {
-  color: #997404;
+  color: var(--sb-warning-text);
 }
 
 .chat-banner--confirmed .chat-banner__icon {
-  color: #0d6efd;
+  color: var(--sb-link);
 }
 
 .chat-banner--awaiting_payment .chat-banner__icon,
@@ -412,7 +412,7 @@ async function saveLocation() {
 
 .chat-banner--rejected .chat-banner__icon,
 .chat-banner--cancelled .chat-banner__icon {
-  color: #dc3545;
+  color: var(--sb-danger-bs);
 }
 
 .chat-banner__text {
@@ -422,7 +422,7 @@ async function saveLocation() {
 }
 
 .chat-banner__label {
-  color: #163127;
+  color: var(--sb-text-main);
   font-size: 13px;
   font-weight: 700;
   overflow: hidden;
@@ -431,7 +431,7 @@ async function saveLocation() {
 }
 
 .chat-banner__sub {
-  color: #6c757d;
+  color: var(--sb-text-muted);
   font-size: 12px;
   margin-top: 1px;
 }
@@ -452,7 +452,7 @@ async function saveLocation() {
 }
 
 .chat-banner__location-value {
-  color: #495057;
+  color: var(--sb-text-secondary);
   font-size: 13px;
 }
 
@@ -468,7 +468,7 @@ async function saveLocation() {
   background: transparent;
   border: 0;
   border-radius: 8px;
-  color: #495057;
+  color: var(--sb-text-secondary);
   cursor: pointer;
   font-size: 13px;
   font-weight: 600;
@@ -477,12 +477,12 @@ async function saveLocation() {
 }
 
 .chat-banner__btn--primary {
-  background: var(--sb-primary, #00895a);
+  background: var(--sb-primary);
   color: #ffffff;
 }
 
 .chat-banner__btn--ghost {
-  color: var(--sb-primary, #00895a);
+  color: var(--sb-primary);
   font-weight: 700;
 }
 
@@ -503,7 +503,7 @@ async function saveLocation() {
 }
 
 .chat-banner__error {
-  color: #dc3545;
+  color: var(--sb-danger-bs);
   font-size: 12px;
   margin: 4px 0 0;
 }

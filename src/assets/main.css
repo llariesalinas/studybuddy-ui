@@ -3,6 +3,24 @@
   --sb-primary: #00895A;   /* Primary green (buttons, icons, active text) */
   --sb-bg: #F8F9FA;        /* Main background */
   --sb-card-border: #EAEAEA;
+
+  --sb-primary-dark:    #0a7a51;
+  --sb-primary-light:   #edf6f1;
+  --sb-primary-lighter: #dff1e8;
+  --sb-primary-mid:     #18a36c;
+  --sb-text-main:       #163127;
+  --sb-text-muted:      #6b7280;
+  --sb-text-secondary:  #495057;
+  --sb-text-dark:       #212529;
+  --sb-text-subtle:     #a0acb8;
+  --sb-text-muted-green:#6b7d74;
+  --sb-border-light:    #e0e7e3;
+  --sb-danger:          #ef4444;
+  --sb-danger-bs:       #dc3545;
+  --sb-warning-bg:      #ffc107;
+  --sb-warning-text:    #997404;
+  --sb-info-bg:         #0dcaf0;
+  --sb-link:            #0d6efd;
 }
 
 body {

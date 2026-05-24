@@ -438,7 +438,7 @@ body {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: #ef4444;
+  background: var(--sb-danger);
   box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.18);
 }
 
@@ -477,7 +477,7 @@ body {
   border-radius: 50%;
   border: 1.5px solid #dee2e6;
   background: #fff;
-  color: #495057;
+  color: var(--sb-text-secondary);
   text-decoration: none;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
   position: relative;
@@ -497,7 +497,7 @@ body {
   height: 20px;
   padding: 0 5px;
   border-radius: 999px;
-  background: #dc3545;
+  background: var(--sb-danger-bs);
   color: #ffffff;
   border: 2px solid #ffffff;
   font-size: 11px;
@@ -517,7 +517,7 @@ body {
   border-radius: 8px;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
   padding: 12px 14px;
-  color: #163127;
+  color: var(--sb-text-main);
   text-decoration: none;
 }
 
@@ -535,7 +535,7 @@ body {
 
 .chat-toast span {
   margin-top: 3px;
-  color: #6c757d;
+  color: var(--sb-text-secondary);
   font-size: 12px;
 }
 

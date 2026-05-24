@@ -650,13 +650,13 @@ onUnmounted(() => {
   font-size: 18px;
   font-weight: 700;
   margin: 0;
-  color: #163127;
+  color: var(--sb-text-main);
 }
 
 .sidebar-header p {
   margin: 4px 0 0;
   font-size: 12px;
-  color: #6c757d;
+  color: var(--sb-text-secondary);
 }
 
 .connection-pill,
@@ -664,14 +664,14 @@ onUnmounted(() => {
 .room-session-badge {
   border-radius: 999px;
   background: #f1f3f5;
-  color: #495057;
+  color: var(--sb-text-secondary);
   font-size: 11px;
   font-weight: 700;
   padding: 4px 9px;
 }
 
 .connection-pill.online {
-  color: #00895a;
+  color: var(--sb-primary);
 }
 
 .room-list {
@@ -698,14 +698,14 @@ onUnmounted(() => {
 }
 
 .room-item.active {
-  border-left-color: #00895a;
+  border-left-color: var(--sb-primary);
 }
 
 .room-avatar {
   width: 42px;
   height: 42px;
   border-radius: 50%;
-  background: #00895a;
+  background: var(--sb-primary);
   color: #ffffff;
   display: inline-flex;
   align-items: center;
@@ -735,7 +735,7 @@ onUnmounted(() => {
 .room-name {
   min-width: 0;
   flex: 1;
-  color: #163127;
+  color: var(--sb-text-main);
   font-weight: 700;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -743,7 +743,7 @@ onUnmounted(() => {
 }
 
 .last-message {
-  color: #6c757d;
+  color: var(--sb-text-secondary);
   font-size: 13px;
   margin-top: 2px;
   overflow: hidden;
@@ -761,7 +761,7 @@ onUnmounted(() => {
   height: 20px;
   padding: 0 6px;
   border-radius: 999px;
-  background: #00895a;
+  background: var(--sb-primary);
   color: #ffffff;
   font-size: 11px;
   font-weight: 800;
@@ -968,7 +968,7 @@ onUnmounted(() => {
   gap: 8px;
   padding: 0 10px;
   font-size: 11px;
-  color: #6c757d;
+  color: var(--sb-text-secondary);
 }
 
 .is-me .message-meta {
@@ -982,7 +982,7 @@ onUnmounted(() => {
 }
 
 .send-status.failed {
-  color: #dc3545;
+  color: var(--sb-danger-bs);
   font-weight: 700;
 }
 
@@ -1021,11 +1021,11 @@ onUnmounted(() => {
   border: 1px solid #e8e8e8;
   border-radius: 8px;
   padding: 12px;
-  color: #163127;
+  color: var(--sb-text-main);
 }
 
 .system-event > i {
-  color: #00895a;
+  color: var(--sb-primary);
 }
 
 .booking-card {
@@ -1051,13 +1051,13 @@ onUnmounted(() => {
   font-size: 16px;
   font-weight: 800;
   margin: 2px 0 0;
-  color: #163127;
+  color: var(--sb-text-main);
 }
 
 .booking-eyebrow {
   font-size: 11px;
   font-weight: 800;
-  color: #00895a;
+  color: var(--sb-primary);
   text-transform: uppercase;
 }
 
@@ -1068,7 +1068,7 @@ onUnmounted(() => {
 }
 
 .booking-grid span {
-  color: #495057;
+  color: var(--sb-text-secondary);
   font-size: 13px;
   display: flex;
   gap: 7px;
@@ -1101,7 +1101,7 @@ onUnmounted(() => {
 .location-edit-row button,
 .text-action {
   border: 0;
-  background: #00895a;
+  background: var(--sb-primary);
   color: #ffffff;
   border-radius: 8px;
   padding: 9px 12px;
@@ -1110,18 +1110,18 @@ onUnmounted(() => {
 
 .text-action {
   background: transparent;
-  color: #00895a;
+  color: var(--sb-primary);
   padding: 0;
 }
 
 .location-error {
-  color: #dc3545;
+  color: var(--sb-danger-bs);
   font-size: 12px;
   margin: 6px 0 0;
 }
 
 .details-link {
-  color: #00895a;
+  color: var(--sb-primary);
   display: inline-block;
   font-size: 13px;
   font-weight: 700;
@@ -1129,7 +1129,7 @@ onUnmounted(() => {
 }
 
 .typing-indicator {
-  color: #6c757d;
+  color: var(--sb-text-secondary);
   font-size: 13px;
   padding-left: 4px;
 }
@@ -1161,7 +1161,7 @@ onUnmounted(() => {
   border-radius: 14px;
   width: 48px;
   height: 48px;
-  background: #00895a;
+  background: var(--sb-primary);
   color: #ffffff;
   display: inline-flex;
   align-items: center;
@@ -1207,7 +1207,7 @@ onUnmounted(() => {
 }
 
 .context-profile h4 {
-  color: #163127;
+  color: var(--sb-text-main);
   font-size: 22px;
   font-weight: 800;
   margin: 0;
@@ -1215,7 +1215,7 @@ onUnmounted(() => {
 
 .context-profile p,
 .context-empty {
-  color: #6c757d;
+  color: var(--sb-text-secondary);
   font-size: 13px;
   margin: 4px 0 0;
 }
@@ -1227,7 +1227,7 @@ onUnmounted(() => {
 }
 
 .context-section h5 {
-  color: #6c757d;
+  color: var(--sb-text-secondary);
   font-size: 11px;
   font-weight: 800;
   margin: 0;
@@ -1249,14 +1249,14 @@ onUnmounted(() => {
 }
 
 .context-stat-card strong {
-  color: #00895a;
+  color: var(--sb-primary);
   display: block;
   font-size: 24px;
   line-height: 1.1;
 }
 
 .context-stat-card span {
-  color: #6c757d;
+  color: var(--sb-text-secondary);
   font-size: 11px;
 }
 
@@ -1270,7 +1270,7 @@ onUnmounted(() => {
   background: rgba(255, 255, 255, 0.62);
   border: 1px solid rgba(255, 255, 255, 0.9);
   border-radius: 999px;
-  color: #163127;
+  color: var(--sb-text-main);
   font-size: 12px;
   font-weight: 700;
   padding: 7px 11px;
@@ -1282,7 +1282,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #6c757d;
+  color: var(--sb-text-secondary);
   text-align: center;
 }
 

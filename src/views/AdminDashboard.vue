@@ -243,7 +243,7 @@ const formatDate = (dateStr) => {
   top: 35px;
   bottom: -20px;
   width: 2px;
-  background-color: #f0f0f0;
+  background-color: var(--sb-bg);
 }
 
 .activity-icon {
@@ -253,7 +253,7 @@ const formatDate = (dateStr) => {
 }
 
 .btn-light:hover {
-  background-color: #f8f9fa !important;
+  background-color: var(--sb-bg) !important;
   transform: translateY(-2px);
   transition: all 0.2s ease;
 }
