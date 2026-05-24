@@ -1,4 +1,6 @@
 from datetime import date, time
+from decimal import Decimal
+from unittest.mock import Mock, patch
 from uuid import uuid4
 
 from django.contrib.auth.models import User
@@ -7,6 +9,8 @@ from rest_framework.test import APITestCase
 from .chat.services import get_current_booking_context, get_partner_context
 from .models import (
     Booking,
+    Payment,
+    PaymentMethod,
     Rating,
     Subjects,
     Tutor,
@@ -14,6 +18,8 @@ from .models import (
     TutorAvailabilityOverride,
     TutorSubjects,
     UserProfile,
+    Transaction,
+    Wallet,
 )
 from .chat.models import ChatRoom, Message
 
@@ -546,3 +552,461 @@ class ChatFeatureTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, 401)
+
+
+class OnlinePaymentInitiationTests(APITestCase):
+    def setUp(self):
+        self.tutee_user = User.objects.create_user(
+            username="payment-tutee",
+            email="payment-tutee@example.com",
+            password="password",
+        )
+        self.tutee_profile = UserProfile.objects.create(
+            user=self.tutee_user,
+            fname="Payment",
+            mname="",
+            lname="Tutee",
+            role="Tutee",
+        )
+        self.tutor_user = User.objects.create_user(
+            username="payment-tutor",
+            email="payment-tutor@example.com",
+            password="password",
+        )
+        self.tutor_profile = UserProfile.objects.create(
+            user=self.tutor_user,
+            fname="Payment",
+            mname="",
+            lname="Tutor",
+            role="Tutor",
+        )
+        self.tutor = Tutor.objects.create(
+            profile=self.tutor_profile,
+            hourly_rate=Decimal("280.00"),
+            can_online=True,
+            can_f2f=True,
+            teaching_level="SHS",
+        )
+        self.availability = TutorAvailability.objects.create(
+            tutor=self.tutor,
+            day="Mon",
+            time_slot=time(14, 0),
+            is_active=True,
+        )
+        self.booking = Booking.objects.create(
+            student=self.tutee_profile,
+            tutor=self.tutor,
+            availability=self.availability,
+            session_date=date(2026, 4, 12),
+            session_mode="Online",
+            booking_request_id=uuid4(),
+            status="Confirmed",
+        )
+        self.client.force_authenticate(user=self.tutee_user)
+
+    def paymongo_response(self, status_code, payload):
+        response = Mock()
+        response.status_code = status_code
+        response.json.return_value = payload
+        return response
+
+    def success_payload(self, session_id="cs_test_123"):
+        return {
+            "data": {
+                "id": session_id,
+                "attributes": {
+                    "checkout_url": "https://checkout.paymongo.com/test-session",
+                },
+            },
+        }
+
+    def retrieve_payload(self, status_value="paid"):
+        return {
+            "data": {
+                "id": "cs_test_123",
+                "attributes": {
+                    "status": status_value,
+                },
+            },
+        }
+
+    def create_pending_paymongo_payment(self):
+        method = PaymentMethod.objects.create(
+            code="PAYMONGO",
+            method_name="Pay Online (GCash / Card)",
+            is_active=True,
+        )
+        return Payment.objects.create(
+            booking=self.booking,
+            amount=Decimal("140.00"),
+            method=method,
+            payment_status="Pending",
+            transaction_reference="cs_test_123",
+        )
+
+    def create_second_request_slot(self):
+        second_availability = TutorAvailability.objects.create(
+            tutor=self.tutor,
+            day="Mon",
+            time_slot=time(14, 30),
+            is_active=True,
+        )
+        return Booking.objects.create(
+            student=self.tutee_profile,
+            tutor=self.tutor,
+            availability=second_availability,
+            session_date=self.booking.session_date,
+            session_mode="Online",
+            session_group_id=self.booking.session_group_id,
+            booking_request_id=self.booking.booking_request_id,
+            status=self.booking.status,
+        )
+
+    @patch("studybuddy.views.requests.post")
+    def test_initiate_online_payment_accepts_paymongo_200_success(self, mock_post):
+        mock_post.return_value = self.paymongo_response(200, self.success_payload())
+
+        response = self.client.post(
+            "/api/payments/initiate/",
+            {"booking_id": self.booking.id},
+            format="json",
+        )
+
+        payment = Payment.objects.get(booking=self.booking)
+        payload = mock_post.call_args.kwargs["json"]
+        attributes = payload["data"]["attributes"]
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.data["payment_url"],
+            "https://checkout.paymongo.com/test-session",
+        )
+        self.assertEqual(payment.amount, Decimal("140.00"))
+        self.assertEqual(payment.method.code, "PAYMONGO")
+        self.assertEqual(payment.payment_status, "Pending")
+        self.assertEqual(payment.transaction_reference, "cs_test_123")
+        self.assertIn(f"SB-BK-{self.booking.id}", attributes["description"])
+        self.assertEqual(
+            attributes["line_items"][0]["name"],
+            f"StudyBuddy SB-BK-{self.booking.id}",
+        )
+
+    @patch("studybuddy.views.requests.post")
+    def test_initiate_online_payment_accepts_paymongo_201_success(self, mock_post):
+        mock_post.return_value = self.paymongo_response(201, self.success_payload("cs_test_201"))
+
+        response = self.client.post(
+            "/api/payments/initiate/",
+            {"booking_id": self.booking.id},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.data["payment_url"],
+            "https://checkout.paymongo.com/test-session",
+        )
+        self.assertEqual(
+            Payment.objects.get(booking=self.booking).transaction_reference,
+            "cs_test_201",
+        )
+
+    @patch("studybuddy.views.requests.post")
+    def test_initiate_online_payment_returns_paymongo_validation_error(self, mock_post):
+        mock_post.return_value = self.paymongo_response(
+            400,
+            {"errors": [{"code": "parameter_invalid", "detail": "Invalid payment method type."}]},
+        )
+
+        response = self.client.post(
+            "/api/payments/initiate/",
+            {"booking_id": self.booking.id},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["error"], "Invalid payment method type.")
+        self.assertFalse(Payment.objects.filter(booking=self.booking).exists())
+
+    @patch("studybuddy.views.requests.post")
+    def test_initiate_online_payment_returns_paymongo_auth_error(self, mock_post):
+        mock_post.return_value = self.paymongo_response(
+            401,
+            {"errors": [{"code": "secret_key_invalid", "detail": "Invalid API key."}]},
+        )
+
+        response = self.client.post(
+            "/api/payments/initiate/",
+            {"booking_id": self.booking.id},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 502)
+        self.assertEqual(
+            response.data["error"],
+            "Payment provider authentication failed. Check the PayMongo secret key.",
+        )
+        self.assertFalse(Payment.objects.filter(booking=self.booking).exists())
+
+    @patch("studybuddy.views.requests.post")
+    def test_initiate_online_payment_requires_checkout_url_on_success(self, mock_post):
+        mock_post.return_value = self.paymongo_response(
+            200,
+            {"data": {"id": "cs_missing_url", "attributes": {}}},
+        )
+
+        response = self.client.post(
+            "/api/payments/initiate/",
+            {"booking_id": self.booking.id},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 502)
+        self.assertEqual(response.data["error"], "Payment provider did not return a checkout URL.")
+        self.assertFalse(Payment.objects.filter(booking=self.booking).exists())
+
+    @patch("studybuddy.views.requests.get")
+    def test_verify_online_payment_marks_paymongo_payment_paid(self, mock_get):
+        payment = self.create_pending_paymongo_payment()
+        mock_get.return_value = self.paymongo_response(200, self.retrieve_payload("paid"))
+
+        response = self.client.post(f"/api/bookings/{self.booking.id}/verify-online-payment/")
+
+        payment.refresh_from_db()
+        self.booking.refresh_from_db()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["session"]["status"], "Awaiting Verification")
+        self.assertEqual(payment.payment_status, "Paid")
+        self.assertIsNotNone(payment.paid_at)
+        self.assertEqual(self.booking.status, "Awaiting Payment Verification")
+        self.assertTrue(self.booking.tutee_confirmed)
+
+    @patch("studybuddy.views.requests.get")
+    def test_verify_online_payment_updates_all_booking_request_slots(self, mock_get):
+        second_booking = self.create_second_request_slot()
+        self.create_pending_paymongo_payment()
+        mock_get.return_value = self.paymongo_response(200, self.retrieve_payload("paid"))
+
+        response = self.client.post(f"/api/bookings/{self.booking.id}/verify-online-payment/")
+
+        self.booking.refresh_from_db()
+        second_booking.refresh_from_db()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["session"]["status"], "Awaiting Verification")
+        self.assertEqual(self.booking.status, "Awaiting Payment Verification")
+        self.assertEqual(second_booking.status, "Awaiting Payment Verification")
+        self.assertTrue(self.booking.tutee_confirmed)
+        self.assertTrue(second_booking.tutee_confirmed)
+
+    @patch("studybuddy.views.requests.get")
+    @patch("studybuddy.views.requests.post")
+    def test_verify_payment_returns_all_booking_request_slots(self, mock_post, mock_get):
+        """Response must include all booking_request_id siblings, not just session_group siblings."""
+        second_booking = self.create_second_request_slot()
+        self.create_pending_paymongo_payment()
+
+        mock_get.return_value = self.paymongo_response(200, self.retrieve_payload("paid"))
+
+        response = self.client.post(
+            f"/api/bookings/{self.booking.id}/verify-online-payment/",
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        # Both slots should be reflected in the response. With 2 x 30-min slots the
+        # duration_hours must be 1.0; if the bug is present (get_session_group_bookings
+        # is used and session_group_id is None) only one slot is included → 0.5.
+        self.assertEqual(response.data["session"]["duration_hours"], 1.0)
+        _ = second_booking  # referenced to avoid unused-variable warning
+
+    def test_manual_payment_submission_updates_all_session_group_slots(self):
+        second_booking = self.create_second_request_slot()
+        method = PaymentMethod.objects.create(
+            code="CASH",
+            method_name="Cash",
+            is_active=True,
+        )
+
+        response = self.client.post(
+            f"/api/bookings/{self.booking.id}/submit-payment/",
+            {"payment_method": method.method_id},
+        )
+
+        self.booking.refresh_from_db()
+        second_booking.refresh_from_db()
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(self.booking.status, "Awaiting Payment Verification")
+        self.assertEqual(second_booking.status, "Awaiting Payment Verification")
+        self.assertTrue(self.booking.tutee_confirmed)
+        self.assertTrue(second_booking.tutee_confirmed)
+
+    def test_tutor_completion_updates_all_session_group_slots(self):
+        second_booking = self.create_second_request_slot()
+        self.booking.status = "Awaiting Payment Verification"
+        self.booking.tutee_confirmed = True
+        self.booking.save(update_fields=["status", "tutee_confirmed"])
+        second_booking.status = "Awaiting Payment Verification"
+        second_booking.tutee_confirmed = True
+        second_booking.save(update_fields=["status", "tutee_confirmed"])
+        method = PaymentMethod.objects.create(
+            code="CASH",
+            method_name="Cash",
+            is_active=True,
+        )
+        Payment.objects.create(
+            booking=self.booking,
+            amount=Decimal("280.00"),
+            method=method,
+            payment_status="Pending",
+        )
+        self.client.force_authenticate(user=self.tutor_user)
+
+        response = self.client.post(f"/api/bookings/{self.booking.id}/tutor-confirm/")
+
+        self.booking.refresh_from_db()
+        second_booking.refresh_from_db()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.booking.status, "Completed")
+        self.assertEqual(second_booking.status, "Completed")
+        self.assertTrue(self.booking.tutor_confirmed)
+        self.assertTrue(second_booking.tutor_confirmed)
+
+    def test_tutor_completion_credits_wallet_for_paymongo_payment(self):
+        self.booking.status = "Awaiting Payment Verification"
+        self.booking.tutee_confirmed = True
+        self.booking.save(update_fields=["status", "tutee_confirmed"])
+        method = PaymentMethod.objects.create(
+            code="PAYMONGO",
+            method_name="Pay Online (GCash / Card)",
+            is_active=True,
+        )
+        Payment.objects.create(
+            booking=self.booking,
+            amount=Decimal("280.00"),
+            method=method,
+            payment_status="Paid",
+            transaction_reference="cs_test_wallet",
+        )
+        self.client.force_authenticate(user=self.tutor_user)
+
+        response = self.client.post(f"/api/bookings/{self.booking.id}/tutor-confirm/")
+
+        wallet = Wallet.objects.get(tutor=self.tutor)
+        transaction = Transaction.objects.get(reference_id=f"BK-{self.booking.id}")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(wallet.balance, Decimal("252.00"))
+        self.assertEqual(transaction.transaction_type, "session_credit")
+        self.assertEqual(transaction.amount, Decimal("252.00"))
+        self.assertIn("Transaction ID: cs_test_wallet", transaction.description)
+
+    def test_wallet_transactions_include_paymongo_transaction_id(self):
+        self.booking.status = "Awaiting Payment Verification"
+        self.booking.tutee_confirmed = True
+        self.booking.save(update_fields=["status", "tutee_confirmed"])
+        method = PaymentMethod.objects.create(
+            code="PAYMONGO",
+            method_name="Pay Online (GCash / Card)",
+            is_active=True,
+        )
+        Payment.objects.create(
+            booking=self.booking,
+            amount=Decimal("280.00"),
+            method=method,
+            payment_status="Paid",
+            transaction_reference="cs_test_wallet",
+        )
+        self.client.force_authenticate(user=self.tutor_user)
+        self.client.post(f"/api/bookings/{self.booking.id}/tutor-confirm/")
+
+        response = self.client.get("/api/wallet/transactions/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data[0]["reference_id"], f"BK-{self.booking.id}")
+        self.assertEqual(response.data[0]["payment_transaction_id"], "cs_test_wallet")
+
+    def test_tutor_completion_does_not_duplicate_wallet_credit(self):
+        self.booking.status = "Awaiting Payment Verification"
+        self.booking.tutee_confirmed = True
+        self.booking.save(update_fields=["status", "tutee_confirmed"])
+        method = PaymentMethod.objects.create(
+            code="PAYMONGO",
+            method_name="Pay Online (GCash / Card)",
+            is_active=True,
+        )
+        Payment.objects.create(
+            booking=self.booking,
+            amount=Decimal("280.00"),
+            method=method,
+            payment_status="Paid",
+            transaction_reference="cs_test_wallet",
+        )
+        self.client.force_authenticate(user=self.tutor_user)
+
+        first_response = self.client.post(f"/api/bookings/{self.booking.id}/tutor-confirm/")
+        second_response = self.client.post(f"/api/bookings/{self.booking.id}/tutor-confirm/")
+
+        wallet = Wallet.objects.get(tutor=self.tutor)
+
+        self.assertEqual(first_response.status_code, 200)
+        self.assertEqual(second_response.status_code, 400)
+        self.assertEqual(wallet.balance, Decimal("252.00"))
+        self.assertEqual(Transaction.objects.filter(reference_id=f"BK-{self.booking.id}").count(), 1)
+
+    @patch("studybuddy.views.requests.get")
+    def test_verify_online_payment_rejects_incomplete_checkout(self, mock_get):
+        payment = self.create_pending_paymongo_payment()
+        mock_get.return_value = self.paymongo_response(200, self.retrieve_payload("active"))
+
+        response = self.client.post(f"/api/bookings/{self.booking.id}/verify-online-payment/")
+
+        payment.refresh_from_db()
+        self.booking.refresh_from_db()
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["error"], "Online payment has not been completed yet.")
+        self.assertEqual(payment.payment_status, "Pending")
+        self.assertEqual(self.booking.status, "Confirmed")
+        self.assertFalse(self.booking.tutee_confirmed)
+
+    def test_verify_online_payment_requires_paymongo_payment(self):
+        response = self.client.post(f"/api/bookings/{self.booking.id}/verify-online-payment/")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["error"], "No PayMongo checkout is pending for this session.")
+
+
+class PaymentMethodTests(APITestCase):
+    def test_payment_methods_hides_legacy_online_methods_when_paymongo_exists(self):
+        PaymentMethod.objects.all().delete()
+
+        PaymentMethod.objects.create(
+            code="CASH",
+            method_name="Cash",
+            is_active=True,
+        )
+        PaymentMethod.objects.create(
+            code="ONLINE",
+            method_name="Online Payment",
+            is_active=True,
+        )
+        PaymentMethod.objects.create(
+            code="online",
+            method_name="Online Payment",
+            is_active=True,
+        )
+        PaymentMethod.objects.create(
+            code="PAYMONGO",
+            method_name="Pay Online (GCash / Card)",
+            is_active=True,
+        )
+
+        response = self.client.get("/api/payment-methods/")
+        codes = [method["code"] for method in response.data]
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(codes, ["CASH", "PAYMONGO"])

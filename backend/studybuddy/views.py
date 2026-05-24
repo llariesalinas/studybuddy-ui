@@ -3081,7 +3081,7 @@ def verify_online_payment(request, booking_id):
                 )
 
         representative_booking.refresh_from_db()
-        refreshed_group = get_session_group_bookings(representative_booking)
+        refreshed_group = get_booking_request_bookings(representative_booking)
         return Response(build_booking_detail_payload(refreshed_group))
     except Exception as e:
         logger.error(f"Payment Verification Exception: {str(e)}")
