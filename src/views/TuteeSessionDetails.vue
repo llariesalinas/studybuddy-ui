@@ -65,7 +65,7 @@
 
           <div class="mt-4">
             <button
-              class="btn bg-sb-primary text-white px-4 py-2 rounded-3 fw-semibold shadow-sm w-100"
+              class="btn bg-sb-primary text-white px-4 py-2 rounded-3 fw-semibold shadow-sm w-100 sb-btn"
               :disabled="isButtonDisabled"
               data-bs-toggle="modal"
               data-bs-target="#confirmationModal"
@@ -150,8 +150,8 @@
           </div>
           
           <div class="modal-footer border-0">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-            <button type="button" class="btn bg-sb-primary text-white" 
+            <button type="button" class="btn btn-secondary sb-btn" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn bg-sb-primary text-white sb-btn" 
               :disabled="currentRating === 0 || isSubmitting" 
               @click="executeConfirmation">
               <span v-if="isSubmitting" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>

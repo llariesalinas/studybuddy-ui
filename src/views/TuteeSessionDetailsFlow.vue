@@ -117,7 +117,7 @@
             <p class="text-muted">
               Your session has ended. Submit your post-session payment details so your tutor can verify them.
             </p>
-            <button class="btn bg-sb-primary text-white w-100" @click="goToPayment">
+            <button class="btn bg-sb-primary text-white w-100 sb-btn" @click="goToPayment">
               Submit Payment
             </button>
           </template>
@@ -126,7 +126,7 @@
             <p class="text-muted mb-3">
               Waiting for your tutor to review the submitted payment.
             </p>
-            <button class="btn btn-outline-secondary w-100" disabled>
+            <button class="btn btn-outline-secondary w-100 sb-btn" disabled>
               Waiting for tutor verification...
             </button>
           </template>
@@ -136,7 +136,7 @@
               Your session is complete. A rating is optional, but it helps improve StudyBuddy matches.
             </p>
             <button
-              class="btn bg-sb-primary text-white w-100"
+              class="btn bg-sb-primary text-white w-100 sb-btn"
               @click="isRatingModalOpen = true"
             >
               Leave a Rating
@@ -148,7 +148,7 @@
               {{ cancelActionMessage }}
             </p>
             <button
-              class="btn btn-outline-danger w-100"
+              class="btn btn-outline-danger w-100 sb-btn"
               :disabled="isCancelling || !canCancelSession"
               @click="isCancelModalOpen = true"
             >
@@ -201,7 +201,7 @@
           <div class="modal-footer">
             <button
               type="button"
-              class="btn btn-outline-secondary"
+              class="btn btn-outline-secondary sb-btn"
               :disabled="isCancelling"
               @click="closeCancelModal"
             >
@@ -209,7 +209,7 @@
             </button>
             <button
               type="button"
-              class="btn btn-danger"
+              class="btn btn-danger sb-btn"
               :disabled="isCancelling"
               @click="handleCancelSession"
             >
