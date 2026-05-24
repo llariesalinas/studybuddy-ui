@@ -13,7 +13,7 @@
       </div>
     </div>
 
-    <button type="button" class="btn btn-dark rounded-3" @click="isModalOpen = true">
+    <button type="button" class="btn btn-dark rounded-3 sb-btn" @click="isModalOpen = true">
       Rate Latest Session
     </button>
   </div>

@@ -2,7 +2,7 @@
   <div class="date-picker-wrap">
     <button
       type="button"
-      class="btn w-100 text-start border-sb shadow-none date-trigger"
+      class="btn w-100 text-start border-sb shadow-none date-trigger sb-btn"
       :class="{ 'date-trigger-active': isOpen }"
       @click="openModal"
     >
@@ -29,7 +29,7 @@
             <div class="date-modal-actions">
               <button
                 type="button"
-                class="date-icon-btn"
+                class="date-icon-btn sb-btn"
                 :disabled="!canGoPrevious"
                 aria-label="Previous month"
                 @click="changeMonth(-1)"
@@ -38,7 +38,7 @@
               </button>
               <button
                 type="button"
-                class="date-icon-btn"
+                class="date-icon-btn sb-btn"
                 aria-label="Next month"
                 @click="changeMonth(1)"
               >
@@ -46,7 +46,7 @@
               </button>
               <button
                 type="button"
-                class="date-icon-btn"
+                class="date-icon-btn sb-btn"
                 aria-label="Close date picker"
                 @click="closeModal"
               >
@@ -64,7 +64,7 @@
               v-for="day in calendar.days"
               :key="day.dateKey"
               type="button"
-              class="date-cell"
+              class="date-cell sb-btn"
               :class="{
                 'date-cell-outside': !day.inMonth,
                 'date-cell-past': day.isPast,
@@ -79,7 +79,7 @@
           </div>
 
           <footer class="date-modal-footer">
-            <button type="button" class="date-today-btn" @click="selectToday">Today</button>
+            <button type="button" class="date-today-btn sb-btn" @click="selectToday">Today</button>
           </footer>
         </section>
       </div>

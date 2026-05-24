@@ -53,7 +53,7 @@
                   v-for="star in 5"
                   :key="star"
                   type="button"
-                  class="rating-star-btn-sm"
+                  class="rating-star-btn-sm sb-btn"
                   :class="{ active: ratings[cat.id] >= star }"
                   @click="ratings[cat.id] = star"
                 >
@@ -77,7 +77,7 @@
         <div class="rating-stack-footer">
           <button
             type="button"
-            class="btn btn-light"
+            class="btn btn-light sb-btn"
             :disabled="activeIndex === 0"
             @click="goToPrevious"
           >
@@ -85,12 +85,12 @@
           </button>
 
           <div class="rating-stack-actions">
-            <button type="button" class="btn btn-outline-secondary" @click="goToNextOrClose">
+            <button type="button" class="btn btn-outline-secondary sb-btn" @click="goToNextOrClose">
               Skip
             </button>
             <button
               type="button"
-              class="btn bg-sb-primary text-white"
+              class="btn bg-sb-primary text-white sb-btn"
               :disabled="!isFormValid || isSubmitting"
               @click="submitRating"
             >

@@ -2,7 +2,7 @@
   <div class="time-picker-wrap">
     <button
       type="button"
-      class="btn w-100 text-start border-sb shadow-none time-trigger"
+      class="btn w-100 text-start border-sb shadow-none time-trigger sb-btn"
       :class="{ 'time-trigger-active': isOpen }"
       :disabled="disabled"
       @click="openModal"
@@ -29,7 +29,7 @@
 
             <button
               type="button"
-              class="time-icon-btn"
+              class="time-icon-btn sb-btn"
               aria-label="Close time picker"
               @click="closeModal"
             >
@@ -42,7 +42,7 @@
               v-for="period in periods"
               :key="period"
               type="button"
-              class="time-segmented-option"
+              class="time-segmented-option sb-btn"
               :class="{ 'time-segmented-option-active': activePeriod === period }"
               @click="activePeriod = period"
             >
@@ -55,7 +55,7 @@
               v-for="slot in visibleTimeSlots"
               :key="slot.value"
               type="button"
-              class="time-chip"
+              class="time-chip sb-btn"
               :class="{ 'time-chip-active': slot.value === modelValue }"
               :disabled="slot.disabled"
               @click="selectTime(slot.value)"

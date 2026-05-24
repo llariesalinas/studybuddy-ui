@@ -35,13 +35,13 @@
           />
           <button
             type="button"
-            class="chat-banner__btn chat-banner__btn--primary"
+            class="chat-banner__btn chat-banner__btn--primary sb-btn"
             :disabled="saving"
             @click="saveLocation"
           >
             {{ saving ? 'Saving...' : 'Save' }}
           </button>
-          <button type="button" class="chat-banner__btn" @click="editing = false">
+          <button type="button" class="chat-banner__btn sb-btn" @click="editing = false">
             Cancel
           </button>
         </div>
@@ -52,7 +52,7 @@
           </span>
           <button
             type="button"
-            class="chat-banner__btn chat-banner__btn--ghost"
+            class="chat-banner__btn chat-banner__btn--ghost sb-btn"
             @click="startEditing"
           >
             {{ isTutor ? 'Edit' : 'Suggest change' }}
@@ -120,7 +120,7 @@
       <RouterLink
         v-if="detailsTarget"
         :to="detailsTarget"
-        class="chat-banner__btn chat-banner__btn--ghost"
+        class="chat-banner__btn chat-banner__btn--ghost sb-btn"
       >
         View Details
       </RouterLink>
@@ -163,7 +163,7 @@
       <button
         v-if="!isTutor"
         type="button"
-        class="chat-banner__btn chat-banner__btn--primary"
+        class="chat-banner__btn chat-banner__btn--primary sb-btn"
         @click="emit('rate')"
       >
         Rate Session

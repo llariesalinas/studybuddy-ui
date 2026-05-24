@@ -1,6 +1,6 @@
 <template>
   <div ref="wrapperRef" class="notification-wrapper">
-    <button type="button" class="notification-trigger" @click="toggleDropdown">
+    <button type="button" class="notification-trigger sb-btn" @click="toggleDropdown">
       <i class="bi bi-bell fs-5"></i>
       <span v-if="notificationsStore.unreadCount" class="notification-badge">
         {{ notificationsStore.unreadCount }}
@@ -29,7 +29,7 @@
           v-for="notification in notificationsStore.notifications"
           :key="notification.id"
           type="button"
-          class="notification-item"
+          class="notification-item sb-btn"
           :class="{ 'notification-item-read': notification.is_read }"
           @click="markAsRead(notification.id)"
         >
