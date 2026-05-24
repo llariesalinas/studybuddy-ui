@@ -30,7 +30,8 @@ if not SECRET_KEY:
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG', 'false').lower() == 'true'
 
-ALLOWED_HOSTS = []
+_allowed_hosts_raw = os.getenv('ALLOWED_HOSTS', '')
+ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts_raw.split(',') if h.strip()]
 
 if DEBUG:
     # Allow local dev + ngrok tunnels when testing from Vite.
