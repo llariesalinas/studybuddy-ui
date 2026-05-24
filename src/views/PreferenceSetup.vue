@@ -19,12 +19,7 @@
 
           <!-- PROGRESS -->
           <div class="mb-4">
-            <div class="progress" style="height:8px;">
-              <div
-                class="progress-bar bg-success"
-                :style="{ width: progressPercentage + '%' }"
-              ></div>
-            </div>
+            <SbStepBar :current="currentCard + 1" :total="totalCards" />
           </div>
 
 
@@ -171,11 +166,12 @@
 
 <script setup>
 
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePreferenceStore } from '@/stores/preferences'
 import { useProfileStore } from '@/stores/profile'
 import api from '@/services/api/api'
+import SbStepBar from '@/components/SbStepBar.vue'
 
 const router = useRouter()
 const store = usePreferenceStore()
@@ -296,11 +292,5 @@ const finish = async () => {
   }
 
 }
-
-/* PROGRESS BAR */
-
-const progressPercentage = computed(() => {
-  return ((currentCard.value + 1) / totalCards) * 100
-})
 
 </script>
