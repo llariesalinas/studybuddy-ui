@@ -4,14 +4,14 @@
     <div class="row g-4 mb-4">
 
       <div class="col-md-4">
-        <div class="card border-sb rounded-4 p-4 shadow-sm h-100">
+        <div class="card border-sb rounded-4 p-4 shadow-sm h-100 sb-stagger-item" style="animation-delay: 0s;">
           <p class="text-muted small fw-bold mb-2">TOTAL SESSIONS</p>
           <h2 class="fw-bold mb-0 text-dark">{{ totalSessions }}</h2>
         </div>
       </div>
 
       <div class="col-md-4">
-        <div class="card border-sb rounded-4 p-4 shadow-sm h-100">
+        <div class="card border-sb rounded-4 p-4 shadow-sm h-100 sb-stagger-item" style="animation-delay: 0.07s;">
           <p class="text-muted small fw-bold mb-2">AVG RATING</p>
           <h2 class="fw-bold mb-0 text-dark d-flex align-items-center">
             {{ avgRating }}
@@ -22,8 +22,8 @@
 
       <div class="col-md-4">
         <div
-          class="card border-0 rounded-4 p-4 shadow-sm h-100"
-          style="background-color: var(--sb-dark);"
+          class="card border-0 rounded-4 p-4 shadow-sm h-100 sb-stagger-item"
+          style="background-color: var(--sb-dark); animation-delay: 0.14s;"
         >
           <p class="text-white-50 small fw-bold mb-2">EARNINGS</p>
           <h2 class="fw-bold text-white mb-0">₱{{ earnings }}</h2>

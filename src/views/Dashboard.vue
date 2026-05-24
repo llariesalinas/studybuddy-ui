@@ -1,8 +1,15 @@
 <template>
   <div class="dashboard-page p-4">
     <div class="row g-4 mb-5">
-      <div v-for="(stat, index) in stats" :key="index" class="col-md-3">
-        <div class="card border-sb shadow-sm rounded-4 h-100 p-3 d-flex flex-row align-items-center stat-card">
+      <div
+        v-for="(stat, index) in stats"
+        :key="index"
+        class="col-md-3"
+      >
+        <div
+          class="card border-sb shadow-sm rounded-4 h-100 p-3 d-flex flex-row align-items-center stat-card sb-stagger-item"
+          :style="{ animationDelay: `${index * 0.07}s` }"
+        >
           <div :class="[stat.bgClass, 'p-3 rounded-4 me-3']">
             <i :class="[stat.icon, 'text-sb-primary fs-3']"></i>
           </div>
