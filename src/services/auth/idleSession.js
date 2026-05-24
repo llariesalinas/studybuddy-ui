@@ -1,4 +1,4 @@
-const IDLE_LOGOUT_MS = 10 * 60 * 1000
+import { IDLE_LOGOUT_MS } from '../../config.js'
 
 const ACTIVITY_EVENTS = [
   'mousemove',
