@@ -8,7 +8,6 @@ import {
   WS_RECONNECT_DELAY_MS,
   TYPING_CLEAR_MS,
   TYPING_DEBOUNCE_MS,
-  WS_RECONNECT_CAP_MS,
   POPUP_DISMISS_MS,
 } from '../config.js'
 
