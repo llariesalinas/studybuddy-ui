@@ -2,7 +2,13 @@
   <div class="p-4">
     <h2 class="fw-bold mb-4">Payment Verification</h2>
 
-    <div class="card border-sb rounded-4 shadow-sm overflow-hidden">
+    <div class="card border-sb rounded-4 shadow-sm overflow-hidden" :class="{ 'sb-success-card': showSuccess }">
+      <Transition name="pop">
+        <div v-if="showSuccess" class="verify-success">
+          <div class="success-icon">✓</div>
+          <span class="ms-2 fw-semibold">Payment verified!</span>
+        </div>
+      </Transition>
       <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
           <thead class="bg-light">
@@ -31,12 +37,49 @@
 
 <script setup>
 import { ref } from 'vue'
+import { useToastStore } from '@/stores/toast'
+
+const toastStore = useToastStore()
+const showSuccess = ref(false)
 const payments = ref([
   { id: 1, name: 'Lia Salinas', amount: 250 },
   { id: 2, name: 'Reggie Cruz', amount: 500 }
 ])
+
 const verify = (id) => {
   payments.value = payments.value.filter(p => p.id !== id)
-  alert('Payment verified! Booking finalized.')
+  showSuccess.value = true
+  toastStore.push('Payment verified! Booking finalized.')
+  setTimeout(() => { showSuccess.value = false }, 1500)
 }
 </script>
+
+<style scoped>
+.verify-success {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  background: rgba(0, 137, 90, 0.07);
+  border-bottom: 1px solid rgba(0, 137, 90, 0.15);
+  color: var(--sb-primary);
+  font-size: 14px;
+}
+
+.success-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--sb-primary);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.pop-enter-active {
+  animation: sb-pop 350ms var(--sb-spring-fast) both;
+}
+</style>

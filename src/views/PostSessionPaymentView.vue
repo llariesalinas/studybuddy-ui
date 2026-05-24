@@ -18,7 +18,12 @@
 
     <div v-else class="row justify-content-center py-3">
       <div class="col-lg-8">
-        <div class="card border-sb shadow-sm rounded-4 p-4">
+        <div class="card border-sb shadow-sm rounded-4 p-4" :class="{ 'sb-success-card': showSuccess }">
+          <Transition name="pop">
+            <div v-if="showSuccess" class="success-icon-overlay">
+              <div class="success-icon">✓</div>
+            </div>
+          </Transition>
           <div class="summary-card rounded-4 p-3 mb-4">
             <h5 class="fw-bold mb-3">Session Payment Summary</h5>
             <div class="summary-grid">
@@ -154,6 +159,7 @@ const paymentMethods = ref([])
 const loading = ref(true)
 const isSubmitting = ref(false)
 const transactionReference = ref('')
+const showSuccess = ref(false)
 
 const selectedMethod = computed(() => {
   return paymentMethods.value.find(method => method.id === paymentStore.selectedMethod) || null
@@ -226,6 +232,8 @@ const submitPayment = async () => {
     bookingDetail.value = await sessionsStore.submitPayment(bookingId, formData)
     await notificationsStore.fetchNotifications()
     paymentStore.reset()
+    showSuccess.value = true
+    await new Promise(resolve => setTimeout(resolve, 800))
     alert('Payment submitted. Waiting for tutor verification.')
     router.push(`/tuteeSessionDetails/${bookingId}`)
   } catch (error) {
@@ -317,5 +325,28 @@ onMounted(async () => {
 
 .payment-method-icon {
   font-size: 1.5rem;
+}
+
+.success-icon-overlay {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.success-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--sb-primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.pop-enter-active {
+  animation: sb-pop 350ms var(--sb-spring-fast) both;
 }
 </style>
