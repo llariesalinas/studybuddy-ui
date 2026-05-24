@@ -70,7 +70,7 @@
             v-for="filter in filters"
             :key="filter.value"
             @click="currentFilter = filter.value"
-            class="btn rounded-pill px-3 py-1 fw-semibold text-muted shadow-none transition-all"
+            class="btn rounded-pill px-3 py-1 fw-semibold text-muted shadow-none transition-all sb-btn"
             :class="currentFilter === filter.value ? 'bg-white text-dark shadow-sm' : 'btn-light'"
           >
             {{ filter.label }}
@@ -126,7 +126,7 @@
                   </td>
                   <td class="py-3 text-end action-cell">
                     <button
-                      class="btn btn-sm bg-sb-primary text-white"
+                      class="btn btn-sm bg-sb-primary text-white sb-btn"
                       @click="goToDetails(session.id)"
                     >
                       View Details

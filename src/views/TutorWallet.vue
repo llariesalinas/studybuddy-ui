@@ -19,10 +19,10 @@
           </div>
           
           <div class="d-flex gap-2">
-            <button @click="showWithdrawModal = true" class="btn btn-light fw-bold flex-grow-1 py-2 rounded-3">
+            <button @click="showWithdrawModal = true" class="btn btn-light fw-bold flex-grow-1 py-2 rounded-3 sb-btn">
               Withdraw Funds
             </button>
-            <button @click="refreshData" class="btn btn-outline-light py-2 rounded-3" :disabled="walletStore.loading">
+            <button @click="refreshData" class="btn btn-outline-light py-2 rounded-3 sb-btn" :disabled="walletStore.loading">
               <i class="bi bi-arrow-clockwise" :class="{'spin': walletStore.loading}"></i>
             </button>
           </div>
@@ -141,8 +141,8 @@
           <div class="d-flex flex-wrap gap-2 align-items-center">
             <span class="input-group-text bg-light border-0">₱</span>
             <input v-model.number="devAmount" type="number" min="1" class="form-control bg-light border-0" style="max-width:140px" />
-            <button @click="addDevFunds" class="btn btn-warning fw-bold px-4">Add Funds</button>
-            <button @click="removeDevFunds" class="btn btn-outline-danger fw-bold px-4">Remove Funds</button>
+            <button @click="addDevFunds" class="btn btn-warning fw-bold px-4 sb-btn">Add Funds</button>
+            <button @click="removeDevFunds" class="btn btn-outline-danger fw-bold px-4 sb-btn">Remove Funds</button>
           </div>
         </div>
       </div>
@@ -240,8 +240,8 @@
               </div>
             </div>
             <div class="modal-footer border-0 px-4 pb-4">
-              <button type="button" class="btn btn-light rounded-3 px-4" @click="showWithdrawModal = false">Cancel</button>
-              <button type="submit" class="btn bg-sb-primary text-white rounded-3 px-4" :disabled="isSubmitting || !canSubmitWithdrawal">
+              <button type="button" class="btn btn-light rounded-3 px-4 sb-btn" @click="showWithdrawModal = false">Cancel</button>
+              <button type="submit" class="btn bg-sb-primary text-white rounded-3 px-4 sb-btn" :disabled="isSubmitting || !canSubmitWithdrawal">
                 {{ isSubmitting ? 'Processing...' : 'Confirm Withdrawal' }}
               </button>
             </div>
