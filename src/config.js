@@ -20,6 +20,7 @@ export const WS_RECONNECT_DELAY_MS  = 3_000
 export const TYPING_CLEAR_MS        = 3_500
 export const TYPING_DEBOUNCE_MS     = 1_800
 export const WS_RECONNECT_CAP_MS    = 6_000
+export const POPUP_DISMISS_MS       = 6_000  // how long the new-message toast stays visible
 
 // UI animations
 export const CHAT_SHAKE_MS = 420

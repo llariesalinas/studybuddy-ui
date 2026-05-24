@@ -9,6 +9,7 @@ import {
   TYPING_CLEAR_MS,
   TYPING_DEBOUNCE_MS,
   WS_RECONNECT_CAP_MS,
+  POPUP_DISMISS_MS,
 } from '../config.js'
 
 export const useChatStore = defineStore('chat', () => {
@@ -129,7 +130,7 @@ export const useChatStore = defineStore('chat', () => {
         if (recentPopup.value?.roomId === roomId) {
           recentPopup.value = null
         }
-      }, WS_RECONNECT_CAP_MS)
+      }, POPUP_DISMISS_MS)
     }
   }
 
