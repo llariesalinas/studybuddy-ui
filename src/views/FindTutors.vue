@@ -50,7 +50,7 @@
           <div class="budget-filter-wrap">
             <button
               type="button"
-              class="btn w-100 budget-toggle-btn shadow-none rounded-3"
+              class="btn w-100 budget-toggle-btn shadow-none rounded-3 sb-btn"
               :class="{ 'budget-toggle-btn-active': showBudgetFilter }"
               @click="showBudgetFilter = !showBudgetFilter"
             >
@@ -101,7 +101,7 @@
         <div class="col-lg-3 col-md-6">
           <button
             type="submit"
-            class="btn bg-sb-primary text-white w-100 py-2 rounded-3 fw-bold shadow-sm"
+            class="btn bg-sb-primary text-white w-100 py-2 rounded-3 fw-bold shadow-sm sb-btn"
             :disabled="isSubmitting"
           >
             <i class="bi bi-search me-2"></i>Search Tutors
@@ -159,7 +159,7 @@
               </div>
               <button
                 @click="toTutorDetails(tutor)"
-                class="btn bg-sb-primary text-white px-4 rounded-3 fw-semibold shadow-sm"
+                class="btn bg-sb-primary text-white px-4 rounded-3 fw-semibold shadow-sm sb-btn"
               >
                 Book Session
               </button>

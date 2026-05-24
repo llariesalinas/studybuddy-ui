@@ -2,7 +2,7 @@
   <div class="booking-page py-4">
     <div class="container">
       <div class="mb-4">
-        <button class="back-link" type="button" @click="backButton">
+        <button class="back-link sb-btn" type="button" @click="backButton">
           <i class="bi bi-arrow-left"></i>
           Back
         </button>
@@ -12,10 +12,10 @@
         <div class="left-column">
           <section class="info-card profile-card shadow-sm position-relative">
             <div class="profile-actions">
-              <button class="action-btn" aria-label="Favorite" @click="toggleFavorite">
+              <button class="action-btn sb-btn" aria-label="Favorite" @click="toggleFavorite">
                 <i class="bi" :class="isFavorite ? 'bi-heart-fill text-danger' : 'bi-heart'"></i>
               </button>
-              <button class="action-btn" aria-label="Message" @click="openChat">
+              <button class="action-btn sb-btn" aria-label="Message" @click="openChat">
                 <i class="bi bi-chat-dots"></i>
               </button>
             </div>
@@ -59,7 +59,7 @@
                 <div class="week-nav">
                   <button
                     type="button"
-                    class="week-nav-btn"
+                    class="week-nav-btn sb-btn"
                     :disabled="!canGoPrevious"
                     @click="navigateWeek(-1)"
                   >
@@ -67,7 +67,7 @@
                   </button>
                   <button
                     type="button"
-                    class="week-nav-btn"
+                    class="week-nav-btn sb-btn"
                     :disabled="!canGoNext"
                     @click="navigateWeek(1)"
                   >
@@ -102,7 +102,7 @@
                       v-for="slot in displayedSlots(day)"
                       :key="`${day.date}-${slot.id}-${slot.time_slot}`"
                       type="button"
-                      class="slot-link"
+                      class="slot-link sb-btn"
                       :class="{
                         selected: isSlotSelected(day, slot),
                         'range-held': isSlotHeldBySelection(day, slot),
@@ -129,7 +129,7 @@
                 <button
                   v-if="hasHiddenSlots"
                   type="button"
-                  class="btn btn-outline-success px-4 rounded-3 fw-semibold"
+                  class="btn btn-outline-success px-4 rounded-3 fw-semibold sb-btn"
                   @click="showFullSchedule = true"
                 >
                   View full schedule
@@ -178,7 +178,7 @@
                 >
                   <button
                     type="button"
-                    class="subject-accordion-header"
+                    class="subject-accordion-header sb-btn"
                     @click="toggleSubject(index)"
                   >
                     <span>{{ subject.subject_name }}</span>
@@ -224,7 +224,7 @@
 
               <button
                 type="button"
-                class="btn confirm-booking-btn w-100"
+                class="btn confirm-booking-btn w-100 sb-btn"
                 :disabled="selectedSlots.length === 0 || isSubmittingBooking"
                 @click="confirmBooking"
               >
