@@ -170,7 +170,9 @@ import { ref, computed, onMounted } from 'vue'
 import { useSessionsStore } from '@/stores/completedSessions'
 import api from '@/services/api/api'
 import * as bootstrap from 'bootstrap'
+import { useToastStore } from '@/stores/toast'
 
+const toastStore = useToastStore()
 const confirmingId = ref(null)
 const rejectingId = ref(null)
 const sessionStore = useSessionsStore()
@@ -223,7 +225,7 @@ const saveLocation = async () => {
     closeLocationModal() 
   } catch (err) {
     console.error('Failed to update location', err)
-    alert(err.response?.data?.error || 'Failed to save location. Please try again.')
+    toastStore.push(err.response?.data?.error || 'Failed to save location. Please try again.', 'error')
   }
 }
 

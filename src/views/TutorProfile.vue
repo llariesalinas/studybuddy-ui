@@ -323,7 +323,9 @@ class="form-control"
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import api from '@/services/api/api'
+import { useToastStore } from '@/stores/toast'
 
+const toastStore = useToastStore()
 const profile = ref({
   fullName: '',
   email: '',
@@ -629,10 +631,10 @@ const saveProfile = async () => {
     await api.put('/tutor/update/', tutorPayload)
     await syncSubjects()
 
-    alert('Profile Updated')
+    toastStore.push('Profile Updated')
   } catch (err) {
     console.error('Profile update failed:', err)
-    alert('Profile update failed. Please try again.')
+    toastStore.push('Profile update failed. Please try again.', 'error')
   } finally {
     isSavingProfile.value = false
   }
