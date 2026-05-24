@@ -1,6 +1,8 @@
 <template>
   <div v-if="isPublicRoute" class="public-layout">
-    <router-view />
+    <Transition name="page" mode="out-in">
+      <router-view :key="route.name" />
+    </Transition>
   </div>
 
   <div v-else class="d-flex vh-100 overflow-hidden">
@@ -272,7 +274,9 @@
           </div>
         </header>
       <RatingReminderBanner v-if="authStore.isAuthenticated && !isPublicRoute && userRole === 'tutee'" />
-      <router-view />
+      <Transition name="page" mode="out-in">
+        <router-view :key="route.name" />
+      </Transition>
     </main>
   </div>
 </template>
@@ -586,6 +590,22 @@ body {
 .sb-interactive:active {
   transform: scale(0.98) translateY(0);
   transition-duration: 60ms;
+}
+
+/* --- Page Route Transition --- */
+.page-enter-active {
+  transition: opacity var(--sb-t-normal) var(--sb-spring),
+              transform var(--sb-t-normal) var(--sb-spring);
+}
+.page-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+.page-leave-active {
+  transition: opacity var(--sb-t-quick) ease;
+}
+.page-leave-to {
+  opacity: 0;
 }
 
 /* --- Animation Keyframes --- */
