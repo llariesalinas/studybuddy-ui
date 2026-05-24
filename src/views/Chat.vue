@@ -233,6 +233,7 @@ import { RouterLink, useRoute } from 'vue-router'
 import { useChatStore } from '@/stores/chat'
 import { useAuthStore } from '@/stores/auth'
 import { useSessionsStore } from '@/stores/completedSessions'
+import { CHAT_SHAKE_MS, CHAT_POP_MS, CHAT_PULSE_MS } from '../config.js'
 import ChatBanner from '@/components/ChatBanner.vue'
 import RatingStackModal from '@/components/RatingStackModal.vue'
 
@@ -408,7 +409,7 @@ const selectRoom = async (room) => {
 
 function triggerShake() {
   composerShaking.value = true
-  setTimeout(() => { composerShaking.value = false }, 420)
+  setTimeout(() => { composerShaking.value = false }, CHAT_SHAKE_MS)
 }
 
 function handleSend() {
@@ -553,7 +554,7 @@ watch(
 
       if (isRead && oldVals[index] === false && msg?.id) {
         poppingMessages.add(msg.id)
-        setTimeout(() => poppingMessages.delete(msg.id), 600)
+        setTimeout(() => poppingMessages.delete(msg.id), CHAT_POP_MS)
       }
     })
   },
@@ -574,7 +575,7 @@ watch(
 
       if (previousUnread !== undefined && room.unread > previousUnread) {
         pulsingRooms.add(room.id)
-        setTimeout(() => pulsingRooms.delete(room.id), 600)
+        setTimeout(() => pulsingRooms.delete(room.id), CHAT_PULSE_MS)
       }
     })
   },

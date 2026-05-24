@@ -50,6 +50,7 @@
 <script setup>
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useNotificationsStore } from '@/stores/notifications'
+import { NOTIFICATION_POLL_INTERVAL_MS } from '../config.js'
 
 const notificationsStore = useNotificationsStore()
 const isOpen = ref(false)
@@ -100,7 +101,7 @@ onMounted(() => {
   notificationsStore.fetchNotifications()
   refreshIntervalId = window.setInterval(() => {
     notificationsStore.fetchNotifications()
-  }, 15000)
+  }, NOTIFICATION_POLL_INTERVAL_MS)
 })
 
 onBeforeUnmount(() => {

@@ -288,6 +288,7 @@ import { useNotificationsStore } from '@/stores/notifications'
 import { useChatStore } from '@/stores/chat'
 import router from './router'
 import * as bootstrap from 'bootstrap'
+import { SESSION_POLL_INTERVAL_MS } from './config.js'
 
 const route = useRoute()
 const authStore = useAuthStore()
@@ -351,7 +352,7 @@ onMounted(() => {
       document.addEventListener('visibilitychange', handleVisibilityChange)
       pendingSessionsRefreshId = window.setInterval(() => {
         refreshTutorPendingSessions()
-      }, 15000)
+      }, SESSION_POLL_INTERVAL_MS)
     }
   }
 })
