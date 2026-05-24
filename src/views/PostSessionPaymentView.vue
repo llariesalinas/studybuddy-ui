@@ -1,7 +1,7 @@
 <template>
   <div class="booking-content container py-2">
     <div class="mb-3">
-      <button class="btn btn-outline-secondary d-flex align-items-center gap-2" @click="backButton">
+      <button class="btn btn-outline-secondary d-flex align-items-center gap-2 sb-btn" @click="backButton">
         <i class="bi bi-arrow-left"></i>
         Back
       </button>
@@ -52,7 +52,7 @@
                 v-for="method in paymentMethods"
                 :key="method.id"
                 type="button"
-                class="payment-method-card"
+                class="payment-method-card sb-btn"
                 :class="{ selected: paymentStore.selectedMethod === method.id }"
                 @click="chooseMethod(method.id)"
               >
@@ -68,7 +68,7 @@
                 Confirm only after you have already paid the tutor in person.
               </div>
               <button
-                class="btn bg-sb-primary text-white w-100"
+                class="btn bg-sb-primary text-white w-100 sb-btn"
                 :disabled="isSubmitting"
                 @click="submitPayment"
               >
@@ -82,7 +82,7 @@
                 You will be redirected to a secure payment page. Accepted: GCash, Maya, Visa, Mastercard.
               </div>
               <button
-                class="btn bg-sb-primary text-white w-100"
+                class="btn bg-sb-primary text-white w-100 sb-btn"
                 :disabled="isSubmitting"
                 @click="initiateOnlinePayment"
               >
@@ -114,7 +114,7 @@
               </div>
 
               <button
-                class="btn bg-sb-primary text-white w-100"
+                class="btn bg-sb-primary text-white w-100 sb-btn"
                 :disabled="isSubmitting || !canSubmitOnlinePayment"
                 @click="submitPayment"
               >

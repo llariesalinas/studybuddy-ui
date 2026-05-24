@@ -115,7 +115,7 @@
           <div class="d-flex justify-content-end">
             <button
               v-if="bookingDetailsStore.sessionInfo?.status === 'Awaiting Verification'"
-              class="btn btn-success"
+              class="btn btn-success sb-btn"
               @click="handleComplete"
             >
               Complete Session

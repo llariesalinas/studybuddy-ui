@@ -2,7 +2,7 @@
 <div class="booking-content container py-2">
     <div class="mb-3">
         <button
-            class="btn btn-outline-secondary d-flex align-items-center gap-2"
+            class="btn btn-outline-secondary d-flex align-items-center gap-2 sb-btn"
             @click="backButton"
         >
             <i class="bi bi-arrow-left"></i>
@@ -41,7 +41,7 @@
                     class="col-4"
                 >
                     <button 
-                    class="btn btn-outline-sb-primary w-100 d-flex flex-column align-items-center py-3"
+                    class="btn btn-outline-sb-primary w-100 d-flex flex-column align-items-center py-3 sb-btn"
                     :class="{ 'btn-sb-primary': paymentStore.selectedMethod === method.id }"
                     @click="chooseMethod(method.id)"
                     >
@@ -65,7 +65,7 @@
                 </div>
 
                 <button
-                class="btn btn-primary bg-sb-primary w-100"
+                class="btn btn-primary bg-sb-primary w-100 sb-btn"
                 style="border-color: #00895A;"
                 @click="ConfirmPayment"
                 >
@@ -95,7 +95,7 @@
                 </div>
 
                 <button
-                class="btn btn-primary bg-sb-primary w-100"
+                class="btn btn-primary bg-sb-primary w-100 sb-btn"
                 style="border-color: #00895A;"
                 :disabled="!canSubmitOnlinePayment"
                 @click="ConfirmPayment"
