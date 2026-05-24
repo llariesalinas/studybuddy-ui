@@ -11,7 +11,7 @@
                         v-for="filter in filters"
                         :key="filter.value"
                         @click="currentFilter = filter.value"
-                        class="btn rounded-pill px-3 py-1 fw-semibold text-muted shadow-none"
+                        class="btn rounded-pill px-3 py-1 fw-semibold text-muted shadow-none sb-btn"
                         :class="currentFilter === filter.value ? 'bg-white text-dark shadow-sm' : 'btn-light'"
                     >
                         {{ filter.label }}
@@ -64,7 +64,7 @@
                             v-for="session in filteredSessions"
                             :key="session.id"
                             @click="goToDetails(session.id)"
-                            class="clickable-row"
+                            class="clickable-row sb-interactive"
                         >
                             <td>{{ session.tutor || 'TBD' }}</td>
                             <td>{{ session.subject }}</td>

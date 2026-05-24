@@ -17,7 +17,7 @@
               {{ profile.fname }} {{ profile.lname }}
             </h5>
             <p class="text-muted small mb-2">Student / Tutee</p>
-            <button class="btn btn-outline-dark btn-sm rounded-3 fw-semibold px-3">
+            <button class="btn btn-outline-dark btn-sm rounded-3 fw-semibold px-3 sb-btn">
               Update Photo
             </button>
           </div>
@@ -149,7 +149,7 @@
           <div class="text-end mt-2">
             <button
               type="submit"
-              class="btn bg-sb-primary text-white px-5 py-2 rounded-3 fw-semibold shadow-sm"
+              class="btn bg-sb-primary text-white px-5 py-2 rounded-3 fw-semibold shadow-sm sb-btn"
             >
               Save Changes
             </button>
