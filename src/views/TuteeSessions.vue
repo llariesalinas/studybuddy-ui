@@ -11,8 +11,8 @@
                         v-for="filter in filters"
                         :key="filter.value"
                         @click="currentFilter = filter.value"
-                        class="btn rounded-pill px-3 py-1 fw-semibold text-muted shadow-none sb-btn"
-                        :class="currentFilter === filter.value ? 'bg-white text-dark shadow-sm' : 'btn-light'"
+                        class="btn rounded-pill px-3 py-1 fw-semibold text-muted shadow-none sb-btn filter-tab"
+                        :class="currentFilter === filter.value ? ['bg-white', 'text-dark', 'shadow-sm', 'active'] : 'btn-light'"
                     >
                         {{ filter.label }}
                     </button>
@@ -183,6 +183,22 @@ const goToDetails = (id) => router.push(`/tuteeSessionDetails/${id}`)
 
 .clickable-row:hover {
     background-color: rgba(0, 0, 0, 0.04);
+}
+
+.filter-tab {
+  position: relative;
+}
+.filter-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 12px;
+  right: 12px;
+  height: 2px;
+  background: var(--sb-primary);
+  border-radius: 999px;
+  transform-origin: left center;
+  animation: sb-tab-indicator var(--sb-t-normal) var(--sb-spring) both;
 }
 
 thead th {

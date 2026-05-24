@@ -75,8 +75,8 @@
             v-for="filter in filters" 
             :key="filter.value"
             @click="currentFilter = filter.value"
-            class="btn rounded-pill px-3 py-1 fw-semibold text-muted shadow-none transition-all sb-btn"
-            :class="currentFilter === filter.value ? 'bg-white text-dark shadow-sm' : 'btn-light'"
+            class="btn rounded-pill px-3 py-1 fw-semibold text-muted shadow-none transition-all sb-btn filter-tab"
+            :class="currentFilter === filter.value ? ['bg-white', 'text-dark', 'shadow-sm', 'active'] : 'btn-light'"
           >
             {{ filter.label }}
           </button>
@@ -261,6 +261,22 @@ const getStatusClass = (status) => {
 /* Smooth transition for the filter pill buttons */
 .transition-all {
   transition: all 0.2s ease-in-out;
+}
+
+.filter-tab {
+  position: relative;
+}
+.filter-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 12px;
+  right: 12px;
+  height: 2px;
+  background: var(--sb-primary);
+  border-radius: 999px;
+  transform-origin: left center;
+  animation: sb-tab-indicator var(--sb-t-normal) var(--sb-spring) both;
 }
 
 /* Ensure the table looks completely clean, removing default Bootstrap borders on the sides */
