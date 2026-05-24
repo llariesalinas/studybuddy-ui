@@ -2,9 +2,14 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import api from '@/services/api/api'
 import { useAuthStore } from './auth'
-
-const RECONNECT_DELAY_MS = 3000
-const TYPING_CLEAR_MS = 3500
+import {
+  API_BASE_URL,
+  wsServerRoot,
+  WS_RECONNECT_DELAY_MS,
+  TYPING_CLEAR_MS,
+  TYPING_DEBOUNCE_MS,
+  WS_RECONNECT_CAP_MS,
+} from '../config.js'
 
 export const useChatStore = defineStore('chat', () => {
   const authStore = useAuthStore()
@@ -27,7 +32,7 @@ export const useChatStore = defineStore('chat', () => {
   const typingClearTimers = new Map()
 
   const wsRoot = computed(() => {
-    let baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api/'
+    let baseUrl = API_BASE_URL
     if (!baseUrl.endsWith('/')) baseUrl += '/'
 
     if (baseUrl.startsWith('http')) {
@@ -36,7 +41,7 @@ export const useChatStore = defineStore('chat', () => {
       return `${scheme}://${apiUrl.host}/ws/chat/`
     }
 
-    const serverRoot = typeof window !== 'undefined' ? window.location.host : '127.0.0.1:8000'
+    const serverRoot = wsServerRoot()
     const scheme =
       typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss' : 'ws'
     return `${scheme}://${serverRoot}/ws/chat/`
@@ -124,7 +129,7 @@ export const useChatStore = defineStore('chat', () => {
         if (recentPopup.value?.roomId === roomId) {
           recentPopup.value = null
         }
-      }, 6000)
+      }, WS_RECONNECT_CAP_MS)
     }
   }
 
@@ -228,7 +233,7 @@ export const useChatStore = defineStore('chat', () => {
       isUpdatesConnected.value = false
       updatesSocket.value = null
       if (!intentionalUpdatesDisconnect.value && authStore.isAuthenticated) {
-        updatesReconnectTimer = window.setTimeout(connectUpdates, RECONNECT_DELAY_MS)
+        updatesReconnectTimer = window.setTimeout(connectUpdates, WS_RECONNECT_DELAY_MS)
       }
     }
 
@@ -266,7 +271,7 @@ export const useChatStore = defineStore('chat', () => {
       isConnected.value = false
       socket.value = null
       if (!intentionalDisconnect.value && currentRoom.value?.id === roomId) {
-        reconnectTimer = window.setTimeout(() => connectToRoom(roomId), RECONNECT_DELAY_MS)
+        reconnectTimer = window.setTimeout(() => connectToRoom(roomId), WS_RECONNECT_DELAY_MS)
       }
     }
 
@@ -446,7 +451,7 @@ export const useChatStore = defineStore('chat', () => {
 
     if (typingTimer) window.clearTimeout(typingTimer)
     if (isTyping) {
-      typingTimer = window.setTimeout(() => sendTyping(false), 1800)
+      typingTimer = window.setTimeout(() => sendTyping(false), TYPING_DEBOUNCE_MS)
     }
   }
 
