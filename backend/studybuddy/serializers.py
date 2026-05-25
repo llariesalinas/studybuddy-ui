@@ -26,6 +26,16 @@ class AdminWithdrawalSerializer(serializers.ModelSerializer):
             'bank_name',
             'status',
             'failure_reason',
+            'provider',
+            'provider_wallet_transaction_id',
+            'provider_reference_number',
+            'provider_status',
+            'provider_error_code',
+            'provider_error_message',
+            'provider_fee',
+            'net_amount',
+            'rail',
+            'callback_received_at',
             'requested_at',
             'processed_at'
         ]
@@ -268,3 +278,9 @@ class NotificationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Notification
         fields = ['id', 'message', 'is_read', 'created_at']
+
+
+class UserProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserProfile
+        fields = ['fname', 'mname', 'lname', 'course', 'year_level', 'bio']
