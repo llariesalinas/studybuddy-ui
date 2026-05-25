@@ -27,7 +27,7 @@ from .recommender.hybrid import recommend_tutors_hybrid
 from .recommender.CF import build_rating_matrix
 
 from .recommender.cbf import recommend_tutors
-from .models import Booking, Course, Notification, PartnerInstitution, Payment, PaymentMethod, Preference, Rating, Subjects, Tutor, TutorAvailability, TutorAvailabilityOverride, TutorSubjects, Wallet, PlatformActivity, Transaction
+from .models import Booking, Course, Notification, PartnerInstitution, Payment, PaymentMethod, Preference, Rating, Subjects, Tutor, TutorAvailability, TutorAvailabilityOverride, TutorSubjects, Wallet, PlatformActivity, Transaction, TutorPayoutAccount
 from .serializers import (
     NotificationSerializer,
     SubjectSerializer,
@@ -2531,7 +2531,8 @@ def get_tutee_profile(request):
         "course": profile.course.course_code if profile.course else None,
         "year_level": profile.year_level,
         "bio": profile.bio,
-        "subjects": subject_ids     # ⭐ important
+        "subjects": subject_ids,
+        "profile_picture_url": request.build_absolute_uri(profile.profile_picture.url) if profile.profile_picture else None
     })
 
 @api_view(['GET'])
@@ -2777,6 +2778,12 @@ def update_booking_location(request, booking_request_id):
 
 # --- WALLET & PAYMENT VIEWS ---
 from .models import Transaction, WithdrawalRequest
+from .paymongo_money_movement import (
+    PayMongoCashOutError,
+    create_wallet_transaction,
+    list_receiving_institutions,
+    normalize_wallet_transaction,
+)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -2792,8 +2799,174 @@ def wallet_status(request):
     return Response({
         "balance": float(wallet.balance),
         "pending_amount": float(wallet.pending_amount),
-        "currency": "PHP"
+        "currency": "PHP",
+        "cashout_minimum": float(get_cashout_minimum()),
+        "cashout_provider_fee": float(get_cashout_provider_fee()),
     })
+
+
+def get_cashout_minimum():
+    return decimal.Decimal(str(settings.CASHOUT_MIN_PHP)).quantize(decimal.Decimal('0.01'))
+
+
+def get_cashout_provider_fee():
+    return decimal.Decimal(str(settings.CASHOUT_PROVIDER_FEE_PHP)).quantize(decimal.Decimal('0.01'))
+
+
+def parse_money_amount(value):
+    try:
+        amount = decimal.Decimal(str(value)).quantize(decimal.Decimal('0.01'))
+    except (decimal.InvalidOperation, TypeError, ValueError):
+        return None
+
+    return amount if amount > 0 else None
+
+
+def get_request_tutor(request):
+    try:
+        return Tutor.objects.get(profile__user=request.user)
+    except Tutor.DoesNotExist:
+        return None
+
+
+def get_cashout_callback_url(request):
+    configured_url = getattr(settings, 'PAYMONGO_CASHOUT_CALLBACK_URL', '')
+    if configured_url:
+        return configured_url
+
+    return request.build_absolute_uri('/api/wallet/paymongo/callback/')
+
+
+def get_required_cashout_rail(amount):
+    return 'pesonet' if amount > decimal.Decimal('50000.00') else 'instapay'
+
+
+def serialize_payout_account(account):
+    return {
+        "id": account.id,
+        "destination_type": account.destination_type,
+        "provider": account.provider,
+        "receiving_institution_id": account.receiving_institution_id,
+        "receiving_institution_name": account.receiving_institution_name,
+        "receiving_institution_code": account.receiving_institution_code,
+        "account_number": account.account_number,
+        "account_name": account.account_name,
+        "bank_name": account.bank_name,
+        "is_active": account.is_active,
+        "created_at": account.created_at,
+        "updated_at": account.updated_at,
+    }
+
+
+def serialize_cash_out(withdrawal):
+    return {
+        "id": withdrawal.id,
+        "amount": float(withdrawal.amount),
+        "method": withdrawal.method,
+        "account_number": withdrawal.account_number,
+        "account_name": withdrawal.account_name,
+        "bank_name": withdrawal.bank_name,
+        "status": withdrawal.status,
+        "failure_reason": withdrawal.failure_reason,
+        "provider": withdrawal.provider,
+        "provider_wallet_transaction_id": withdrawal.provider_wallet_transaction_id,
+        "provider_reference_number": withdrawal.provider_reference_number,
+        "provider_status": withdrawal.provider_status,
+        "provider_error_code": withdrawal.provider_error_code,
+        "provider_error_message": withdrawal.provider_error_message,
+        "provider_fee": float(withdrawal.provider_fee),
+        "net_amount": float(withdrawal.net_amount),
+        "rail": withdrawal.rail,
+        "callback_received_at": withdrawal.callback_received_at,
+        "requested_at": withdrawal.requested_at,
+        "processed_at": withdrawal.processed_at,
+        "payout_account_id": withdrawal.payout_account_id,
+    }
+
+
+def update_cash_out_provider_fields(withdrawal, provider_data, callback_received=False):
+    provider_status = provider_data.get('status') or withdrawal.provider_status
+
+    withdrawal.provider_wallet_transaction_id = (
+        provider_data.get('id') or withdrawal.provider_wallet_transaction_id
+    )
+    withdrawal.provider = provider_data.get('provider') or withdrawal.provider
+    withdrawal.provider_reference_number = (
+        provider_data.get('reference_number') or withdrawal.provider_reference_number
+    )
+    withdrawal.provider_status = provider_status
+    withdrawal.provider_error_code = (
+        provider_data.get('provider_error_code') or withdrawal.provider_error_code
+    )
+    withdrawal.provider_error_message = (
+        provider_data.get('provider_error_message') or withdrawal.provider_error_message
+    )
+
+    provider_fee = provider_data.get('fee')
+    if provider_fee and provider_fee > 0:
+        withdrawal.provider_fee = provider_fee
+
+    net_amount = provider_data.get('net_amount')
+    if net_amount and net_amount > 0:
+        withdrawal.net_amount = net_amount
+
+    if callback_received:
+        withdrawal.callback_received_at = timezone.now()
+
+
+def reverse_failed_cash_out(withdrawal):
+    wallet = Wallet.objects.select_for_update().get(tutor=withdrawal.tutor)
+    principal_ref = f"WD-{withdrawal.id}-REV"
+    fee_ref = f"WD-{withdrawal.id}-FEE-REV"
+    changed_balance = False
+
+    if not Transaction.objects.filter(wallet=wallet, reference_id=principal_ref).exists():
+        wallet.balance += withdrawal.amount
+        changed_balance = True
+        Transaction.objects.create(
+            wallet=wallet,
+            transaction_type='withdrawal_reversal',
+            amount=withdrawal.amount,
+            description=f"Cash-out reversal for failed request #{withdrawal.id}",
+            reference_id=principal_ref
+        )
+
+    if (
+        withdrawal.provider_fee > 0
+        and not Transaction.objects.filter(wallet=wallet, reference_id=fee_ref).exists()
+    ):
+        wallet.balance += withdrawal.provider_fee
+        changed_balance = True
+        Transaction.objects.create(
+            wallet=wallet,
+            transaction_type='cashout_fee_reversal',
+            amount=withdrawal.provider_fee,
+            description=f"Provider fee reversal for failed cash-out #{withdrawal.id}",
+            reference_id=fee_ref
+        )
+
+    if changed_balance:
+        wallet.save(update_fields=['balance'])
+
+
+def apply_cash_out_provider_result(withdrawal, provider_data, callback_received=False):
+    with transaction.atomic():
+        locked_withdrawal = WithdrawalRequest.objects.select_for_update().get(pk=withdrawal.pk)
+        update_cash_out_provider_fields(locked_withdrawal, provider_data, callback_received)
+        provider_status = (locked_withdrawal.provider_status or '').lower()
+
+        if provider_status == 'succeeded':
+            locked_withdrawal.status = 'processed'
+            locked_withdrawal.processed_at = locked_withdrawal.processed_at or timezone.now()
+        elif provider_status == 'failed':
+            locked_withdrawal.status = 'failed'
+            locked_withdrawal.processed_at = locked_withdrawal.processed_at or timezone.now()
+            if locked_withdrawal.provider_error_message and not locked_withdrawal.failure_reason:
+                locked_withdrawal.failure_reason = locked_withdrawal.provider_error_message
+            reverse_failed_cash_out(locked_withdrawal)
+
+        locked_withdrawal.save()
+        return locked_withdrawal
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -2890,6 +3063,228 @@ def request_withdrawal(request):
         )
 
     return Response({"status": "pending", "id": withdrawal.id})
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def receiving_institutions(request):
+    provider = request.query_params.get('provider', 'instapay').lower()
+    if provider not in ['instapay', 'pesonet']:
+        return Response({"error": "Provider must be instapay or pesonet."}, status=400)
+
+    try:
+        provider_response = list_receiving_institutions(provider)
+    except PayMongoCashOutError as exc:
+        return Response({"error": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
+
+    return Response(provider_response.get('data', provider_response))
+
+
+@api_view(['GET', 'POST', 'PATCH'])
+@permission_classes([IsAuthenticated])
+def payout_destinations(request, account_id=None):
+    tutor = get_request_tutor(request)
+    if tutor is None:
+        return Response({"error": "Not a tutor"}, status=403)
+
+    if request.method == 'GET':
+        accounts = TutorPayoutAccount.objects.filter(tutor=tutor).order_by('-is_active', '-updated_at')
+        return Response([serialize_payout_account(account) for account in accounts])
+
+    if request.method == 'POST':
+        data = request.data
+        destination_type = data.get('destination_type')
+        if destination_type not in ['gcash', 'bank']:
+            return Response({"error": "Destination type must be gcash or bank."}, status=400)
+
+        required_fields = [
+            'receiving_institution_id',
+            'receiving_institution_name',
+            'account_number',
+            'account_name',
+        ]
+        if any(not data.get(field) for field in required_fields):
+            return Response({"error": "Missing payout account details."}, status=400)
+
+        account = TutorPayoutAccount.objects.create(
+            tutor=tutor,
+            destination_type=destination_type,
+            provider=data.get('provider', ''),
+            receiving_institution_id=data.get('receiving_institution_id'),
+            receiving_institution_name=data.get('receiving_institution_name'),
+            receiving_institution_code=data.get('receiving_institution_code', ''),
+            account_number=data.get('account_number'),
+            account_name=data.get('account_name'),
+            bank_name=data.get('bank_name', ''),
+            is_active=bool(data.get('is_active', True)),
+        )
+        return Response(serialize_payout_account(account), status=status.HTTP_201_CREATED)
+
+    lookup_id = account_id or request.data.get('id')
+    account = get_object_or_404(TutorPayoutAccount, id=lookup_id, tutor=tutor)
+    editable_fields = [
+        'destination_type',
+        'provider',
+        'receiving_institution_id',
+        'receiving_institution_name',
+        'receiving_institution_code',
+        'account_number',
+        'account_name',
+        'bank_name',
+        'is_active',
+    ]
+
+    for field in editable_fields:
+        if field in request.data:
+            setattr(account, field, request.data.get(field))
+
+    if account.destination_type not in ['gcash', 'bank']:
+        return Response({"error": "Destination type must be gcash or bank."}, status=400)
+
+    account.save()
+    return Response(serialize_payout_account(account))
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def list_withdrawals(request):
+    tutor = get_request_tutor(request)
+    if tutor is None:
+        return Response({"error": "Not a tutor"}, status=403)
+
+    withdrawals = WithdrawalRequest.objects.filter(tutor=tutor).order_by('-requested_at')
+    return Response([serialize_cash_out(withdrawal) for withdrawal in withdrawals])
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def request_withdrawal(request):
+    return cash_outs(request)
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def cash_outs(request):
+    tutor = get_request_tutor(request)
+    if tutor is None:
+        return Response({"error": "Not a tutor"}, status=403)
+
+    if request.method == 'GET':
+        withdrawals = WithdrawalRequest.objects.filter(tutor=tutor).order_by('-requested_at')
+        return Response([serialize_cash_out(withdrawal) for withdrawal in withdrawals])
+
+    amount = parse_money_amount(request.data.get('amount'))
+    if amount is None:
+        return Response({"error": "Enter a valid cash-out amount."}, status=400)
+
+    minimum_amount = get_cashout_minimum()
+    if amount < minimum_amount:
+        return Response({"error": f"Minimum cash-out is PHP {minimum_amount}."}, status=400)
+
+    payout_account_id = request.data.get('payout_account_id')
+    payout_account = get_object_or_404(
+        TutorPayoutAccount,
+        id=payout_account_id,
+        tutor=tutor,
+        is_active=True
+    )
+
+    rail = get_required_cashout_rail(amount)
+    if payout_account.provider and payout_account.provider != rail:
+        return Response(
+            {"error": f"This destination is saved for {payout_account.provider}. Use a {rail} destination."},
+            status=400
+        )
+
+    with transaction.atomic():
+        wallet, _ = Wallet.objects.select_for_update().get_or_create(tutor=tutor)
+        provider_fee = get_cashout_provider_fee()
+        total_deducted = amount + provider_fee
+
+        if total_deducted > wallet.balance:
+            return Response({"error": "Insufficient balance for cash-out amount plus provider fee."}, status=400)
+
+        withdrawal = WithdrawalRequest.objects.create(
+            tutor=tutor,
+            payout_account=payout_account,
+            amount=amount,
+            method=payout_account.destination_type,
+            account_number=payout_account.account_number,
+            account_name=payout_account.account_name,
+            bank_name=payout_account.bank_name or payout_account.receiving_institution_name,
+            provider='paymongo',
+            provider_fee=provider_fee,
+            net_amount=amount,
+            rail=rail,
+            status='pending',
+        )
+
+        wallet.balance -= total_deducted
+        wallet.save(update_fields=['balance'])
+
+        Transaction.objects.create(
+            wallet=wallet,
+            transaction_type='withdrawal',
+            amount=-amount,
+            description=f"Cash-out request via {withdrawal.get_method_display()}",
+            reference_id=f"WD-{withdrawal.id}"
+        )
+
+        if provider_fee > 0:
+            Transaction.objects.create(
+                wallet=wallet,
+                transaction_type='cashout_fee',
+                amount=-provider_fee,
+                description=f"Provider fee for cash-out request #{withdrawal.id}",
+                reference_id=f"WD-{withdrawal.id}-FEE"
+            )
+
+    try:
+        provider_data = create_wallet_transaction(
+            settings.PAYMONGO_WALLET_ID,
+            payout_account,
+            amount,
+            rail,
+            get_cashout_callback_url(request),
+            withdrawal.id,
+        )
+    except PayMongoCashOutError as exc:
+        provider_data = {
+            'status': 'failed',
+            'provider': 'paymongo',
+            'provider_error_message': str(exc),
+        }
+        withdrawal = apply_cash_out_provider_result(withdrawal, provider_data)
+        return Response(serialize_cash_out(withdrawal), status=status.HTTP_502_BAD_GATEWAY)
+
+    withdrawal = apply_cash_out_provider_result(withdrawal, provider_data)
+    return Response(serialize_cash_out(withdrawal), status=status.HTTP_201_CREATED)
+
+
+request_withdrawal = cash_outs
+
+
+@api_view(['POST'])
+@authentication_classes([])
+@permission_classes([])
+def paymongo_cashout_callback(request):
+    provider_data = normalize_wallet_transaction(request.data)
+    provider_transaction_id = provider_data.get('id')
+
+    if not provider_transaction_id:
+        return Response({"error": "Missing wallet transaction id."}, status=400)
+
+    withdrawal = get_object_or_404(
+        WithdrawalRequest,
+        provider_wallet_transaction_id=provider_transaction_id
+    )
+    withdrawal = apply_cash_out_provider_result(
+        withdrawal,
+        provider_data,
+        callback_received=True
+    )
+
+    return Response({"status": withdrawal.status})
+
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
