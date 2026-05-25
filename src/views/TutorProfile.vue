@@ -250,20 +250,40 @@
 
               <div class="session-mode-group">
                 <span class="field-label">Session Mode</span>
-                <label class="mode-check">
-                  <input v-model="profile.can_online" type="checkbox" class="mode-checkbox">
-                  <span class="mode-copy">
-                    <i class="bi bi-camera-video-fill"></i>
-                    Online Tutoring
-                  </span>
-                </label>
-                <label class="mode-check">
-                  <input v-model="profile.can_f2f" type="checkbox" class="mode-checkbox">
-                  <span class="mode-copy">
-                    <i class="bi bi-geo-alt-fill"></i>
-                    Face-to-Face
-                  </span>
-                </label>
+                <div class="mode-card-grid">
+                  <label
+                    class="mode-check sb-btn"
+                    :class="{ 'mode-check-active': profile.can_online }"
+                  >
+                    <input v-model="profile.can_online" type="checkbox" class="mode-checkbox">
+                    <span class="mode-copy">
+                      <span class="mode-icon"><i class="bi bi-camera-video-fill"></i></span>
+                      <span>
+                        <span class="mode-title">Online Tutoring</span>
+                        <span class="mode-subtitle">Video sessions with remote learners</span>
+                      </span>
+                    </span>
+                    <span class="mode-checkmark" aria-hidden="true">
+                      <i class="bi" :class="profile.can_online ? 'bi-check-circle-fill' : 'bi-circle'"></i>
+                    </span>
+                  </label>
+                  <label
+                    class="mode-check sb-btn"
+                    :class="{ 'mode-check-active': profile.can_f2f }"
+                  >
+                    <input v-model="profile.can_f2f" type="checkbox" class="mode-checkbox">
+                    <span class="mode-copy">
+                      <span class="mode-icon"><i class="bi bi-geo-alt-fill"></i></span>
+                      <span>
+                        <span class="mode-title">Face-to-Face</span>
+                        <span class="mode-subtitle">In-person sessions on campus or nearby</span>
+                      </span>
+                    </span>
+                    <span class="mode-checkmark" aria-hidden="true">
+                      <i class="bi" :class="profile.can_f2f ? 'bi-check-circle-fill' : 'bi-circle'"></i>
+                    </span>
+                  </label>
+                </div>
               </div>
             </div>
 
@@ -404,7 +424,7 @@
           <p class="modal-section-label">Year Level</p>
           <div class="year-grid">
             <button
-              v-for="year in yearLevels"
+              v-for="year in filteredDraftYearLevels"
               :key="year.value"
               type="button"
               class="year-btn sb-btn"
@@ -656,6 +676,29 @@ const currentYearLabel = computed(() => {
   return year?.label || 'Select year'
 })
 
+const filteredDraftYearLevels = computed(() => {
+  const selectedCourse = courses.value.find(course => course.course_code === draftCourse.value)
+  const level = getCourseEducationLevel(selectedCourse)
+
+  if (level === 'elementary') {
+    return yearLevels.filter(year => year.value >= 1 && year.value <= 6)
+  }
+
+  if (level === 'jhs') {
+    return yearLevels.filter(year => year.value >= 7 && year.value <= 10)
+  }
+
+  if (level === 'shs') {
+    return yearLevels.filter(year => year.value >= 11 && year.value <= 12)
+  }
+
+  if (level === 'college') {
+    return yearLevels.filter(year => year.value >= 13 && year.value <= 16)
+  }
+
+  return yearLevels
+})
+
 const availableCategories = computed(() => {
   const categories = allSubjects.value
     .map(subject => normalizeCategory(subject.category))
@@ -687,6 +730,38 @@ const selectedDraftCountLabel = computed(() => {
 function normalizeCategory(category) {
   const normalized = category?.trim()
   return normalized || 'Uncategorized'
+}
+
+function getCourseEducationLevel(course) {
+  if (!course) {
+    return null
+  }
+
+  const code = String(course.course_code || '').toLowerCase()
+  const name = String(course.course_name || '').toLowerCase()
+  const label = `${code} ${name}`
+
+  if (label.includes('elementary') || label.includes('primary') || label.includes('grade school')) {
+    return 'elementary'
+  }
+
+  if (label.includes('jhs') || label.includes('junior high')) {
+    return 'jhs'
+  }
+
+  if (
+    label.includes('shs') ||
+    label.includes('senior high') ||
+    ['stem', 'abm', 'humss', 'gas', 'tvl'].includes(code)
+  ) {
+    return 'shs'
+  }
+
+  if (code.startsWith('bs') || label.includes('college')) {
+    return 'college'
+  }
+
+  return null
 }
 
 function splitFullName(fullName) {
@@ -734,6 +809,7 @@ function openCourseYearModal() {
   draftCourse.value = profile.value.course || ''
   draftYearLevel.value = profile.value.year_level || null
   isCourseYearModalOpen.value = true
+  alignDraftYearLevelWithCourse()
 }
 
 function closeCourseYearModal() {
@@ -745,6 +821,29 @@ function confirmCourseYearSelection() {
   profile.value.year_level = draftYearLevel.value
   closeCourseYearModal()
 }
+
+function alignDraftYearLevelWithCourse() {
+  const yearOptions = filteredDraftYearLevels.value
+
+  if (!yearOptions.length) {
+    return
+  }
+
+  const currentDraftYear = Number(draftYearLevel.value)
+  const hasCurrentYear = yearOptions.some(year => year.value === currentDraftYear)
+
+  if (!hasCurrentYear) {
+    draftYearLevel.value = yearOptions[0].value
+  }
+}
+
+watch(filteredDraftYearLevels, () => {
+  if (!isCourseYearModalOpen.value) {
+    return
+  }
+
+  alignDraftYearLevelWithCourse()
+})
 
 async function openSubjectModal() {
   if (!allSubjects.value.length) {
@@ -1630,32 +1729,111 @@ onMounted(() => {
 
 .session-mode-group {
   display: grid;
-  gap: 0.6rem;
+  gap: 0.7rem;
+}
+
+.mode-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
 }
 
 .mode-check {
   display: flex;
   align-items: center;
-  gap: 0.65rem;
+  justify-content: space-between;
+  gap: 1rem;
   margin: 0;
+  min-height: 112px;
+  padding: 1rem;
+  border: 1px solid rgba(188, 206, 198, 0.86);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.68);
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.07);
   cursor: pointer;
+  transition:
+    transform 0.18s var(--sb-spring, cubic-bezier(0.16, 1, 0.3, 1)),
+    border-color 0.18s ease,
+    background-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.mode-check:hover {
+  border-color: rgba(0, 137, 90, 0.42);
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.1);
+}
+
+.mode-check-active {
+  border-color: rgba(0, 137, 90, 0.62);
+  background:
+    linear-gradient(135deg, rgba(0, 137, 90, 0.14), rgba(255, 255, 255, 0.88));
+  box-shadow: 0 18px 42px rgba(0, 137, 90, 0.14);
 }
 
 .mode-checkbox {
-  width: 18px;
-  height: 18px;
-  accent-color: var(--sb-primary);
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .mode-copy {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.85rem;
+  min-width: 0;
   color: #334155;
-  font-weight: 700;
 }
 
-.mode-copy .bi {
+.mode-icon,
+.mode-checkmark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.mode-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+  background: rgba(0, 137, 90, 0.1);
+  color: var(--sb-primary);
+  font-size: 1.25rem;
+}
+
+.mode-title,
+.mode-subtitle {
+  display: block;
+}
+
+.mode-title {
+  color: #17251f;
+  font-size: 0.98rem;
+  font-weight: 850;
+}
+
+.mode-subtitle {
+  margin-top: 0.18rem;
+  color: #66756e;
+  font-size: 0.78rem;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.mode-checkmark {
+  color: #9aaba3;
+  font-size: 1.15rem;
+}
+
+.mode-check-active .mode-icon {
+  background: var(--sb-primary);
+  color: #fff;
+}
+
+.mode-check-active .mode-checkmark {
   color: var(--sb-primary);
 }
 
@@ -2095,6 +2273,7 @@ onMounted(() => {
   }
 
   .field-row-2,
+  .mode-card-grid,
   .teaching-level-grid,
   .response-pills,
   .year-grid {
