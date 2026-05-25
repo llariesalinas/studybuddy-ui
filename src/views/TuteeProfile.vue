@@ -1,14 +1,14 @@
 <template>
   <div class="tutee-profile-shell py-5">
     <div class="container py-lg-4">
-      <div class="glass-modal p-0 overflow-hidden border-0 shadow-2xl">
+      <div class="glass-modal">
         
-        <form @submit.prevent="saveProfile" class="p-4 p-md-5">
+        <form @submit.prevent="saveProfile">
           
           <!-- PROFILE HEADER -->
-          <div class="profile-header d-flex align-items-center mb-5 pb-4 border-bottom border-light border-opacity-10">
-            <div class="avatar-container me-4 position-relative">
-              <img v-if="profile.profile_picture" :src="profile.profile_picture" class="rounded-circle avatar-img" @click="triggerFileInput">
+          <div class="profile-header d-flex align-items-center">
+            <div class="avatar-wrapper me-4">
+              <img v-if="profile.profile_picture_url" :src="profile.profile_picture_url" class="rounded-circle avatar-img" @click="triggerFileInput">
               <div v-else class="rounded-circle initials-avatar d-flex align-items-center justify-content-center fw-bold fs-3" @click="triggerFileInput">
                 {{ initials }}
               </div>
@@ -23,42 +23,42 @@
             </div>
           </div>
 
-          <div class="profile-body">
+          <div class="profile-body p-4 p-md-5">
             <div class="row g-4">
               
               <!-- LEFT COLUMN (7/12): Personal Info + Bio -->
               <div class="col-lg-7">
-                <div class="bento-card p-4 h-100">
+                <div class="selection-card p-4 h-100">
                   <h5 class="section-title mb-4">Personal Information</h5>
                   
                   <div class="row g-3">
                     <div class="col-md-4">
                       <label class="form-label text-muted small fw-bold">First Name</label>
-                      <input type="text" v-model="profile.fname" class="form-control sb-input">
+                      <input type="text" v-model="profile.fname" class="form-control input-glass">
                     </div>
                     <div class="col-md-4">
                       <label class="form-label text-muted small fw-bold">Middle Name</label>
-                      <input type="text" v-model="profile.mname" class="form-control sb-input">
+                      <input type="text" v-model="profile.mname" class="form-control input-glass">
                     </div>
                     <div class="col-md-4">
                       <label class="form-label text-muted small fw-bold">Last Name</label>
-                      <input type="text" v-model="profile.lname" class="form-control sb-input">
+                      <input type="text" v-model="profile.lname" class="form-control input-glass">
                     </div>
                     
                     <div class="col-12 mt-3">
                       <label class="form-label text-muted small fw-bold">University Email</label>
-                      <input type="email" v-model="profile.email" class="form-control sb-input bg-light" disabled title="Email cannot be changed">
+                      <input type="email" v-model="profile.email" class="form-control input-glass bg-light" disabled title="Email cannot be changed">
                       <div class="form-text small opacity-50">Email cannot be changed after registration.</div>
                     </div>
 
                     <div class="col-12 mt-4">
                       <div class="d-flex justify-content-between">
                         <label class="form-label text-muted small fw-bold">Bio (About Me)</label>
-                        <span class="text-muted small">{{ bioCharCount }}/500</span>
+                        <span :class="['small', bioCharCount > 450 ? 'text-danger fw-bold' : 'text-muted']">{{ bioCharCount }}/500</span>
                       </div>
                       <textarea 
                         v-model="profile.bio" 
-                        class="form-control sb-input" 
+                        :class="['form-control input-glass', { 'border-danger glow-danger': bioCharCount > 450 }]"
                         rows="6" 
                         maxlength="500" 
                         placeholder="Tell tutors about your learning style, academic goals, or what you usually need help with..."
@@ -70,13 +70,13 @@
 
               <!-- RIGHT COLUMN (5/12): Academic Level + Year Level + Course/Strand + Subjects -->
               <div class="col-lg-5">
-                <div class="bento-card p-4 h-100">
+                <div class="selection-card p-4 h-100">
                   <h5 class="section-title mb-4">Academic Context</h5>
                   
                   <div class="row g-3">
                     <div class="col-12">
                       <label class="form-label text-muted small fw-bold">Education Level</label>
-                      <select v-model="educationLevel" class="form-select sb-input">
+                      <select v-model="educationLevel" class="form-select input-glass">
                         <option value="elementary">Elementary</option>
                         <option value="jhs">Junior High School</option>
                         <option value="shs">Senior High School</option>
@@ -86,7 +86,7 @@
 
                     <div class="col-12 mt-3">
                       <label class="form-label text-muted small fw-bold">Year Level</label>
-                      <select v-model="profile.year_level" class="form-select sb-input">
+                      <select v-model="profile.year_level" class="form-select input-glass">
                         <option v-for="opt in yearOptions" :key="opt.value" :value="opt.value">
                           {{ opt.label }}
                         </option>
@@ -97,7 +97,7 @@
                       <label class="form-label text-muted small fw-bold">
                         {{ educationLevel === 'college' ? 'Degree Program / Course' : 'Academic Strand' }}
                       </label>
-                      <select v-model="profile.course" class="form-select sb-input">
+                      <select v-model="profile.course" class="form-select input-glass">
                         <option value="">Select {{ educationLevel === 'college' ? 'Course' : 'Strand' }}</option>
                         <option v-for="c in courses" :key="c.course_code" :value="c.course_code">
                           {{ c.course_name }}
@@ -107,7 +107,7 @@
 
                     <div class="col-12 mt-4">
                       <label class="form-label text-muted small fw-bold">Preferred Subjects</label>
-                      <select v-model="profile.subjects" class="form-select sb-input custom-multiselect" multiple>
+                      <select v-model="profile.subjects" class="form-select input-glass custom-multiselect" multiple>
                         <option v-for="s in subjects" :key="s.subject_code" :value="s.subject_code">
                           {{ s.subject_name }}
                         </option>
@@ -122,8 +122,8 @@
           </div>
 
           <!-- PROFILE FOOTER -->
-          <div class="profile-footer d-flex justify-content-end mt-5 pt-4 border-top border-light border-opacity-10">
-            <button type="submit" class="btn btn-save-profile px-5 py-3 fw-bold rounded-pill shadow-lg">
+          <div class="profile-footer d-flex justify-content-end mt-5 pt-4 border-top border-light border-opacity-10 px-4 px-md-5 pb-5">
+            <button type="submit" class="sb-btn hover-lift px-5 py-3 fw-bold">
               Save Profile Changes
             </button>
           </div>
@@ -150,7 +150,7 @@ const profile = ref({
   course: '',
   year_level: '',
   bio: '',
-  profile_picture: '',
+  profile_picture_url: '',
   subjects: []
 })
 
@@ -239,7 +239,7 @@ const handleAvatarUpload = async (event) => {
   if (!file) return
 
   const formData = new FormData()
-  formData.append('profile_picture', file)
+  formData.append('avatar', file)
 
   try {
     const res = await api.post('/tutee/profile/avatar/', formData, {
@@ -247,7 +247,7 @@ const handleAvatarUpload = async (event) => {
         'Content-Type': 'multipart/form-data'
       }
     })
-    profile.value.profile_picture = res.data.profile_picture
+    profile.value.profile_picture_url = res.data.profile_picture_url
     toastStore.push("Avatar updated successfully")
   } catch (err) {
     console.error("Avatar upload failed", err)
@@ -271,3 +271,148 @@ onMounted(() => {
   loadSubjects()
 })
 </script>
+
+<style scoped>
+.tutee-profile-shell {
+  min-height: 100vh;
+  padding: 2rem;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(16, 185, 129, 0.32), transparent 38%),
+    radial-gradient(circle at 96% 6%, rgba(139, 92, 246, 0.2), transparent 36%),
+    radial-gradient(circle at 88% 74%, rgba(14, 165, 233, 0.18), transparent 42%),
+    linear-gradient(135deg, #f8fafc 0%, #f5fbf4 100%);
+}
+
+.glass-modal {
+  max-width: 900px;
+  margin: 0 auto;
+  background: rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 24px;
+  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.18);
+  overflow: hidden;
+}
+
+.profile-header {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  padding: 3rem 2rem;
+  color: white;
+}
+
+.avatar-wrapper {
+  position: relative;
+  width: 120px;
+  height: 120px;
+}
+
+.avatar-img, .initials-avatar {
+  width: 120px;
+  height: 120px;
+  object-fit: cover;
+  border: 4px solid rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  transition: transform 0.3s ease;
+}
+
+.avatar-img:hover, .initials-avatar:hover {
+  transform: scale(1.05);
+}
+
+.initials-avatar {
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
+}
+
+.avatar-edit-badge {
+  position: absolute;
+  bottom: 5px;
+  right: 5px;
+  background: #10b981;
+  color: white;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: 2px solid white;
+}
+
+.selection-card {
+  background: white;
+  border-radius: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+}
+
+.selection-card:hover {
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+  transform: translateY(-2px);
+}
+
+.section-title {
+  font-weight: 700;
+  color: #1e293b;
+  position: relative;
+  padding-left: 1rem;
+}
+
+.section-title::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 1.5rem;
+  background: #10b981;
+  border-radius: 2px;
+}
+
+.input-glass {
+  background: rgba(248, 250, 252, 0.8);
+  border: 1.5px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+  transition: all 0.2s ease;
+}
+
+.input-glass:focus {
+  background: white;
+  border-color: #10b981;
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.1);
+  outline: none;
+}
+
+.border-danger {
+  border-color: #dc3545 !important;
+}
+
+.glow-danger:focus {
+  box-shadow: 0 0 0 4px rgba(220, 53, 69, 0.15) !important;
+}
+
+.sb-btn {
+  background: #10b981;
+  color: white;
+  border: none;
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.sb-btn:hover {
+  background: #059669;
+  color: white;
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(16, 185, 129, 0.25);
+}
+
+.custom-multiselect {
+  min-height: 120px;
+}
+</style>
