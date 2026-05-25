@@ -1,331 +1,545 @@
 <template>
-<div class="profile-content">
-  <div class="card border-sb shadow-sm rounded-4">
-  <div class="card-body p-4 p-md-5">
+  <div class="tutor-profile-shell">
+    <div class="aurora-blob aurora-blob-one"></div>
+    <div class="aurora-blob aurora-blob-two"></div>
+    <div class="aurora-blob aurora-blob-three"></div>
 
-  <div class="d-flex align-items-center mb-4 pb-4 border-bottom">
-    <div
-      class="rounded-circle bg-success bg-opacity-10 d-flex justify-content-center align-items-center fw-bold fs-3 me-4"
-      style="width:80px;height:80px"
-    >
-      {{ initials }}
-    </div>
-
-    <div>
-      <h5 class="fw-bold mb-1">{{ profile.fullName }}</h5>
-      <p class="text-muted small mb-2">Tutor</p>
-    </div>
-  </div>
-
-<form @submit.prevent="saveProfile">
-
-<div class="row g-4">
-
-<div class="col-md-6">
-<label class="form-label fw-semibold small">Full Name</label>
-<input v-model="profile.fullName" class="form-control">
-</div>
-
-<div class="col-md-6">
-<label class="form-label fw-semibold small">Email</label>
-<input :value="profile.email" disabled class="form-control bg-light">
-</div>
-
-<div class="col-md-6">
-<label class="form-label fw-semibold small">Course</label>
-
-<select v-model="profile.course" class="form-select">
-
-<option value="">Select Course</option>
-
-<option
-  v-for="c in courses"
-  :key="c.course_code"
-  :value="c.course_code"
->
-  {{ c.course_code }} - {{ c.course_name }}
-</option>
-
-</select>
-</div>
-
-<div class="col-md-6">
-<label class="form-label fw-semibold small">Year Level</label>
-
-<select v-model.number="profile.year_level" class="form-select">
-
-<option value="">Select Level</option>
-
-<option
-  v-for="y in yearLevels"
-  :key="y.value"
-  :value="y.value"
->
-  {{ y.label }}
-</option>
-
-</select>
-</div>
-
-<div class="col-md-6">
-<label class="form-label fw-semibold small">Hourly Rate</label>
-<input type="number" v-model="profile.hourly_rate" class="form-control">
-</div>
-
-<div class="col-md-6">
-<label class="form-label fw-semibold small">Response Time</label>
-<select v-model="profile.response_time" class="form-select">
-<option value="">Select response time</option>
-<option
-  v-for="option in responseTimeOptions"
-  :key="option.value"
-  :value="option.value"
->
-  {{ option.label }}
-</option>
-</select>
-</div>
-
-<div class="col-md-6">
-<label class="form-label fw-semibold small">Teaching Level</label>
-<input v-model="profile.teaching_level" class="form-control">
-</div>
-
-<div class="col-md-6">
-<label class="form-label fw-semibold small">Session Mode</label>
-
-<div class="form-check">
-<input type="checkbox" v-model="profile.can_online" class="form-check-input">
-<label class="form-check-label">Online</label>
-</div>
-
-<div class="form-check">
-<input type="checkbox" v-model="profile.can_f2f" class="form-check-input">
-<label class="form-check-label">Face-to-Face</label>
-</div>
-
-</div>
-
-<div class="col-12">
-<label class="form-label fw-semibold small">Subjects</label>
-
-<div class="subject-picker-shell">
-  <button
-    type="button"
-    class="btn btn-outline-dark rounded-3 fw-semibold sb-btn"
-    @click="openSubjectModal"
-  >
-    + Add subjects
-  </button>
-
-  <div v-if="profile.subjects.length" class="subject-pill-list">
-    <span
-      v-for="subject in profile.subjects"
-      :key="subject.subject_code"
-      class="subject-pill"
-    >
-      {{ subject.subject_name }}
-      <button
-        type="button"
-        class="subject-pill-remove sb-btn"
-        @click="removeSubject(subject.subject_code)"
-      >
-        ×
-      </button>
-    </span>
-  </div>
-
-  <p v-else class="text-muted small mb-0">No subjects selected yet.</p>
-
-  <div v-if="profile.subjects.length" class="subject-accordion-list">
-    <article
-      v-for="subject in profile.subjects"
-      :key="`${subject.subject_code}-accordion`"
-      class="subject-accordion-card"
-      :class="{ 'subject-accordion-card-open': openSubjectCode === subject.subject_code }"
-    >
-      <button
-        type="button"
-        class="subject-accordion-header sb-btn"
-        @click="toggleSubjectAccordion(subject.subject_code)"
-      >
-        <span
-          class="subject-accordion-icon"
-          :class="{ 'subject-accordion-icon-open': openSubjectCode === subject.subject_code }"
-        >
-          <i class="bi bi-journal-bookmark-fill"></i>
-        </span>
-
-        <span
-          class="subject-accordion-title"
-          :class="{ 'subject-accordion-title-open': openSubjectCode === subject.subject_code }"
-        >
-          {{ subject.subject_name }}
-        </span>
-
-        <i
-          class="bi ms-auto subject-accordion-chevron"
-          :class="openSubjectCode === subject.subject_code ? 'bi-chevron-up' : 'bi-chevron-down'"
-        ></i>
-      </button>
-
-      <Transition
-        @before-enter="el => { el.style.maxHeight = '0'; el.style.opacity = '0' }"
-        @enter="el => { el.offsetHeight; el.style.maxHeight = el.scrollHeight + 'px'; el.style.opacity = '1' }"
-        @after-enter="el => { el.style.maxHeight = ''; el.style.opacity = '' }"
-        @before-leave="el => { el.style.maxHeight = el.scrollHeight + 'px'; el.style.opacity = '1' }"
-        @leave="el => { el.offsetHeight; el.style.maxHeight = '0'; el.style.opacity = '0' }"
-        @after-leave="el => { el.style.maxHeight = ''; el.style.opacity = '' }"
-      >
-        <div v-if="openSubjectCode === subject.subject_code" class="subject-accordion-body">
-          <label class="subject-accordion-label">Subject Syllabus &amp; Approach</label>
-          <textarea
-            v-model="subject.description"
-            rows="4"
-            class="subject-description-input"
-            placeholder="Describe your methodology for this specific subject..."
-          ></textarea>
-        </div>
-      </Transition>
-    </article>
-  </div>
-
-  <p class="text-muted small mb-0">Up to 8 subjects.</p>
-</div>
-
-</div>
-
-<div class="col-12">
-
-<label class="form-label fw-semibold small">Bio</label>
-
-<textarea
-v-model="profile.bio"
-rows="4"
-class="form-control"
-></textarea>
-
-</div>
-
-</div>
-
-<div class="text-end mt-4">
-<button
-  class="btn bg-sb-primary text-white px-4 d-inline-flex align-items-center gap-2 sb-btn"
-  :disabled="isSavingProfile"
->
-<span v-if="isSavingProfile" class="spinner-border spinner-border-sm" aria-hidden="true"></span>
-{{ isSavingProfile ? 'Saving...' : 'Save Changes' }}
-</button>
-</div>
-
-</form>
-
-</div>
-</div>
-
-<div
-  v-if="isSubjectModalOpen"
-  class="subject-modal-backdrop"
-  @click.self="closeSubjectModal"
->
-  <div class="subject-modal card border-0 shadow rounded-4">
-    <div class="card-body p-4">
-      <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
-        <div>
-          <h5 class="fw-bold mb-1">Pick Subjects</h5>
-          <p class="text-muted small mb-0">Search and filter by category before confirming.</p>
-        </div>
-        <button type="button" class="btn-close" @click="closeSubjectModal"></button>
-      </div>
-
-      <div class="mb-3">
-        <input
-          v-model="subjectSearch"
-          type="text"
-          class="form-control"
-          placeholder="Search subjects"
-        >
-      </div>
-
-      <div class="category-pills mb-3">
-        <button
-          v-for="category in availableCategories"
-          :key="category"
-          type="button"
-          class="category-pill sb-btn"
-          :class="{ active: activeCategory === category }"
-          @click="activeCategory = category"
-        >
-          {{ category }}
-        </button>
-      </div>
-
-      <div class="subject-modal-list">
-        <div v-if="isLoadingSubjects" class="text-center text-muted py-4">
-          Loading subjects...
-        </div>
-
-        <div v-else-if="subjectsLoadError" class="text-center text-danger py-4">
-          {{ subjectsLoadError }}
-        </div>
-
-        <template v-else>
+    <form class="profile-content" @submit.prevent="saveProfile">
+      <header class="glass-segment profile-header-segment">
+        <div class="header-left">
           <button
-            v-for="subject in filteredSubjects"
-            :key="subject.subject_code"
             type="button"
-            class="subject-option sb-btn"
-            :class="{ selected: isDraftSelected(subject.subject_code) }"
-            @click="toggleDraftSubject(subject.subject_code)"
+            class="avatar-wrapper sb-btn"
+            aria-label="Upload profile photo"
+            @click="triggerAvatarUpload"
           >
-            <div class="subject-option-copy">
-              <span class="subject-option-name">{{ subject.subject_name }}</span>
-              <span class="subject-option-meta">
-                {{ normalizeCategory(subject.category) }}
+            <img
+              v-if="avatarUrl && !avatarLoadError"
+              :src="avatarUrl"
+              class="avatar-img"
+              alt="Profile photo"
+              @error="avatarLoadError = true"
+            >
+            <span v-else class="initials-avatar">{{ initials || 'SB' }}</span>
+            <span class="avatar-camera-overlay">
+              <i class="bi bi-camera-fill"></i>
+            </span>
+          </button>
+          <input
+            ref="fileInputRef"
+            type="file"
+            accept="image/*"
+            class="visually-hidden"
+            @change="handleAvatarUpload"
+          >
+
+          <div class="header-info">
+            <p class="header-kicker">Tutor Profile</p>
+            <h1 class="profile-name">{{ profile.fullName || 'Your Name' }}</h1>
+            <div class="header-badges">
+              <span class="role-badge">
+                <i class="bi bi-mortarboard-fill"></i>
+                Tutor
+              </span>
+              <span class="verified-badge">
+                <i class="bi bi-patch-check-fill"></i>
+                Verified
               </span>
             </div>
-
-            <div class="subject-option-check">
-              <input
-                type="checkbox"
-                class="form-check-input"
-                :checked="isDraftSelected(subject.subject_code)"
-                tabindex="-1"
-                @change.prevent
-              >
-            </div>
-          </button>
-
-          <div v-if="!filteredSubjects.length" class="text-center text-muted py-4">
-            No subjects match your filters.
           </div>
-        </template>
-      </div>
+        </div>
 
-      <div class="subject-modal-footer mt-3">
-        <span class="text-muted small">{{ selectedDraftCountLabel }}</span>
-        <div class="d-flex gap-2">
-          <button type="button" class="btn btn-outline-secondary sb-btn" @click="closeSubjectModal">
+        <div class="header-actions">
+          <button type="button" class="btn-soft sb-btn" @click="goToSchedule">
+            <i class="bi bi-calendar3"></i>
+            Schedule
+          </button>
+          <button type="button" class="btn-primary-action sb-btn" @click="goToPendingSessions">
+            <i class="bi bi-inbox-fill"></i>
+            Pending Sessions
+          </button>
+        </div>
+      </header>
+
+      <main class="profile-grid">
+        <div class="profile-col">
+          <section class="glass-segment">
+            <div class="segment-header">
+              <span class="segment-icon"><i class="bi bi-person-fill"></i></span>
+              <div>
+                <h2 class="segment-title">Identity Details</h2>
+                <p class="segment-copy">Keep your visible tutor identity current.</p>
+              </div>
+            </div>
+
+            <div class="field-group">
+              <div class="field-row-2">
+                <label class="field">
+                  <span class="field-label">Full Name</span>
+                  <input
+                    v-model.trim="profile.fullName"
+                    type="text"
+                    class="input-glass"
+                    placeholder="First Last"
+                  >
+                </label>
+
+                <label class="field">
+                  <span class="field-label">Email</span>
+                  <input
+                    :value="profile.email"
+                    type="email"
+                    class="input-glass input-disabled"
+                    disabled
+                  >
+                </label>
+              </div>
+
+              <div class="field">
+                <span class="field-label">Course and Year Level</span>
+                <div class="course-year-display">
+                  <span class="course-chip" :class="{ 'chip-unset': !profile.course }">
+                    {{ currentCourseLabel }}
+                  </span>
+                  <span class="year-chip" :class="{ 'chip-unset': !profile.year_level }">
+                    {{ currentYearLabel }}
+                  </span>
+                  <button type="button" class="change-btn sb-btn" @click="openCourseYearModal">
+                    Change
+                    <i class="bi bi-arrow-right-short"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="glass-segment">
+            <div class="segment-header">
+              <span class="segment-icon"><i class="bi bi-award-fill"></i></span>
+              <div>
+                <h2 class="segment-title">Expertise Level</h2>
+                <p class="segment-copy">Choose the learner level you are ready to teach.</p>
+              </div>
+            </div>
+
+            <div class="teaching-level-grid" role="radiogroup" aria-label="Teaching level">
+              <button
+                v-for="option in teachingLevelOptions"
+                :key="option.value"
+                type="button"
+                class="teaching-card sb-btn"
+                :class="{ 'teaching-card-active': profile.teaching_level === option.value }"
+                role="radio"
+                :aria-checked="profile.teaching_level === option.value"
+                @click="profile.teaching_level = option.value"
+              >
+                <i :class="['bi', option.icon, 'teaching-card-icon']"></i>
+                <span class="teaching-card-label">{{ option.label }}</span>
+              </button>
+            </div>
+          </section>
+
+          <section class="glass-segment">
+            <div class="segment-header">
+              <span class="segment-icon"><i class="bi bi-cash-coin"></i></span>
+              <div>
+                <h2 class="segment-title">Financials</h2>
+                <p class="segment-copy">Set your rate and response goal.</p>
+              </div>
+            </div>
+
+            <div class="field-group">
+              <div class="field">
+                <span class="field-label">Hourly Rate</span>
+                <div class="rate-stepper">
+                  <button
+                    type="button"
+                    class="stepper-btn sb-btn"
+                    :disabled="normalizedRate <= minHourlyRate"
+                    aria-label="Decrease hourly rate"
+                    @click="decrementRate"
+                  >
+                    <i class="bi bi-dash-lg"></i>
+                  </button>
+                  <span class="rate-display">PHP {{ normalizedRate.toFixed(2) }}</span>
+                  <button
+                    type="button"
+                    class="stepper-btn sb-btn"
+                    aria-label="Increase hourly rate"
+                    @click="incrementRate"
+                  >
+                    <i class="bi bi-plus-lg"></i>
+                  </button>
+                </div>
+              </div>
+
+              <div class="field">
+                <span class="field-label">Response Time</span>
+                <div class="response-pills" role="radiogroup" aria-label="Response time">
+                  <button
+                    v-for="option in responseTimeOptions"
+                    :key="option.value"
+                    type="button"
+                    class="response-pill sb-btn"
+                    :class="{ 'response-pill-active': profile.response_time === option.value }"
+                    role="radio"
+                    :aria-checked="profile.response_time === option.value"
+                    @click="profile.response_time = option.value"
+                  >
+                    {{ option.label }}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <div class="profile-col">
+          <section class="glass-segment specializations-segment">
+            <div class="segment-header segment-header-with-action">
+              <span class="segment-icon"><i class="bi bi-stars"></i></span>
+              <div>
+                <h2 class="segment-title">Specializations</h2>
+                <p class="segment-copy">Select subjects and describe your tutoring approach.</p>
+              </div>
+              <span class="subject-counter">{{ profile.subjects.length }}/8</span>
+            </div>
+
+            <div class="field-group">
+              <div class="subject-pill-row">
+                <span
+                  v-for="subject in profile.subjects"
+                  :key="subject.subject_code"
+                  class="subject-pill"
+                >
+                  {{ subject.subject_name }}
+                  <button
+                    type="button"
+                    class="subject-pill-remove sb-btn"
+                    :aria-label="`Remove ${subject.subject_name}`"
+                    @click="removeSubject(subject.subject_code)"
+                  >
+                    <i class="bi bi-x-lg"></i>
+                  </button>
+                </span>
+
+                <button type="button" class="subject-add-btn sb-btn" @click="openSubjectModal">
+                  <i class="bi bi-plus-lg"></i>
+                  Add Subject
+                </button>
+              </div>
+
+              <p v-if="!profile.subjects.length" class="empty-note">
+                No subjects selected yet.
+              </p>
+
+              <label class="field">
+                <span class="field-label">Bio</span>
+                <textarea
+                  v-model="profile.bio"
+                  class="input-glass bio-textarea"
+                  :class="{ 'bio-near-limit': bioCharCount > 450, 'bio-at-limit': bioCharCount >= 500 }"
+                  maxlength="500"
+                  rows="5"
+                  placeholder="Share your teaching philosophy, strengths, and the kind of support learners can expect."
+                ></textarea>
+                <span class="bio-counter" :class="{ 'bio-counter-warn': bioCharCount > 450 }">
+                  {{ bioCharCount }}/500
+                </span>
+              </label>
+
+              <div class="session-mode-group">
+                <span class="field-label">Session Mode</span>
+                <label class="mode-check">
+                  <input v-model="profile.can_online" type="checkbox" class="mode-checkbox">
+                  <span class="mode-copy">
+                    <i class="bi bi-camera-video-fill"></i>
+                    Online Tutoring
+                  </span>
+                </label>
+                <label class="mode-check">
+                  <input v-model="profile.can_f2f" type="checkbox" class="mode-checkbox">
+                  <span class="mode-copy">
+                    <i class="bi bi-geo-alt-fill"></i>
+                    Face-to-Face
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            <div v-if="profile.subjects.length" class="subject-accordion-list">
+              <article
+                v-for="subject in profile.subjects"
+                :key="`${subject.subject_code}-accordion`"
+                class="subject-accordion-card"
+                :class="{ 'subject-accordion-card-open': openSubjectCode === subject.subject_code }"
+              >
+                <button
+                  type="button"
+                  class="subject-accordion-header sb-btn"
+                  :aria-expanded="openSubjectCode === subject.subject_code"
+                  @click="toggleSubjectAccordion(subject.subject_code)"
+                >
+                  <span
+                    class="subject-accordion-icon"
+                    :class="{ 'subject-accordion-icon-open': openSubjectCode === subject.subject_code }"
+                  >
+                    <i class="bi bi-journal-bookmark-fill"></i>
+                  </span>
+                  <span
+                    class="subject-accordion-title"
+                    :class="{ 'subject-accordion-title-open': openSubjectCode === subject.subject_code }"
+                  >
+                    {{ subject.subject_name }}
+                  </span>
+                  <i
+                    class="bi ms-auto subject-accordion-chevron"
+                    :class="openSubjectCode === subject.subject_code ? 'bi-chevron-up' : 'bi-chevron-down'"
+                  ></i>
+                </button>
+
+                <Transition
+                  @before-enter="setAccordionClosed"
+                  @enter="openAccordionPanel"
+                  @after-enter="clearAccordionInlineStyles"
+                  @before-leave="setAccordionOpen"
+                  @leave="closeAccordionPanel"
+                  @after-leave="clearAccordionInlineStyles"
+                >
+                  <div v-if="openSubjectCode === subject.subject_code" class="subject-accordion-body">
+                    <label class="subject-accordion-label" :for="`subject-${subject.subject_code}`">
+                      Subject Description
+                    </label>
+                    <textarea
+                      :id="`subject-${subject.subject_code}`"
+                      v-model="subject.description"
+                      rows="4"
+                      class="subject-description-input"
+                      placeholder="Describe your method, scope, and materials for this subject."
+                    ></textarea>
+                  </div>
+                </Transition>
+              </article>
+            </div>
+          </section>
+
+          <section class="glass-segment actions-segment">
+            <div>
+              <h2 class="segment-title">Profile Changes</h2>
+              <p class="segment-copy mb-0">
+                Save your updates when every section is ready.
+              </p>
+            </div>
+            <div class="profile-actions">
+              <button
+                type="button"
+                class="btn-discard sb-btn"
+                :disabled="isSavingProfile || isLoadingProfile"
+                @click="discardChanges"
+              >
+                Discard Changes
+              </button>
+              <button
+                type="submit"
+                class="btn-save sb-btn"
+                :disabled="isSavingProfile || isLoadingProfile"
+              >
+                <span
+                  v-if="isSavingProfile"
+                  class="spinner-border spinner-border-sm"
+                  aria-hidden="true"
+                ></span>
+                {{ isSavingProfile ? 'Saving' : 'Save Profile' }}
+              </button>
+            </div>
+          </section>
+        </div>
+      </main>
+    </form>
+
+    <div
+      v-if="isCourseYearModalOpen"
+      class="modal-backdrop-soft"
+      role="presentation"
+      @click.self="closeCourseYearModal"
+    >
+      <section
+        class="glass-modal course-year-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="course-year-title"
+      >
+        <div class="modal-header-row">
+          <div>
+            <p class="modal-kicker">Academic Context</p>
+            <h2 id="course-year-title" class="modal-title">Course and Year Level</h2>
+          </div>
+          <button type="button" class="modal-close sb-btn" aria-label="Close" @click="closeCourseYearModal">
+            <i class="bi bi-x-lg"></i>
+          </button>
+        </div>
+
+        <div class="modal-section">
+          <p class="modal-section-label">Course</p>
+          <div class="course-grid">
+            <button
+              v-for="course in courses"
+              :key="course.course_code"
+              type="button"
+              class="course-card sb-btn"
+              :class="{ 'course-card-active': draftCourse === course.course_code }"
+              @click="draftCourse = course.course_code"
+            >
+              <span class="course-card-code">{{ course.course_code }}</span>
+              <span class="course-card-name">{{ course.course_name }}</span>
+            </button>
+
+            <p v-if="!courses.length" class="empty-note modal-empty">
+              Courses are not available right now.
+            </p>
+          </div>
+        </div>
+
+        <div class="modal-section">
+          <p class="modal-section-label">Year Level</p>
+          <div class="year-grid">
+            <button
+              v-for="year in yearLevels"
+              :key="year.value"
+              type="button"
+              class="year-btn sb-btn"
+              :class="{ 'year-btn-active': Number(draftYearLevel) === year.value }"
+              @click="draftYearLevel = year.value"
+            >
+              {{ year.label }}
+            </button>
+          </div>
+        </div>
+
+        <div class="modal-footer-row">
+          <button type="button" class="btn-ghost-sm sb-btn" @click="closeCourseYearModal">
             Cancel
           </button>
-          <button type="button" class="btn bg-sb-primary text-white sb-btn" @click="confirmSubjectSelection">
+          <button type="button" class="btn-confirm sb-btn" @click="confirmCourseYearSelection">
             Confirm
           </button>
         </div>
-      </div>
+      </section>
+    </div>
+
+    <div
+      v-if="isSubjectModalOpen"
+      class="modal-backdrop-soft"
+      role="presentation"
+      @click.self="closeSubjectModal"
+    >
+      <section
+        class="glass-modal subject-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="subject-modal-title"
+      >
+        <div class="modal-header-row">
+          <div>
+            <p class="modal-kicker">Specializations</p>
+            <h2 id="subject-modal-title" class="modal-title">Choose Subjects</h2>
+          </div>
+          <button type="button" class="modal-close sb-btn" aria-label="Close" @click="closeSubjectModal">
+            <i class="bi bi-x-lg"></i>
+          </button>
+        </div>
+
+        <label class="field">
+          <span class="field-label">Search Subjects</span>
+          <input
+            v-model.trim="subjectSearch"
+            type="text"
+            class="input-glass"
+            placeholder="Search by subject name or code"
+          >
+        </label>
+
+        <div class="modal-section">
+          <p class="modal-section-label">Categories</p>
+          <div class="category-pills">
+            <button
+              v-for="category in availableCategories"
+              :key="category"
+              type="button"
+              class="category-pill sb-btn"
+              :class="{ active: activeCategory === category }"
+              @click="activeCategory = category"
+            >
+              {{ category }}
+            </button>
+          </div>
+        </div>
+
+        <div class="subject-modal-list">
+          <div v-if="isLoadingSubjects" class="modal-status">
+            <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+            Loading subjects
+          </div>
+          <div v-else-if="subjectsLoadError" class="modal-status modal-error">
+            {{ subjectsLoadError }}
+          </div>
+          <template v-else>
+            <button
+              v-for="subject in filteredSubjects"
+              :key="subject.subject_code"
+              type="button"
+              class="subject-option sb-btn"
+              :class="{ selected: isDraftSelected(subject.subject_code) }"
+              @click="toggleDraftSubject(subject.subject_code)"
+            >
+              <span class="subject-option-copy">
+                <span class="subject-option-name">{{ subject.subject_name }}</span>
+                <span class="subject-option-meta">
+                  {{ subject.subject_code }} - {{ normalizeCategory(subject.category) }}
+                </span>
+              </span>
+              <span class="subject-option-check" aria-hidden="true">
+                <i
+                  class="bi"
+                  :class="isDraftSelected(subject.subject_code) ? 'bi-check-circle-fill' : 'bi-circle'"
+                ></i>
+              </span>
+            </button>
+
+            <div v-if="!filteredSubjects.length" class="modal-status">
+              No subjects match your filters.
+            </div>
+          </template>
+        </div>
+
+        <div class="subject-modal-footer">
+          <span class="selected-count">{{ selectedDraftCountLabel }}</span>
+          <div class="modal-footer-actions">
+            <button type="button" class="btn-ghost-sm sb-btn" @click="closeSubjectModal">
+              Cancel
+            </button>
+            <button type="button" class="btn-confirm sb-btn" @click="confirmSubjectSelection">
+              Confirm
+            </button>
+          </div>
+        </div>
+      </section>
     </div>
   </div>
-</div>
-</div>
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import api from '@/services/api/api'
 import { useToastStore } from '@/stores/toast'
 
+const router = useRouter()
 const toastStore = useToastStore()
+
+const minHourlyRate = 50
+const hourlyRateStep = 10
+
 const profile = ref({
   fullName: '',
   email: '',
@@ -333,30 +547,44 @@ const profile = ref({
   year_level: null,
   subjects: [],
   bio: '',
-  hourly_rate: '',
-  teaching_level: '',
+  hourly_rate: minHourlyRate,
+  teaching_level: 'College',
   can_online: true,
   can_f2f: false,
-  response_time: ''
+  response_time: '',
+  profile_picture_url: ''
 })
 
 const courses = ref([])
 const allSubjects = ref([])
 const initialSubjectCodes = ref([])
 const initialSubjectDescriptions = ref(new Map())
+const fileInputRef = ref(null)
+const avatarLoadError = ref(false)
+const isLoadingProfile = ref(false)
+const isSavingProfile = ref(false)
+const isUploadingAvatar = ref(false)
 const isSubjectModalOpen = ref(false)
+const isCourseYearModalOpen = ref(false)
 const subjectSearch = ref('')
 const activeCategory = ref('All')
 const draftSubjectCodes = ref([])
+const draftCourse = ref('')
+const draftYearLevel = ref(null)
 const openSubjectCode = ref(null)
 const isLoadingSubjects = ref(false)
 const subjectsLoadError = ref('')
-const isSavingProfile = ref(false)
 
 const responseTimeOptions = [
   { value: 'within_1_hour', label: 'Within 1 hour' },
   { value: 'within_few_hours', label: 'Within a few hours' },
   { value: 'within_a_day', label: 'Within a day' }
+]
+
+const teachingLevelOptions = [
+  { value: 'Elementary', label: 'Elementary', icon: 'bi-pencil-fill' },
+  { value: 'High School', label: 'High School', icon: 'bi-book-fill' },
+  { value: 'College', label: 'College', icon: 'bi-mortarboard-fill' }
 ]
 
 const yearLevels = [
@@ -372,19 +600,60 @@ const yearLevels = [
   { label: 'Grade 10', value: 10 },
   { label: 'Grade 11', value: 11 },
   { label: 'Grade 12', value: 12 },
-  { label: '1st Year College', value: 13 },
-  { label: '2nd Year College', value: 14 },
-  { label: '3rd Year College', value: 15 },
-  { label: '4th Year College', value: 16 }
+  { label: '1st Year', value: 13 },
+  { label: '2nd Year', value: 14 },
+  { label: '3rd Year', value: 15 },
+  { label: '4th Year', value: 16 }
 ]
 
-const initials = computed(() => {
-  if (!profile.value.fullName) return ''
+watch(
+  () => profile.value.profile_picture_url,
+  () => {
+    avatarLoadError.value = false
+  }
+)
 
-  return profile.value.fullName
-    .split(' ')
-    .map(name => name[0])
+const bioCharCount = computed(() => profile.value.bio?.length || 0)
+
+const normalizedRate = computed(() => {
+  const rate = Number(profile.value.hourly_rate)
+  return Number.isFinite(rate) ? Math.max(rate, minHourlyRate) : minHourlyRate
+})
+
+const avatarUrl = computed(() => profile.value.profile_picture_url || '')
+
+const initials = computed(() => {
+  const parts = String(profile.value.fullName || '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+
+  if (!parts.length) {
+    return ''
+  }
+
+  return parts
+    .slice(0, 2)
+    .map(part => part.charAt(0).toUpperCase())
     .join('')
+})
+
+const currentCourseLabel = computed(() => {
+  if (!profile.value.course) {
+    return 'Select course'
+  }
+
+  const course = courses.value.find(item => item.course_code === profile.value.course)
+  if (!course) {
+    return profile.value.course
+  }
+
+  return `${course.course_code} - ${course.course_name}`
+})
+
+const currentYearLabel = computed(() => {
+  const year = yearLevels.find(item => item.value === Number(profile.value.year_level))
+  return year?.label || 'Select year'
 })
 
 const availableCategories = computed(() => {
@@ -420,6 +689,14 @@ function normalizeCategory(category) {
   return normalized || 'Uncategorized'
 }
 
+function splitFullName(fullName) {
+  const parts = String(fullName || '').trim().split(/\s+/).filter(Boolean)
+  return {
+    fname: parts[0] || '',
+    lname: parts.slice(1).join(' ')
+  }
+}
+
 function getSubjectByCode(subjectCode) {
   return allSubjects.value.find(subject => subject.subject_code === subjectCode)
     || profile.value.subjects.find(subject => subject.subject_code === subjectCode)
@@ -453,6 +730,22 @@ function syncProfileSubjectsFromCodes(subjectCodes) {
     .sort((left, right) => left.subject_name.localeCompare(right.subject_name))
 }
 
+function openCourseYearModal() {
+  draftCourse.value = profile.value.course || ''
+  draftYearLevel.value = profile.value.year_level || null
+  isCourseYearModalOpen.value = true
+}
+
+function closeCourseYearModal() {
+  isCourseYearModalOpen.value = false
+}
+
+function confirmCourseYearSelection() {
+  profile.value.course = draftCourse.value
+  profile.value.year_level = draftYearLevel.value
+  closeCourseYearModal()
+}
+
 async function openSubjectModal() {
   if (!allSubjects.value.length) {
     await loadSubjects()
@@ -482,6 +775,7 @@ function toggleDraftSubject(subjectCode) {
   }
 
   if (draftSubjectCodes.value.length >= 8) {
+    toastStore.push('You can select up to 8 subjects.', 'warning')
     return
   }
 
@@ -507,37 +801,118 @@ function toggleSubjectAccordion(subjectCode) {
   openSubjectCode.value = openSubjectCode.value === subjectCode ? null : subjectCode
 }
 
-const loadProfile = async () => {
+function setAccordionClosed(element) {
+  element.style.maxHeight = '0'
+  element.style.opacity = '0'
+}
+
+function openAccordionPanel(element) {
+  element.offsetHeight
+  element.style.maxHeight = `${element.scrollHeight}px`
+  element.style.opacity = '1'
+}
+
+function clearAccordionInlineStyles(element) {
+  element.style.maxHeight = ''
+  element.style.opacity = ''
+}
+
+function setAccordionOpen(element) {
+  element.style.maxHeight = `${element.scrollHeight}px`
+  element.style.opacity = '1'
+}
+
+function closeAccordionPanel(element) {
+  element.offsetHeight
+  element.style.maxHeight = '0'
+  element.style.opacity = '0'
+}
+
+function incrementRate() {
+  profile.value.hourly_rate = normalizedRate.value + hourlyRateStep
+}
+
+function decrementRate() {
+  profile.value.hourly_rate = Math.max(minHourlyRate, normalizedRate.value - hourlyRateStep)
+}
+
+function triggerAvatarUpload() {
+  if (!isUploadingAvatar.value) {
+    fileInputRef.value?.click()
+  }
+}
+
+async function handleAvatarUpload(event) {
+  const file = event.target.files?.[0]
+  event.target.value = ''
+
+  if (!file) {
+    return
+  }
+
+  if (!file.type.startsWith('image/')) {
+    toastStore.push('Please select an image file.', 'error')
+    return
+  }
+
+  if (file.size > 5 * 1024 * 1024) {
+    toastStore.push('Image must be under 5 MB.', 'error')
+    return
+  }
+
+  const formData = new FormData()
+  formData.append('avatar', file)
+
   try {
-    const res = await api.get('/tutor/profile/')
-    const data = res.data
+    isUploadingAvatar.value = true
+    const response = await api.post('/tutor/profile/avatar/', formData)
+    profile.value.profile_picture_url = response.data.profile_picture_url || ''
+    toastStore.push('Photo updated successfully.')
+  } catch (error) {
+    console.error('Avatar upload failed:', error)
+    toastStore.push(error.response?.data?.error || 'Failed to upload photo.', 'error')
+  } finally {
+    isUploadingAvatar.value = false
+  }
+}
 
-    profile.value.fullName = `${data.fname} ${data.lname}`
-    profile.value.email = data.email
-    profile.value.course = data.course
-    profile.value.year_level = data.year_level
-    profile.value.bio = data.bio
-    profile.value.hourly_rate = data.hourly_rate
-    profile.value.teaching_level = data.teaching_level
-    profile.value.can_online = data.can_online
-    profile.value.can_f2f = data.can_f2f
-    profile.value.response_time = data.response_time || ''
+async function loadProfile() {
+  try {
+    isLoadingProfile.value = true
+    const profileResponse = await api.get('/tutor/profile/')
+    const data = profileResponse.data
 
-    const subjectRes = await api.get('/tutor/subjects/')
-    profile.value.subjects = subjectRes.data.map(subject => ({
+    profile.value.fullName = [data.fname, data.lname].filter(Boolean).join(' ')
+    profile.value.email = data.email || ''
+    profile.value.course = data.course || ''
+    profile.value.year_level = data.year_level || null
+    profile.value.bio = data.bio || ''
+    profile.value.hourly_rate = data.hourly_rate || minHourlyRate
+    profile.value.teaching_level = data.teaching_level || 'College'
+    profile.value.can_online = Boolean(data.can_online)
+    profile.value.can_f2f = Boolean(data.can_f2f)
+    profile.value.response_time = data.response_time || 'within_a_day'
+    profile.value.profile_picture_url = data.profile_picture_url || ''
+
+    const subjectResponse = await api.get('/tutor/subjects/')
+    profile.value.subjects = subjectResponse.data.map(subject => ({
       ...subject,
       description: subject.description || ''
     }))
+
     initialSubjectCodes.value = profile.value.subjects.map(subject => subject.subject_code)
     initialSubjectDescriptions.value = new Map(
       profile.value.subjects.map(subject => [subject.subject_code, subject.description || ''])
     )
-  } catch (err) {
-    console.error('Failed to load tutor profile:', err)
+  } catch (error) {
+    console.error('Failed to load tutor profile:', error)
+    toastStore.push('Failed to load profile.', 'error')
+  } finally {
+    isLoadingProfile.value = false
   }
 }
 
-const loadSubjects = async () => {
+async function loadSubjects() {
   if (isLoadingSubjects.value) {
     return
   }
@@ -546,8 +921,8 @@ const loadSubjects = async () => {
   subjectsLoadError.value = ''
 
   try {
-    const res = await api.get('/subjects/')
-    allSubjects.value = res.data
+    const response = await api.get('/subjects/')
+    allSubjects.value = response.data
   } catch (error) {
     console.error('Failed to load subjects:', error)
     subjectsLoadError.value = 'Could not load subjects right now.'
@@ -556,9 +931,14 @@ const loadSubjects = async () => {
   }
 }
 
-const loadCourses = async () => {
-  const res = await api.get('/courses/')
-  courses.value = res.data
+async function loadCourses() {
+  try {
+    const response = await api.get('/courses/')
+    courses.value = response.data
+  } catch (error) {
+    console.error('Failed to load courses:', error)
+    toastStore.push('Failed to load courses.', 'error')
+  }
 }
 
 async function syncSubjects() {
@@ -602,23 +982,22 @@ async function syncSubjects() {
   )
 }
 
-const saveProfile = async () => {
+async function saveProfile() {
   if (isSavingProfile.value) {
     return
   }
 
-  const names = profile.value.fullName.split(' ')
-
-  const tuteePayload = {
-    fname: names[0],
-    lname: names.slice(1).join(' '),
+  const names = splitFullName(profile.value.fullName)
+  const profilePayload = {
+    fname: names.fname,
+    lname: names.lname,
     course: profile.value.course,
     year_level: profile.value.year_level,
-    bio: profile.value.bio
+    bio: profile.value.bio || ''
   }
 
   const tutorPayload = {
-    hourly_rate: profile.value.hourly_rate,
+    hourly_rate: normalizedRate.value,
     teaching_level: profile.value.teaching_level,
     can_online: profile.value.can_online,
     can_f2f: profile.value.can_f2f,
@@ -627,17 +1006,30 @@ const saveProfile = async () => {
 
   try {
     isSavingProfile.value = true
-    await api.put('/tutee/profile/update/', tuteePayload)
+    await api.put('/tutee/profile/update/', profilePayload)
     await api.put('/tutor/update/', tutorPayload)
     await syncSubjects()
-
-    toastStore.push('Profile Updated')
-  } catch (err) {
-    console.error('Profile update failed:', err)
-    toastStore.push('Profile update failed. Please try again.', 'error')
+    toastStore.push('Profile updated successfully.')
+    await loadProfile()
+  } catch (error) {
+    console.error('Profile update failed:', error)
+    toastStore.push(error.response?.data?.error || 'Profile update failed. Please try again.', 'error')
   } finally {
     isSavingProfile.value = false
   }
+}
+
+async function discardChanges() {
+  await loadProfile()
+  toastStore.push('Changes discarded.')
+}
+
+function goToPendingSessions() {
+  router.push('/tch-requestedSessions')
+}
+
+function goToSchedule() {
+  router.push('/tch-availability')
 }
 
 onMounted(() => {
@@ -645,233 +1037,1076 @@ onMounted(() => {
   loadSubjects()
   loadCourses()
 })
-
 </script>
 
 <style scoped>
-.subject-picker-shell {
-  display: grid;
-  gap: 14px;
+.tutor-profile-shell {
+  --sb-primary: #00895a;
+  --sb-primary-hover: #00704a;
+  --sb-dark: #0a1916;
+  --sb-ink: #1d1d1f;
+  --sb-muted: #6e6e73;
+  --sb-divider: #e7ece9;
+  --sb-green-tint: #edf7f3;
+  --sb-green-border: #b8dece;
+  position: relative;
+  min-height: 100vh;
+  padding: 2rem;
+  overflow: hidden;
+  color: var(--sb-ink);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background:
+    radial-gradient(circle at 10% 5%, rgba(0, 137, 90, 0.2), transparent 30%),
+    radial-gradient(circle at 90% 8%, rgba(41, 128, 185, 0.16), transparent 28%),
+    radial-gradient(circle at 85% 80%, rgba(245, 158, 11, 0.12), transparent 34%),
+    linear-gradient(135deg, #f8fbf9 0%, #eef7f3 48%, #f8fafc 100%);
 }
 
-.subject-pill-list {
+.aurora-blob {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(18px);
+  opacity: 0.42;
+  pointer-events: none;
+}
+
+.aurora-blob-one {
+  width: 280px;
+  height: 280px;
+  top: -90px;
+  left: 12%;
+  background: rgba(0, 137, 90, 0.34);
+}
+
+.aurora-blob-two {
+  width: 320px;
+  height: 320px;
+  top: 10%;
+  right: -110px;
+  background: rgba(14, 165, 233, 0.2);
+}
+
+.aurora-blob-three {
+  width: 240px;
+  height: 240px;
+  left: -80px;
+  bottom: 10%;
+  background: rgba(245, 158, 11, 0.14);
+}
+
+.profile-content {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 1.25rem;
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.glass-segment {
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 24px;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.1);
+  backdrop-filter: blur(24px);
+  padding: 1.5rem;
+}
+
+.profile-header-segment {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  background: linear-gradient(135deg, rgba(10, 25, 22, 0.94), rgba(0, 137, 90, 0.86));
+  color: #fff;
+}
+
+.header-left,
+.header-actions,
+.segment-header,
+.course-year-display,
+.profile-actions,
+.modal-header-row,
+.modal-footer-row,
+.modal-footer-actions,
+.subject-modal-footer {
+  display: flex;
+  align-items: center;
+}
+
+.header-left {
+  gap: 1rem;
+  min-width: 0;
+}
+
+.avatar-wrapper {
+  position: relative;
+  width: 104px;
+  height: 104px;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+}
+
+.avatar-img,
+.initials-avatar {
+  width: 104px;
+  height: 104px;
+  border: 4px solid rgba(255, 255, 255, 0.42);
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  object-fit: cover;
+}
+
+.initials-avatar {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  font-size: 1.7rem;
+  font-weight: 800;
+}
+
+.avatar-camera-overlay {
+  position: absolute;
+  right: 4px;
+  bottom: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 2px solid #fff;
+  border-radius: 999px;
+  background: var(--sb-primary);
+  color: #fff;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+}
+
+.header-info {
+  min-width: 0;
+}
+
+.header-kicker,
+.modal-kicker {
+  margin: 0 0 0.25rem;
+  color: rgba(255, 255, 255, 0.74);
+  font-size: 0.74rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.profile-name {
+  margin: 0;
+  color: #fff;
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.header-badges {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 0.5rem;
+  margin-top: 0.65rem;
+}
+
+.role-badge,
+.verified-badge,
+.subject-counter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.role-badge,
+.verified-badge {
+  padding: 0.38rem 0.7rem;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: #fff;
+}
+
+.header-actions {
+  justify-content: flex-end;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.sb-btn {
+  border-radius: 12px;
+  transition: transform 0.16s ease, background-color 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease, color 0.16s ease;
+}
+
+.sb-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.sb-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.btn-soft,
+.btn-primary-action,
+.btn-save,
+.btn-discard,
+.btn-confirm,
+.btn-ghost-sm {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  border: 0;
+  font-weight: 800;
+}
+
+.btn-soft {
+  padding: 0.72rem 1rem;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.btn-soft:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.btn-primary-action,
+.btn-save,
+.btn-confirm {
+  color: #fff;
+  background: var(--sb-primary);
+  box-shadow: 0 12px 24px rgba(0, 137, 90, 0.22);
+}
+
+.btn-primary-action {
+  padding: 0.74rem 1.1rem;
+}
+
+.btn-primary-action:hover,
+.btn-save:hover,
+.btn-confirm:hover {
+  background: var(--sb-primary-hover);
+  color: #fff;
+}
+
+.profile-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+  gap: 1.25rem;
+}
+
+.profile-col {
+  display: grid;
+  align-content: start;
+  gap: 1.25rem;
+}
+
+.segment-header {
+  gap: 0.8rem;
+  margin-bottom: 1.25rem;
+}
+
+.segment-header-with-action {
+  align-items: flex-start;
+}
+
+.segment-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  border-radius: 14px;
+  background: var(--sb-green-tint);
+  color: var(--sb-primary);
+  border: 1px solid var(--sb-green-border);
+}
+
+.segment-title {
+  margin: 0;
+  color: #10231d;
+  font-size: 1.05rem;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.segment-copy {
+  margin: 0.18rem 0 0;
+  color: #64748b;
+  font-size: 0.86rem;
+}
+
+.subject-counter {
+  margin-left: auto;
+  padding: 0.3rem 0.6rem;
+  color: var(--sb-primary);
+  background: var(--sb-green-tint);
+  border: 1px solid var(--sb-green-border);
+}
+
+.field-group {
+  display: grid;
+  gap: 1.1rem;
+}
+
+.field {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.field-row-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.field-label,
+.modal-section-label,
+.subject-accordion-label {
+  color: #64748b;
+  font-size: 0.74rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.input-glass {
+  width: 100%;
+  border: 1.5px solid #dbe7e1;
+  border-radius: 14px;
+  background: rgba(248, 250, 252, 0.78);
+  color: #0f172a;
+  font-size: 0.94rem;
+  padding: 0.75rem 0.9rem;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+}
+
+.input-glass:focus {
+  outline: none;
+  background: #fff;
+  border-color: var(--sb-primary);
+  box-shadow: 0 0 0 4px rgba(0, 137, 90, 0.12);
+}
+
+.input-disabled {
+  opacity: 0.68;
+}
+
+.course-year-display {
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.course-chip,
+.year-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  max-width: 100%;
+  padding: 0.42rem 0.7rem;
+  border: 1px solid rgba(0, 137, 90, 0.22);
+  border-radius: 10px;
+  background: rgba(0, 137, 90, 0.08);
+  color: var(--sb-primary);
+  font-size: 0.84rem;
+  font-weight: 750;
+}
+
+.course-chip {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chip-unset {
+  color: #94a3b8;
+  background: #f8fafc;
+  border-color: #dbe3df;
+}
+
+.change-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  border: 1.5px dashed #b9c7c1;
+  background: transparent;
+  color: #4b655b;
+  font-weight: 800;
+  padding: 0.42rem 0.7rem;
+}
+
+.change-btn:hover {
+  border-color: var(--sb-primary);
+  color: var(--sb-primary);
+  background: rgba(0, 137, 90, 0.05);
+}
+
+.teaching-level-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.teaching-card {
+  display: grid;
+  place-items: center;
+  gap: 0.45rem;
+  min-height: 112px;
+  border: 1.5px solid #dbe7e1;
+  background: rgba(248, 250, 252, 0.76);
+  color: #64748b;
+  padding: 1rem 0.5rem;
+  text-align: center;
+}
+
+.teaching-card:hover,
+.teaching-card-active {
+  border-color: var(--sb-primary);
+  background: rgba(0, 137, 90, 0.08);
+  color: var(--sb-primary);
+}
+
+.teaching-card-icon {
+  font-size: 1.55rem;
+}
+
+.teaching-card-label {
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.rate-stepper {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 42px;
+  align-items: center;
+  gap: 0.75rem;
+  border: 1.5px solid rgba(0, 137, 90, 0.18);
+  border-radius: 16px;
+  background: rgba(0, 137, 90, 0.06);
+  padding: 0.6rem;
+}
+
+.stepper-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid #dbe7e1;
+  background: #fff;
+  color: var(--sb-primary);
+}
+
+.stepper-btn:hover:not(:disabled) {
+  color: #fff;
+  background: var(--sb-primary);
+  border-color: var(--sb-primary);
+}
+
+.rate-display {
+  min-width: 0;
+  color: var(--sb-primary);
+  font-size: 1.35rem;
+  font-weight: 850;
+  text-align: center;
+}
+
+.response-pills {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.response-pill {
+  min-height: 44px;
+  border: 1.5px solid #dbe7e1;
+  background: rgba(248, 250, 252, 0.78);
+  color: #556a61;
+  font-size: 0.82rem;
+  font-weight: 800;
+  padding: 0.55rem 0.4rem;
+}
+
+.response-pill:hover,
+.response-pill-active {
+  border-color: var(--sb-primary);
+  background: var(--sb-primary);
+  color: #fff;
+}
+
+.specializations-segment {
+  min-height: 100%;
+}
+
+.subject-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .subject-pill {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
+  gap: 0.45rem;
+  max-width: 100%;
+  padding: 0.42rem 0.54rem 0.42rem 0.75rem;
   border-radius: 999px;
-  background: #0a7a51;
-  color: #ffffff;
-  font-weight: 600;
-  font-size: 0.9rem;
+  background: var(--sb-primary);
+  color: #fff;
+  font-size: 0.84rem;
+  font-weight: 800;
 }
 
 .subject-pill-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
   border: 0;
-  background: transparent;
-  color: inherit;
-  font-size: 1rem;
-  line-height: 1;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
   padding: 0;
+}
+
+.subject-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1.5px dashed rgba(0, 137, 90, 0.42);
+  background: transparent;
+  color: var(--sb-primary);
+  font-weight: 800;
+  padding: 0.48rem 0.78rem;
+}
+
+.subject-add-btn:hover {
+  background: rgba(0, 137, 90, 0.06);
+  border-style: solid;
+}
+
+.empty-note {
+  margin: 0;
+  color: #7b8b84;
+  font-size: 0.88rem;
+}
+
+.bio-textarea {
+  min-height: 132px;
+  resize: vertical;
+}
+
+.bio-near-limit {
+  border-color: #f59e0b;
+}
+
+.bio-at-limit {
+  border-color: #dc3545;
+  box-shadow: 0 0 0 4px rgba(220, 53, 69, 0.12);
+}
+
+.bio-counter {
+  justify-self: end;
+  margin-top: -0.2rem;
+  color: #8a9a93;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.bio-counter-warn {
+  color: #dc3545;
+}
+
+.session-mode-group {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.mode-check {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin: 0;
+  cursor: pointer;
+}
+
+.mode-checkbox {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--sb-primary);
+}
+
+.mode-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #334155;
+  font-weight: 700;
+}
+
+.mode-copy .bi {
+  color: var(--sb-primary);
 }
 
 .subject-accordion-list {
   display: grid;
-  gap: 12px;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
 }
 
 .subject-accordion-card {
   border: 1px solid #dbe7e1;
-  border-radius: 20px;
-  background: #f6f8f7;
+  border-radius: 18px;
+  background: rgba(246, 248, 247, 0.9);
   overflow: hidden;
-  transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+  transition: border-color 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease;
 }
 
 .subject-accordion-card-open {
   border-color: #9fd0ba;
   background: #eef7f3;
-  box-shadow: 0 12px 24px rgba(10, 122, 81, 0.08);
+  box-shadow: 0 12px 28px rgba(10, 122, 81, 0.08);
 }
 
 .subject-accordion-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
   width: 100%;
   border: 0;
   background: transparent;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 16px 18px;
+  padding: 0.9rem 1rem;
   text-align: left;
 }
 
 .subject-accordion-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 999px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border-radius: 999px;
   background: #dfe5e2;
   color: #65756d;
-  flex-shrink: 0;
-  transition: background-color 180ms ease, color 180ms ease;
+  transition: background-color 0.18s ease, color 0.18s ease;
 }
 
 .subject-accordion-icon-open {
-  background: #0a7a51;
-  color: #ffffff;
+  color: #fff;
+  background: var(--sb-primary);
 }
 
 .subject-accordion-title {
-  font-size: 0.98rem;
-  font-weight: 700;
+  min-width: 0;
   color: #1f2f2a;
-  transition: color 180ms ease;
+  font-size: 0.95rem;
+  font-weight: 800;
 }
 
 .subject-accordion-title-open {
-  color: #0a7a51;
+  color: var(--sb-primary);
 }
 
 .subject-accordion-chevron {
   color: #5d7168;
-  font-size: 1rem;
 }
 
 .subject-accordion-body {
-  padding: 0 18px 18px;
   display: grid;
-  gap: 10px;
+  gap: 0.55rem;
+  padding: 0 1rem 1rem;
   overflow: hidden;
-  transition: max-height var(--sb-t-slow) var(--sb-spring),
-              opacity var(--sb-t-normal) ease;
-}
-
-.subject-accordion-label {
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #6d8178;
+  transition: max-height 0.36s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.22s ease;
 }
 
 .subject-description-input {
   width: 100%;
-  min-height: 120px;
+  min-height: 112px;
   border: 0;
-  border-radius: 18px;
-  background: #ffffff;
-  padding: 14px 16px;
+  border-radius: 14px;
+  background: #fff;
   color: #183129;
+  padding: 0.8rem 0.9rem;
   resize: vertical;
-  box-shadow: inset 0 0 0 1px rgba(224, 231, 227, 0.85);
+  box-shadow: inset 0 0 0 1px rgba(224, 231, 227, 0.9);
 }
 
 .subject-description-input:focus {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(10, 122, 81, 0.14);
+  box-shadow: 0 0 0 4px rgba(0, 137, 90, 0.12);
 }
 
-.subject-modal-backdrop {
+.actions-segment {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.profile-actions {
+  justify-content: flex-end;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.btn-discard {
+  padding: 0.75rem 1.1rem;
+  border: 1.5px solid #dbe7e1;
+  background: rgba(255, 255, 255, 0.72);
+  color: #4b655b;
+}
+
+.btn-discard:hover {
+  background: #fff;
+  border-color: #b9c7c1;
+}
+
+.btn-save {
+  min-width: 138px;
+  padding: 0.78rem 1.25rem;
+}
+
+.modal-backdrop-soft {
   position: fixed;
   inset: 0;
   z-index: 1050;
   display: grid;
   place-items: center;
-  padding: 24px;
-  background: rgba(15, 23, 42, 0.42);
+  padding: 1.5rem;
+  background: rgba(15, 23, 42, 0.46);
+  backdrop-filter: blur(6px);
+}
+
+.glass-modal {
+  width: min(100%, 680px);
+  max-height: min(86vh, 780px);
+  display: grid;
+  gap: 1.1rem;
+  overflow: auto;
+  border: 1px solid rgba(255, 255, 255, 0.92);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 28px 90px rgba(15, 23, 42, 0.26);
+  backdrop-filter: blur(24px);
+  padding: 1.5rem;
+}
+
+.modal-header-row {
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.modal-kicker {
+  color: var(--sb-primary);
+}
+
+.modal-title {
+  margin: 0;
+  color: #10231d;
+  font-size: 1.25rem;
+  font-weight: 850;
+}
+
+.modal-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  border: 1px solid #dbe7e1;
+  background: #fff;
+  color: #526960;
+}
+
+.modal-section {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.modal-section-label {
+  margin: 0;
+}
+
+.course-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  gap: 0.55rem;
+}
+
+.course-card {
+  display: grid;
+  gap: 0.18rem;
+  min-height: 76px;
+  border: 1.5px solid #dbe7e1;
+  background: rgba(248, 250, 252, 0.82);
+  padding: 0.65rem 0.75rem;
+  text-align: left;
+}
+
+.course-card:hover,
+.course-card-active {
+  border-color: var(--sb-primary);
+  background: rgba(0, 137, 90, 0.08);
+}
+
+.course-card-code {
+  color: #10231d;
+  font-size: 0.84rem;
+  font-weight: 850;
+}
+
+.course-card-name {
+  color: #64748b;
+  font-size: 0.75rem;
+  line-height: 1.25;
+}
+
+.year-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.year-btn {
+  min-height: 42px;
+  border: 1.5px solid #dbe7e1;
+  background: rgba(248, 250, 252, 0.82);
+  color: #334155;
+  font-size: 0.8rem;
+  font-weight: 800;
+  padding: 0.5rem 0.3rem;
+}
+
+.year-btn:hover,
+.year-btn-active {
+  border-color: var(--sb-primary);
+  background: var(--sb-primary);
+  color: #fff;
+}
+
+.modal-footer-row {
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.btn-ghost-sm,
+.btn-confirm {
+  padding: 0.62rem 1.05rem;
+}
+
+.btn-ghost-sm {
+  border: 1.5px solid #dbe7e1;
+  background: #fff;
+  color: #526960;
+}
+
+.btn-ghost-sm:hover {
+  background: #f8fafc;
 }
 
 .subject-modal {
-  width: min(720px, 100%);
-  max-height: min(85vh, 760px);
-  overflow: hidden;
+  width: min(100%, 720px);
 }
 
 .category-pills {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 0.45rem;
 }
 
 .category-pill {
   border: 1px solid #d8e3de;
-  background: #ffffff;
-  color: #315447;
   border-radius: 999px;
-  padding: 7px 14px;
-  font-size: 0.9rem;
-  font-weight: 600;
+  background: #fff;
+  color: #315447;
+  padding: 0.42rem 0.85rem;
+  font-size: 0.84rem;
+  font-weight: 800;
 }
 
+.category-pill:hover,
 .category-pill.active {
-  background: #e8f7f1;
-  border-color: #0a7a51;
-  color: #0a7a51;
+  border-color: var(--sb-primary);
+  background: rgba(0, 137, 90, 0.08);
+  color: var(--sb-primary);
 }
 
 .subject-modal-list {
   display: grid;
-  gap: 10px;
-  max-height: 420px;
-  overflow-y: auto;
+  gap: 0.55rem;
+  max-height: 370px;
+  overflow: auto;
+  padding-right: 0.15rem;
 }
 
 .subject-option {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  gap: 16px;
+  justify-content: space-between;
+  gap: 1rem;
   width: 100%;
-  padding: 14px 16px;
-  border: 1px solid #dde7e2;
-  border-radius: 16px;
-  background: #ffffff;
+  border: 1px solid #dbe7e1;
+  background: #fff;
+  padding: 0.8rem 0.9rem;
   text-align: left;
 }
 
+.subject-option:hover,
 .subject-option.selected {
-  background: #eef8f4;
   border-color: #86d0af;
+  background: #eef8f4;
 }
 
 .subject-option-copy {
   display: grid;
-  gap: 2px;
+  gap: 0.15rem;
+  min-width: 0;
 }
 
 .subject-option-name {
-  font-weight: 700;
   color: #163127;
+  font-size: 0.92rem;
+  font-weight: 850;
 }
 
 .subject-option-meta {
-  font-size: 0.85rem;
   color: #6e8178;
+  font-size: 0.8rem;
 }
 
 .subject-option-check {
-  flex-shrink: 0;
+  flex: 0 0 auto;
+  color: var(--sb-primary);
+  font-size: 1.15rem;
+}
+
+.modal-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  min-height: 112px;
+  color: #64748b;
+  text-align: center;
+}
+
+.modal-error {
+  color: #dc3545;
+}
+
+.modal-empty {
+  grid-column: 1 / -1;
+  padding: 0.5rem 0;
 }
 
 .subject-modal-footer {
-  display: flex;
   justify-content: space-between;
-  align-items: center;
-  gap: 16px;
+  gap: 1rem;
   flex-wrap: wrap;
 }
 
-@media (max-width: 576px) {
-  .subject-modal-footer {
+.selected-count {
+  color: #64748b;
+  font-size: 0.86rem;
+  font-weight: 750;
+}
+
+.modal-footer-actions {
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.mb-0 {
+  margin-bottom: 0;
+}
+
+@media (max-width: 991px) {
+  .profile-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-header-segment,
+  .actions-segment {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .header-actions,
+  .profile-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  .tutor-profile-shell {
+    padding: 1rem;
+  }
+
+  .glass-segment,
+  .glass-modal {
+    border-radius: 18px;
+    padding: 1rem;
+  }
+
+  .header-left {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .avatar-wrapper,
+  .avatar-img,
+  .initials-avatar {
+    width: 88px;
+    height: 88px;
+  }
+
+  .profile-name {
+    font-size: 1.55rem;
+  }
+
+  .header-actions,
+  .profile-actions,
+  .modal-footer-actions {
     align-items: stretch;
+    flex-direction: column;
+  }
+
+  .btn-soft,
+  .btn-primary-action,
+  .btn-discard,
+  .btn-save,
+  .btn-ghost-sm,
+  .btn-confirm {
+    width: 100%;
+  }
+
+  .field-row-2,
+  .teaching-level-grid,
+  .response-pills,
+  .year-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .course-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .rate-display {
+    font-size: 1.05rem;
   }
 }
 </style>
