@@ -128,12 +128,14 @@ import { useRoute, useRouter } from 'vue-router'
 import api from '@/services/api/api'
 import { usePaymentStore } from '@/stores/tuteePaymentDetails'
 import { useBookedSessionStore } from '@/stores/bookedSessionDetails'
+import { useToastStore } from '@/stores/toast'
 
 const route = useRoute()
 const router = useRouter()
 
 const paymentStore = usePaymentStore()
 const bookedSessionStore = useBookedSessionStore()
+const toastStore = useToastStore()
 
 const tutorId = route.params.tutorId
 
@@ -219,7 +221,7 @@ onMounted(async () => {
 
   // Protect against direct URL access
   if (!bookedSessionStore.bookedSessions?.length) {
-    alert("No Sessions Selected.")
+    toastStore.push("No Sessions Selected.", 'warning')
     router.push('/find-tutors')
   }
 })
@@ -230,12 +232,12 @@ onMounted(async () => {
 const ConfirmPayment = async () => {
 
   if (!paymentStore.selectedMethod) {
-    alert("Please select a payment method.")
+    toastStore.push("Please select a payment method.", 'warning')
     return
   }
 
   if (selectedMethodName.value === 'Online Payment' && !canSubmitOnlinePayment.value) {
-    alert("Please attach a receipt and enter the transaction reference.")
+    toastStore.push("Please attach a receipt and enter the transaction reference.", 'warning')
     return
   }
 
@@ -259,7 +261,7 @@ const ConfirmPayment = async () => {
 
     await api.post('bookings/confirm/', formData)
 
-    alert("Booking Confirmed!")
+    toastStore.push("Booking Confirmed!")
 
     paymentStore.reset()
     transactionReference.value = ''
@@ -272,7 +274,7 @@ const ConfirmPayment = async () => {
 
   } catch (error) {
     console.error("Payment error:", error.response?.data || error)
-    alert(error.response?.data?.error || "Something went wrong.")
+    toastStore.push(error.response?.data?.error || "Something went wrong.", 'error')
   }
 }
 </script>

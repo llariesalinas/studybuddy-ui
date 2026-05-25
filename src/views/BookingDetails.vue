@@ -161,18 +161,20 @@
 import { onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import { useTutorBookingDetailStore } from '@/stores/tutorBookingDetails'
+import { useToastStore } from '@/stores/toast'
 
 const route = useRoute()
 const bookingId = route.params.id
 const bookingDetailsStore = useTutorBookingDetailStore()
 const store = useTutorBookingDetailStore()
+const toastStore = useToastStore()
 
 const handleComplete = async () => {
   try {
     await bookingDetailsStore.completeSession()
-    alert("Session marked as completed.")
+    toastStore.push("Session marked as completed.")
   } catch (error) {
-    alert(error.response?.data?.error || "Failed to complete session.")
+    toastStore.push(error.response?.data?.error || "Failed to complete session.", 'error')
   }
 }
 

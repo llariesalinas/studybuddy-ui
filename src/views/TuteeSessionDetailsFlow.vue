@@ -234,12 +234,14 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useSessionsStore } from '@/stores/completedSessions'
 import { useNotificationsStore } from '@/stores/notifications'
+import { useToastStore } from '@/stores/toast'
 import RatingStackModal from '@/components/RatingStackModal.vue'
 
 const route = useRoute()
 const router = useRouter()
 const sessionsStore = useSessionsStore()
 const notificationsStore = useNotificationsStore()
+const toastStore = useToastStore()
 
 const sessionDetail = ref(null)
 const loading = ref(true)
@@ -396,9 +398,9 @@ const handleCancelSession = async () => {
     sessionDetail.value = updatedDetail
     isCancelModalOpen.value = false
     await notificationsStore.fetchNotifications()
-    alert('Session cancelled successfully.')
+    toastStore.push('Session cancelled successfully.')
   } catch (error) {
-    alert(error.response?.data?.error || 'Failed to cancel session.')
+    toastStore.push(error.response?.data?.error || 'Failed to cancel session.', 'error')
   } finally {
     isCancelling.value = false
   }

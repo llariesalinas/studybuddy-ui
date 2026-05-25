@@ -146,12 +146,14 @@ import api from '@/services/api/api'
 import { useNotificationsStore } from '@/stores/notifications'
 import { usePaymentStore } from '@/stores/tuteePaymentDetails'
 import { useSessionsStore } from '@/stores/completedSessions'
+import { useToastStore } from '@/stores/toast'
 
 const route = useRoute()
 const router = useRouter()
 const notificationsStore = useNotificationsStore()
 const paymentStore = usePaymentStore()
 const sessionsStore = useSessionsStore()
+const toastStore = useToastStore()
 
 const bookingId = route.params.bookingId
 const bookingDetail = ref(null)
@@ -199,19 +201,19 @@ const initiateOnlinePayment = async () => {
     window.location.href = data.payment_url
   } catch (error) {
     console.error('Online payment initiation error:', error)
-    alert(error.response?.data?.error || 'Unable to initiate payment. Please try again.')
+    toastStore.push(error.response?.data?.error || 'Unable to initiate payment. Please try again.', 'error')
     isSubmitting.value = false
   }
 }
 
 const submitPayment = async () => {
   if (!paymentStore.selectedMethod) {
-    alert('Please select a payment method.')
+    toastStore.push('Please select a payment method.', 'warning')
     return
   }
 
   if (selectedMethod.value?.code === 'online' && !canSubmitOnlinePayment.value) {
-    alert('Please attach a receipt and enter the transaction reference.')
+    toastStore.push('Please attach a receipt and enter the transaction reference.', 'warning')
     return
   }
 
@@ -234,11 +236,11 @@ const submitPayment = async () => {
     paymentStore.reset()
     showSuccess.value = true
     await new Promise(resolve => setTimeout(resolve, 800))
-    alert('Payment submitted. Waiting for tutor verification.')
+    toastStore.push('Payment submitted. Waiting for tutor verification.')
     router.push(`/tuteeSessionDetails/${bookingId}`)
   } catch (error) {
     console.error('Payment submission error:', error)
-    alert(error.response?.data?.error || 'Unable to submit payment.')
+    toastStore.push(error.response?.data?.error || 'Unable to submit payment.', 'error')
   } finally {
     isSubmitting.value = false
   }
