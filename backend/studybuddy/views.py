@@ -1113,7 +1113,7 @@ def get_tutor_profile(request):
     except Tutor.DoesNotExist:
         return Response({"error": "Tutor not found"}, status=404)
 
-    serializer = TutorProfileSerializer(tutor)
+    serializer = TutorProfileSerializer(tutor, context={'request': request})
     return Response(serializer.data)
 
 #Tutor Detail View

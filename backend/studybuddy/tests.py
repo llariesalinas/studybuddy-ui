@@ -1242,3 +1242,33 @@ class TuteeProfileTests(APITestCase):
         response = self.client.post('/api/tutee/profile/avatar/', {'avatar': image}, format='multipart')
         self.assertEqual(response.status_code, 200)
         self.assertIn('profile_picture_url', response.data)
+
+
+class TutorProfileTests(APITestCase):
+    def setUp(self):
+        self.tutor_user = User.objects.create_user(
+            username="tutor-test",
+            email="tutor@example.com",
+            password="password",
+        )
+        self.tutor_profile = UserProfile.objects.create(
+            user=self.tutor_user,
+            fname="Tutor",
+            mname="",
+            lname="Test",
+            role="Tutor",
+            year_level=12,
+        )
+        self.tutor = Tutor.objects.create(
+            profile=self.tutor_profile,
+            hourly_rate=Decimal("250.00"),
+            can_online=True,
+            can_f2f=True,
+            teaching_level="SHS",
+        )
+
+    def test_get_profile_includes_profile_picture_url(self):
+        self.client.force_authenticate(user=self.tutor_user)
+        response = self.client.get('/api/tutor/profile/')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('profile_picture_url', response.data)
