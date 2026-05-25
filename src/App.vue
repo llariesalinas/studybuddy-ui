@@ -1,8 +1,10 @@
 <template>
   <div v-if="isPublicRoute" class="public-layout">
-    <Transition name="page" mode="out-in">
-      <router-view :key="route.name" />
-    </Transition>
+    <router-view v-slot="{ Component }">
+      <Transition name="page" mode="out-in">
+        <component :is="Component" :key="route.name" />
+      </Transition>
+    </router-view>
   </div>
 
   <div v-else class="d-flex vh-100 overflow-hidden">
@@ -274,9 +276,11 @@
           </div>
         </header>
       <RatingReminderBanner v-if="authStore.isAuthenticated && !isPublicRoute && userRole === 'tutee'" />
-      <Transition name="page" mode="out-in">
-        <router-view :key="route.name" />
-      </Transition>
+      <router-view v-slot="{ Component }">
+        <Transition name="page" mode="out-in">
+          <component :is="Component" :key="route.name" />
+        </Transition>
+      </router-view>
     </main>
   </div>
 
