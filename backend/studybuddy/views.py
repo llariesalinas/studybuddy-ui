@@ -2532,7 +2532,8 @@ def get_tutee_profile(request):
         "year_level": profile.year_level,
         "bio": profile.bio,
         "subjects": subject_ids,
-        "profile_picture_url": request.build_absolute_uri(profile.profile_picture.url) if profile.profile_picture else None
+        "profile_picture_url": request.build_absolute_uri(profile.profile_picture.url) if profile.profile_picture else None,
+        "updated_at": profile.updated_at.isoformat() if profile.updated_at else None
     })
 
 @api_view(['POST'])
@@ -2549,6 +2550,8 @@ def upload_tutee_avatar(request):
         return Response({'error': 'Image must be under 5MB'}, status=400)
 
     profile = request.user.userprofile
+    if profile.profile_picture:
+        profile.profile_picture.delete(save=False)
     profile.profile_picture = avatar
     profile.save()
     

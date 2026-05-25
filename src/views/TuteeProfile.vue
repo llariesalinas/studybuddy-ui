@@ -6,20 +6,26 @@
         <form @submit.prevent="saveProfile">
           
           <!-- PROFILE HEADER -->
-          <div class="profile-header d-flex align-items-center">
-            <div class="avatar-wrapper me-4">
-              <img v-if="profile.profile_picture_url" :src="profile.profile_picture_url" class="rounded-circle avatar-img" @click="triggerFileInput">
-              <div v-else class="rounded-circle initials-avatar d-flex align-items-center justify-content-center fw-bold fs-3" @click="triggerFileInput">
-                {{ initials }}
+          <div class="profile-header d-flex align-items-center justify-content-between flex-wrap gap-3">
+            <div class="d-flex align-items-center gap-4">
+              <div class="avatar-wrapper">
+                <img v-if="profile.profile_picture_url" :src="profile.profile_picture_url" class="rounded-circle avatar-img" @click="triggerFileInput">
+                <div v-else class="rounded-circle initials-avatar d-flex align-items-center justify-content-center fw-bold fs-3" @click="triggerFileInput">
+                  {{ initials }}
+                </div>
+                <input type="file" ref="fileInput" class="d-none" @change="handleAvatarUpload" accept="image/*">
+                <div class="avatar-edit-badge" @click="triggerFileInput">
+                  <i class="bi bi-camera-fill"></i>
+                </div>
               </div>
-              <input type="file" ref="fileInput" class="d-none" @change="handleAvatarUpload" accept="image/*">
-              <div class="avatar-edit-badge" @click="triggerFileInput">
-                <i class="bi bi-camera-fill"></i>
+              <div class="header-info">
+                <h2 class="mb-1 fw-bold text-white">{{ profile.fname }} {{ profile.lname }}</h2>
+                <p class="text-white text-opacity-75 mb-0">Student / Tutee</p>
               </div>
             </div>
-            <div class="header-info">
-              <h2 class="mb-1 fw-bold text-white">{{ profile.fname }} {{ profile.lname }}</h2>
-              <p class="text-white text-opacity-75 mb-0">Tutee / {{ educationLevel.toUpperCase() }}</p>
+            <div class="d-flex gap-2">
+              <button type="button" class="sb-btn btn-discard px-4 py-2 fw-semibold" @click="discardChanges">Discard</button>
+              <button type="submit" class="sb-btn btn-save px-4 py-2 fw-semibold">Save Profile</button>
             </div>
           </div>
 
@@ -107,12 +113,14 @@
 
                     <div class="col-12 mt-4">
                       <label class="form-label text-muted small fw-bold">Preferred Subjects</label>
-                      <select v-model="profile.subjects" class="form-select input-glass custom-multiselect" multiple>
-                        <option v-for="s in subjects" :key="s.subject_code" :value="s.subject_code">
-                          {{ s.subject_name }}
-                        </option>
-                      </select>
-                      <div class="form-text mt-2 small opacity-50">Hold Ctrl (Windows) or Cmd (Mac) to select multiple subjects.</div>
+                      <div class="subjects-pills d-flex flex-wrap gap-2 mt-1">
+                        <label v-for="s in subjects" :key="s.subject_code" class="subject-pill-label">
+                          <input type="checkbox" class="sr-only" :value="s.subject_code" v-model="profile.subjects">
+                          <span :class="['subject-pill', { active: profile.subjects.includes(s.subject_code) }]">
+                            {{ s.subject_name }}
+                          </span>
+                        </label>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -122,9 +130,11 @@
           </div>
 
           <!-- PROFILE FOOTER -->
-          <div class="profile-footer d-flex justify-content-end mt-5 pt-4 border-top border-light border-opacity-10 px-4 px-md-5 pb-5">
-            <button type="submit" class="sb-btn hover-lift px-5 py-3 fw-bold">
-              Save Profile Changes
+          <div class="profile-footer d-flex align-items-center justify-content-between mt-5 pt-4 border-top border-light border-opacity-10 px-4 px-md-5 pb-5 flex-wrap gap-3">
+            <p v-if="lastUpdated" class="mb-0 small text-muted fst-italic">Last updated: {{ lastUpdated }}</p>
+            <p v-else class="mb-0"></p>
+            <button type="submit" class="sb-btn btn-save hover-lift px-5 py-3 fw-bold">
+              Save Changes
             </button>
           </div>
 
@@ -230,6 +240,13 @@ const initials = computed(() => {
   return (first + last).toUpperCase()
 })
 
+const lastUpdated = computed(() => {
+  if (!profile.value.updated_at) return null
+  return new Date(profile.value.updated_at).toLocaleDateString('en-US', {
+    year: 'numeric', month: 'short', day: 'numeric'
+  })
+})
+
 const triggerFileInput = () => {
   fileInput.value.click()
 }
@@ -237,22 +254,30 @@ const triggerFileInput = () => {
 const handleAvatarUpload = async (event) => {
   const file = event.target.files[0]
   if (!file) return
+  if (!file.type.startsWith('image/')) {
+    toastStore.push('Please select an image file', 'error')
+    return
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    toastStore.push('Image must be under 5 MB', 'error')
+    return
+  }
 
   const formData = new FormData()
   formData.append('avatar', file)
 
   try {
-    const res = await api.post('/tutee/profile/avatar/', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      }
-    })
+    const res = await api.post('/tutee/profile/avatar/', formData)
     profile.value.profile_picture_url = res.data.profile_picture_url
-    toastStore.push("Avatar updated successfully")
+    toastStore.push('Photo updated successfully')
   } catch (err) {
-    console.error("Avatar upload failed", err)
-    toastStore.push("Failed to upload avatar", 'error')
+    console.error('Avatar upload failed', err)
+    toastStore.push('Failed to upload photo', 'error')
   }
+}
+
+const discardChanges = () => {
+  loadProfile()
 }
 
 const saveProfile = async () => {
@@ -295,7 +320,7 @@ onMounted(() => {
 }
 
 .profile-header {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  background: linear-gradient(135deg, var(--sb-primary-deep) 0%, var(--sb-primary) 100%);
   padding: 3rem 2rem;
   color: white;
 }
@@ -328,7 +353,7 @@ onMounted(() => {
   position: absolute;
   bottom: 5px;
   right: 5px;
-  background: #10b981;
+  background: var(--sb-primary);
   color: white;
   width: 32px;
   height: 32px;
@@ -367,7 +392,7 @@ onMounted(() => {
   transform: translateY(-50%);
   width: 4px;
   height: 1.5rem;
-  background: #10b981;
+  background: var(--sb-primary);
   border-radius: 2px;
 }
 
@@ -381,8 +406,8 @@ onMounted(() => {
 
 .input-glass:focus {
   background: white;
-  border-color: #10b981;
-  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.1);
+  border-color: var(--sb-primary);
+  box-shadow: 0 0 0 4px rgba(0, 137, 90, 0.1);
   outline: none;
 }
 
@@ -395,24 +420,61 @@ onMounted(() => {
 }
 
 .sb-btn {
-  background: #10b981;
-  color: white;
   border: none;
   border-radius: 12px;
   transition: all 0.3s ease;
 }
 
-.sb-btn:hover {
-  background: #059669;
+.btn-save {
+  background: var(--sb-primary);
+  color: white;
+}
+
+.btn-save:hover {
+  background: var(--sb-primary-hover);
+  color: white;
+}
+
+.btn-discard {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+.btn-discard:hover {
+  background: rgba(255, 255, 255, 0.35);
   color: white;
 }
 
 .hover-lift:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(16, 185, 129, 0.25);
+  box-shadow: 0 8px 20px rgba(0, 137, 90, 0.25);
 }
 
-.custom-multiselect {
-  min-height: 120px;
+.subject-pill-label {
+  margin: 0;
+  cursor: pointer;
+}
+
+.subject-pill {
+  display: inline-block;
+  padding: 0.4rem 0.9rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: rgba(255, 255, 255, 0.5);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.subject-pill:hover {
+  border-color: var(--sb-primary);
+  color: var(--sb-primary);
+}
+
+.subject-pill.active {
+  background: var(--sb-primary);
+  color: white;
+  border-color: var(--sb-primary);
 }
 </style>

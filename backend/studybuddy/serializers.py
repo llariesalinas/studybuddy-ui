@@ -280,7 +280,3 @@ class NotificationSerializer(serializers.ModelSerializer):
         fields = ['id', 'message', 'is_read', 'created_at']
 
 
-class UserProfileSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = UserProfile
-        fields = ['fname', 'mname', 'lname', 'course', 'year_level', 'bio']
