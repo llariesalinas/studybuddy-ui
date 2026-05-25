@@ -4,6 +4,7 @@ from unittest.mock import Mock, patch
 from uuid import uuid4
 
 from django.contrib.auth.models import User
+from django.test import override_settings
 from rest_framework.test import APITestCase
 
 from .chat.services import get_current_booking_context, get_partner_context
@@ -19,7 +20,10 @@ from .models import (
     TutorSubjects,
     UserProfile,
     Transaction,
+    TutorPayoutAccount,
     Wallet,
+    WithdrawalRequest,
+    Preference,
 )
 from .chat.models import ChatRoom, Message
 
@@ -1020,3 +1024,221 @@ class PaymentMethodTests(APITestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(codes, ["CASH", "PAYMONGO"])
+
+
+@override_settings(
+    PAYMONGO_WALLET_ID="wallet_test",
+    PAYMONGO_CASHOUT_CALLBACK_URL="https://api.test/api/wallet/paymongo/callback/",
+    CASHOUT_PROVIDER_FEE_PHP="10",
+    CASHOUT_MIN_PHP="500",
+)
+class TutorCashOutTests(APITestCase):
+    def setUp(self):
+        self.tutor_user = User.objects.create_user(
+            username="cashout-tutor",
+            email="cashout-tutor@example.com",
+            password="password",
+        )
+        self.tutor_profile = UserProfile.objects.create(
+            user=self.tutor_user,
+            fname="Cash",
+            mname="",
+            lname="Tutor",
+            role="Tutor",
+        )
+        self.tutor = Tutor.objects.create(
+            profile=self.tutor_profile,
+            hourly_rate=Decimal("300.00"),
+            can_online=True,
+            can_f2f=True,
+            teaching_level="SHS",
+        )
+        self.wallet = Wallet.objects.get(tutor=self.tutor)
+        self.wallet.balance = Decimal("1000.00")
+        self.wallet.save(update_fields=["balance"])
+        self.client.force_authenticate(user=self.tutor_user)
+
+    def create_account(self, provider="instapay", is_active=True):
+        return TutorPayoutAccount.objects.create(
+            tutor=self.tutor,
+            destination_type="gcash",
+            provider=provider,
+            receiving_institution_id="inst_gcash",
+            receiving_institution_name="GCash",
+            receiving_institution_code="GCASH",
+            account_number="09171234567",
+            account_name="Cash Tutor",
+            is_active=is_active,
+        )
+
+    def provider_result(self, status_value="pending", transaction_id="wt_test_123"):
+        return {
+            "id": transaction_id,
+            "status": status_value,
+            "provider": "paymongo",
+            "reference_number": "PMO-123",
+            "fee": Decimal("0.00"),
+            "net_amount": Decimal("500.00"),
+        }
+
+    def callback_payload(self, status_value="failed", transaction_id="wt_test_123"):
+        return {
+            "data": {
+                "id": transaction_id,
+                "attributes": {
+                    "status": status_value,
+                    "provider": "paymongo",
+                    "reference_number": "PMO-123",
+                    "provider_error": {"detail": "Receiving account rejected the transfer."},
+                },
+            }
+        }
+
+    def test_create_list_and_deactivate_payout_destination(self):
+        payload = {
+            "destination_type": "gcash",
+            "provider": "instapay",
+            "receiving_institution_id": "inst_gcash",
+            "receiving_institution_name": "GCash",
+            "receiving_institution_code": "GCASH",
+            "account_number": "09171234567",
+            "account_name": "Cash Tutor",
+        }
+
+        create_response = self.client.post("/api/wallet/payout-destinations/", payload, format="json")
+        list_response = self.client.get("/api/wallet/payout-destinations/")
+        account_id = create_response.data["id"]
+        patch_response = self.client.patch(
+            f"/api/wallet/payout-destinations/{account_id}/",
+            {"is_active": False},
+            format="json",
+        )
+
+        self.assertEqual(create_response.status_code, 201)
+        self.assertEqual(list_response.status_code, 200)
+        self.assertEqual(len(list_response.data), 1)
+        self.assertEqual(patch_response.status_code, 200)
+        self.assertFalse(patch_response.data["is_active"])
+
+    def test_cashout_rejects_invalid_amount_and_insufficient_balance(self):
+        account = self.create_account()
+
+        small_response = self.client.post(
+            "/api/wallet/cash-outs/",
+            {"amount": "499.99", "payout_account_id": account.id},
+            format="json",
+        )
+        insufficient_response = self.client.post(
+            "/api/wallet/cash-outs/",
+            {"amount": "995.00", "payout_account_id": account.id},
+            format="json",
+        )
+
+        self.assertEqual(small_response.status_code, 400)
+        self.assertEqual(insufficient_response.status_code, 400)
+        self.wallet.refresh_from_db()
+        self.assertEqual(self.wallet.balance, Decimal("1000.00"))
+
+    @patch("studybuddy.views.create_wallet_transaction")
+    def test_cashout_deducts_amount_and_fee_and_stores_provider_data(self, mock_create):
+        account = self.create_account()
+        mock_create.return_value = self.provider_result()
+
+        response = self.client.post(
+            "/api/wallet/cash-outs/",
+            {"amount": "500.00", "payout_account_id": account.id},
+            format="json",
+        )
+
+        self.wallet.refresh_from_db()
+        withdrawal = WithdrawalRequest.objects.get(id=response.data["id"])
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(self.wallet.balance, Decimal("490.00"))
+        self.assertEqual(withdrawal.status, "pending")
+        self.assertEqual(withdrawal.provider_wallet_transaction_id, "wt_test_123")
+        self.assertEqual(withdrawal.provider_reference_number, "PMO-123")
+        self.assertEqual(withdrawal.provider_fee, Decimal("10.00"))
+        self.assertTrue(
+            Transaction.objects.filter(
+                wallet=self.wallet,
+                transaction_type="withdrawal",
+                amount=Decimal("-500.00"),
+            ).exists()
+        )
+        self.assertTrue(
+            Transaction.objects.filter(
+                wallet=self.wallet,
+                transaction_type="cashout_fee",
+                amount=Decimal("-10.00"),
+            ).exists()
+        )
+
+    @patch("studybuddy.views.create_wallet_transaction")
+    def test_failed_callback_refunds_amount_and_fee_once(self, mock_create):
+        account = self.create_account()
+        mock_create.return_value = self.provider_result()
+
+        create_response = self.client.post(
+            "/api/wallet/cash-outs/",
+            {"amount": "500.00", "payout_account_id": account.id},
+            format="json",
+        )
+        self.client.force_authenticate(user=None)
+
+        first_callback = self.client.post(
+            "/api/wallet/paymongo/callback/",
+            self.callback_payload(),
+            format="json",
+        )
+        second_callback = self.client.post(
+            "/api/wallet/paymongo/callback/",
+            self.callback_payload(),
+            format="json",
+        )
+
+        self.wallet.refresh_from_db()
+        withdrawal = WithdrawalRequest.objects.get(id=create_response.data["id"])
+
+        self.assertEqual(first_callback.status_code, 200)
+        self.assertEqual(second_callback.status_code, 200)
+        self.assertEqual(withdrawal.status, "failed")
+        self.assertEqual(self.wallet.balance, Decimal("1000.00"))
+        self.assertEqual(
+            Transaction.objects.filter(
+                wallet=self.wallet,
+                transaction_type__in=["withdrawal_reversal", "cashout_fee_reversal"],
+            ).count(),
+            2,
+        )
+
+
+class TuteeProfileTests(APITestCase):
+    def setUp(self):
+        self.tutee_user = User.objects.create_user(
+            username="tutee-test",
+            email="tutee@example.com",
+            password="password",
+        )
+        self.tutee_profile = UserProfile.objects.create(
+            user=self.tutee_user,
+            fname="Tutee",
+            mname="",
+            lname="Test",
+            role="Tutee",
+            year_level=11,
+        )
+
+    def test_get_profile_includes_avatar_url(self):
+        self.client.force_authenticate(user=self.tutee_user)
+        response = self.client.get('/api/tutee/profile/')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('profile_picture_url', response.data)
+
+    def test_upload_avatar_success(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        self.client.force_authenticate(user=self.tutee_user)
+        image = SimpleUploadedFile("avatar.jpg", b"file_content", content_type="image/jpeg")
+        response = self.client.post('/api/tutee/profile/avatar/', {'avatar': image}, format='multipart')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('profile_picture_url', response.data)

@@ -2535,6 +2535,28 @@ def get_tutee_profile(request):
         "profile_picture_url": request.build_absolute_uri(profile.profile_picture.url) if profile.profile_picture else None
     })
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def upload_tutee_avatar(request):
+    if 'avatar' not in request.FILES:
+        return Response({'error': 'No avatar provided'}, status=400)
+    
+    avatar = request.FILES['avatar']
+    if not avatar.content_type.startswith('image/'):
+        return Response({'error': 'File must be an image'}, status=400)
+    
+    if avatar.size > 5 * 1024 * 1024:
+        return Response({'error': 'Image must be under 5MB'}, status=400)
+
+    profile = request.user.userprofile
+    profile.profile_picture = avatar
+    profile.save()
+    
+    return Response({
+        "profile_picture_url": request.build_absolute_uri(profile.profile_picture.url)
+    })
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_tutor_subjects(request):
