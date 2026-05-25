@@ -10,6 +10,7 @@ from rest_framework.test import APITestCase
 from .chat.services import get_current_booking_context, get_partner_context
 from .models import (
     Booking,
+    Course,
     Payment,
     PaymentMethod,
     Rating,
@@ -1242,6 +1243,35 @@ class TuteeProfileTests(APITestCase):
         response = self.client.post('/api/tutee/profile/avatar/', {'avatar': image}, format='multipart')
         self.assertEqual(response.status_code, 200)
         self.assertIn('profile_picture_url', response.data)
+
+    def test_update_profile_can_clear_course_and_subjects(self):
+        course = Course.objects.create(
+            course_code="BSCS",
+            course_name="BS Computer Science",
+        )
+        subject = Subjects.objects.create(
+            subject_code="MATH101",
+            subject_name="College Algebra",
+            department="Math",
+            category="College",
+        )
+        self.tutee_profile.course = course
+        self.tutee_profile.save()
+        preference = Preference.objects.create(user=self.tutee_profile)
+        preference.subjects.add(subject)
+
+        self.client.force_authenticate(user=self.tutee_user)
+        response = self.client.put('/api/tutee/profile/update/', {
+            "course": "",
+            "year_level": 7,
+            "subjects": [],
+        }, format='json')
+
+        self.assertEqual(response.status_code, 200)
+        self.tutee_profile.refresh_from_db()
+        preference.refresh_from_db()
+        self.assertIsNone(self.tutee_profile.course)
+        self.assertEqual(preference.subjects.count(), 0)
 
 
 class TutorProfileTests(APITestCase):

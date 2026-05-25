@@ -2484,14 +2484,17 @@ def update_tutee_profile(request):
     profile.mname = request.data.get("mname", profile.mname)
     profile.lname = request.data.get("lname", profile.lname)
 
-    course_code = request.data.get("course")
+    if "course" in request.data:
+        course_code = request.data.get("course")
 
-    if course_code:
-        try:
-            course = Course.objects.get(course_code=course_code)
-            profile.course = course
-        except Course.DoesNotExist:
-            return Response({"error": "Invalid course"}, status=400)
+        if course_code:
+            try:
+                course = Course.objects.get(course_code=course_code)
+                profile.course = course
+            except Course.DoesNotExist:
+                return Response({"error": "Invalid course"}, status=400)
+        else:
+            profile.course = None
 
     profile.year_level = request.data.get("year_level", profile.year_level)
     profile.bio = request.data.get("bio", profile.bio)
@@ -2503,7 +2506,7 @@ def update_tutee_profile(request):
 
     pref, created = Preference.objects.get_or_create(user=profile)
 
-    if subject_ids:
+    if "subjects" in request.data:
         pref.subjects.set(subject_ids)
 
     pref.save()

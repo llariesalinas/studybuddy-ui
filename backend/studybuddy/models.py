@@ -181,11 +181,13 @@ class Transaction(models.Model):
         ('session_credit', 'Session Credit'),
         ('withdrawal', 'Withdrawal'),
         ('withdrawal_reversal', 'Withdrawal Reversal'),
+        ('cashout_fee', 'Cash-Out Provider Fee'),
+        ('cashout_fee_reversal', 'Cash-Out Provider Fee Reversal'),
         ('commission_deduction', 'Commission Deduction'),
     ]
     
     wallet = models.ForeignKey(Wallet, on_delete=models.CASCADE, related_name='transactions')
-    transaction_type = models.CharField(max_length=20, choices=TRANSACTION_TYPES)
+    transaction_type = models.CharField(max_length=30, choices=TRANSACTION_TYPES)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     description = models.TextField()
     reference_id = models.CharField(max_length=100, blank=True)
@@ -193,6 +195,31 @@ class Transaction(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+
+class TutorPayoutAccount(models.Model):
+    DESTINATION_TYPES = [
+        ('gcash', 'GCash'),
+        ('bank', 'Bank Transfer'),
+    ]
+
+    tutor = models.ForeignKey(Tutor, on_delete=models.CASCADE, related_name='payout_accounts')
+    destination_type = models.CharField(max_length=10, choices=DESTINATION_TYPES)
+    receiving_institution_id = models.CharField(max_length=100)
+    receiving_institution_name = models.CharField(max_length=150)
+    receiving_institution_code = models.CharField(max_length=50, blank=True)
+    provider = models.CharField(max_length=20, blank=True, default='')
+    account_number = models.CharField(max_length=50)
+    account_name = models.CharField(max_length=100)
+    bank_name = models.CharField(max_length=100, blank=True, null=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-is_active', '-updated_at']
+
+    def __str__(self):
+        return f"{self.tutor.profile.fname} - {self.receiving_institution_name}"
 
 class WithdrawalRequest(models.Model):
     STATUS_CHOICES = [
@@ -208,6 +235,13 @@ class WithdrawalRequest(models.Model):
     ]
 
     tutor = models.ForeignKey(Tutor, on_delete=models.CASCADE)
+    payout_account = models.ForeignKey(
+        TutorPayoutAccount,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='cash_outs'
+    )
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     method = models.CharField(max_length=10, choices=METHOD_CHOICES)
     account_number = models.CharField(max_length=50)
@@ -215,6 +249,16 @@ class WithdrawalRequest(models.Model):
     bank_name = models.CharField(max_length=100, blank=True, null=True)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
     failure_reason = models.TextField(blank=True, null=True)
+    provider = models.CharField(max_length=30, blank=True, default='')
+    provider_wallet_transaction_id = models.CharField(max_length=120, blank=True, default='')
+    provider_reference_number = models.CharField(max_length=120, blank=True, default='')
+    provider_status = models.CharField(max_length=30, blank=True, default='')
+    provider_error_code = models.CharField(max_length=120, blank=True, default='')
+    provider_error_message = models.TextField(blank=True, default='')
+    provider_fee = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    net_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    rail = models.CharField(max_length=20, blank=True, default='')
+    callback_received_at = models.DateTimeField(null=True, blank=True)
     requested_at = models.DateTimeField(auto_now_add=True)
     processed_at = models.DateTimeField(null=True, blank=True)
 

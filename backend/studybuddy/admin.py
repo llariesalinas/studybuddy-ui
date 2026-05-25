@@ -17,6 +17,7 @@ from .models import (
     UserProfile,
     Wallet,
     Transaction,
+    TutorPayoutAccount,
     WithdrawalRequest,
 )
 
@@ -38,13 +39,32 @@ admin.site.register(Course)
 
 admin.site.register(Wallet)
 admin.site.register(Transaction)
+admin.site.register(TutorPayoutAccount)
 
 
 @admin.register(WithdrawalRequest)
 class WithdrawalRequestAdmin(admin.ModelAdmin):
-    list_display = ('tutor', 'amount', 'method', 'account_number', 'account_name', 'status', 'requested_at', 'processed_at')
-    list_filter = ('status', 'method')
-    search_fields = ('tutor__profile__fname', 'tutor__profile__lname', 'account_number', 'account_name')
+    list_display = (
+        'tutor',
+        'amount',
+        'provider_fee',
+        'method',
+        'rail',
+        'provider_status',
+        'provider_reference_number',
+        'status',
+        'requested_at',
+        'processed_at'
+    )
+    list_filter = ('status', 'method', 'rail', 'provider_status')
+    search_fields = (
+        'tutor__profile__fname',
+        'tutor__profile__lname',
+        'account_number',
+        'account_name',
+        'provider_reference_number',
+        'provider_wallet_transaction_id'
+    )
     readonly_fields = ('tutor', 'amount', 'method', 'account_number', 'account_name', 'bank_name', 'requested_at')
     actions = ['mark_processed', 'mark_rejected']
 

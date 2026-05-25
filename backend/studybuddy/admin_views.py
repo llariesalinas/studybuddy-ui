@@ -1,6 +1,7 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
+from django.db import transaction
 from django.db.models import Count, Q, Sum
 from django.utils import timezone
 from datetime import timedelta
@@ -73,20 +74,43 @@ class AdminWithdrawalDetailView(APIView):
         if new_status in ['processed', 'rejected', 'failed', 'flagged']:
             withdrawal.processed_at = timezone.now()
         
-        if new_status == 'rejected':
-            # Reverse the balance in the tutor's wallet
-            wallet = withdrawal.tutor.wallet
-            wallet.balance += withdrawal.amount
-            wallet.save()
+        if new_status in ['rejected', 'failed']:
+            with transaction.atomic():
+                wallet = Wallet.objects.select_for_update().get(tutor=withdrawal.tutor)
+                principal_ref = f"WD-{withdrawal.id}-REV"
+                fee_ref = f"WD-{withdrawal.id}-FEE-REV"
+                changed_balance = False
 
-            # Record reversal transaction
-            Transaction.objects.create(
-                wallet=wallet,
-                transaction_type='withdrawal_reversal',
-                amount=withdrawal.amount,
-                description=f"Reversal of rejected withdrawal request #{withdrawal.id}",
-                reference_id=str(withdrawal.id)
-            )
+                if not Transaction.objects.filter(
+                    wallet=wallet,
+                    reference_id__in=[principal_ref, str(withdrawal.id)]
+                ).exists():
+                    wallet.balance += withdrawal.amount
+                    changed_balance = True
+                    Transaction.objects.create(
+                        wallet=wallet,
+                        transaction_type='withdrawal_reversal',
+                        amount=withdrawal.amount,
+                        description=f"Reversal of cash-out request #{withdrawal.id}",
+                        reference_id=principal_ref
+                    )
+
+                if (
+                    withdrawal.provider_fee > 0
+                    and not Transaction.objects.filter(wallet=wallet, reference_id=fee_ref).exists()
+                ):
+                    wallet.balance += withdrawal.provider_fee
+                    changed_balance = True
+                    Transaction.objects.create(
+                        wallet=wallet,
+                        transaction_type='cashout_fee_reversal',
+                        amount=withdrawal.provider_fee,
+                        description=f"Provider fee reversal for cash-out request #{withdrawal.id}",
+                        reference_id=fee_ref
+                    )
+
+                if changed_balance:
+                    wallet.save(update_fields=['balance'])
 
         withdrawal.save()
 
