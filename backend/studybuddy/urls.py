@@ -56,6 +56,7 @@ urlpatterns = [
     path('tutee/profile/avatar/', views.upload_tutee_avatar),
     path('tutee/profile/update/', views.update_tutee_profile),
     path('tutor/profile/', views.get_tutor_profile),
+    path('tutor/profile/avatar/', views.upload_tutor_avatar),
     path('tutor/subjects/', views.get_tutor_subjects),
     path('tutor/subjects/add/', views.add_tutor_subject),
     path('tutor/subjects/update/<str:subject_code>/', views.update_tutor_subject),

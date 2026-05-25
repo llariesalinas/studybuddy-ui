@@ -1272,3 +1272,23 @@ class TutorProfileTests(APITestCase):
         response = self.client.get('/api/tutor/profile/')
         self.assertEqual(response.status_code, 200)
         self.assertIn('profile_picture_url', response.data)
+
+    def test_upload_avatar_success(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        self.client.force_authenticate(user=self.tutor_user)
+        image = SimpleUploadedFile("avatar.jpg", b"fake_image_content", content_type="image/jpeg")
+        response = self.client.post('/api/tutor/profile/avatar/', {'avatar': image}, format='multipart')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('profile_picture_url', response.data)
+
+    def test_upload_avatar_rejects_non_image(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        self.client.force_authenticate(user=self.tutor_user)
+        document = SimpleUploadedFile("avatar.pdf", b"fake_pdf_content", content_type="application/pdf")
+        response = self.client.post('/api/tutor/profile/avatar/', {'avatar': document}, format='multipart')
+        self.assertEqual(response.status_code, 400)
+
+    def test_upload_avatar_rejects_missing_file(self):
+        self.client.force_authenticate(user=self.tutor_user)
+        response = self.client.post('/api/tutor/profile/avatar/', {}, format='multipart')
+        self.assertEqual(response.status_code, 400)
