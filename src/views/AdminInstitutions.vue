@@ -268,8 +268,10 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue';
 import { useAdminStore } from '@/stores/admin';
+import { useToastStore } from '@/stores/toast'
 
 const store = useAdminStore()
+const toastStore = useToastStore()
 const showAddModal = ref(false)
 
 const selectedInstitution = ref(null)
@@ -294,7 +296,7 @@ const toggleActive = async (inst) => {
         selectedInstitution.value = updated
       }
     } catch (err) {
-      alert('Failed to update institution status.')
+      toastStore.push('Failed to update institution status.', 'error')
     } finally {
       toggling.value = false
     }
@@ -322,7 +324,7 @@ const submitAdd = async () => {
     showAddModal.value = false
     Object.assign(form, { institution_name: '', school_email_domain: '', contact_person: '' })
   } catch (err) {
-    alert('Failed to add institution. Domain might already exist.')
+    toastStore.push('Failed to add institution. Domain might already exist.', 'error')
   }
 }
 </script>

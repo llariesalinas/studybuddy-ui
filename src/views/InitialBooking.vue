@@ -115,11 +115,13 @@ import {
   useInitialBookingPrefsStore,
 } from '@/stores/initialbookingprefs'
 import { useFindTutorsStore } from '@/stores/findTutors'
+import { useToastStore } from '@/stores/toast'
 import api from '@/services/api/api'
 
 const router = useRouter()
 const store = useInitialBookingPrefsStore()
 const findTutorsStore = useFindTutorsStore()
+const toastStore = useToastStore()
 
 const isSubmitting = ref(false)
 const subjects = ref([])
@@ -218,13 +220,13 @@ onMounted(async () => {
 // FIND TUTOR (CBF CALL)
 const findTutor = async () => {
   if (!store.selectedDate) {
-    alert('Please select a session date.')
+    toastStore.push('Please select a session date.', 'warning')
     return
   }
 
   if (isPastDate(store.selectedDate)) {
     store.selectedDate = null
-    alert('Please choose today or a future date.')
+    toastStore.push('Please choose today or a future date.', 'warning')
     return
   }
 
@@ -235,13 +237,13 @@ const findTutor = async () => {
   if (isPastTimeForDate(store.selectedDate, store.selectedStartTime)) {
     store.selectedStartTime = null
     store.selectedEndTime = null
-    alert('Please choose a future start time.')
+    toastStore.push('Please choose a future start time.', 'warning')
     return
   }
 
   if (store.selectedEndTime <= store.selectedStartTime) {
     store.selectedEndTime = null
-    alert('Please choose an end time after the start time.')
+    toastStore.push('Please choose an end time after the start time.', 'warning')
     return
   }
 

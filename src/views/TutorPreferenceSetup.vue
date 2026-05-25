@@ -54,10 +54,12 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useProfileStore } from '@/stores/profile'
+import { useToastStore } from '@/stores/toast'
 import api from '@/services/api/api'
 
 const router = useRouter()
 const profileStore = useProfileStore()
+const toastStore = useToastStore()
 
 const form = ref({
   teaching_level: '',
@@ -105,7 +107,7 @@ const handleCompleteSetup = async () => {
   } catch (error) {
 
     console.error("Failed to save tutor profile", error)
-    alert("Could not save tutor profile.")
+    toastStore.push("Could not save tutor profile.", 'error')
 
   }
 

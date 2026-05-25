@@ -172,8 +172,10 @@
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue';
 import { useAdminStore } from '@/stores/admin';
+import { useToastStore } from '@/stores/toast'
 
 const store = useAdminStore()
+const toastStore = useToastStore()
 const selectedUser = ref(null)
 
 const filters = reactive({
@@ -234,7 +236,7 @@ const toggleSuspension = async (user) => {
       await store.updateUserStatus(user.id, !user.is_suspended)
       // No manual patch needed — store mutation is reactive
     } catch (err) {
-      alert('Failed to update user status.')
+      toastStore.push('Failed to update user status.', 'error')
     } finally {
       suspending.value = false
     }
@@ -246,7 +248,7 @@ const confirmDelete = async (user) => {
       await store.deleteUser(user.id)
       selectedUser.value = null
     } catch (err) {
-      alert('Failed to delete user.')
+      toastStore.push('Failed to delete user.', 'error')
     }
   }
 }

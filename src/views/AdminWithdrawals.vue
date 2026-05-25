@@ -499,8 +499,10 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue';
 import { useAdminStore } from '@/stores/admin';
+import { useToastStore } from '@/stores/toast'
 
 const store = useAdminStore()
+const toastStore = useToastStore()
 const statusFilter = ref('')
 const activeWithdrawal = ref(null)
 const failureReason = ref('')
@@ -546,7 +548,7 @@ const markProcessed = async (w) => {
     try {
       await store.updateWithdrawalStatus(w.id, { status: 'processed' })
     } catch (err) {
-      alert('Update failed.')
+      toastStore.push('Update failed.', 'error')
     }
   }
 }
@@ -560,7 +562,7 @@ const updateStatus = async (status) => {
       })
       activeWithdrawal.value = null
     } catch (err) {
-      alert('Update failed.')
+      toastStore.push('Update failed.', 'error')
     }
   }
 }

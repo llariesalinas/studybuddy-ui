@@ -191,6 +191,7 @@ import {
 } from '@/stores/initialbookingprefs'
 import { useBookedSessionStore } from '@/stores/bookedSessionDetails'
 import { useFindTutorsStore } from '@/stores/findTutors'
+import { useToastStore } from '@/stores/toast'
 
 const route = useRoute()
 const router = useRouter()
@@ -198,6 +199,7 @@ const router = useRouter()
 const initialbookStore = useInitialBookingPrefsStore()
 const bookedSessionStore = useBookedSessionStore()
 const findTutorsStore = useFindTutorsStore()
+const toastStore = useToastStore()
 
 const isLoading = ref(true)
 const isSubmitting = ref(false)
@@ -430,30 +432,30 @@ const getNavigationFilters = (routeLike) => ({
 
 const searchTutor = async () => {
   if (!findTutorsStore.filters.date) {
-    alert('Please select a session date.')
+    toastStore.push('Please select a session date.', 'warning')
     return
   }
 
   if (isPastDate(findTutorsStore.filters.date)) {
     updateFindTutorsFilters({ date: null })
-    alert('Please choose today or a future date.')
+    toastStore.push('Please choose today or a future date.', 'warning')
     return
   }
 
   if (!findTutorsStore.filters.startTime || !findTutorsStore.filters.endTime) {
-    alert('Please select a start and end time.')
+    toastStore.push('Please select a start and end time.', 'warning')
     return
   }
 
   if (isPastTimeForDate(findTutorsStore.filters.date, findTutorsStore.filters.startTime)) {
     updateFindTutorsFilters({ startTime: null, endTime: null })
-    alert('Please choose a future start time.')
+    toastStore.push('Please choose a future start time.', 'warning')
     return
   }
 
   if (findTutorsStore.filters.endTime <= findTutorsStore.filters.startTime) {
     updateFindTutorsFilters({ endTime: null })
-    alert('Please choose an end time after the start time.')
+    toastStore.push('Please choose an end time after the start time.', 'warning')
     return
   }
 

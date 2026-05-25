@@ -247,6 +247,7 @@ import { useInitialBookingPrefsStore } from '@/stores/initialbookingprefs'
 import { useFindTutorsStore } from '@/stores/findTutors'
 import { usePaymentStore } from '@/stores/tuteePaymentDetails'
 import { useChatStore } from '@/stores/chat'
+import { useToastStore } from '@/stores/toast'
 import api from '@/services/api/api'
 
 const router = useRouter()
@@ -258,6 +259,7 @@ const initialBookingStore = useInitialBookingPrefsStore()
 const findTutorsStore = useFindTutorsStore()
 const paymentStore = usePaymentStore()
 const chatStore = useChatStore()
+const toastStore = useToastStore()
 
 const tutorID = route.params.id
 const monthOffset = ref(0)
@@ -467,7 +469,7 @@ const toggleFavorite = async () => {
   } catch (error) {
     isFavorite.value = !isFavorite.value
     console.error('Failed to toggle favorite status', error)
-    alert('Could not update favorite status. Please try again.')
+    toastStore.push('Could not update favorite status. Please try again.', 'error')
   }
 }
 
@@ -674,12 +676,12 @@ function toggleSlot(day, week, slot) {
   }
 
   if (selectedSlots.value.length > 0 && selectedSlots.value[0].week_start !== week.week_start) {
-    alert('You can book multiple slots only within the same week.')
+    toastStore.push('You can book multiple slots only within the same week.', 'warning')
     return
   }
 
   if (selectedSlots.value.length > 0 && selectedSlots.value[0].session_date !== day.date) {
-    alert('You can only book multiple sessions on the same day.')
+    toastStore.push('You can only book multiple sessions on the same day.', 'warning')
     return
   }
 
@@ -687,7 +689,7 @@ function toggleSlot(day, week, slot) {
   const daySelections = nextSelections.filter(selected => selected.session_date === day.date)
 
   if (!canExpandSelectionWithinDay(day, daySelections)) {
-    alert('The selected range includes unavailable in-between time slots.')
+    toastStore.push('The selected range includes unavailable in-between time slots.', 'warning')
     return
   }
 
@@ -714,7 +716,7 @@ const confirmBooking = async () => {
       preferred_location: bookedSessionStore.bookedSessionLocation
     })
 
-    alert('Booking Confirmed!')
+    toastStore.push('Booking Confirmed!')
     initialBookingStore.$reset()
     findTutorsStore.reset()
     selectedSlots.value = []
@@ -725,7 +727,7 @@ const confirmBooking = async () => {
     })
   } catch (error) {
     console.error('Payment error:', error.response?.data || error)
-    alert(error.response?.data?.error || 'Something went wrong.')
+    toastStore.push(error.response?.data?.error || 'Something went wrong.', 'error')
   } finally {
     isSubmittingBooking.value = false
   }

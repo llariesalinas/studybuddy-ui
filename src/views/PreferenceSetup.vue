@@ -172,10 +172,12 @@ import { usePreferenceStore } from '@/stores/preferences'
 import { useProfileStore } from '@/stores/profile'
 import api from '@/services/api/api'
 import SbStepBar from '@/components/SbStepBar.vue'
+import { useToastStore } from '@/stores/toast'
 
 const router = useRouter()
 const store = usePreferenceStore()
 const profileStore = useProfileStore()
+const toastStore = useToastStore()
 
 const currentCard = ref(0)
 const totalCards = 3
@@ -283,7 +285,7 @@ const finish = async () => {
   } catch (error) {
 
     console.error("Failed saving preferences", error)
-    alert("Could not save preferences")
+    toastStore.push("Could not save preferences", 'error')
 
   } finally {
 

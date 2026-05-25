@@ -165,6 +165,9 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import api from '@/services/api/api'
+import { useToastStore } from '@/stores/toast'
+
+const toastStore = useToastStore()
 
 const profile = ref({
   fname: '',
@@ -262,11 +265,11 @@ const saveProfile = async () => {
 
     await api.put('/tutee/profile/update/', profile.value)
 
-    alert("Profile updated successfully")
+    toastStore.push("Profile updated successfully")
 
   } catch (err) {
     console.error(err)
-    alert("Failed to update profile")
+    toastStore.push("Failed to update profile", 'error')
   }
 }
 

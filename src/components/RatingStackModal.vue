@@ -106,6 +106,7 @@
 <script setup>
 import { computed, nextTick, ref, watch, onUnmounted } from 'vue'
 import { useSessionsStore } from '@/stores/completedSessions'
+import { useToastStore } from '@/stores/toast'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -115,6 +116,7 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'rated'])
 const sessionsStore = useSessionsStore()
+const toastStore = useToastStore()
 
 const activeIndex = ref(0)
 const ratingComment = ref('')
@@ -188,7 +190,7 @@ const submitRating = async () => {
     }
   } catch (error) {
     console.error('Failed to submit rating:', error)
-    alert('Failed to submit rating.')
+    toastStore.push('Failed to submit rating.', 'error')
   } finally {
     isSubmitting.value = false
   }

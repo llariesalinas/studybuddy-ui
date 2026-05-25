@@ -294,8 +294,10 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useTutorSchedStore } from '@/stores/tutorSched'
+import { useToastStore } from '@/stores/toast'
 
 const tutorSchedStore = useTutorSchedStore()
+const toastStore = useToastStore()
 
 const showAddModal = ref(false)
 const monthOffset = ref(0)
@@ -614,7 +616,7 @@ async function toggleFullDayOverride(dateString) {
     await refreshAvailability()
   } catch (error) {
     console.error('Failed to toggle full-day override:', error)
-    alert(error.response?.data?.error || 'Unable to update the blocked date.')
+    toastStore.push(error.response?.data?.error || 'Unable to update the blocked date.', 'error')
   }
 }
 
@@ -634,7 +636,7 @@ async function blockSelectedSlots(day) {
     await refreshAvailability()
   } catch (error) {
     console.error('Failed to block selected slots:', error)
-    alert(error.response?.data?.error || 'Unable to block the selected slots.')
+    toastStore.push(error.response?.data?.error || 'Unable to block the selected slots.', 'error')
   }
 }
 
@@ -663,13 +665,13 @@ async function unblockSelectedSlots(day) {
     await refreshAvailability()
   } catch (error) {
     console.error('Failed to unblock selected slots:', error)
-    alert(error.response?.data?.error || 'Unable to unblock the selected slots.')
+    toastStore.push(error.response?.data?.error || 'Unable to unblock the selected slots.', 'error')
   }
 }
 
 async function saveSlot() {
   if (!newSlot.value.day || !newSlot.value.start_time || !newSlot.value.end_time) {
-    alert('Please complete all fields.')
+    toastStore.push('Please complete all fields.', 'warning')
     return
   }
 
@@ -677,7 +679,7 @@ async function saveSlot() {
   const end = new Date(`1970-01-01T${newSlot.value.end_time}`)
 
   if (end <= start) {
-    alert('End time must be after start time.')
+    toastStore.push('End time must be after start time.', 'warning')
     return
   }
 
@@ -706,13 +708,13 @@ async function saveSlot() {
     }
 
     if (createdCount === 0) {
-      alert('All selected time slots already exist.')
+      toastStore.push('All selected time slots already exist.', 'warning')
     }
 
     await refreshAvailability()
 
     if (createdCount > 0) {
-      alert(`${createdCount} slot${createdCount > 1 ? 's were' : ' was'} added successfully.`)
+      toastStore.push(`${createdCount} slot${createdCount > 1 ? 's were' : ' was'} added successfully.`)
     }
 
     newSlot.value = {
@@ -728,7 +730,7 @@ async function saveSlot() {
     clearSelection()
   } catch (error) {
     console.error('Failed to add slots:', error)
-    alert('Something went wrong.')
+    toastStore.push('Something went wrong.', 'error')
   }
 }
 

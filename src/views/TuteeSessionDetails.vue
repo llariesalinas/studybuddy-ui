@@ -180,10 +180,12 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useSessionsStore } from '@/stores/sessionsStore'
+import { useToastStore } from '@/stores/toast'
 import * as bootstrap from 'bootstrap'
 
 const route = useRoute()
 const sessionsStore = useSessionsStore()
+const toastStore = useToastStore()
 
 const session = ref(null)
 const isLoading = ref(true)
@@ -236,7 +238,7 @@ const executeConfirmation = async () => {
 
   } catch (error) {
     console.error("Failed to complete session:", error)
-    alert("Failed to submit rating. Please try again.")
+    toastStore.push("Failed to submit rating. Please try again.", 'error')
   } finally {
     isSubmitting.value = false
   }
