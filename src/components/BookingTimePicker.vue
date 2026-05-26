@@ -2,7 +2,7 @@
   <div class="time-picker-wrap">
     <button
       type="button"
-      class="btn w-100 text-start border-sb shadow-none time-trigger"
+      class="btn w-100 text-start border-sb shadow-none time-trigger sb-btn"
       :class="{ 'time-trigger-active': isOpen }"
       :disabled="disabled"
       @click="openModal"
@@ -29,7 +29,7 @@
 
             <button
               type="button"
-              class="time-icon-btn"
+              class="time-icon-btn sb-btn"
               aria-label="Close time picker"
               @click="closeModal"
             >
@@ -42,7 +42,7 @@
               v-for="period in periods"
               :key="period"
               type="button"
-              class="time-segmented-option"
+              class="time-segmented-option sb-btn"
               :class="{ 'time-segmented-option-active': activePeriod === period }"
               @click="activePeriod = period"
             >
@@ -55,7 +55,7 @@
               v-for="slot in visibleTimeSlots"
               :key="slot.value"
               type="button"
-              class="time-chip"
+              class="time-chip sb-btn"
               :class="{ 'time-chip-active': slot.value === modelValue }"
               :disabled="slot.disabled"
               @click="selectTime(slot.value)"
@@ -222,7 +222,7 @@ defineExpose({
 .time-trigger {
   min-height: 42px;
   background: #ffffff;
-  color: #212529;
+  color: var(--sb-text-dark);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -230,18 +230,18 @@ defineExpose({
 }
 
 .time-trigger i {
-  color: #6b7280;
+  color: var(--sb-text-muted);
   flex-shrink: 0;
 }
 
 .time-trigger:disabled {
-  color: #9aa7b3;
-  background: #f8faf9;
+  color: var(--sb-text-subtle);
+  background: var(--sb-bg);
   cursor: not-allowed;
 }
 
 .time-trigger-active {
-  border-color: var(--sb-primary, #00895a);
+  border-color: var(--sb-primary);
   box-shadow: 0 0 0 0.15rem rgba(0, 137, 90, 0.12);
 }
 
@@ -274,7 +274,7 @@ defineExpose({
 }
 
 .time-modal-kicker {
-  color: #6b7d74;
+  color: var(--sb-text-muted-green);
   font-size: 0.68rem;
   font-weight: 800;
   letter-spacing: 0.14em;
@@ -282,7 +282,7 @@ defineExpose({
 }
 
 .time-modal-title {
-  color: #163127;
+  color: var(--sb-text-main);
   font-size: 1.15rem;
   font-weight: 800;
 }
@@ -292,15 +292,15 @@ defineExpose({
   height: 36px;
   border: 0;
   border-radius: 10px;
-  background: #edf6f1;
-  color: #0a7a51;
+  background: var(--sb-primary-light);
+  color: var(--sb-primary-dark);
   display: inline-grid;
   place-items: center;
   flex-shrink: 0;
 }
 
 .time-icon-btn:hover {
-  background: #dff1e8;
+  background: var(--sb-primary-lighter);
 }
 
 .time-segmented-control {
@@ -308,7 +308,7 @@ defineExpose({
   grid-template-columns: repeat(2, minmax(80px, 1fr));
   padding: 4px;
   border-radius: 999px;
-  background: #edf2f7;
+  background: var(--sb-bg);
   gap: 4px;
 }
 
@@ -318,12 +318,12 @@ defineExpose({
   border-radius: 999px;
   padding: 0.5rem 1rem;
   font-weight: 700;
-  color: #4a5568;
+  color: var(--sb-text-secondary);
 }
 
 .time-segmented-option-active {
   background: #ffffff;
-  color: var(--sb-primary, #00895a);
+  color: var(--sb-primary);
   box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
 }
 
@@ -335,12 +335,12 @@ defineExpose({
 
 .time-chip {
   min-height: 44px;
-  border: 1px solid #d7dee7;
+  border: 1px solid var(--sb-border-light);
   background: #ffffff;
   border-radius: 12px;
   padding: 0.7rem 0.5rem;
   font-weight: 700;
-  color: #243142;
+  color: var(--sb-text-dark);
   transition:
     background-color 150ms ease,
     border-color 150ms ease,
@@ -350,20 +350,20 @@ defineExpose({
 
 .time-chip:hover:not(:disabled) {
   border-color: rgba(0, 137, 90, 0.36);
-  background: #edf7f2;
-  color: #0a7a51;
+  background: var(--sb-primary-light);
+  color: var(--sb-primary-dark);
 }
 
 .time-chip:disabled {
-  color: #a0acb8;
-  background: #f8faf9;
+  color: var(--sb-text-subtle);
+  background: var(--sb-bg);
   cursor: not-allowed;
 }
 
 .time-chip-active {
-  border-color: var(--sb-primary, #00895a);
+  border-color: var(--sb-primary);
   background: rgba(0, 137, 90, 0.1);
-  color: var(--sb-primary, #00895a);
+  color: var(--sb-primary);
   box-shadow: 0 8px 18px rgba(0, 137, 90, 0.12);
 }
 </style>

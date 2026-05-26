@@ -37,6 +37,9 @@ __screenshots__/
 
 # Vite
 *.timestamp-*-*.mjs
+.env
+.env.*
+!.env.example
 
 # Local handoff notes and plans
 PROJECT_HANDOFF_DUMP.md
@@ -50,3 +53,13 @@ handoffs/
 .mcp.json
 # Added by code-review-graph
 .code-review-graph/
+
+# Specific local files to ignore
+Algorithm Improvements documentation.md
+backend/studybuddy/migrations/0041_recommendation_filter_indexes.py
+tatusQ
+backend/{
+src/views/*.zip
+*.log
+*.err.log
+*.out.log

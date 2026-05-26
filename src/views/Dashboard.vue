@@ -1,193 +1,193 @@
 <template>
-  <div class="dashboard-page p-4">
-    <div class="row g-4 mb-5">
-      <div v-for="(stat, index) in stats" :key="index" class="col-md-3">
-        <div class="card border-sb shadow-sm rounded-4 h-100 p-3 d-flex flex-row align-items-center stat-card">
-          <div :class="[stat.bgClass, 'p-3 rounded-4 me-3']">
-            <i :class="[stat.icon, 'text-sb-primary fs-3']"></i>
-          </div>
-          <div class="flex-grow-1">
-            <h6 class="text-muted small fw-bold mb-1">{{ stat.label }}</h6>
+  <div class="dashboard-shell">
+    <div class="aurora-blob aurora-blob-one"></div>
+    <div class="aurora-blob aurora-blob-two"></div>
+    <div class="aurora-blob aurora-blob-three"></div>
+
+    <div class="dashboard-content">
+      <section class="metrics-grid" aria-label="Session summary">
+        <article
+          v-for="(stat, index) in stats"
+          :key="index"
+          class="glass-panel metric-card sb-stagger-item"
+          :style="{ animationDelay: `${index * 0.07}s` }"
+        >
+          <span class="metric-icon">
+            <i :class="['bi', stat.icon]"></i>
+          </span>
+          <div class="metric-copy">
+            <p class="metric-label">{{ stat.label }}</p>
             <Transition name="fade" mode="out-in">
-              <h2 v-if="loading" class="fw-bold mb-0 placeholder-glow">
+              <span v-if="loading" class="metric-value placeholder-glow">
                 <span class="placeholder col-6 rounded"></span>
-              </h2>
-              <h2 v-else class="fw-bold mb-0">{{ stat.count }}</h2>
+              </span>
+              <span v-else class="metric-value">{{ stat.count }}</span>
             </Transition>
           </div>
-        </div>
-      </div>
-    </div>
+        </article>
+      </section>
 
-    <div class="row g-4 align-items-stretch">
-      <div class="col-xl-8">
-        <div class="card border-0 shadow-sm rounded-4 weekly-board-card h-100">
-          <div class="card-body p-4 p-xl-4 d-flex flex-column h-100">
-            <header class="weekly-board-header d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
-              <div>
-                <p class="weekly-board-kicker mb-2">Weekly Schedule</p>
-                <h4 class="weekly-board-title mb-1">Your Sessions This Week</h4>
-                <p class="weekly-board-subtitle mb-0">
-                  Review your booked sessions across the week and open any session details in one click.
-                </p>
-              </div>
-              <div class="d-flex align-items-center gap-2 align-self-start align-self-lg-auto weekly-board-nav">
-                <button
-                  type="button"
-                  class="schedule-nav-btn"
-                  :disabled="!canGoToPreviousWeek"
-                  @click="goToPreviousWeek"
-                  aria-label="Previous week"
-                >
-                  <i class="bi bi-chevron-left"></i>
-                </button>
-                <div class="week-range-pill">
-                  {{ formattedWeekRange }}
+      <section class="dashboard-grid">
+        <article class="glass-panel weekly-panel">
+          <header class="panel-header weekly-board-header">
+            <div class="panel-heading">
+              <p class="panel-kicker">Weekly Schedule</p>
+              <h2 class="panel-title">Your Sessions This Week</h2>
+              <p class="panel-subtitle">
+                Review your booked sessions across the week and open any session details in one click.
+              </p>
+            </div>
+
+            <div class="weekly-board-nav" aria-label="Week navigation">
+              <button
+                type="button"
+                class="schedule-nav-btn sb-btn"
+                :disabled="!canGoToPreviousWeek"
+                @click="goToPreviousWeek"
+                aria-label="Previous week"
+              >
+                <i class="bi bi-chevron-left"></i>
+              </button>
+              <button
+                type="button"
+                class="week-range-pill sb-btn"
+                :class="{ 'week-range-pill-current': isViewingCurrentWeek }"
+                :aria-label="weekRangeAriaLabel"
+                :aria-current="isViewingCurrentWeek ? 'date' : undefined"
+                @click="goToCurrentWeek"
+              >
+                {{ formattedWeekRange }}
+              </button>
+              <button
+                type="button"
+                class="schedule-nav-btn sb-btn"
+                :disabled="!canGoToNextWeek"
+                @click="goToNextWeek"
+                aria-label="Next week"
+              >
+                <i class="bi bi-chevron-right"></i>
+              </button>
+            </div>
+          </header>
+
+          <Transition name="fade" mode="out-in">
+            <div v-if="loading" class="weekly-board-skeleton">
+              <div class="weekly-grid">
+                <div v-for="i in 7" :key="'skeleton-day-' + i" class="day-column day-column-skeleton">
+                  <div class="day-header">
+                    <span class="placeholder col-5 rounded mb-2"></span>
+                    <span class="placeholder col-7 rounded"></span>
+                  </div>
+                  <div class="day-body">
+                    <div v-for="j in 2" :key="'skeleton-card-' + i + '-' + j" class="session-card-skeleton placeholder-glow">
+                      <span class="placeholder col-4 rounded mb-2"></span>
+                      <span class="placeholder col-8 rounded mb-2"></span>
+                      <span class="placeholder col-6 rounded"></span>
+                    </div>
+                  </div>
                 </div>
-                <button
-                  type="button"
-                  class="schedule-nav-btn"
-                  :disabled="!canGoToNextWeek"
-                  @click="goToNextWeek"
-                  aria-label="Next week"
-                >
-                  <i class="bi bi-chevron-right"></i>
-                </button>
-                <button
-                  v-if="nextSessionWeekOffset !== null && weekOffset !== nextSessionWeekOffset"
-                  type="button"
-                  class="btn btn-sm ms-1"
-                  style="font-size: 0.75rem; color: var(--sb-primary); border: 1px solid var(--sb-primary); white-space: nowrap;"
-                  @click="weekOffset = nextSessionWeekOffset"
-                  aria-label="Jump to next session"
-                >
-                  <i class="bi bi-calendar2-event me-1"></i>Next session
-                </button>
               </div>
-            </header>
+            </div>
 
+            <div v-else class="weekly-board-scroll custom-scrollbar">
+              <div class="weekly-grid">
+                <article
+                  v-for="day in weekDays"
+                  :key="day.key"
+                  class="day-column"
+                  :class="{ 'day-column-today': day.isToday }"
+                >
+                  <div class="day-header">
+                    <p class="day-name">{{ day.shortName }}</p>
+                    <p class="day-date">{{ day.date.getDate() }}</p>
+                  </div>
+
+                  <div class="day-body">
+                    <button
+                      v-for="session in daySessionsMap[day.key]"
+                      :key="session.id"
+                      type="button"
+                      class="weekly-session-card sb-interactive"
+                      :class="getWeeklySessionCardClasses(session.status)"
+                      :style="getSessionCardStyle(session)"
+                      @click="goToDetails(session.id)"
+                    >
+                      <p class="weekly-session-time">{{ formatSessionTime(session) }}</p>
+                      <h3 class="weekly-session-title">{{ session.subject }}</h3>
+                      <p class="weekly-session-tutor">{{ session.tutor }}</p>
+                      <div class="weekly-session-meta">
+                        <span class="weekly-session-status">{{ session.status }}</span>
+                        <span class="weekly-session-duration">
+                          {{ getSessionSlotSpan(session) }} slot{{ getSessionSlotSpan(session) === 1 ? '' : 's' }}
+                        </span>
+                      </div>
+                    </button>
+
+                    <div v-if="!daySessionsMap[day.key]?.length" class="day-empty-state">
+                      <i :class="getEmptyStateIcon(day.index)"></i>
+                      <span>{{ getEmptyStateLabel(day.index) }}</span>
+                    </div>
+                  </div>
+                </article>
+              </div>
+            </div>
+          </Transition>
+        </article>
+
+        <aside class="glass-panel recommendation-panel">
+          <header class="panel-header recommendation-header">
+            <div class="panel-heading">
+              <p class="panel-kicker">Discover</p>
+              <h2 class="panel-title">Try out these tutors</h2>
+              <p class="panel-subtitle">Browse recommended tutors without leaving your dashboard rhythm.</p>
+            </div>
+          </header>
+
+          <div class="recommendation-body">
             <Transition name="fade" mode="out-in">
-              <div v-if="loading" class="weekly-board-skeleton flex-grow-1">
-                <div class="weekly-grid">
-                  <div v-for="i in 7" :key="'skeleton-day-' + i" class="day-column day-column-skeleton">
-                    <div class="day-header">
-                      <span class="placeholder col-5 rounded mb-2"></span>
-                      <span class="placeholder col-7 rounded"></span>
-                    </div>
-                    <div class="day-body">
-                      <div v-for="j in 2" :key="'skeleton-card-' + i + '-' + j" class="session-card-skeleton placeholder-glow">
-                        <span class="placeholder col-4 rounded mb-2"></span>
-                        <span class="placeholder col-8 rounded mb-2"></span>
-                        <span class="placeholder col-6 rounded"></span>
-                      </div>
-                    </div>
+              <div v-if="loading" class="recommendation-skeleton placeholder-glow">
+                <div v-for="i in 6" :key="'skel-tutor-' + i" class="recommendation-skeleton-row">
+                  <div class="skeleton-copy">
+                    <span class="placeholder col-8 rounded"></span>
+                    <span class="placeholder col-5 rounded"></span>
                   </div>
+                  <span class="placeholder col-3 rounded"></span>
                 </div>
               </div>
 
-              <div v-else class="weekly-board-scroll custom-scrollbar flex-grow-1">
-                <div class="weekly-grid">
-                  <article
-                    v-for="day in weekDays"
-                    :key="day.key"
-                    class="day-column"
-                    :class="{ 'day-column-today': day.isToday }"
+              <div v-else class="recommendation-list-wrap">
+                <div class="recommendation-list">
+                  <div v-if="pagedTutors.length === 0" class="recommendation-empty">
+                    No recommended tutors available at the moment.
+                  </div>
+
+                  <button
+                    v-for="tutor in pagedTutors"
+                    :key="tutor.id"
+                    type="button"
+                    class="tutor-list-item sb-interactive"
+                    @click="bookTutor(tutor.id)"
                   >
-                    <div class="day-header">
-                      <p class="day-name mb-1">{{ day.shortName }}</p>
-                      <p class="day-date mb-0">{{ day.date.getDate() }}</p>
-                    </div>
+                    <span class="tutor-copy">
+                      <span class="tutor-name">{{ tutor.name }}</span>
+                      <span class="tutor-meta">
+                        Rating {{ tutor.rating || 'N/A' }} · {{ tutor.subjects?.join(', ') || 'Various Subjects' }}
+                      </span>
+                    </span>
+                    <span class="tutor-rate">PHP {{ tutor.hourlyRate || 0 }}/hr</span>
+                  </button>
+                </div>
 
-                    <div class="day-body">
-                      <button
-                        v-for="session in daySessionsMap[day.key]"
-                        :key="session.id"
-                        type="button"
-                        class="weekly-session-card"
-                        :class="getWeeklySessionCardClasses(session.status)"
-                        :style="getSessionCardStyle(session)"
-                        @click="goToDetails(session.id)"
-                      >
-                        <p class="weekly-session-time mb-2">{{ formatSessionTime(session) }}</p>
-                        <h6 class="weekly-session-title mb-1">{{ session.subject }}</h6>
-                        <p class="weekly-session-tutor mb-2">{{ session.tutor }}</p>
-                        <div class="d-flex align-items-center justify-content-between gap-2">
-                          <span class="weekly-session-status">{{ session.status }}</span>
-                          <span class="weekly-session-duration">{{ getSessionSlotSpan(session) }} slot{{ getSessionSlotSpan(session) === 1 ? '' : 's' }}</span>
-                        </div>
-                      </button>
-
-                      <div v-if="!daySessionsMap[day.key]?.length" class="day-empty-state">
-                        <i :class="getEmptyStateIcon(day.index)"></i>
-                        <span>{{ getEmptyStateLabel(day.index) }}</span>
-                      </div>
-                    </div>
-                  </article>
+                <div class="recommendation-pagination">
+                  <button class="pagination-btn sb-btn" @click="prevPage" :disabled="page === 1">Prev</button>
+                  <span class="pagination-label">Page {{ page }} of {{ totalPages || 1 }}</span>
+                  <button class="pagination-btn sb-btn" @click="nextPage" :disabled="page >= totalPages">Next</button>
                 </div>
               </div>
             </Transition>
           </div>
-        </div>
-      </div>
-
-      <div class="col-xl-4">
-        <div class="card border-sb shadow-sm rounded-4 recommendations-card h-100">
-          <div class="card-body p-4 d-flex flex-column h-100">
-            <div class="mb-3">
-              <p class="weekly-board-kicker mb-2">Discover</p>
-              <h4 class="fw-bold mb-1">Try out these tutors</h4>
-              <p class="text-muted small mb-0">Browse recommended tutors without leaving your dashboard rhythm.</p>
-            </div>
-
-            <div class="flex-grow-1 d-flex flex-column overflow-hidden">
-              <Transition name="fade" mode="out-in">
-                <div v-if="loading" class="flex-grow-1 pe-2">
-                  <div class="list-group list-group-flush placeholder-glow">
-                    <div v-for="i in 6" :key="'skel-tutor-' + i" class="list-group-item d-flex justify-content-between align-items-center py-2">
-                      <div class="w-75">
-                        <h6 class="mb-1"><span class="placeholder col-8 rounded"></span></h6>
-                        <p class="mb-0"><span class="placeholder col-5 rounded"></span></p>
-                      </div>
-                      <div class="w-25 text-end">
-                        <span class="placeholder col-10 rounded"></span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div v-else class="d-flex flex-column h-100">
-                  <div class="flex-grow-1 pe-2">
-                    <div class="list-group list-group-flush">
-                      <div v-if="pagedTutors.length === 0" class="text-muted small py-3">
-                        No recommended tutors available at the moment.
-                      </div>
-
-                      <div
-                        v-for="tutor in pagedTutors"
-                        :key="tutor.id"
-                        class="list-group-item d-flex justify-content-between align-items-center py-2 tutor-list-item"
-                        @click="bookTutor(tutor.id)"
-                      >
-                        <div>
-                          <h6 class="mb-1">{{ tutor.name }}</h6>
-                          <p class="mb-0 text-muted small">Rating {{ tutor.rating || 'N/A' }} | {{ tutor.subjects?.join(', ') || 'Various Subjects' }}</p>
-                        </div>
-                        <div class="fw-bold text-sb-primary">PHP {{ tutor.hourlyRate || 0 }}/hr</div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top flex-shrink-0">
-                    <button class="btn bg-sb-primary text-white btn-sm" @click="prevPage" :disabled="page === 1">Prev</button>
-                    <span class="small text-muted">Page {{ page }} of {{ totalPages || 1 }}</span>
-                    <button class="btn bg-sb-primary text-white btn-sm" @click="nextPage" :disabled="page >= totalPages">Next</button>
-                  </div>
-                </div>
-              </Transition>
-            </div>
-          </div>
-        </div>
-      </div>
+        </aside>
+      </section>
     </div>
   </div>
 </template>
@@ -225,32 +225,6 @@ const getSessionDateKey = (session) => {
   return getDateKey(parsedDate)
 }
 
-const hasVisibleWeekSessions = () => {
-  const startKey = getDateKey(visibleStartOfWeek.value)
-  const endKey = getDateKey(visibleEndOfWeek.value)
-
-  return (sessionsStore.sessions || []).some((session) => {
-    const normalizedStatus = String(session?.status || '').toLowerCase()
-    const sessionDateKey = getSessionDateKey(session)
-
-    return (
-      sessionDateKey >= startKey
-      && sessionDateKey <= endKey
-      && !['cancelled', 'rejected'].includes(normalizedStatus)
-    )
-  })
-}
-
-const ensureWeekContainsSessions = () => {
-  if (nextSessionWeekOffset.value === null) {
-    return
-  }
-
-  if (!hasVisibleWeekSessions()) {
-    weekOffset.value = nextSessionWeekOffset.value
-  }
-}
-
 const refreshDashboard = async () => {
   loading.value = true
 
@@ -260,8 +234,6 @@ const refreshDashboard = async () => {
   ])
 
   loading.value = false
-
-  ensureWeekContainsSessions()
 }
 
 onMounted(refreshDashboard)
@@ -270,13 +242,6 @@ watch(
   () => route.query.refresh,
   () => {
     refreshDashboard()
-  }
-)
-
-watch(
-  () => sessionsStore.sessions,
-  () => {
-    ensureWeekContainsSessions()
   }
 )
 
@@ -302,10 +267,6 @@ const addDays = (date, days) => {
   return next
 }
 
-const getEndOfMonth = (date) => {
-  return new Date(date.getFullYear(), date.getMonth() + 1, 0)
-}
-
 const getDateKey = (date) => `${date.getFullYear()}-${padNumber(date.getMonth() + 1)}-${padNumber(date.getDate())}`
 
 const today = new Date()
@@ -318,19 +279,11 @@ const MS_PER_WEEK = 7 * 24 * 60 * 60 * 1000
 const minWeekOffset = Math.round((minVisibleWeekStart.getTime() - baseStartOfWeek.getTime()) / MS_PER_WEEK)
 const maxWeekOffset = Math.round((maxVisibleWeekStart.getTime() - baseStartOfWeek.getTime()) / MS_PER_WEEK)
 
-const nextSessionWeekOffset = computed(() => {
-  const upcoming = sessionsStore.upcomingSessions
-  if (!upcoming || upcoming.length === 0) return null
-  const nearestDate = new Date(upcoming[0].date)
-  const nearestWeekStart = getStartOfWeek(nearestDate)
-  const offset = Math.round((nearestWeekStart.getTime() - baseStartOfWeek.getTime()) / MS_PER_WEEK)
-  return Math.min(Math.max(offset, minWeekOffset), maxWeekOffset)
-})
-
 const visibleStartOfWeek = computed(() => addDays(baseStartOfWeek, weekOffset.value * 7))
 const visibleEndOfWeek = computed(() => addDays(visibleStartOfWeek.value, 6))
 const canGoToPreviousWeek = computed(() => weekOffset.value > minWeekOffset)
 const canGoToNextWeek = computed(() => weekOffset.value < maxWeekOffset)
+const isViewingCurrentWeek = computed(() => weekOffset.value === 0)
 
 const weekDays = computed(() =>
   Array.from({ length: 7 }, (_, index) => {
@@ -361,6 +314,18 @@ const formattedWeekRange = computed(() => {
 
   return `${startMonth} ${start.getDate()} - ${endMonth} ${end.getDate()}, ${year}`
 })
+
+const weekRangeAriaLabel = computed(() => {
+  if (isViewingCurrentWeek.value) {
+    return `Current week, ${formattedWeekRange.value}`
+  }
+
+  return `Viewing week, ${formattedWeekRange.value}. Click to return to the current week.`
+})
+
+const goToCurrentWeek = () => {
+  weekOffset.value = 0
+}
 
 const visibleSessions = computed(() => {
   const startKey = getDateKey(visibleStartOfWeek.value)
@@ -563,7 +528,7 @@ const bookTutor = (id) => router.push({
 <style scoped>
 .fade-enter-active,
 .fade-leave-active {
-  transition: opacity 0.3s ease-in-out;
+  transition: opacity 0.24s var(--sb-spring, cubic-bezier(0.16, 1, 0.3, 1));
 }
 
 .fade-enter-from,
@@ -571,51 +536,194 @@ const bookTutor = (id) => router.push({
   opacity: 0;
 }
 
-.dashboard-page {
-  color: #163127;
-}
-
-.stat-card,
-.recommendations-card,
-.weekly-board-card {
+.dashboard-shell {
+  --sb-primary: #00895a;
+  --sb-primary-hover: #00704a;
+  --sb-dark: #0a1916;
+  --sb-ink: var(--sb-text-main);
+  --sb-muted: var(--sb-text-muted);
+  --sb-divider: var(--sb-card-border);
+  --sb-green-tint: #edf7f3;
+  --sb-green-border: #b8dece;
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+  padding: 2rem;
+  color: var(--sb-ink);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   background:
-    radial-gradient(circle at top right, rgba(111, 251, 190, 0.12), transparent 32%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.98), #ffffff);
+    radial-gradient(circle at 0% 0%, rgba(16, 185, 129, 0.28), transparent 34%),
+    radial-gradient(circle at 96% 8%, rgba(14, 165, 233, 0.18), transparent 32%),
+    radial-gradient(circle at 86% 82%, rgba(245, 158, 11, 0.11), transparent 34%),
+    var(--sb-bg);
 }
 
-.weekly-board-card {
-  min-height: 500px;
-  background: #ffffff;
+.aurora-blob {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(18px);
+  opacity: 0.38;
+  pointer-events: none;
 }
 
-.weekly-board-kicker {
-  font-size: 0.65rem;
-  font-weight: 800;
-  letter-spacing: 0.18em;
+.aurora-blob-one {
+  width: 280px;
+  height: 280px;
+  top: -90px;
+  left: 12%;
+  background: rgba(0, 137, 90, 0.3);
+}
+
+.aurora-blob-two {
+  width: 320px;
+  height: 320px;
+  top: 12%;
+  right: -120px;
+  background: rgba(14, 165, 233, 0.18);
+}
+
+.aurora-blob-three {
+  width: 250px;
+  height: 250px;
+  left: -90px;
+  bottom: 8%;
+  background: rgba(245, 158, 11, 0.12);
+}
+
+.dashboard-content {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 1.25rem;
+  max-width: 1320px;
+  margin: 0 auto;
+}
+
+.glass-panel {
+  border: 1px solid var(--sb-card-border);
+  border-radius: 24px;
+  background: color-mix(in srgb, var(--sb-card-bg) 88%, transparent);
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.1);
+  backdrop-filter: blur(24px);
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.metric-card {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  min-height: 104px;
+  padding: 1rem;
+}
+
+.metric-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  flex: 0 0 auto;
+  border-radius: 18px;
+  background: rgba(0, 137, 90, 0.1);
+  color: var(--sb-primary);
+  font-size: 1.35rem;
+}
+
+.metric-copy {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.metric-label {
+  margin: 0;
+  color: var(--sb-muted);
+  font-size: 0.75rem;
+  font-weight: 850;
   text-transform: uppercase;
-  color: #6b7d74;
+  letter-spacing: 0;
 }
 
-.weekly-board-title {
-  font-size: 1.5rem;
+.metric-value {
+  display: block;
+  min-height: 2rem;
+  color: var(--sb-ink);
+  font-size: 1.85rem;
+  font-weight: 850;
+  line-height: 1;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(340px, 0.38fr);
+  gap: 1.25rem;
+  align-items: stretch;
+}
+
+.weekly-panel,
+.recommendation-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 560px;
+  padding: 1.35rem;
+}
+
+.panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.2rem;
+}
+
+.panel-heading {
+  min-width: 0;
+}
+
+.panel-kicker {
+  margin: 0 0 0.35rem;
+  color: var(--sb-muted);
+  font-size: 0.72rem;
   font-weight: 800;
-  letter-spacing: -0.02em;
-  color: #111827;
+  text-transform: uppercase;
+  letter-spacing: 0;
 }
 
-.weekly-board-subtitle {
-  color: #6b7280;
+.panel-title {
+  margin: 0;
+  color: var(--sb-ink);
+  font-size: 1.4rem;
+  font-weight: 850;
+  letter-spacing: 0;
+}
+
+.panel-subtitle {
+  max-width: 620px;
+  margin: 0.3rem 0 0;
+  color: var(--sb-muted);
   font-size: 0.9rem;
+  line-height: 1.45;
 }
 
 .weekly-board-header {
-  padding-bottom: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .weekly-board-nav {
-  background: #f2f4f6;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex: 0 0 auto;
+  border: 1px solid var(--sb-card-border);
   border-radius: 999px;
-  padding: 0.3rem;
+  background: var(--sb-bg);
+  padding: 0.32rem;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
 .week-range-pill {
@@ -625,37 +733,74 @@ const bookTutor = (id) => router.push({
   min-width: 180px;
   min-height: 38px;
   padding: 0.45rem 0.85rem;
+  border: 1px solid transparent;
   border-radius: 999px;
-  background: #ffffff;
-  color: #111827;
+  background: var(--sb-card-bg);
+  color: var(--sb-ink);
+  font-family: inherit;
   font-size: 0.8rem;
-  font-weight: 700;
+  font-weight: 850;
   text-align: center;
+  white-space: nowrap;
+  user-select: none;
   box-shadow: 0 1px 2px rgba(17, 24, 39, 0.06);
+  transition: border-color var(--sb-t-normal) var(--sb-spring),
+              box-shadow var(--sb-t-normal) var(--sb-spring),
+              color var(--sb-t-normal) var(--sb-spring);
+}
+
+.week-range-pill:hover {
+  border-color: rgba(0, 137, 90, 0.24);
+  color: var(--sb-primary);
+  box-shadow: 0 0 0 3px rgba(0, 137, 90, 0.08),
+              0 1px 2px rgba(17, 24, 39, 0.06);
+}
+
+.week-range-pill-current {
+  color: var(--sb-primary);
+  border: 1px solid rgba(0, 137, 90, 0.42);
+  box-shadow: 0 0 0 3px rgba(0, 137, 90, 0.1),
+              0 1px 2px rgba(17, 24, 39, 0.06);
+  animation: current-week-ring 2.4s var(--sb-spring) infinite;
+}
+
+@keyframes current-week-ring {
+  0% {
+    box-shadow: 0 0 0 0 rgba(0, 137, 90, 0.2),
+                0 1px 2px rgba(17, 24, 39, 0.06);
+  }
+  60% {
+    box-shadow: 0 0 0 6px rgba(0, 137, 90, 0),
+                0 1px 2px rgba(17, 24, 39, 0.06);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(0, 137, 90, 0),
+                0 1px 2px rgba(17, 24, 39, 0.06);
+  }
 }
 
 .schedule-nav-btn {
   width: 38px;
   height: 38px;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: #4b5563;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--sb-muted);
   transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 
 .schedule-nav-btn:hover:not(:disabled) {
-  background: #ffffff;
-  color: #111827;
+  background: var(--sb-card-bg);
+  color: var(--sb-ink);
   box-shadow: 0 1px 2px rgba(17, 24, 39, 0.08);
 }
 
 .schedule-nav-btn:disabled {
-  color: #9aa7b3;
-  background: #f8faf9;
+  color: var(--sb-text-subtle);
+  background: var(--sb-bg);
   cursor: not-allowed;
 }
 
@@ -665,24 +810,26 @@ const bookTutor = (id) => router.push({
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #d6e2dd;
+  background: var(--sb-card-border);
   border-radius: 999px;
 }
 
 .weekly-board-scroll {
+  flex: 1;
   overflow-x: auto;
   overflow-y: hidden;
   padding-bottom: 4px;
 }
 
 .weekly-board-skeleton {
+  flex: 1;
   overflow: hidden;
 }
 
 .weekly-grid {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 8px;
+  gap: 0.7rem;
   min-width: 0;
   align-items: start;
 }
@@ -692,45 +839,46 @@ const bookTutor = (id) => router.push({
   grid-template-rows: auto 1fr;
   min-height: 380px;
   min-width: 0;
-  border-radius: 18px;
+  border: 1px solid var(--sb-card-border);
+  border-radius: 20px;
   background: transparent;
   overflow: hidden;
 }
 
-.day-column:nth-child(odd) .day-body {
-  background: rgba(242, 244, 246, 0.42);
-}
-
-.day-column:nth-child(even) .day-body {
-  background: #f2f4f6;
-}
-
 .day-column-today {
-  border-radius: 18px;
+  border-color: rgba(0, 137, 90, 0.42);
+  box-shadow: 0 0 0 3px rgba(0, 137, 90, 0.08);
 }
 
+.day-column-today .day-header {
+  background: rgba(0, 137, 90, 0.1);
+}
+
+.day-column-today .day-name,
 .day-column-today .day-date {
-  color: #0f172a;
+  color: var(--sb-primary);
 }
 
 .day-header {
-  padding: 0 0.3rem 0.65rem;
-  background: transparent;
+  padding: 0.75rem 0.65rem;
+  background: var(--sb-bg);
   text-align: center;
 }
 
 .day-name {
+  margin: 0 0 0.25rem;
   font-size: 0.62rem;
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.16em;
-  color: #8a9099;
+  letter-spacing: 0;
+  color: var(--sb-muted);
 }
 
 .day-date {
+  margin: 0;
   font-size: 1.1rem;
-  font-weight: 800;
-  color: #111827;
+  font-weight: 850;
+  color: var(--sb-ink);
   line-height: 1;
 }
 
@@ -738,22 +886,22 @@ const bookTutor = (id) => router.push({
   display: grid;
   align-content: start;
   gap: 0.55rem;
-  padding: 0.55rem;
-  border-radius: 14px;
+  padding: 0.65rem;
   min-height: 332px;
   overflow-y: auto;
   overflow-x: hidden;
   min-width: 0;
+  background: color-mix(in srgb, var(--sb-bg) 76%, var(--sb-card-bg));
 }
 
 .weekly-session-card {
   width: 100%;
-  border: 0;
-  border-radius: 12px;
-  padding: 0.7rem 0.65rem;
+  border: 1px solid transparent;
+  border-radius: 16px;
+  padding: 0.75rem;
   text-align: left;
   transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
-  box-shadow: 0 1px 2px rgba(17, 24, 39, 0.08);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
   min-width: 0;
   overflow: hidden;
 }
@@ -765,7 +913,7 @@ const bookTutor = (id) => router.push({
 
 .weekly-session-card-upcoming {
   background: #f8fbff;
-  border-left: 4px solid #0dcaf0;
+  border-left: 4px solid #0ea5e9;
 }
 
 .weekly-session-card-ongoing {
@@ -775,7 +923,7 @@ const bookTutor = (id) => router.push({
 
 .weekly-session-card-completed {
   background: #f2fbf5;
-  border-left: 4px solid #198754;
+  border-left: 4px solid var(--sb-primary);
 }
 
 .weekly-session-card-verification {
@@ -809,12 +957,12 @@ const bookTutor = (id) => router.push({
   min-height: 22px;
   padding: 0.1rem 0.45rem;
   border-radius: 999px;
-  background: #f3f4f6;
+  background: var(--sb-bg);
   font-size: 0.58rem;
   font-weight: 800;
-  letter-spacing: 0.1em;
+  letter-spacing: 0;
   text-transform: uppercase;
-  color: #4b5563;
+  color: var(--sb-muted);
 }
 
 .weekly-session-card-upcoming .weekly-session-status {
@@ -858,18 +1006,20 @@ const bookTutor = (id) => router.push({
 }
 
 .weekly-session-title {
+  margin: 0 0 0.25rem;
   font-size: 0.72rem;
   font-weight: 800;
   line-height: 1.3;
-  color: #111827;
+  color: var(--sb-ink);
   word-break: break-word;
 }
 
 .weekly-session-time {
+  margin: 0 0 0.45rem;
   font-size: 0.62rem;
   font-weight: 800;
   color: #006c49;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
   text-transform: uppercase;
   white-space: nowrap;
   overflow: hidden;
@@ -877,16 +1027,24 @@ const bookTutor = (id) => router.push({
 }
 
 .weekly-session-tutor {
+  margin: 0 0 0.55rem;
   font-size: 0.66rem;
-  color: #6b7280;
+  color: var(--sb-muted);
   word-break: break-word;
   overflow-wrap: anywhere;
+}
+
+.weekly-session-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
 }
 
 .weekly-session-duration {
   font-size: 0.58rem;
   font-weight: 700;
-  color: #6b7280;
+  color: var(--sb-muted);
   flex-shrink: 0;
   white-space: nowrap;
 }
@@ -894,19 +1052,19 @@ const bookTutor = (id) => router.push({
 
 .day-empty-state {
   min-height: 110px;
-  border: 1px dashed #d2d7de;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.72);
+  border: 1px dashed var(--sb-card-border);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--sb-card-bg) 72%, transparent);
   display: grid;
   place-items: center;
   gap: 0.45rem;
   padding: 0.75rem;
   text-align: center;
-  color: #8a9099;
+  color: var(--sb-muted);
   font-size: 0.62rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
 }
 
 .day-empty-state i {
@@ -917,15 +1075,163 @@ const bookTutor = (id) => router.push({
   width: 100%;
   padding: 0.75rem;
   border-radius: 16px;
-  background: #ffffff;
+  background: var(--sb-card-bg);
   box-shadow: 0 8px 20px rgba(19, 41, 34, 0.04);
 }
 
+.recommendation-panel {
+  min-height: 560px;
+}
+
+.recommendation-header {
+  margin-bottom: 1rem;
+}
+
+.recommendation-body,
+.recommendation-list-wrap {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.recommendation-list {
+  display: grid;
+  gap: 0.65rem;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 0.15rem;
+}
+
+.recommendation-empty {
+  display: grid;
+  min-height: 160px;
+  place-items: center;
+  border: 1px dashed var(--sb-card-border);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--sb-card-bg) 72%, transparent);
+  color: var(--sb-muted);
+  padding: 1rem;
+  text-align: center;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
 .tutor-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.9rem;
+  width: 100%;
+  min-height: 76px;
+  border: 1px solid var(--sb-card-border);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--sb-card-bg) 78%, transparent);
+  color: inherit;
+  padding: 0.85rem;
+  text-align: left;
   cursor: pointer;
 }
 
+.tutor-copy {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.tutor-name {
+  color: var(--sb-ink);
+  font-size: 0.96rem;
+  font-weight: 850;
+}
+
+.tutor-meta {
+  display: block;
+  color: var(--sb-muted);
+  font-size: 0.78rem;
+  font-weight: 650;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tutor-rate {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  min-height: 34px;
+  border: 1px solid rgba(0, 137, 90, 0.24);
+  border-radius: 999px;
+  background: rgba(0, 137, 90, 0.09);
+  color: #07543a;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.recommendation-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex: 0 0 auto;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--sb-card-border);
+}
+
+.pagination-btn {
+  min-height: 36px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--sb-primary);
+  color: #fff;
+  padding: 0.5rem 0.85rem;
+  font-size: 0.8rem;
+  font-weight: 850;
+}
+
+.pagination-btn:disabled {
+  background: var(--sb-card-border);
+  color: var(--sb-muted);
+  cursor: not-allowed;
+}
+
+.pagination-label {
+  color: var(--sb-muted);
+  font-size: 0.82rem;
+  font-weight: 750;
+}
+
+.recommendation-skeleton {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.recommendation-skeleton-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 76px;
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--sb-card-bg) 78%, transparent);
+  padding: 0.85rem;
+}
+
+.skeleton-copy {
+  display: grid;
+  gap: 0.5rem;
+  width: 70%;
+}
+
 @media (max-width: 1199px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
   .weekly-grid {
     grid-template-columns: repeat(7, minmax(118px, 1fr));
     min-width: 860px;
@@ -933,15 +1239,35 @@ const bookTutor = (id) => router.push({
 }
 
 @media (max-width: 991px) {
+  .metrics-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .panel-header {
+    flex-direction: column;
+  }
+
   .week-range-pill {
     min-width: 160px;
   }
 }
 
 @media (max-width: 767px) {
-  .dashboard-page {
-    padding-left: 0 !important;
-    padding-right: 0 !important;
+  .dashboard-shell {
+    padding: 1rem;
+  }
+
+  .metrics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .glass-panel {
+    border-radius: 18px;
+  }
+
+  .weekly-panel,
+  .recommendation-panel {
+    padding: 1rem;
   }
 
   .weekly-grid {
@@ -949,8 +1275,24 @@ const bookTutor = (id) => router.push({
     min-width: 1080px;
   }
 
-  .weekly-board-header {
-    align-items: flex-start !important;
+  .weekly-board-nav,
+  .recommendation-pagination {
+    width: 100%;
+  }
+
+  .week-range-pill {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .tutor-list-item {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .tutor-rate,
+  .pagination-btn {
+    width: 100%;
   }
 }
 </style>

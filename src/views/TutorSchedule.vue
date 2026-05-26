@@ -12,7 +12,7 @@
           <div class="week-nav">
             <button
               type="button"
-              class="week-nav-btn"
+              class="week-nav-btn sb-btn"
               :disabled="weekIndex <= 0"
               @click="navigateWeek(-1)"
             >
@@ -20,7 +20,7 @@
             </button>
             <button
               type="button"
-              class="week-nav-btn"
+              class="week-nav-btn sb-btn"
               :disabled="weekIndex >= monthWeeks.length - 1"
               @click="navigateWeek(1)"
             >
@@ -51,7 +51,7 @@
                 </div>
                 <button
                   type="button"
-                  class="btn day-block-date-btn"
+                  class="btn day-block-date-btn sb-btn"
                   :class="{ active: isFullDayBlocked(day.date) }"
                   @click="toggleFullDayOverride(day.date)"
                 >
@@ -59,7 +59,7 @@
                 </button>
                 <button
                   type="button"
-                  class="btn day-add-slot-btn"
+                  class="btn day-add-slot-btn sb-btn"
                   @click="openAddModal(day.code)"
                 >
                   + Add Slot
@@ -83,7 +83,7 @@
                   v-for="slot in groupedSlots[day.code]"
                   :key="slot.availability_id"
                   type="button"
-                  class="slot-pill"
+                  class="slot-pill sb-btn"
                   :class="{
                     selected: isSlotSelected(slot.availability_id),
                     blocked: isSlotBlocked(day.date, slot.availability_id)
@@ -111,7 +111,7 @@
                 <button
                   v-if="selectedUnblockedCount(day) && !isFullDayBlocked(day.date)"
                   type="button"
-                  class="selected-day-btn"
+                  class="selected-day-btn sb-btn"
                   @click="blockSelectedSlots(day)"
                 >
                   Block Selected For {{ formatDayDate(day.date) }} ({{ selectedUnblockedCount(day) }})
@@ -119,7 +119,7 @@
                 <button
                   v-if="selectedBlockedCount(day)"
                   type="button"
-                  class="selected-day-btn unblock-day-btn"
+                  class="selected-day-btn unblock-day-btn sb-btn"
                   @click="unblockSelectedSlots(day)"
                 >
                   Unblock Selected ({{ selectedBlockedCount(day) }})
@@ -127,7 +127,7 @@
                 <button
                   v-if="selectedCountForDay(day.code)"
                   type="button"
-                  class="selected-day-btn"
+                  class="selected-day-btn sb-btn"
                   @click="removeSelectedSlots(day.code)"
                 >
                   Remove Selected ({{ selectedCountForDay(day.code) }})
@@ -148,7 +148,7 @@
           </div>
           <button
             type="button"
-            class="time-picker-close"
+            class="time-picker-close sb-btn"
             @click="closeAddModal"
           >
             Close
@@ -173,7 +173,7 @@
           <button
             v-if="newSlot.start_time && expandedPicker !== 'start'"
             type="button"
-            class="selected-time-card"
+            class="selected-time-card sb-btn"
             @click="expandedPicker = 'start'"
           >
             <span class="selected-time-label">Start Time</span>
@@ -189,7 +189,7 @@
             <div class="time-period-toggle">
               <button
                 type="button"
-                class="time-period-btn"
+                class="time-period-btn sb-btn"
                 :class="{ active: startPeriod === 'AM' }"
                 @click="startPeriod = 'AM'"
               >
@@ -197,7 +197,7 @@
               </button>
               <button
                 type="button"
-                class="time-period-btn"
+                class="time-period-btn sb-btn"
                 :class="{ active: startPeriod === 'PM' }"
                 @click="startPeriod = 'PM'"
               >
@@ -210,7 +210,7 @@
                 v-for="time in visibleStartTimes"
                 :key="`start-${time}`"
                 type="button"
-                class="time-grid-btn"
+                class="time-grid-btn sb-btn"
                 :class="{ active: newSlot.start_time === time }"
                 @click="selectStartTime(time)"
               >
@@ -224,7 +224,7 @@
           <button
             v-if="newSlot.end_time && expandedPicker !== 'end'"
             type="button"
-            class="selected-time-card"
+            class="selected-time-card sb-btn"
             @click="expandedPicker = 'end'"
           >
             <span class="selected-time-label">End Time</span>
@@ -240,7 +240,7 @@
             <div class="time-period-toggle">
               <button
                 type="button"
-                class="time-period-btn"
+                class="time-period-btn sb-btn"
                 :class="{ active: endPeriod === 'AM' }"
                 @click="endPeriod = 'AM'"
               >
@@ -248,7 +248,7 @@
               </button>
               <button
                 type="button"
-                class="time-period-btn"
+                class="time-period-btn sb-btn"
                 :class="{ active: endPeriod === 'PM' }"
                 @click="endPeriod = 'PM'"
               >
@@ -261,7 +261,7 @@
                 v-for="time in visibleEndTimes"
                 :key="`end-${time}`"
                 type="button"
-                class="time-grid-btn"
+                class="time-grid-btn sb-btn"
                 :class="{ active: newSlot.end_time === time }"
                 @click="selectEndTime(time)"
               >
@@ -273,14 +273,14 @@
 
         <div class="d-flex justify-content-end gap-2 mt-3">
           <button
-            class="btn btn-secondary"
+            class="btn btn-secondary sb-btn"
             @click="closeAddModal"
           >
             Cancel
           </button>
 
           <button
-            class="btn btn-success"
+            class="btn btn-success sb-btn"
             @click="saveSlot"
           >
             Save
@@ -294,8 +294,10 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useTutorSchedStore } from '@/stores/tutorSched'
+import { useToastStore } from '@/stores/toast'
 
 const tutorSchedStore = useTutorSchedStore()
+const toastStore = useToastStore()
 
 const showAddModal = ref(false)
 const monthOffset = ref(0)
@@ -614,7 +616,7 @@ async function toggleFullDayOverride(dateString) {
     await refreshAvailability()
   } catch (error) {
     console.error('Failed to toggle full-day override:', error)
-    alert(error.response?.data?.error || 'Unable to update the blocked date.')
+    toastStore.push(error.response?.data?.error || 'Unable to update the blocked date.', 'error')
   }
 }
 
@@ -634,7 +636,7 @@ async function blockSelectedSlots(day) {
     await refreshAvailability()
   } catch (error) {
     console.error('Failed to block selected slots:', error)
-    alert(error.response?.data?.error || 'Unable to block the selected slots.')
+    toastStore.push(error.response?.data?.error || 'Unable to block the selected slots.', 'error')
   }
 }
 
@@ -663,13 +665,13 @@ async function unblockSelectedSlots(day) {
     await refreshAvailability()
   } catch (error) {
     console.error('Failed to unblock selected slots:', error)
-    alert(error.response?.data?.error || 'Unable to unblock the selected slots.')
+    toastStore.push(error.response?.data?.error || 'Unable to unblock the selected slots.', 'error')
   }
 }
 
 async function saveSlot() {
   if (!newSlot.value.day || !newSlot.value.start_time || !newSlot.value.end_time) {
-    alert('Please complete all fields.')
+    toastStore.push('Please complete all fields.', 'warning')
     return
   }
 
@@ -677,7 +679,7 @@ async function saveSlot() {
   const end = new Date(`1970-01-01T${newSlot.value.end_time}`)
 
   if (end <= start) {
-    alert('End time must be after start time.')
+    toastStore.push('End time must be after start time.', 'warning')
     return
   }
 
@@ -706,13 +708,13 @@ async function saveSlot() {
     }
 
     if (createdCount === 0) {
-      alert('All selected time slots already exist.')
+      toastStore.push('All selected time slots already exist.', 'warning')
     }
 
     await refreshAvailability()
 
     if (createdCount > 0) {
-      alert(`${createdCount} slot${createdCount > 1 ? 's were' : ' was'} added successfully.`)
+      toastStore.push(`${createdCount} slot${createdCount > 1 ? 's were' : ' was'} added successfully.`)
     }
 
     newSlot.value = {
@@ -728,7 +730,7 @@ async function saveSlot() {
     clearSelection()
   } catch (error) {
     console.error('Failed to add slots:', error)
-    alert('Something went wrong.')
+    toastStore.push('Something went wrong.', 'error')
   }
 }
 

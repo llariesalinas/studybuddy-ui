@@ -2,7 +2,7 @@
   <div class="date-picker-wrap">
     <button
       type="button"
-      class="btn w-100 text-start border-sb shadow-none date-trigger"
+      class="btn w-100 text-start border-sb shadow-none date-trigger sb-btn"
       :class="{ 'date-trigger-active': isOpen }"
       @click="openModal"
     >
@@ -29,7 +29,7 @@
             <div class="date-modal-actions">
               <button
                 type="button"
-                class="date-icon-btn"
+                class="date-icon-btn sb-btn"
                 :disabled="!canGoPrevious"
                 aria-label="Previous month"
                 @click="changeMonth(-1)"
@@ -38,7 +38,7 @@
               </button>
               <button
                 type="button"
-                class="date-icon-btn"
+                class="date-icon-btn sb-btn"
                 aria-label="Next month"
                 @click="changeMonth(1)"
               >
@@ -46,7 +46,7 @@
               </button>
               <button
                 type="button"
-                class="date-icon-btn"
+                class="date-icon-btn sb-btn"
                 aria-label="Close date picker"
                 @click="closeModal"
               >
@@ -64,7 +64,7 @@
               v-for="day in calendar.days"
               :key="day.dateKey"
               type="button"
-              class="date-cell"
+              class="date-cell sb-btn"
               :class="{
                 'date-cell-outside': !day.inMonth,
                 'date-cell-past': day.isPast,
@@ -79,7 +79,7 @@
           </div>
 
           <footer class="date-modal-footer">
-            <button type="button" class="date-today-btn" @click="selectToday">Today</button>
+            <button type="button" class="date-today-btn sb-btn" @click="selectToday">Today</button>
           </footer>
         </section>
       </div>
@@ -242,7 +242,7 @@ const selectToday = () => {
 .date-trigger {
   min-height: 42px;
   background: #ffffff;
-  color: #212529;
+  color: var(--sb-text-dark);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -251,12 +251,12 @@ const selectToday = () => {
 }
 
 .date-trigger i {
-  color: #6b7280;
+  color: var(--sb-text-muted);
   flex-shrink: 0;
 }
 
 .date-trigger-active {
-  border-color: var(--sb-primary, #00895a);
+  border-color: var(--sb-primary);
   box-shadow: 0 0 0 0.15rem rgba(0, 137, 90, 0.12);
 }
 
@@ -289,7 +289,7 @@ const selectToday = () => {
 }
 
 .date-modal-kicker {
-  color: #6b7d74;
+  color: var(--sb-text-muted-green);
   font-size: 0.68rem;
   font-weight: 800;
   letter-spacing: 0.14em;
@@ -297,7 +297,7 @@ const selectToday = () => {
 }
 
 .date-modal-title {
-  color: #163127;
+  color: var(--sb-text-main);
   font-size: 1.15rem;
   font-weight: 800;
 }
@@ -312,19 +312,19 @@ const selectToday = () => {
   height: 36px;
   border: 0;
   border-radius: 10px;
-  background: #edf6f1;
-  color: #0a7a51;
+  background: var(--sb-primary-light);
+  color: var(--sb-primary-dark);
   display: inline-grid;
   place-items: center;
 }
 
 .date-icon-btn:hover:not(:disabled) {
-  background: #dff1e8;
+  background: var(--sb-primary-lighter);
 }
 
 .date-icon-btn:disabled {
-  background: #f3f4f6;
-  color: #9aa7b3;
+  background: var(--sb-bg);
+  color: var(--sb-text-subtle);
   cursor: not-allowed;
 }
 
@@ -337,7 +337,7 @@ const selectToday = () => {
 
 .date-weekdays {
   margin-bottom: 0.45rem;
-  color: #6b7280;
+  color: var(--sb-text-muted);
   font-size: 0.72rem;
   font-weight: 800;
   text-align: center;
@@ -345,10 +345,10 @@ const selectToday = () => {
 
 .date-cell {
   aspect-ratio: 1;
-  border: 1px solid #e0e7e3;
+  border: 1px solid var(--sb-border-light);
   border-radius: 12px;
   background: #ffffff;
-  color: #163127;
+  color: var(--sb-text-main);
   font-weight: 700;
   display: grid;
   place-items: center;
@@ -361,8 +361,8 @@ const selectToday = () => {
 
 .date-cell:hover:not(:disabled) {
   border-color: rgba(0, 137, 90, 0.36);
-  background: #edf7f2;
-  color: #0a7a51;
+  background: var(--sb-primary-light);
+  color: var(--sb-primary-dark);
 }
 
 .date-cell-outside {
@@ -371,8 +371,8 @@ const selectToday = () => {
 
 .date-cell-past,
 .date-cell:disabled {
-  color: #a0acb8;
-  background: #f8faf9;
+  color: var(--sb-text-subtle);
+  background: var(--sb-bg);
   cursor: not-allowed;
 }
 
@@ -383,8 +383,8 @@ const selectToday = () => {
 
 .date-cell-selected {
   color: #ffffff;
-  background: #00895a;
-  border-color: #00895a;
+  background: var(--sb-primary);
+  border-color: var(--sb-primary);
   box-shadow: 0 8px 18px rgba(0, 137, 90, 0.18);
 }
 
@@ -395,10 +395,10 @@ const selectToday = () => {
 }
 
 .date-today-btn {
-  border: 1px solid #cfe6da;
+  border: 1px solid var(--sb-border-light);
   border-radius: 10px;
   background: #ffffff;
-  color: #0a7a51;
+  color: var(--sb-primary-dark);
   padding: 0.45rem 0.8rem;
   font-weight: 700;
 }
