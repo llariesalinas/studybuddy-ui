@@ -16,7 +16,7 @@ class Command(BaseCommand):
     help = 'Seeds the database with explicit, cascading, and rich academic parameters for thesis evaluation'
 
     def handle(self, *args, **options):
-        self.stdout.write("🌱 Starting algorithmic framework seeding process...")
+        self.stdout.write("Starting seeding process...")
 
         # 1. Seed Strands (The Foundations)
         strands_data = [
@@ -75,7 +75,7 @@ class Command(BaseCommand):
         # 4. Seed Subjects with Explicit Course Constraints
         # CRITICAL REFINEMENT: Links every single subject row directly to a matching parent course model code target
         subjects_data = [
-            # --- ELEMENTARY SUBSET (Grades 1 – 6) ---
+            # --- ELEMENTARY SUBSET (Grades 1-6) ---
             {'code': 'G1-ENG',  'name': 'English 1 (Primary Literacy)', 'dept': 'Grade 1', 'course': 'ELEMENTARY'},
             {'code': 'G1-MTH',  'name': 'Mathematics 1 (Basic Arithmetic)', 'dept': 'Grade 1', 'course': 'ELEMENTARY'},
             {'code': 'G1-FIL',  'name': 'Filipino 1 (Wika)', 'dept': 'Grade 1', 'course': 'ELEMENTARY'},
@@ -85,7 +85,7 @@ class Command(BaseCommand):
             {'code': 'G5-SCI',  'name': 'Science 5 (Environmental Ecology)', 'dept': 'Grade 5', 'course': 'ELEMENTARY'},
             {'code': 'G6-EPP',  'name': 'EPP 6 (Home Economics & ICT Basics)', 'dept': 'Grade 6', 'course': 'ELEMENTARY'},
 
-            # --- JUNIOR HIGH SUBSET (Grades 7 – 10) ---
+            # --- JUNIOR HIGH SUBSET (Grades 7-10) ---
             {'code': 'G7-ENG',  'name': 'English 7 (Philippine Literature)', 'dept': 'Grade 7', 'course': 'JUNIOR_HIGH'},
             {'code': 'G7-MTH',  'name': 'Mathematics 7 (Algebra & Set Theory)', 'dept': 'Grade 7', 'course': 'JUNIOR_HIGH'},
             {'code': 'G7-SCI',  'name': 'Integrated Science 7', 'dept': 'Grade 7', 'course': 'JUNIOR_HIGH'},
@@ -365,7 +365,7 @@ class Command(BaseCommand):
 
             tutor.total_sessions = completed
             tutor.save()
-            self.stdout.write(f"  - Aggregated {tutor.profile.fname} Vectors: {tutor.rating_average}⭐ Average / {tutor.total_sessions} Active Closures")
+            self.stdout.write(f"  - Aggregated {tutor.profile.fname}: {tutor.rating_average} avg rating / {tutor.total_sessions} sessions")
             
         # 13. Seed User Preference Maps
         for tutee in tutee_profiles:
@@ -375,4 +375,4 @@ class Command(BaseCommand):
             pref.save()
 
         self.stdout.write(f"  - Preference bounds initialized for {len(tutee_profiles)} student accounts.")
-        self.stdout.write(self.style.SUCCESS("🎉 Algorithmic sandbox successfully provisioned and relational blocks verified! ready for front-facing evaluation."))
+        self.stdout.write(self.style.SUCCESS("Seeding complete. Database ready for evaluation."))
