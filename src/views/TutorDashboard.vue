@@ -4,16 +4,16 @@
     <div class="row g-4 mb-4">
 
       <div class="col-md-4">
-        <div class="card border-sb rounded-4 p-4 shadow-sm h-100 sb-stagger-item" style="animation-delay: 0s;">
-          <p class="text-muted small fw-bold mb-2">TOTAL SESSIONS</p>
-          <h2 class="fw-bold mb-0 text-dark">{{ totalSessions }}</h2>
+        <div class="card sb-card-surface rounded-4 p-4 shadow-sm h-100 sb-stagger-item" style="animation-delay: 0s;">
+          <p class="sb-muted small fw-bold mb-2">TOTAL SESSIONS</p>
+          <h2 class="fw-bold mb-0 sb-text">{{ totalSessions }}</h2>
         </div>
       </div>
 
       <div class="col-md-4">
-        <div class="card border-sb rounded-4 p-4 shadow-sm h-100 sb-stagger-item" style="animation-delay: 0.07s;">
-          <p class="text-muted small fw-bold mb-2">AVG RATING</p>
-          <h2 class="fw-bold mb-0 text-dark d-flex align-items-center">
+        <div class="card sb-card-surface rounded-4 p-4 shadow-sm h-100 sb-stagger-item" style="animation-delay: 0.07s;">
+          <p class="sb-muted small fw-bold mb-2">AVG RATING</p>
+          <h2 class="fw-bold mb-0 sb-text d-flex align-items-center">
             {{ avgRating }}
             <i class="bi bi-star-fill text-warning fs-4 ms-2"></i>
           </h2>
@@ -34,24 +34,24 @@
 
 
     <!-- Upcoming Bookings -->
-    <div class="card border-sb rounded-4 shadow-sm">
+    <div class="card sb-card-surface rounded-4 shadow-sm">
 
       <div class="card-body p-4">
 
-        <h6 class="fw-bold text-dark mb-4">Upcoming Bookings</h6>
+        <h6 class="fw-bold sb-text mb-4">Upcoming Bookings</h6>
 
         <!-- No bookings -->
-        <div v-if="upcomingBookings.length === 0" class="text-muted text-center py-4">
+        <div v-if="upcomingBookings.length === 0" class="sb-muted text-center py-4">
           No upcoming sessions yet.
         </div>
 
         <!-- Table -->
         <div v-else class="table-responsive">
 
-          <table class="table align-middle mb-0">
+          <table class="table align-middle mb-0 sb-themed-table">
 
             <thead>
-              <tr class="small fw-bold text-muted">
+              <tr class="small fw-bold sb-muted">
                 <th class="border-bottom-0 pb-3">STUDENT</th>
                 <th class="border-bottom-0 pb-3">SUBJECT</th>
                 <th class="border-bottom-0 pb-3">DATE</th>
@@ -69,19 +69,19 @@
               >
 
                 <!-- Student -->
-                <td class="py-3 text-dark">
+                <td class="py-3 sb-text">
                   {{ booking.student || booking.tuteeName || 'N/A' }}
                 </td>
 
                 <!-- Subject -->
                 <td class="py-3">
-                  <span class="badge bg-light text-dark border border-sb px-2 py-1">
+                  <span class="badge sb-subject-badge px-2 py-1">
                     {{ booking.subject || 'General' }}
                   </span>
                 </td>
 
                 <!-- Date -->
-                <td class="py-3 text-dark">
+                <td class="py-3 sb-text">
                   {{ new Date(booking.date).toLocaleDateString() }}
                 </td>
 
@@ -201,3 +201,17 @@ watch(
   }
 )
 </script>
+
+<style scoped>
+.sb-themed-table {
+  --bs-table-bg: transparent;
+  --bs-table-color: var(--sb-text-main);
+  --bs-table-border-color: var(--sb-card-border);
+}
+
+.sb-subject-badge {
+  background: var(--sb-bg);
+  color: var(--sb-text-main);
+  border: 1px solid var(--sb-card-border);
+}
+</style>

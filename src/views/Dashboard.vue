@@ -540,9 +540,9 @@ const bookTutor = (id) => router.push({
   --sb-primary: #00895a;
   --sb-primary-hover: #00704a;
   --sb-dark: #0a1916;
-  --sb-ink: #1d1d1f;
-  --sb-muted: #6e6e73;
-  --sb-divider: #e7ece9;
+  --sb-ink: var(--sb-text-main);
+  --sb-muted: var(--sb-text-muted);
+  --sb-divider: var(--sb-card-border);
   --sb-green-tint: #edf7f3;
   --sb-green-border: #b8dece;
   position: relative;
@@ -555,7 +555,7 @@ const bookTutor = (id) => router.push({
     radial-gradient(circle at 0% 0%, rgba(16, 185, 129, 0.28), transparent 34%),
     radial-gradient(circle at 96% 8%, rgba(14, 165, 233, 0.18), transparent 32%),
     radial-gradient(circle at 86% 82%, rgba(245, 158, 11, 0.11), transparent 34%),
-    linear-gradient(135deg, #f8fbf9 0%, #eef7f3 48%, #f8fafc 100%);
+    var(--sb-bg);
 }
 
 .aurora-blob {
@@ -600,9 +600,9 @@ const bookTutor = (id) => router.push({
 }
 
 .glass-panel {
-  border: 1px solid rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--sb-card-border);
   border-radius: 24px;
-  background: rgba(255, 255, 255, 0.74);
+  background: color-mix(in srgb, var(--sb-card-bg) 88%, transparent);
   box-shadow: 0 24px 70px rgba(15, 23, 42, 0.1);
   backdrop-filter: blur(24px);
 }
@@ -642,7 +642,7 @@ const bookTutor = (id) => router.push({
 
 .metric-label {
   margin: 0;
-  color: #60716a;
+  color: var(--sb-muted);
   font-size: 0.75rem;
   font-weight: 850;
   text-transform: uppercase;
@@ -652,7 +652,7 @@ const bookTutor = (id) => router.push({
 .metric-value {
   display: block;
   min-height: 2rem;
-  color: #17251f;
+  color: var(--sb-ink);
   font-size: 1.85rem;
   font-weight: 850;
   line-height: 1;
@@ -687,7 +687,7 @@ const bookTutor = (id) => router.push({
 
 .panel-kicker {
   margin: 0 0 0.35rem;
-  color: #60716a;
+  color: var(--sb-muted);
   font-size: 0.72rem;
   font-weight: 800;
   text-transform: uppercase;
@@ -696,7 +696,7 @@ const bookTutor = (id) => router.push({
 
 .panel-title {
   margin: 0;
-  color: #17251f;
+  color: var(--sb-ink);
   font-size: 1.4rem;
   font-weight: 850;
   letter-spacing: 0;
@@ -705,7 +705,7 @@ const bookTutor = (id) => router.push({
 .panel-subtitle {
   max-width: 620px;
   margin: 0.3rem 0 0;
-  color: #66756e;
+  color: var(--sb-muted);
   font-size: 0.9rem;
   line-height: 1.45;
 }
@@ -719,9 +719,9 @@ const bookTutor = (id) => router.push({
   align-items: center;
   gap: 0.35rem;
   flex: 0 0 auto;
-  border: 1px solid rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--sb-card-border);
   border-radius: 999px;
-  background: rgba(239, 244, 241, 0.86);
+  background: var(--sb-bg);
   padding: 0.32rem;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
@@ -735,8 +735,8 @@ const bookTutor = (id) => router.push({
   padding: 0.45rem 0.85rem;
   border: 1px solid transparent;
   border-radius: 999px;
-  background: #ffffff;
-  color: #17251f;
+  background: var(--sb-card-bg);
+  color: var(--sb-ink);
   font-family: inherit;
   font-size: 0.8rem;
   font-weight: 850;
@@ -788,19 +788,19 @@ const bookTutor = (id) => router.push({
   border: 0;
   border-radius: 999px;
   background: transparent;
-  color: #4f625a;
+  color: var(--sb-muted);
   transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 
 .schedule-nav-btn:hover:not(:disabled) {
-  background: #ffffff;
-  color: #17251f;
+  background: var(--sb-card-bg);
+  color: var(--sb-ink);
   box-shadow: 0 1px 2px rgba(17, 24, 39, 0.08);
 }
 
 .schedule-nav-btn:disabled {
-  color: #9aa7b3;
-  background: #f8faf9;
+  color: var(--sb-text-subtle);
+  background: var(--sb-bg);
   cursor: not-allowed;
 }
 
@@ -810,7 +810,7 @@ const bookTutor = (id) => router.push({
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #d6e2dd;
+  background: var(--sb-card-border);
   border-radius: 999px;
 }
 
@@ -839,7 +839,7 @@ const bookTutor = (id) => router.push({
   grid-template-rows: auto 1fr;
   min-height: 380px;
   min-width: 0;
-  border: 1px solid rgba(219, 231, 225, 0.78);
+  border: 1px solid var(--sb-card-border);
   border-radius: 20px;
   background: transparent;
   overflow: hidden;
@@ -861,7 +861,7 @@ const bookTutor = (id) => router.push({
 
 .day-header {
   padding: 0.75rem 0.65rem;
-  background: rgba(248, 251, 249, 0.78);
+  background: var(--sb-bg);
   text-align: center;
 }
 
@@ -871,14 +871,14 @@ const bookTutor = (id) => router.push({
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0;
-  color: #7a8d85;
+  color: var(--sb-muted);
 }
 
 .day-date {
   margin: 0;
   font-size: 1.1rem;
   font-weight: 850;
-  color: #17251f;
+  color: var(--sb-ink);
   line-height: 1;
 }
 
@@ -891,7 +891,7 @@ const bookTutor = (id) => router.push({
   overflow-y: auto;
   overflow-x: hidden;
   min-width: 0;
-  background: rgba(245, 249, 247, 0.72);
+  background: color-mix(in srgb, var(--sb-bg) 76%, var(--sb-card-bg));
 }
 
 .weekly-session-card {
@@ -957,12 +957,12 @@ const bookTutor = (id) => router.push({
   min-height: 22px;
   padding: 0.1rem 0.45rem;
   border-radius: 999px;
-  background: #f3f4f6;
+  background: var(--sb-bg);
   font-size: 0.58rem;
   font-weight: 800;
   letter-spacing: 0;
   text-transform: uppercase;
-  color: #4b5563;
+  color: var(--sb-muted);
 }
 
 .weekly-session-card-upcoming .weekly-session-status {
@@ -1010,7 +1010,7 @@ const bookTutor = (id) => router.push({
   font-size: 0.72rem;
   font-weight: 800;
   line-height: 1.3;
-  color: #17251f;
+  color: var(--sb-ink);
   word-break: break-word;
 }
 
@@ -1029,7 +1029,7 @@ const bookTutor = (id) => router.push({
 .weekly-session-tutor {
   margin: 0 0 0.55rem;
   font-size: 0.66rem;
-  color: #6b7280;
+  color: var(--sb-muted);
   word-break: break-word;
   overflow-wrap: anywhere;
 }
@@ -1044,7 +1044,7 @@ const bookTutor = (id) => router.push({
 .weekly-session-duration {
   font-size: 0.58rem;
   font-weight: 700;
-  color: #6b7280;
+  color: var(--sb-muted);
   flex-shrink: 0;
   white-space: nowrap;
 }
@@ -1052,15 +1052,15 @@ const bookTutor = (id) => router.push({
 
 .day-empty-state {
   min-height: 110px;
-  border: 1px dashed #cad9d2;
+  border: 1px dashed var(--sb-card-border);
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.72);
+  background: color-mix(in srgb, var(--sb-card-bg) 72%, transparent);
   display: grid;
   place-items: center;
   gap: 0.45rem;
   padding: 0.75rem;
   text-align: center;
-  color: #8a9099;
+  color: var(--sb-muted);
   font-size: 0.62rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -1075,7 +1075,7 @@ const bookTutor = (id) => router.push({
   width: 100%;
   padding: 0.75rem;
   border-radius: 16px;
-  background: #ffffff;
+  background: var(--sb-card-bg);
   box-shadow: 0 8px 20px rgba(19, 41, 34, 0.04);
 }
 
@@ -1108,10 +1108,10 @@ const bookTutor = (id) => router.push({
   display: grid;
   min-height: 160px;
   place-items: center;
-  border: 1px dashed #cad9d2;
+  border: 1px dashed var(--sb-card-border);
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.6);
-  color: #66756e;
+  background: color-mix(in srgb, var(--sb-card-bg) 72%, transparent);
+  color: var(--sb-muted);
   padding: 1rem;
   text-align: center;
   font-size: 0.9rem;
@@ -1125,9 +1125,9 @@ const bookTutor = (id) => router.push({
   gap: 0.9rem;
   width: 100%;
   min-height: 76px;
-  border: 1px solid rgba(219, 231, 225, 0.88);
+  border: 1px solid var(--sb-card-border);
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.72);
+  background: color-mix(in srgb, var(--sb-card-bg) 78%, transparent);
   color: inherit;
   padding: 0.85rem;
   text-align: left;
@@ -1141,14 +1141,14 @@ const bookTutor = (id) => router.push({
 }
 
 .tutor-name {
-  color: #17251f;
+  color: var(--sb-ink);
   font-size: 0.96rem;
   font-weight: 850;
 }
 
 .tutor-meta {
   display: block;
-  color: #66756e;
+  color: var(--sb-muted);
   font-size: 0.78rem;
   font-weight: 650;
   line-height: 1.35;
@@ -1179,7 +1179,7 @@ const bookTutor = (id) => router.push({
   flex: 0 0 auto;
   margin-top: 1rem;
   padding-top: 1rem;
-  border-top: 1px solid rgba(219, 231, 225, 0.9);
+  border-top: 1px solid var(--sb-card-border);
 }
 
 .pagination-btn {
@@ -1194,13 +1194,13 @@ const bookTutor = (id) => router.push({
 }
 
 .pagination-btn:disabled {
-  background: #d8e3dd;
-  color: #7b8b84;
+  background: var(--sb-card-border);
+  color: var(--sb-muted);
   cursor: not-allowed;
 }
 
 .pagination-label {
-  color: #66756e;
+  color: var(--sb-muted);
   font-size: 0.82rem;
   font-weight: 750;
 }
@@ -1217,7 +1217,7 @@ const bookTutor = (id) => router.push({
   gap: 1rem;
   min-height: 76px;
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.72);
+  background: color-mix(in srgb, var(--sb-card-bg) 78%, transparent);
   padding: 0.85rem;
 }
 

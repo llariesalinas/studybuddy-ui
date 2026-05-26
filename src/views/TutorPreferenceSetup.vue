@@ -1,18 +1,23 @@
 <template>
-  <div class="min-vh-100 bg-light py-5">
+  <div class="min-vh-100 py-5 tutor-setup-page">
+    <div class="container-fluid px-4 mb-3 d-flex justify-content-between align-items-center">
+      <span class="fw-bold sb-text">StudyBuddy</span>
+      <SbThemeToggle />
+    </div>
+
     <div class="container">
       <div class="row justify-content-center">
         <div class="col-md-7 col-lg-6">
-          <div class="card border-0 shadow-sm rounded-4">
+          <div class="card border-0 sb-card-surface sb-text shadow-sm rounded-4">
             <div class="card-body p-4 p-md-5">
               <div class="text-center mb-4">
-                <h3 class="fw-bold text-dark">Tutor Profile Setup</h3>
-                <p class="text-muted">Set your teaching preferences to start matching.</p>
+                <h3 class="fw-bold sb-text">Tutor Profile Setup</h3>
+                <p class="sb-muted">Set your teaching preferences to start matching.</p>
               </div>
 
               <form @submit.prevent="handleCompleteSetup">
                 <div class="mb-4">
-                  <label class="form-label fw-bold small text-muted">TEACHING LEVEL</label>
+                  <label class="form-label fw-bold small sb-muted">TEACHING LEVEL</label>
                   <select v-model="form.teaching_level" class="form-select border-sb shadow-none" required>
                     <option value="" disabled>Select level</option>
                     <option value="Elementary">Elementary</option>
@@ -22,7 +27,7 @@
                 </div>
 
                 <div class="mb-4">
-                  <label class="form-label fw-bold small text-muted d-block">MODALITY</label>
+                  <label class="form-label fw-bold small sb-muted d-block">MODALITY</label>
                   <div class="form-check form-switch mb-2">
                     <input class="form-check-input" type="checkbox" v-model="form.can_online" id="on">
                     <label class="form-check-label" for="on">Online Sessions</label>
@@ -34,7 +39,7 @@
                 </div>
 
                 <div class="mb-5">
-                  <label class="form-label fw-bold small text-muted">HOURLY RATE (PHP)</label>
+                  <label class="form-label fw-bold small sb-muted">HOURLY RATE (PHP)</label>
                   <input type="number" v-model="form.hourly_rate" class="form-control border-sb shadow-none" placeholder="₱ 0.00" required>
                 </div>
 
@@ -56,6 +61,7 @@ import { useRouter } from 'vue-router'
 import { useProfileStore } from '@/stores/profile'
 import { useToastStore } from '@/stores/toast'
 import api from '@/services/api/api'
+import SbThemeToggle from '@/components/SbThemeToggle.vue'
 
 const router = useRouter()
 const profileStore = useProfileStore()
@@ -113,3 +119,9 @@ const handleCompleteSetup = async () => {
 
 }
 </script>
+
+<style scoped>
+.tutor-setup-page {
+  background-color: var(--sb-bg);
+}
+</style>

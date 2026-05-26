@@ -1,11 +1,12 @@
 <template>
 
   <!-- NAVBAR -->
-  <nav class="navbar navbar-expand-lg bg-white py-3">
-    <div class="container">
-      <a class="navbar-brand fw-bold fs-4">
+  <nav class="navbar navbar-expand-lg sb-surface py-3">
+    <div class="container d-flex justify-content-between align-items-center">
+      <a class="navbar-brand fw-bold fs-4 sb-text">
         StudyBuddy
       </a>
+      <SbThemeToggle />
     </div>
   </nav>
 
@@ -15,7 +16,7 @@
 
       <div class="col-md-7">
 
-        <div class="card shadow-sm rounded-4 p-4">
+        <div class="card sb-card-surface sb-text shadow-sm rounded-4 p-4">
 
           <!-- PROGRESS -->
           <div class="mb-4">
@@ -28,7 +29,7 @@
 
             <div class="text-center mb-4">
               <h3 class="fw-bold">What subjects are you interested in?</h3>
-              <p class="text-muted">Choose all that apply</p>
+              <p class="sb-muted">Choose all that apply</p>
             </div>
 
             <div class="row g-3 mb-4">
@@ -40,7 +41,7 @@
               >
 
                 <div
-                  class="card border rounded-4 p-3 text-center h-100 subject-card sb-interactive"
+                  class="card sb-card-surface border rounded-4 p-3 text-center h-100 subject-card sb-interactive"
                   style="cursor:pointer"
                   :class="store.selectedSubjects.includes(subject.subject_code)
                     ? 'border-success bg-success bg-opacity-10'
@@ -78,7 +79,7 @@
 
             <div class="text-center mb-4">
               <h3 class="fw-bold">Select Your Year Level</h3>
-              <p class="text-muted">Choose your current academic level</p>
+              <p class="sb-muted">Choose your current academic level</p>
             </div>
 
             <div class="mb-4">
@@ -119,7 +120,7 @@
 
             <div class="text-center mb-4">
               <h3 class="fw-bold">Select Your Course</h3>
-              <p class="text-muted">Choose your academic program</p>
+              <p class="sb-muted">Choose your academic program</p>
             </div>
 
             <div class="mb-4">
@@ -172,6 +173,7 @@ import { usePreferenceStore } from '@/stores/preferences'
 import { useProfileStore } from '@/stores/profile'
 import api from '@/services/api/api'
 import SbStepBar from '@/components/SbStepBar.vue'
+import SbThemeToggle from '@/components/SbThemeToggle.vue'
 import { useToastStore } from '@/stores/toast'
 
 const router = useRouter()

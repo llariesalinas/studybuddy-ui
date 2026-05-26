@@ -4,7 +4,7 @@
       <div class="row g-3 align-items-end">
         <!-- Subject -->
         <div class="col-lg-4 col-md-6">
-          <label class="form-label fw-semibold small text-muted">Subject</label>
+          <label class="form-label fw-semibold small sb-muted">Subject</label>
           <select v-model="subjectModel" class="form-select border-sb shadow-none py-2 rounded-3">
             <option disabled value="">Select Subject</option>
             <option
@@ -19,7 +19,7 @@
 
         <!-- Mode -->
         <div class="col-lg-2 col-md-3">
-          <label class="form-label fw-semibold small text-muted">Mode</label>
+          <label class="form-label fw-semibold small sb-muted">Mode</label>
           <select v-model="modeModel" class="form-select border-sb shadow-none py-2 rounded-3">
             <option v-for="mode in modes" :key="mode" :value="mode">
               {{ mode }}
@@ -29,7 +29,7 @@
 
         <!-- Location -->
         <div v-if="modeModel === 'Face-to-face'" class="col-lg-3 col-md-3">
-          <label class="form-label fw-semibold small text-muted">Location</label>
+          <label class="form-label fw-semibold small sb-muted">Location</label>
           <input
             type="text"
             v-model="locationModel"
@@ -40,13 +40,13 @@
 
         <!-- Date -->
         <div class="col-lg-3 col-md-6">
-          <label class="form-label fw-semibold small text-muted">Date</label>
+          <label class="form-label fw-semibold small sb-muted">Date</label>
           <BookingDatePicker v-model="dateModel" />
         </div>
 
         <!-- Budget -->
         <div class="col-lg-3 col-md-6 subject-filter-column">
-          <label class="form-label fw-semibold small text-muted">Budget Range</label>
+          <label class="form-label fw-semibold small sb-muted">Budget Range</label>
           <div class="budget-filter-wrap">
             <button
               type="button"
@@ -72,7 +72,7 @@
 
         <!-- From -->
         <div class="col-lg-3 col-md-6">
-          <label class="form-label fw-semibold small text-muted">Start Time</label>
+          <label class="form-label fw-semibold small sb-muted">Start Time</label>
           <BookingTimePicker
             v-model="startTimeModel"
             :selected-date="findTutorsStore.filters.date"
@@ -84,7 +84,7 @@
 
         <!-- To -->
         <div class="col-lg-3 col-md-6">
-          <label class="form-label fw-semibold small text-muted">End Time</label>
+          <label class="form-label fw-semibold small sb-muted">End Time</label>
           <BookingTimePicker
             v-model="endTimeModel"
             ref="endTimePickerRef"
@@ -112,12 +112,12 @@
 
     <div v-if="isLoading" class="text-center py-5">
       <div class="spinner-border text-sb-primary" role="status"></div>
-      <p class="text-muted mt-2">Running matching algorithm...</p>
+      <p class="sb-muted mt-2">Running matching algorithm...</p>
     </div>
 
     <div v-else-if="filteredTutors.length" class="row g-4">
       <div class="col-md-6" v-for="tutor in filteredTutors" :key="tutor.profile_id">
-        <div class="card border-sb shadow-sm rounded-4 h-100">
+        <div class="card sb-card-surface shadow-sm rounded-4 h-100">
           <div class="card-body p-4">
             <div class="d-flex justify-content-between align-items-start mb-3">
               <div class="d-flex align-items-center gap-3">
@@ -128,8 +128,8 @@
                   {{ tutor.initials }}
                 </div>
                 <div>
-                  <h6 class="fw-bold mb-0 text-dark">{{ tutor.name }}</h6>
-                  <p class="text-muted small mb-0">{{ tutor.year_course }}</p>
+                  <h6 class="fw-bold mb-0 sb-text">{{ tutor.name }}</h6>
+                  <p class="sb-muted small mb-0">{{ tutor.year_course }}</p>
                 </div>
               </div>
               <div class="text-end">
@@ -139,13 +139,13 @@
               </div>
             </div>
 
-            <p class="small text-dark mb-3">{{ tutor.bio }}</p>
+            <p class="small sb-text mb-3">{{ tutor.bio }}</p>
 
             <div class="d-flex gap-2 mb-4 flex-wrap">
               <span
                 v-for="subject in tutor.subjects"
                 :key="subject"
-                class="badge bg-light text-dark border border-sb"
+                class="badge sb-subject-badge"
               >
                 {{ subject }}
               </span>
@@ -153,9 +153,9 @@
 
             <div class="d-flex justify-content-between align-items-center mt-auto">
               <div class="small">
-                <span class="fw-bold text-dark">P{{ tutor.hourly_rate }}</span
-                ><span class="text-muted">/hr</span>
-                <span class="text-muted ms-2">. {{ tutor.total_sessions }} sessions</span>
+                <span class="fw-bold sb-text">P{{ tutor.hourly_rate }}</span
+                ><span class="sb-muted">/hr</span>
+                <span class="sb-muted ms-2">. {{ tutor.total_sessions }} sessions</span>
               </div>
               <button
                 @click="toTutorDetails(tutor)"
@@ -169,9 +169,9 @@
       </div>
     </div>
 
-    <div v-else class="empty-state border-sb rounded-4 shadow-sm text-center py-5 px-4 bg-white">
-      <h5 class="fw-bold text-dark mb-2">No tutors match this budget range</h5>
-      <p class="text-muted mb-0">Try widening the slider range to see more tutor options.</p>
+    <div v-else class="empty-state sb-card-surface rounded-4 shadow-sm text-center py-5 px-4">
+      <h5 class="fw-bold sb-text mb-2">No tutors match this budget range</h5>
+      <p class="sb-muted mb-0">Try widening the slider range to see more tutor options.</p>
     </div>
   </div>
 </template>
@@ -546,8 +546,8 @@ onBeforeRouteUpdate(async (to, from, next) => {
 <style scoped>
 .time-trigger {
   min-height: 42px;
-  background: #fff;
-  color: #212529;
+  background: var(--sb-card-bg);
+  color: var(--sb-text-main);
 }
 
 .subject-filter-column {
@@ -556,9 +556,9 @@ onBeforeRouteUpdate(async (to, from, next) => {
 
 .budget-toggle-btn {
   min-height: 42px;
-  background: #ffffff;
+  background: var(--sb-card-bg);
   border: 1px solid var(--sb-card-border, #eaeaea);
-  color: #163127;
+  color: var(--sb-text-main);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -587,7 +587,7 @@ onBeforeRouteUpdate(async (to, from, next) => {
 .budget-toggle-inline {
   font-size: 0.95rem;
   line-height: 1.2;
-  color: #163127;
+  color: var(--sb-text-main);
   font-weight: 600;
 }
 
@@ -601,7 +601,7 @@ onBeforeRouteUpdate(async (to, from, next) => {
   top: calc(100% + 0.65rem);
   left: 0;
   width: min(520px, 92vw);
-  background: linear-gradient(180deg, #ffffff, #fbfdfc);
+  background: var(--sb-card-bg);
   border: 1px solid var(--sb-card-border, #eaeaea);
   border-radius: 22px;
   box-shadow: 0 20px 44px rgba(10, 122, 81, 0.12);
@@ -612,6 +612,12 @@ onBeforeRouteUpdate(async (to, from, next) => {
 .empty-state {
   max-width: 720px;
   margin: 0 auto;
+}
+
+.sb-subject-badge {
+  background: var(--sb-bg);
+  color: var(--sb-text-main);
+  border: 1px solid var(--sb-card-border);
 }
 
 @media (max-width: 991px) {

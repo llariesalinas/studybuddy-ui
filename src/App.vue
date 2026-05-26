@@ -111,7 +111,7 @@
             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
           </div>
 
-          <div class="modal-body text-muted">
+          <div class="modal-body sb-muted">
             Are you sure you want to log out?
           </div>
 
@@ -136,100 +136,99 @@
     </div>
 
     <main
-      class="app-main flex-grow-1 overflow-auto p-5 position-relative"
+      class="app-main app-main-surface flex-grow-1 overflow-auto p-5 position-relative"
       :class="{ 'app-main-chat': route.name === 'chat' }"
-      style="background-color: var(--sb-bg);"
     >
         <header class="app-page-header d-flex justify-content-between align-items-center mb-3 pb-3 border-bottom border-sb">
           
           <div v-if="route.path === '/dashboard'">
-            <h2 class="fw-bold text-dark">Welcome back, {{ userFname }}!</h2>
-            <p class="text-muted">Here's your tutoring overview for today.</p>
+            <h2 class="fw-bold sb-text">Welcome back, {{ userFname }}!</h2>
+            <p class="sb-muted">Here's your tutoring overview for today.</p>
           </div>
 
           <div v-if="route.path === '/tutee-profile'">
-            <h2 class="fw-bold text-dark">My Profile</h2>
-            <p class="text-muted">Manage your personal information and tutoring preferences.</p>
+            <h2 class="fw-bold sb-text">My Profile</h2>
+            <p class="sb-muted">Manage your personal information and tutoring preferences.</p>
           </div>
 
           <div v-if="route.path === '/book'">
-            <h2 class="fw-bold text-dark">Book a Session</h2>
-            <p class="text-muted">
+            <h2 class="fw-bold sb-text">Book a Session</h2>
+            <p class="sb-muted">
               Tell us what you need help with, and we'll match you with the right tutor.
             </p>
           </div>
 
           <div v-if="route.path === '/find-tutors'">
-            <h2 class="fw-bold text-dark">Find Tutors</h2>
-            <p class="text-muted">Browse peer tutors matched to your learning needs.</p>
+            <h2 class="fw-bold sb-text">Find Tutors</h2>
+            <p class="sb-muted">Browse peer tutors matched to your learning needs.</p>
         </div>
 
           <div v-if="route.path === '/tuteeSessions'">
-            <h2 class="fw-bold text-dark">Here are your sessions, {{ userFname}}!</h2>
-            <p class="text-muted">Browse and review pending, upcoming, and completed sessions and confirm ongoing sessions here.</p>
+            <h2 class="fw-bold sb-text">Here are your sessions, {{ userFname}}!</h2>
+            <p class="sb-muted">Browse and review pending, upcoming, and completed sessions and confirm ongoing sessions here.</p>
           </div>
 
           <div v-if="route.path.startsWith('/tuteeSessionDetails/')">
-            <h2 class="fw-bold text-dark">Session Details</h2>
-            <p class="text-muted">Review your session here.</p>
+            <h2 class="fw-bold sb-text">Session Details</h2>
+            <p class="sb-muted">Review your session here.</p>
           </div>
 
           <div v-if="route.path === '/tch-dashboard'">
-            <h2 class="fw-bold text-dark">Welcome back, {{ userFname }}!</h2>
-            <p class="text-muted">Here's your tutoring overview for today.</p>
+            <h2 class="fw-bold sb-text">Welcome back, {{ userFname }}!</h2>
+            <p class="sb-muted">Here's your tutoring overview for today.</p>
           </div>
 
           <div v-if="route.path === '/tutor-profile'">
-            <h2 class="fw-bold text-dark">My Profile</h2>
-            <p class="text-muted">Manage your personal information and tutoring preferences.</p>
+            <h2 class="fw-bold sb-text">My Profile</h2>
+            <p class="sb-muted">Manage your personal information and tutoring preferences.</p>
           </div>
 
           <div v-if="route.path === '/tch-wallet'">
-            <h2 class="fw-bold text-dark">My Wallet</h2>
-            <p class="text-muted">Manage your earnings and cash-out requests.</p>
+            <h2 class="fw-bold sb-text">My Wallet</h2>
+            <p class="sb-muted">Manage your earnings and cash-out requests.</p>
           </div>
 
           <div v-if="route.path === '/reports'">
-            <h2 class="fw-bold text-dark">Sessions & Reports</h2>
-            <p class="text-muted">Track your tutoring history, earnings, and performance.</p>
+            <h2 class="fw-bold sb-text">Sessions & Reports</h2>
+            <p class="sb-muted">Track your tutoring history, earnings, and performance.</p>
           </div>
 
           <div v-if="route.path === '/tch-availability'">
-            <h2 class="fw-bold text-dark">Your Schedule</h2>
-            <p class="text-muted">Set recurring weekly slots and add one-off date blocks when your schedule changes.</p>
+            <h2 class="fw-bold sb-text">Your Schedule</h2>
+            <p class="sb-muted">Set recurring weekly slots and add one-off date blocks when your schedule changes.</p>
           </div>
 
           <div v-if="route.path === '/admin/dashboard'">
-            <h2 class="fw-bold text-dark">Admin Dashboard</h2>
-            <p class="text-muted">Platform overview and key performance metrics.</p>
+            <h2 class="fw-bold sb-text">Admin Dashboard</h2>
+            <p class="sb-muted">Platform overview and key performance metrics.</p>
           </div>
 
           <div v-if="route.path === '/admin/users'">
-            <h2 class="fw-bold text-dark">Users</h2>
-            <p class="text-muted">Search, filter, and manage all platform users.</p>
+            <h2 class="fw-bold sb-text">Users</h2>
+            <p class="sb-muted">Search, filter, and manage all platform users.</p>
           </div>
 
           <div v-if="route.path === '/admin/withdrawals'">
-            <h2 class="fw-bold text-dark">Cash Outs</h2>
-            <p class="text-muted">Search, filter, and manage all user cash-outs.</p>
+            <h2 class="fw-bold sb-text">Cash Outs</h2>
+            <p class="sb-muted">Search, filter, and manage all user cash-outs.</p>
           </div>
 
           <div v-if="route.path === '/admin/institutions'">
-            <h2 class="fw-bold text-dark">Institutions</h2>
-            <p class="text-muted">View and manage requests from partnered institutions.</p>
+            <h2 class="fw-bold sb-text">Institutions</h2>
+            <p class="sb-muted">View and manage requests from partnered institutions.</p>
           </div>
 
           <div v-if="route.path === '/admin/reports'">
-            <h2 class="fw-bold text-dark">Reports</h2>
-            <p class="text-muted">View and review platform analytics.</p>
+            <h2 class="fw-bold sb-text">Reports</h2>
+            <p class="sb-muted">View and review platform analytics.</p>
           </div>
 
           <div v-if="route.path === '/tch-requestedSessions'">
             <div class="d-flex align-items-center gap-2 flex-wrap">
-              <h2 class="fw-bold mb-1">Requested Sessions</h2>
+              <h2 class="fw-bold sb-text mb-1">Requested Sessions</h2>
               <span v-if="sessionStore.hasNewPendingRequests" class="request-alert-dot" aria-label="New requests available"></span>
             </div>
-            <p class="text-muted mb-0">
+            <p class="sb-muted mb-0">
                 Manage pending session requests.
             </p>
           </div>
@@ -248,7 +247,7 @@
               <span>Manage Pending Sessions</span>
               <span
                 v-if="sessionStore.requestedSessions.length > 0"
-                class="pending-request-count badge rounded-pill bg-light text-sb-primary border border-sb"
+                class="pending-request-count pending-request-count-surface badge rounded-pill text-sb-primary border border-sb"
                 :aria-label="`${sessionStore.requestedSessions.length} pending session request${sessionStore.requestedSessions.length === 1 ? '' : 's'}`"
               >
                 {{ sessionStore.requestedSessions.length }}
@@ -418,6 +417,10 @@ onBeforeUnmount(() => {
   padding: 0.4rem 0.5rem;
 }
 
+.pending-request-count-surface {
+  background: var(--sb-card-bg);
+}
+
 .pending-request-btn:has(.pending-request-dot) {
   box-shadow: 0 0 0 3px rgba(0, 137, 90, 0.18), 0 10px 20px rgba(0, 137, 90, 0.18);
 }
@@ -453,6 +456,10 @@ onBeforeUnmount(() => {
   min-width: 0;
 }
 
+.app-main-surface {
+  background-color: var(--sb-bg);
+}
+
 .app-main-chat {
   display: flex;
   flex-direction: column;
@@ -470,8 +477,8 @@ onBeforeUnmount(() => {
   width: var(--sb-bell-size);
   height: var(--sb-bell-size);
   border-radius: 50%;
-  border: 1.5px solid #dee2e6;
-  background: #fff;
+  border: 1.5px solid var(--sb-card-border);
+  background: var(--sb-card-bg);
   color: var(--sb-text-muted);
   text-decoration: none;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
@@ -494,7 +501,7 @@ onBeforeUnmount(() => {
   border-radius: 999px;
   background: var(--sb-danger-bs);
   color: #ffffff;
-  border: 2px solid #ffffff;
+  border: 2px solid var(--sb-card-bg);
   font-size: 11px;
   font-weight: 800;
   line-height: 16px;
@@ -507,7 +514,7 @@ onBeforeUnmount(() => {
   right: calc(var(--sb-bell-size) + var(--sb-bell-gap) + 70px);
   z-index: 20;
   width: min(320px, calc(100vw - 48px));
-  background: #ffffff;
+  background: var(--sb-card-bg);
   border: 1px solid var(--sb-card-border);
   border-radius: 8px;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
