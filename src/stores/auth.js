@@ -8,9 +8,7 @@ import {
   startIdleSessionTracking,
   stopIdleSessionTracking
 } from '@/services/auth/idleSession'
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api/'
-const ACCESS_REFRESH_INTERVAL_MS = 4 * 60 * 1000
+import { API_BASE_URL, ACCESS_REFRESH_INTERVAL_MS } from '../config.js'
 
 let refreshIntervalId = null
 

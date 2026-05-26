@@ -3,9 +3,11 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from django.db.models import Q
+from django.utils import timezone
 from .models import ChatRoom, Message
 from .serializers import ChatRoomSerializer, MessageSerializer
 from studybuddy.models import UserProfile, Tutor
+from .services import broadcast_message, broadcast_room_updated, create_chat_message, get_canonical_room
 
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
@@ -14,7 +16,7 @@ def list_chat_rooms(request):
     user_profile = request.user.userprofile
     rooms = ChatRoom.objects.filter(
         Q(tutee=user_profile) | Q(tutor=user_profile)
-    ).order_by('-created_at')
+    ).select_related('tutee', 'tutor').order_by('-updated_at', '-created_at')
     
     serializer = ChatRoomSerializer(rooms, many=True, context={'request': request})
     return Response(serializer.data)
@@ -36,6 +38,26 @@ def get_message_history(request, room_id):
 
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])
+def mark_room_read(request, room_id):
+    """Mark messages in a room as read for the logged-in user."""
+    user_profile = request.user.userprofile
+    room = get_object_or_404(ChatRoom, id=room_id)
+
+    if room.tutee != user_profile and room.tutor != user_profile:
+        return Response({"error": "Unauthorized"}, status=status.HTTP_403_FORBIDDEN)
+
+    updated = room.messages.filter(is_read=False).exclude(sender=request.user).update(
+        is_read=True,
+        read_at=timezone.now()
+    )
+
+    if updated:
+        broadcast_room_updated(room)
+
+    return Response({"message": "Messages marked read.", "updated": updated})
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
 def start_inquiry_chat(request, tutor_profile_id):
     """Start or get an inquiry chat room with a tutor."""
     tutee_profile = request.user.userprofile
@@ -44,12 +66,50 @@ def start_inquiry_chat(request, tutor_profile_id):
     if tutee_profile == tutor_profile:
         return Response({"error": "Cannot chat with yourself"}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Find or create a room without a booking (inquiry)
-    room, created = ChatRoom.objects.get_or_create(
+    existing_room = ChatRoom.objects.filter(
         tutee=tutee_profile,
         tutor=tutor_profile,
-        booking=None
-    )
+        booking__isnull=True
+    ).first()
+    room = existing_room or get_canonical_room(tutee_profile, tutor_profile)
+    created = existing_room is None
     
     serializer = ChatRoomSerializer(room, context={'request': request})
     return Response(serializer.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def send_message(request, room_id):
+    """REST fallback for sending a message when WebSocket is unavailable."""
+    user_profile = request.user.userprofile
+    room = get_object_or_404(ChatRoom, id=room_id)
+
+    if room.tutee != user_profile and room.tutor != user_profile:
+        return Response({"error": "Unauthorized"}, status=status.HTTP_403_FORBIDDEN)
+
+    content = str(request.data.get('message') or '').strip()
+    if not content:
+        return Response({"error": "Message cannot be empty."}, status=status.HTTP_400_BAD_REQUEST)
+
+    temp_id = request.data.get('temp_id')
+    message = create_chat_message(
+        room,
+        request.user,
+        content,
+        message_type='text',
+        metadata={},
+        broadcast=False,
+    )
+    broadcast_message(room, message, temp_id=temp_id)
+
+    message_data = MessageSerializer(message, context={'request': request}).data
+    if temp_id:
+        message_data['temp_id'] = temp_id
+
+    return Response(
+        {
+            'message': message_data,
+            'room': ChatRoomSerializer(room, context={'request': request}).data,
+        },
+        status=status.HTTP_201_CREATED,
+    )

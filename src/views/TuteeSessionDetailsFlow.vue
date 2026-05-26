@@ -9,9 +9,25 @@
       {{ errorMessage || 'Booking not found.' }}
     </div>
 
-    <div v-else class="row g-4">
-      <div class="col-12 col-lg-8">
-        <div class="card shadow-sm p-4 h-100">
+    <template v-else>
+      <div
+        v-if="paymentReturnMessage"
+        class="alert d-flex align-items-center gap-2"
+        :class="paymentReturnAlertClass"
+      >
+        <span
+          v-if="paymentSyncing"
+          class="spinner-border spinner-border-sm"
+          role="status"
+          aria-hidden="true"
+        ></span>
+        <i v-else class="bi" :class="paymentReturnIcon"></i>
+        <span>{{ paymentReturnMessage }}</span>
+      </div>
+
+      <div class="row g-4">
+        <div class="col-12 col-lg-8">
+          <div class="card shadow-sm p-4 h-100">
           <div class="d-flex gap-3 align-items-start">
             <div class="avatar-shell">
               <img
@@ -90,18 +106,18 @@
               </div>
             </div>
           </div>
+          </div>
         </div>
-      </div>
 
-      <div class="col-12 col-lg-4">
-        <div class="card shadow-sm p-4 h-100">
+        <div class="col-12 col-lg-4">
+          <div class="card shadow-sm p-4 h-100">
           <h5 class="fw-bold mb-3">Next Action</h5>
 
           <template v-if="canSubmitPayment">
             <p class="text-muted">
               Your session has ended. Submit your post-session payment details so your tutor can verify them.
             </p>
-            <button class="btn bg-sb-primary text-white w-100" @click="goToPayment">
+            <button class="btn bg-sb-primary text-white w-100 sb-btn" @click="goToPayment">
               Submit Payment
             </button>
           </template>
@@ -110,7 +126,7 @@
             <p class="text-muted mb-3">
               Waiting for your tutor to review the submitted payment.
             </p>
-            <button class="btn btn-outline-secondary w-100" disabled>
+            <button class="btn btn-outline-secondary w-100 sb-btn" disabled>
               Waiting for tutor verification...
             </button>
           </template>
@@ -120,7 +136,7 @@
               Your session is complete. A rating is optional, but it helps improve StudyBuddy matches.
             </p>
             <button
-              class="btn bg-sb-primary text-white w-100"
+              class="btn bg-sb-primary text-white w-100 sb-btn"
               @click="isRatingModalOpen = true"
             >
               Leave a Rating
@@ -132,7 +148,7 @@
               {{ cancelActionMessage }}
             </p>
             <button
-              class="btn btn-outline-danger w-100"
+              class="btn btn-outline-danger w-100 sb-btn"
               :disabled="isCancelling || !canCancelSession"
               @click="isCancelModalOpen = true"
             >
@@ -148,6 +164,7 @@
         </div>
       </div>
     </div>
+    </template>
 
     <RatingStackModal
       :open="isRatingModalOpen"
@@ -184,7 +201,7 @@
           <div class="modal-footer">
             <button
               type="button"
-              class="btn btn-outline-secondary"
+              class="btn btn-outline-secondary sb-btn"
               :disabled="isCancelling"
               @click="closeCancelModal"
             >
@@ -192,7 +209,7 @@
             </button>
             <button
               type="button"
-              class="btn btn-danger"
+              class="btn btn-danger sb-btn"
               :disabled="isCancelling"
               @click="handleCancelSession"
             >
@@ -217,12 +234,14 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useSessionsStore } from '@/stores/completedSessions'
 import { useNotificationsStore } from '@/stores/notifications'
+import { useToastStore } from '@/stores/toast'
 import RatingStackModal from '@/components/RatingStackModal.vue'
 
 const route = useRoute()
 const router = useRouter()
 const sessionsStore = useSessionsStore()
 const notificationsStore = useNotificationsStore()
+const toastStore = useToastStore()
 
 const sessionDetail = ref(null)
 const loading = ref(true)
@@ -230,6 +249,9 @@ const errorMessage = ref('')
 const isRatingModalOpen = ref(false)
 const isCancelModalOpen = ref(false)
 const isCancelling = ref(false)
+const paymentSyncing = ref(false)
+const paymentReturnMessage = ref('')
+const paymentReturnState = ref('info')
 
 const normalizedStatus = computed(() => String(sessionDetail.value?.session?.status || '').toLowerCase())
 const canSubmitPayment = computed(() => normalizedStatus.value === 'payment required')
@@ -254,6 +276,16 @@ const cancelActionMessage = computed(() => {
   }
 
   return 'Cancellation is only available before the session date.'
+})
+const paymentReturnAlertClass = computed(() => {
+  if (paymentReturnState.value === 'success') return 'alert-success'
+  if (paymentReturnState.value === 'warning') return 'alert-warning'
+  return 'alert-info'
+})
+const paymentReturnIcon = computed(() => {
+  if (paymentReturnState.value === 'success') return 'bi-check-circle-fill'
+  if (paymentReturnState.value === 'warning') return 'bi-exclamation-triangle-fill'
+  return 'bi-info-circle-fill'
 })
 
 const tutorInitials = computed(() => {
@@ -319,6 +351,29 @@ const loadSession = async () => {
   }
 }
 
+const syncReturnedOnlinePayment = async () => {
+  if (route.query.payment !== 'success') {
+    return
+  }
+
+  paymentSyncing.value = true
+  paymentReturnState.value = 'info'
+  paymentReturnMessage.value = 'Confirming your online payment...'
+
+  try {
+    sessionDetail.value = await sessionsStore.verifyOnlinePayment(route.params.id)
+    await notificationsStore.fetchNotifications()
+    paymentReturnState.value = 'success'
+    paymentReturnMessage.value = 'Payment confirmed. Waiting for tutor verification.'
+    router.replace({ name: 'tuteeSessionDetails', params: route.params, query: {} })
+  } catch (error) {
+    paymentReturnState.value = 'warning'
+    paymentReturnMessage.value = error.response?.data?.error || 'Unable to confirm the online payment yet.'
+  } finally {
+    paymentSyncing.value = false
+  }
+}
+
 const closeCancelModal = () => {
   if (isCancelling.value) {
     return
@@ -343,9 +398,9 @@ const handleCancelSession = async () => {
     sessionDetail.value = updatedDetail
     isCancelModalOpen.value = false
     await notificationsStore.fetchNotifications()
-    alert('Session cancelled successfully.')
+    toastStore.push('Session cancelled successfully.')
   } catch (error) {
-    alert(error.response?.data?.error || 'Failed to cancel session.')
+    toastStore.push(error.response?.data?.error || 'Failed to cancel session.', 'error')
   } finally {
     isCancelling.value = false
   }
@@ -359,7 +414,10 @@ const handleRated = async () => {
   }
 }
 
-onMounted(loadSession)
+onMounted(async () => {
+  await loadSession()
+  await syncReturnedOnlinePayment()
+})
 </script>
 
 <style scoped>

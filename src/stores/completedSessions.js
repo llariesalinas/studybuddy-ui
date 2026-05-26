@@ -181,6 +181,12 @@ export const useSessionsStore = defineStore('sessions', () => {
     return fetchSessionById(id)
   }
 
+  const verifyOnlinePayment = async (id) => {
+    await api.post(`/bookings/${id}/verify-online-payment/`)
+    await fetchSessions()
+    return fetchSessionById(id)
+  }
+
   const submitRating = async (id, ratingScore, comment = '') => {
     await api.post(`/bookings/${id}/rating/`, {
       rating_score: ratingScore,
@@ -281,6 +287,7 @@ export const useSessionsStore = defineStore('sessions', () => {
     cancelSession,
     markPendingRequestsSeen,
     submitPayment,
+    verifyOnlinePayment,
     submitRating,
   }
 })

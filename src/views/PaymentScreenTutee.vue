@@ -2,7 +2,7 @@
 <div class="booking-content container py-2">
     <div class="mb-3">
         <button
-            class="btn btn-outline-secondary d-flex align-items-center gap-2"
+            class="btn btn-outline-secondary d-flex align-items-center gap-2 sb-btn"
             @click="backButton"
         >
             <i class="bi bi-arrow-left"></i>
@@ -41,7 +41,7 @@
                     class="col-4"
                 >
                     <button 
-                    class="btn btn-outline-sb-primary w-100 d-flex flex-column align-items-center py-3"
+                    class="btn btn-outline-sb-primary w-100 d-flex flex-column align-items-center py-3 sb-btn"
                     :class="{ 'btn-sb-primary': paymentStore.selectedMethod === method.id }"
                     @click="chooseMethod(method.id)"
                     >
@@ -65,7 +65,7 @@
                 </div>
 
                 <button
-                class="btn btn-primary bg-sb-primary w-100"
+                class="btn btn-primary bg-sb-primary w-100 sb-btn"
                 style="border-color: #00895A;"
                 @click="ConfirmPayment"
                 >
@@ -95,7 +95,7 @@
                 </div>
 
                 <button
-                class="btn btn-primary bg-sb-primary w-100"
+                class="btn btn-primary bg-sb-primary w-100 sb-btn"
                 style="border-color: #00895A;"
                 :disabled="!canSubmitOnlinePayment"
                 @click="ConfirmPayment"
@@ -128,12 +128,14 @@ import { useRoute, useRouter } from 'vue-router'
 import api from '@/services/api/api'
 import { usePaymentStore } from '@/stores/tuteePaymentDetails'
 import { useBookedSessionStore } from '@/stores/bookedSessionDetails'
+import { useToastStore } from '@/stores/toast'
 
 const route = useRoute()
 const router = useRouter()
 
 const paymentStore = usePaymentStore()
 const bookedSessionStore = useBookedSessionStore()
+const toastStore = useToastStore()
 
 const tutorId = route.params.tutorId
 
@@ -219,7 +221,7 @@ onMounted(async () => {
 
   // Protect against direct URL access
   if (!bookedSessionStore.bookedSessions?.length) {
-    alert("No Sessions Selected.")
+    toastStore.push("No Sessions Selected.", 'warning')
     router.push('/find-tutors')
   }
 })
@@ -230,12 +232,12 @@ onMounted(async () => {
 const ConfirmPayment = async () => {
 
   if (!paymentStore.selectedMethod) {
-    alert("Please select a payment method.")
+    toastStore.push("Please select a payment method.", 'warning')
     return
   }
 
   if (selectedMethodName.value === 'Online Payment' && !canSubmitOnlinePayment.value) {
-    alert("Please attach a receipt and enter the transaction reference.")
+    toastStore.push("Please attach a receipt and enter the transaction reference.", 'warning')
     return
   }
 
@@ -259,7 +261,7 @@ const ConfirmPayment = async () => {
 
     await api.post('bookings/confirm/', formData)
 
-    alert("Booking Confirmed!")
+    toastStore.push("Booking Confirmed!")
 
     paymentStore.reset()
     transactionReference.value = ''
@@ -272,7 +274,7 @@ const ConfirmPayment = async () => {
 
   } catch (error) {
     console.error("Payment error:", error.response?.data || error)
-    alert(error.response?.data?.error || "Something went wrong.")
+    toastStore.push(error.response?.data?.error || "Something went wrong.", 'error')
   }
 }
 </script>

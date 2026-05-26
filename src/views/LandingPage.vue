@@ -23,6 +23,7 @@
           <button class="sb-btn-pill sb-btn-small hover-lift" type="button" @click="router.push('/register')">
             Get started
           </button>
+          <SbThemeToggle />
         </div>
       </div>
     </nav>
@@ -302,6 +303,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
+import SbThemeToggle from '@/components/SbThemeToggle.vue'
 
 const router = useRouter()
 
@@ -389,14 +391,15 @@ const footerLinks = [
 
 <style scoped>
 .sb-landing {
-  --sb-primary: #00895a;
-  --sb-primary-hover: #00704a;
   --sb-dark: #071310;
-  --sb-canvas: #f0fdf4;
-  --sb-ink: #0f172a;
-  --sb-muted: #475569;
+  --sb-canvas: var(--sb-bg);
+  --sb-ink: var(--sb-text-main);
+  --sb-muted: var(--sb-text-muted);
   --sb-muted-dark: #94a3b8;
-  --sb-divider: rgba(0, 0, 0, 0.08);
+  --sb-divider: var(--sb-card-border);
+  --sb-glass-surface: color-mix(in srgb, var(--sb-card-bg) 68%, transparent);
+  --sb-glass-strong: color-mix(in srgb, var(--sb-card-bg) 90%, transparent);
+  --sb-glass-border: color-mix(in srgb, var(--sb-card-border) 72%, transparent);
 
   min-height: 100vh;
   background: var(--sb-canvas);
@@ -423,7 +426,9 @@ const footerLinks = [
   z-index: 0;
   pointer-events: none;
   overflow: hidden;
-  background-color: #f8fafc;
+  background:
+    var(--sb-aurora-bg, none),
+    var(--sb-bg);
 }
 
 .blob-interactive {
@@ -484,8 +489,8 @@ const footerLinks = [
   top: 0;
   z-index: 20;
   min-height: 60px;
-  background: rgba(255, 255, 255, 0.6);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.8);
+  background: color-mix(in srgb, var(--sb-surface) 82%, transparent);
+  border-bottom: 1px solid var(--sb-glass-border);
   backdrop-filter: blur(24px) saturate(200%);
   transition: all 0.3s ease;
 }
@@ -528,7 +533,7 @@ const footerLinks = [
   height: 28px;
   border-radius: 8px;
   background: var(--sb-primary);
-  color: #fff;
+  color: var(--sb-primary-contrast);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -551,9 +556,9 @@ const footerLinks = [
 .sb-tile { margin: 0; }
 
 .sb-tile-glass {
-  background: rgba(255, 255, 255, 0.4);
+  background: color-mix(in srgb, var(--sb-surface) 56%, transparent);
   backdrop-filter: blur(20px);
-  border-top: 1px solid rgba(255,255,255,0.8);
+  border-top: 1px solid var(--sb-glass-border);
 }
 
 .glass-panel-dark {
@@ -582,12 +587,12 @@ const footerLinks = [
   border-radius: 32px;
   overflow: hidden;
   box-shadow: 0 24px 48px rgba(0,0,0,0.05);
-  border: 1px solid rgba(255, 255, 255, 0.8);
+  border: 1px solid var(--sb-glass-border);
   aspect-ratio: 1/1;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.6);
+  background: var(--sb-glass-surface);
   backdrop-filter: blur(12px);
   max-width: 380px;
   margin: 0 auto;
@@ -681,10 +686,10 @@ const footerLinks = [
 
 .sb-badge {
   display: inline-block;
-  background: rgba(255, 255, 255, 0.8);
+  background: var(--sb-glass-strong);
   backdrop-filter: blur(10px);
   color: var(--sb-ink);
-  border: 1px solid rgba(255,255,255,1);
+  border: 1px solid var(--sb-glass-border);
   border-radius: 9999px;
   font-size: 12px;
   font-weight: 600;
@@ -744,9 +749,9 @@ const footerLinks = [
 .sb-feature-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
 .interactive-card, .sb-step-card {
-  background: rgba(255, 255, 255, 0.6);
+  background: var(--sb-glass-surface);
   backdrop-filter: blur(24px);
-  border: 1px solid rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--sb-glass-border);
   border-radius: 24px;
   padding: 32px;
   box-shadow: 0 8px 32px rgba(0,0,0,0.02);
@@ -760,8 +765,8 @@ const footerLinks = [
   height: 72px;
   margin: 0 auto 20px;
   border-radius: 20px;
-  background: rgba(255, 255, 255, 0.8);
-  border: 1px solid #ffffff;
+  background: var(--sb-glass-strong);
+  border: 1px solid var(--sb-glass-border);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -776,8 +781,8 @@ const footerLinks = [
   height: 48px;
   border-radius: 12px;
   margin-bottom: 20px;
-  background: rgba(255, 255, 255, 0.8);
-  border: 1px solid #ffffff;
+  background: var(--sb-glass-strong);
+  border: 1px solid var(--sb-glass-border);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -815,7 +820,7 @@ const footerLinks = [
 .interactive-card:hover, .sb-step-card:hover {
   transform: translateY(-6px);
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--sb-glass-strong);
 }
 
 .interactive-card-dark {
@@ -958,7 +963,7 @@ const footerLinks = [
 
 .sb-footer {
   padding: 80px 0 32px;
-  background: rgba(255, 255, 255, 0.4);
+  background: color-mix(in srgb, var(--sb-surface) 56%, transparent);
 }
 
 .sb-footer-grid {

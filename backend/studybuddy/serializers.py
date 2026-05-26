@@ -26,6 +26,16 @@ class AdminWithdrawalSerializer(serializers.ModelSerializer):
             'bank_name',
             'status',
             'failure_reason',
+            'provider',
+            'provider_wallet_transaction_id',
+            'provider_reference_number',
+            'provider_status',
+            'provider_error_code',
+            'provider_error_message',
+            'provider_fee',
+            'net_amount',
+            'rail',
+            'callback_received_at',
             'requested_at',
             'processed_at'
         ]
@@ -163,6 +173,7 @@ class TutorProfileSerializer(serializers.ModelSerializer):
     course = serializers.SerializerMethodField()
     year_level = serializers.IntegerField(source='profile.year_level', read_only=True, allow_null=True)
     bio = serializers.CharField(source='profile.bio', read_only=True, allow_null=True)
+    profile_picture_url = serializers.SerializerMethodField()
     response_time_label = serializers.CharField(read_only=True)
     pinned_review_id = serializers.IntegerField(read_only=True)
     pinned_review = PinnedReviewSerializer(read_only=True)
@@ -176,6 +187,7 @@ class TutorProfileSerializer(serializers.ModelSerializer):
             'course',
             'year_level',
             'bio',
+            'profile_picture_url',
             'hourly_rate',
             'teaching_level',
             'can_online',
@@ -190,6 +202,12 @@ class TutorProfileSerializer(serializers.ModelSerializer):
 
     def get_course(self, obj):
         return obj.profile.course.course_code if obj.profile.course else None
+
+    def get_profile_picture_url(self, obj):
+        request = self.context.get('request')
+        if obj.profile.profile_picture and request:
+            return request.build_absolute_uri(obj.profile.profile_picture.url)
+        return None
 
 
 class TutorProfileUpdateSerializer(serializers.ModelSerializer):
@@ -268,3 +286,4 @@ class NotificationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Notification
         fields = ['id', 'message', 'is_read', 'created_at']
+

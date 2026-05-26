@@ -1,12 +1,8 @@
-from ..models import (
-    Preference,
-    Tutor,
-    TutorSubjects
-)
+import logging
 
-# -----------------------------
-# WEIGHTS
-# -----------------------------
+from ..models import Preference, Tutor
+
+logger = logging.getLogger(__name__)
 
 W_SUBJECT = 0.35
 W_EXPERTISE = 0.20
@@ -15,136 +11,78 @@ W_YEAR = 0.15
 W_LEVEL = 0.10
 
 
-# -----------------------------
-# COMPUTE CBF SCORE
-# -----------------------------
-
-def compute_cbf_score(student_profile, tutor, requested_subject):
-
-    print("\n==============================")
-    print("Running CBF for Tutor:", tutor.profile.fname, tutor.profile.lname)
-
-    # -----------------------------
-    # STUDENT DATA
-    # -----------------------------
-
-    student_course = student_profile.course
-    student_year = student_profile.year_level
-
+def get_student_subject_codes(student_profile):
     try:
         pref = Preference.objects.get(user=student_profile)
-
-        student_subjects = list(
-            pref.subjects.values_list("subject_code", flat=True)
-        )
-
     except Preference.DoesNotExist:
-        student_subjects = []
+        return []
 
-    # Add requested booking subject
-    if requested_subject and requested_subject not in student_subjects:
-        student_subjects.append(requested_subject)
-
-    print("Student Subjects:", student_subjects)
+    return list(pref.subjects.values_list("subject_code", flat=True))
 
 
-    # -----------------------------
-    # TUTOR DATA
-    # -----------------------------
+def compute_cbf_score(
+    student_profile,
+    tutor,
+    requested_subject,
+    student_subjects=None,
+    tutor_subjects=None,
+):
+    student_course = student_profile.course
+    student_year = student_profile.year_level
+    subject_codes = (
+        list(student_subjects)
+        if student_subjects is not None
+        else get_student_subject_codes(student_profile)
+    )
+
+    if requested_subject and requested_subject not in subject_codes:
+        subject_codes.append(requested_subject)
 
     tutor_profile = tutor.profile
     tutor_course = tutor_profile.course
     tutor_year = tutor_profile.year_level
     tutor_level = tutor.teaching_level
+    subjects = (
+        list(tutor_subjects)
+        if tutor_subjects is not None
+        else list(tutor.tutorsubjects_set.all())
+    )
 
-    tutor_subjects = TutorSubjects.objects.filter(tutor=tutor)
-
-    tutor_subject_codes = [
-        ts.subject.subject_code for ts in tutor_subjects
+    tutor_subject_codes = [ts.subject.subject_code for ts in subjects]
+    matching_expertise = [
+        ts.expertise_level
+        for ts in subjects
+        if ts.subject.subject_code in subject_codes
     ]
 
-    print("Tutor Subjects:", tutor_subject_codes)
-
-
-    # -----------------------------
-    # SUBJECT MATCH + EXPERTISE
-    # -----------------------------
-
-    matching_expertise = []
-
-    for ts in tutor_subjects:
-
-        if ts.subject.subject_code in student_subjects:
-
-            matching_expertise.append(ts.expertise_level)
-
     if matching_expertise:
-
         s_subject = 1
-        ex_ave = sum(matching_expertise) / len(matching_expertise)
-        s_expertise = ex_ave / 5
-
+        s_expertise = (sum(matching_expertise) / len(matching_expertise)) / 5
     else:
-
         s_subject = 0
         s_expertise = 0
-
-    print("Subject Match Score:", s_subject)
-    print("Expertise Score:", round(s_expertise, 3))
-
-
-    # -----------------------------
-    # COURSE SIMILARITY
-    # -----------------------------
 
     s_course = 0
 
     if student_course == tutor_course:
-
         s_course = 1
-
     elif (
         student_course
         and tutor_course
         and student_course.strand == tutor_course.strand
     ):
-
         s_course = 0.5
 
-    print("Course Score:", s_course)
-
-
-    # -----------------------------
-    # YEAR SIMILARITY
-    # -----------------------------
-
     if student_year and tutor_year:
-
         year_diff = abs(student_year - tutor_year)
         s_year = 1 / (1 + year_diff)
-
     else:
-
         s_year = 0
-
-    print("Year Score:", round(s_year, 3))
-
-
-    # -----------------------------
-    # TEACHING LEVEL RULE
-    # -----------------------------
 
     s_level = 1
 
-    if tutor_level == "SHS" and int(student_year) > 12:
+    if tutor_level == "SHS" and student_year is not None and int(student_year) > 12:
         s_level = 0
-
-    print("Teaching Level Score:", s_level)
-
-
-    # -----------------------------
-    # FINAL SCORE
-    # -----------------------------
 
     score = (
         W_SUBJECT * s_subject +
@@ -154,25 +92,25 @@ def compute_cbf_score(student_profile, tutor, requested_subject):
         W_LEVEL * s_level
     )
 
-    print("FINAL SCORE:", round(score, 3))
-    print("==============================")
+    logger.debug(
+        "CBF score for tutor %s: %.3f (student subjects=%s, tutor subjects=%s)",
+        tutor.profile_id,
+        score,
+        subject_codes,
+        tutor_subject_codes,
+    )
 
     return score
 
 
-# -----------------------------
-# RECOMMEND TUTORS
-# -----------------------------
-
 def recommend_tutors(student_profile, subject=None, preferred_mode=None):
+    logger.debug("Starting CBF recommender")
 
-    print("\n===== STARTING CBF RECOMMENDER =====")
-
-    tutors = Tutor.objects.all().select_related("profile")
-
-    # -----------------------------
-    # FILTER BY MODE
-    # -----------------------------
+    tutors = Tutor.objects.select_related(
+        "profile",
+        "profile__course",
+        "profile__course__strand",
+    ).prefetch_related("tutorsubjects_set__subject")
 
     if preferred_mode == "Online":
         tutors = tutors.filter(can_online=True)
@@ -180,24 +118,24 @@ def recommend_tutors(student_profile, subject=None, preferred_mode=None):
     if preferred_mode == "Face-to-face":
         tutors = tutors.filter(can_f2f=True)
 
+    student_subjects = get_student_subject_codes(student_profile)
     results = []
 
     for tutor in tutors:
-
         score = compute_cbf_score(
             student_profile,
             tutor,
-            subject
+            subject,
+            student_subjects=student_subjects,
+            tutor_subjects=tutor.tutorsubjects_set.all(),
         )
 
         results.append({
             "tutor": tutor,
-            "score": score
+            "score": score,
         })
 
-    # Sort highest score first
     results.sort(key=lambda x: x["score"], reverse=True)
-
-    print("===== RECOMMENDER FINISHED =====\n")
+    logger.debug("CBF recommender finished with %s results", len(results))
 
     return results

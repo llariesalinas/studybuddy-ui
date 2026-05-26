@@ -158,7 +158,7 @@
 
           <button
             v-if="showDevReadyForPayment"
-            class="btn btn-warning fw-bold mb-3"
+            class="btn btn-warning fw-bold mb-3 sb-btn"
             :disabled="isDevSubmitting"
             @click="handleDevReadyForPayment"
           >
@@ -167,7 +167,7 @@
 
           <button
             v-if="isAwaitingVerification"
-            class="btn btn-success mt-auto"
+            class="btn btn-success mt-auto sb-btn"
             :disabled="isSubmitting"
             @click="handleComplete"
           >
@@ -184,10 +184,12 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useNotificationsStore } from '@/stores/notifications'
 import { useTutorBookingDetailStore } from '@/stores/tutorBookingDetails'
+import { useToastStore } from '@/stores/toast'
 
 const route = useRoute()
 const bookingDetailsStore = useTutorBookingDetailStore()
 const notificationsStore = useNotificationsStore()
+const toastStore = useToastStore()
 const isSubmitting = ref(false)
 const isDevSubmitting = ref(false)
 const isDev = import.meta.env.DEV
@@ -252,9 +254,9 @@ const handleComplete = async () => {
   try {
     await bookingDetailsStore.confirmCompletion()
     await notificationsStore.fetchNotifications()
-    alert('Session marked as completed.')
+    toastStore.push('Session marked as completed.')
   } catch (error) {
-    alert(error.response?.data?.error || 'Failed to complete session.')
+    toastStore.push(error.response?.data?.error || 'Failed to complete session.', 'error')
   } finally {
     isSubmitting.value = false
   }
@@ -266,9 +268,9 @@ const handleDevReadyForPayment = async () => {
   try {
     await bookingDetailsStore.devMarkReadyForPayment()
     await notificationsStore.fetchNotifications()
-    alert('Dev: session is ready for tutee payment.')
+    toastStore.push('Dev: session is ready for tutee payment.')
   } catch (error) {
-    alert(error.response?.data?.error || 'Failed to make session ready for payment.')
+    toastStore.push(error.response?.data?.error || 'Failed to make session ready for payment.', 'error')
   } finally {
     isDevSubmitting.value = false
   }

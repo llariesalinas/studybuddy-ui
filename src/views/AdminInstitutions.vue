@@ -2,7 +2,7 @@
   <div class="admin-institutions p-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
       <h3 class="mb-0">Partner Institutions</h3>
-      <button @click="showAddModal = true" class="btn bg-sb-primary text-white btn-sm rounded-pill px-3">
+      <button @click="showAddModal = true" class="btn bg-sb-primary text-white btn-sm rounded-pill px-3 sb-btn">
         <i class="bi bi-plus-lg me-1"></i> Add Institution
       </button>
     </div>
@@ -96,7 +96,7 @@
                   <td class="pe-4 text-end">
                     <button
                       @click="openDetail(inst)"
-                      class="btn btn-sm btn-light rounded-circle"
+                      class="btn btn-sm btn-light rounded-circle sb-btn"
                     >
                       <i class="bi bi-pencil"></i>
                     </button>
@@ -162,7 +162,7 @@
           <button
             @click="toggleActive(selectedInstitution)"
             :disabled="toggling"
-            class="btn w-100 mb-2 rounded-pill py-2"
+            class="btn w-100 mb-2 rounded-pill py-2 sb-btn"
             :class="selectedInstitution.is_active ? 'btn-outline-danger' : 'btn-success'"
           >
             <span v-if="toggling" class="spinner-border spinner-border-sm me-2"></span>
@@ -245,14 +245,14 @@
                 <button
                   type="button"
                   @click="showAddModal = false"
-                  class="btn btn-light rounded-pill w-100 py-2"
+                  class="btn btn-light rounded-pill w-100 py-2 sb-btn"
                 >
                   Cancel
                 </button>
 
                 <button
                   type="submit"
-                  class="btn bg-sb-primary text-white rounded-pill w-100 py-2"
+                  class="btn bg-sb-primary text-white rounded-pill w-100 py-2 sb-btn"
                 >
                   Save Institution
                 </button>
@@ -268,8 +268,10 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue';
 import { useAdminStore } from '@/stores/admin';
+import { useToastStore } from '@/stores/toast'
 
 const store = useAdminStore()
+const toastStore = useToastStore()
 const showAddModal = ref(false)
 
 const selectedInstitution = ref(null)
@@ -294,7 +296,7 @@ const toggleActive = async (inst) => {
         selectedInstitution.value = updated
       }
     } catch (err) {
-      alert('Failed to update institution status.')
+      toastStore.push('Failed to update institution status.', 'error')
     } finally {
       toggling.value = false
     }
@@ -322,7 +324,7 @@ const submitAdd = async () => {
     showAddModal.value = false
     Object.assign(form, { institution_name: '', school_email_domain: '', contact_person: '' })
   } catch (err) {
-    alert('Failed to add institution. Domain might already exist.')
+    toastStore.push('Failed to add institution. Domain might already exist.', 'error')
   }
 }
 </script>

@@ -1,7 +1,7 @@
 <template>
   <div class="booking-content container py-2">
     <div class="mb-3">
-      <button class="btn btn-outline-secondary d-flex align-items-center gap-2" @click="backButton">
+      <button class="btn btn-outline-secondary d-flex align-items-center gap-2 sb-btn" @click="backButton">
         <i class="bi bi-arrow-left"></i>
         Back
       </button>
@@ -18,7 +18,12 @@
 
     <div v-else class="row justify-content-center py-3">
       <div class="col-lg-8">
-        <div class="card border-sb shadow-sm rounded-4 p-4">
+        <div class="card border-sb shadow-sm rounded-4 p-4" :class="{ 'sb-success-card': showSuccess }">
+          <Transition name="pop">
+            <div v-if="showSuccess" class="success-icon-overlay">
+              <div class="success-icon">✓</div>
+            </div>
+          </Transition>
           <div class="summary-card rounded-4 p-3 mb-4">
             <h5 class="fw-bold mb-3">Session Payment Summary</h5>
             <div class="summary-grid">
@@ -52,7 +57,7 @@
                 v-for="method in paymentMethods"
                 :key="method.id"
                 type="button"
-                class="payment-method-card"
+                class="payment-method-card sb-btn"
                 :class="{ selected: paymentStore.selectedMethod === method.id }"
                 @click="chooseMethod(method.id)"
               >
@@ -68,7 +73,7 @@
                 Confirm only after you have already paid the tutor in person.
               </div>
               <button
-                class="btn bg-sb-primary text-white w-100"
+                class="btn bg-sb-primary text-white w-100 sb-btn"
                 :disabled="isSubmitting"
                 @click="submitPayment"
               >
@@ -82,7 +87,7 @@
                 You will be redirected to a secure payment page. Accepted: GCash, Maya, Visa, Mastercard.
               </div>
               <button
-                class="btn bg-sb-primary text-white w-100"
+                class="btn bg-sb-primary text-white w-100 sb-btn"
                 :disabled="isSubmitting"
                 @click="initiateOnlinePayment"
               >
@@ -114,7 +119,7 @@
               </div>
 
               <button
-                class="btn bg-sb-primary text-white w-100"
+                class="btn bg-sb-primary text-white w-100 sb-btn"
                 :disabled="isSubmitting || !canSubmitOnlinePayment"
                 @click="submitPayment"
               >
@@ -141,12 +146,14 @@ import api from '@/services/api/api'
 import { useNotificationsStore } from '@/stores/notifications'
 import { usePaymentStore } from '@/stores/tuteePaymentDetails'
 import { useSessionsStore } from '@/stores/completedSessions'
+import { useToastStore } from '@/stores/toast'
 
 const route = useRoute()
 const router = useRouter()
 const notificationsStore = useNotificationsStore()
 const paymentStore = usePaymentStore()
 const sessionsStore = useSessionsStore()
+const toastStore = useToastStore()
 
 const bookingId = route.params.bookingId
 const bookingDetail = ref(null)
@@ -154,6 +161,7 @@ const paymentMethods = ref([])
 const loading = ref(true)
 const isSubmitting = ref(false)
 const transactionReference = ref('')
+const showSuccess = ref(false)
 
 const selectedMethod = computed(() => {
   return paymentMethods.value.find(method => method.id === paymentStore.selectedMethod) || null
@@ -193,19 +201,19 @@ const initiateOnlinePayment = async () => {
     window.location.href = data.payment_url
   } catch (error) {
     console.error('Online payment initiation error:', error)
-    alert(error.response?.data?.error || 'Unable to initiate payment. Please try again.')
+    toastStore.push(error.response?.data?.error || 'Unable to initiate payment. Please try again.', 'error')
     isSubmitting.value = false
   }
 }
 
 const submitPayment = async () => {
   if (!paymentStore.selectedMethod) {
-    alert('Please select a payment method.')
+    toastStore.push('Please select a payment method.', 'warning')
     return
   }
 
   if (selectedMethod.value?.code === 'online' && !canSubmitOnlinePayment.value) {
-    alert('Please attach a receipt and enter the transaction reference.')
+    toastStore.push('Please attach a receipt and enter the transaction reference.', 'warning')
     return
   }
 
@@ -226,11 +234,13 @@ const submitPayment = async () => {
     bookingDetail.value = await sessionsStore.submitPayment(bookingId, formData)
     await notificationsStore.fetchNotifications()
     paymentStore.reset()
-    alert('Payment submitted. Waiting for tutor verification.')
+    showSuccess.value = true
+    await new Promise(resolve => setTimeout(resolve, 800))
+    toastStore.push('Payment submitted. Waiting for tutor verification.')
     router.push(`/tuteeSessionDetails/${bookingId}`)
   } catch (error) {
     console.error('Payment submission error:', error)
-    alert(error.response?.data?.error || 'Unable to submit payment.')
+    toastStore.push(error.response?.data?.error || 'Unable to submit payment.', 'error')
   } finally {
     isSubmitting.value = false
   }
@@ -317,5 +327,28 @@ onMounted(async () => {
 
 .payment-method-icon {
   font-size: 1.5rem;
+}
+
+.success-icon-overlay {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.success-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--sb-primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.pop-enter-active {
+  animation: sb-pop 350ms var(--sb-spring-fast) both;
 }
 </style>

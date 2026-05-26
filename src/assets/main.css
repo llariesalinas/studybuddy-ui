@@ -1,16 +1,73 @@
 :root {
-  --sb-dark: #0A1916;      /* Sidebar background */
-  --sb-primary: #00895A;   /* Primary green (buttons, icons, active text) */
-  --sb-bg: #F8F9FA;        /* Main background */
+  --sb-dark: #0A1916;
+  --sb-primary: #00895A; /* Your exact Figma Green */
+  --sb-primary-dark: #0A7A51;
+  --sb-primary-mid: #18A36C;
+  --sb-primary-hover: #00704A; /* Slightly darker for button hovers */
+  --sb-primary-contrast: #ffffff;
+  --sb-primary-light: #edf6f1;
+  --sb-primary-lighter: #dff1e8;
+  --sb-bg: #F8F9FA;
+  --sb-card-bg: #ffffff;
   --sb-card-border: #EAEAEA;
+  --sb-surface: #ffffff;
+  --sb-text-main: #163127;
+  --sb-text-muted: #6B7280;
+  --sb-text-secondary: #495057;
+  --sb-text-dark: #212529;
+  --sb-text-subtle: #a0acb8;
+  --sb-text-muted-green: #6b7d74;
+  --sb-border-light: #e0e7e3;
+  --sb-danger: #ef4444;
+  --sb-danger-bs: #dc3545;
+  --sb-warning-bg: #ffc107;
+  --sb-warning-text: #997404;
+  --sb-info-bg: #0dcaf0;
+  --sb-link: #0d6efd;
+  --sb-topbar-height: 60px;
+  --sb-bell-size: 52px;
+  --sb-bell-gap: 1.5rem;
+  --sb-main-padding: 3rem;
+  --sb-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  --sb-spring-fast: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --sb-t-quick: 120ms;
+  --sb-t-normal: 250ms;
+  --sb-t-slow: 400ms;
+}
+
+[data-sb-theme="dark"] {
+  --sb-primary:         #86B7A3;
+  --sb-primary-dark:    #6FA18C;
+  --sb-primary-mid:     #9BC8B6;
+  --sb-primary-hover:   #9CC8B8;
+  --sb-primary-contrast:#071310;
+  --sb-bg:              #050807;
+  --sb-card-bg:         #0C1110;
+  --sb-card-border:     #1B2A25;
+  --sb-surface:         #0C1110;
+  --sb-text-main:       #F3F7F5;
+  --sb-text-muted:      #9AA8A1;
+  --sb-text-secondary:  #BAC8C1;
+  --sb-text-dark:       #F3F7F5;
+  --sb-border-light:    #1B2A25;
+  --sb-aurora-bg:
+    radial-gradient(at 10% 0%, rgba(134, 183, 163, 0.18), transparent 42%),
+    radial-gradient(at 58% 0%, rgba(38, 166, 154, 0.12), transparent 46%),
+    radial-gradient(at 100% 10%, rgba(76, 201, 240, 0.10), transparent 42%);
 }
 
 body {
-  background-color: var(--sb-bg);
-  font-family: 'Inter', system-ui, -apple-system, sans-serif; /* Standard modern font */
+  background:
+    var(--sb-aurora-bg, none),
+    var(--sb-bg);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
 /* Custom Utilities to extend Bootstrap */
 .text-sb-primary { color: var(--sb-primary) !important; }
 .bg-sb-primary { background-color: var(--sb-primary) !important; }
 .border-sb { border-color: var(--sb-card-border) !important; }
+.sb-surface { background-color: var(--sb-surface); }
+.sb-text { color: var(--sb-text-main); }
+.sb-muted { color: var(--sb-text-muted); }
+.sb-card-surface { background-color: var(--sb-card-bg); border-color: var(--sb-card-border); }

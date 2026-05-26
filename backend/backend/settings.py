@@ -23,12 +23,15 @@ load_dotenv(BASE_DIR / ".env")
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-p@^2u1gzwyov3&bo_2td(e8i-#m3(97ai@f^jg$l&k-0e%+fhc')
+SECRET_KEY = os.getenv('SECRET_KEY')
+if not SECRET_KEY:
+    raise RuntimeError("SECRET_KEY env var is required but not set")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv('DEBUG', 'false').lower() == 'true'
 
-ALLOWED_HOSTS = []
+_allowed_hosts_raw = os.getenv('ALLOWED_HOSTS', '')
+ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts_raw.split(',') if h.strip()]
 
 if DEBUG:
     # Allow local dev + ngrok tunnels when testing from Vite.
@@ -175,5 +178,11 @@ CHANNEL_LAYERS = {
 }
 
 # PayMongo & Integration Settings
-PAYMONGO_SECRET_KEY = os.getenv("PAYMONGO_SECRET_KEY", "sk_test_placeholder")
+PAYMONGO_SECRET_KEY = os.getenv("PAYMONGO_SECRET_KEY")
+if not PAYMONGO_SECRET_KEY:
+    raise RuntimeError("PAYMONGO_SECRET_KEY env var is required but not set")
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+PAYMONGO_WALLET_ID = os.getenv("PAYMONGO_WALLET_ID", "")
+PAYMONGO_CASHOUT_CALLBACK_URL = os.getenv("PAYMONGO_CASHOUT_CALLBACK_URL", "")
+CASHOUT_PROVIDER_FEE_PHP = os.getenv("CASHOUT_PROVIDER_FEE_PHP", "10")
+CASHOUT_MIN_PHP = os.getenv("CASHOUT_MIN_PHP", "500")

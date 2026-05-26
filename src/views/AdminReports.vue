@@ -5,7 +5,7 @@
       <button
         @click="store.fetchAnalytics(true)"
         :disabled="store.loading.analytics"
-        class="btn bg-sb-primary text-white btn-sm rounded-pill ms-auto"
+        class="btn bg-sb-primary text-white btn-sm rounded-pill ms-auto sb-btn"
       >
         <span v-if="store.loading.analytics" class="spinner-border spinner-border-sm me-1" role="status"></span>
         <i v-else class="bi bi-arrow-clockwise me-1"></i>

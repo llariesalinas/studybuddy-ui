@@ -1,52 +1,47 @@
 <template>
-  <nav class="navbar navbar-expand-lg bg-white py-3 border-bottom shadow-sm">
-    <div class="container">
-      <span class="navbar-brand fw-bold text-success fs-4">StudyBuddy Onboarding</span>
+
+  <!-- NAVBAR -->
+  <nav class="navbar navbar-expand-lg sb-surface py-3">
+    <div class="container d-flex justify-content-between align-items-center">
+      <span class="navbar-brand fw-bold fs-4 sb-text">StudyBuddy</span>
+      <SbThemeToggle />
     </div>
   </nav>
 
   <div class="container py-5">
     <div class="row justify-content-center">
       <div class="col-md-7">
-        <div class="card shadow-lg rounded-4 p-4 border-0 bg-white">
+        <div class="card sb-card-surface sb-text shadow-sm rounded-4 p-4">
 
-          <!-- Progress Bar -->
+          <!-- PROGRESS -->
           <div class="mb-4">
-            <div class="progress" style="height: 8px;">
-              <div
-                class="progress-bar bg-success progress-bar-striped progress-bar-animated"
-                :style="{ width: progressPercentage + '%' }"
-              ></div>
-            </div>
-            <div class="text-end text-muted small mt-2">
-              Step {{ currentCard + 1 }} of {{ totalCards }}
-            </div>
+            <SbStepBar :current="currentCard + 1" :total="totalCards" />
           </div>
 
           <!-- CARD 1: Education Level Category -->
           <div v-if="currentCard === 0">
             <div class="text-center mb-4">
-              <h3 class="fw-bold text-dark">What is your Education Level?</h3>
-              <p class="text-muted">Select the category that best describes where you are now.</p>
+              <h3 class="fw-bold">What is your Education Level?</h3>
+              <p class="sb-muted">Select the category that best describes where you are now.</p>
             </div>
             <div class="row g-3">
               <div class="col-6" v-for="level in educationLevels" :key="level.value">
                 <div
-                  class="card border rounded-4 p-4 text-center h-100 select-card"
+                  class="card sb-card-surface border rounded-4 p-4 text-center h-100 select-card sb-interactive"
                   :class="educationLevel === level.value
                     ? 'border-success bg-success bg-opacity-10 shadow-sm'
-                    : 'bg-light'"
+                    : ''"
                   @click="selectEducationLevel(level.value)"
                 >
                   <span class="fs-3 mb-1">{{ level.icon }}</span>
-                  <span class="fw-bold text-dark small">{{ level.label }}</span>
-                  <span class="text-muted" style="font-size: 11px;">{{ level.sub }}</span>
+                  <span class="fw-bold sb-text small">{{ level.label }}</span>
+                  <span class="sb-muted" style="font-size: 11px;">{{ level.sub }}</span>
                 </div>
               </div>
             </div>
             <div class="d-flex justify-content-end mt-4">
               <button
-                class="btn btn-success px-4 py-2 rounded-3 fw-bold shadow-sm"
+                class="btn btn-success px-4 py-2 rounded-3 fw-bold sb-btn"
                 :disabled="!educationLevel"
                 @click="nextCard"
               >
@@ -61,19 +56,19 @@
             <!-- Elementary: Grade 1–6 -->
             <div v-if="educationLevel === 'elementary'">
               <div class="text-center mb-4">
-                <h3 class="fw-bold text-dark">Select Your Grade Level</h3>
-                <p class="text-muted">Elementary School — Grades 1 to 6</p>
+                <h3 class="fw-bold">Select Your Grade Level</h3>
+                <p class="sb-muted">Elementary School — Grades 1 to 6</p>
               </div>
               <div class="row g-3">
                 <div class="col-4" v-for="g in elementaryGrades" :key="g.value">
                   <div
-                    class="card border rounded-4 p-3 text-center select-card"
+                    class="card sb-card-surface border rounded-4 p-3 text-center select-card sb-interactive"
                     :class="selectedGrade === g.value
                       ? 'border-success bg-success bg-opacity-10 shadow-sm'
-                      : 'bg-light'"
+                      : ''"
                     @click="selectedGrade = g.value; store.selectedSubjects.splice(0)"
                   >
-                    <span class="fw-bold text-dark">{{ g.label }}</span>
+                    <span class="fw-bold sb-text">{{ g.label }}</span>
                   </div>
                 </div>
               </div>
@@ -82,19 +77,19 @@
             <!-- JHS: Grade 7–10 -->
             <div v-if="educationLevel === 'jhs'">
               <div class="text-center mb-4">
-                <h3 class="fw-bold text-dark">Select Your Grade Level</h3>
-                <p class="text-muted">Junior High School — Grades 7 to 10</p>
+                <h3 class="fw-bold">Select Your Grade Level</h3>
+                <p class="sb-muted">Junior High School — Grades 7 to 10</p>
               </div>
               <div class="row g-3">
                 <div class="col-6" v-for="g in jhsGrades" :key="g.value">
                   <div
-                    class="card border rounded-4 p-4 text-center select-card"
+                    class="card sb-card-surface border rounded-4 p-4 text-center select-card sb-interactive"
                     :class="selectedGrade === g.value
                       ? 'border-success bg-success bg-opacity-10 shadow-sm'
-                      : 'bg-light'"
+                      : ''"
                     @click="selectedGrade = g.value; store.selectedSubjects.splice(0)"
                   >
-                    <span class="fw-bold text-dark">{{ g.label }}</span>
+                    <span class="fw-bold sb-text">{{ g.label }}</span>
                   </div>
                 </div>
               </div>
@@ -103,35 +98,35 @@
             <!-- SHS: Strand Selection -->
             <div v-if="educationLevel === 'shs'">
               <div class="text-center mb-4">
-                <h3 class="fw-bold text-dark">Select Your SHS Strand</h3>
-                <p class="text-muted">Senior High School — Grade 11 or 12</p>
+                <h3 class="fw-bold">Select Your SHS Strand</h3>
+                <p class="sb-muted">Senior High School — Grade 11 or 12</p>
               </div>
               <div class="row g-3 mb-3">
                 <div class="col-6" v-for="s in shsStrands" :key="s.value">
                   <div
-                    class="card border rounded-4 p-4 text-center select-card"
+                    class="card sb-card-surface border rounded-4 p-4 text-center select-card sb-interactive"
                     :class="selectedStrand === s.value
                       ? 'border-success bg-success bg-opacity-10 shadow-sm'
-                      : 'bg-light'"
+                      : ''"
                     @click="selectedStrand = s.value; store.selectedSubjects.splice(0)"
                   >
-                    <span class="fw-bold text-dark small">{{ s.label }}</span>
-                    <span class="text-muted" style="font-size: 11px;">{{ s.full }}</span>
+                    <span class="fw-bold sb-text small">{{ s.label }}</span>
+                    <span class="sb-muted" style="font-size: 11px;">{{ s.full }}</span>
                   </div>
                 </div>
               </div>
               <div class="mb-2">
-                <label class="form-label fw-semibold text-secondary small">GRADE LEVEL</label>
+                <label class="form-label fw-semibold sb-muted small">GRADE LEVEL</label>
                 <div class="d-flex gap-3">
                   <div
                     v-for="g in shsGrades" :key="g.value"
-                    class="card border rounded-3 p-3 text-center flex-grow-1 select-card"
+                    class="card sb-card-surface border rounded-3 p-3 text-center flex-grow-1 select-card sb-interactive"
                     :class="selectedGrade === g.value
                       ? 'border-success bg-success bg-opacity-10'
-                      : 'bg-light'"
+                      : ''"
                     @click="selectedGrade = g.value"
                   >
-                    <span class="fw-bold text-dark">{{ g.label }}</span>
+                    <span class="fw-bold sb-text">{{ g.label }}</span>
                   </div>
                 </div>
               </div>
@@ -140,11 +135,11 @@
             <!-- College: Course + Year Level -->
             <div v-if="educationLevel === 'college'">
               <div class="text-center mb-4">
-                <h3 class="fw-bold text-dark">Select Your College Program</h3>
-                <p class="text-muted">Choose your degree and current year level.</p>
+                <h3 class="fw-bold">Select Your College Program</h3>
+                <p class="sb-muted">Choose your degree and current year level.</p>
               </div>
               <div class="mb-4">
-                <label class="form-label fw-semibold text-secondary small">DEGREE PROGRAM</label>
+                <label class="form-label fw-semibold sb-muted small">DEGREE PROGRAM</label>
                 <select
                   class="form-select form-select-lg rounded-3 border"
                   v-model="selectedCourse"
@@ -152,7 +147,7 @@
                 >
                   <option value="" disabled>-- Select your Course --</option>
                   <option
-                    v-for="course in courses"
+                    v-for="course in collegeCourses"
                     :key="course.course_code"
                     :value="course.course_code"
                   >
@@ -161,17 +156,17 @@
                 </select>
               </div>
               <div>
-                <label class="form-label fw-semibold text-secondary small">YEAR LEVEL</label>
+                <label class="form-label fw-semibold sb-muted small">YEAR LEVEL</label>
                 <div class="row g-2">
                   <div class="col-3" v-for="y in collegeYears" :key="y.value">
                     <div
-                      class="card border rounded-3 p-3 text-center select-card"
+                      class="card sb-card-surface border rounded-3 p-3 text-center select-card sb-interactive"
                       :class="selectedCollegeYear === y.value
                         ? 'border-success bg-success bg-opacity-10'
-                        : 'bg-light'"
+                        : ''"
                       @click="selectedCollegeYear = y.value"
                     >
-                      <span class="fw-bold text-dark small">{{ y.label }}</span>
+                      <span class="fw-bold sb-text small">{{ y.label }}</span>
                     </div>
                   </div>
                 </div>
@@ -183,7 +178,7 @@
                 Back
               </button>
               <button
-                class="btn btn-success px-4 py-2 rounded-3 fw-bold shadow-sm"
+                class="btn btn-success px-4 py-2 rounded-3 fw-bold sb-btn"
                 :disabled="!card2Valid"
                 @click="nextCard"
               >
@@ -195,8 +190,8 @@
           <!-- CARD 3: Subject Selection -->
           <div v-if="currentCard === 2">
             <div class="text-center mb-4">
-              <h3 class="fw-bold text-dark">Choose Your Target Subjects</h3>
-              <p class="text-muted">
+              <h3 class="fw-bold">Choose Your Target Subjects</h3>
+              <p class="sb-muted">
                 Showing subjects for
                 <strong class="text-success">{{ card3Label }}</strong>.
               </p>
@@ -204,7 +199,7 @@
 
             <div
               v-if="filteredSubjects.length === 0"
-              class="text-center py-4 bg-light rounded-4 border text-secondary"
+              class="text-center py-4 sb-card-surface rounded-4 border sb-muted"
             >
               <p class="fw-semibold text-danger mb-1">⚠️ No subjects found for this selection.</p>
               <p class="small mb-0">Contact your administrator to seed subjects for this level.</p>
@@ -213,8 +208,8 @@
             <div v-else class="row g-2 overflow-auto mb-4" style="max-height: 320px;">
               <div class="col-12" v-for="subject in filteredSubjects" :key="subject.subject_code">
                 <div
-                  class="card border rounded-3 p-3 d-flex flex-row align-items-center
-                         justify-content-between select-card"
+                  class="card sb-card-surface border rounded-3 p-3 d-flex flex-row align-items-center
+                         justify-content-between select-card sb-interactive"
                   :class="store.selectedSubjects.includes(subject.subject_code)
                     ? 'border-success bg-success bg-opacity-10 shadow-sm'
                     : ''"
@@ -223,8 +218,8 @@
                   <div class="d-flex align-items-center">
                     <span class="badge bg-secondary me-2 px-2">{{ subject.subject_code }}</span>
                     <div>
-                      <span class="fw-semibold text-dark d-block">{{ subject.subject_name }}</span>
-                      <span class="text-muted small">{{ subject.department }}</span>
+                      <span class="fw-semibold sb-text d-block">{{ subject.subject_name }}</span>
+                      <span class="sb-muted small">{{ subject.department }}</span>
                     </div>
                   </div>
                   <input
@@ -242,7 +237,7 @@
                 Back
               </button>
               <button
-                class="btn btn-success px-5 py-2 rounded-3 fw-bold shadow-sm"
+                class="btn btn-success px-5 py-2 rounded-3 fw-bold sb-btn"
                 :disabled="store.selectedSubjects.length === 0 || isSubmitting"
                 @click="finish"
               >
@@ -256,18 +251,24 @@
       </div>
     </div>
   </div>
+
 </template>
 
 <script setup>
+
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/services/api/api'
 import { usePreferenceStore } from '@/stores/preferences'
 import { useProfileStore } from '@/stores/profile'
+import SbStepBar from '@/components/SbStepBar.vue'
+import SbThemeToggle from '@/components/SbThemeToggle.vue'
+import { useToastStore } from '@/stores/toast'
 
 const router = useRouter()
 const store = usePreferenceStore()
 const profileStore = useProfileStore()
+const toastStore = useToastStore()
 
 const currentCard = ref(0)
 const totalCards = 3
@@ -288,32 +289,24 @@ const courses = ref([])
 
 // ── Education Level Options ──────────────────────────────────
 const educationLevels = [
-  { value: 'elementary', label: 'Elementary',      icon: '🏫', sub: 'Grade 1 – 6' },
-  { value: 'jhs',        label: 'Junior High',     icon: '📚', sub: 'Grade 7 – 10' },
-  { value: 'shs',        label: 'Senior High',     icon: '🎓', sub: 'Grade 11 – 12' },
-  { value: 'college',    label: 'College',          icon: '🏛️', sub: '1st – 4th Year' },
+  { value: 'elementary', label: 'Elementary',  icon: '🏫', sub: 'Grade 1 – 6' },
+  { value: 'jhs',        label: 'Junior High', icon: '📚', sub: 'Grade 7 – 10' },
+  { value: 'shs',        label: 'Senior High', icon: '🎓', sub: 'Grade 11 – 12' },
+  { value: 'college',    label: 'College',     icon: '🏛️', sub: '1st – 4th Year' },
 ]
 
-const elementaryGrades = [1,2,3,4,5,6].map(n => ({
-  label: `Grade ${n}`, value: n
-}))
-
-const jhsGrades = [7,8,9,10].map(n => ({
-  label: `Grade ${n}`, value: n
-}))
-
+const elementaryGrades = [1,2,3,4,5,6].map(n => ({ label: `Grade ${n}`, value: n }))
+const jhsGrades = [7,8,9,10].map(n => ({ label: `Grade ${n}`, value: n }))
 const shsGrades = [
   { label: 'Grade 11', value: 11 },
   { label: 'Grade 12', value: 12 },
 ]
-
 const shsStrands = [
   { value: 'STEM',  label: 'STEM',  full: 'Science, Tech, Engineering & Math' },
   { value: 'ABM',   label: 'ABM',   full: 'Accountancy, Business & Management' },
   { value: 'HUMSS', label: 'HUMSS', full: 'Humanities & Social Sciences' },
   { value: 'GAS',   label: 'GAS',   full: 'General Academic Strand' },
 ]
-
 const collegeYears = [
   { label: '1st Year', value: 1 },
   { label: '2nd Year', value: 2 },
@@ -322,46 +315,31 @@ const collegeYears = [
 ]
 
 // ── Department Filter Map ────────────────────────────────────
-// Keys match the filter key returned by computedFilterKey
-// Values are the department strings in the Subjects table
 const SUBJECT_FILTER_MAP = {
-  // Elementary
   'grade-1':  ['Grade 1'],
   'grade-2':  ['Grade 2'],
   'grade-3':  ['Grade 3'],
   'grade-4':  ['Grade 4'],
   'grade-5':  ['Grade 5'],
   'grade-6':  ['Grade 6'],
-  // JHS
   'grade-7':  ['Grade 7'],
   'grade-8':  ['Grade 8'],
   'grade-9':  ['Grade 9'],
   'grade-10': ['Grade 10'],
-  // SHS Strands
   'STEM':     ['STEM'],
   'ABM':      ['ABM'],
   'HUMSS':    ['HUMSS'],
   'GAS':      ['GAS'],
-  // College Courses
   'BSCS':     ['Computer Science', 'Mathematics', 'English'],
   'BSIT':     ['Information Technology', 'Computer Science', 'English'],
   'BSBA':     ['Business', 'Accountancy', 'English'],
 }
 
-// ── Computed Filter Key ──────────────────────────────────────
 const computedFilterKey = computed(() => {
-  if (educationLevel.value === 'elementary' && selectedGrade.value) {
-    return `grade-${selectedGrade.value}`
-  }
-  if (educationLevel.value === 'jhs' && selectedGrade.value) {
-    return `grade-${selectedGrade.value}`
-  }
-  if (educationLevel.value === 'shs' && selectedStrand.value) {
-    return selectedStrand.value
-  }
-  if (educationLevel.value === 'college' && selectedCourse.value) {
-    return selectedCourse.value
-  }
+  if (educationLevel.value === 'elementary' && selectedGrade.value) return `grade-${selectedGrade.value}`
+  if (educationLevel.value === 'jhs'        && selectedGrade.value) return `grade-${selectedGrade.value}`
+  if (educationLevel.value === 'shs'        && selectedStrand.value) return selectedStrand.value
+  if (educationLevel.value === 'college'    && selectedCourse.value) return selectedCourse.value
   return null
 })
 
@@ -372,7 +350,16 @@ const filteredSubjects = computed(() => {
   return subjects.value.filter(s => allowedDepts.includes(s.department))
 })
 
-// ── Card 2 Validation ────────────────────────────────────────
+// Only show actual college degree programs in the dropdown —
+// excludes virtual containers like ELEMENTARY, JUNIOR_HIGH, SHS-* that
+// the seed creates for internal subject grouping
+const collegeCourses = computed(() =>
+  courses.value.filter(c =>
+    !['ELEMENTARY', 'JUNIOR_HIGH'].includes(c.course_code) &&
+    !c.course_code.startsWith('SHS-')
+  )
+)
+
 const card2Valid = computed(() => {
   if (educationLevel.value === 'elementary') return selectedGrade.value !== null
   if (educationLevel.value === 'jhs')        return selectedGrade.value !== null
@@ -381,13 +368,11 @@ const card2Valid = computed(() => {
   return false
 })
 
-// ── Computed year_level for submission ───────────────────────
 const finalYearLevel = computed(() => {
   if (educationLevel.value === 'college') return selectedCollegeYear.value
   return selectedGrade.value
 })
 
-// ── Card 3 Label ─────────────────────────────────────────────
 const card3Label = computed(() => {
   if (educationLevel.value === 'elementary') return `Grade ${selectedGrade.value}`
   if (educationLevel.value === 'jhs')        return `Grade ${selectedGrade.value}`
@@ -396,12 +381,6 @@ const card3Label = computed(() => {
   return ''
 })
 
-// ── Progress ─────────────────────────────────────────────────
-const progressPercentage = computed(() =>
-  ((currentCard.value + 1) / totalCards) * 100
-)
-
-// ── Lifecycle ────────────────────────────────────────────────
 onMounted(async () => {
   try {
     const [subjectRes, courseRes] = await Promise.all([
@@ -415,7 +394,6 @@ onMounted(async () => {
   }
 })
 
-// ── Navigation ───────────────────────────────────────────────
 const selectEducationLevel = (value) => {
   educationLevel.value = value
   selectedGrade.value = null
@@ -439,7 +417,6 @@ const toggleSubject = (code) => {
   else store.selectedSubjects.push(code)
 }
 
-// ── Submit ───────────────────────────────────────────────────
 const finish = async () => {
   isSubmitting.value = true
   try {
@@ -460,11 +437,12 @@ const finish = async () => {
     router.push('/dashboard')
   } catch (error) {
     console.error('Onboarding submission failed:', error)
-    alert('Could not complete onboarding. Please try again.')
+    toastStore.push('Could not complete onboarding. Please try again.', 'error')
   } finally {
     isSubmitting.value = false
   }
 }
+
 </script>
 
 <style scoped>

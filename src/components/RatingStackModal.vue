@@ -53,7 +53,7 @@
                   v-for="star in 5"
                   :key="star"
                   type="button"
-                  class="rating-star-btn-sm"
+                  class="rating-star-btn-sm sb-btn"
                   :class="{ active: ratings[cat.id] >= star }"
                   @click="ratings[cat.id] = star"
                 >
@@ -77,7 +77,7 @@
         <div class="rating-stack-footer">
           <button
             type="button"
-            class="btn btn-light"
+            class="btn btn-light sb-btn"
             :disabled="activeIndex === 0"
             @click="goToPrevious"
           >
@@ -85,12 +85,12 @@
           </button>
 
           <div class="rating-stack-actions">
-            <button type="button" class="btn btn-outline-secondary" @click="goToNextOrClose">
+            <button type="button" class="btn btn-outline-secondary sb-btn" @click="goToNextOrClose">
               Skip
             </button>
             <button
               type="button"
-              class="btn bg-sb-primary text-white"
+              class="btn bg-sb-primary text-white sb-btn"
               :disabled="!isFormValid || isSubmitting"
               @click="submitRating"
             >
@@ -106,6 +106,7 @@
 <script setup>
 import { computed, nextTick, ref, watch, onUnmounted } from 'vue'
 import { useSessionsStore } from '@/stores/completedSessions'
+import { useToastStore } from '@/stores/toast'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -115,6 +116,7 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'rated'])
 const sessionsStore = useSessionsStore()
+const toastStore = useToastStore()
 
 const activeIndex = ref(0)
 const ratingComment = ref('')
@@ -188,7 +190,7 @@ const submitRating = async () => {
     }
   } catch (error) {
     console.error('Failed to submit rating:', error)
-    alert('Failed to submit rating.')
+    toastStore.push('Failed to submit rating.', 'error')
   } finally {
     isSubmitting.value = false
   }

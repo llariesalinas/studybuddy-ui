@@ -12,7 +12,7 @@ from calendar import monthrange
 from uuid import uuid4
 from django.conf import settings
 from django.shortcuts import get_object_or_404
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
@@ -20,14 +20,14 @@ from django.utils import timezone
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.views import APIView
 from rest_framework.generics import ListAPIView
-from django.db.models import Avg, Case, When, Value, IntegerField, Q
+from django.db.models import Avg, Case, When, Value, IntegerField, Q, Count
 from collections import defaultdict
 # algo
 from .recommender.hybrid import recommend_tutors_hybrid
 from .recommender.CF import build_rating_matrix
 
 from .recommender.cbf import recommend_tutors
-from .models import Booking, Course, Notification, PartnerInstitution, Payment, PaymentMethod, Preference, Rating, Subjects, Tutor, TutorAvailability, TutorAvailabilityOverride, TutorSubjects, Wallet, PlatformActivity, Transaction
+from .models import Booking, Course, Notification, PartnerInstitution, Payment, PaymentMethod, Preference, Rating, Subjects, Tutor, TutorAvailability, TutorAvailabilityOverride, TutorSubjects, Wallet, PlatformActivity, Transaction, TutorPayoutAccount
 from .serializers import (
     NotificationSerializer,
     SubjectSerializer,
@@ -37,6 +37,7 @@ from .serializers import (
     TutorProfileUpdateSerializer,
     TutorSearchSerializer,
 )
+from .chat.services import create_booking_event
 
 from .models import (
     UserProfile,
@@ -343,16 +344,71 @@ def get_payment_method_code(payment):
     return getattr(getattr(payment, 'method', None), 'code', None)
 
 
+# All codes that the UI labels as "Online Payment"
+ONLINE_LABEL_CODES = {'online', 'PAYMONGO', 'GCASH', 'BANK'}
+
+# Codes whose payments are settled via PayMongo and should auto-credit the tutor wallet.
+# GCASH and BANK are excluded: they may be settled via a separate manual or external flow.
+PAYMONGO_SETTLED_CODES = {'online', 'PAYMONGO'}
+
+
 def get_payment_method_label(payment):
     method = getattr(payment, 'method', None)
 
     if not method:
         return None
 
-    if method.code in {'GCASH', 'BANK', 'online'}:
+    if method.code in ONLINE_LABEL_CODES:
         return 'Online Payment'
 
     return method.method_name
+
+
+def get_wallet_transaction_payment_reference(wallet_transaction):
+    reference_id = wallet_transaction.reference_id or ''
+
+    if not reference_id.startswith('BK-'):
+        return None
+
+    try:
+        booking_id = int(reference_id.removeprefix('BK-'))
+    except ValueError:
+        return None
+
+    payment = Payment.objects.filter(booking_id=booking_id).only('transaction_reference').first()
+    if not payment:
+        return None
+
+    return payment.transaction_reference
+
+
+def get_wallet_transaction_student_name(wallet_transaction):
+    reference_id = wallet_transaction.reference_id or ''
+
+    if not reference_id.startswith('BK-'):
+        return None
+
+    try:
+        booking_id = int(reference_id.removeprefix('BK-'))
+    except ValueError:
+        return None
+
+    booking = Booking.objects.filter(id=booking_id).select_related('student').first()
+    if not booking:
+        return None
+
+    return f"{booking.student.fname} {booking.student.lname}".strip() or None
+
+
+def get_wallet_transaction_description(wallet_transaction, student_name=None):
+    description = wallet_transaction.description
+
+    if wallet_transaction.transaction_type != 'session_credit' or not student_name:
+        return description
+
+    base_description = description.split(' - Transaction ID:', 1)[0]
+    base_description = base_description.split(' - Student:', 1)[0]
+    return f"{base_description} - Student: {student_name}"
 
 
 def serialize_payment_summary(representative_booking):
@@ -393,6 +449,7 @@ def serialize_payment_summary(representative_booking):
         "receipt_image": payment.receipt_image.url if payment.receipt_image else None,
     }
 @api_view(['GET'])
+@authentication_classes([])
 def partner_institutions_list(request):
 
     institutions = PartnerInstitution.objects.filter(is_active=True).order_by('institution_name')
@@ -411,6 +468,7 @@ def partner_institutions_list(request):
 
 
 @api_view(['POST'])
+@authentication_classes([])
 @transaction.atomic
 def register_user(request):
 
@@ -516,6 +574,7 @@ def profile_status(request):
     })
 
 @api_view(['POST'])
+@authentication_classes([])
 def login_view(request):
 
     email = request.data.get("email")
@@ -1054,7 +1113,7 @@ def get_tutor_profile(request):
     except Tutor.DoesNotExist:
         return Response({"error": "Tutor not found"}, status=404)
 
-    serializer = TutorProfileSerializer(tutor)
+    serializer = TutorProfileSerializer(tutor, context={'request': request})
     return Response(serializer.data)
 
 #Tutor Detail View
@@ -1392,6 +1451,14 @@ def confirm_payment_and_book(request):
             request_bookings
         )
 
+    if request_bookings:
+        create_booking_event(
+            request_bookings[0],
+            request.user,
+            "New booking request sent.",
+            "booking_requested"
+        )
+
     return Response({
         "message": "Booking successful",
         "booking_ids": created_bookings
@@ -1666,6 +1733,14 @@ def approve_booking(request, booking_id):
         session_group_bookings
     )
 
+    booking.refresh_from_db()
+    create_booking_event(
+        booking,
+        request.user,
+        "Booking request approved.",
+        "booking_approved"
+    )
+
     return Response({"message": "Booking confirmed successfully."})
 
 #Reject booking
@@ -1694,6 +1769,14 @@ def reject_booking(request, booking_id):
         session_group_bookings
     )
 
+    booking.refresh_from_db()
+    create_booking_event(
+        booking,
+        request.user,
+        "Booking request rejected.",
+        "booking_rejected"
+    )
+
     return Response({"message": "Booking rejected successfully."})
 
 
@@ -1716,7 +1799,7 @@ def cancel_booking(request, booking_id):
     if profile != booking.student:
         return Response({"error": "Unauthorized"}, status=403)
 
-    session_group_bookings = get_session_group_bookings(booking)
+    session_group_bookings = get_booking_request_bookings(booking)
     representative_booking = get_representative_booking(session_group_bookings)
 
     if not representative_booking:
@@ -1899,7 +1982,7 @@ def booking_detail(request, booking_id):
     if request.user.userprofile not in (booking.tutor.profile, booking.student):
         return Response({"error": "Unauthorized"}, status=403)
 
-    session_group_bookings = get_session_group_bookings(booking)
+    session_group_bookings = get_booking_request_bookings(booking)
     return Response(build_booking_detail_payload(session_group_bookings))
 
 
@@ -1916,7 +1999,7 @@ def submit_session_payment(request, booking_id):
     if profile != booking.student:
         return Response({"error": "Unauthorized"}, status=403)
 
-    session_group_bookings = get_session_group_bookings(booking)
+    session_group_bookings = get_booking_request_bookings(booking)
 
     if any(group_booking.status != "Confirmed" for group_booking in session_group_bookings):
         return Response({"error": "All session slots must be confirmed before payment submission."}, status=400)
@@ -1988,7 +2071,7 @@ def tutor_confirm_booking(request, booking_id):
     if profile != booking.tutor.profile:
         return Response({"error": "Unauthorized"}, status=403)
 
-    session_group_bookings = get_session_group_bookings(booking)
+    session_group_bookings = get_booking_request_bookings(booking)
 
     if any(group_booking.status != "Awaiting Payment Verification" for group_booking in session_group_bookings):
         return Response({"error": "This session is not awaiting payment verification."}, status=400)
@@ -2054,7 +2137,7 @@ def dev_mark_booking_ready_for_payment(request, booking_id):
     if profile != booking.tutor.profile:
         return Response({"error": "Unauthorized"}, status=403)
 
-    session_group_bookings = get_session_group_bookings(booking)
+    session_group_bookings = get_booking_request_bookings(booking)
 
     if any(group_booking.status != "Confirmed" for group_booking in session_group_bookings):
         return Response(
@@ -2067,7 +2150,7 @@ def dev_mark_booking_ready_for_payment(request, booking_id):
             id__in=[group_booking.id for group_booking in session_group_bookings]
         ).update(tutor_confirmed=True)
 
-    refreshed_group = get_session_group_bookings(booking)
+    refreshed_group = get_booking_request_bookings(booking)
 
     return Response(build_booking_detail_payload(refreshed_group))
 
@@ -2085,7 +2168,7 @@ def submit_session_rating(request, booking_id):
     if profile != booking.student:
         return Response({"error": "Unauthorized"}, status=403)
 
-    session_group_bookings = get_session_group_bookings(booking)
+    session_group_bookings = get_booking_request_bookings(booking)
 
     if any(group_booking.status != "Completed" for group_booking in session_group_bookings):
         return Response({"error": "You can only rate completed sessions."}, status=400)
@@ -2181,6 +2264,123 @@ def tutor_setup(request):
     return Response({"message": "Tutor profile updated"})
 
 
+RECOMMENDATION_BLOCKING_STATUSES = [
+    'Pending',
+    'Confirmed',
+    'Awaiting Payment Verification',
+    'Completed',
+]
+
+
+def parse_recommendation_time(time_string):
+    if not time_string:
+        return None
+
+    for time_format in ("%H:%M", "%H:%M:%S"):
+        try:
+            return datetime.strptime(str(time_string), time_format).time()
+        except ValueError:
+            continue
+
+    return None
+
+
+def get_recommendation_time_slots(start_time_string, end_time_string):
+    start_time = parse_recommendation_time(start_time_string)
+    end_time = parse_recommendation_time(end_time_string)
+
+    if not start_time or not end_time or end_time <= start_time:
+        return None
+
+    current = datetime.combine(date.today(), start_time)
+    end_at = datetime.combine(date.today(), end_time)
+    slots = []
+
+    while current < end_at:
+        slots.append(current.time())
+        current += timedelta(minutes=SESSION_SLOT_MINUTES)
+
+    return slots
+
+
+def get_recommendation_candidate_tutors(
+    subject,
+    preferred_mode=None,
+    min_budget=None,
+    max_budget=None,
+    requested_date=None,
+    start_time=None,
+    end_time=None,
+):
+    candidates = Tutor.objects.filter(
+        tutorsubjects__subject__subject_code=subject
+    )
+
+    if preferred_mode == "Online":
+        candidates = candidates.filter(can_online=True)
+    elif preferred_mode in ["Face-to-face", "F2F"]:
+        candidates = candidates.filter(can_f2f=True)
+
+    if min_budget not in [None, ""]:
+        candidates = candidates.filter(hourly_rate__gte=min_budget)
+
+    if max_budget not in [None, ""]:
+        candidates = candidates.filter(hourly_rate__lte=max_budget)
+
+    session_date = parse_request_date(requested_date)
+    required_slots = get_recommendation_time_slots(start_time, end_time)
+
+    if session_date and required_slots:
+        weekday = WEEKDAY_MAP[session_date.weekday()]
+
+        candidates = candidates.filter(
+            tutoravailability__day=weekday,
+            tutoravailability__time_slot__in=required_slots,
+            tutoravailability__is_active=True,
+        ).annotate(
+            matching_available_slots=Count(
+                "tutoravailability__time_slot",
+                filter=Q(
+                    tutoravailability__day=weekday,
+                    tutoravailability__time_slot__in=required_slots,
+                    tutoravailability__is_active=True,
+                ),
+                distinct=True,
+            )
+        ).filter(
+            matching_available_slots=len(required_slots)
+        )
+
+        conflicting_tutor_ids = Booking.objects.filter(
+            session_date=session_date,
+            status__in=RECOMMENDATION_BLOCKING_STATUSES,
+            availability__day=weekday,
+            availability__time_slot__in=required_slots,
+        ).values_list("tutor_id", flat=True)
+
+        full_day_override_tutor_ids = TutorAvailabilityOverride.objects.filter(
+            override_date=session_date,
+            is_full_day=True,
+        ).values_list("tutor_id", flat=True)
+
+        slot_override_tutor_ids = TutorAvailabilityOverride.objects.filter(
+            override_date=session_date,
+            is_full_day=False,
+            availability__day=weekday,
+            availability__time_slot__in=required_slots,
+        ).values_list("tutor_id", flat=True)
+
+        candidates = candidates.exclude(
+            profile_id__in=conflicting_tutor_ids
+        ).exclude(
+            profile_id__in=full_day_override_tutor_ids
+        ).exclude(
+            profile_id__in=slot_override_tutor_ids
+        )
+
+    return candidates.distinct()
+
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def recommend_tutors_view(request):
@@ -2189,6 +2389,11 @@ def recommend_tutors_view(request):
 
     subject = request.data.get("subject")
     preferred_mode = request.data.get("preferred_mode")
+    min_budget = request.data.get("min_budget")
+    max_budget = request.data.get("max_budget")
+    requested_date = request.data.get("date")
+    start_time = request.data.get("start_time")
+    end_time = request.data.get("end_time")
 
     if not subject:
         return Response(
@@ -2196,31 +2401,29 @@ def recommend_tutors_view(request):
             status=400
         )
 
-    # Build rating matrix for CF
     ratings = build_rating_matrix()
+    candidate_qs = get_recommendation_candidate_tutors(
+        subject,
+        preferred_mode=preferred_mode,
+        min_budget=min_budget,
+        max_budget=max_budget,
+        requested_date=requested_date,
+        start_time=start_time,
+        end_time=end_time,
+    )
 
-    # Run Hybrid algorithm
     results = recommend_tutors_hybrid(
         ratings,
         student_profile,
-        subject
+        subject,
+        candidate_qs=candidate_qs,
     )
 
-    # ⭐ DEBUG CONSOLE OUTPUT
-    print("\n===================================")
-    print(" HYBRID RECOMMENDATION RESULTS")
-    print("===================================")
-
-    for i, r in enumerate(results[:10], start=1):
-
-        tutor = r["tutor"]
-        score = r["score"]
-
-        print(
-            f"{i}. {tutor.profile.fname} {tutor.profile.lname} — Score: {score:.3f}"
-        )
-
-    print("===================================\n")
+    logger.debug(
+        "Recommendation request for subject %s scored %s candidate tutors",
+        subject,
+        len(results),
+    )
 
     data = []
 
@@ -2229,9 +2432,7 @@ def recommend_tutors_view(request):
         tutor = r["tutor"]
         score = r["score"]
 
-        tutor_subjects = TutorSubjects.objects.filter(
-            tutor=tutor
-        ).select_related("subject")
+        tutor_subjects = tutor.tutorsubjects_set.all()
 
         subjects = [
             ts.subject.subject_name
@@ -2283,14 +2484,17 @@ def update_tutee_profile(request):
     profile.mname = request.data.get("mname", profile.mname)
     profile.lname = request.data.get("lname", profile.lname)
 
-    course_code = request.data.get("course")
+    if "course" in request.data:
+        course_code = request.data.get("course")
 
-    if course_code:
-        try:
-            course = Course.objects.get(course_code=course_code)
-            profile.course = course
-        except Course.DoesNotExist:
-            return Response({"error": "Invalid course"}, status=400)
+        if course_code:
+            try:
+                course = Course.objects.get(course_code=course_code)
+                profile.course = course
+            except Course.DoesNotExist:
+                return Response({"error": "Invalid course"}, status=400)
+        else:
+            profile.course = None
 
     profile.year_level = request.data.get("year_level", profile.year_level)
     profile.bio = request.data.get("bio", profile.bio)
@@ -2302,7 +2506,7 @@ def update_tutee_profile(request):
 
     pref, created = Preference.objects.get_or_create(user=profile)
 
-    if subject_ids:
+    if "subjects" in request.data:
         pref.subjects.set(subject_ids)
 
     pref.save()
@@ -2330,8 +2534,58 @@ def get_tutee_profile(request):
         "course": profile.course.course_code if profile.course else None,
         "year_level": profile.year_level,
         "bio": profile.bio,
-        "subjects": subject_ids     # ⭐ important
+        "subjects": subject_ids,
+        "profile_picture_url": request.build_absolute_uri(profile.profile_picture.url) if profile.profile_picture else None,
+        "updated_at": profile.updated_at.isoformat() if profile.updated_at else None
     })
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def upload_tutee_avatar(request):
+    if 'avatar' not in request.FILES:
+        return Response({'error': 'No avatar provided'}, status=400)
+    
+    avatar = request.FILES['avatar']
+    if not avatar.content_type.startswith('image/'):
+        return Response({'error': 'File must be an image'}, status=400)
+    
+    if avatar.size > 5 * 1024 * 1024:
+        return Response({'error': 'Image must be under 5MB'}, status=400)
+
+    profile = request.user.userprofile
+    if profile.profile_picture:
+        profile.profile_picture.delete(save=False)
+    profile.profile_picture = avatar
+    profile.save()
+    
+    return Response({
+        "profile_picture_url": request.build_absolute_uri(profile.profile_picture.url)
+    })
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def upload_tutor_avatar(request):
+    if 'avatar' not in request.FILES:
+        return Response({'error': 'No avatar provided'}, status=400)
+
+    avatar = request.FILES['avatar']
+    if not avatar.content_type.startswith('image/'):
+        return Response({'error': 'File must be an image'}, status=400)
+
+    if avatar.size > 5 * 1024 * 1024:
+        return Response({'error': 'Image must be under 5MB'}, status=400)
+
+    profile = request.user.userprofile
+    if profile.profile_picture:
+        profile.profile_picture.delete(save=False)
+    profile.profile_picture = avatar
+    profile.save()
+
+    return Response({
+        "profile_picture_url": request.build_absolute_uri(profile.profile_picture.url)
+    })
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -2435,8 +2689,22 @@ def update_tutor_profile(request):
 
 @api_view(['GET'])
 def payment_methods(request):
+    active_methods = list(PaymentMethod.objects.filter(is_active=True).order_by('method_id'))
+    has_paymongo = any(method.code == 'PAYMONGO' for method in active_methods)
+    methods = []
+    seen_codes = set()
 
-    methods = PaymentMethod.objects.filter(is_active=True)
+    for method in active_methods:
+        code = method.code
+
+        if has_paymongo and str(code).lower() == 'online':
+            continue
+
+        if code in seen_codes:
+            continue
+
+        seen_codes.add(code)
+        methods.append(method)
 
     data = [
         {
@@ -2448,6 +2716,80 @@ def payment_methods(request):
     ]
 
     return Response(data)
+
+
+def get_paymongo_error_message(response_body):
+    errors = response_body.get("errors") if isinstance(response_body, dict) else None
+
+    if isinstance(errors, list) and errors:
+        first_error = errors[0]
+
+        if isinstance(first_error, dict):
+            return (
+                first_error.get("detail")
+                or first_error.get("message")
+                or first_error.get("code")
+                or "PayMongo rejected the checkout session."
+            )
+
+    return "PayMongo rejected the checkout session."
+
+
+def get_paymongo_auth_headers():
+    secret_key = settings.PAYMONGO_SECRET_KEY
+    auth_str = f"{secret_key}:"
+    encoded_auth = base64.b64encode(auth_str.encode()).decode()
+
+    return {
+        "Content-Type": "application/json",
+        "Authorization": f"Basic {encoded_auth}"
+    }
+
+
+def get_paymongo_payment_statuses(response_body):
+    if not isinstance(response_body, dict):
+        return []
+
+    data = response_body.get('data') or {}
+    attributes = data.get('attributes') or {}
+    statuses = [
+        attributes.get('status'),
+        attributes.get('payment_status'),
+    ]
+
+    payment_intent = attributes.get('payment_intent') or data.get('payment_intent')
+
+    if isinstance(payment_intent, dict):
+        payment_intent_attributes = payment_intent.get('attributes') or {}
+        statuses.extend([
+            payment_intent.get('status'),
+            payment_intent_attributes.get('status'),
+            payment_intent_attributes.get('payment_status'),
+        ])
+
+    payments = attributes.get('payments') or data.get('payments') or []
+
+    if isinstance(payments, dict):
+        payments = payments.get('data') or []
+
+    for payment in payments if isinstance(payments, list) else []:
+        if not isinstance(payment, dict):
+            continue
+
+        payment_attributes = payment.get('attributes') or {}
+        statuses.extend([
+            payment.get('status'),
+            payment_attributes.get('status'),
+            payment_attributes.get('payment_status'),
+        ])
+
+    return [str(value).lower() for value in statuses if value]
+
+
+def is_paymongo_checkout_paid(response_body):
+    paid_statuses = {'paid', 'succeeded', 'success', 'completed'}
+    return any(status_value in paid_statuses for status_value in get_paymongo_payment_statuses(response_body))
+
 
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated])
@@ -2463,19 +2805,37 @@ def update_booking_location(request, booking_request_id):
     if not new_location:
         return Response({"error": "Location cannot be empty for Face-to-Face sessions."}, status=400)
 
-    updated = Booking.objects.filter(
+    pending_bookings = Booking.objects.filter(
         booking_request_id=booking_request_id,
         tutor=tutor,
         status="Pending"
-    ).update(preferred_location=new_location)
+    )
+
+    booking = pending_bookings.select_related('student', 'tutor__profile', 'availability').first()
+    updated = pending_bookings.update(preferred_location=new_location)
 
     if not updated:
         return Response({"error": "No matching pending bookings found."}, status=404)
+
+    if booking:
+        booking.preferred_location = new_location
+        create_booking_event(
+            booking,
+            request.user,
+            f"Face-to-face location updated to {new_location}.",
+            "location_updated"
+        )
 
     return Response({"message": "Location updated."})
 
 # --- WALLET & PAYMENT VIEWS ---
 from .models import Transaction, WithdrawalRequest
+from .paymongo_money_movement import (
+    PayMongoCashOutError,
+    create_wallet_transaction,
+    list_receiving_institutions,
+    normalize_wallet_transaction,
+)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -2491,8 +2851,174 @@ def wallet_status(request):
     return Response({
         "balance": float(wallet.balance),
         "pending_amount": float(wallet.pending_amount),
-        "currency": "PHP"
+        "currency": "PHP",
+        "cashout_minimum": float(get_cashout_minimum()),
+        "cashout_provider_fee": float(get_cashout_provider_fee()),
     })
+
+
+def get_cashout_minimum():
+    return decimal.Decimal(str(settings.CASHOUT_MIN_PHP)).quantize(decimal.Decimal('0.01'))
+
+
+def get_cashout_provider_fee():
+    return decimal.Decimal(str(settings.CASHOUT_PROVIDER_FEE_PHP)).quantize(decimal.Decimal('0.01'))
+
+
+def parse_money_amount(value):
+    try:
+        amount = decimal.Decimal(str(value)).quantize(decimal.Decimal('0.01'))
+    except (decimal.InvalidOperation, TypeError, ValueError):
+        return None
+
+    return amount if amount > 0 else None
+
+
+def get_request_tutor(request):
+    try:
+        return Tutor.objects.get(profile__user=request.user)
+    except Tutor.DoesNotExist:
+        return None
+
+
+def get_cashout_callback_url(request):
+    configured_url = getattr(settings, 'PAYMONGO_CASHOUT_CALLBACK_URL', '')
+    if configured_url:
+        return configured_url
+
+    return request.build_absolute_uri('/api/wallet/paymongo/callback/')
+
+
+def get_required_cashout_rail(amount):
+    return 'pesonet' if amount > decimal.Decimal('50000.00') else 'instapay'
+
+
+def serialize_payout_account(account):
+    return {
+        "id": account.id,
+        "destination_type": account.destination_type,
+        "provider": account.provider,
+        "receiving_institution_id": account.receiving_institution_id,
+        "receiving_institution_name": account.receiving_institution_name,
+        "receiving_institution_code": account.receiving_institution_code,
+        "account_number": account.account_number,
+        "account_name": account.account_name,
+        "bank_name": account.bank_name,
+        "is_active": account.is_active,
+        "created_at": account.created_at,
+        "updated_at": account.updated_at,
+    }
+
+
+def serialize_cash_out(withdrawal):
+    return {
+        "id": withdrawal.id,
+        "amount": float(withdrawal.amount),
+        "method": withdrawal.method,
+        "account_number": withdrawal.account_number,
+        "account_name": withdrawal.account_name,
+        "bank_name": withdrawal.bank_name,
+        "status": withdrawal.status,
+        "failure_reason": withdrawal.failure_reason,
+        "provider": withdrawal.provider,
+        "provider_wallet_transaction_id": withdrawal.provider_wallet_transaction_id,
+        "provider_reference_number": withdrawal.provider_reference_number,
+        "provider_status": withdrawal.provider_status,
+        "provider_error_code": withdrawal.provider_error_code,
+        "provider_error_message": withdrawal.provider_error_message,
+        "provider_fee": float(withdrawal.provider_fee),
+        "net_amount": float(withdrawal.net_amount),
+        "rail": withdrawal.rail,
+        "callback_received_at": withdrawal.callback_received_at,
+        "requested_at": withdrawal.requested_at,
+        "processed_at": withdrawal.processed_at,
+        "payout_account_id": withdrawal.payout_account_id,
+    }
+
+
+def update_cash_out_provider_fields(withdrawal, provider_data, callback_received=False):
+    provider_status = provider_data.get('status') or withdrawal.provider_status
+
+    withdrawal.provider_wallet_transaction_id = (
+        provider_data.get('id') or withdrawal.provider_wallet_transaction_id
+    )
+    withdrawal.provider = provider_data.get('provider') or withdrawal.provider
+    withdrawal.provider_reference_number = (
+        provider_data.get('reference_number') or withdrawal.provider_reference_number
+    )
+    withdrawal.provider_status = provider_status
+    withdrawal.provider_error_code = (
+        provider_data.get('provider_error_code') or withdrawal.provider_error_code
+    )
+    withdrawal.provider_error_message = (
+        provider_data.get('provider_error_message') or withdrawal.provider_error_message
+    )
+
+    provider_fee = provider_data.get('fee')
+    if provider_fee and provider_fee > 0:
+        withdrawal.provider_fee = provider_fee
+
+    net_amount = provider_data.get('net_amount')
+    if net_amount and net_amount > 0:
+        withdrawal.net_amount = net_amount
+
+    if callback_received:
+        withdrawal.callback_received_at = timezone.now()
+
+
+def reverse_failed_cash_out(withdrawal):
+    wallet = Wallet.objects.select_for_update().get(tutor=withdrawal.tutor)
+    principal_ref = f"WD-{withdrawal.id}-REV"
+    fee_ref = f"WD-{withdrawal.id}-FEE-REV"
+    changed_balance = False
+
+    if not Transaction.objects.filter(wallet=wallet, reference_id=principal_ref).exists():
+        wallet.balance += withdrawal.amount
+        changed_balance = True
+        Transaction.objects.create(
+            wallet=wallet,
+            transaction_type='withdrawal_reversal',
+            amount=withdrawal.amount,
+            description=f"Cash-out reversal for failed request #{withdrawal.id}",
+            reference_id=principal_ref
+        )
+
+    if (
+        withdrawal.provider_fee > 0
+        and not Transaction.objects.filter(wallet=wallet, reference_id=fee_ref).exists()
+    ):
+        wallet.balance += withdrawal.provider_fee
+        changed_balance = True
+        Transaction.objects.create(
+            wallet=wallet,
+            transaction_type='cashout_fee_reversal',
+            amount=withdrawal.provider_fee,
+            description=f"Provider fee reversal for failed cash-out #{withdrawal.id}",
+            reference_id=fee_ref
+        )
+
+    if changed_balance:
+        wallet.save(update_fields=['balance'])
+
+
+def apply_cash_out_provider_result(withdrawal, provider_data, callback_received=False):
+    with transaction.atomic():
+        locked_withdrawal = WithdrawalRequest.objects.select_for_update().get(pk=withdrawal.pk)
+        update_cash_out_provider_fields(locked_withdrawal, provider_data, callback_received)
+        provider_status = (locked_withdrawal.provider_status or '').lower()
+
+        if provider_status == 'succeeded':
+            locked_withdrawal.status = 'processed'
+            locked_withdrawal.processed_at = locked_withdrawal.processed_at or timezone.now()
+        elif provider_status == 'failed':
+            locked_withdrawal.status = 'failed'
+            locked_withdrawal.processed_at = locked_withdrawal.processed_at or timezone.now()
+            if locked_withdrawal.provider_error_message and not locked_withdrawal.failure_reason:
+                locked_withdrawal.failure_reason = locked_withdrawal.provider_error_message
+            reverse_failed_cash_out(locked_withdrawal)
+
+        locked_withdrawal.save()
+        return locked_withdrawal
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -2508,12 +3034,17 @@ def wallet_transactions(request):
     
     data = []
     for tx in transactions:
+        payment_transaction_id = get_wallet_transaction_payment_reference(tx)
+        student_name = get_wallet_transaction_student_name(tx)
+        description = get_wallet_transaction_description(tx, student_name)
         data.append({
             "id": tx.id,
             "transaction_type": tx.transaction_type,
             "amount": float(tx.amount),
-            "description": tx.description,
+            "description": description,
             "reference_id": tx.reference_id,
+            "payment_transaction_id": payment_transaction_id,
+            "student_name": student_name,
             "created_at": tx.created_at
         })
     return Response(data)
@@ -2585,6 +3116,228 @@ def request_withdrawal(request):
 
     return Response({"status": "pending", "id": withdrawal.id})
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def receiving_institutions(request):
+    provider = request.query_params.get('provider', 'instapay').lower()
+    if provider not in ['instapay', 'pesonet']:
+        return Response({"error": "Provider must be instapay or pesonet."}, status=400)
+
+    try:
+        provider_response = list_receiving_institutions(provider)
+    except PayMongoCashOutError as exc:
+        return Response({"error": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
+
+    return Response(provider_response.get('data', provider_response))
+
+
+@api_view(['GET', 'POST', 'PATCH'])
+@permission_classes([IsAuthenticated])
+def payout_destinations(request, account_id=None):
+    tutor = get_request_tutor(request)
+    if tutor is None:
+        return Response({"error": "Not a tutor"}, status=403)
+
+    if request.method == 'GET':
+        accounts = TutorPayoutAccount.objects.filter(tutor=tutor).order_by('-is_active', '-updated_at')
+        return Response([serialize_payout_account(account) for account in accounts])
+
+    if request.method == 'POST':
+        data = request.data
+        destination_type = data.get('destination_type')
+        if destination_type not in ['gcash', 'bank']:
+            return Response({"error": "Destination type must be gcash or bank."}, status=400)
+
+        required_fields = [
+            'receiving_institution_id',
+            'receiving_institution_name',
+            'account_number',
+            'account_name',
+        ]
+        if any(not data.get(field) for field in required_fields):
+            return Response({"error": "Missing payout account details."}, status=400)
+
+        account = TutorPayoutAccount.objects.create(
+            tutor=tutor,
+            destination_type=destination_type,
+            provider=data.get('provider', ''),
+            receiving_institution_id=data.get('receiving_institution_id'),
+            receiving_institution_name=data.get('receiving_institution_name'),
+            receiving_institution_code=data.get('receiving_institution_code', ''),
+            account_number=data.get('account_number'),
+            account_name=data.get('account_name'),
+            bank_name=data.get('bank_name', ''),
+            is_active=bool(data.get('is_active', True)),
+        )
+        return Response(serialize_payout_account(account), status=status.HTTP_201_CREATED)
+
+    lookup_id = account_id or request.data.get('id')
+    account = get_object_or_404(TutorPayoutAccount, id=lookup_id, tutor=tutor)
+    editable_fields = [
+        'destination_type',
+        'provider',
+        'receiving_institution_id',
+        'receiving_institution_name',
+        'receiving_institution_code',
+        'account_number',
+        'account_name',
+        'bank_name',
+        'is_active',
+    ]
+
+    for field in editable_fields:
+        if field in request.data:
+            setattr(account, field, request.data.get(field))
+
+    if account.destination_type not in ['gcash', 'bank']:
+        return Response({"error": "Destination type must be gcash or bank."}, status=400)
+
+    account.save()
+    return Response(serialize_payout_account(account))
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def list_withdrawals(request):
+    tutor = get_request_tutor(request)
+    if tutor is None:
+        return Response({"error": "Not a tutor"}, status=403)
+
+    withdrawals = WithdrawalRequest.objects.filter(tutor=tutor).order_by('-requested_at')
+    return Response([serialize_cash_out(withdrawal) for withdrawal in withdrawals])
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def request_withdrawal(request):
+    return cash_outs(request)
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def cash_outs(request):
+    tutor = get_request_tutor(request)
+    if tutor is None:
+        return Response({"error": "Not a tutor"}, status=403)
+
+    if request.method == 'GET':
+        withdrawals = WithdrawalRequest.objects.filter(tutor=tutor).order_by('-requested_at')
+        return Response([serialize_cash_out(withdrawal) for withdrawal in withdrawals])
+
+    amount = parse_money_amount(request.data.get('amount'))
+    if amount is None:
+        return Response({"error": "Enter a valid cash-out amount."}, status=400)
+
+    minimum_amount = get_cashout_minimum()
+    if amount < minimum_amount:
+        return Response({"error": f"Minimum cash-out is PHP {minimum_amount}."}, status=400)
+
+    payout_account_id = request.data.get('payout_account_id')
+    payout_account = get_object_or_404(
+        TutorPayoutAccount,
+        id=payout_account_id,
+        tutor=tutor,
+        is_active=True
+    )
+
+    rail = get_required_cashout_rail(amount)
+    if payout_account.provider and payout_account.provider != rail:
+        return Response(
+            {"error": f"This destination is saved for {payout_account.provider}. Use a {rail} destination."},
+            status=400
+        )
+
+    with transaction.atomic():
+        wallet, _ = Wallet.objects.select_for_update().get_or_create(tutor=tutor)
+        provider_fee = get_cashout_provider_fee()
+        total_deducted = amount + provider_fee
+
+        if total_deducted > wallet.balance:
+            return Response({"error": "Insufficient balance for cash-out amount plus provider fee."}, status=400)
+
+        withdrawal = WithdrawalRequest.objects.create(
+            tutor=tutor,
+            payout_account=payout_account,
+            amount=amount,
+            method=payout_account.destination_type,
+            account_number=payout_account.account_number,
+            account_name=payout_account.account_name,
+            bank_name=payout_account.bank_name or payout_account.receiving_institution_name,
+            provider='paymongo',
+            provider_fee=provider_fee,
+            net_amount=amount,
+            rail=rail,
+            status='pending',
+        )
+
+        wallet.balance -= total_deducted
+        wallet.save(update_fields=['balance'])
+
+        Transaction.objects.create(
+            wallet=wallet,
+            transaction_type='withdrawal',
+            amount=-amount,
+            description=f"Cash-out request via {withdrawal.get_method_display()}",
+            reference_id=f"WD-{withdrawal.id}"
+        )
+
+        if provider_fee > 0:
+            Transaction.objects.create(
+                wallet=wallet,
+                transaction_type='cashout_fee',
+                amount=-provider_fee,
+                description=f"Provider fee for cash-out request #{withdrawal.id}",
+                reference_id=f"WD-{withdrawal.id}-FEE"
+            )
+
+    try:
+        provider_data = create_wallet_transaction(
+            settings.PAYMONGO_WALLET_ID,
+            payout_account,
+            amount,
+            rail,
+            get_cashout_callback_url(request),
+            withdrawal.id,
+        )
+    except PayMongoCashOutError as exc:
+        provider_data = {
+            'status': 'failed',
+            'provider': 'paymongo',
+            'provider_error_message': str(exc),
+        }
+        withdrawal = apply_cash_out_provider_result(withdrawal, provider_data)
+        return Response(serialize_cash_out(withdrawal), status=status.HTTP_502_BAD_GATEWAY)
+
+    withdrawal = apply_cash_out_provider_result(withdrawal, provider_data)
+    return Response(serialize_cash_out(withdrawal), status=status.HTTP_201_CREATED)
+
+
+request_withdrawal = cash_outs
+
+
+@api_view(['POST'])
+@authentication_classes([])
+@permission_classes([])
+def paymongo_cashout_callback(request):
+    provider_data = normalize_wallet_transaction(request.data)
+    provider_transaction_id = provider_data.get('id')
+
+    if not provider_transaction_id:
+        return Response({"error": "Missing wallet transaction id."}, status=400)
+
+    withdrawal = get_object_or_404(
+        WithdrawalRequest,
+        provider_wallet_transaction_id=provider_transaction_id
+    )
+    withdrawal = apply_cash_out_provider_result(
+        withdrawal,
+        provider_data,
+        callback_received=True
+    )
+
+    return Response({"status": withdrawal.status})
+
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def initiate_online_payment(request):
@@ -2593,17 +3346,16 @@ def initiate_online_payment(request):
     booking = get_object_or_404(Booking, id=booking_id, student__user=request.user)
     
     # Calculate amount: Hourly Rate * Duration (sum of slots)
-    group_bookings = get_session_group_bookings(booking)
+    group_bookings = get_booking_request_bookings(booking)
+    representative_booking = get_representative_booking(group_bookings)
     duration_hours = get_duration_hours_for_bookings(group_bookings)
-    total_amount = float(booking.tutor.hourly_rate) * duration_hours
+    total_amount = decimal.Decimal(str(representative_booking.tutor.hourly_rate)) * decimal.Decimal(
+        str(duration_hours)
+    )
     
     # PayMongo amount in centavos
-    amount_cents = int(total_amount * 100)
-
-    # Prepare PayMongo Authentication
-    secret_key = getattr(settings, 'PAYMONGO_SECRET_KEY', 'sk_test_placeholder')
-    auth_str = f"{secret_key}:"
-    encoded_auth = base64.b64encode(auth_str.encode()).decode()
+    amount_cents = int(total_amount * decimal.Decimal("100"))
+    reference_code = f"SB-BK-{representative_booking.id}"
 
     url = "https://api.paymongo.com/v1/checkout_sessions"
     payload = {
@@ -2612,34 +3364,57 @@ def initiate_online_payment(request):
                 "send_email_receipt": True,
                 "show_description": True,
                 "show_line_items": True,
-                "description": f"StudyBuddy Session with {booking.tutor.profile.fname}",
+                "description": (
+                    f"StudyBuddy {reference_code} - Session with "
+                    f"{representative_booking.tutor.profile.fname}"
+                ),
                 "line_items": [
                     {
                         "currency": "PHP",
                         "amount": amount_cents,
-                        "description": "Tutoring Session Fee",
-                        "name": f"Session on {booking.session_date}",
+                        "description": f"Tutoring Session Fee ({reference_code})",
+                        "name": f"StudyBuddy {reference_code}",
                         "quantity": 1
                     }
                 ],
                 "payment_method_types": ["gcash", "card", "paymaya"],
-                "success_url": f"{settings.FRONTEND_URL}/tuteeSessionDetails/{booking.id}?payment=success",
-                "cancel_url": f"{settings.FRONTEND_URL}/payment-tutee/{booking.id}?payment=cancelled",
+                "success_url": f"{settings.FRONTEND_URL}/tuteeSessionDetails/{representative_booking.id}?payment=success",
+                "cancel_url": f"{settings.FRONTEND_URL}/payment-tutee/{representative_booking.id}?payment=cancelled",
             }
         }
     }
     
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Basic {encoded_auth}"
-    }
-
     try:
-        response = requests.post(url, json=payload, headers=headers)
-        res_data = response.json()
+        response = requests.post(url, json=payload, headers=get_paymongo_auth_headers())
+        try:
+            res_data = response.json()
+        except ValueError:
+            res_data = {"raw": getattr(response, "text", "")}
+
+        logger.info(
+            "PayMongo checkout response status=%s",
+            response.status_code,
+        )
         
-        if response.status_code == 201:
-            checkout_url = res_data['data']['attributes']['checkout_url']
+        if response.status_code in (200, 201):
+            checkout_url = (
+                res_data
+                .get('data', {})
+                .get('attributes', {})
+                .get('checkout_url')
+            )
+
+            if not checkout_url:
+                logger.error("PayMongo checkout response missing checkout_url: %s", res_data)
+                error_response = {
+                    "error": "Payment provider did not return a checkout URL.",
+                }
+
+                if settings.DEBUG:
+                    error_response["provider_status"] = response.status_code
+                    error_response["provider_error"] = res_data
+
+                return Response(error_response, status=status.HTTP_502_BAD_GATEWAY)
             
             # Store payment record
             method_online, _ = PaymentMethod.objects.get_or_create(
@@ -2648,23 +3423,154 @@ def initiate_online_payment(request):
             )
             
             payment, _ = Payment.objects.get_or_create(
-                booking=booking, 
+                booking=representative_booking,
                 defaults={
                     'amount': total_amount,
                     'method': method_online,
                     'payment_status': 'Pending'
                 }
             )
-            payment.transaction_reference = res_data['data']['id']
-            payment.save()
+            payment.amount = total_amount
+            payment.method = method_online
+            payment.payment_status = 'Pending'
+            payment.transaction_reference = res_data.get('data', {}).get('id')
+            payment.save(update_fields=[
+                'amount',
+                'method',
+                'payment_status',
+                'transaction_reference',
+            ])
             
             return Response({"payment_url": checkout_url})
+
+        provider_message = get_paymongo_error_message(res_data)
+        logger.error(
+            "PayMongo checkout failed status=%s error=%s body=%s",
+            response.status_code,
+            provider_message,
+            res_data,
+        )
+
+        if response.status_code == 401:
+            error_response = {
+                "error": "Payment provider authentication failed. Check the PayMongo secret key.",
+            }
+            response_status = status.HTTP_502_BAD_GATEWAY
         else:
-            logger.error(f"PayMongo Error: {res_data}")
-            return Response({"error": "Failed to create checkout session"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            error_response = {"error": provider_message}
+            response_status = (
+                status.HTTP_400_BAD_REQUEST
+                if response.status_code == 400
+                else status.HTTP_502_BAD_GATEWAY
+            )
+
+        if settings.DEBUG:
+            error_response["provider_status"] = response.status_code
+            error_response["provider_error"] = res_data
+
+        return Response(error_response, status=response_status)
     except Exception as e:
         logger.error(f"Payment Initiation Exception: {str(e)}")
         return Response({"error": "Internal server error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def verify_online_payment(request, booking_id):
+    profile = request.user.userprofile
+    booking = get_object_or_404(
+        Booking.objects.select_related('availability', 'tutor', 'tutor__profile'),
+        id=booking_id
+    )
+
+    if profile != booking.student:
+        return Response({"error": "Unauthorized"}, status=403)
+
+    session_group_bookings = get_booking_request_bookings(booking)
+    representative_booking = get_representative_booking(session_group_bookings)
+    payment = getattr(representative_booking, 'payment', None)
+
+    if not payment or getattr(payment.method, 'code', None) != 'PAYMONGO':
+        return Response({"error": "No PayMongo checkout is pending for this session."}, status=400)
+
+    if not payment.transaction_reference:
+        return Response({"error": "Missing PayMongo checkout session reference."}, status=400)
+
+    url = f"https://api.paymongo.com/v1/checkout_sessions/{payment.transaction_reference}"
+
+    try:
+        response = requests.get(url, headers=get_paymongo_auth_headers())
+
+        try:
+            res_data = response.json()
+        except ValueError:
+            res_data = {"raw": getattr(response, "text", "")}
+
+        logger.info(
+            "PayMongo checkout retrieve response status=%s",
+            response.status_code,
+        )
+
+        if response.status_code != 200:
+            provider_message = get_paymongo_error_message(res_data)
+            logger.error(
+                "PayMongo checkout retrieve failed status=%s error=%s body=%s",
+                response.status_code,
+                provider_message,
+                res_data,
+            )
+            error_response = {"error": provider_message}
+
+            if settings.DEBUG:
+                error_response["provider_status"] = response.status_code
+                error_response["provider_error"] = res_data
+
+            return Response(error_response, status=status.HTTP_502_BAD_GATEWAY)
+
+        if not is_paymongo_checkout_paid(res_data):
+            error_response = {
+                "error": "Online payment has not been completed yet.",
+                "provider_payment_statuses": get_paymongo_payment_statuses(res_data),
+            }
+
+            if settings.DEBUG:
+                error_response["provider_status"] = response.status_code
+                error_response["provider_error"] = res_data
+
+            return Response(error_response, status=status.HTTP_400_BAD_REQUEST)
+
+        already_submitted = all(
+            group_booking.status == "Awaiting Payment Verification"
+            and group_booking.tutee_confirmed
+            for group_booking in session_group_bookings
+        )
+
+        with transaction.atomic():
+            payment.payment_status = "Paid"
+            payment.paid_at = now()
+            payment.save(update_fields=['payment_status', 'paid_at'])
+
+            Booking.objects.filter(
+                id__in=[group_booking.id for group_booking in session_group_bookings]
+            ).update(
+                tutee_confirmed=True,
+                status="Awaiting Payment Verification"
+            )
+
+            if not already_submitted:
+                create_booking_status_notification(
+                    representative_booking.tutor.profile,
+                    "awaiting_payment_verification",
+                    session_group_bookings
+                )
+
+        representative_booking.refresh_from_db()
+        refreshed_group = get_booking_request_bookings(representative_booking)
+        return Response(build_booking_detail_payload(refreshed_group))
+    except Exception as e:
+        logger.error(f"Payment Verification Exception: {str(e)}")
+        return Response({"error": "Internal server error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 def credit_tutor_wallet(booking):
     session_group = get_session_group_bookings(booking)
@@ -2685,15 +3591,20 @@ def credit_tutor_wallet(booking):
     with transaction.atomic():
         wallet, _ = Wallet.objects.get_or_create(tutor=rep_booking.tutor)
 
-        if payment.method.code == 'online':
+        if payment.method.code in PAYMONGO_SETTLED_CODES:
             tutor_share = total_amount - commission
             wallet.balance += tutor_share
-            wallet.save()
+            wallet.save(update_fields=['balance'])
+            student_name = f"{rep_booking.student.fname} {rep_booking.student.lname}".strip()
+            student_note = f" - Student: {student_name}" if student_name else ""
             Transaction.objects.create(
                 wallet=wallet,
                 transaction_type='session_credit',
                 amount=tutor_share,
-                description=f"Session Credit for {rep_booking.session_date} (Less 10% Platform Fee)",
+                description=(
+                    f"Session Credit for {rep_booking.session_date} "
+                    f"(Less 10% Platform Fee){student_note}"
+                ),
                 reference_id=ref_id
             )
         elif payment.method.code == 'CASH':

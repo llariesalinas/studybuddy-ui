@@ -177,7 +177,7 @@ const updateMaxValue = (event) => {
 
 .budget-summary-large {
   text-align: center;
-  color: #163127;
+  color: var(--sb-text-main);
   font-size: clamp(1.7rem, 3vw, 2.2rem);
   font-weight: 700;
   letter-spacing: -0.03em;
@@ -200,11 +200,11 @@ const updateMaxValue = (event) => {
 
 .slider-track {
   inset-inline: 0;
-  background: #dfe8e3;
+  background: var(--sb-card-border);
 }
 
 .slider-fill {
-  background: linear-gradient(90deg, #0a7a51, #18a36c);
+  background: linear-gradient(90deg, var(--sb-primary-dark), var(--sb-primary-mid));
 }
 
 .slider-thumb {
@@ -235,7 +235,7 @@ const updateMaxValue = (event) => {
   height: 22px;
   border-radius: 50%;
   border: 3px solid #ffffff;
-  background: #00895a;
+  background: var(--sb-primary);
   box-shadow: 0 6px 16px rgba(0, 137, 90, 0.22);
   cursor: pointer;
   pointer-events: auto;
@@ -247,7 +247,7 @@ const updateMaxValue = (event) => {
   height: 22px;
   border-radius: 50%;
   border: 3px solid #ffffff;
-  background: #00895a;
+  background: var(--sb-primary);
   box-shadow: 0 6px 16px rgba(0, 137, 90, 0.22);
   cursor: pointer;
   pointer-events: auto;
@@ -272,11 +272,11 @@ const updateMaxValue = (event) => {
 }
 
 .budget-range-dropdown .slider-track {
-  background: #d7e1dc;
+  background: var(--sb-card-border);
 }
 
 .budget-range-dropdown .slider-fill {
-  background: linear-gradient(90deg, #0a7a51, #18a36c);
+  background: linear-gradient(90deg, var(--sb-primary-dark), var(--sb-primary-mid));
 }
 
 .budget-range-dropdown .slider-thumb::-webkit-slider-thumb {

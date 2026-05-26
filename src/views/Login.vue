@@ -90,7 +90,7 @@ const handleLogin = async () => {
   display: block;
   font-size: 13px;
   font-weight: 600;
-  color: #1d1d1f;
+  color: var(--sb-text-main);
   margin-bottom: 6px;
 }
 
@@ -109,10 +109,10 @@ const handleLogin = async () => {
   width: 100%;
   padding: 10px 14px;
   font-size: 14px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--sb-card-border);
   border-radius: 12px;
-  background: #fff;
-  color: #1d1d1f;
+  background: var(--sb-surface);
+  color: var(--sb-text-main);
   outline: none;
   transition:
     border-color 0.15s ease,
@@ -122,6 +122,11 @@ const handleLogin = async () => {
 .sb-auth-input:focus {
   border-color: #00895a;
   box-shadow: 0 0 0 3px rgba(0, 137, 90, 0.12);
+}
+
+.sb-auth-input::placeholder {
+  color: var(--sb-text-muted);
+  opacity: 0.78;
 }
 
 .sb-auth-alert {
@@ -135,8 +140,8 @@ const handleLogin = async () => {
 }
 
 .sb-btn-pill {
-  background: #00895a;
-  color: #fff;
+  background: var(--sb-primary);
+  color: var(--sb-primary-contrast);
   padding: 11px 28px;
   border-radius: 9999px;
   font-size: 14px;
@@ -149,7 +154,7 @@ const handleLogin = async () => {
 }
 
 .sb-btn-pill:hover:not(:disabled) {
-  background: #00704a;
+  background: var(--sb-primary-hover);
 }
 
 .sb-btn-pill:active:not(:disabled) {
@@ -188,7 +193,7 @@ const handleLogin = async () => {
 }
 
 .sb-auth-link {
-  color: #00895a;
+  color: var(--sb-primary);
   font-weight: 600;
   text-decoration: none;
 }
@@ -205,7 +210,7 @@ const handleLogin = async () => {
 .sb-auth-footer-text {
   text-align: center;
   font-size: 13px;
-  color: #6e6e73;
+  color: var(--sb-text-muted);
   margin: 0;
 }
 </style>

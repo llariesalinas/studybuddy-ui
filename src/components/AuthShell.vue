@@ -6,6 +6,10 @@
       <span class="sb-auth-back">← Back to home</span>
     </a>
 
+    <div class="sb-auth-theme-toggle">
+      <SbThemeToggle />
+    </div>
+
     <div class="sb-auth-card">
       <div class="sb-auth-icon-badge">
         <slot name="icon" />
@@ -23,21 +27,25 @@
 
 <script setup>
 import { useRouter } from 'vue-router'
+import SbThemeToggle from '@/components/SbThemeToggle.vue'
 const router = useRouter()
 </script>
 
 <style scoped>
 .sb-auth-page {
-  --sb-primary: #00895a;
-  --sb-primary-hover: #00704a;
-  --sb-parchment: #f5f5f7;
-  --sb-ink: #1d1d1f;
-  --sb-muted: #6e6e73;
+  --sb-parchment: var(--sb-bg);
+  --sb-ink: var(--sb-text-main);
+  --sb-muted: var(--sb-text-muted);
+  --sb-auth-card-bg: var(--sb-card-bg);
+  --sb-auth-card-border: var(--sb-card-border);
   --sb-green-tint: #edf7f3;
   --sb-green-border: #b8dece;
 
   min-height: 100vh;
-  background: var(--sb-parchment);
+  position: relative;
+  background:
+    var(--sb-aurora-bg, none),
+    var(--sb-parchment);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -49,6 +57,12 @@ const router = useRouter()
     'Segoe UI',
     sans-serif;
   box-sizing: border-box;
+}
+
+.sb-auth-theme-toggle {
+  position: absolute;
+  top: 24px;
+  right: 24px;
 }
 
 .sb-auth-page *,
@@ -78,7 +92,7 @@ const router = useRouter()
   height: 24px;
   border-radius: 50%;
   background: var(--sb-primary);
-  color: #fff;
+  color: var(--sb-primary-contrast);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -93,8 +107,8 @@ const router = useRouter()
 }
 
 .sb-auth-card {
-  background: #fff;
-  border: 1px solid #e8e8e8;
+  background: var(--sb-auth-card-bg);
+  border: 1px solid var(--sb-auth-card-border);
   border-radius: 18px;
   padding: 36px 32px;
   width: 100%;
@@ -136,6 +150,11 @@ const router = useRouter()
 
   .sb-auth-card {
     padding: 24px 20px;
+  }
+
+  .sb-auth-theme-toggle {
+    top: 16px;
+    right: 12px;
   }
 }
 </style>
