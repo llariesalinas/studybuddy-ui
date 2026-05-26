@@ -457,7 +457,9 @@ onBeforeUnmount(() => {
 }
 
 .app-main-surface {
-  background-color: var(--sb-bg);
+  background:
+    var(--sb-aurora-bg, none),
+    var(--sb-bg);
 }
 
 .app-main-chat {

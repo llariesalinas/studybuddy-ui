@@ -140,8 +140,8 @@ const handleLogin = async () => {
 }
 
 .sb-btn-pill {
-  background: #00895a;
-  color: #fff;
+  background: var(--sb-primary);
+  color: var(--sb-primary-contrast);
   padding: 11px 28px;
   border-radius: 9999px;
   font-size: 14px;
@@ -154,7 +154,7 @@ const handleLogin = async () => {
 }
 
 .sb-btn-pill:hover:not(:disabled) {
-  background: #00704a;
+  background: var(--sb-primary-hover);
 }
 
 .sb-btn-pill:active:not(:disabled) {
@@ -193,7 +193,7 @@ const handleLogin = async () => {
 }
 
 .sb-auth-link {
-  color: #00895a;
+  color: var(--sb-primary);
   font-weight: 600;
   text-decoration: none;
 }

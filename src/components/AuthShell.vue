@@ -33,8 +33,6 @@ const router = useRouter()
 
 <style scoped>
 .sb-auth-page {
-  --sb-primary: #00895a;
-  --sb-primary-hover: #00704a;
   --sb-parchment: var(--sb-bg);
   --sb-ink: var(--sb-text-main);
   --sb-muted: var(--sb-text-muted);
@@ -45,7 +43,9 @@ const router = useRouter()
 
   min-height: 100vh;
   position: relative;
-  background: var(--sb-parchment);
+  background:
+    var(--sb-aurora-bg, none),
+    var(--sb-parchment);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -92,7 +92,7 @@ const router = useRouter()
   height: 24px;
   border-radius: 50%;
   background: var(--sb-primary);
-  color: #fff;
+  color: var(--sb-primary-contrast);
   display: inline-flex;
   align-items: center;
   justify-content: center;

@@ -391,8 +391,6 @@ const footerLinks = [
 
 <style scoped>
 .sb-landing {
-  --sb-primary: #00895a;
-  --sb-primary-hover: #00704a;
   --sb-dark: #071310;
   --sb-canvas: var(--sb-bg);
   --sb-ink: var(--sb-text-main);
@@ -428,7 +426,9 @@ const footerLinks = [
   z-index: 0;
   pointer-events: none;
   overflow: hidden;
-  background-color: var(--sb-bg);
+  background:
+    var(--sb-aurora-bg, none),
+    var(--sb-bg);
 }
 
 .blob-interactive {
@@ -533,7 +533,7 @@ const footerLinks = [
   height: 28px;
   border-radius: 8px;
   background: var(--sb-primary);
-  color: #fff;
+  color: var(--sb-primary-contrast);
   display: inline-flex;
   align-items: center;
   justify-content: center;
