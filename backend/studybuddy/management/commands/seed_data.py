@@ -130,23 +130,19 @@ class Command(BaseCommand):
         ]
 
         for s in subjects_data:
-            # Safely grab the parent course object mapping link 
-            parent_course = Course.objects.get(course_code=s['course'])
-            
             obj, created = Subjects.objects.update_or_create(
                 subject_code=s['code'],
                 defaults={
                     'subject_name': s['name'],
                     'department': s['dept'],
-                    'course': parent_course # Attaches relationship safely to block blank lookups
                 }
             )
-            self.stdout.write(f"  - Subject {s['code']}: {'Created' if created else 'Updated'} -> Linked to {s['course']}")
+            self.stdout.write(f"  - Subject {s['code']}: {'Created' if created else 'Updated'}")
             
         # 5. Seed Users + UserProfiles with Bounded Security Rules
         cpu = PartnerInstitution.objects.get(school_email_domain='cpu.edu.ph')
         courses = list(Course.objects.all())
-        year_levels_pool = ["1st Year", "2nd Year", "3rd Year", "4th Year"]
+        year_levels_pool = [1, 2, 3, 4]
 
         TUTEE_COUNT = 20
         TUTOR_COUNT = 10

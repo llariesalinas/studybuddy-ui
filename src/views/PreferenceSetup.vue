@@ -147,7 +147,7 @@
                 >
                   <option value="" disabled>-- Select your Course --</option>
                   <option
-                    v-for="course in courses"
+                    v-for="course in collegeCourses"
                     :key="course.course_code"
                     :value="course.course_code"
                   >
@@ -349,6 +349,16 @@ const filteredSubjects = computed(() => {
   const allowedDepts = SUBJECT_FILTER_MAP[key] ?? []
   return subjects.value.filter(s => allowedDepts.includes(s.department))
 })
+
+// Only show actual college degree programs in the dropdown —
+// excludes virtual containers like ELEMENTARY, JUNIOR_HIGH, SHS-* that
+// the seed creates for internal subject grouping
+const collegeCourses = computed(() =>
+  courses.value.filter(c =>
+    !['ELEMENTARY', 'JUNIOR_HIGH'].includes(c.course_code) &&
+    !c.course_code.startsWith('SHS-')
+  )
+)
 
 const card2Valid = computed(() => {
   if (educationLevel.value === 'elementary') return selectedGrade.value !== null
