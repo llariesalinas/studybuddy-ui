@@ -42,8 +42,8 @@ const themeStore = useThemeStore()
 .sb-theme-toggle {
   position: relative;
   display: inline-grid;
-  width: 76px;
-  height: 38px;
+  width: 58px;
+  height: 30px;
   flex: 0 0 auto;
   place-items: center;
   cursor: pointer;
@@ -64,18 +64,17 @@ const themeStore = useThemeStore()
 .sb-theme-toggle__track {
   position: relative;
   display: block;
-  width: 76px;
-  height: 38px;
+  width: 58px;
+  height: 30px;
   overflow: hidden;
-  border: 1px solid #7dbcea;
+  border: 1px solid color-mix(in srgb, var(--sb-card-border) 72%, var(--sb-primary));
   border-radius: 999px;
   background:
-    radial-gradient(circle at 22% 22%, rgba(255, 255, 255, 0.85) 0 6px, transparent 7px),
-    linear-gradient(180deg, #72c7ff 0%, #b8e6ff 100%);
+    radial-gradient(circle at 22% 24%, rgba(255, 255, 255, 0.68) 0 4px, transparent 5px),
+    linear-gradient(180deg, #cbe8eb 0%, #e8f5ef 100%);
   box-shadow:
-    inset 0 1px 3px rgba(255, 255, 255, 0.7),
-    inset 0 -8px 14px rgba(255, 255, 255, 0.22),
-    0 8px 20px rgba(20, 92, 145, 0.16);
+    inset 0 1px 2px rgba(255, 255, 255, 0.62),
+    0 4px 12px rgba(10, 25, 22, 0.1);
   transition:
     border-color 0.26s ease,
     background 0.26s ease,
@@ -86,13 +85,13 @@ const themeStore = useThemeStore()
   position: absolute;
   top: 4px;
   left: 4px;
-  width: 30px;
-  height: 30px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
-  background: #ffd75e;
+  background: #f0c85a;
   box-shadow:
-    0 0 0 5px rgba(255, 222, 110, 0.24),
-    0 3px 8px rgba(166, 106, 18, 0.24);
+    0 0 0 3px rgba(240, 200, 90, 0.14),
+    0 2px 6px rgba(88, 62, 15, 0.16);
   transition:
     transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1),
     background 0.26s ease,
@@ -112,25 +111,25 @@ const themeStore = useThemeStore()
 .sb-theme-toggle__sun {
   opacity: 1;
   background:
-    radial-gradient(circle, #fff4a8 0 16%, transparent 17%),
+    radial-gradient(circle, #fff1a4 0 15%, transparent 16%),
     conic-gradient(
       from 0deg,
       transparent 0deg 18deg,
-      rgba(255, 249, 186, 0.9) 18deg 30deg,
+      rgba(255, 246, 170, 0.72) 18deg 30deg,
       transparent 30deg 62deg,
-      rgba(255, 249, 186, 0.9) 62deg 74deg,
+      rgba(255, 246, 170, 0.72) 62deg 74deg,
       transparent 74deg 106deg,
-      rgba(255, 249, 186, 0.9) 106deg 118deg,
+      rgba(255, 246, 170, 0.72) 106deg 118deg,
       transparent 118deg 150deg,
-      rgba(255, 249, 186, 0.9) 150deg 162deg,
+      rgba(255, 246, 170, 0.72) 150deg 162deg,
       transparent 162deg 194deg,
-      rgba(255, 249, 186, 0.9) 194deg 206deg,
+      rgba(255, 246, 170, 0.72) 194deg 206deg,
       transparent 206deg 238deg,
-      rgba(255, 249, 186, 0.9) 238deg 250deg,
+      rgba(255, 246, 170, 0.72) 238deg 250deg,
       transparent 250deg 282deg,
-      rgba(255, 249, 186, 0.9) 282deg 294deg,
+      rgba(255, 246, 170, 0.72) 282deg 294deg,
       transparent 294deg 326deg,
-      rgba(255, 249, 186, 0.9) 326deg 338deg,
+      rgba(255, 246, 170, 0.72) 326deg 338deg,
       transparent 338deg 360deg
     );
 }
@@ -138,29 +137,29 @@ const themeStore = useThemeStore()
 .sb-theme-toggle__moon {
   opacity: 0;
   transform: rotate(-18deg) scale(0.7);
-  background: #f6f0ca;
+  background: #d8e2dc;
 }
 
 .sb-theme-toggle__moon::after {
   position: absolute;
-  top: 1px;
-  left: 9px;
-  width: 25px;
-  height: 25px;
+  top: 0;
+  left: 7px;
+  width: 19px;
+  height: 22px;
   border-radius: 50%;
-  background: #142847;
+  background: #17251f;
   content: '';
 }
 
 .sb-theme-toggle__cloud {
   position: absolute;
-  right: 9px;
-  bottom: 6px;
-  width: 30px;
-  height: 14px;
+  right: 7px;
+  bottom: 5px;
+  width: 22px;
+  height: 10px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.9);
-  box-shadow: 14px 3px 0 rgba(255, 255, 255, 0.48);
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 10px 2px 0 rgba(255, 255, 255, 0.36);
   transition:
     opacity 0.22s ease,
     transform 0.28s ease;
@@ -174,21 +173,21 @@ const themeStore = useThemeStore()
 }
 
 .sb-theme-toggle__cloud-puff--one {
-  left: 4px;
-  width: 13px;
-  height: 13px;
+  left: 3px;
+  width: 9px;
+  height: 9px;
 }
 
 .sb-theme-toggle__cloud-puff--two {
-  left: 13px;
-  width: 16px;
-  height: 16px;
+  left: 9px;
+  width: 12px;
+  height: 12px;
 }
 
 .sb-theme-toggle__cloud-puff--three {
-  right: -4px;
-  width: 11px;
-  height: 11px;
+  right: -3px;
+  width: 8px;
+  height: 8px;
 }
 
 .sb-theme-toggle__stars {
@@ -203,49 +202,48 @@ const themeStore = useThemeStore()
 
 .sb-theme-toggle__star {
   position: absolute;
-  width: 3px;
-  height: 3px;
+  width: 2px;
+  height: 2px;
   border-radius: 50%;
-  background: #fff8c6;
-  box-shadow: 0 0 6px rgba(255, 248, 198, 0.8);
+  background: #e8f1ed;
+  box-shadow: 0 0 4px rgba(232, 241, 237, 0.62);
 }
 
 .sb-theme-toggle__star--one {
-  top: 9px;
-  left: 14px;
+  top: 8px;
+  left: 12px;
 }
 
 .sb-theme-toggle__star--two {
-  top: 20px;
-  left: 25px;
+  top: 18px;
+  left: 20px;
   width: 2px;
   height: 2px;
 }
 
 .sb-theme-toggle__star--three {
-  top: 12px;
-  right: 18px;
+  top: 10px;
+  right: 14px;
   width: 2px;
   height: 2px;
 }
 
 .sb-theme-toggle__input:checked + .sb-theme-toggle__track {
-  border-color: #213b65;
+  border-color: color-mix(in srgb, var(--sb-card-border) 76%, var(--sb-primary));
   background:
-    radial-gradient(circle at 18% 28%, rgba(255, 255, 255, 0.12) 0 2px, transparent 3px),
-    linear-gradient(180deg, #172b50 0%, #0c1730 100%);
+    radial-gradient(circle at 18% 28%, rgba(255, 255, 255, 0.08) 0 2px, transparent 3px),
+    linear-gradient(180deg, #20372d 0%, #101d19 100%);
   box-shadow:
-    inset 0 1px 3px rgba(255, 255, 255, 0.14),
-    inset 0 -8px 14px rgba(0, 0, 0, 0.18),
-    0 8px 20px rgba(6, 18, 38, 0.22);
+    inset 0 1px 2px rgba(255, 255, 255, 0.1),
+    0 4px 12px rgba(6, 18, 16, 0.18);
 }
 
 .sb-theme-toggle__input:checked + .sb-theme-toggle__track .sb-theme-toggle__thumb {
-  transform: translateX(38px);
-  background: #f6f0ca;
+  transform: translateX(28px);
+  background: #d8e2dc;
   box-shadow:
-    0 0 0 5px rgba(246, 240, 202, 0.13),
-    0 3px 8px rgba(0, 0, 0, 0.28);
+    0 0 0 3px rgba(216, 226, 220, 0.1),
+    0 2px 6px rgba(0, 0, 0, 0.2);
 }
 
 .sb-theme-toggle__input:checked + .sb-theme-toggle__track .sb-theme-toggle__sun {
@@ -278,7 +276,7 @@ const themeStore = useThemeStore()
 }
 
 .sb-theme-toggle__input:checked:active + .sb-theme-toggle__track .sb-theme-toggle__thumb {
-  transform: translateX(38px) scale(0.94);
+  transform: translateX(28px) scale(0.94);
 }
 
 .sb-theme-toggle__label {

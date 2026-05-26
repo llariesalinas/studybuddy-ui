@@ -230,7 +230,7 @@ onMounted(() => {
   display: block;
   font-size: 13px;
   font-weight: 600;
-  color: #1d1d1f;
+  color: var(--sb-text-main);
   margin-bottom: 6px;
 }
 
@@ -239,10 +239,10 @@ onMounted(() => {
   width: 100%;
   padding: 10px 14px;
   font-size: 14px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--sb-card-border);
   border-radius: 12px;
-  background: #fff;
-  color: #1d1d1f;
+  background: var(--sb-surface);
+  color: var(--sb-text-main);
   outline: none;
   transition:
     border-color 0.15s ease,
@@ -254,6 +254,11 @@ onMounted(() => {
 .sb-auth-select:focus {
   border-color: #00895a;
   box-shadow: 0 0 0 3px rgba(0, 137, 90, 0.12);
+}
+
+.sb-auth-input::placeholder {
+  color: var(--sb-text-muted);
+  opacity: 0.78;
 }
 
 .sb-auth-alert {
@@ -273,7 +278,7 @@ onMounted(() => {
 }
 
 .sb-auth-helper {
-  color: #6e6e73;
+  color: var(--sb-text-muted);
   font-size: 12px;
   margin-top: 4px;
 }
