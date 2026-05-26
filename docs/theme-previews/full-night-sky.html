@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>StudyBuddy Dark Theme Preview - Full Night Sky</title>
+    <style>
+      :root {
+        --sb-dark: #0a1916;
+        --sb-bg: #08111d;
+        --sb-card-bg: #f4fbf7;
+        --sb-card-border: rgba(255, 255, 255, 0.26);
+        --sb-surface: rgba(244, 251, 247, 0.94);
+        --sb-text-main: #10231d;
+        --sb-text-muted: #5d736b;
+        --sb-text-secondary: #335146;
+        --sb-primary: #00895a;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        color: var(--sb-text-main);
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background:
+          radial-gradient(circle at 12% 18%, rgba(255, 255, 255, 0.95) 0 1px, transparent 2px),
+          radial-gradient(circle at 26% 74%, rgba(255, 255, 255, 0.75) 0 1px, transparent 2px),
+          radial-gradient(circle at 48% 22%, rgba(255, 255, 255, 0.9) 0 1px, transparent 2px),
+          radial-gradient(circle at 68% 62%, rgba(255, 255, 255, 0.72) 0 1px, transparent 2px),
+          radial-gradient(circle at 84% 30%, rgba(255, 255, 255, 0.85) 0 1px, transparent 2px),
+          radial-gradient(circle at 74% 8%, rgba(82, 141, 255, 0.3), transparent 24%),
+          linear-gradient(145deg, #050913 0%, #0b1830 42%, #07120f 100%);
+      }
+
+      .app-shell {
+        display: grid;
+        grid-template-columns: 248px minmax(0, 1fr);
+        min-height: 100vh;
+      }
+
+      .sidebar {
+        display: flex;
+        flex-direction: column;
+        gap: 28px;
+        padding: 28px 22px;
+        background: #0a1916;
+        color: #e2ede8;
+        border-right: 1px solid rgba(226, 237, 232, 0.08);
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 18px;
+        font-weight: 700;
+      }
+
+      .brand-mark {
+        width: 34px;
+        height: 34px;
+        border-radius: 10px;
+        background: linear-gradient(135deg, #00895a, #ffffff);
+      }
+
+      .nav {
+        display: grid;
+        gap: 10px;
+      }
+
+      .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        padding: 11px 12px;
+        border-radius: 8px;
+        color: #a8bdb5;
+        font-size: 14px;
+      }
+
+      .nav-item.active {
+        background: rgba(255, 255, 255, 0.08);
+        color: #ffffff;
+      }
+
+      .nav-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 99px;
+        background: currentColor;
+      }
+
+      .sidebar-footer {
+        margin-top: auto;
+        padding-top: 20px;
+        border-top: 1px solid rgba(255, 255, 255, 0.12);
+      }
+
+      .preview {
+        display: grid;
+        gap: 22px;
+        padding: 28px;
+        background: rgba(4, 7, 14, 0.12);
+      }
+
+      .header {
+        display: flex;
+        justify-content: space-between;
+        gap: 18px;
+        align-items: center;
+        padding: 20px 22px;
+        background: var(--sb-surface);
+        border: 1px solid var(--sb-card-border);
+        border-radius: 8px;
+        box-shadow: 0 28px 70px rgba(0, 0, 0, 0.26);
+      }
+
+      h1,
+      h2,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: 25px;
+        line-height: 1.18;
+      }
+
+      .muted {
+        color: var(--sb-text-muted);
+      }
+
+      .main-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
+        gap: 22px;
+      }
+
+      .panel,
+      .card {
+        background: var(--sb-card-bg);
+        border: 1px solid var(--sb-card-border);
+        border-radius: 8px;
+        box-shadow: 0 28px 70px rgba(0, 0, 0, 0.24);
+      }
+
+      .panel {
+        padding: 24px;
+      }
+
+      .card-row {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 14px;
+        margin-top: 20px;
+      }
+
+      .card {
+        min-height: 132px;
+        padding: 18px;
+      }
+
+      .metric {
+        margin-top: 18px;
+        font-size: 32px;
+        font-weight: 700;
+      }
+
+      .timeline {
+        display: grid;
+        gap: 13px;
+        margin-top: 22px;
+      }
+
+      .timeline-item {
+        display: grid;
+        grid-template-columns: 36px 1fr;
+        gap: 12px;
+        align-items: start;
+        padding: 14px;
+        border: 1px solid #d9e7df;
+        border-radius: 8px;
+        background: #ffffff;
+      }
+
+      .time-dot {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: #e2f4eb;
+        border: 1px solid #b9dfcd;
+      }
+
+      .readability {
+        display: grid;
+        gap: 14px;
+      }
+
+      .sample-text {
+        display: grid;
+        gap: 8px;
+        padding: 18px;
+        border: 1px solid #d9e7df;
+        border-radius: 8px;
+        background: #ffffff;
+      }
+
+      .theme-toggle {
+        position: relative;
+        width: 132px;
+        height: 48px;
+        border-radius: 999px;
+        padding: 5px;
+        background:
+          radial-gradient(circle at 25px 18px, #ffd76a 0 6px, transparent 7px),
+          radial-gradient(circle at 90px 13px, #ffffff 0 2px, transparent 3px),
+          radial-gradient(circle at 108px 29px, #ffffff 0 1px, transparent 2px),
+          linear-gradient(90deg, #b9e1f1 0%, #172c47 58%, #07111f 100%);
+        border: 1px solid rgba(9, 22, 32, 0.18);
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+      }
+
+      .toggle-thumb {
+        position: absolute;
+        top: 5px;
+        left: 73px;
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        background: #fff8da;
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.28);
+      }
+
+      .toggle-thumb::after {
+        content: "";
+        position: absolute;
+        top: 5px;
+        left: 11px;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: #172c47;
+      }
+
+      .toggle-path {
+        position: absolute;
+        inset: 13px 44px 13px 40px;
+        border-top: 1px dashed rgba(255, 255, 255, 0.34);
+      }
+
+      .label {
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+
+      .sidebar .muted {
+        color: #8ba89a;
+      }
+
+      @media (max-width: 860px) {
+        .app-shell,
+        .main-grid,
+        .card-row {
+          grid-template-columns: 1fr;
+        }
+
+        .sidebar {
+          min-height: auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <span class="brand-mark"></span>
+          <span>StudyBuddy</span>
+        </div>
+        <nav class="nav" aria-label="Mock app navigation">
+          <div class="nav-item active"><span class="nav-dot"></span>Dashboard</div>
+          <div class="nav-item"><span class="nav-dot"></span>Find tutors</div>
+          <div class="nav-item"><span class="nav-dot"></span>Sessions</div>
+          <div class="nav-item"><span class="nav-dot"></span>Messages</div>
+        </nav>
+        <div class="sidebar-footer">
+          <div class="label muted">Sidebar stays #0A1916</div>
+        </div>
+      </aside>
+
+      <main class="preview">
+        <header class="header">
+          <div>
+            <h1>Full Night Sky</h1>
+            <p class="muted">Deep space background with brighter app surfaces for high-contrast readability.</p>
+          </div>
+          <div class="theme-toggle" aria-label="Static sun to crescent toggle mock">
+            <span class="toggle-path"></span>
+            <span class="toggle-thumb"></span>
+          </div>
+        </header>
+
+        <section class="main-grid">
+          <div class="panel">
+            <p class="label muted">Content Surface</p>
+            <h2>Study plan overview</h2>
+            <p class="muted">Bright cards float over the full night background while the sidebar remains brand-dark.</p>
+            <div class="card-row">
+              <article class="card">
+                <p class="muted">Upcoming</p>
+                <div class="metric">4</div>
+                <p class="muted">sessions this week</p>
+              </article>
+              <article class="card">
+                <p class="muted">Match score</p>
+                <div class="metric">92%</div>
+                <p class="muted">best tutor fit</p>
+              </article>
+              <article class="card">
+                <p class="muted">Focus</p>
+                <div class="metric">Algebra</div>
+                <p class="muted">recommended topic</p>
+              </article>
+            </div>
+            <div class="timeline">
+              <div class="timeline-item">
+                <span class="time-dot"></span>
+                <div>
+                  <p>Algebra warmup</p>
+                  <p class="muted">15 minute review before tomorrow's session.</p>
+                </div>
+              </div>
+              <div class="timeline-item">
+                <span class="time-dot"></span>
+                <div>
+                  <p>Chemistry notes</p>
+                  <p class="muted">Prepare two questions for the next tutor match.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <aside class="panel readability">
+            <div class="sample-text">
+              <p class="label muted">Main Text</p>
+              <p>This is the primary readable text color on bright night-sky surfaces.</p>
+            </div>
+            <div class="sample-text">
+              <p class="label muted">Muted Text</p>
+              <p class="muted">Muted helper text uses deeper green-gray for legibility on light cards.</p>
+            </div>
+            <div class="sample-text">
+              <p class="label muted">Toggle Concept</p>
+              <div class="theme-toggle" aria-hidden="true">
+                <span class="toggle-path"></span>
+                <span class="toggle-thumb"></span>
+              </div>
+            </div>
+          </aside>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

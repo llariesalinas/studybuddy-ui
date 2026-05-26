@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>StudyBuddy Dark Theme Preview - Aurora Glass</title>
+    <style>
+      :root {
+        --sb-dark: #0a1916;
+        --sb-bg: #0f1a16;
+        --sb-card-bg: rgba(22, 42, 32, 0.72);
+        --sb-card-border: rgba(150, 221, 184, 0.22);
+        --sb-surface: rgba(18, 37, 29, 0.68);
+        --sb-text-main: #e2ede8;
+        --sb-text-muted: #8ba89a;
+        --sb-text-secondary: #a8bdb5;
+        --sb-primary: #00895a;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        color: var(--sb-text-main);
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background:
+          radial-gradient(circle at 18% 16%, rgba(0, 137, 90, 0.36), transparent 30%),
+          radial-gradient(circle at 82% 10%, rgba(107, 151, 255, 0.28), transparent 28%),
+          radial-gradient(circle at 58% 86%, rgba(42, 199, 151, 0.2), transparent 34%),
+          linear-gradient(145deg, #09120f 0%, #10271d 46%, #08110f 100%);
+      }
+
+      .app-shell {
+        display: grid;
+        grid-template-columns: 248px minmax(0, 1fr);
+        min-height: 100vh;
+      }
+
+      .sidebar {
+        display: flex;
+        flex-direction: column;
+        gap: 28px;
+        padding: 28px 22px;
+        background: #0a1916;
+        color: #e2ede8;
+        border-right: 1px solid rgba(226, 237, 232, 0.08);
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 18px;
+        font-weight: 700;
+      }
+
+      .brand-mark {
+        width: 34px;
+        height: 34px;
+        border-radius: 10px;
+        background: linear-gradient(135deg, #00895a, #65c79d);
+      }
+
+      .nav {
+        display: grid;
+        gap: 10px;
+      }
+
+      .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        padding: 11px 12px;
+        border-radius: 8px;
+        color: #a8bdb5;
+        font-size: 14px;
+      }
+
+      .nav-item.active {
+        background: rgba(255, 255, 255, 0.08);
+        color: #ffffff;
+      }
+
+      .nav-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 99px;
+        background: currentColor;
+      }
+
+      .sidebar-footer {
+        margin-top: auto;
+        padding-top: 20px;
+        border-top: 1px solid rgba(255, 255, 255, 0.12);
+      }
+
+      .preview {
+        display: grid;
+        gap: 22px;
+        padding: 28px;
+        background: rgba(4, 12, 10, 0.24);
+      }
+
+      .header {
+        display: flex;
+        justify-content: space-between;
+        gap: 18px;
+        align-items: center;
+        padding: 20px 22px;
+        background: var(--sb-surface);
+        border: 1px solid var(--sb-card-border);
+        border-radius: 8px;
+        backdrop-filter: blur(24px);
+        box-shadow: 0 24px 80px rgba(0, 0, 0, 0.28);
+      }
+
+      h1,
+      h2,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: 25px;
+        line-height: 1.18;
+      }
+
+      .muted {
+        color: var(--sb-text-muted);
+      }
+
+      .main-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
+        gap: 22px;
+      }
+
+      .panel,
+      .card {
+        background: var(--sb-card-bg);
+        border: 1px solid var(--sb-card-border);
+        border-radius: 8px;
+        backdrop-filter: blur(28px);
+        box-shadow: 0 22px 68px rgba(0, 0, 0, 0.24);
+      }
+
+      .panel {
+        padding: 24px;
+      }
+
+      .card-row {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 14px;
+        margin-top: 20px;
+      }
+
+      .card {
+        min-height: 132px;
+        padding: 18px;
+      }
+
+      .metric {
+        margin-top: 18px;
+        font-size: 32px;
+        font-weight: 700;
+      }
+
+      .bar-list {
+        display: grid;
+        gap: 14px;
+        margin-top: 22px;
+      }
+
+      .bar {
+        height: 12px;
+        border-radius: 99px;
+        background: rgba(226, 237, 232, 0.11);
+        overflow: hidden;
+      }
+
+      .bar span {
+        display: block;
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, #00895a, #76d5aa);
+      }
+
+      .readability {
+        display: grid;
+        gap: 14px;
+      }
+
+      .sample-text {
+        display: grid;
+        gap: 8px;
+        padding: 18px;
+        border: 1px solid rgba(226, 237, 232, 0.1);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.04);
+      }
+
+      .toggle-card {
+        display: grid;
+        gap: 14px;
+        margin-top: 20px;
+      }
+
+      .theme-toggle {
+        position: relative;
+        width: 132px;
+        height: 48px;
+        border-radius: 999px;
+        padding: 5px;
+        background:
+          radial-gradient(circle at 26px 16px, rgba(255, 219, 112, 0.9) 0 6px, transparent 7px),
+          radial-gradient(circle at 88px 16px, rgba(255, 255, 255, 0.72) 0 2px, transparent 3px),
+          linear-gradient(90deg, #c5e7f4 0%, #13251f 68%);
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+      }
+
+      .toggle-thumb {
+        position: absolute;
+        top: 5px;
+        left: 73px;
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        background: #e7efe9;
+        box-shadow: 0 8px 18px rgba(0, 0, 0, 0.3);
+      }
+
+      .toggle-thumb::after {
+        content: "";
+        position: absolute;
+        top: 5px;
+        left: 11px;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: #13251f;
+      }
+
+      .toggle-path {
+        position: absolute;
+        inset: 13px 44px 13px 40px;
+        border-top: 1px dashed rgba(255, 255, 255, 0.32);
+      }
+
+      .label {
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+
+      @media (max-width: 860px) {
+        .app-shell,
+        .main-grid,
+        .card-row {
+          grid-template-columns: 1fr;
+        }
+
+        .sidebar {
+          min-height: auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <span class="brand-mark"></span>
+          <span>StudyBuddy</span>
+        </div>
+        <nav class="nav" aria-label="Mock app navigation">
+          <div class="nav-item active"><span class="nav-dot"></span>Dashboard</div>
+          <div class="nav-item"><span class="nav-dot"></span>Find tutors</div>
+          <div class="nav-item"><span class="nav-dot"></span>Sessions</div>
+          <div class="nav-item"><span class="nav-dot"></span>Messages</div>
+        </nav>
+        <div class="sidebar-footer">
+          <div class="label muted">Sidebar stays #0A1916</div>
+        </div>
+      </aside>
+
+      <main class="preview">
+        <header class="header">
+          <div>
+            <h1>Aurora Glass</h1>
+            <p class="muted">Atmospheric app background with translucent header, cards, and content panels.</p>
+          </div>
+          <div class="theme-toggle" aria-label="Static sun to crescent toggle mock">
+            <span class="toggle-path"></span>
+            <span class="toggle-thumb"></span>
+          </div>
+        </header>
+
+        <section class="main-grid">
+          <div class="panel">
+            <p class="label muted">Content Surface</p>
+            <h2>Study plan overview</h2>
+            <p class="muted">Glass surfaces keep the full aurora background visible while preserving contrast.</p>
+            <div class="card-row">
+              <article class="card">
+                <p class="muted">Upcoming</p>
+                <div class="metric">4</div>
+                <p class="muted">sessions this week</p>
+              </article>
+              <article class="card">
+                <p class="muted">Match score</p>
+                <div class="metric">92%</div>
+                <p class="muted">best tutor fit</p>
+              </article>
+              <article class="card">
+                <p class="muted">Focus</p>
+                <div class="metric">Algebra</div>
+                <p class="muted">recommended topic</p>
+              </article>
+            </div>
+            <div class="bar-list">
+              <div class="bar"><span style="width: 72%"></span></div>
+              <div class="bar"><span style="width: 54%"></span></div>
+              <div class="bar"><span style="width: 83%"></span></div>
+            </div>
+          </div>
+
+          <aside class="panel readability">
+            <div class="sample-text">
+              <p class="label muted">Main Text</p>
+              <p>This is the primary readable text color on glass app surfaces.</p>
+            </div>
+            <div class="sample-text">
+              <p class="label muted">Muted Text</p>
+              <p class="muted">Muted helper text remains visible against the dark green glass.</p>
+            </div>
+            <div class="toggle-card sample-text">
+              <p class="label muted">Toggle Concept</p>
+              <div class="theme-toggle" aria-hidden="true">
+                <span class="toggle-path"></span>
+                <span class="toggle-thumb"></span>
+              </div>
+            </div>
+          </aside>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>
