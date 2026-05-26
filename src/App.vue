@@ -95,6 +95,11 @@
           </button>
         </li>
       </ul>
+
+      <!-- Theme toggle in sidebar footer -->
+      <div class="mt-auto pt-3 border-top border-secondary border-opacity-25">
+        <SbThemeToggle />
+      </div>
     </aside>
 
     <div ref="logoutModalRef" class="modal fade" id="logoutModal" tabindex="-1">
@@ -300,6 +305,7 @@ import router from './router'
 import * as bootstrap from 'bootstrap'
 import { SESSION_POLL_INTERVAL_MS } from './config.js'
 import SbToast from '@/components/SbToast.vue'
+import SbThemeToggle from '@/components/SbThemeToggle.vue'
 
 const route = useRoute()
 const authStore = useAuthStore()
@@ -381,35 +387,6 @@ onBeforeUnmount(() => {
 </script>
 
 <style>
-/* Global styles */
-:root {
-  --sb-dark: #0A1916;
-  --sb-primary: #00895A; /* Your exact Figma Green */
-  --sb-primary-dark: #0A7A51;
-  --sb-primary-mid: #18A36C;
-  --sb-primary-hover: #00704A; /* Slightly darker for button hovers */
-  --sb-text-main: #163127;
-  --sb-text-muted: #6B7280;
-  --sb-text-secondary: #495057;
-  --sb-text-dark: #212529;
-  --sb-bg: #F8F9FA;
-  --sb-card-border: #EAEAEA;
-  --sb-topbar-height: 60px;
-  --sb-bell-size: 52px;
-  --sb-bell-gap: 1.5rem;
-  --sb-main-padding: 3rem;
-  --sb-spring: cubic-bezier(0.16, 1, 0.3, 1);
-  --sb-spring-fast: cubic-bezier(0.34, 1.56, 0.64, 1);
-  --sb-t-quick: 120ms;
-  --sb-t-normal: 250ms;
-  --sb-t-slow: 400ms;
-}
-
-body {
-  background-color: var(--sb-bg);
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
-}
-
 /* --- Brand Color Utility Classes --- */
 .text-sb-primary {
   color: var(--sb-primary) !important;
