@@ -170,8 +170,8 @@
     </div>
 
     <div v-else class="empty-state sb-card-surface rounded-4 shadow-sm text-center py-5 px-4">
-      <h5 class="fw-bold sb-text mb-2">No tutors match this budget range</h5>
-      <p class="sb-muted mb-0">Try widening the slider range to see more tutor options.</p>
+      <h5 class="fw-bold sb-text mb-2">{{ emptyStateTitle }}</h5>
+      <p class="sb-muted mb-0">{{ emptyStateMessage }}</p>
     </div>
   </div>
 </template>
@@ -257,6 +257,18 @@ const filteredTutors = computed(() =>
     const rate = Number(tutor.hourly_rate || 0)
     return rate >= findTutorsStore.filters.minRate && rate <= findTutorsStore.filters.maxRate
   }),
+)
+
+const noBackendResults = computed(() => matchedTutors.value.length === 0)
+const emptyStateTitle = computed(() =>
+  noBackendResults.value
+    ? 'No tutors available for this search'
+    : 'No tutors match this budget range',
+)
+const emptyStateMessage = computed(() =>
+  noBackendResults.value
+    ? 'No tutors are available for the selected subject, date and time. Try a different date, time, or subject.'
+    : 'Try widening the slider range to see more tutor options.',
 )
 
 const budgetSummary = computed(() => {
