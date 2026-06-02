@@ -311,7 +311,7 @@ def get_display_status(raw_status, session_date, start_time, end_time):
     return raw_status
 
 
-def create_booking_status_notification(recipient, status_key, bookings, recipient_role=None):
+def create_booking_status_notification(recipient, status_key, bookings, recipient_role=None, actor_role=None, reason=None):
     context = get_session_notification_context(bookings)
 
     messages = {
@@ -323,12 +323,22 @@ def create_booking_status_notification(recipient, status_key, bookings, recipien
     }
 
     if status_key == "cancelled":
+        actor = actor_role or "tutee"
         if recipient_role == "tutor":
-            message = f"{context['tutee_name']} has cancelled your {context['subject']} session on {context['date']}."
+            if actor == "tutor":
+                message = f"You cancelled your {context['subject']} session on {context['date']}."
+            else:
+                message = f"{context['tutee_name']} has cancelled your {context['subject']} session on {context['date']}."
         elif recipient_role == "tutee":
-            message = f"Your {context['subject']} session on {context['date']} has been successfully cancelled"
+            if actor == "tutor":
+                message = f"Your {context['subject']} session on {context['date']} was cancelled by {context['tutor_name']}."
+            else:
+                message = f"Your {context['subject']} session on {context['date']} has been successfully cancelled."
         else:
             message = None
+
+        if message and reason:
+            message = f"{message} Reason: {reason}"
     else:
         message = messages.get(status_key)
 
@@ -1825,10 +1835,28 @@ def cancel_booking(request, booking_id):
         id=booking_id
     )
 
-    if profile != booking.student:
+    # Either party may cancel.
+    is_student = profile == booking.student
+    is_tutor = profile == booking.tutor.profile
+    if not (is_student or is_tutor):
         return Response({"error": "Unauthorized"}, status=403)
 
-    session_group_bookings = get_booking_request_bookings(booking)
+    actor_role = "tutee" if is_student else "tutor"
+
+    # Reason is required.
+    reason = str(request.data.get("reason", "")).strip()
+    if len(reason) < 5:
+        return Response(
+            {"error": "Please provide a reason for cancelling (at least 5 characters)."},
+            status=400
+        )
+
+    # Group lookup mirrors approve/reject.
+    if booking.status == "Pending":
+        session_group_bookings = get_booking_request_bookings(booking)
+    else:
+        session_group_bookings = get_session_group_bookings(booking)
+
     representative_booking = get_representative_booking(session_group_bookings)
 
     if not representative_booking:
@@ -1842,37 +1870,60 @@ def cancel_booking(request, booking_id):
         + timedelta(minutes=SESSION_SLOT_MINUTES)
     ).time()
 
+    raw_status = representative_booking.status
     display_status = get_display_status(
-        representative_booking.status,
+        raw_status,
         representative_booking.session_date,
         start_time,
         end_time
     )
 
-    if display_status != "Upcoming":
-        return Response({"error": "Only upcoming sessions can be cancelled."}, status=400)
+    # Allowed: pending requests (withdraw) or confirmed-upcoming sessions.
+    if raw_status != "Pending" and display_status != "Upcoming":
+        return Response(
+            {"error": "Only pending requests or upcoming sessions can be cancelled."},
+            status=400
+        )
 
-    if representative_booking.session_date <= timezone.localdate():
-        return Response({"error": "Only future sessions can be cancelled before the session date."}, status=400)
+    # Cutoff: cannot cancel the day of or the day before the session.
+    if representative_booking.session_date <= timezone.localdate() + timedelta(days=1):
+        return Response(
+            {"error": "Sessions can only be cancelled at least two days before the session date."},
+            status=400
+        )
 
     with transaction.atomic():
         Booking.objects.filter(id__in=[group_booking.id for group_booking in session_group_bookings]).update(
             status="Cancelled",
             tutee_confirmed=False,
             tutor_confirmed=False,
+            cancellation_reason=reason,
+            cancelled_by_role=actor_role,
         )
 
         create_booking_status_notification(
             representative_booking.tutor.profile,
             "cancelled",
             session_group_bookings,
-            recipient_role="tutor"
+            recipient_role="tutor",
+            actor_role=actor_role,
+            reason=reason,
         )
         create_booking_status_notification(
             representative_booking.student,
             "cancelled",
             session_group_bookings,
-            recipient_role="tutee"
+            recipient_role="tutee",
+            actor_role=actor_role,
+            reason=reason,
+        )
+
+        representative_booking.refresh_from_db()
+        create_booking_event(
+            representative_booking,
+            request.user,
+            f"Session cancelled by {actor_role}. Reason: {reason}",
+            "booking_cancelled",
         )
 
     return Response({"message": "Session cancelled successfully."}, status=200)
