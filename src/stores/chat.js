@@ -170,6 +170,18 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  async function fetchRoomDetail(roomId) {
+    try {
+      const response = await api.get(`chat/rooms/${roomId}/`)
+      upsertRoom(response.data, { preserveUnread: true })
+      if (currentRoom.value?.id === roomId) {
+        currentRoom.value = { ...currentRoom.value, ...response.data }
+      }
+    } catch (error) {
+      console.error('Error fetching room detail:', error)
+    }
+  }
+
   async function fetchHistory(roomId) {
     try {
       messages.value = []
@@ -194,6 +206,9 @@ export const useChatStore = defineStore('chat', () => {
     await fetchHistory(room.id)
     connectToRoom(room.id)
     await markRoomRead(room.id)
+    // Load the rich context (partner stats, current booking) that the list
+    // endpoint no longer ships; non-blocking so the conversation opens instantly.
+    fetchRoomDetail(room.id)
   }
 
   async function markRoomRead(roomId = currentRoom.value?.id) {
@@ -504,6 +519,7 @@ export const useChatStore = defineStore('chat', () => {
     totalUnread,
     recentPopup,
     fetchRooms,
+    fetchRoomDetail,
     fetchHistory,
     startInquiry,
     selectRoom,

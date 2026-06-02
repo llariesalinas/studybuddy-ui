@@ -259,7 +259,10 @@ def get_completed_session_key(booking):
     return str(booking.session_group_id or booking.booking_request_id or booking.id)
 
 
-def get_partner_context(room, user=None):
+_CURRENT_BOOKING_UNSET = object()
+
+
+def get_partner_context(room, user=None, current_booking=_CURRENT_BOOKING_UNSET):
     tutor = Tutor.objects.filter(profile=room.tutor).select_related('profile__course').first()
     completed_bookings = list(
         Booking.objects
@@ -285,7 +288,8 @@ def get_partner_context(room, user=None):
         )
 
     if not topics:
-        current_booking = get_current_booking_context(room)
+        if current_booking is _CURRENT_BOOKING_UNSET:
+            current_booking = get_current_booking_context(room)
         if current_booking and current_booking.get('subject') != 'General':
             topics = [current_booking['subject']]
 

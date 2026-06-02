@@ -2,7 +2,7 @@ from rest_framework import status, permissions
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
-from django.db.models import Q
+from django.db.models import Q, Count, Max
 from django.utils import timezone
 from .models import ChatRoom, Message
 from .serializers import ChatRoomSerializer, MessageSerializer
@@ -14,11 +14,56 @@ from .services import broadcast_message, broadcast_room_updated, create_chat_mes
 def list_chat_rooms(request):
     """List all chat rooms for the logged-in user."""
     user_profile = request.user.userprofile
-    rooms = ChatRoom.objects.filter(
-        Q(tutee=user_profile) | Q(tutor=user_profile)
-    ).select_related('tutee', 'tutor').order_by('-updated_at', '-created_at')
-    
-    serializer = ChatRoomSerializer(rooms, many=True, context={'request': request})
+    rooms = list(
+        ChatRoom.objects.filter(
+            Q(tutee=user_profile) | Q(tutor=user_profile)
+        ).select_related('tutee', 'tutor').order_by('-updated_at', '-created_at')
+    )
+    room_ids = [room.id for room in rooms]
+
+    # Unread counts for every room in a single aggregate query.
+    unread_map = {
+        row['room_id']: row['unread']
+        for row in Message.objects
+        .filter(room_id__in=room_ids, is_read=False)
+        .exclude(sender=request.user)
+        .values('room_id')
+        .annotate(unread=Count('id'))
+    }
+
+    # Last message per room: one query for the latest ids, one to fetch them.
+    last_ids = list(
+        Message.objects
+        .filter(room_id__in=room_ids)
+        .values('room_id')
+        .annotate(last_id=Max('id'))
+        .values_list('last_id', flat=True)
+    )
+    last_message_map = {
+        message.room_id: message
+        for message in Message.objects.filter(id__in=last_ids).select_related('sender')
+    }
+
+    serializer = ChatRoomSerializer(rooms, many=True, context={
+        'request': request,
+        'unread_map': unread_map,
+        'last_message_map': last_message_map,
+        'skip_partner_context': True,
+    })
+    return Response(serializer.data)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def get_room_detail(request, room_id):
+    """Full detail (incl. partner_context) for a single room, loaded when opened."""
+    user_profile = request.user.userprofile
+    room = get_object_or_404(ChatRoom.objects.select_related('tutee', 'tutor'), id=room_id)
+
+    if room.tutee != user_profile and room.tutor != user_profile:
+        return Response({"error": "Unauthorized"}, status=status.HTTP_403_FORBIDDEN)
+
+    serializer = ChatRoomSerializer(room, context={'request': request})
     return Response(serializer.data)
 
 @api_view(['GET'])

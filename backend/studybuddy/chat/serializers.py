@@ -74,6 +74,14 @@ class ChatRoomSerializer(serializers.ModelSerializer):
             'partner_context',
         ]
 
+    def _current_booking(self, obj):
+        # Memoize per room so current_booking and partner_context don't both
+        # recompute the (expensive) current-booking lookup.
+        cache = self.context.setdefault('_booking_ctx_cache', {})
+        if obj.id not in cache:
+            cache[obj.id] = get_current_booking_context(obj)
+        return cache[obj.id]
+
     def get_tutee_name(self, obj):
         return f"{obj.tutee.fname} {obj.tutee.lname}"
 
@@ -81,21 +89,33 @@ class ChatRoomSerializer(serializers.ModelSerializer):
         return f"{obj.tutor.fname} {obj.tutor.lname}"
 
     def get_last_message(self, obj):
-        last_msg = obj.messages.order_by('-created_at').first()
+        last_map = self.context.get('last_message_map')
+        if last_map is not None:
+            last_msg = last_map.get(obj.id)
+        else:
+            last_msg = obj.messages.order_by('-created_at').first()
         if last_msg:
             return MessageSerializer(last_msg, context=self.context).data
         return None
 
     def get_unread_count(self, obj):
+        unread_map = self.context.get('unread_map')
+        if unread_map is not None:
+            return unread_map.get(obj.id, 0)
         request = self.context.get('request')
         if request and request.user.is_authenticated:
             return obj.messages.filter(is_read=False).exclude(sender=request.user).count()
         return 0
 
     def get_current_booking(self, obj):
-        return get_current_booking_context(obj)
+        return self._current_booking(obj)
 
     def get_partner_context(self, obj):
+        # The sidebar list never renders partner_context; it's only shown for the
+        # opened room (fetched via the room-detail endpoint). Skipping it here
+        # removes the bulk of the per-room queries.
+        if self.context.get('skip_partner_context'):
+            return None
         request = self.context.get('request')
         user = request.user if request and request.user.is_authenticated else None
-        return get_partner_context(obj, user)
+        return get_partner_context(obj, user, current_booking=self._current_booking(obj))
