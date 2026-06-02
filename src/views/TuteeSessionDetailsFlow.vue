@@ -195,7 +195,20 @@
           </div>
 
           <div class="modal-body">
-            <p class="mb-0">Are you sure you want to cancel this session?</p>
+            <p class="mb-2">Are you sure you want to cancel this session?</p>
+            <label class="form-label fw-semibold small">Reason (required)</label>
+            <textarea
+              v-model="cancelReason"
+              class="form-control border-sb shadow-none"
+              rows="3"
+              placeholder="Let your tutor know why you're cancelling..."
+              :disabled="isCancelling"
+            ></textarea>
+            <p class="small text-muted mt-2 mb-0">
+              Please also
+              <a href="#" @click.prevent="goToChat">message your tutor in Chat</a>
+              to coordinate.
+            </p>
           </div>
 
           <div class="modal-footer">
@@ -210,7 +223,7 @@
             <button
               type="button"
               class="btn btn-danger sb-btn"
-              :disabled="isCancelling"
+              :disabled="isCancelling || !reasonValid"
               @click="handleCancelSession"
             >
               <span
@@ -249,6 +262,7 @@ const errorMessage = ref('')
 const isRatingModalOpen = ref(false)
 const isCancelModalOpen = ref(false)
 const isCancelling = ref(false)
+const cancelReason = ref('')
 const paymentSyncing = ref(false)
 const paymentReturnMessage = ref('')
 const paymentReturnState = ref('info')
@@ -258,24 +272,29 @@ const canSubmitPayment = computed(() => normalizedStatus.value === 'payment requ
 const isAwaitingPaymentVerification = computed(() => normalizedStatus.value === 'awaiting verification')
 const isCompleted = computed(() => normalizedStatus.value === 'completed')
 const isUpcoming = computed(() => normalizedStatus.value === 'upcoming')
-const todayKey = computed(() => {
-  const today = new Date()
-  const year = today.getFullYear()
-  const month = String(today.getMonth() + 1).padStart(2, '0')
-  const day = String(today.getDate()).padStart(2, '0')
+const isPending = computed(() => normalizedStatus.value === 'pending')
+const reasonValid = computed(() => cancelReason.value.trim().length >= 5)
+const tomorrowKey = computed(() => {
+  const d = new Date()
+  d.setDate(d.getDate() + 1)
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
 })
-const showCancelAction = computed(() => isUpcoming.value)
+const showCancelAction = computed(() => isUpcoming.value || isPending.value)
 const canCancelSession = computed(() => (
-  isUpcoming.value
-  && String(sessionDetail.value?.session?.date || '') > todayKey.value
+  (isUpcoming.value || isPending.value)
+  && String(sessionDetail.value?.session?.date || '') > tomorrowKey.value
 ))
 const cancelActionMessage = computed(() => {
   if (canCancelSession.value) {
-    return 'This upcoming session can still be cancelled before the session date.'
+    return isPending.value
+      ? 'You can withdraw this pending request before it is confirmed.'
+      : 'This upcoming session can still be cancelled.'
   }
 
-  return 'Cancellation is only available before the session date.'
+  return 'Sessions can only be cancelled at least two days before the session date.'
 })
 const paymentReturnAlertClass = computed(() => {
   if (paymentReturnState.value === 'success') return 'alert-success'
@@ -379,6 +398,7 @@ const closeCancelModal = () => {
     return
   }
 
+  cancelReason.value = ''
   isCancelModalOpen.value = false
 }
 
@@ -386,17 +406,22 @@ const goToPayment = () => {
   router.push({ name: 'PaymentTutee', params: { bookingId: route.params.id } })
 }
 
+const goToChat = () => {
+  router.push({ name: 'chat' })
+}
+
 const handleCancelSession = async () => {
-  if (!canCancelSession.value) {
+  if (!canCancelSession.value || !reasonValid.value) {
     return
   }
 
   isCancelling.value = true
 
   try {
-    const updatedDetail = await sessionsStore.cancelSession(route.params.id)
+    const updatedDetail = await sessionsStore.cancelSession(route.params.id, cancelReason.value.trim())
     sessionDetail.value = updatedDetail
     isCancelModalOpen.value = false
+    cancelReason.value = ''
     await notificationsStore.fetchNotifications()
     toastStore.push('Session cancelled successfully.')
   } catch (error) {
