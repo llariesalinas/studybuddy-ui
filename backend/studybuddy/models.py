@@ -433,6 +433,13 @@ class Booking(models.Model):
         choices=STATUS_CHOICES,
         default="Pending"
     )
+    cancellation_reason = models.TextField(blank=True, default='')
+    cancelled_by_role = models.CharField(
+        max_length=10,
+        blank=True,
+        default='',
+        choices=[('tutee', 'Tutee'), ('tutor', 'Tutor')],
+    )
     tutee_confirmed = models.BooleanField(default=False)
     tutor_confirmed = models.BooleanField(default=False)
 
