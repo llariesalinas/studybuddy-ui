@@ -1918,12 +1918,20 @@ def cancel_booking(request, booking_id):
             reason=reason,
         )
 
-        representative_booking.refresh_from_db()
+    # Timeline event is best-effort: the cancellation itself must never fail
+    # because logging the chat event did.
+    representative_booking.refresh_from_db()
+    try:
         create_booking_event(
             representative_booking,
             request.user,
             f"Session cancelled by {actor_role}. Reason: {reason}",
             "booking_cancelled",
+        )
+    except Exception:
+        logger.exception(
+            "Cancellation succeeded but recording the booking event failed for booking %s",
+            representative_booking.id,
         )
 
     return Response({"message": "Session cancelled successfully."}, status=200)
