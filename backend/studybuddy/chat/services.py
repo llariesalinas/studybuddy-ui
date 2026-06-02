@@ -327,7 +327,10 @@ def serialize_message_payload(message, user=None):
         sender_name = full_name(sender_profile)
         sender_profile_id = sender_profile.id
     except Exception:
-        sender_name = message.sender.get_username()
+        try:
+            sender_name = message.sender.get_username()
+        except Exception:
+            sender_name = 'System'
 
     return {
         'id': message.id,

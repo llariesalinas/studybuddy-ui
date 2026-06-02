@@ -25,11 +25,17 @@ class MessageSerializer(serializers.ModelSerializer):
         ]
 
     def get_sender_name(self, obj):
+        # System messages (e.g. support-ticket events) have no sender; serializing
+        # them must never dereference a missing sender, or the whole endpoint 500s.
         try:
             profile = obj.sender.userprofile
             return f"{profile.fname} {profile.lname}"
         except Exception:
+            pass
+        try:
             return obj.sender.username
+        except Exception:
+            return 'System'
 
     def get_sender_profile_id(self, obj):
         try:
