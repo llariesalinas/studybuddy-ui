@@ -1,150 +1,228 @@
 <template>
   <div class="reports-content">
+    <section class="metric-grid" aria-label="Tutor session metrics">
+      <article
+        v-for="stat in statCards"
+        :key="stat.label"
+        class="metric-card"
+      >
+        <div class="metric-copy">
+          <span class="metric-icon">
+            <i :class="['bi', stat.icon]"></i>
+          </span>
+          <span class="metric-label">{{ stat.label }}</span>
+          <strong class="metric-value">{{ stat.value }}</strong>
+          <span class="metric-note">{{ stat.note }}</span>
+        </div>
 
-    <div class="row g-4 mb-3">
-      <div class="col-md-3">
-        <div class="card border-sb shadow-sm h-100 rounded-4">
-          <div class="card-body d-flex flex-column justify-content-center text-center py-4">
-            <div class="d-flex align-items-center justify-content-center mb-2 gap-2">
-              <div class="rounded-circle bg-success bg-opacity-10 text-sb-primary d-flex justify-content-center align-items-center stat-icon">
-                <i class="bi bi-calendar-event"></i>
-              </div>
-              <span class="text-muted small fw-semibold">Total Sessions</span>
-            </div>
-            <h3 class="fw-bold mb-0">{{ totalSessions }}</h3>
+        <div class="metric-visual" :class="`metric-visual-${stat.visual}`" aria-hidden="true">
+          <svg v-if="stat.visual === 'ring'" class="metric-ring" viewBox="0 0 72 72">
+            <circle class="metric-ring-track" cx="36" cy="36" r="28"></circle>
+            <circle
+              class="metric-ring-fill"
+              cx="36"
+              cy="36"
+              r="28"
+              :style="{ '--metric-progress': stat.progress }"
+            ></circle>
+          </svg>
+
+          <div v-else class="metric-bars">
+            <span
+              v-for="height in stat.bars"
+              :key="height"
+              :style="{ height: height + '%' }"
+            ></span>
           </div>
         </div>
-      </div>
+      </article>
+    </section>
 
-      <div class="col-md-3">
-        <div class="card border-sb shadow-sm h-100 rounded-4">
-          <div class="card-body d-flex flex-column justify-content-center text-center py-4">
-            <div class="d-flex align-items-center justify-content-center mb-2 gap-2">
-              <div class="rounded-circle bg-success bg-opacity-10 text-sb-primary d-flex justify-content-center align-items-center stat-icon">
-                <i class="bi bi-currency-dollar"></i>
-              </div>
-              <span class="text-muted small fw-semibold">Total Earnings</span>
-            </div>
-            <h3 class="fw-bold mb-0">{{ totalEarnings }}</h3>
-          </div>
+    <section class="reports-panel">
+      <header class="reports-panel-header">
+        <div>
+          <p class="panel-kicker">Tutor Workspace</p>
+          <h4 class="panel-title">
+            <i class="bi bi-file-earmark-text"></i>
+            Sessions & Reports
+          </h4>
         </div>
-      </div>
 
-      <div class="col-md-3">
-        <div class="card border-sb shadow-sm h-100 rounded-4">
-          <div class="card-body d-flex flex-column justify-content-center text-center py-4">
-            <div class="d-flex align-items-center justify-content-center mb-2 gap-2">
-              <div class="rounded-circle bg-warning bg-opacity-10 text-warning d-flex justify-content-center align-items-center stat-icon">
-                <i class="bi bi-star"></i>
-              </div>
-              <span class="text-muted small fw-semibold">Avg Rating</span>
-            </div>
-            <h3 class="fw-bold mb-0">{{ averageRating }}</h3>
-          </div>
-        </div>
-      </div>
-
-      <div class="col-md-3">
-        <div class="card border-sb shadow-sm h-100 rounded-4">
-          <div class="card-body d-flex flex-column justify-content-center text-center py-4">
-            <div class="d-flex align-items-center justify-content-center mb-2 gap-2">
-              <div class="rounded-circle bg-info bg-opacity-10 text-info d-flex justify-content-center align-items-center stat-icon">
-                <i class="bi bi-graph-up-arrow"></i>
-              </div>
-              <span class="text-muted small fw-semibold">Hours Tutored</span>
-            </div>
-            <h3 class="fw-bold mb-0">{{ totalHours.toFixed(1) }}h</h3>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="card border-sb border-1 shadow-sm rounded-4">
-      <div class="card-body p-4 p-md-5">
-        <h4 class="fw-bold mb-4 d-flex align-items-center">
-          <i class="bi bi-file-earmark-text text-sb-primary me-3"></i> Session History
-        </h4>
-
-        <div class="d-flex gap-2 mb-4 bg-light p-2 rounded-3 d-inline-flex border border-sb">
+        <div class="view-tabs" role="tablist" aria-label="Sessions and reports">
           <button
-            v-for="filter in filters"
-            :key="filter.value"
-            @click="currentFilter = filter.value"
-            class="btn rounded-pill px-3 py-1 fw-semibold text-muted shadow-none transition-all sb-btn filter-tab"
-            :class="currentFilter === filter.value ? ['bg-white', 'text-dark', 'shadow-sm', 'active'] : 'btn-light'"
+            v-for="tab in viewTabs"
+            :key="tab.value"
+            type="button"
+            class="view-tab sb-btn"
+            :class="{ 'view-tab-active': activeTab === tab.value }"
+            :aria-selected="activeTab === tab.value"
+            role="tab"
+            @click="activeTab = tab.value"
           >
-            {{ filter.label }}
+            <i :class="['bi', tab.icon]"></i>
+            <span>{{ tab.label }}</span>
           </button>
         </div>
+      </header>
 
-        <div class="table-responsive">
-          <table class="table table-hover align-middle mb-0">
-            <thead>
-              <tr class="text-muted small align-bottom reports-header-row">
-                <th class="fw-semibold pb-3">Subject</th>
-                <th class="fw-semibold pb-3">Tutee</th>
-                <th class="fw-semibold pb-3">Date</th>
-                <th class="fw-semibold pb-3">Duration</th>
-                <th class="fw-semibold pb-3">Status</th>
-                <th class="fw-semibold pb-3">Rating</th>
-                <th class="fw-semibold pb-3">Earnings</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-if="sessionStore.loading">
-                <td colspan="8" class="text-center py-5 text-muted">Loading sessions...</td>
-              </tr>
+      <div v-if="activeTab === 'sessions'" class="tab-panel" role="tabpanel">
+        <div class="sessions-toolbar">
+          <div class="filter-bar" aria-label="Session filters">
+            <button
+              v-for="filter in filters"
+              :key="filter.value"
+              type="button"
+              @click="currentFilter = filter.value"
+              class="filter-tab sb-btn"
+              :class="{ 'filter-tab-active': currentFilter === filter.value }"
+            >
+              {{ filter.label }}
+            </button>
+          </div>
+        </div>
 
-              <tr v-else-if="sessionStore.error">
-                <td colspan="8" class="text-center py-5 text-danger">{{ sessionStore.error }}</td>
-              </tr>
+        <div v-if="sessionStore.loading" class="state-panel">
+          <div class="spinner-border text-sb-primary mb-3" role="status"></div>
+          <p>Loading sessions...</p>
+        </div>
 
-              <template v-else-if="filteredSessions.length">
-                <tr
-                  v-for="session in filteredSessions"
-                  :key="session.id"
-                  class="session-row"
-                >
-                  <td class="py-3 fw-bold">{{ session.subject }}</td>
-                  <td class="py-3">{{ session.tutee }}</td>
-                  <td class="py-3">{{ session.date }}</td>
-                  <td class="py-3">{{ session.startTime }} - {{ session.endTime }}</td>
-                  <td class="py-3">
-                    <span class="badge rounded-pill px-3 py-1 fw-normal" :class="getStatusClass(session.status)">
-                      {{ formatStatus(session.status) }}
-                    </span>
-                  </td>
-                  <td class="py-3">
-                    <span v-if="session.rating" class="d-flex align-items-center text-warning fw-bold small">
-                      <i class="bi bi-star-fill me-1"></i> {{ session.rating }}
-                    </span>
-                    <span v-else class="text-muted">-</span>
-                  </td>
-                  <td class="py-3 fw-bold">
-                    {{ session.earnings ? `PHP ${session.earnings}` : '-' }}
-                  </td>
-                  <td class="py-3 text-end action-cell">
-                    <button
-                      class="btn btn-sm bg-sb-primary text-white sb-btn"
-                      @click="goToDetails(session.id)"
-                    >
-                      View Details
-                    </button>
-                  </td>
-                </tr>
-              </template>
+        <div v-else-if="sessionStore.error" class="state-panel state-panel-error">
+          <i class="bi bi-exclamation-triangle"></i>
+          <p>{{ sessionStore.error }}</p>
+        </div>
 
-              <tr v-else>
-                <td colspan="8" class="text-center py-5 text-muted">
-                  No sessions found for this category.
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        <div v-else-if="filteredSessions.length" class="session-list">
+          <article
+            v-for="session in filteredSessions"
+            :key="session.id"
+            class="session-row"
+          >
+            <div class="session-main">
+              <div class="session-subject-line">
+                <span class="session-icon">
+                  <i class="bi bi-journal-bookmark"></i>
+                </span>
+                <div>
+                  <h5>{{ session.subject }}</h5>
+                  <p>{{ session.tutee }}</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="session-meta-grid">
+              <div class="session-meta-item">
+                <span>Date</span>
+                <strong>{{ session.date }}</strong>
+              </div>
+              <div class="session-meta-item">
+                <span>Time</span>
+                <strong>{{ session.startTime }} - {{ session.endTime }}</strong>
+              </div>
+              <div class="session-meta-item">
+                <span>Rating</span>
+                <strong v-if="session.rating" class="rating-value">
+                  <i class="bi bi-star-fill"></i>{{ session.rating }}
+                </strong>
+                <strong v-else>-</strong>
+              </div>
+              <div class="session-meta-item">
+                <span>Earnings</span>
+                <strong>{{ session.earnings ? `PHP ${session.earnings}` : '-' }}</strong>
+              </div>
+            </div>
+
+            <div class="session-actions">
+              <span class="badge rounded-pill px-3 py-2 fw-normal" :class="getStatusClass(session.status)">
+                {{ formatStatus(session.status) }}
+              </span>
+              <button
+                class="details-btn sb-btn"
+                type="button"
+                @click="goToDetails(session.id)"
+              >
+                <span>Details</span>
+                <i class="bi bi-arrow-right"></i>
+              </button>
+            </div>
+          </article>
+        </div>
+
+        <div v-else class="state-panel">
+          <i class="bi bi-calendar2-week"></i>
+          <p>No sessions found for this category.</p>
         </div>
       </div>
-    </div>
+
+      <div v-else class="tab-panel" role="tabpanel">
+        <div v-if="sessionStore.loading" class="state-panel">
+          <div class="spinner-border text-sb-primary mb-3" role="status"></div>
+          <p>Loading reports...</p>
+        </div>
+
+        <div v-else-if="sessionStore.error" class="state-panel state-panel-error">
+          <i class="bi bi-exclamation-triangle"></i>
+          <p>{{ sessionStore.error }}</p>
+        </div>
+
+        <div v-else-if="totalSessions" class="reports-grid">
+          <article class="analytics-summary">
+            <div class="summary-header">
+              <span class="summary-icon">
+                <i class="bi bi-activity"></i>
+              </span>
+              <div>
+                <p class="panel-kicker">Performance</p>
+                <h5>Session Mix</h5>
+              </div>
+            </div>
+
+            <div class="status-bars">
+              <div
+                v-for="item in statusBreakdown"
+                :key="item.label"
+                class="status-bar-row"
+              >
+                <div class="status-bar-label">
+                  <span>{{ item.label }}</span>
+                  <strong>{{ item.count }}</strong>
+                </div>
+                <div class="status-track">
+                  <span class="status-fill" :style="{ width: item.percent + '%' }"></span>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <article class="analytics-summary">
+            <div class="summary-header">
+              <span class="summary-icon">
+                <i class="bi bi-clipboard2-data"></i>
+              </span>
+              <div>
+                <p class="panel-kicker">Snapshot</p>
+                <h5>Tutor Summary</h5>
+              </div>
+            </div>
+
+            <div class="summary-list">
+              <div
+                v-for="summary in reportSummaries"
+                :key="summary.label"
+                class="summary-row"
+              >
+                <span>{{ summary.label }}</span>
+                <strong>{{ summary.value }}</strong>
+              </div>
+            </div>
+          </article>
+        </div>
+
+        <div v-else class="state-panel">
+          <i class="bi bi-bar-chart"></i>
+          <p>No report data available yet.</p>
+        </div>
+      </div>
+    </section>
   </div>
 </template>
 
@@ -156,6 +234,12 @@ import { useSessionsStore } from '@/stores/completedSessions'
 const router = useRouter()
 const sessionStore = useSessionsStore()
 const currentFilter = ref('all')
+const activeTab = ref('sessions')
+
+const viewTabs = [
+  { label: 'Sessions', value: 'sessions', icon: 'bi-calendar2-week' },
+  { label: 'Reports', value: 'reports', icon: 'bi-bar-chart' },
+]
 
 const filters = computed(() => [
   {
@@ -205,11 +289,103 @@ const averageRating = computed(() => {
 
 const totalHours = computed(() =>
   sessionStore.completedSessions.reduce((sum, session) => {
+    if (session.duration_hours) {
+      return sum + Number(session.duration_hours || 0)
+    }
+
     const start = new Date(`1970-01-01T${session.startTime}`)
     const end = new Date(`1970-01-01T${session.endTime}`)
-    return sum + ((end - start) / (1000 * 60 * 60))
+    const hours = (end - start) / (1000 * 60 * 60)
+
+    if (!Number.isFinite(hours) || hours < 0) {
+      return sum
+    }
+
+    return sum + hours
   }, 0)
 )
+
+const statCards = computed(() => [
+  {
+    label: 'Total Sessions',
+    value: totalSessions.value,
+    note: `${sessionStore.completedSessions.length} completed`,
+    icon: 'bi-calendar-event',
+    visual: 'ring',
+    progress: getPercent(sessionStore.completedSessions.length),
+  },
+  {
+    label: 'Total Earnings',
+    value: `PHP ${totalEarnings.value.toLocaleString()}`,
+    note: 'Completed sessions',
+    icon: 'bi-wallet2',
+    visual: 'bars',
+    bars: [36, 56, 72, 92, 68, 44],
+  },
+  {
+    label: 'Avg Rating',
+    value: averageRating.value,
+    note: 'Rated sessions',
+    icon: 'bi-star',
+    visual: 'ring',
+    progress: Math.round((Number(averageRating.value) / 5) * 100),
+  },
+  {
+    label: 'Hours Tutored',
+    value: `${totalHours.value.toFixed(1)}h`,
+    note: 'Completed time',
+    icon: 'bi-clock-history',
+    visual: 'bars',
+    bars: [42, 48, 62, 78, 88, 58],
+  },
+])
+
+const getPercent = (count) => {
+  if (!totalSessions.value) {
+    return 0
+  }
+
+  return Math.round((count / totalSessions.value) * 100)
+}
+
+const statusBreakdown = computed(() => [
+  {
+    label: 'Completed',
+    count: sessionStore.completedSessions.length,
+    percent: getPercent(sessionStore.completedSessions.length),
+  },
+  {
+    label: 'Upcoming',
+    count: sessionStore.upcomingSessions.length,
+    percent: getPercent(sessionStore.upcomingSessions.length),
+  },
+  {
+    label: 'Rejected',
+    count: sessionStore.rejectedSessions.length,
+    percent: getPercent(sessionStore.rejectedSessions.length),
+  },
+])
+
+const reportSummaries = computed(() => [
+  {
+    label: 'Completion rate',
+    value: `${getPercent(sessionStore.completedSessions.length)}%`,
+  },
+  {
+    label: 'Average per hour',
+    value: totalHours.value ? `PHP ${(totalEarnings.value / totalHours.value).toFixed(0)}` : 'PHP 0',
+  },
+  {
+    label: 'Average per completed session',
+    value: sessionStore.completedSessions.length
+      ? `PHP ${(totalEarnings.value / sessionStore.completedSessions.length).toFixed(0)}`
+      : 'PHP 0',
+  },
+  {
+    label: 'Filtered sessions',
+    value: filteredSessions.value.length,
+  },
+])
 
 const filteredSessions = computed(() => {
   switch (currentFilter.value) {
@@ -229,61 +405,555 @@ const formatStatus = (status) => status
 const getStatusClass = (status) => {
   switch (String(status || '').toLowerCase()) {
     case 'upcoming':
-      return 'bg-primary text-white'
+      return 'status-badge status-badge-upcoming'
     case 'ongoing':
-      return 'bg-info text-white'
+      return 'status-badge status-badge-ongoing'
     case 'payment required':
     case 'awaiting verification':
-      return 'bg-warning bg-opacity-25 text-dark'
+      return 'status-badge status-badge-warning'
     case 'completed':
-      return 'bg-sb-primary text-white'
+      return 'status-badge status-badge-completed'
     case 'rejected':
     case 'cancelled':
-      return 'bg-danger text-white'
+      return 'status-badge status-badge-danger'
     case 'pending':
-      return 'bg-secondary text-white'
+      return 'status-badge status-badge-pending'
     default:
-      return 'bg-secondary text-white'
+      return 'status-badge status-badge-pending'
   }
 }
 </script>
 
 <style scoped>
-.transition-all {
-  transition: all 0.2s ease-in-out;
+.reports-content {
+  --reports-glass: color-mix(in srgb, var(--sb-card-bg) 76%, transparent);
+  --reports-glass-strong: color-mix(in srgb, var(--sb-card-bg) 88%, transparent);
+  --reports-border: color-mix(in srgb, var(--sb-card-border) 82%, transparent);
+  --reports-muted: var(--sb-text-muted);
+  --reports-ink: var(--sb-text-main);
+  color: var(--reports-ink);
+  display: grid;
+  gap: 1rem;
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.metric-card,
+.reports-panel,
+.session-row,
+.analytics-summary {
+  border: 1px solid var(--reports-border);
+  background: var(--reports-glass);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.08);
+}
+
+.metric-card {
+  min-height: 142px;
+  border-radius: 24px;
+  padding: 1rem;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.85rem;
+  overflow: hidden;
+  position: relative;
+}
+
+.metric-card::after {
+  content: '';
+  position: absolute;
+  inset: auto -22px -36px auto;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--sb-primary) 14%, transparent);
+  pointer-events: none;
+}
+
+.metric-copy {
+  display: grid;
+  align-content: space-between;
+  gap: 0.4rem;
+  min-width: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.metric-icon,
+.session-icon,
+.summary-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--sb-primary) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sb-primary) 22%, transparent);
+  color: var(--sb-primary);
+}
+
+.metric-label,
+.metric-note,
+.panel-kicker,
+.session-meta-item span,
+.summary-row span,
+.status-bar-label span {
+  color: var(--reports-muted);
+}
+
+.metric-label,
+.panel-kicker,
+.session-meta-item span {
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.metric-value {
+  font-size: clamp(1.55rem, 2vw, 2.15rem);
+  line-height: 1;
+  letter-spacing: 0;
+  position: relative;
+  z-index: 1;
+  overflow-wrap: anywhere;
+}
+
+.metric-note {
+  font-size: 0.82rem;
+  position: relative;
+  z-index: 1;
+}
+
+.metric-visual {
+  width: 70px;
+  min-width: 70px;
+  align-self: center;
+  display: flex;
+  justify-content: center;
+  position: relative;
+  z-index: 1;
+}
+
+.metric-ring {
+  width: 68px;
+  height: 68px;
+  transform: rotate(-90deg);
+  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--sb-primary) 24%, transparent));
+}
+
+.metric-ring-track,
+.metric-ring-fill {
+  fill: none;
+  stroke-width: 7;
+}
+
+.metric-ring-track {
+  stroke: color-mix(in srgb, var(--sb-primary) 12%, transparent);
+}
+
+.metric-ring-fill {
+  --metric-circumference: 175.93;
+  stroke: color-mix(in srgb, var(--sb-primary) 84%, white);
+  stroke-linecap: round;
+  stroke-dasharray: var(--metric-circumference);
+  stroke-dashoffset: calc(var(--metric-circumference) - (var(--metric-circumference) * var(--metric-progress) / 100));
+}
+
+.metric-bars {
+  width: 68px;
+  height: 54px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 0.28rem;
+}
+
+.metric-bars span {
+  width: 0.44rem;
+  min-height: 20%;
+  border-radius: 999px;
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--sb-primary) 20%, transparent),
+    color-mix(in srgb, var(--sb-primary) 82%, white)
+  );
+  box-shadow: 0 0 10px color-mix(in srgb, var(--sb-primary) 16%, transparent);
+}
+
+.reports-panel {
+  border-radius: 28px;
+  padding: 1.25rem;
+}
+
+.reports-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.35rem 0.35rem 1.2rem;
+}
+
+.panel-kicker {
+  margin: 0 0 0.35rem;
+}
+
+.panel-title {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin: 0;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.panel-title i {
+  color: var(--sb-primary);
+}
+
+.view-tabs,
+.filter-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid var(--reports-border);
+  background: color-mix(in srgb, var(--sb-bg) 62%, transparent);
+  border-radius: 999px;
+  padding: 0.35rem;
+}
+
+.view-tab,
+.filter-tab,
+.details-btn {
+  border: 0;
+  transition:
+    transform var(--sb-t-quick, 120ms) var(--sb-spring-fast, ease),
+    background-color var(--sb-t-normal, 250ms) var(--sb-spring, ease),
+    color var(--sb-t-normal, 250ms) var(--sb-spring, ease),
+    box-shadow var(--sb-t-normal, 250ms) var(--sb-spring, ease);
+}
+
+.view-tab,
+.filter-tab {
+  border-radius: 999px;
+  color: var(--reports-muted);
+  background: transparent;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.view-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.52rem 0.85rem;
 }
 
 .filter-tab {
-  position: relative;
-}
-.filter-tab.active::after {
-  content: '';
-  position: absolute;
-  bottom: -2px;
-  left: 12px;
-  right: 12px;
-  height: 2px;
-  background: var(--sb-primary);
-  border-radius: 999px;
-  transform-origin: left center;
-  animation: sb-tab-indicator var(--sb-t-normal) var(--sb-spring) both;
+  padding: 0.48rem 0.9rem;
+  font-size: 0.88rem;
 }
 
-.stat-icon {
-  width: 32px;
-  height: 32px;
+.view-tab-active,
+.filter-tab-active {
+  color: var(--reports-ink);
+  background: var(--reports-glass-strong);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
 }
 
-.table > :not(caption) > * > * {
-  border-bottom-width: 0;
+.view-tab:active,
+.filter-tab:active,
+.details-btn:active {
+  transform: scale(0.97);
 }
 
-.reports-header-row {
-  border-bottom: 2px solid var(--sb-card-border);
+.tab-panel {
+  border-top: 1px solid var(--reports-border);
+  padding-top: 1rem;
+}
+
+.sessions-toolbar {
+  display: flex;
+  justify-content: flex-start;
+  margin-bottom: 1rem;
+  overflow-x: auto;
+  padding-bottom: 0.15rem;
+}
+
+.session-list {
+  display: grid;
+  gap: 0.75rem;
 }
 
 .session-row {
-  position: relative;
-  border-bottom: 1px solid var(--sb-card-border);
+  border-radius: 20px;
+  padding: 1rem;
+  display: grid;
+  grid-template-columns: minmax(180px, 1.15fr) minmax(320px, 1.8fr) auto;
+  align-items: center;
+  gap: 1rem;
+}
+
+.session-subject-line {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  min-width: 0;
+}
+
+.session-subject-line h5,
+.analytics-summary h5 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.session-subject-line p {
+  margin: 0.2rem 0 0;
+  color: var(--reports-muted);
+  font-size: 0.9rem;
+}
+
+.session-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.session-meta-item {
+  min-width: 0;
+}
+
+.session-meta-item strong {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.92rem;
+  color: var(--reports-ink);
+  overflow-wrap: anywhere;
+}
+
+.rating-value {
+  color: #c49102 !important;
+}
+
+.rating-value i {
+  margin-right: 0.25rem;
+}
+
+.session-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.65rem;
+}
+
+.status-badge {
+  border: 1px solid transparent;
+  font-weight: 800 !important;
+}
+
+.status-badge-completed,
+.status-badge-upcoming,
+.status-badge-ongoing {
+  color: var(--sb-primary) !important;
+  background: color-mix(in srgb, var(--sb-primary) 13%, transparent) !important;
+  border-color: color-mix(in srgb, var(--sb-primary) 24%, transparent) !important;
+}
+
+.status-badge-warning {
+  color: #9a6500 !important;
+  background: rgba(255, 193, 7, 0.14) !important;
+  border-color: rgba(255, 193, 7, 0.28) !important;
+}
+
+.status-badge-danger {
+  color: var(--bs-danger, #dc3545) !important;
+  background: rgba(220, 53, 69, 0.12) !important;
+  border-color: rgba(220, 53, 69, 0.26) !important;
+}
+
+.status-badge-pending {
+  color: var(--reports-muted) !important;
+  background: color-mix(in srgb, var(--sb-card-border) 42%, transparent) !important;
+  border-color: var(--reports-border) !important;
+}
+
+.details-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border-radius: 999px;
+  padding: 0.55rem 0.85rem;
+  background: var(--sb-primary);
+  color: var(--sb-primary-contrast, #fff);
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.details-btn:hover {
+  background: var(--sb-primary-hover);
+  color: var(--sb-primary-contrast, #fff);
+}
+
+.state-panel {
+  min-height: 260px;
+  border: 1px dashed var(--reports-border);
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--sb-card-bg) 54%, transparent);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  color: var(--reports-muted);
+  text-align: center;
+}
+
+.state-panel i {
+  color: var(--sb-primary);
+  font-size: 1.75rem;
+  margin-bottom: 0.8rem;
+}
+
+.state-panel p {
+  margin: 0;
+  font-weight: 700;
+}
+
+.state-panel-error {
+  color: var(--sb-danger-bs, #dc3545);
+}
+
+.state-panel-error i {
+  color: var(--sb-danger-bs, #dc3545);
+}
+
+.reports-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
+  gap: 1rem;
+}
+
+.analytics-summary {
+  border-radius: 22px;
+  padding: 1rem;
+}
+
+.summary-header {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+.status-bars,
+.summary-list {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.status-bar-label,
+.summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.status-track {
+  height: 0.55rem;
+  border-radius: 999px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--sb-card-border) 70%, transparent);
+}
+
+.status-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--sb-primary), color-mix(in srgb, var(--sb-primary) 64%, white));
+}
+
+.summary-row {
+  border-bottom: 1px solid var(--reports-border);
+  padding-bottom: 0.75rem;
+}
+
+.summary-row:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.summary-row strong {
+  color: var(--reports-ink);
+  text-align: right;
+}
+
+@media (max-width: 1199.98px) {
+  .metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .session-row {
+    grid-template-columns: 1fr;
+  }
+
+  .session-actions {
+    justify-content: space-between;
+  }
+}
+
+@media (max-width: 767.98px) {
+  .metric-grid,
+  .reports-grid,
+  .session-meta-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .reports-panel {
+    border-radius: 22px;
+    padding: 1rem;
+  }
+
+  .reports-panel-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .view-tabs,
+  .filter-bar {
+    width: 100%;
+    overflow-x: auto;
+    justify-content: flex-start;
+  }
+
+  .session-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .details-btn {
+    justify-content: center;
+  }
+
+  .metric-card {
+    min-height: 124px;
+  }
+}
+
+@supports not (backdrop-filter: blur(18px)) {
+  .metric-card,
+  .reports-panel,
+  .session-row,
+  .analytics-summary {
+    background: var(--sb-card-bg);
+  }
 }
 </style>

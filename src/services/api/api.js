@@ -15,6 +15,7 @@ const PUBLIC_ENDPOINTS = [
 
 const api = axios.create({
   baseURL: API_BASE_URL,
+  timeout: 30000,
   headers: isNgrok ? { 'ngrok-skip-browser-warning': 'true' } : {},
 })
 

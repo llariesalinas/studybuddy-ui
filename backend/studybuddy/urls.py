@@ -47,6 +47,7 @@ urlpatterns = [
 
     path('register/', register_user),
     path('login/', login_view),
+    path('logout/', views.logout_view),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('profile/status/', views.profile_status),
     path('preferences/', views.save_preferences),

@@ -81,6 +81,15 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     updateAccessToken(newAccessToken)
+
+    // Backend rotates refresh tokens (ROTATE_REFRESH_TOKENS) and blacklists the
+    // old one, so persist the new refresh token or the next refresh will fail.
+    const rotatedRefreshToken = response.data.refresh
+    if (rotatedRefreshToken) {
+      refreshToken.value = rotatedRefreshToken
+      localStorage.setItem('refresh_token', rotatedRefreshToken)
+    }
+
     return newAccessToken
   }
 
@@ -144,6 +153,25 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   const logout = () => {
+    // Best-effort server-side revocation: blacklist the refresh token.
+    // Uses raw axios (not the api instance) to avoid the 401 interceptor recursing.
+    const currentAccess = token.value || localStorage.getItem('access_token')
+    const currentRefresh = refreshToken.value || localStorage.getItem('refresh_token')
+
+    if (currentAccess && currentRefresh) {
+      const ngrokHeaders = API_BASE_URL.includes('ngrok')
+        ? { 'ngrok-skip-browser-warning': 'true' }
+        : {}
+
+      axios
+        .post(
+          `${API_BASE_URL}logout/`,
+          { refresh: currentRefresh },
+          { headers: { Authorization: `Bearer ${currentAccess}`, ...ngrokHeaders } }
+        )
+        .catch(() => {})
+    }
+
     stopIdleSessionTracking()
     stopAccessTokenRefresh()
 

@@ -102,7 +102,13 @@
       </div>
     </aside>
 
-    <div ref="logoutModalRef" class="modal fade" id="logoutModal" tabindex="-1">
+    <div
+      ref="logoutModalRef"
+      class="modal fade logout-modal"
+      id="logoutModal"
+      tabindex="-1"
+      data-bs-backdrop="false"
+    >
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content rounded-4">
           
@@ -292,7 +298,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth' // Import auth store
 import { useSessionsStore } from '@/stores/completedSessions'
@@ -313,28 +319,109 @@ const chatStore = useChatStore()
 const sessionStore = useSessionsStore()
 const logoutModalRef = ref(null)
 let pendingSessionsRefreshId = null
+let auroraFrameId = null
+let auroraPointerTarget = { x: 0, y: 0 }
+let auroraMotionEnabled = false
 
-const closeLogoutModal = () => {
-  const modalElement = logoutModalRef.value
+const setAuroraMovement = (x = 0, y = 0) => {
+  const rootStyle = document.documentElement.style
+  rootStyle.setProperty('--sb-aurora-base-x', `${(x * 10).toFixed(2)}px`)
+  rootStyle.setProperty('--sb-aurora-base-y', `${(y * 7).toFixed(2)}px`)
+  rootStyle.setProperty('--sb-aurora-overlay-x', `${(x * 34).toFixed(2)}px`)
+  rootStyle.setProperty('--sb-aurora-overlay-y', `${(y * 26).toFixed(2)}px`)
+  rootStyle.setProperty('--sb-aurora-sheen-x', `${(x * -8).toFixed(2)}px`)
+  rootStyle.setProperty('--sb-aurora-sheen-y', `${(y * -5).toFixed(2)}px`)
+}
 
-  if (!modalElement) {
+const scheduleAuroraMovement = () => {
+  if (auroraFrameId) {
     return
   }
 
-  const modalInstance = bootstrap.Modal.getInstance(modalElement)
-  modalInstance?.hide()
+  auroraFrameId = window.requestAnimationFrame(() => {
+    auroraFrameId = null
+    setAuroraMovement(auroraPointerTarget.x, auroraPointerTarget.y)
+  })
+}
 
+const handleAuroraPointerMove = (event) => {
+  auroraPointerTarget = {
+    x: ((event.clientX / window.innerWidth) - 0.5) * 2,
+    y: ((event.clientY / window.innerHeight) - 0.5) * 2
+  }
+  scheduleAuroraMovement()
+}
+
+const resetAuroraMovement = () => {
+  auroraPointerTarget = { x: 0, y: 0 }
+  scheduleAuroraMovement()
+}
+
+const setupAuroraPointerMotion = () => {
+  const finePointer = window.matchMedia?.('(pointer: fine)').matches
+  const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+
+  auroraMotionEnabled = Boolean(finePointer && !reducedMotion)
+
+  if (!auroraMotionEnabled) {
+    setAuroraMovement()
+    return
+  }
+
+  window.addEventListener('pointermove', handleAuroraPointerMove, { passive: true })
+  window.addEventListener('pointerleave', resetAuroraMovement)
+  window.addEventListener('blur', resetAuroraMovement)
+}
+
+const teardownAuroraPointerMotion = () => {
+  window.removeEventListener('pointermove', handleAuroraPointerMove)
+  window.removeEventListener('pointerleave', resetAuroraMovement)
+  window.removeEventListener('blur', resetAuroraMovement)
+
+  if (auroraFrameId) {
+    window.cancelAnimationFrame(auroraFrameId)
+    auroraFrameId = null
+  }
+
+  setAuroraMovement()
+}
+
+const clearBootstrapModalState = () => {
   document.body.classList.remove('modal-open')
   document.body.style.removeProperty('overflow')
   document.body.style.removeProperty('padding-right')
   document.querySelectorAll('.modal-backdrop').forEach(backdrop => backdrop.remove())
 }
 
+const closeLogoutModal = () => {
+  const modalElement = logoutModalRef.value
+
+  if (!modalElement) {
+    clearBootstrapModalState()
+    return
+  }
+
+  const modalInstance = bootstrap.Modal.getInstance(modalElement)
+  modalInstance?.hide()
+  modalInstance?.dispose()
+
+  modalElement.classList.remove('show')
+  modalElement.setAttribute('aria-hidden', 'true')
+  modalElement.removeAttribute('aria-modal')
+  modalElement.removeAttribute('role')
+  modalElement.style.display = 'none'
+  clearBootstrapModalState()
+}
+
 const logout = async () => {
   closeLogoutModal()
+  await nextTick()
   chatStore.disconnectAll()
   authStore.logout()
-  await router.push('/login')
+  await router.replace('/login')
+  await nextTick()
+  closeLogoutModal()
+  window.setTimeout(clearBootstrapModalState, 0)
 }
 
 const isPublicRoute = computed(() => {
@@ -359,6 +446,8 @@ const handleVisibilityChange = async () => {
   }
 }
 onMounted(() => {
+  setupAuroraPointerMotion()
+
   if (authStore.isAuthenticated) {
     notificationsStore.fetchNotifications()
     chatStore.fetchRooms()
@@ -375,6 +464,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   closeLogoutModal()
+  teardownAuroraPointerMotion()
   document.removeEventListener('visibilitychange', handleVisibilityChange)
 
   if (pendingSessionsRefreshId) {
@@ -457,9 +547,7 @@ onBeforeUnmount(() => {
 }
 
 .app-main-surface {
-  background:
-    var(--sb-aurora-bg, none),
-    var(--sb-bg);
+  background: transparent;
 }
 
 .app-main-chat {
@@ -470,6 +558,18 @@ onBeforeUnmount(() => {
 
 .app-page-header {
   min-height: var(--sb-topbar-height);
+}
+
+.logout-modal {
+  background: transparent;
+}
+
+.logout-modal .modal-content {
+  border: 1px solid color-mix(in srgb, var(--sb-card-border) 82%, transparent);
+  background: color-mix(in srgb, var(--sb-card-bg) 94%, transparent);
+  color: var(--sb-text-main);
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(28px);
 }
 
 .chat-icon-btn {

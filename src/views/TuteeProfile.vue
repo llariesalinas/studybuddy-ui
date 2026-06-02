@@ -1,9 +1,5 @@
 <template>
   <div class="tutee-profile-shell">
-    <div class="aurora-blob aurora-blob-one"></div>
-    <div class="aurora-blob aurora-blob-two"></div>
-    <div class="aurora-blob aurora-blob-three"></div>
-
     <form class="profile-content" @submit.prevent="saveProfile">
       <header class="glass-segment profile-header-segment">
         <div class="header-left">
@@ -1160,57 +1156,19 @@ onMounted(() => {
 
 <style scoped>
 .tutee-profile-shell {
-  --sb-primary: #00895a;
-  --sb-primary-hover: #00704a;
   --sb-dark: #0a1916;
-  --sb-ink: #1d1d1f;
-  --sb-muted: #6e6e73;
-  --sb-divider: #e7ece9;
-  --sb-green-tint: #edf7f3;
-  --sb-green-border: #b8dece;
+  --sb-ink: var(--sb-text-main);
+  --sb-muted: var(--sb-text-muted);
+  --sb-divider: var(--sb-card-border);
+  --sb-green-tint: color-mix(in srgb, var(--sb-primary) 10%, transparent);
+  --sb-green-border: color-mix(in srgb, var(--sb-primary) 28%, var(--sb-card-border));
   position: relative;
   min-height: 100vh;
   padding: 2rem;
   overflow: hidden;
   color: var(--sb-ink);
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background:
-    radial-gradient(circle at 10% 5%, rgba(0, 137, 90, 0.2), transparent 30%),
-    radial-gradient(circle at 90% 8%, rgba(41, 128, 185, 0.16), transparent 28%),
-    radial-gradient(circle at 85% 80%, rgba(245, 158, 11, 0.12), transparent 34%),
-    linear-gradient(135deg, #f8fbf9 0%, #eef7f3 48%, #f8fafc 100%);
-}
-
-.aurora-blob {
-  position: absolute;
-  border-radius: 999px;
-  filter: blur(18px);
-  opacity: 0.42;
-  pointer-events: none;
-}
-
-.aurora-blob-one {
-  width: 280px;
-  height: 280px;
-  top: -90px;
-  left: 12%;
-  background: rgba(0, 137, 90, 0.34);
-}
-
-.aurora-blob-two {
-  width: 320px;
-  height: 320px;
-  top: 10%;
-  right: -110px;
-  background: rgba(14, 165, 233, 0.2);
-}
-
-.aurora-blob-three {
-  width: 240px;
-  height: 240px;
-  left: -80px;
-  bottom: 10%;
-  background: rgba(245, 158, 11, 0.14);
+  background: transparent;
 }
 
 .profile-content {
@@ -1223,8 +1181,8 @@ onMounted(() => {
 }
 
 .glass-segment {
-  background: rgba(255, 255, 255, 0.78);
-  border: 1px solid rgba(255, 255, 255, 0.9);
+  background: color-mix(in srgb, var(--sb-card-bg) 84%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sb-card-border) 82%, transparent);
   border-radius: 24px;
   box-shadow: 0 24px 70px rgba(15, 23, 42, 0.1);
   backdrop-filter: blur(24px);

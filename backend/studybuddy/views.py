@@ -6,18 +6,25 @@ import requests
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
 from django.utils.timezone import now
+from django.utils.crypto import constant_time_compare
 from django.db import transaction
 from datetime import datetime,timedelta, date
 from calendar import monthrange
 from uuid import uuid4
 from django.conf import settings
 from django.shortcuts import get_object_or_404
-from rest_framework.decorators import api_view, authentication_classes, permission_classes
+from rest_framework.decorators import api_view, authentication_classes, permission_classes, throttle_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.throttling import AnonRateThrottle
 from django.utils import timezone
-from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.tokens import RefreshToken, TokenError
+
+
+class LoginRateThrottle(AnonRateThrottle):
+    """Per-IP throttle for unauthenticated auth endpoints (login/register)."""
+    scope = 'login'
 from rest_framework.views import APIView
 from rest_framework.generics import ListAPIView
 from django.db.models import Avg, Case, When, Value, IntegerField, Q, Count
@@ -469,6 +476,7 @@ def partner_institutions_list(request):
 
 @api_view(['POST'])
 @authentication_classes([])
+@throttle_classes([LoginRateThrottle])
 @transaction.atomic
 def register_user(request):
 
@@ -575,6 +583,7 @@ def profile_status(request):
 
 @api_view(['POST'])
 @authentication_classes([])
+@throttle_classes([LoginRateThrottle])
 def login_view(request):
 
     email = request.data.get("email")
@@ -654,6 +663,26 @@ def login_view(request):
         "fname": profile.fname,
         "lname": profile.lname
     })
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def logout_view(request):
+    """Blacklist the supplied refresh token so it can no longer be used."""
+    refresh = request.data.get("refresh")
+    if not refresh:
+        return Response(
+            {"error": "Refresh token required."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        RefreshToken(refresh).blacklist()
+    except TokenError:
+        # Token already invalid/expired/blacklisted — logout is idempotent.
+        return Response({"message": "Logged out."}, status=status.HTTP_200_OK)
+
+    return Response({"message": "Logged out."}, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])
@@ -2883,10 +2912,15 @@ def get_request_tutor(request):
 
 def get_cashout_callback_url(request):
     configured_url = getattr(settings, 'PAYMONGO_CASHOUT_CALLBACK_URL', '')
-    if configured_url:
-        return configured_url
+    base_url = configured_url or request.build_absolute_uri('/api/wallet/paymongo/callback/')
 
-    return request.build_absolute_uri('/api/wallet/paymongo/callback/')
+    # Append a shared-secret token so the inbound callback can be authenticated.
+    secret = getattr(settings, 'PAYMONGO_CASHOUT_CALLBACK_SECRET', '')
+    if secret:
+        separator = '&' if '?' in base_url else '?'
+        return f"{base_url}{separator}token={secret}"
+
+    return base_url
 
 
 def get_required_cashout_rail(amount):
@@ -3319,6 +3353,19 @@ request_withdrawal = cash_outs
 @authentication_classes([])
 @permission_classes([])
 def paymongo_cashout_callback(request):
+    # Authenticate the callback with the shared secret token when configured.
+    secret = getattr(settings, 'PAYMONGO_CASHOUT_CALLBACK_SECRET', '')
+    if secret:
+        provided = request.query_params.get('token', '')
+        if not constant_time_compare(provided, secret):
+            logger.warning("Rejected PayMongo cashout callback: invalid or missing token.")
+            return Response({"error": "Unauthorized."}, status=status.HTTP_403_FORBIDDEN)
+    else:
+        logger.warning(
+            "PayMongo cashout callback received without signature verification "
+            "(PAYMONGO_CASHOUT_CALLBACK_SECRET not set)."
+        )
+
     provider_data = normalize_wallet_transaction(request.data)
     provider_transaction_id = provider_data.get('id')
 
