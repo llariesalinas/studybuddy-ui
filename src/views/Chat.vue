@@ -76,14 +76,14 @@
                           item.type === 'date-separator'
                             ? 'date-separator-row'
                             : [
-                                'message-wrapper',
-                                {
-                                  'is-me': item.is_me,
-                                  'is-system': item.message_type !== 'text',
-                                  'is-pending': item.status === 'pending' || item.pending === true,
-                                  'is-failed': item.failed === true,
-                                },
-                              ]
+                                  'message-wrapper',
+                                  {
+                                    'is-me': item.is_me,
+                                    'is-system': item.message_type !== 'text' || !item.sender || item.sender_name === 'System',
+                                    'is-pending': item.status === 'pending' || item.pending === true,
+                                    'is-failed': item.failed === true,
+                                  },
+                                ]
                         "
                       >
                         <template v-if="item.type === 'date-separator'">
@@ -102,6 +102,13 @@
                                 compact
                                 @location-saved="handleLocationSaved"
                               />
+                            </div>
+                          </div>
+
+                          <div v-else-if="!item.sender || item.sender_name === 'System'" class="system-event text-center my-3">
+                            <div class="px-4 py-2 bg-light border border-sb rounded-pill text-sb-muted small d-inline-block shadow-sm">
+                              <i class="bi bi-info-circle-fill text-sb-primary me-2"></i>
+                              <span>{{ item.content }}</span>
                             </div>
                           </div>
 
@@ -149,7 +156,11 @@
                     </div>
                   </div>
 
+                  <div v-if="isResolvedSupport" class="resolved-banner p-3 text-center bg-light text-muted border-top">
+                    <i class="bi bi-lock-fill me-2"></i>This support ticket is resolved and the chat conversation is closed.
+                  </div>
                   <form
+                    v-else
                     class="chat-input-area"
                     @submit.prevent="handleSend"
                     :class="{ 'sb-shake-active': composerShaking }"
@@ -175,35 +186,63 @@
               </div>
 
               <aside class="chat-context-panel" aria-label="Conversation context">
-                <div class="context-profile">
-                  <div class="context-avatar">{{ getRoomInitials(chatStore.currentRoom) }}</div>
-                  <h4>{{ chatStore.getRoomPartnerName(chatStore.currentRoom) }}</h4>
-                  <p>{{ partnerSubtitle }}</p>
-                </div>
-
-                <div class="context-section">
-                  <h5>Stats together</h5>
-                  <div class="context-stat-grid">
-                    <div class="context-stat-card">
-                      <strong>{{ partnerContext.sessions_together || 0 }}</strong>
-                      <span>Sessions</span>
+                <template v-if="chatStore.currentRoom?.room_type === 'support'">
+                  <div class="context-profile">
+                    <div class="context-avatar bg-success text-white">
+                      <i class="bi bi-headset fs-4"></i>
                     </div>
-                    <div class="context-stat-card">
-                      <strong>{{ formattedFocusedHours }}</strong>
-                      <span>Focused</span>
+                    <h4 class="mt-3">Customer Support</h4>
+                    <p class="small text-muted mb-0">Support Ticket Room</p>
+                  </div>
+                  <div class="context-section">
+                    <h5>Ticket Details</h5>
+                    <div class="card border-0 bg-light p-3 rounded-4 small">
+                      <div class="mb-2">
+                        <span class="text-muted d-block small">ROOM TYPE</span>
+                        <strong>Official Support</strong>
+                      </div>
+                      <div class="mb-2">
+                        <span class="text-muted d-block small">REPORTER</span>
+                        <strong>{{ chatStore.currentRoom.tutee_name }}</strong>
+                      </div>
+                      <div class="mb-0">
+                        <span class="text-muted d-block small">STATUS</span>
+                        <span class="badge rounded-pill bg-sb-primary text-white py-1 px-2 mt-1">{{ chatStore.currentRoom.ticket_status || 'Active' }}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-
-                <div class="context-section">
-                  <h5>Common Topics</h5>
-                  <div v-if="partnerContext.topics?.length" class="topic-chip-list">
-                    <span v-for="topic in partnerContext.topics" :key="topic" class="topic-chip">
-                      {{ topic }}
-                    </span>
+                </template>
+                <template v-else>
+                  <div class="context-profile">
+                    <div class="context-avatar">{{ getRoomInitials(chatStore.currentRoom) }}</div>
+                    <h4>{{ chatStore.getRoomPartnerName(chatStore.currentRoom) }}</h4>
+                    <p>{{ partnerSubtitle }}</p>
                   </div>
-                  <p v-else class="context-empty">No shared topics yet</p>
-                </div>
+
+                  <div class="context-section">
+                    <h5>Stats together</h5>
+                    <div class="context-stat-grid">
+                      <div class="context-stat-card">
+                        <strong>{{ partnerContext.sessions_together || 0 }}</strong>
+                        <span>Sessions</span>
+                      </div>
+                      <div class="context-stat-card">
+                        <strong>{{ formattedFocusedHours }}</strong>
+                        <span>Focused</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="context-section">
+                    <h5>Common Topics</h5>
+                    <div v-if="partnerContext.topics?.length" class="topic-chip-list">
+                      <span v-for="topic in partnerContext.topics" :key="topic" class="topic-chip">
+                        {{ topic }}
+                      </span>
+                    </div>
+                    <p v-else class="context-empty">No shared topics yet</p>
+                  </div>
+                </template>
               </aside>
             </div>
           </template>
@@ -380,7 +419,13 @@ const typingLabel = computed(() => {
 })
 
 const partnerContext = computed(() => chatStore.currentRoom?.partner_context || {})
-const partnerSubtitle = computed(() => (isTutor.value ? 'Tutee' : 'Tutor'))
+const partnerSubtitle = computed(() => {
+  if (chatStore.currentRoom?.room_type === 'support') return 'Support Staff'
+  return isTutor.value ? 'Tutee' : 'Tutor'
+})
+const isResolvedSupport = computed(() => {
+  return chatStore.currentRoom?.room_type === 'support' && chatStore.currentRoom?.ticket_status === 'Resolved'
+})
 const formattedFocusedHours = computed(() => {
   const hours = Number(partnerContext.value.focused_hours || 0)
   if (Number.isInteger(hours)) return `${hours}h`
@@ -591,7 +636,12 @@ watch(
       return
     }
 
-    const room = chatStore.rooms.find((candidate) => candidate.id === numericRoomId)
+    let room = chatStore.rooms.find((candidate) => candidate.id === numericRoomId)
+    if (!room) {
+      await chatStore.fetchRooms()
+      room = chatStore.rooms.find((candidate) => candidate.id === numericRoomId)
+    }
+
     if (room) {
       await selectRoom(room)
     }
@@ -603,9 +653,14 @@ onMounted(async () => {
   chatStore.connectUpdates()
 
   const roomId = Number(route.query.room)
-  const initialRoom = roomId
+  let initialRoom = roomId
     ? chatStore.rooms.find((candidate) => candidate.id === roomId)
     : chatStore.sortedRooms[0]
+
+  if (roomId && !initialRoom) {
+    await chatStore.fetchRooms()
+    initialRoom = chatStore.rooms.find((candidate) => candidate.id === roomId)
+  }
 
   if (initialRoom) {
     await selectRoom(initialRoom)

@@ -25,6 +25,8 @@ class MessageSerializer(serializers.ModelSerializer):
         ]
 
     def get_sender_name(self, obj):
+        if not obj.sender:
+            return "System"
         try:
             profile = obj.sender.userprofile
             return f"{profile.fname} {profile.lname}"
@@ -32,6 +34,8 @@ class MessageSerializer(serializers.ModelSerializer):
             return obj.sender.username
 
     def get_sender_profile_id(self, obj):
+        if not obj.sender:
+            return None
         try:
             return obj.sender.userprofile.id
         except Exception:
@@ -50,6 +54,7 @@ class ChatRoomSerializer(serializers.ModelSerializer):
     unread_count = serializers.SerializerMethodField()
     current_booking = serializers.SerializerMethodField()
     partner_context = serializers.SerializerMethodField()
+    ticket_status = serializers.SerializerMethodField()
 
     class Meta:
         model = ChatRoom
@@ -60,19 +65,34 @@ class ChatRoomSerializer(serializers.ModelSerializer):
             'booking',
             'created_at',
             'updated_at',
+            'room_type',
             'tutee_name',
             'tutor_name',
             'last_message',
             'unread_count',
             'current_booking',
             'partner_context',
+            'ticket_status',
         ]
 
+    def get_ticket_status(self, obj):
+        if hasattr(obj, 'ticket') and obj.ticket:
+            return obj.ticket.status
+        return None
+
     def get_tutee_name(self, obj):
-        return f"{obj.tutee.fname} {obj.tutee.lname}"
+        if obj.tutee:
+            return f"{obj.tutee.fname} {obj.tutee.lname}"
+        return "User"
 
     def get_tutor_name(self, obj):
-        return f"{obj.tutor.fname} {obj.tutor.lname}"
+        if obj.room_type == 'support':
+            if obj.tutor:
+                return f"{obj.tutor.fname} {obj.tutor.lname}"
+            return "Support Agent"
+        if obj.tutor:
+            return f"{obj.tutor.fname} {obj.tutor.lname}"
+        return "Tutor"
 
     def get_last_message(self, obj):
         last_msg = obj.messages.order_by('-created_at').first()

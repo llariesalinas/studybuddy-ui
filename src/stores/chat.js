@@ -464,6 +464,14 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   function getRoomPartnerName(room) {
+    if (!room) return ''
+    if (room.room_type === 'support') {
+      const myId = myProfileId()
+      if (room.tutee === myId) {
+        return room.tutor_name || 'Support Agent'
+      }
+      return room.tutee_name || 'Customer'
+    }
     const role = authStore.user?.role || localStorage.getItem('user_role')
     return String(role).toLowerCase() === 'tutor' ? room.tutee_name : room.tutor_name
   }

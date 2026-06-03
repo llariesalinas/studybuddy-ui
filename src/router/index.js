@@ -163,6 +163,12 @@ const router = createRouter({
       component: () => import('@/views/AdminReports.vue'),
       meta: { requiresAuth: true, role: 'Admin' }
     },
+    {
+      path: '/admin/support',
+      name: 'admin-support',
+      component: () => import('@/views/AdminSupport.vue'),
+      meta: { requiresAuth: true, role: 'Admin' }
+    },
 
 
     // ---------- SHARED ROUTES ----------
@@ -187,6 +193,11 @@ const router = createRouter({
   GLOBAL NAVIGATION GUARD
 */
 router.beforeEach(async (to, from, next) => {
+  // Clean up any lingering backdrops or modal styles
+  document.querySelectorAll('.offcanvas-backdrop, .modal-backdrop').forEach(el => el.remove())
+  document.body.classList.remove('modal-open', 'offcanvas-open')
+  document.body.style.removeProperty('overflow')
+  document.body.style.removeProperty('padding-right')
 
   const authStore = useAuthStore()
   const profileStore = useProfileStore()
