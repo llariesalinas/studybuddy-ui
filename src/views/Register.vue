@@ -103,13 +103,11 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useRegistrationInfoStore } from '@/stores/registrationinfo'
-import { useAuthStore } from '@/stores/auth'
 import api from '@/services/api/api'
 import AuthShell from '@/components/AuthShell.vue'
 
 const router = useRouter()
 const store = useRegistrationInfoStore()
-const authStore = useAuthStore()
 
 const isSubmitting = ref(false)
 const institutions = ref([])
@@ -189,13 +187,13 @@ const handleRegister = async () => {
       institution_id: store.selectedInstitutionId,
     })
 
-    await authStore.login({
-      email: store.newUserEmail,
-      password: store.newUserPassword,
+    router.push({
+      name: 'login',
+      query: {
+        registered: 'success',
+        email: store.newUserEmail,
+      },
     })
-
-    if (role === 'Tutor') router.push('/tutor-setup')
-    else router.push('/preferencesetup')
   } catch (error) {
     console.error('Registration Error:', error)
 

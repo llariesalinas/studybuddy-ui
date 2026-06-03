@@ -7,6 +7,10 @@ const isNgrok = API_BASE_URL.includes('ngrok')
 const PUBLIC_ENDPOINTS = [
   'login/',
   'register/',
+  'login/verify-otp/',
+  'login/resend-otp/',
+  'password-reset/request/',
+  'password-reset/confirm/',
   'token/refresh/',
   'partner-institutions/',
   'courses/',

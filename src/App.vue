@@ -88,8 +88,7 @@
         <li class="nav-item mb-2">
           <button
            class="nav-link border-0 shadow-none bg-transparent text-white opacity-75 d-flex align-items-center sb-btn"
-           data-bs-toggle="modal"
-           data-bs-target="#logoutModal"
+           @click="openLogoutModal"
            >
             <i class="bi bi-box-arrow-right me-3"></i> Log-out
           </button>
@@ -103,18 +102,22 @@
     </aside>
 
     <div
+      v-if="showLogoutModal"
       ref="logoutModalRef"
-      class="modal fade logout-modal"
+      class="modal logout-modal show"
       id="logoutModal"
       tabindex="-1"
-      data-bs-backdrop="false"
+      role="dialog"
+      aria-modal="true"
+      style="display: block;"
+      @click.self="closeLogoutModal"
     >
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content rounded-4">
           
           <div class="modal-header border-0">
             <h5 class="modal-title fw-bold">Confirm Logout</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            <button type="button" class="btn-close" @click="closeLogoutModal"></button>
           </div>
 
           <div class="modal-body sb-muted">
@@ -124,7 +127,7 @@
           <div class="modal-footer border-0">
             <button
               class="btn btn-light sb-btn"
-              data-bs-dismiss="modal"
+              @click="closeLogoutModal"
             >
               Cancel
             </button>
@@ -307,7 +310,6 @@ import RatingReminderBanner from '@/components/RatingReminderBanner.vue'
 import { useNotificationsStore } from '@/stores/notifications'
 import { useChatStore } from '@/stores/chat'
 import router from './router'
-import * as bootstrap from 'bootstrap'
 import { SESSION_POLL_INTERVAL_MS } from './config.js'
 import SbToast from '@/components/SbToast.vue'
 import SbThemeToggle from '@/components/SbThemeToggle.vue'
@@ -318,6 +320,7 @@ const notificationsStore = useNotificationsStore()
 const chatStore = useChatStore()
 const sessionStore = useSessionsStore()
 const logoutModalRef = ref(null)
+const showLogoutModal = ref(false)
 let pendingSessionsRefreshId = null
 let auroraFrameId = null
 let auroraPointerTarget = { x: 0, y: 0 }
@@ -393,23 +396,13 @@ const clearBootstrapModalState = () => {
   document.querySelectorAll('.modal-backdrop').forEach(backdrop => backdrop.remove())
 }
 
+const openLogoutModal = () => {
+  clearBootstrapModalState()
+  showLogoutModal.value = true
+}
+
 const closeLogoutModal = () => {
-  const modalElement = logoutModalRef.value
-
-  if (!modalElement) {
-    clearBootstrapModalState()
-    return
-  }
-
-  const modalInstance = bootstrap.Modal.getInstance(modalElement)
-  modalInstance?.hide()
-  modalInstance?.dispose()
-
-  modalElement.classList.remove('show')
-  modalElement.setAttribute('aria-hidden', 'true')
-  modalElement.removeAttribute('aria-modal')
-  modalElement.removeAttribute('role')
-  modalElement.style.display = 'none'
+  showLogoutModal.value = false
   clearBootstrapModalState()
 }
 
@@ -425,7 +418,16 @@ const logout = async () => {
 }
 
 const isPublicRoute = computed(() => {
-  return ['home', 'login', 'register', 'preferencesetup', 'tutorpreferencesetup'].includes(route.name)
+  return [
+    'home',
+    'login',
+    'register',
+    'forgot-password',
+    'reset-password',
+    'password-reset-confirm',
+    'preferencesetup',
+    'tutorpreferencesetup'
+  ].includes(route.name)
 })
 
 // Get the role from the store to control the sidebar links

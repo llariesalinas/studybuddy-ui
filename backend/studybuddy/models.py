@@ -98,6 +98,33 @@ class UserProfile(models.Model):
 
     def __str__(self):
         return f"{self.fname} {self.lname}"
+
+
+class EmailOTPChallenge(models.Model):
+    PURPOSE_LOGIN = 'login'
+    PURPOSE_CHOICES = [
+        (PURPOSE_LOGIN, 'Login'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='email_otp_challenges')
+    challenge_id = models.UUIDField(default=uuid.uuid4, unique=True, db_index=True)
+    purpose = models.CharField(max_length=20, choices=PURPOSE_CHOICES, default=PURPOSE_LOGIN)
+    code_hash = models.CharField(max_length=64)
+    expires_at = models.DateTimeField()
+    consumed_at = models.DateTimeField(null=True, blank=True)
+    attempt_count = models.PositiveSmallIntegerField(default=0)
+    resend_count = models.PositiveSmallIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['user', 'purpose', 'created_at']),
+            models.Index(fields=['expires_at']),
+        ]
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.purpose} OTP for user {self.user_id}"
     
 #TUTOR TABLE
 class Tutor(models.Model):

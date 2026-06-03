@@ -24,6 +24,21 @@ const router = createRouter({
       name: 'register',
       component: () => import('@/views/Register.vue')
     },
+    {
+      path: '/forgot-password',
+      name: 'forgot-password',
+      component: () => import('@/views/ForgotPassword.vue')
+    },
+    {
+      path: '/reset-password/:uid/:token',
+      name: 'reset-password',
+      component: () => import('@/views/ResetPassword.vue')
+    },
+    {
+      path: '/password-reset/confirm',
+      name: 'password-reset-confirm',
+      component: () => import('@/views/ResetPassword.vue')
+    },
 
     // ---------- STUDENT ROUTES ----------
     {

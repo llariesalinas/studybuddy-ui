@@ -2,11 +2,20 @@ import json
 import logging
 import decimal
 import base64
+import hashlib
+import hmac
+import secrets
 import requests
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
+from django.contrib.auth.password_validation import validate_password
+from django.contrib.auth.tokens import default_token_generator
+from django.core.exceptions import ValidationError
+from django.core.mail import send_mail
 from django.utils.timezone import now
 from django.utils.crypto import constant_time_compare
+from django.utils.encoding import force_bytes, force_str
+from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from django.db import transaction
 from datetime import datetime,timedelta, date
 from calendar import monthrange
@@ -20,6 +29,7 @@ from rest_framework import status
 from rest_framework.throttling import AnonRateThrottle
 from django.utils import timezone
 from rest_framework_simplejwt.tokens import RefreshToken, TokenError
+from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
 
 
 class LoginRateThrottle(AnonRateThrottle):
@@ -34,7 +44,7 @@ from .recommender.hybrid import recommend_tutors_hybrid
 from .recommender.CF import build_rating_matrix
 
 from .recommender.cbf import recommend_tutors
-from .models import Booking, Course, Notification, PartnerInstitution, Payment, PaymentMethod, Preference, Rating, Subjects, Tutor, TutorAvailability, TutorAvailabilityOverride, TutorSubjects, Wallet, PlatformActivity, Transaction, TutorPayoutAccount
+from .models import Booking, Course, EmailOTPChallenge, Notification, PartnerInstitution, Payment, PaymentMethod, Preference, Rating, Subjects, Tutor, TutorAvailability, TutorAvailabilityOverride, TutorSubjects, Wallet, PlatformActivity, Transaction, TutorPayoutAccount
 from .serializers import (
     NotificationSerializer,
     SubjectSerializer,
@@ -86,6 +96,165 @@ def get_active_institution_by_domain(domain):
         school_email_domain__iexact=normalized_domain,
         is_active=True
     ).first()
+
+
+PASSWORD_RESET_GENERIC_MESSAGE = (
+    "If an account with that email exists, password reset instructions have been sent."
+)
+OTP_ERROR_MESSAGE = "Invalid or expired verification code."
+
+
+def build_login_response_payload(user, profile):
+    refresh = RefreshToken.for_user(user)
+    return {
+        "access": str(refresh.access_token),
+        "refresh": str(refresh),
+        "role": profile.role,
+        "user_id": user.id,
+        "profile_id": profile.id,
+        "email": user.email,
+        "fname": profile.fname,
+        "lname": profile.lname,
+    }
+
+
+def generate_otp_code():
+    return f"{secrets.randbelow(1000000):06d}"
+
+
+def hash_otp_code(user_id, challenge_id, purpose, code):
+    message = f"{purpose}:{user_id}:{challenge_id}:{code}".encode("utf-8")
+    return hmac.new(
+        settings.SECRET_KEY.encode("utf-8"),
+        message,
+        hashlib.sha256,
+    ).hexdigest()
+
+
+def verify_otp_code(challenge, code):
+    expected_hash = hash_otp_code(
+        challenge.user_id,
+        challenge.challenge_id,
+        challenge.purpose,
+        str(code or ""),
+    )
+    return constant_time_compare(challenge.code_hash, expected_hash)
+
+
+def get_login_otp_expiry():
+    return timezone.now() + timedelta(seconds=settings.LOGIN_OTP_TTL_SECONDS)
+
+
+def send_login_otp_email(user, code):
+    ttl_minutes = max(1, settings.LOGIN_OTP_TTL_SECONDS // 60)
+    send_mail(
+        subject="Your StudyBuddy login code",
+        message=(
+            f"Your StudyBuddy login verification code is {code}.\n\n"
+            f"This code expires in {ttl_minutes} minutes."
+        ),
+        from_email=None,
+        recipient_list=[user.email or user.username],
+        fail_silently=False,
+    )
+
+
+def create_login_otp_challenge(user):
+    EmailOTPChallenge.objects.filter(
+        user=user,
+        purpose=EmailOTPChallenge.PURPOSE_LOGIN,
+        consumed_at__isnull=True,
+    ).delete()
+
+    code = generate_otp_code()
+    challenge = EmailOTPChallenge(
+        user=user,
+        purpose=EmailOTPChallenge.PURPOSE_LOGIN,
+        expires_at=get_login_otp_expiry(),
+    )
+    challenge.code_hash = hash_otp_code(
+        user.id,
+        challenge.challenge_id,
+        challenge.purpose,
+        code,
+    )
+    challenge.save()
+
+    try:
+        send_login_otp_email(user, code)
+    except Exception:
+        challenge.delete()
+        logger.exception("Failed to send login OTP email for user_id=%s", user.id)
+        raise
+
+    if settings.DEBUG:
+        challenge.debug_code = code
+
+    return challenge
+
+
+def build_otp_challenge_response(challenge, message):
+    payload = {
+        "requires_2fa": True,
+        "challenge_id": str(challenge.challenge_id),
+        "message": message,
+    }
+
+    if settings.DEBUG and hasattr(challenge, "debug_code"):
+        payload["debug_code"] = challenge.debug_code
+
+    return payload
+
+
+def get_password_reset_url(user):
+    uid = urlsafe_base64_encode(force_bytes(user.pk))
+    token = default_token_generator.make_token(user)
+    return f"{settings.FRONTEND_URL.rstrip('/')}/reset-password/{uid}/{token}"
+
+
+def send_password_reset_email(user):
+    reset_url = get_password_reset_url(user)
+    send_mail(
+        subject="Reset your StudyBuddy password",
+        message=(
+            "We received a request to reset your StudyBuddy password.\n\n"
+            "Use this link to choose a new password:\n\n"
+            f"{reset_url}\n\n"
+            "If you did not request this, you can ignore this email."
+        ),
+        from_email=None,
+        recipient_list=[user.email or user.username],
+        fail_silently=False,
+    )
+
+
+def send_password_changed_email(user):
+    send_mail(
+        subject="Your StudyBuddy password was changed",
+        message=(
+            "Your StudyBuddy password was changed successfully.\n\n"
+            "If you did not make this change, please contact support immediately."
+        ),
+        from_email=None,
+        recipient_list=[user.email or user.username],
+        fail_silently=False,
+    )
+
+
+def get_user_from_reset_uid(uid):
+    try:
+        user_id = force_str(urlsafe_base64_decode(uid))
+        return User.objects.get(pk=user_id)
+    except (TypeError, ValueError, OverflowError, User.DoesNotExist, ValidationError):
+        return None
+
+
+def blacklist_user_refresh_tokens(user):
+    try:
+        for outstanding_token in OutstandingToken.objects.filter(user=user):
+            BlacklistedToken.objects.get_or_create(token=outstanding_token)
+    except Exception:
+        logger.exception("Failed to blacklist outstanding refresh tokens for user_id=%s", user.id)
 
 
 WEEKDAY_MAP = {
@@ -614,7 +783,6 @@ def login_view(request):
             status=status.HTTP_401_UNAUTHORIZED
         )
 
-    refresh = RefreshToken.for_user(user)
     try:
         profile = UserProfile.objects.get(user=user)
     except UserProfile.DoesNotExist:
@@ -663,16 +831,209 @@ def login_view(request):
             profile.institution = active_institution
             profile.save(update_fields=['institution', 'updated_at'])
 
-    return Response({
-        "access": str(refresh.access_token),
-        "refresh": str(refresh),
-        "role": profile.role,
-        "user_id": user.id,
-        "profile_id": profile.id,
-        "email": user.email,
-        "fname": profile.fname,
-        "lname": profile.lname
-    })
+    try:
+        challenge = create_login_otp_challenge(user)
+    except Exception:
+        return Response(
+            {"error": "Unable to send verification code. Please try again."},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+    return Response(
+        build_otp_challenge_response(
+            challenge,
+            "A verification code has been sent to your email.",
+        )
+    )
+
+
+@api_view(['POST'])
+@authentication_classes([])
+@permission_classes([])
+@throttle_classes([LoginRateThrottle])
+def password_reset_request(request):
+    email = str(request.data.get("email") or "").strip()
+
+    if email:
+        user = User.objects.filter(Q(username__iexact=email) | Q(email__iexact=email)).first()
+        if user and user.is_active and user.has_usable_password():
+            try:
+                send_password_reset_email(user)
+            except Exception:
+                logger.exception("Failed to send password reset email for user_id=%s", user.id)
+
+    return Response({"message": PASSWORD_RESET_GENERIC_MESSAGE})
+
+
+@api_view(['POST'])
+@authentication_classes([])
+@permission_classes([])
+@throttle_classes([LoginRateThrottle])
+def password_reset_confirm(request):
+    uid = request.data.get("uid") or request.data.get("uidb64")
+    token = request.data.get("token")
+    password = request.data.get("password")
+    password_confirm = request.data.get("password_confirm")
+
+    if not all([uid, token, password, password_confirm]):
+        return Response(
+            {"error": "UID, token, password, and password confirmation are required."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    if password != password_confirm:
+        return Response(
+            {"error": "Passwords do not match."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    user = get_user_from_reset_uid(uid)
+    if user is None or not default_token_generator.check_token(user, token):
+        return Response(
+            {"error": "Invalid or expired password reset link."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        validate_password(password, user)
+    except ValidationError as exc:
+        return Response(
+            {"error": exc.messages},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    user.set_password(password)
+    user.save(update_fields=["password"])
+    blacklist_user_refresh_tokens(user)
+
+    try:
+        send_password_changed_email(user)
+    except Exception:
+        logger.exception("Failed to send password changed notification for user_id=%s", user.id)
+
+    return Response({"message": "Password has been reset successfully."})
+
+
+@api_view(['POST'])
+@authentication_classes([])
+@permission_classes([])
+@throttle_classes([LoginRateThrottle])
+def login_verify_otp(request):
+    challenge_id = request.data.get("challenge_id")
+    code = request.data.get("code")
+
+    if not challenge_id or not code:
+        return Response(
+            {"error": "Challenge ID and code are required."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    challenge = EmailOTPChallenge.objects.select_related('user').filter(
+        challenge_id=challenge_id,
+        purpose=EmailOTPChallenge.PURPOSE_LOGIN,
+    ).first()
+
+    if challenge is None or challenge.consumed_at is not None or challenge.expires_at <= timezone.now():
+        return Response({"error": OTP_ERROR_MESSAGE}, status=status.HTTP_400_BAD_REQUEST)
+
+    if challenge.attempt_count >= settings.LOGIN_OTP_MAX_ATTEMPTS:
+        return Response(
+            {"error": "Too many verification attempts. Please request a new code."},
+            status=status.HTTP_429_TOO_MANY_REQUESTS
+        )
+
+    if not verify_otp_code(challenge, code):
+        challenge.attempt_count += 1
+        challenge.save(update_fields=['attempt_count'])
+
+        if challenge.attempt_count >= settings.LOGIN_OTP_MAX_ATTEMPTS:
+            return Response(
+                {"error": "Too many verification attempts. Please request a new code."},
+                status=status.HTTP_429_TOO_MANY_REQUESTS
+            )
+
+        return Response({"error": OTP_ERROR_MESSAGE}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        profile = UserProfile.objects.get(user=challenge.user)
+    except UserProfile.DoesNotExist:
+        return Response(
+            {"error": "User profile not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    if profile.is_suspended:
+        return Response(
+            {"error": "Your account has been suspended. Please contact administration for more details."},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    challenge.consumed_at = timezone.now()
+    challenge.save(update_fields=['consumed_at'])
+
+    return Response(build_login_response_payload(challenge.user, profile))
+
+
+@api_view(['POST'])
+@authentication_classes([])
+@permission_classes([])
+@throttle_classes([LoginRateThrottle])
+def login_resend_otp(request):
+    challenge_id = request.data.get("challenge_id")
+
+    if not challenge_id:
+        return Response(
+            {"error": "Challenge ID is required."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    challenge = EmailOTPChallenge.objects.select_related('user').filter(
+        challenge_id=challenge_id,
+        purpose=EmailOTPChallenge.PURPOSE_LOGIN,
+    ).first()
+
+    if challenge is None or challenge.consumed_at is not None:
+        return Response({"error": OTP_ERROR_MESSAGE}, status=status.HTTP_400_BAD_REQUEST)
+
+    if challenge.attempt_count >= settings.LOGIN_OTP_MAX_ATTEMPTS:
+        return Response(
+            {"error": "Too many verification attempts. Please start login again."},
+            status=status.HTTP_429_TOO_MANY_REQUESTS
+        )
+
+    code = generate_otp_code()
+    new_hash = hash_otp_code(
+        challenge.user_id,
+        challenge.challenge_id,
+        challenge.purpose,
+        code,
+    )
+    new_expiry = get_login_otp_expiry()
+
+    try:
+        send_login_otp_email(challenge.user, code)
+    except Exception:
+        logger.exception("Failed to resend login OTP email for user_id=%s", challenge.user_id)
+        return Response(
+            {"error": "Unable to send verification code. Please try again."},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+    challenge.code_hash = new_hash
+    challenge.expires_at = new_expiry
+    challenge.attempt_count = 0
+    challenge.resend_count += 1
+    challenge.save(update_fields=['code_hash', 'expires_at', 'attempt_count', 'resend_count'])
+
+    if settings.DEBUG:
+        challenge.debug_code = code
+
+    return Response(
+        build_otp_challenge_response(
+            challenge,
+            "A new verification code has been sent to your email.",
+        )
+    )
 
 
 @api_view(['POST'])

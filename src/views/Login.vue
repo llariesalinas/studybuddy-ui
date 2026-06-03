@@ -1,14 +1,20 @@
 <template>
   <AuthShell>
     <template #icon>
-      <i class="bi bi-box-arrow-in-right"></i>
+      <i :class="step === 'otp' ? 'bi bi-envelope-check' : 'bi bi-box-arrow-in-right'"></i>
     </template>
-    <template #title>Welcome Back</template>
-    <template #subtitle>Log in to your StudyBuddy account</template>
+    <template #title>{{ authTitle }}</template>
+    <template #subtitle>{{ authSubtitle }}</template>
 
     <div v-if="loginError" class="sb-auth-alert">{{ loginError }}</div>
+    <div v-if="successMessage" class="sb-auth-alert sb-auth-alert-success">
+      {{ successMessage }}
+    </div>
+    <div v-if="debugOtpCode" class="sb-auth-alert sb-auth-alert-dev">
+      Development code: <strong>{{ debugOtpCode }}</strong>
+    </div>
 
-    <form @submit.prevent="handleLogin">
+    <form v-if="step === 'password'" @submit.prevent="handleLogin">
       <div class="sb-auth-field">
         <label class="sb-auth-label">University Email</label>
         <input
@@ -23,13 +29,15 @@
       <div class="sb-auth-field">
         <div class="sb-auth-label-row">
           <label class="sb-auth-label">Password</label>
-          <a href="#" class="sb-auth-link sb-auth-link-sm">Forgot?</a>
+          <router-link to="/forgot-password" class="sb-auth-link sb-auth-link-sm">
+            Forgot?
+          </router-link>
         </div>
         <input
           type="password"
           v-model="password"
           class="sb-auth-input"
-          placeholder="••••••••"
+          placeholder="********"
           required
         />
       </div>
@@ -40,7 +48,41 @@
       </button>
     </form>
 
-    <p class="sb-auth-footer-text">
+    <form v-else @submit.prevent="handleVerifyOtp">
+      <div class="sb-auth-field">
+        <label class="sb-auth-label">Email verification code</label>
+        <input
+          type="text"
+          v-model="otp"
+          class="sb-auth-input sb-auth-otp-input"
+          placeholder="Enter the code"
+          autocomplete="one-time-code"
+          inputmode="numeric"
+          required
+        />
+      </div>
+
+      <button type="submit" class="sb-btn-pill sb-auth-submit" :disabled="isSubmitting">
+        <span v-if="isSubmitting" class="sb-spinner" aria-hidden="true"></span>
+        {{ isSubmitting ? 'Verifying...' : 'Verify Code' }}
+      </button>
+
+      <div class="sb-auth-action-row">
+        <button
+          type="button"
+          class="sb-auth-link sb-auth-link-button"
+          :disabled="isResending"
+          @click="handleResendOtp"
+        >
+          {{ isResending ? 'Sending...' : 'Resend code' }}
+        </button>
+        <button type="button" class="sb-auth-link sb-auth-link-button" @click="returnToPassword">
+          Use a different login
+        </button>
+      </div>
+    </form>
+
+    <p v-if="step === 'password'" class="sb-auth-footer-text">
       No account?
       <router-link to="/register" class="sb-auth-link">Create one</router-link>
     </p>
@@ -48,36 +90,126 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import api from '@/services/api/api'
 import AuthShell from '@/components/AuthShell.vue'
 
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
 
-const email = ref('')
+const email = ref(typeof route.query.email === 'string' ? route.query.email : '')
 const password = ref('')
+const otp = ref('')
+const challengeId = ref('')
+const debugOtpCode = ref('')
+const step = ref('password')
 const isSubmitting = ref(false)
+const isResending = ref(false)
 const loginError = ref('')
+const successMessage = ref(
+  route.query.reset === 'success'
+    ? 'Your password has been reset. You can sign in now.'
+    : route.query.registered === 'success'
+      ? 'Your account has been created. Sign in to verify your email.'
+      : '',
+)
+
+const authTitle = computed(() => (step.value === 'otp' ? 'Check Your Email' : 'Welcome Back'))
+const authSubtitle = computed(() =>
+  step.value === 'otp'
+    ? 'Enter the verification code sent to your university email'
+    : 'Log in to your StudyBuddy account',
+)
+
+const getErrorMessage = (error, fallback) => {
+  const data = error.response?.data
+
+  return data?.error || data?.detail || data?.message || fallback
+}
+
+const redirectForRole = (role) => {
+  const normalizedRole = role?.toLowerCase()
+
+  if (normalizedRole === 'tutor') router.push('/tch-dashboard')
+  else if (normalizedRole === 'tutee') router.push('/dashboard')
+  else if (normalizedRole === 'admin') router.push('/admin/dashboard')
+  else router.push('/')
+}
 
 const handleLogin = async () => {
   isSubmitting.value = true
   loginError.value = ''
+  successMessage.value = ''
 
   try {
-    const role = await authStore.login({ email: email.value, password: password.value })
-    const normalizedRole = role?.toLowerCase()
+    const result = await authStore.login({ email: email.value, password: password.value })
 
-    if (normalizedRole === 'tutor') router.push('/tch-dashboard')
-    else if (normalizedRole === 'tutee') router.push('/dashboard')
-    else if (normalizedRole === 'admin') router.push('/admin/dashboard')
-    else router.push('/')
+    if (result?.requires_2fa) {
+      challengeId.value = result.challenge_id
+      debugOtpCode.value = result.debug_code || ''
+      password.value = ''
+      otp.value = ''
+      step.value = 'otp'
+      successMessage.value = 'We sent a verification code to your university email.'
+      return
+    }
+
+    redirectForRole(result)
   } catch (error) {
-    loginError.value = error.response?.data?.error || 'Login failed. Please check your credentials.'
+    loginError.value = getErrorMessage(error, 'Login failed. Please check your credentials.')
   } finally {
     isSubmitting.value = false
   }
+}
+
+const handleVerifyOtp = async () => {
+  isSubmitting.value = true
+  loginError.value = ''
+  successMessage.value = ''
+
+  try {
+    const response = await api.post('login/verify-otp/', {
+      challenge_id: challengeId.value,
+      code: otp.value.trim(),
+    })
+    const role = await authStore.login(response.data, { completed: true })
+
+    redirectForRole(role)
+  } catch (error) {
+    loginError.value = getErrorMessage(error, 'Verification failed. Please check the code.')
+  } finally {
+    isSubmitting.value = false
+  }
+}
+
+const handleResendOtp = async () => {
+  isResending.value = true
+  loginError.value = ''
+  successMessage.value = ''
+
+  try {
+    const response = await api.post('login/resend-otp/', {
+      challenge_id: challengeId.value,
+    })
+    debugOtpCode.value = response.data?.debug_code || ''
+    successMessage.value = 'A new verification code has been sent.'
+  } catch (error) {
+    loginError.value = getErrorMessage(error, 'Unable to resend the code right now.')
+  } finally {
+    isResending.value = false
+  }
+}
+
+const returnToPassword = () => {
+  step.value = 'password'
+  challengeId.value = ''
+  debugOtpCode.value = ''
+  otp.value = ''
+  loginError.value = ''
+  successMessage.value = ''
 }
 </script>
 
@@ -129,6 +261,10 @@ const handleLogin = async () => {
   opacity: 0.78;
 }
 
+.sb-auth-otp-input {
+  text-align: center;
+}
+
 .sb-auth-alert {
   background: #fff5f5;
   border: 1px solid #fecaca;
@@ -137,6 +273,18 @@ const handleLogin = async () => {
   padding: 10px 14px;
   font-size: 13px;
   margin-bottom: 18px;
+}
+
+.sb-auth-alert-success {
+  background: #edf7f3;
+  border-color: #b8dece;
+  color: #00704a;
+}
+
+.sb-auth-alert-dev {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1d4ed8;
 }
 
 .sb-btn-pill {
@@ -176,6 +324,27 @@ const handleLogin = async () => {
   margin-bottom: 20px;
 }
 
+.sb-auth-action-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: -4px;
+  margin-bottom: 18px;
+}
+
+.sb-auth-link-button {
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+.sb-auth-link-button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
 .sb-spinner {
   width: 14px;
   height: 14px;
@@ -212,5 +381,12 @@ const handleLogin = async () => {
   font-size: 13px;
   color: var(--sb-text-muted);
   margin: 0;
+}
+
+@media (max-width: 420px) {
+  .sb-auth-action-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }
 </style>

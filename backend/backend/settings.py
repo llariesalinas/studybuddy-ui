@@ -19,6 +19,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
 
 
+def env_bool(name, default=False):
+    return os.getenv(name, str(default)).strip().lower() in {"1", "true", "yes", "on"}
+
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
@@ -28,7 +32,7 @@ if not SECRET_KEY:
     raise RuntimeError("SECRET_KEY env var is required but not set")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv('DEBUG', 'false').lower() == 'true'
+DEBUG = env_bool('DEBUG', False)
 
 _allowed_hosts_raw = os.getenv('ALLOWED_HOSTS', '')
 ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts_raw.split(',') if h.strip()]
@@ -190,6 +194,41 @@ TIME_ZONE = 'Asia/Manila'
 USE_I18N = True
 
 USE_TZ = True
+
+
+# Email
+# https://docs.djangoproject.com/en/6.0/topics/email/
+
+EMAIL_HOST = os.getenv("EMAIL_HOST", "")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT") or "587")
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True)
+EMAIL_USE_SSL = env_bool("EMAIL_USE_SSL", False)
+_configured_default_from_email = os.getenv("DEFAULT_FROM_EMAIL", "")
+DEFAULT_FROM_EMAIL = _configured_default_from_email or "StudyBuddy <no-reply@localhost>"
+EMAIL_TIMEOUT = int(os.getenv("EMAIL_TIMEOUT") or "10")
+
+_smtp_configured = all([
+    EMAIL_HOST,
+    EMAIL_HOST_USER,
+    EMAIL_HOST_PASSWORD,
+    _configured_default_from_email,
+])
+
+if DEBUG and not _smtp_configured:
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+elif not _smtp_configured:
+    raise RuntimeError(
+        "SMTP email env vars are required when DEBUG=false: "
+        "EMAIL_HOST, EMAIL_HOST_USER, EMAIL_HOST_PASSWORD, DEFAULT_FROM_EMAIL"
+    )
+else:
+    EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend")
+
+PASSWORD_RESET_TIMEOUT = 3600
+LOGIN_OTP_TTL_SECONDS = 600
+LOGIN_OTP_MAX_ATTEMPTS = 5
 
 
 # Static files (CSS, JavaScript, Images)
