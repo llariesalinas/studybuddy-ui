@@ -189,6 +189,27 @@
               <i class="bi bi-slash-circle"></i>
             </button>
           </div>
+        </TransitionGroup>
+      </article>
+
+      <aside class="glass-panel destinations-card">
+        <header class="section-header compact">
+          <div>
+            <span class="eyebrow">Payout</span>
+            <h3>Destinations</h3>
+          </div>
+          <button
+            class="icon-btn sb-btn"
+            @click="openDestinationModal"
+            aria-label="Add payout destination"
+          >
+            <i class="bi bi-plus-lg"></i>
+          </button>
+        </header>
+
+        <div v-if="walletStore.payoutAccounts.length === 0" class="destination-empty">
+          <i class="bi bi-credit-card-2-front"></i>
+          <p>No payout destinations saved.</p>
         </div>
 
         <button class="add-destination-card sb-btn" @click="openDestinationModal">
@@ -258,6 +279,14 @@
             <strong class="text-dark">Need help with payments or cash outs?</strong>
             <p class="text-muted">Submit a support ticket and a platform administrator will assist you.</p>
           </div>
+          <span class="history-summary">
+            Minimum PHP {{ money(walletStore.cashoutMinimum) }}
+          </span>
+        </header>
+
+        <div v-if="walletStore.withdrawals.length === 0" class="empty-state compact-empty">
+          <i class="bi bi-send"></i>
+          <p>No cash-outs yet.</p>
         </div>
         <div class="support-btn">
           <button class="btn btn-outline-danger sb-btn px-4" @click="openSupport('Payment')">
