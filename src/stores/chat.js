@@ -17,6 +17,11 @@ export const useChatStore = defineStore('chat', () => {
   const rooms = ref([])
   const currentRoom = ref(null)
   const messages = ref([])
+  const totalUnread = ref(0)
+  const nextCursor = ref(null)
+  const hasMoreRooms = ref(false)
+  const isLoadingRooms = ref(false)
+  const hasLoadedRooms = ref(false)
   const socket = ref(null)
   const updatesSocket = ref(null)
   const isConnected = ref(false)
@@ -45,10 +50,6 @@ export const useChatStore = defineStore('chat', () => {
     const scheme =
       typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss' : 'ws'
     return `${scheme}://${serverRoot}/ws/chat/`
-  })
-
-  const totalUnread = computed(() => {
-    return rooms.value.reduce((total, room) => total + Number(room.unread_count || 0), 0)
   })
 
   const activeTypingUsers = computed(() => {
@@ -101,6 +102,12 @@ export const useChatStore = defineStore('chat', () => {
         ...existingRoom,
         ...nextRoom,
       }
+
+      if (Object.prototype.hasOwnProperty.call(nextRoom, 'unread_count')) {
+        const previousUnread = Number(existingRoom.unread_count || 0)
+        const nextUnread = Number(rooms.value[existingIndex].unread_count || 0)
+        totalUnread.value = Math.max(0, totalUnread.value + nextUnread - previousUnread)
+      }
     }
 
     if (currentRoom.value?.id === room.id) {
@@ -120,6 +127,7 @@ export const useChatStore = defineStore('chat', () => {
 
     if (!message.is_me && currentRoom.value?.id !== roomId) {
       room.unread_count = Number(previousUnread ?? room.unread_count ?? 0) + 1
+      totalUnread.value += 1
       recentPopup.value = {
         roomId,
         partnerName: getRoomPartnerName(room),
@@ -162,11 +170,68 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   async function fetchRooms() {
+    if (isLoadingRooms.value) return
+    isLoadingRooms.value = true
+
     try {
+      nextCursor.value = null
+      hasMoreRooms.value = false
+
       const response = await api.get('chat/rooms/')
-      rooms.value = response.data
+      const payload = Array.isArray(response.data)
+        ? {
+            results: response.data,
+            next_cursor: null,
+            has_more: false,
+            total_unread: response.data.reduce((total, room) => total + Number(room.unread_count || 0), 0),
+          }
+        : response.data
+
+      rooms.value = payload.results || []
+      nextCursor.value = payload.next_cursor || null
+      hasMoreRooms.value = Boolean(payload.has_more)
+      totalUnread.value = Number(payload.total_unread ?? 0)
+      hasLoadedRooms.value = true
     } catch (error) {
       console.error('Error fetching chat rooms:', error)
+    } finally {
+      isLoadingRooms.value = false
+      hasLoadedRooms.value = true
+    }
+  }
+
+  async function fetchMoreRooms() {
+    if (isLoadingRooms.value || !hasMoreRooms.value || !nextCursor.value) return
+    isLoadingRooms.value = true
+
+    try {
+      const response = await api.get('chat/rooms/', {
+        params: {
+          cursor: nextCursor.value,
+        },
+      })
+      const payload = response.data
+      const incomingRooms = payload.results || []
+
+      for (const room of incomingRooms) {
+        const existingIndex = rooms.value.findIndex((existing) => existing.id === room.id)
+        if (existingIndex === -1) {
+          rooms.value.push(room)
+        } else {
+          rooms.value[existingIndex] = {
+            ...rooms.value[existingIndex],
+            ...room,
+          }
+        }
+      }
+
+      nextCursor.value = payload.next_cursor || null
+      hasMoreRooms.value = Boolean(payload.has_more)
+      totalUnread.value = Number(payload.total_unread ?? totalUnread.value ?? 0)
+    } catch (error) {
+      console.error('Error fetching more chat rooms:', error)
+    } finally {
+      isLoadingRooms.value = false
     }
   }
 
@@ -177,8 +242,10 @@ export const useChatStore = defineStore('chat', () => {
       if (currentRoom.value?.id === roomId) {
         currentRoom.value = { ...currentRoom.value, ...response.data }
       }
+      return response.data
     } catch (error) {
       console.error('Error fetching room detail:', error)
+      return null
     }
   }
 
@@ -515,10 +582,14 @@ export const useChatStore = defineStore('chat', () => {
     messages,
     isConnected,
     isUpdatesConnected,
+    hasMoreRooms,
+    isLoadingRooms,
+    hasLoadedRooms,
     activeTypingUsers,
     totalUnread,
     recentPopup,
     fetchRooms,
+    fetchMoreRooms,
     fetchRoomDetail,
     fetchHistory,
     startInquiry,

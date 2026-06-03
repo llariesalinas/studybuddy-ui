@@ -77,6 +77,10 @@ class ChatRoomSerializer(serializers.ModelSerializer):
     def _current_booking(self, obj):
         # Memoize per room so current_booking and partner_context don't both
         # recompute the (expensive) current-booking lookup.
+        booking_map = self.context.get('current_booking_map')
+        if booking_map is not None:
+            return booking_map.get(obj.id)
+
         cache = self.context.setdefault('_booking_ctx_cache', {})
         if obj.id not in cache:
             cache[obj.id] = get_current_booking_context(obj)

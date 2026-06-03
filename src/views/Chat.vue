@@ -11,7 +11,7 @@
         </span>
       </div>
 
-      <div class="room-list">
+      <div class="room-list" ref="roomList" @scroll="handleRoomListScroll">
         <button
           v-for="room in chatStore.sortedRooms"
           :key="room.id"
@@ -45,7 +45,15 @@
           </span>
         </button>
 
-        <div v-if="!chatStore.rooms.length" class="empty-rooms">
+        <div v-if="chatStore.isLoadingRooms && chatStore.rooms.length" class="rooms-loading">
+          <span class="rooms-loading-dot" aria-hidden="true"></span>
+          Loading conversations
+        </div>
+
+        <div
+          v-if="chatStore.hasLoadedRooms && !chatStore.rooms.length && !chatStore.isLoadingRooms"
+          class="empty-rooms"
+        >
           <i class="bi bi-chat-dots"></i>
           <p>No conversations yet</p>
         </div>
@@ -353,6 +361,7 @@ const authStore = useAuthStore()
 const sessionsStore = useSessionsStore()
 const route = useRoute()
 const newMessage = ref('')
+const roomList = ref(null)
 const messageList = ref(null)
 const messageInput = ref(null)
 const ratingModalOpen = ref(false)
@@ -405,6 +414,35 @@ const getSidebarChipClass = (intent) => {
 const selectRoom = async (room) => {
   await chatStore.selectRoom(room)
   scrollToBottom()
+}
+
+const loadMoreRoomsIfNeeded = async () => {
+  const list = roomList.value
+  if (!list || !chatStore.hasMoreRooms || chatStore.isLoadingRooms) return
+
+  const remaining = list.scrollHeight - list.scrollTop - list.clientHeight
+  if (remaining > 96) return
+
+  await chatStore.fetchMoreRooms()
+  ensureRoomListScrollable()
+}
+
+const handleRoomListScroll = () => {
+  loadMoreRoomsIfNeeded()
+}
+
+const ensureRoomListScrollable = () => {
+  nextTick(() => {
+    const list = roomList.value
+    if (
+      list
+      && chatStore.hasMoreRooms
+      && !chatStore.isLoadingRooms
+      && list.scrollHeight <= list.clientHeight + 20
+    ) {
+      chatStore.fetchMoreRooms()
+    }
+  })
 }
 
 function triggerShake() {
@@ -591,7 +629,10 @@ watch(
       return
     }
 
-    const room = chatStore.rooms.find((candidate) => candidate.id === numericRoomId)
+    let room = chatStore.rooms.find((candidate) => candidate.id === numericRoomId)
+    if (!room) {
+      room = await chatStore.fetchRoomDetail(numericRoomId)
+    }
     if (room) {
       await selectRoom(room)
     }
@@ -600,12 +641,17 @@ watch(
 
 onMounted(async () => {
   await chatStore.fetchRooms()
+  ensureRoomListScrollable()
   chatStore.connectUpdates()
 
   const roomId = Number(route.query.room)
-  const initialRoom = roomId
+  let initialRoom = roomId
     ? chatStore.rooms.find((candidate) => candidate.id === roomId)
     : chatStore.sortedRooms[0]
+
+  if (roomId && !initialRoom) {
+    initialRoom = await chatStore.fetchRoomDetail(roomId) || chatStore.sortedRooms[0]
+  }
 
   if (initialRoom) {
     await selectRoom(initialRoom)
@@ -677,6 +723,26 @@ onUnmounted(() => {
 .room-list {
   flex: 1;
   overflow-y: auto;
+}
+
+.rooms-loading {
+  align-items: center;
+  color: var(--sb-text-secondary);
+  display: flex;
+  font-size: 12px;
+  font-weight: 700;
+  gap: 8px;
+  justify-content: center;
+  padding: 14px;
+}
+
+.rooms-loading-dot {
+  animation: sb-pulse-dot 1s ease infinite;
+  background: var(--sb-primary);
+  border-radius: 50%;
+  display: inline-block;
+  height: 8px;
+  width: 8px;
 }
 
 .room-item {
