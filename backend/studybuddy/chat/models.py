@@ -6,7 +6,7 @@ from studybuddy.models import Booking, UserProfile
 class ChatRoom(models.Model):
     # Participants in the chat
     tutee = models.ForeignKey(UserProfile, on_delete=models.CASCADE, related_name='tutee_chat_rooms')
-    tutor = models.ForeignKey(UserProfile, on_delete=models.CASCADE, related_name='tutor_chat_rooms')
+    tutor = models.ForeignKey(UserProfile, on_delete=models.CASCADE, related_name='tutor_chat_rooms', null=True)
     
     # Optional booking. If present, it's a booking-specific chat.
     # If null, it's a pre-booking inquiry.
@@ -14,6 +14,13 @@ class ChatRoom(models.Model):
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(default=timezone.now)
+
+    ROOM_TYPES = [
+        ('regular', 'Regular'),
+        ('support', 'Support'),
+    ]
+
+    room_type = models.CharField(max_length=10, choices=ROOM_TYPES, default='regular')
 
     class Meta:
         constraints = [
@@ -38,7 +45,7 @@ class Message(models.Model):
     ]
 
     room = models.ForeignKey(ChatRoom, on_delete=models.CASCADE, related_name='messages')
-    sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='sent_messages')
+    sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='sent_messages', null=True, blank=True)
     content = models.TextField()
     message_type = models.CharField(max_length=20, choices=MESSAGE_TYPES, default='text')
     metadata = models.JSONField(default=dict, blank=True)

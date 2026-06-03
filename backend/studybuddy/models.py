@@ -598,3 +598,35 @@ class Preference(models.Model):
 
 # Import chat models to register them with the studybuddy app
 from .chat.models import ChatRoom, Message
+
+class SupportTicket(models.Model):
+    CATEGORY_CHOICES = [
+        ('Payment', 'Payment Issue'),
+        ('Booking', 'Booking/No-show'),
+        ('Technical', 'Technical Problem'),
+        ('Dispute', 'Tutee/Tutor Dispute'),
+        ('Other', 'Other'),
+    ]
+    STATUS_CHOICES = [
+        ('Open', 'Open'),
+        ('In_Progress', 'In Progress'),
+        ('Resolved', 'Resolved'),
+    ]
+
+    user = models.ForeignKey(UserProfile, on_delete=models.CASCADE, related_name="support_tickets")
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
+    subject = models.CharField(max_length=150)
+    description = models.TextField()
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="Open")
+
+    booking = models.ForeignKey('Booking', on_delete=models.SET_NULL, null=True, blank=True)
+    transaction = models.ForeignKey('Transaction', on_delete=models.SET_NULL, null=True, blank=True)
+
+    chatroom = models.OneToOneField('ChatRoom', on_delete=models.SET_NULL, null=True, related_name='ticket')
+
+    assigned_agent = models.ForeignKey(UserProfile, on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_tickets')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Ticket #{self.id} - {self.subject} ({self.status})"

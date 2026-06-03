@@ -85,6 +85,12 @@
           </router-link>
         </li>
 
+        <li class="nav-item mb-2" v-if="userRole === 'admin'">
+          <router-link to="/admin/support" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
+            <i class="bi bi-headset me-3"></i> Support Desk
+          </router-link>
+        </li>
+
         <li class="nav-item mb-2">
           <button
            class="nav-link border-0 shadow-none bg-transparent text-white opacity-75 d-flex align-items-center sb-btn"
@@ -96,11 +102,24 @@
         </li>
       </ul>
 
-      <!-- Theme toggle in sidebar footer -->
-      <div class="mt-auto pt-3 border-top border-secondary border-opacity-25">
+      <!-- Footer utility items: Help and Theme toggle -->
+      <div class="mt-auto pt-3 border-top border-secondary border-opacity-25 d-flex align-items-center justify-content-between px-2">
+        <button
+          class="btn p-0 text-white opacity-75 d-flex align-items-center sb-btn"
+          @click="openSupport('Other')"
+        >
+          <i class="bi bi-question-circle me-2"></i> Help
+        </button>
         <SbThemeToggle />
       </div>
     </aside>
+
+    <SupportModal
+      :open="isSupportModalOpen"
+      :type="supportContextType"
+      :context-id="supportContextId"
+      @close="isSupportModalOpen = false"
+    />
 
     <div ref="logoutModalRef" class="modal fade" id="logoutModal" tabindex="-1">
       <div class="modal-dialog modal-dialog-centered">
@@ -223,6 +242,11 @@
             <p class="sb-muted">View and review platform analytics.</p>
           </div>
 
+          <div v-if="route.path === '/admin/support'">
+            <h2 class="fw-bold sb-text">Support Desk</h2>
+            <p class="sb-muted">Claim, manage, and resolve user support tickets in real-time.</p>
+          </div>
+
           <div v-if="route.path === '/tch-requestedSessions'">
             <div class="d-flex align-items-center gap-2 flex-wrap">
               <h2 class="fw-bold sb-text mb-1">Requested Sessions</h2>
@@ -305,6 +329,7 @@ import * as bootstrap from 'bootstrap'
 import { SESSION_POLL_INTERVAL_MS } from './config.js'
 import SbToast from '@/components/SbToast.vue'
 import SbThemeToggle from '@/components/SbThemeToggle.vue'
+import SupportModal from '@/components/SupportModal.vue'
 
 const route = useRoute()
 const authStore = useAuthStore()
@@ -312,6 +337,16 @@ const notificationsStore = useNotificationsStore()
 const chatStore = useChatStore()
 const sessionStore = useSessionsStore()
 const logoutModalRef = ref(null)
+
+const isSupportModalOpen = ref(false)
+const supportContextType = ref('Other')
+const supportContextId = ref(null)
+
+const openSupport = (type = 'Other', id = null) => {
+  supportContextType.value = type
+  supportContextId.value = id
+  isSupportModalOpen.value = true
+}
 let pendingSessionsRefreshId = null
 
 const closeLogoutModal = () => {

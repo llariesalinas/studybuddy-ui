@@ -189,6 +189,27 @@
               <i class="bi bi-slash-circle"></i>
             </button>
           </div>
+        </TransitionGroup>
+      </article>
+
+      <aside class="glass-panel destinations-card">
+        <header class="section-header compact">
+          <div>
+            <span class="eyebrow">Payout</span>
+            <h3>Destinations</h3>
+          </div>
+          <button
+            class="icon-btn sb-btn"
+            @click="openDestinationModal"
+            aria-label="Add payout destination"
+          >
+            <i class="bi bi-plus-lg"></i>
+          </button>
+        </header>
+
+        <div v-if="walletStore.payoutAccounts.length === 0" class="destination-empty">
+          <i class="bi bi-credit-card-2-front"></i>
+          <p>No payout destinations saved.</p>
         </div>
 
         <button class="add-destination-card sb-btn" @click="openDestinationModal">
@@ -248,6 +269,31 @@
           </div>
         </TransitionGroup>
       </article>
+    </section>
+
+    <section class="wallet-grid mt-4">
+      <div class="glass-panel dev-tools-card">
+        <div class="dev-label">
+          <span><i class="bi bi-headset text-primary"></i></span>
+          <div>
+            <strong class="text-dark">Need help with payments or cash outs?</strong>
+            <p class="text-muted">Submit a support ticket and a platform administrator will assist you.</p>
+          </div>
+          <span class="history-summary">
+            Minimum PHP {{ money(walletStore.cashoutMinimum) }}
+          </span>
+        </header>
+
+        <div v-if="walletStore.withdrawals.length === 0" class="empty-state compact-empty">
+          <i class="bi bi-send"></i>
+          <p>No cash-outs yet.</p>
+        </div>
+        <div class="support-btn">
+          <button class="btn btn-outline-danger sb-btn px-4" @click="openSupport('Payment')">
+            Contact Support
+          </button>
+        </div>
+      </div>
     </section>
 
     <section v-if="isDev" class="glass-panel dev-tools-card">
@@ -399,6 +445,12 @@
         </div>
       </div>
     </div>
+    <SupportModal
+      :open="isSupportModalOpen"
+      :context-type="supportContextType"
+      :context-id="supportContextId"
+      @close="isSupportModalOpen = false"
+    />
   </div>
 </template>
 
@@ -406,11 +458,22 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useWalletStore } from '@/stores/wallet'
 import { useToastStore } from '@/stores/toast'
+import SupportModal from '@/components/SupportModal.vue'
 
 const toastStore = useToastStore()
 const walletStore = useWalletStore()
 const showCashoutModal = ref(false)
 const showDestinationModal = ref(false)
+
+const isSupportModalOpen = ref(false)
+const supportContextType = ref('Payment')
+const supportContextId = ref(null)
+
+const openSupport = (type, id = null) => {
+  supportContextType.value = type
+  supportContextId.value = id
+  isSupportModalOpen.value = true
+}
 const isSubmitting = ref(false)
 const savingAccount = ref(false)
 const isDev = import.meta.env.DEV
@@ -1384,6 +1447,15 @@ watch(showCashoutModal, async (isOpen) => {
   font-weight: 800;
 }
 
+.support-btn button {
+  padding: 9px 14px;
+  border-radius: 12px;
+  color: #fff;
+  background: red;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .dev-actions button.secondary {
   color: #b45309;
   background: rgba(255, 255, 255, 0.56);
@@ -1597,6 +1669,11 @@ watch(showCashoutModal, async (isOpen) => {
   }
 
   .dev-tools-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .support-card {
     align-items: stretch;
     flex-direction: column;
   }
