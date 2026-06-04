@@ -16,7 +16,7 @@ from django.utils.timezone import now
 from django.utils.crypto import constant_time_compare
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
-from django.db import transaction
+from django.db import transaction, IntegrityError
 from datetime import datetime,timedelta, date
 from calendar import monthrange
 from uuid import uuid4
@@ -4135,3 +4135,138 @@ def dev_remove_wallet_funds(request):
             reference_id=f'DEV-{timezone.now().timestamp()}'
         )
     return Response({'balance': str(wallet.balance)})
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_support_ticket(request):
+    user_profile = request.user.userprofile
+    data = request.data
+
+    with transaction.atomic():
+        from studybuddy.chat.models import ChatRoom
+        from .models import SupportTicket
+        room = ChatRoom.objects.create(
+            room_type='support',
+            tutee=user_profile
+        )
+
+        ticket = SupportTicket.objects.create(
+            user=user_profile,
+            category=data.get('category'),
+            subject=data.get('subject'),
+            description=data.get('description'),
+            booking_id=data.get('booking_id'),
+            transaction_id=data.get('transaction_id'),
+            chatroom=room
+        )
+
+        from studybuddy.chat.models import Message
+        Message.objects.create(
+            room=room,
+            sender=None,
+            content=f"Ticket #{ticket.id} created. Category: {ticket.category}. An agent will assist you shortly."
+        )
+
+    return Response({"message": "Ticket created", "ticket_id": ticket.id, "room_id": room.id}, status=201)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def admin_claim_ticket(request, ticket_id):
+    if request.user.userprofile.role != 'Admin':
+        return Response(status=403)
+
+    from .models import SupportTicket
+    ticket = get_object_or_404(SupportTicket, id=ticket_id)
+
+    try:
+        with transaction.atomic():
+            ticket.assigned_agent = request.user.userprofile
+            ticket.status = 'In_Progress'
+
+            ticket.chatroom.tutor = request.user.userprofile
+
+            ticket.save()
+            ticket.chatroom.save()
+    except IntegrityError:
+        return Response(
+            {"error": "User already has an active support ticket claimed by you."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    return Response({"message": "Ticket claimed"})
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def list_my_tickets(request):
+    user_profile = request.user.userprofile
+    from .models import SupportTicket
+    tickets = SupportTicket.objects.filter(user=user_profile).order_by('-created_at')
+
+    data = []
+    for ticket in tickets:
+        data.append({
+            "id": ticket.id,
+            "category": ticket.category,
+            "subject": ticket.subject,
+            "description": ticket.description,
+            "status": ticket.status,
+            "booking_id": ticket.booking_id,
+            "transaction_id": ticket.transaction_id,
+            "chatroom_id": ticket.chatroom_id,
+            "assigned_agent": f"{ticket.assigned_agent.fname} {ticket.assigned_agent.lname}" if ticket.assigned_agent else None,
+            "created_at": ticket.created_at,
+            "updated_at": ticket.updated_at,
+        })
+    return Response(data)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def admin_list_tickets(request):
+    if request.user.userprofile.role != 'Admin':
+        return Response(status=403)
+
+    from .models import SupportTicket
+    tickets = SupportTicket.objects.all().order_by('-created_at')
+
+    data = []
+    for ticket in tickets:
+        data.append({
+            "id": ticket.id,
+            "user": {
+                "id": ticket.user.id,
+                "name": f"{ticket.user.fname} {ticket.user.lname}",
+                "role": ticket.user.role
+            },
+            "category": ticket.category,
+            "subject": ticket.subject,
+            "description": ticket.description,
+            "status": ticket.status,
+            "booking_id": ticket.booking_id,
+            "transaction_id": ticket.transaction_id,
+            "chatroom_id": ticket.chatroom_id,
+            "assigned_agent": f"{ticket.assigned_agent.fname} {ticket.assigned_agent.lname}" if ticket.assigned_agent else None,
+            "assigned_agent_id": ticket.assigned_agent_id,
+            "created_at": ticket.created_at,
+            "updated_at": ticket.updated_at,
+        })
+    return Response(data)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def admin_resolve_ticket(request, ticket_id):
+    if request.user.userprofile.role != 'Admin':
+        return Response(status=403)
+
+    from .models import SupportTicket
+    ticket = get_object_or_404(SupportTicket, id=ticket_id)
+    ticket.status = 'Resolved'
+    ticket.save()
+
+    from studybuddy.chat.models import Message
+    Message.objects.create(
+        room=ticket.chatroom,
+        sender=None,
+        content="This support ticket has been marked as Resolved. The chat is now closed."
+    )
+
+    return Response({"message": "Ticket resolved", "status": "Resolved"})
