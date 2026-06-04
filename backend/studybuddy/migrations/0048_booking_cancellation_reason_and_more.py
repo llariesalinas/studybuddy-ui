@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('studybuddy', '0045_cashout_money_movement'),
+        ('studybuddy', '0047_alter_message_sender_and_more'),
     ]
 
     operations = [

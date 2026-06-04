@@ -162,6 +162,19 @@
             </p>
           </template>
         </div>
+
+        <div class="card shadow-sm p-4 mt-4">
+          <h5 class="fw-bold mb-3">Support</h5>
+          <p class="text-muted small mb-3">
+            Need help? If there's an issue with this session, you can report it to our support team.
+          </p>
+          <button
+            class="btn btn-outline-danger w-100 sb-btn"
+            @click="openSupport('Booking', sessionDetail?.session?.id)"
+          >
+            <i class="bi bi-exclamation-circle me-2"></i>Report Issue
+          </button>
+        </div>
       </div>
     </div>
     </template>
@@ -239,6 +252,12 @@
       </div>
     </div>
     <div v-if="isCancelModalOpen" class="modal-backdrop fade show"></div>
+    <SupportModal
+      :open="isSupportModalOpen"
+      :context-type="supportContextType"
+      :context-id="supportContextId"
+      @close="isSupportModalOpen = false"
+    />
   </div>
 </template>
 
@@ -249,6 +268,7 @@ import { useSessionsStore } from '@/stores/completedSessions'
 import { useNotificationsStore } from '@/stores/notifications'
 import { useToastStore } from '@/stores/toast'
 import RatingStackModal from '@/components/RatingStackModal.vue'
+import SupportModal from '@/components/SupportModal.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -266,6 +286,16 @@ const cancelReason = ref('')
 const paymentSyncing = ref(false)
 const paymentReturnMessage = ref('')
 const paymentReturnState = ref('info')
+
+const isSupportModalOpen = ref(false)
+const supportContextType = ref('Booking')
+const supportContextId = ref(null)
+
+const openSupport = (type, id) => {
+  supportContextType.value = type
+  supportContextId.value = id
+  isSupportModalOpen.value = true
+}
 
 const normalizedStatus = computed(() => String(sessionDetail.value?.session?.status || '').toLowerCase())
 const canSubmitPayment = computed(() => normalizedStatus.value === 'payment required')

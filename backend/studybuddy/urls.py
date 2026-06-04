@@ -44,7 +44,12 @@ urlpatterns = [
     path('admin/institutions/', AdminInstitutionView.as_view()),
     path('admin/institutions/<int:pk>/', AdminInstitutionView.as_view()),
     path('admin/analytics/', AdminAnalyticsView.as_view()),
+    path('admin/support/tickets/', views.admin_list_tickets),
+    path('admin/support/tickets/<int:ticket_id>/claim/', views.admin_claim_ticket),
+    path('admin/support/tickets/<int:ticket_id>/resolve/', views.admin_resolve_ticket),
 
+    path('support/tickets/create/', views.create_support_ticket),
+    path('support/tickets/my/', views.list_my_tickets),
     path('register/', register_user),
     path('login/', login_view),
     path('login/verify-otp/', views.login_verify_otp),

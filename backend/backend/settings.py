@@ -264,8 +264,11 @@ if not PAYMONGO_SECRET_KEY:
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 PAYMONGO_WALLET_ID = os.getenv("PAYMONGO_WALLET_ID", "")
 PAYMONGO_CASHOUT_CALLBACK_URL = os.getenv("PAYMONGO_CASHOUT_CALLBACK_URL", "")
+<<<<<<< HEAD
 # Shared secret appended to the cashout callback URL and verified on the inbound
 # callback. When set, callbacks without a matching ?token= are rejected.
 PAYMONGO_CASHOUT_CALLBACK_SECRET = os.getenv("PAYMONGO_CASHOUT_CALLBACK_SECRET", "")
+=======
+>>>>>>> origin/main
 CASHOUT_PROVIDER_FEE_PHP = os.getenv("CASHOUT_PROVIDER_FEE_PHP", "10")
 CASHOUT_MIN_PHP = os.getenv("CASHOUT_MIN_PHP", "500")

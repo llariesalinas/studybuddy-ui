@@ -263,6 +263,7 @@ def get_current_booking_context(room):
     return None
 
 
+<<<<<<< HEAD
 def get_current_booking_contexts(rooms):
     room_list = list(rooms)
     if not room_list:
@@ -427,6 +428,7 @@ def get_booking_groups_for_contexts(bookings):
     }
 
 
+
 def get_completed_session_key(booking):
     return str(booking.session_group_id or booking.booking_request_id or booking.id)
 
@@ -460,8 +462,12 @@ def get_partner_context(room, user=None, current_booking=_CURRENT_BOOKING_UNSET)
         )
 
     if not topics:
+<<<<<<< HEAD
         if current_booking is _CURRENT_BOOKING_UNSET:
             current_booking = get_current_booking_context(room)
+=======
+        current_booking = get_current_booking_context(room)
+>>>>>>> origin/main
         if current_booking and current_booking.get('subject') != 'General':
             topics = [current_booking['subject']]
 
@@ -503,10 +509,14 @@ def serialize_message_payload(message, user=None):
         sender_name = full_name(sender_profile)
         sender_profile_id = sender_profile.id
     except Exception:
+<<<<<<< HEAD
         try:
             sender_name = message.sender.get_username()
         except Exception:
             sender_name = 'System'
+=======
+        sender_name = message.sender.get_username()
+>>>>>>> origin/main
 
     return {
         'id': message.id,

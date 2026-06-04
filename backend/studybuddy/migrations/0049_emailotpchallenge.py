@@ -8,7 +8,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('auth', '0012_alter_user_first_name_max_length'),
-        ('studybuddy', '0046_booking_cancellation_reason_and_more'),
+        ('studybuddy', '0048_booking_cancellation_reason_and_more'),
     ]
 
     operations = [

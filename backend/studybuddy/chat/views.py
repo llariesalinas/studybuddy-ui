@@ -59,6 +59,7 @@ def decode_room_cursor(cursor):
 def list_chat_rooms(request):
     """List all chat rooms for the logged-in user."""
     user_profile = request.user.userprofile
+<<<<<<< HEAD
     page_size = get_room_page_size(request)
     rooms_qs = (
         ChatRoom.objects.filter(
