@@ -1,23 +1,19 @@
 <template>
   <div class="initial-booking-content">
-    <div class="card border-sb shadow-sm rounded-4" style="max-width: 600px">
+    <div class="card border-sb shadow-sm rounded-4 booking-fields-card">
       <div class="card-body p-4 p-md-5">
         <form @submit.prevent="findTutor">
           <div class="mb-3">
             <label class="form-label fw-semibold small">Subject</label>
-            <select
-              v-model="store.selectedSubject"
-              class="form-select border-sb shadow-none"
-              required
-            >
-              <option
-                v-for="subject in subjects"
-                :key="subject.subject_code"
-                :value="subject.subject_code"
-              >
-                {{ subject.subject_name }}
-              </option>
-            </select>
+            <SbSelectModal
+              v-model="selectedSubjectModel"
+              :groups="subjectGroups"
+              title="Choose Subject"
+              placeholder="Select subject"
+              search-placeholder="Search subjects"
+              searchable
+              empty-message="No subjects found."
+            />
           </div>
 
           <div class="row g-3 mb-3">
@@ -28,15 +24,23 @@
 
             <div class="col-md-6">
               <label class="form-label fw-semibold small">Preferred Mode</label>
-              <select
-                v-model="store.selectedMode"
-                class="form-select border-sb shadow-none"
-                required
-              >
-                <option v-for="mode in modes" :key="mode" :value="mode">
-                  {{ mode }}
-                </option>
-              </select>
+              <div class="mode-button-group" role="radiogroup" aria-label="Preferred Mode">
+                <button
+                  v-for="mode in modes"
+                  :key="mode.value"
+                  type="button"
+                  class="mode-button sb-btn"
+                  :class="{ 'mode-button-active': store.selectedMode === mode.value }"
+                  role="radio"
+                  :aria-checked="store.selectedMode === mode.value ? 'true' : 'false'"
+                  @click="selectMode(mode.value)"
+                >
+                  <span class="mode-button-icon" aria-hidden="true">
+                    <i class="bi" :class="mode.icon"></i>
+                  </span>
+                  <span>{{ mode.label }}</span>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -109,6 +113,7 @@ import { useRouter } from 'vue-router'
 import BudgetRangeSlider from '@/components/BudgetRangeSlider.vue'
 import BookingDatePicker from '@/components/BookingDatePicker.vue'
 import BookingTimePicker from '@/components/BookingTimePicker.vue'
+import SbSelectModal from '@/components/SbSelectModal.vue'
 import {
   INITIAL_BUDGET_MAX,
   INITIAL_BUDGET_MIN,
@@ -127,7 +132,10 @@ const isSubmitting = ref(false)
 const subjects = ref([])
 const endTimePickerRef = ref(null)
 
-const modes = ['Online', 'Face-to-face']
+const modes = [
+  { label: 'Online', value: 'Online', icon: 'bi-camera-video-fill' },
+  { label: 'Face-to-face', value: 'Face-to-face', icon: 'bi-geo-alt-fill' },
+]
 const padNumber = (value) => String(value).padStart(2, '0')
 const todayKey = () => {
   const today = new Date()
@@ -166,6 +174,23 @@ const nextTimeSlot = (value) => {
   const hours = Math.floor(nextMinutes / 60)
   const minutes = nextMinutes % 60
   return `${padNumber(hours)}:${padNumber(minutes)}`
+}
+
+const normalizeSelectValue = (value) => (value == null ? '' : String(value))
+
+const selectedSubjectModel = computed({
+  get: () => store.selectedSubject,
+  set: (value) => {
+    store.selectedSubject = normalizeSelectValue(value)
+  },
+})
+
+const selectMode = (value) => {
+  store.selectedMode = value
+
+  if (value !== 'Face-to-face') {
+    store.selectedLocation = ''
+  }
 }
 
 const selectedDateModel = computed({
@@ -207,6 +232,35 @@ const selectedEndTimeModel = computed({
   },
 })
 
+const getSubjectGroupLabel = (subject) => {
+  return subject?.department?.trim() || subject?.category?.trim() || 'Other Subjects'
+}
+
+const subjectGroups = computed(() => {
+  const groups = new Map()
+
+  subjects.value.forEach((subject) => {
+    const groupLabel = getSubjectGroupLabel(subject)
+
+    if (!groups.has(groupLabel)) {
+      groups.set(groupLabel, [])
+    }
+
+    groups.get(groupLabel).push({
+      label: subject.subject_name,
+      value: subject.subject_code,
+      description: subject.description || subject.subject_code,
+    })
+  })
+
+  return [...groups.entries()]
+    .sort(([leftLabel], [rightLabel]) => leftLabel.localeCompare(rightLabel))
+    .map(([label, options]) => ({
+      label,
+      options: options.sort((left, right) => left.label.localeCompare(right.label)),
+    }))
+})
+
 // Load subjects from backend
 onMounted(async () => {
   try {
@@ -219,6 +273,16 @@ onMounted(async () => {
 
 // FIND TUTOR (CBF CALL)
 const findTutor = async () => {
+  if (!store.selectedSubject) {
+    toastStore.push('Please select a subject.', 'warning')
+    return
+  }
+
+  if (!store.selectedMode) {
+    toastStore.push('Please select a preferred mode.', 'warning')
+    return
+  }
+
   if (!store.selectedDate) {
     toastStore.push('Please select a session date.', 'warning')
     return
@@ -274,10 +338,84 @@ const findTutor = async () => {
 </script>
 
 <style scoped>
+.initial-booking-content {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.booking-fields-card {
+  width: min(100%, 600px);
+}
+
+.mode-button-group {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.mode-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  border: 1px solid var(--sb-card-border);
+  border-radius: 14px;
+  background: var(--sb-card-bg);
+  color: var(--sb-text-main);
+  padding: 9px 10px;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.2;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, background-color 0.16s ease,
+    transform 0.16s ease;
+}
+
+.mode-button:hover,
+.mode-button:focus-visible {
+  border-color: var(--sb-primary);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--sb-primary) 12%, transparent);
+  outline: none;
+}
+
+.mode-button:active {
+  transform: scale(0.98);
+}
+
+.mode-button-active {
+  border-color: var(--sb-primary);
+  background: color-mix(in srgb, var(--sb-primary) 12%, var(--sb-card-bg));
+  color: var(--sb-primary);
+}
+
+.mode-button-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
 .time-trigger {
   min-height: 42px;
   background: #fff;
   color: #212529;
+}
+
+.initial-booking-content :deep(.date-trigger:hover),
+.initial-booking-content :deep(.date-trigger:focus-visible),
+.initial-booking-content :deep(.date-trigger-active),
+.initial-booking-content :deep(.time-trigger:hover:not(:disabled)),
+.initial-booking-content :deep(.time-trigger:focus-visible),
+.initial-booking-content :deep(.time-trigger-active) {
+  border-color: var(--sb-primary) !important;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--sb-primary) 12%, transparent) !important;
+  outline: none;
+  transform: none !important;
+}
+
+.initial-booking-content :deep(.date-trigger:active:not(:disabled)),
+.initial-booking-content :deep(.time-trigger:active:not(:disabled)) {
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--sb-primary) 12%, transparent) !important;
+  transform: none !important;
 }
 
 .budget-card {

@@ -11,7 +11,7 @@
         </span>
       </div>
 
-      <div class="room-list">
+      <div class="room-list" ref="roomList" @scroll="handleRoomListScroll">
         <button
           v-for="room in chatStore.sortedRooms"
           :key="room.id"
@@ -45,7 +45,15 @@
           </span>
         </button>
 
-        <div v-if="!chatStore.rooms.length" class="empty-rooms">
+        <div v-if="chatStore.isLoadingRooms && chatStore.rooms.length" class="rooms-loading">
+          <span class="rooms-loading-dot" aria-hidden="true"></span>
+          Loading conversations
+        </div>
+
+        <div
+          v-if="chatStore.hasLoadedRooms && !chatStore.rooms.length && !chatStore.isLoadingRooms"
+          class="empty-rooms"
+        >
           <i class="bi bi-chat-dots"></i>
           <p>No conversations yet</p>
         </div>
@@ -76,14 +84,14 @@
                           item.type === 'date-separator'
                             ? 'date-separator-row'
                             : [
-                                  'message-wrapper',
-                                  {
-                                    'is-me': item.is_me,
-                                    'is-system': item.message_type !== 'text' || !item.sender || item.sender_name === 'System',
-                                    'is-pending': item.status === 'pending' || item.pending === true,
-                                    'is-failed': item.failed === true,
-                                  },
-                                ]
+                                'message-wrapper',
+                                {
+                                  'is-me': item.is_me,
+                                  'is-system': item.message_type !== 'text' || !item.sender || item.sender_name === 'System',
+                                  'is-pending': item.status === 'pending' || item.pending === true,
+                                  'is-failed': item.failed === true,
+                                },
+                              ]
                         "
                       >
                         <template v-if="item.type === 'date-separator'">
@@ -105,12 +113,14 @@
                             </div>
                           </div>
 
+
                           <div v-else-if="!item.sender || item.sender_name === 'System'" class="system-event text-center my-3">
                             <div class="px-4 py-2 bg-light border border-sb rounded-pill text-sb-muted small d-inline-block shadow-sm">
                               <i class="bi bi-info-circle-fill text-sb-primary me-2"></i>
                               <span>{{ item.content }}</span>
                             </div>
                           </div>
+
 
                           <template v-else>
                             <div v-if="!item.is_me" class="message-avatar-sm">
@@ -392,6 +402,7 @@ const authStore = useAuthStore()
 const sessionsStore = useSessionsStore()
 const route = useRoute()
 const newMessage = ref('')
+const roomList = ref(null)
 const messageList = ref(null)
 const messageInput = ref(null)
 const ratingModalOpen = ref(false)
@@ -451,6 +462,36 @@ const selectRoom = async (room) => {
   await chatStore.selectRoom(room)
   scrollToBottom()
 }
+
+const loadMoreRoomsIfNeeded = async () => {
+  const list = roomList.value
+  if (!list || !chatStore.hasMoreRooms || chatStore.isLoadingRooms) return
+
+  const remaining = list.scrollHeight - list.scrollTop - list.clientHeight
+  if (remaining > 96) return
+
+  await chatStore.fetchMoreRooms()
+  ensureRoomListScrollable()
+}
+
+const handleRoomListScroll = () => {
+  loadMoreRoomsIfNeeded()
+}
+
+const ensureRoomListScrollable = () => {
+  nextTick(() => {
+    const list = roomList.value
+    if (
+      list
+      && chatStore.hasMoreRooms
+      && !chatStore.isLoadingRooms
+      && list.scrollHeight <= list.clientHeight + 20
+    ) {
+      chatStore.fetchMoreRooms()
+    }
+  })
+}
+
 
 function triggerShake() {
   composerShaking.value = true
@@ -638,10 +679,8 @@ watch(
 
     let room = chatStore.rooms.find((candidate) => candidate.id === numericRoomId)
     if (!room) {
-      await chatStore.fetchRooms()
-      room = chatStore.rooms.find((candidate) => candidate.id === numericRoomId)
+      room = await chatStore.fetchRoomDetail(numericRoomId)
     }
-
     if (room) {
       await selectRoom(room)
     }
@@ -650,6 +689,7 @@ watch(
 
 onMounted(async () => {
   await chatStore.fetchRooms()
+  ensureRoomListScrollable()
   chatStore.connectUpdates()
 
   const roomId = Number(route.query.room)
@@ -658,8 +698,7 @@ onMounted(async () => {
     : chatStore.sortedRooms[0]
 
   if (roomId && !initialRoom) {
-    await chatStore.fetchRooms()
-    initialRoom = chatStore.rooms.find((candidate) => candidate.id === roomId)
+    initialRoom = await chatStore.fetchRoomDetail(roomId) || chatStore.sortedRooms[0]
   }
 
   if (initialRoom) {
@@ -734,6 +773,26 @@ onUnmounted(() => {
   overflow-y: auto;
 }
 
+.rooms-loading {
+  align-items: center;
+  color: var(--sb-text-secondary);
+  display: flex;
+  font-size: 12px;
+  font-weight: 700;
+  gap: 8px;
+  justify-content: center;
+  padding: 14px;
+}
+
+.rooms-loading-dot {
+  animation: sb-pulse-dot 1s ease infinite;
+  background: var(--sb-primary);
+  border-radius: 50%;
+  display: inline-block;
+  height: 8px;
+  width: 8px;
+}
+
 .room-item {
   width: 100%;
   border: 0;
@@ -746,6 +805,7 @@ onUnmounted(() => {
   text-align: left;
   cursor: pointer;
 }
+
 
 .room-item:hover,
 .room-item.active {

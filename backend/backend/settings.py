@@ -19,6 +19,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
 
 
+def env_bool(name, default=False):
+    return os.getenv(name, str(default)).strip().lower() in {"1", "true", "yes", "on"}
+
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
@@ -28,7 +32,7 @@ if not SECRET_KEY:
     raise RuntimeError("SECRET_KEY env var is required but not set")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv('DEBUG', 'false').lower() == 'true'
+DEBUG = env_bool('DEBUG', False)
 
 _allowed_hosts_raw = os.getenv('ALLOWED_HOSTS', '')
 ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts_raw.split(',') if h.strip()]
@@ -54,18 +58,48 @@ if DEBUG:
         "https://*.ngrok-free.dev",
         "https://*.ngrok-free.app",
     ]
+else:
+    # Production: lock CORS/CSRF to explicitly trusted origins (comma-separated env vars).
+    CORS_ALLOW_ALL_ORIGINS = False
+    CORS_ALLOWED_ORIGINS = [
+        o.strip() for o in os.getenv('CORS_ALLOWED_ORIGINS', '').split(',') if o.strip()
+    ]
+    CSRF_TRUSTED_ORIGINS = [
+        o.strip() for o in os.getenv('CSRF_TRUSTED_ORIGINS', '').split(',') if o.strip()
+    ]
+
+    # Transport / cookie hardening. Behind a TLS-terminating proxy (e.g. ngrok),
+    # trust the forwarded-proto header so the SSL redirect doesn't loop.
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SECURE_SSL_REDIRECT = True
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
+    'DEFAULT_THROTTLE_CLASSES': (
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+        'rest_framework.throttling.ScopedRateThrottle',
+    ),
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '60/min',
+        'user': '240/min',
+        'login': '5/min',
+    },
 }
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=5),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
-    'ROTATE_REFRESH_TOKENS': False,
-    'BLACKLIST_AFTER_ROTATION': False,
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
 }
 # Application definition
 
@@ -73,6 +107,7 @@ INSTALLED_APPS = [
     'daphne',
     'channels',
     'rest_framework',
+    'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
     'django.contrib.admin',
     'django.contrib.auth',
@@ -161,6 +196,41 @@ USE_I18N = True
 USE_TZ = True
 
 
+# Email
+# https://docs.djangoproject.com/en/6.0/topics/email/
+
+EMAIL_HOST = os.getenv("EMAIL_HOST", "")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT") or "587")
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True)
+EMAIL_USE_SSL = env_bool("EMAIL_USE_SSL", False)
+_configured_default_from_email = os.getenv("DEFAULT_FROM_EMAIL", "")
+DEFAULT_FROM_EMAIL = _configured_default_from_email or "StudyBuddy <no-reply@localhost>"
+EMAIL_TIMEOUT = int(os.getenv("EMAIL_TIMEOUT") or "10")
+
+_smtp_configured = all([
+    EMAIL_HOST,
+    EMAIL_HOST_USER,
+    EMAIL_HOST_PASSWORD,
+    _configured_default_from_email,
+])
+
+if DEBUG and not _smtp_configured:
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+elif not _smtp_configured:
+    raise RuntimeError(
+        "SMTP email env vars are required when DEBUG=false: "
+        "EMAIL_HOST, EMAIL_HOST_USER, EMAIL_HOST_PASSWORD, DEFAULT_FROM_EMAIL"
+    )
+else:
+    EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend")
+
+PASSWORD_RESET_TIMEOUT = 3600
+LOGIN_OTP_TTL_SECONDS = 600
+LOGIN_OTP_MAX_ATTEMPTS = 5
+
+
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
@@ -171,11 +241,21 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 ASGI_APPLICATION = 'backend.asgi.application'
 
-CHANNEL_LAYERS = {
-    'default': {
-        'BACKEND': 'channels.layers.InMemoryChannelLayer',
-    },
-}
+# Use Redis in production (set REDIS_URL); in-memory only works for a single process.
+_redis_url = os.getenv('REDIS_URL')
+if _redis_url:
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels_redis.core.RedisChannelLayer',
+            'CONFIG': {'hosts': [_redis_url]},
+        },
+    }
+else:
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels.layers.InMemoryChannelLayer',
+        },
+    }
 
 # PayMongo & Integration Settings
 PAYMONGO_SECRET_KEY = os.getenv("PAYMONGO_SECRET_KEY")
@@ -184,5 +264,8 @@ if not PAYMONGO_SECRET_KEY:
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 PAYMONGO_WALLET_ID = os.getenv("PAYMONGO_WALLET_ID", "")
 PAYMONGO_CASHOUT_CALLBACK_URL = os.getenv("PAYMONGO_CASHOUT_CALLBACK_URL", "")
+# Shared secret appended to the cashout callback URL and verified on the inbound
+# callback. When set, callbacks without a matching ?token= are rejected.
+PAYMONGO_CASHOUT_CALLBACK_SECRET = os.getenv("PAYMONGO_CASHOUT_CALLBACK_SECRET", "")
 CASHOUT_PROVIDER_FEE_PHP = os.getenv("CASHOUT_PROVIDER_FEE_PHP", "10")
 CASHOUT_MIN_PHP = os.getenv("CASHOUT_MIN_PHP", "500")

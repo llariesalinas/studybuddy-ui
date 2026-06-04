@@ -94,8 +94,7 @@
         <li class="nav-item mb-2">
           <button
            class="nav-link border-0 shadow-none bg-transparent text-white opacity-75 d-flex align-items-center sb-btn"
-           data-bs-toggle="modal"
-           data-bs-target="#logoutModal"
+           @click="openLogoutModal"
            >
             <i class="bi bi-box-arrow-right me-3"></i> Log-out
           </button>
@@ -121,13 +120,23 @@
       @close="isSupportModalOpen = false"
     />
 
-    <div ref="logoutModalRef" class="modal fade" id="logoutModal" tabindex="-1">
+    <div
+      v-if="showLogoutModal"
+      ref="logoutModalRef"
+      class="modal logout-modal show"
+      id="logoutModal"
+      tabindex="-1"
+      role="dialog"
+      aria-modal="true"
+      style="display: block;"
+      @click.self="closeLogoutModal"
+    >
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content rounded-4">
           
           <div class="modal-header border-0">
             <h5 class="modal-title fw-bold">Confirm Logout</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            <button type="button" class="btn-close" @click="closeLogoutModal"></button>
           </div>
 
           <div class="modal-body sb-muted">
@@ -137,7 +146,7 @@
           <div class="modal-footer border-0">
             <button
               class="btn btn-light sb-btn"
-              data-bs-dismiss="modal"
+              @click="closeLogoutModal"
             >
               Cancel
             </button>
@@ -316,7 +325,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth' // Import auth store
 import { useSessionsStore } from '@/stores/completedSessions'
@@ -325,7 +334,6 @@ import RatingReminderBanner from '@/components/RatingReminderBanner.vue'
 import { useNotificationsStore } from '@/stores/notifications'
 import { useChatStore } from '@/stores/chat'
 import router from './router'
-import * as bootstrap from 'bootstrap'
 import { SESSION_POLL_INTERVAL_MS } from './config.js'
 import SbToast from '@/components/SbToast.vue'
 import SbThemeToggle from '@/components/SbThemeToggle.vue'
@@ -337,6 +345,7 @@ const notificationsStore = useNotificationsStore()
 const chatStore = useChatStore()
 const sessionStore = useSessionsStore()
 const logoutModalRef = ref(null)
+const showLogoutModal = ref(false)
 
 const isSupportModalOpen = ref(false)
 const supportContextType = ref('Other')
@@ -348,32 +357,113 @@ const openSupport = (type = 'Other', id = null) => {
   isSupportModalOpen.value = true
 }
 let pendingSessionsRefreshId = null
+let auroraFrameId = null
+let auroraPointerTarget = { x: 0, y: 0 }
+let auroraMotionEnabled = false
 
-const closeLogoutModal = () => {
-  const modalElement = logoutModalRef.value
+const setAuroraMovement = (x = 0, y = 0) => {
+  const rootStyle = document.documentElement.style
+  rootStyle.setProperty('--sb-aurora-base-x', `${(x * 10).toFixed(2)}px`)
+  rootStyle.setProperty('--sb-aurora-base-y', `${(y * 7).toFixed(2)}px`)
+  rootStyle.setProperty('--sb-aurora-overlay-x', `${(x * 34).toFixed(2)}px`)
+  rootStyle.setProperty('--sb-aurora-overlay-y', `${(y * 26).toFixed(2)}px`)
+  rootStyle.setProperty('--sb-aurora-sheen-x', `${(x * -8).toFixed(2)}px`)
+  rootStyle.setProperty('--sb-aurora-sheen-y', `${(y * -5).toFixed(2)}px`)
+}
 
-  if (!modalElement) {
+const scheduleAuroraMovement = () => {
+  if (auroraFrameId) {
     return
   }
 
-  const modalInstance = bootstrap.Modal.getInstance(modalElement)
-  modalInstance?.hide()
+  auroraFrameId = window.requestAnimationFrame(() => {
+    auroraFrameId = null
+    setAuroraMovement(auroraPointerTarget.x, auroraPointerTarget.y)
+  })
+}
 
+const handleAuroraPointerMove = (event) => {
+  auroraPointerTarget = {
+    x: ((event.clientX / window.innerWidth) - 0.5) * 2,
+    y: ((event.clientY / window.innerHeight) - 0.5) * 2
+  }
+  scheduleAuroraMovement()
+}
+
+const resetAuroraMovement = () => {
+  auroraPointerTarget = { x: 0, y: 0 }
+  scheduleAuroraMovement()
+}
+
+const setupAuroraPointerMotion = () => {
+  const finePointer = window.matchMedia?.('(pointer: fine)').matches
+  const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+
+  auroraMotionEnabled = Boolean(finePointer && !reducedMotion)
+
+  if (!auroraMotionEnabled) {
+    setAuroraMovement()
+    return
+  }
+
+  window.addEventListener('pointermove', handleAuroraPointerMove, { passive: true })
+  window.addEventListener('pointerleave', resetAuroraMovement)
+  window.addEventListener('blur', resetAuroraMovement)
+}
+
+const teardownAuroraPointerMotion = () => {
+  window.removeEventListener('pointermove', handleAuroraPointerMove)
+  window.removeEventListener('pointerleave', resetAuroraMovement)
+  window.removeEventListener('blur', resetAuroraMovement)
+
+  if (auroraFrameId) {
+    window.cancelAnimationFrame(auroraFrameId)
+    auroraFrameId = null
+  }
+
+  setAuroraMovement()
+}
+
+const clearBootstrapModalState = () => {
   document.body.classList.remove('modal-open')
   document.body.style.removeProperty('overflow')
   document.body.style.removeProperty('padding-right')
   document.querySelectorAll('.modal-backdrop').forEach(backdrop => backdrop.remove())
 }
 
-const logout = async () => {
-  closeLogoutModal()
-  chatStore.disconnectAll()
-  authStore.logout()
-  await router.push('/login')
+const openLogoutModal = () => {
+  clearBootstrapModalState()
+  showLogoutModal.value = true
 }
 
+const closeLogoutModal = () => {
+  showLogoutModal.value = false
+  clearBootstrapModalState()
+}
+
+const logout = async () => {
+  closeLogoutModal()
+  await nextTick()
+  chatStore.disconnectAll()
+  authStore.logout()
+  await router.replace('/login')
+  await nextTick()
+  closeLogoutModal()
+  window.setTimeout(clearBootstrapModalState, 0)
+}
+
+
 const isPublicRoute = computed(() => {
-  return ['home', 'login', 'register', 'preferencesetup', 'tutorpreferencesetup'].includes(route.name)
+  return [
+    'home',
+    'login',
+    'register',
+    'forgot-password',
+    'reset-password',
+    'password-reset-confirm',
+    'preferencesetup',
+    'tutorpreferencesetup'
+  ].includes(route.name)
 })
 
 // Get the role from the store to control the sidebar links
@@ -394,6 +484,8 @@ const handleVisibilityChange = async () => {
   }
 }
 onMounted(() => {
+  setupAuroraPointerMotion()
+
   if (authStore.isAuthenticated) {
     notificationsStore.fetchNotifications()
     chatStore.fetchRooms()
@@ -410,6 +502,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   closeLogoutModal()
+  teardownAuroraPointerMotion()
   document.removeEventListener('visibilitychange', handleVisibilityChange)
 
   if (pendingSessionsRefreshId) {
@@ -505,6 +598,18 @@ onBeforeUnmount(() => {
 
 .app-page-header {
   min-height: var(--sb-topbar-height);
+}
+
+.logout-modal {
+  background: transparent;
+}
+
+.logout-modal .modal-content {
+  border: 1px solid color-mix(in srgb, var(--sb-card-border) 82%, transparent);
+  background: color-mix(in srgb, var(--sb-card-bg) 94%, transparent);
+  color: var(--sb-text-main);
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(28px);
 }
 
 .chat-icon-btn {

@@ -7,6 +7,10 @@ const isNgrok = API_BASE_URL.includes('ngrok')
 const PUBLIC_ENDPOINTS = [
   'login/',
   'register/',
+  'login/verify-otp/',
+  'login/resend-otp/',
+  'password-reset/request/',
+  'password-reset/confirm/',
   'token/refresh/',
   'partner-institutions/',
   'courses/',
@@ -15,6 +19,7 @@ const PUBLIC_ENDPOINTS = [
 
 const api = axios.create({
   baseURL: API_BASE_URL,
+  timeout: 30000,
   headers: isNgrok ? { 'ngrok-skip-browser-warning': 'true' } : {},
 })
 

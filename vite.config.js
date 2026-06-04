@@ -16,6 +16,10 @@ export default defineConfig(({ mode }) => {
     : undefined
 
   return {
+    // Strip console/debugger statements from production builds.
+    esbuild: {
+      drop: mode === 'production' ? ['console', 'debugger'] : [],
+    },
     plugins: [
       vue(),
       vueDevTools(),
@@ -25,24 +29,27 @@ export default defineConfig(({ mode }) => {
         '@': fileURLToPath(new URL('./src', import.meta.url))
       },
     },
-    server: apiProxyTarget
-      ? {
-          proxy: {
-            '/api': {
-              target: apiProxyTarget,
-              changeOrigin: true,
-              secure: false,
-              headers: proxyHeaders,
+    server: {
+      allowedHosts: true,
+      ...(apiProxyTarget
+        ? {
+            proxy: {
+              '/api': {
+                target: apiProxyTarget,
+                changeOrigin: true,
+                secure: false,
+                headers: proxyHeaders,
+              },
+              '/ws': {
+                target: apiProxyTarget,
+                changeOrigin: true,
+                secure: false,
+                ws: true,
+                headers: proxyHeaders,
+              },
             },
-            '/ws': {
-              target: apiProxyTarget,
-              changeOrigin: true,
-              secure: false,
-              ws: true,
-              headers: proxyHeaders,
-            },
-          },
-        }
-      : undefined,
+          }
+        : {}),
+    },
   }
 })

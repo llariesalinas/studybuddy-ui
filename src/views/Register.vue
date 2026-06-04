@@ -55,16 +55,14 @@
 
       <div class="sb-auth-field">
         <label class="sb-auth-label">Institution</label>
-        <select v-model="store.selectedInstitutionId" class="sb-auth-select" required>
-          <option value="" disabled>Select your institution</option>
-          <option
-            v-for="institution in institutions"
-            :key="institution.id"
-            :value="String(institution.id)"
-          >
-            {{ institution.institution_name }} ({{ institution.school_email_domain }})
-          </option>
-        </select>
+        <SbSelectModal
+          v-model="store.selectedInstitutionId"
+          :options="institutionOptions"
+          title="Institution"
+          placeholder="Select your institution"
+          searchable
+          trigger-class="sb-auth-select"
+        />
         <div v-if="selectedInstitutionDomain" class="sb-auth-helper">
           Allowed email domain: {{ selectedInstitutionDomain }}
         </div>
@@ -84,11 +82,13 @@
 
       <div class="sb-auth-field">
         <label class="sb-auth-label">I want to</label>
-        <select v-model="store.newUserType" class="sb-auth-select" required>
-          <option value="" disabled selected>Select your role</option>
-          <option value="Tutee">Find a Tutor (Student)</option>
-          <option value="Tutor">Become a Tutor</option>
-        </select>
+        <SbSelectModal
+          v-model="store.newUserType"
+          :options="roleOptions"
+          title="I want to"
+          placeholder="Select your role"
+          trigger-class="sb-auth-select"
+        />
       </div>
 
       <button type="submit" class="sb-btn-pill sb-auth-submit" :disabled="isSubmitting">
@@ -103,13 +103,12 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useRegistrationInfoStore } from '@/stores/registrationinfo'
-import { useAuthStore } from '@/stores/auth'
 import api from '@/services/api/api'
 import AuthShell from '@/components/AuthShell.vue'
+import SbSelectModal from '@/components/SbSelectModal.vue'
 
 const router = useRouter()
 const store = useRegistrationInfoStore()
-const authStore = useAuthStore()
 
 const isSubmitting = ref(false)
 const institutions = ref([])
@@ -117,6 +116,18 @@ const institutions = ref([])
 const generalError = ref('')
 const emailError = ref('')
 const institutionError = ref('')
+
+const roleOptions = [
+  { label: 'Find a Tutor (Student)', value: 'Tutee' },
+  { label: 'Become a Tutor', value: 'Tutor' },
+]
+
+const institutionOptions = computed(() =>
+  institutions.value.map((institution) => ({
+    label: `${institution.institution_name} (${institution.school_email_domain})`,
+    value: String(institution.id),
+  }))
+)
 
 const selectedInstitution = computed(() => {
   return (
@@ -156,10 +167,14 @@ const handleRegister = async () => {
     !store.newUserFname ||
     !store.newUserLname ||
     !store.newUserEmail ||
-    !store.newUserPassword ||
-    !store.selectedInstitutionId
+    !store.newUserPassword
   ) {
     generalError.value = 'Please fill in all required fields.'
+    return
+  }
+
+  if (!store.selectedInstitutionId) {
+    institutionError.value = 'Please select your institution.'
     return
   }
 
@@ -189,13 +204,13 @@ const handleRegister = async () => {
       institution_id: store.selectedInstitutionId,
     })
 
-    await authStore.login({
-      email: store.newUserEmail,
-      password: store.newUserPassword,
+    router.push({
+      name: 'login',
+      query: {
+        registered: 'success',
+        email: store.newUserEmail,
+      },
     })
-
-    if (role === 'Tutor') router.push('/tutor-setup')
-    else router.push('/preferencesetup')
   } catch (error) {
     console.error('Registration Error:', error)
 

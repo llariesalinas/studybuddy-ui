@@ -1,9 +1,5 @@
 <template>
   <div class="dashboard-shell">
-    <div class="aurora-blob aurora-blob-one"></div>
-    <div class="aurora-blob aurora-blob-two"></div>
-    <div class="aurora-blob aurora-blob-three"></div>
-
     <div class="dashboard-content">
       <section class="metrics-grid" aria-label="Session summary">
         <article
@@ -551,43 +547,7 @@ const bookTutor = (id) => router.push({
   padding: 2rem;
   color: var(--sb-ink);
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background:
-    radial-gradient(circle at 0% 0%, rgba(16, 185, 129, 0.28), transparent 34%),
-    radial-gradient(circle at 96% 8%, rgba(14, 165, 233, 0.18), transparent 32%),
-    radial-gradient(circle at 86% 82%, rgba(245, 158, 11, 0.11), transparent 34%),
-    var(--sb-bg);
-}
-
-.aurora-blob {
-  position: absolute;
-  border-radius: 999px;
-  filter: blur(18px);
-  opacity: 0.38;
-  pointer-events: none;
-}
-
-.aurora-blob-one {
-  width: 280px;
-  height: 280px;
-  top: -90px;
-  left: 12%;
-  background: rgba(0, 137, 90, 0.3);
-}
-
-.aurora-blob-two {
-  width: 320px;
-  height: 320px;
-  top: 12%;
-  right: -120px;
-  background: rgba(14, 165, 233, 0.18);
-}
-
-.aurora-blob-three {
-  width: 250px;
-  height: 250px;
-  left: -90px;
-  bottom: 8%;
-  background: rgba(245, 158, 11, 0.12);
+  background: transparent;
 }
 
 .dashboard-content {
