@@ -440,6 +440,7 @@
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
+import { useSubjectCatalog } from '@/composables/useSubjectCatalog'
 import api from '@/services/api/api'
 import { useToastStore } from '@/stores/toast'
 
@@ -501,13 +502,6 @@ const yearLevels = [
   { label: '3rd Year', value: 15, level: 'college' },
   { label: '4th Year', value: 16, level: 'college' }
 ]
-
-const categoryMap = {
-  elementary: 'Elementary',
-  jhs: 'JHS',
-  shs: 'SHS',
-  college: 'College'
-}
 
 watch(
   () => profile.value.profile_picture_url,
@@ -585,136 +579,34 @@ const filteredDraftCourses = computed(() =>
   })
 )
 
-const hasSubjectsForCurrentLevel = computed(() => {
-  const activeLevelCategory = categoryMap[educationLevel.value]
+const selectedCourseCode = computed(() => profile.value.course)
 
-  if (!activeLevelCategory) {
-    return false
+const profileSubjectCodes = computed({
+  get: () => profile.value.subjects,
+  set: value => {
+    profile.value.subjects = value
   }
-
-  return subjects.value.some(subject => normalizeCategory(subject.category) === activeLevelCategory)
 })
 
-const levelScopedSubjects = computed(() => {
-  const activeLevelCategory = categoryMap[educationLevel.value]
-
-  return subjects.value.filter(subject => {
-    if (!activeLevelCategory || !hasSubjectsForCurrentLevel.value) {
-      return true
-    }
-
-    return normalizeCategory(subject.category) === activeLevelCategory
-  })
-})
-
-const prioritizedSubjects = computed(() =>
-  [...levelScopedSubjects.value].sort((left, right) => {
-    const priorityDelta = getSubjectPriorityScore(right) - getSubjectPriorityScore(left)
-
-    if (priorityDelta !== 0) {
-      return priorityDelta
-    }
-
-    const leftGroup = getSubjectGroup(left)
-    const rightGroup = getSubjectGroup(right)
-    const groupDelta = leftGroup.localeCompare(rightGroup)
-
-    if (groupDelta !== 0) {
-      return groupDelta
-    }
-
-    return left.subject_name.localeCompare(right.subject_name)
-  })
-)
-
-const recommendedSubjects = computed(() =>
-  prioritizedSubjects.value.filter(subject => getSubjectPriorityScore(subject) > 0)
-)
-
-const availableCategories = computed(() => {
-  const groupScores = new Map()
-
-  levelScopedSubjects.value.forEach(subject => {
-    const group = getSubjectGroup(subject)
-    const score = Math.max(groupScores.get(group) || 0, getSubjectPriorityScore(subject))
-    groupScores.set(group, score)
-  })
-
-  const groups = [...groupScores.entries()]
-    .sort((left, right) => {
-      const priorityDelta = right[1] - left[1]
-
-      if (priorityDelta !== 0) {
-        return priorityDelta
-      }
-
-      return left[0].localeCompare(right[0])
-    })
-    .map(([group]) => group)
-
-  return recommendedSubjects.value.length
-    ? ['All', 'Recommended', ...groups]
-    : ['All', ...groups]
-})
-
-const filteredSubjects = computed(() => {
-  const query = subjectSearch.value.trim().toLowerCase()
-
-  return prioritizedSubjects.value.filter(subject => {
-    const group = getSubjectGroup(subject)
-    const matchesCategory =
-      activeCategory.value === 'All' ||
-      (activeCategory.value === 'Recommended' && getSubjectPriorityScore(subject) > 0) ||
-      group === activeCategory.value
-    const matchesSearch =
-      !query ||
-      subject.subject_name.toLowerCase().includes(query) ||
-      subject.subject_code.toLowerCase().includes(query) ||
-      getSubjectGroup(subject).toLowerCase().includes(query)
-
-    return matchesCategory && matchesSearch
-  })
-})
-
-const groupedSubjectSections = computed(() => {
-  if (activeCategory.value === 'Recommended') {
-    return [{
-      name: getRecommendedSectionLabel(),
-      subjects: filteredSubjects.value
-    }]
-  }
-
-  const groups = new Map()
-
-  filteredSubjects.value.forEach(subject => {
-    const group = getSubjectGroup(subject)
-
-    if (!groups.has(group)) {
-      groups.set(group, [])
-    }
-
-    groups.get(group).push(subject)
-  })
-
-  return [...groups.entries()].map(([name, groupedSubjects]) => ({
-    name,
-    subjects: groupedSubjects
-  }))
-})
-
-const selectedSubjectObjects = computed(() => {
-  const selectedCodes = new Set(profile.value.subjects)
-  return subjects.value
-    .filter(subject => selectedCodes.has(subject.subject_code))
-    .sort((left, right) => {
-      const priorityDelta = getSubjectPriorityScore(right) - getSubjectPriorityScore(left)
-
-      if (priorityDelta !== 0) {
-        return priorityDelta
-      }
-
-      return left.subject_name.localeCompare(right.subject_name)
-    })
+const {
+  availableCategories,
+  filteredSubjects,
+  groupedSubjectSections,
+  selectedSubjectObjects,
+  getPreferredSubjectCategory,
+  getSubjectGroup,
+  pruneSubjectsForCurrentLevel,
+  refreshSubjectFilterForAcademicContext
+} = useSubjectCatalog({
+  subjects,
+  courses,
+  educationLevel,
+  selectedCourseCode,
+  subjectSearch,
+  activeCategory,
+  selectedSubjectCodes: profileSubjectCodes,
+  draftSubjectCodes,
+  isSubjectModalOpen
 })
 
 const selectedDraftCountLabel = computed(() => {
@@ -733,93 +625,6 @@ const lastUpdated = computed(() => {
     day: 'numeric'
   })
 })
-
-function normalizeCategory(category) {
-  const normalized = category?.trim()
-  return normalized || 'Uncategorized'
-}
-
-function normalizeDepartment(department) {
-  const normalized = department?.trim()
-  return normalized || ''
-}
-
-function getSubjectGroup(subject) {
-  return normalizeDepartment(subject.department) || normalizeCategory(subject.category)
-}
-
-function getSelectedCourseTokens() {
-  const selectedCourse = courses.value.find(course => course.course_code === profile.value.course)
-
-  if (!selectedCourse) {
-    return []
-  }
-
-  const label = `${selectedCourse.course_code || ''} ${selectedCourse.course_name || ''}`.toLowerCase()
-  const tokens = label
-    .split(/[^a-z0-9]+/)
-    .filter(token => token.length >= 3)
-    .filter(token => !['the', 'and', 'for', 'bachelor', 'science'].includes(token))
-
-  if (label.includes('computer science') || label.includes('bscs')) {
-    tokens.push('computer', 'computing', 'programming', 'algorithm', 'data')
-  }
-
-  if (label.includes('information technology') || label.includes('bsit')) {
-    tokens.push('information', 'technology', 'network', 'web', 'programming')
-  }
-
-  if (label.includes('business') || label.includes('bsba')) {
-    tokens.push('business', 'accounting', 'management', 'finance', 'marketing')
-  }
-
-  if (label.includes('stem')) {
-    tokens.push('math', 'science', 'physics', 'chemistry', 'biology')
-  }
-
-  if (label.includes('abm')) {
-    tokens.push('business', 'accounting', 'management', 'finance')
-  }
-
-  if (label.includes('humss')) {
-    tokens.push('humanities', 'social', 'writing', 'english', 'communication')
-  }
-
-  return [...new Set(tokens)]
-}
-
-function getSubjectPriorityScore(subject) {
-  const tokens = getSelectedCourseTokens()
-
-  if (!tokens.length) {
-    return 0
-  }
-
-  const haystack = [
-    subject.subject_code,
-    subject.subject_name,
-    subject.department,
-    subject.category,
-  ].join(' ').toLowerCase()
-
-  return tokens.reduce((score, token) => {
-    if (haystack.includes(token)) {
-      return score + 1
-    }
-
-    return score
-  }, 0)
-}
-
-function getRecommendedSectionLabel() {
-  const selectedCourse = courses.value.find(course => course.course_code === profile.value.course)
-
-  if (!selectedCourse) {
-    return 'Recommended'
-  }
-
-  return `Recommended for ${selectedCourse.course_code}`
-}
 
 function getCourseEducationLevel(course) {
   if (!course) {
@@ -974,32 +779,6 @@ function confirmSubjectSelection() {
 
 function removeSubject(subjectCode) {
   profile.value.subjects = profile.value.subjects.filter(code => code !== subjectCode)
-}
-
-function pruneSubjectsForCurrentLevel() {
-  const validCodes = new Set(levelScopedSubjects.value.map(subject => subject.subject_code))
-  profile.value.subjects = profile.value.subjects.filter(code => validCodes.has(code))
-}
-
-function getPreferredSubjectCategory() {
-  return recommendedSubjects.value.length ? 'Recommended' : 'All'
-}
-
-function pruneDraftSubjectsForCurrentLevel() {
-  const validCodes = new Set(levelScopedSubjects.value.map(subject => subject.subject_code))
-  draftSubjectCodes.value = draftSubjectCodes.value.filter(code => validCodes.has(code))
-}
-
-function refreshSubjectFilterForAcademicContext({ preferRecommended = false } = {}) {
-  if (preferRecommended || !availableCategories.value.includes(activeCategory.value)) {
-    activeCategory.value = getPreferredSubjectCategory()
-  }
-
-  subjectSearch.value = ''
-
-  if (isSubjectModalOpen.value) {
-    pruneDraftSubjectsForCurrentLevel()
-  }
 }
 
 function triggerAvatarUpload() {

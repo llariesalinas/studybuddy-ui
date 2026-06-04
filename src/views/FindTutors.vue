@@ -5,26 +5,31 @@
         <!-- Subject -->
         <div class="col-lg-4 col-md-6">
           <label class="form-label fw-semibold small sb-muted">Subject</label>
-          <select v-model="subjectModel" class="form-select border-sb shadow-none py-2 rounded-3">
-            <option disabled value="">Select Subject</option>
-            <option
-              v-for="subject in subjects"
-              :key="subject.subject_code"
-              :value="subject.subject_code"
-            >
-              {{ subject.subject_name }}
-            </option>
-          </select>
+          <SbSelectModal
+            v-model="subjectModel"
+            :groups="subjectGroups"
+            title="Choose Subject"
+            placeholder="Any Subject"
+            search-placeholder="Search subjects"
+            searchable
+            clearable
+            clear-label="Any Subject"
+            empty-message="No subjects found."
+          />
         </div>
 
         <!-- Mode -->
         <div class="col-lg-2 col-md-3">
           <label class="form-label fw-semibold small sb-muted">Mode</label>
-          <select v-model="modeModel" class="form-select border-sb shadow-none py-2 rounded-3">
-            <option v-for="mode in modes" :key="mode" :value="mode">
-              {{ mode }}
-            </option>
-          </select>
+          <SbSelectModal
+            v-model="modeModel"
+            :options="modeOptions"
+            title="Choose Mode"
+            placeholder="Any Mode"
+            clearable
+            clear-label="Any Mode"
+            empty-message="No modes found."
+          />
         </div>
 
         <!-- Location -->
@@ -183,6 +188,7 @@ import { computed, nextTick, ref, onMounted } from 'vue'
 import BudgetRangeSlider from '@/components/BudgetRangeSlider.vue'
 import BookingDatePicker from '@/components/BookingDatePicker.vue'
 import BookingTimePicker from '@/components/BookingTimePicker.vue'
+import SbSelectModal from '@/components/SbSelectModal.vue'
 
 import {
   INITIAL_BUDGET_MAX,
@@ -267,7 +273,7 @@ const emptyStateTitle = computed(() =>
 )
 const emptyStateMessage = computed(() =>
   noBackendResults.value
-    ? 'No tutors are available for the selected subject, date and time. Try a different date, time, or subject.'
+    ? 'No tutors are available for the selected filters. Try a different date, time, subject, or mode.'
     : 'Try widening the slider range to see more tutor options.',
 )
 
@@ -314,14 +320,16 @@ const updateFindTutorsFilters = (fields) => {
   syncInitialBookingPrefs(fields)
 }
 
+const normalizeSelectValue = (value) => (value == null ? '' : String(value))
+
 const subjectModel = computed({
   get: () => findTutorsStore.filters.subject,
-  set: (value) => updateFindTutorsFilters({ subject: value }),
+  set: (value) => updateFindTutorsFilters({ subject: normalizeSelectValue(value) }),
 })
 
 const modeModel = computed({
   get: () => findTutorsStore.filters.mode,
-  set: (value) => updateFindTutorsFilters({ mode: value }),
+  set: (value) => updateFindTutorsFilters({ mode: normalizeSelectValue(value) }),
 })
 
 const locationModel = computed({
@@ -355,6 +363,7 @@ const maxRateModel = computed({
 })
 
 const modes = ['Online', 'Face-to-face']
+const modeOptions = modes.map((mode) => ({ label: mode, value: mode }))
 const startTimeModel = computed({
   get: () => findTutorsStore.filters.startTime,
   set: (value) => {
@@ -380,6 +389,43 @@ const endTimeModel = computed({
     updateFindTutorsFilters({ endTime: value })
   },
 })
+
+const getSubjectGroupLabel = (subject) => {
+  return subject?.department?.trim() || subject?.category?.trim() || 'Other Subjects'
+}
+
+const subjectGroups = computed(() => {
+  const groups = new Map()
+
+  subjects.value.forEach((subject) => {
+    const groupLabel = getSubjectGroupLabel(subject)
+
+    if (!groups.has(groupLabel)) {
+      groups.set(groupLabel, [])
+    }
+
+    groups.get(groupLabel).push({
+      label: subject.subject_name,
+      value: subject.subject_code,
+      description: subject.description || subject.subject_code,
+    })
+  })
+
+  return [...groups.entries()]
+    .sort(([leftLabel], [rightLabel]) => leftLabel.localeCompare(rightLabel))
+    .map(([label, options]) => ({
+      label,
+      options: options.sort((left, right) => left.label.localeCompare(right.label)),
+    }))
+})
+
+const canRunRecommendation = () => {
+  return Boolean(
+    findTutorsStore.filters.date &&
+      findTutorsStore.filters.startTime &&
+      findTutorsStore.filters.endTime,
+  )
+}
 
 const runRecommendation = async () => {
   const response = await api.post('/recommend-tutors/', {
@@ -413,7 +459,7 @@ const runRecommendation = async () => {
 }
 
 const ensureFindTutorsData = async () => {
-  if (!findTutorsStore.filters.subject) {
+  if (!canRunRecommendation()) {
     return
   }
 
@@ -521,7 +567,7 @@ onMounted(async () => {
     console.error('Failed to load subjects', error)
   }
 
-  if (findTutorsStore.filters.subject) {
+  if (canRunRecommendation()) {
     try {
       await ensureFindTutorsData()
     } catch (error) {
@@ -540,7 +586,7 @@ onBeforeRouteUpdate(async (to, from, next) => {
     }
   }
 
-  if (to.name === 'tutors' && findTutorsStore.filters.subject && !findTutorsStore.hasFetched) {
+  if (to.name === 'tutors' && canRunRecommendation() && !findTutorsStore.hasFetched) {
     isLoading.value = true
     try {
       await ensureFindTutorsData()
