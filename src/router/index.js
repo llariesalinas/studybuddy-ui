@@ -24,6 +24,21 @@ const router = createRouter({
       name: 'register',
       component: () => import('@/views/Register.vue')
     },
+    {
+      path: '/forgot-password',
+      name: 'forgot-password',
+      component: () => import('@/views/ForgotPassword.vue')
+    },
+    {
+      path: '/reset-password/:uid/:token',
+      name: 'reset-password',
+      component: () => import('@/views/ResetPassword.vue')
+    },
+    {
+      path: '/password-reset/confirm',
+      name: 'password-reset-confirm',
+      component: () => import('@/views/ResetPassword.vue')
+    },
 
     // ---------- STUDENT ROUTES ----------
     {
@@ -163,6 +178,12 @@ const router = createRouter({
       component: () => import('@/views/AdminReports.vue'),
       meta: { requiresAuth: true, role: 'Admin' }
     },
+    {
+      path: '/admin/support',
+      name: 'admin-support',
+      component: () => import('@/views/AdminSupport.vue'),
+      meta: { requiresAuth: true, role: 'Admin' }
+    },
 
 
     // ---------- SHARED ROUTES ----------
@@ -187,6 +208,11 @@ const router = createRouter({
   GLOBAL NAVIGATION GUARD
 */
 router.beforeEach(async (to, from, next) => {
+  // Clean up any lingering backdrops or modal styles
+  document.querySelectorAll('.offcanvas-backdrop, .modal-backdrop').forEach(el => el.remove())
+  document.body.classList.remove('modal-open', 'offcanvas-open')
+  document.body.style.removeProperty('overflow')
+  document.body.style.removeProperty('padding-right')
 
   const authStore = useAuthStore()
   const profileStore = useProfileStore()

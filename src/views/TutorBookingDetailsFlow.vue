@@ -173,25 +173,107 @@
           >
             {{ isSubmitting ? 'Updating...' : 'Mark as Complete' }}
           </button>
+
+          <button
+            v-if="showCancelButton"
+            class="btn btn-outline-danger mt-3 sb-btn"
+            :disabled="isCancelling || !canCancel"
+            @click="isCancelModalOpen = true"
+          >
+            {{ isCancelling ? 'Cancelling...' : 'Cancel Session' }}
+          </button>
+          <p v-if="showCancelButton && !canCancel" class="small text-muted mt-2 mb-0">
+            Sessions can only be cancelled at least two days before the session date.
+          </p>
         </div>
       </div>
     </div>
+
+    <div
+      v-if="isCancelModalOpen"
+      class="modal fade show d-block"
+      tabindex="-1"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content border-0 shadow">
+          <div class="modal-header">
+            <h5 class="modal-title fw-bold">Cancel Session</h5>
+            <button
+              type="button"
+              class="btn-close"
+              aria-label="Close"
+              :disabled="isCancelling"
+              @click="closeCancelModal"
+            ></button>
+          </div>
+
+          <div class="modal-body">
+            <p class="mb-2">Are you sure you want to cancel this session?</p>
+            <label class="form-label fw-semibold small">Reason (required)</label>
+            <textarea
+              v-model="cancelReason"
+              class="form-control shadow-none"
+              rows="3"
+              placeholder="Let your tutee know why you're cancelling..."
+              :disabled="isCancelling"
+            ></textarea>
+            <p class="small text-muted mt-2 mb-0">
+              Please also
+              <a href="#" @click.prevent="goToChat">message your tutee in Chat</a>
+              to coordinate.
+            </p>
+          </div>
+
+          <div class="modal-footer">
+            <button
+              type="button"
+              class="btn btn-outline-secondary sb-btn"
+              :disabled="isCancelling"
+              @click="closeCancelModal"
+            >
+              Keep Session
+            </button>
+            <button
+              type="button"
+              class="btn btn-danger sb-btn"
+              :disabled="isCancelling || !reasonValid"
+              @click="handleCancel"
+            >
+              <span
+                v-if="isCancelling"
+                class="spinner-border spinner-border-sm me-2"
+                role="status"
+                aria-hidden="true"
+              ></span>
+              {{ isCancelling ? 'Cancelling...' : 'Yes, Cancel Session' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div v-if="isCancelModalOpen" class="modal-backdrop fade show"></div>
   </div>
 </template>
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useNotificationsStore } from '@/stores/notifications'
 import { useTutorBookingDetailStore } from '@/stores/tutorBookingDetails'
 import { useToastStore } from '@/stores/toast'
 
 const route = useRoute()
+const router = useRouter()
 const bookingDetailsStore = useTutorBookingDetailStore()
 const notificationsStore = useNotificationsStore()
 const toastStore = useToastStore()
 const isSubmitting = ref(false)
 const isDevSubmitting = ref(false)
+const isCancelling = ref(false)
+const isCancelModalOpen = ref(false)
+const cancelReason = ref('')
 const isDev = import.meta.env.DEV
 
 const normalizedStatus = computed(() =>
@@ -206,6 +288,19 @@ const showDevReadyForPayment = computed(
     isDev &&
     normalizedRawStatus.value === 'confirmed' &&
     !bookingDetailsStore.booking?.tutor_confirmed,
+)
+
+const reasonValid = computed(() => cancelReason.value.trim().length >= 5)
+const tomorrowKey = computed(() => {
+  const d = new Date()
+  d.setDate(d.getDate() + 1)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+})
+const showCancelButton = computed(() => normalizedStatus.value === 'upcoming')
+const canCancel = computed(
+  () =>
+    normalizedStatus.value === 'upcoming' &&
+    String(bookingDetailsStore.sessionInfo?.date || '') > tomorrowKey.value,
 )
 
 const amountPaid = computed(() => {
@@ -273,6 +368,39 @@ const handleDevReadyForPayment = async () => {
     toastStore.push(error.response?.data?.error || 'Failed to make session ready for payment.', 'error')
   } finally {
     isDevSubmitting.value = false
+  }
+}
+
+const goToChat = () => {
+  router.push({ name: 'chat' })
+}
+
+const closeCancelModal = () => {
+  if (isCancelling.value) {
+    return
+  }
+
+  cancelReason.value = ''
+  isCancelModalOpen.value = false
+}
+
+const handleCancel = async () => {
+  if (!canCancel.value || !reasonValid.value) {
+    return
+  }
+
+  isCancelling.value = true
+
+  try {
+    await bookingDetailsStore.cancelBooking(cancelReason.value.trim())
+    await notificationsStore.fetchNotifications()
+    isCancelModalOpen.value = false
+    cancelReason.value = ''
+    toastStore.push('Session cancelled. Your tutee has been notified.')
+  } catch (error) {
+    toastStore.push(error.response?.data?.error || 'Failed to cancel session.', 'error')
+  } finally {
+    isCancelling.value = false
   }
 }
 

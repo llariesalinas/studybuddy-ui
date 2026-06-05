@@ -173,6 +173,16 @@
                 </div>
               </div>
             </router-link>
+
+            <router-link to="/admin/support" class="btn action-surface border-0 text-start rounded-3 p-3 shadow-none sb-btn">
+              <div class="d-flex align-items-center">
+                <i class="bi bi-headset fs-4 me-3 text-info"></i>
+                <div>
+                  <p class="fw-bold mb-0">Support Desk</p>
+                  <p class="small sb-muted mb-0">Claim and resolve user support tickets</p>
+                </div>
+              </div>
+            </router-link>
           </div>
         </div>
       </div>

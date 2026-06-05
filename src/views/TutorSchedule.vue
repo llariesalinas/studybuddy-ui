@@ -157,16 +157,13 @@
 
         <div class="mb-3">
           <label>Day</label>
-          <select v-model="newSlot.day" class="form-control">
-            <option disabled value="">Select day</option>
-            <option
-              v-for="day in daysOfWeek"
-              :key="day.code"
-              :value="day.code"
-            >
-              {{ day.label }}
-            </option>
-          </select>
+          <SbSelectModal
+            v-model="newSlot.day"
+            :options="dayOptions"
+            title="Day"
+            placeholder="Select day"
+            trigger-class="form-control"
+          />
         </div>
 
         <div class="time-picker-block">
@@ -295,6 +292,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useTutorSchedStore } from '@/stores/tutorSched'
 import { useToastStore } from '@/stores/toast'
+import SbSelectModal from '@/components/SbSelectModal.vue'
 
 const tutorSchedStore = useTutorSchedStore()
 const toastStore = useToastStore()
@@ -316,6 +314,11 @@ const daysOfWeek = [
   { code: 'Sat', label: 'Saturday', shortLabel: 'Sat' },
   { code: 'Sun', label: 'Sunday', shortLabel: 'Sun' }
 ]
+
+const dayOptions = daysOfWeek.map(day => ({
+  label: day.label,
+  value: day.code
+}))
 
 const groupedSlots = computed(() => {
   const result = {}

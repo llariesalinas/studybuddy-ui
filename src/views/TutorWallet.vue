@@ -281,32 +281,37 @@
               <div class="form-grid">
                 <label>
                   <span>Rail</span>
-                  <select v-model="accountForm.provider">
-                    <option value="instapay">InstaPay</option>
-                    <option value="pesonet">PESONet</option>
-                  </select>
+                  <SbSelectModal
+                    v-model="accountForm.provider"
+                    :options="providerOptions"
+                    title="Rail"
+                    placeholder="Select rail"
+                    trigger-class="wallet-select-trigger"
+                  />
                 </label>
                 <label>
                   <span>Type</span>
-                  <select v-model="accountForm.destination_type">
-                    <option value="gcash">GCash</option>
-                    <option value="bank">Bank</option>
-                  </select>
+                  <SbSelectModal
+                    v-model="accountForm.destination_type"
+                    :options="destinationTypeOptions"
+                    title="Destination Type"
+                    placeholder="Select type"
+                    trigger-class="wallet-select-trigger"
+                  />
                 </label>
               </div>
 
               <label>
                 <span>Receiving Institution</span>
-                <select v-model="accountForm.receiving_institution_id" required>
-                  <option value="">Select institution</option>
-                  <option
-                    v-for="institution in walletStore.receivingInstitutions"
-                    :key="institutionKey(institution)"
-                    :value="institutionId(institution)"
-                  >
-                    {{ institutionName(institution) }}
-                  </option>
-                </select>
+                <SbSelectModal
+                  v-model="accountForm.receiving_institution_id"
+                  :options="receivingInstitutionOptions"
+                  title="Receiving Institution"
+                  placeholder="Select institution"
+                  :clearable="true"
+                  :searchable="true"
+                  trigger-class="wallet-select-trigger"
+                />
               </label>
 
               <label>
@@ -347,12 +352,15 @@
             <div class="modal-body">
               <label>
                 <span>Destination</span>
-                <select v-model.number="cashoutForm.payout_account_id" required>
-                  <option :value="null">Select saved destination</option>
-                  <option v-for="account in activePayoutAccounts" :key="account.id" :value="account.id">
-                    {{ account.receiving_institution_name }} · {{ maskAccount(account.account_number) }}
-                  </option>
-                </select>
+                <SbSelectModal
+                  v-model="cashoutForm.payout_account_id"
+                  :options="payoutAccountOptions"
+                  title="Destination"
+                  placeholder="Select saved destination"
+                  :clearable="true"
+                  :searchable="true"
+                  trigger-class="wallet-select-trigger"
+                />
               </label>
 
               <label>
@@ -404,6 +412,7 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
+import SbSelectModal from '@/components/SbSelectModal.vue'
 import { useWalletStore } from '@/stores/wallet'
 import { useToastStore } from '@/stores/toast'
 
@@ -429,6 +438,16 @@ const cashoutForm = reactive({
   payout_account_id: null,
 })
 
+const providerOptions = [
+  { label: 'InstaPay', value: 'instapay' },
+  { label: 'PESONet', value: 'pesonet' },
+]
+
+const destinationTypeOptions = [
+  { label: 'GCash', value: 'gcash' },
+  { label: 'Bank', value: 'bank' },
+]
+
 const activePayoutAccounts = computed(() =>
   walletStore.payoutAccounts.filter((account) => account.is_active)
 )
@@ -436,8 +455,13 @@ const activePayoutAccounts = computed(() =>
 const cashoutAmount = computed(() => Number(cashoutForm.amount) || 0)
 const totalDeducted = computed(() => cashoutAmount.value + Number(walletStore.cashoutProviderFee || 0))
 const cashoutRail = computed(() => (cashoutAmount.value > 50000 ? 'pesonet' : 'instapay'))
+const selectedPayoutAccountId = computed(() =>
+  cashoutForm.payout_account_id === null || cashoutForm.payout_account_id === ''
+    ? null
+    : Number(cashoutForm.payout_account_id)
+)
 const selectedCashoutAccount = computed(() =>
-  activePayoutAccounts.value.find((account) => account.id === cashoutForm.payout_account_id)
+  activePayoutAccounts.value.find((account) => Number(account.id) === selectedPayoutAccountId.value)
 )
 
 const grossValue = computed(() => Number(walletStore.grossEarned) || 0)
@@ -494,7 +518,20 @@ const institutionName = (institution) =>
   institutionId(institution)
 const institutionCode = (institution) =>
   institutionAttributes(institution).code || institutionAttributes(institution).bank_code || ''
-const institutionKey = (institution) => `${institutionId(institution)}-${institutionCode(institution)}`
+const receivingInstitutionOptions = computed(() =>
+  walletStore.receivingInstitutions.map((institution) => ({
+    label: institutionName(institution),
+    value: institutionId(institution),
+  }))
+)
+
+const payoutAccountOptions = computed(() =>
+  activePayoutAccounts.value.map((account) => ({
+    label: `${account.receiving_institution_name} · ${maskAccount(account.account_number)}`,
+    value: Number(account.id),
+    description: formatDestinationType(account.destination_type),
+  }))
+)
 
 const formatDestinationType = (type) => (type === 'gcash' ? 'GCash' : 'Bank Transfer')
 
@@ -554,6 +591,11 @@ const deactivateAccount = async (id) => {
 }
 
 const handleCashout = async () => {
+  if (!selectedPayoutAccountId.value) {
+    toastStore.push('Select a payout destination.', 'error')
+    return
+  }
+
   if (!canSubmitCashout.value) {
     toastStore.push(cashoutError.value, 'error')
     return
@@ -562,7 +604,7 @@ const handleCashout = async () => {
   isSubmitting.value = true
   const result = await walletStore.requestWithdrawal({
     amount: cashoutForm.amount,
-    payout_account_id: cashoutForm.payout_account_id,
+    payout_account_id: selectedPayoutAccountId.value,
   })
   isSubmitting.value = false
 
@@ -657,7 +699,7 @@ watch(showCashoutModal, async (isOpen) => {
   if (!isOpen) return
   await refreshData()
   if (activePayoutAccounts.value.length && !cashoutForm.payout_account_id) {
-    cashoutForm.payout_account_id = activePayoutAccounts.value[0].id
+    cashoutForm.payout_account_id = Number(activePayoutAccounts.value[0].id)
   }
   if (!cashoutForm.amount) {
     cashoutForm.amount = walletStore.cashoutMinimum
@@ -1424,7 +1466,8 @@ watch(showCashoutModal, async (isOpen) => {
 }
 
 .wallet-modal input,
-.wallet-modal select {
+.wallet-modal select,
+.wallet-modal :deep(.wallet-select-trigger) {
   width: 100%;
   min-height: 44px;
   border: 1px solid rgba(15, 23, 42, 0.08);
@@ -1436,6 +1479,14 @@ watch(showCashoutModal, async (isOpen) => {
   font-weight: 600;
   text-transform: none;
   letter-spacing: 0;
+}
+
+.wallet-modal :deep(.wallet-select-trigger) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  text-align: left;
 }
 
 .form-grid {

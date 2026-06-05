@@ -140,20 +140,15 @@
               </div>
               <div class="mb-4">
                 <label class="form-label fw-semibold sb-muted small">DEGREE PROGRAM</label>
-                <select
-                  class="form-select form-select-lg rounded-3 border"
-                  v-model="selectedCourse"
-                  @change="store.selectedSubjects.splice(0)"
-                >
-                  <option value="" disabled>-- Select your Course --</option>
-                  <option
-                    v-for="course in collegeCourses"
-                    :key="course.course_code"
-                    :value="course.course_code"
-                  >
-                    {{ course.course_code }} — {{ course.course_name }}
-                  </option>
-                </select>
+                <SbSelectModal
+                  :model-value="selectedCourse"
+                  :options="collegeCourseOptions"
+                  title="Degree Program"
+                  placeholder="-- Select your Course --"
+                  searchable
+                  trigger-class="form-select form-select-lg rounded-3 border"
+                  @update:model-value="handleCourseChange"
+                />
               </div>
               <div>
                 <label class="form-label fw-semibold sb-muted small">YEAR LEVEL</label>
@@ -263,6 +258,7 @@ import { usePreferenceStore } from '@/stores/preferences'
 import { useProfileStore } from '@/stores/profile'
 import SbStepBar from '@/components/SbStepBar.vue'
 import SbThemeToggle from '@/components/SbThemeToggle.vue'
+import SbSelectModal from '@/components/SbSelectModal.vue'
 import { useToastStore } from '@/stores/toast'
 
 const router = useRouter()
@@ -360,6 +356,13 @@ const collegeCourses = computed(() =>
   )
 )
 
+const collegeCourseOptions = computed(() =>
+  collegeCourses.value.map(course => ({
+    label: `${course.course_code} - ${course.course_name}`,
+    value: course.course_code,
+  }))
+)
+
 const card2Valid = computed(() => {
   if (educationLevel.value === 'elementary') return selectedGrade.value !== null
   if (educationLevel.value === 'jhs')        return selectedGrade.value !== null
@@ -400,6 +403,11 @@ const selectEducationLevel = (value) => {
   selectedStrand.value = ''
   selectedCourse.value = ''
   selectedCollegeYear.value = null
+  store.selectedSubjects.splice(0)
+}
+
+const handleCourseChange = (courseCode) => {
+  selectedCourse.value = courseCode
   store.selectedSubjects.splice(0)
 }
 

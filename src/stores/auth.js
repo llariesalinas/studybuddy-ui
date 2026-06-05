@@ -81,6 +81,15 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     updateAccessToken(newAccessToken)
+
+    // Backend rotates refresh tokens (ROTATE_REFRESH_TOKENS) and blacklists the
+    // old one, so persist the new refresh token or the next refresh will fail.
+    const rotatedRefreshToken = response.data.refresh
+    if (rotatedRefreshToken) {
+      refreshToken.value = rotatedRefreshToken
+      localStorage.setItem('refresh_token', rotatedRefreshToken)
+    }
+
     return newAccessToken
   }
 
@@ -109,11 +118,9 @@ export const useAuthStore = defineStore('auth', () => {
     startAccessTokenRefresh()
   }
 
-  const login = async (credentials) => {
-    const response = await api.post('login/', credentials)
-
-    const receivedToken = response.data.access
-    const receivedRefreshToken = response.data.refresh
+  const completeLogin = (authPayload) => {
+    const receivedToken = authPayload.access
+    const receivedRefreshToken = authPayload.refresh
 
     if (!receivedToken || !receivedRefreshToken) {
       throw new Error('Missing authentication token(s) from server.')
@@ -124,26 +131,67 @@ export const useAuthStore = defineStore('auth', () => {
       refreshTokenValue: receivedRefreshToken
     })
 
+    const normalizedRole = normalizeRole(authPayload.role)
+
     user.value = {
-      email: response.data.email,
-      role: normalizeRole(response.data.role),
-      id: Number(response.data.user_id),
-      profile_id: Number(response.data.profile_id),
-      fname: response.data.fname,
-      lname: response.data.lname
+      email: authPayload.email,
+      role: normalizedRole,
+      id: Number(authPayload.user_id),
+      profile_id: Number(authPayload.profile_id),
+      fname: authPayload.fname,
+      lname: authPayload.lname
     }
 
-    localStorage.setItem('user_role', normalizeRole(response.data.role))
-    localStorage.setItem('user_id', response.data.user_id)
-    localStorage.setItem('profile_id', response.data.profile_id)
+    localStorage.setItem('user_role', normalizedRole)
+    localStorage.setItem('user_id', authPayload.user_id)
+    localStorage.setItem('profile_id', authPayload.profile_id)
     profileStore.resetProfileState()
 
     startSessionTracking()
 
-    return response.data.role
+    return authPayload.role
+  }
+
+  const login = async (credentialsOrPayload, options = {}) => {
+    const responseData = options.completed
+      ? credentialsOrPayload
+      : (await api.post('login/', credentialsOrPayload)).data
+
+    if (!options.completed && responseData.requires_2fa) {
+      if (!responseData.challenge_id) {
+        throw new Error('Missing email verification challenge from server.')
+      }
+
+      return {
+        requires_2fa: true,
+        challenge_id: responseData.challenge_id,
+        debug_code: responseData.debug_code || null
+      }
+    }
+
+    return completeLogin(responseData)
   }
 
   const logout = () => {
+    // Best-effort server-side revocation: blacklist the refresh token.
+    // Uses raw axios (not the api instance) to avoid the 401 interceptor recursing.
+    const currentAccess = token.value || localStorage.getItem('access_token')
+    const currentRefresh = refreshToken.value || localStorage.getItem('refresh_token')
+
+    if (currentAccess && currentRefresh) {
+      const ngrokHeaders = API_BASE_URL.includes('ngrok')
+        ? { 'ngrok-skip-browser-warning': 'true' }
+        : {}
+
+      axios
+        .post(
+          `${API_BASE_URL}logout/`,
+          { refresh: currentRefresh },
+          { headers: { Authorization: `Bearer ${currentAccess}`, ...ngrokHeaders } }
+        )
+        .catch(() => {})
+    }
+
     stopIdleSessionTracking()
     stopAccessTokenRefresh()
 
@@ -191,6 +239,7 @@ export const useAuthStore = defineStore('auth', () => {
     setTokens,
     updateAccessToken,
     refreshAccessToken,
+    completeLogin,
     login,
     logout,
     initializeAuth

@@ -1,16 +1,25 @@
+import re
 from datetime import date, time
 from decimal import Decimal
 from unittest.mock import Mock, patch
 from uuid import uuid4
 
+from django.core.cache import cache
+from django.core import mail
 from django.contrib.auth.models import User
+from django.db import connection
 from django.test import override_settings
+from django.test.utils import CaptureQueriesContext
 from rest_framework.test import APITestCase
+from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
+from rest_framework_simplejwt.tokens import RefreshToken
 
-from .chat.services import get_current_booking_context, get_partner_context
+from .chat.services import get_current_booking_context, get_current_booking_contexts, get_partner_context
 from .models import (
     Booking,
     Course,
+    EmailOTPChallenge,
+    PartnerInstitution,
     Payment,
     PaymentMethod,
     Rating,
@@ -277,6 +286,39 @@ class ChatFeatureTests(APITestCase):
             status=status,
         )
 
+    def make_extra_tutor_room(self, username, updated_at=None):
+        user = User.objects.create_user(
+            username=username,
+            email=f"{username}@example.com",
+            password="password",
+        )
+        profile = UserProfile.objects.create(
+            user=user,
+            fname=username.title(),
+            mname="",
+            lname="Tutor",
+            role="Tutor",
+        )
+        tutor = Tutor.objects.create(
+            profile=profile,
+            hourly_rate=250,
+            can_online=True,
+            can_f2f=True,
+            teaching_level="SHS",
+        )
+        availability = TutorAvailability.objects.create(
+            tutor=tutor,
+            day="Mon",
+            time_slot=time(14, 0),
+            is_active=True,
+        )
+        room = ChatRoom.objects.create(
+            tutee=self.tutee_profile,
+            tutor=profile,
+            **({'updated_at': updated_at} if updated_at else {}),
+        )
+        return user, profile, tutor, availability, room
+
     def test_status_intent_pending_f2f_returns_pending_location(self):
         room = ChatRoom.objects.create(tutee=self.tutee_profile, tutor=self.tutor_profile)
         booking = self.make_booking('Pending', session_mode='F2F')
@@ -394,6 +436,165 @@ class ChatFeatureTests(APITestCase):
         self.make_booking('Rejected', days_ago=8)
         context = get_current_booking_context(room)
         self.assertIsNone(context)
+
+    def test_chat_rooms_endpoint_returns_paginated_payload(self):
+        from django.utils import timezone
+        from datetime import timedelta
+
+        base_time = timezone.now()
+        rooms = []
+        for index in range(4):
+            *_, room = self.make_extra_tutor_room(
+                f"page-tutor-{index}",
+                updated_at=base_time - timedelta(minutes=index),
+            )
+            rooms.append(room)
+
+        self.client.force_authenticate(user=self.tutee_user)
+        response = self.client.get("/api/chat/rooms/?page_size=2")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data["results"]), 2)
+        self.assertTrue(response.data["has_more"])
+        self.assertIsNotNone(response.data["next_cursor"])
+        self.assertEqual(response.data["total_unread"], 0)
+        self.assertEqual(
+            [room["id"] for room in response.data["results"]],
+            [rooms[0].id, rooms[1].id],
+        )
+
+    def test_chat_rooms_cursor_returns_next_page_without_duplicates(self):
+        from django.utils import timezone
+        from datetime import timedelta
+
+        base_time = timezone.now()
+        for index in range(4):
+            self.make_extra_tutor_room(
+                f"cursor-tutor-{index}",
+                updated_at=base_time - timedelta(minutes=index),
+            )
+
+        self.client.force_authenticate(user=self.tutee_user)
+        first_page = self.client.get("/api/chat/rooms/?page_size=2")
+        second_page = self.client.get(
+            f"/api/chat/rooms/?page_size=2&cursor={first_page.data['next_cursor']}"
+        )
+
+        first_ids = {room["id"] for room in first_page.data["results"]}
+        second_ids = {room["id"] for room in second_page.data["results"]}
+        self.assertEqual(first_page.status_code, 200)
+        self.assertEqual(second_page.status_code, 200)
+        self.assertEqual(len(second_ids), 2)
+        self.assertFalse(first_ids & second_ids)
+        self.assertFalse(second_page.data["has_more"])
+
+    def test_chat_rooms_total_unread_includes_rooms_outside_page(self):
+        from django.utils import timezone
+        from datetime import timedelta
+
+        base_time = timezone.now()
+        for index in range(3):
+            tutor_user, *_, room = self.make_extra_tutor_room(
+                f"unread-tutor-{index}",
+                updated_at=base_time - timedelta(minutes=index),
+            )
+            Message.objects.create(
+                room=room,
+                sender=tutor_user,
+                content=f"Unread {index}",
+                is_read=False,
+            )
+
+        self.client.force_authenticate(user=self.tutee_user)
+        response = self.client.get("/api/chat/rooms/?page_size=1")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data["results"]), 1)
+        self.assertEqual(response.data["total_unread"], 3)
+
+    def test_batched_current_booking_context_matches_single_room_helper(self):
+        from datetime import timedelta
+        from uuid import uuid4
+
+        today = date.today()
+        room_pending = ChatRoom.objects.create(tutee=self.tutee_profile, tutor=self.tutor_profile)
+
+        _, confirmed_profile, confirmed_tutor, confirmed_availability, room_confirmed = (
+            self.make_extra_tutor_room("bulk-confirmed")
+        )
+        Booking.objects.create(
+            student=self.tutee_profile,
+            tutor=confirmed_tutor,
+            availability=confirmed_availability,
+            session_date=today + timedelta(days=2),
+            session_mode="Online",
+            booking_request_id=uuid4(),
+            status="Confirmed",
+        )
+
+        _, completed_profile, completed_tutor, completed_availability, room_completed = (
+            self.make_extra_tutor_room("bulk-completed")
+        )
+        Booking.objects.create(
+            student=self.tutee_profile,
+            tutor=completed_tutor,
+            availability=completed_availability,
+            session_date=today - timedelta(days=1),
+            session_mode="Online",
+            booking_request_id=uuid4(),
+            status="Completed",
+        )
+
+        _, terminal_profile, terminal_tutor, terminal_availability, room_terminal = (
+            self.make_extra_tutor_room("bulk-terminal")
+        )
+        Booking.objects.create(
+            student=self.tutee_profile,
+            tutor=terminal_tutor,
+            availability=terminal_availability,
+            session_date=today - timedelta(days=2),
+            session_mode="Online",
+            booking_request_id=uuid4(),
+            status="Cancelled",
+        )
+
+        *_, room_none = self.make_extra_tutor_room("bulk-none")
+        rooms = [room_pending, room_confirmed, room_completed, room_terminal, room_none]
+        batched_contexts = get_current_booking_contexts(rooms)
+
+        for room in rooms:
+            self.assertEqual(batched_contexts[room.id], get_current_booking_context(room))
+
+    def test_chat_room_list_query_count_does_not_scale_per_room(self):
+        from django.utils import timezone
+        from datetime import timedelta
+        from uuid import uuid4
+
+        base_time = timezone.now()
+        for index in range(6):
+            _, _, tutor, availability, room = self.make_extra_tutor_room(
+                f"query-tutor-{index}",
+                updated_at=base_time - timedelta(minutes=index),
+            )
+            Booking.objects.create(
+                student=self.tutee_profile,
+                tutor=tutor,
+                availability=availability,
+                session_date=date.today() + timedelta(days=index + 1),
+                session_mode="Online",
+                booking_request_id=uuid4(),
+                status="Pending",
+            )
+
+        self.client.force_authenticate(user=self.tutee_user)
+        with CaptureQueriesContext(connection) as two_room_queries:
+            two_room_response = self.client.get("/api/chat/rooms/?page_size=2")
+        with CaptureQueriesContext(connection) as six_room_queries:
+            six_room_response = self.client.get("/api/chat/rooms/?page_size=6")
+
+        self.assertEqual(two_room_response.status_code, 200)
+        self.assertEqual(six_room_response.status_code, 200)
+        self.assertLessEqual(len(six_room_queries), len(two_room_queries) + 3)
 
     def test_partner_context_counts_completed_session_groups_and_hours(self):
         room = ChatRoom.objects.create(tutee=self.tutee_profile, tutor=self.tutor_profile)
@@ -1322,3 +1523,223 @@ class TutorProfileTests(APITestCase):
         self.client.force_authenticate(user=self.tutor_user)
         response = self.client.post('/api/tutor/profile/avatar/', {}, format='multipart')
         self.assertEqual(response.status_code, 400)
+
+
+@override_settings(
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    FRONTEND_URL="https://studybuddy.example",
+    LOGIN_OTP_TTL_SECONDS=600,
+    LOGIN_OTP_MAX_ATTEMPTS=2,
+    REST_FRAMEWORK={
+        "DEFAULT_AUTHENTICATION_CLASSES": (
+            "rest_framework_simplejwt.authentication.JWTAuthentication",
+        ),
+        "DEFAULT_THROTTLE_RATES": {
+            "anon": "1000/min",
+            "user": "1000/min",
+            "login": "1000/min",
+        },
+    },
+)
+class EmailAuthTests(APITestCase):
+    def setUp(self):
+        cache.clear()
+        mail.outbox = []
+        self.institution = PartnerInstitution.objects.create(
+            institution_name="Example University",
+            school_email_domain="example.edu",
+            is_active=True,
+        )
+        self.user = User.objects.create_user(
+            username="student@example.edu",
+            email="student@example.edu",
+            password="password",
+        )
+        self.profile = UserProfile.objects.create(
+            user=self.user,
+            fname="Email",
+            mname="",
+            lname="Auth",
+            role="Tutee",
+            institution=self.institution,
+        )
+
+    def login(self):
+        return self.client.post(
+            "/api/login/",
+            {"email": self.user.email, "password": "password"},
+            format="json",
+        )
+
+    def latest_otp_code(self):
+        match = re.search(r"\b(\d{6})\b", mail.outbox[-1].body)
+        self.assertIsNotNone(match)
+        return match.group(1)
+
+    def reset_link_parts(self):
+        match = re.search(r"/reset-password/([^/\s]+)/([^/\s]+)", mail.outbox[-1].body)
+        self.assertIsNotNone(match)
+        return match.group(1), match.group(2)
+
+    def test_login_sends_otp_challenge_instead_of_tokens_then_verify_returns_tokens(self):
+        response = self.login()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["requires_2fa"])
+        self.assertIn("challenge_id", response.data)
+        self.assertNotIn("access", response.data)
+        self.assertEqual(len(mail.outbox), 1)
+
+        challenge = EmailOTPChallenge.objects.get(
+            challenge_id=response.data["challenge_id"]
+        )
+        self.assertEqual(challenge.user, self.user)
+
+        verify_response = self.client.post(
+            "/api/login/verify-otp/",
+            {
+                "challenge_id": response.data["challenge_id"],
+                "code": self.latest_otp_code(),
+            },
+            format="json",
+        )
+
+        self.assertEqual(verify_response.status_code, 200)
+        self.assertIn("access", verify_response.data)
+        self.assertIn("refresh", verify_response.data)
+        self.assertEqual(verify_response.data["email"], self.user.email)
+        challenge.refresh_from_db()
+        self.assertIsNotNone(challenge.consumed_at)
+
+    @patch("studybuddy.views.generate_otp_code", side_effect=["123456", "654321"])
+    def test_resend_replaces_otp_code_and_increments_resend_count(self, _generate_otp_code):
+        login_response = self.login()
+        old_code = self.latest_otp_code()
+
+        resend_response = self.client.post(
+            "/api/login/resend-otp/",
+            {"challenge_id": login_response.data["challenge_id"]},
+            format="json",
+        )
+
+        self.assertEqual(resend_response.status_code, 200)
+        self.assertEqual(len(mail.outbox), 2)
+        challenge = EmailOTPChallenge.objects.get(
+            challenge_id=login_response.data["challenge_id"]
+        )
+        self.assertEqual(challenge.resend_count, 1)
+        self.assertEqual(challenge.attempt_count, 0)
+
+        old_code_response = self.client.post(
+            "/api/login/verify-otp/",
+            {
+                "challenge_id": login_response.data["challenge_id"],
+                "code": old_code,
+            },
+            format="json",
+        )
+        self.assertEqual(old_code_response.status_code, 400)
+
+        new_code_response = self.client.post(
+            "/api/login/verify-otp/",
+            {
+                "challenge_id": login_response.data["challenge_id"],
+                "code": self.latest_otp_code(),
+            },
+            format="json",
+        )
+        self.assertEqual(new_code_response.status_code, 200)
+
+    def test_otp_verify_locks_after_max_attempts(self):
+        login_response = self.login()
+        actual_code = self.latest_otp_code()
+        first_wrong_code = "000000" if actual_code != "000000" else "000001"
+        second_wrong_code = "111111" if actual_code != "111111" else "111112"
+
+        first_response = self.client.post(
+            "/api/login/verify-otp/",
+            {
+                "challenge_id": login_response.data["challenge_id"],
+                "code": first_wrong_code,
+            },
+            format="json",
+        )
+        second_response = self.client.post(
+            "/api/login/verify-otp/",
+            {
+                "challenge_id": login_response.data["challenge_id"],
+                "code": second_wrong_code,
+            },
+            format="json",
+        )
+
+        self.assertEqual(first_response.status_code, 400)
+        self.assertEqual(second_response.status_code, 429)
+        challenge = EmailOTPChallenge.objects.get(
+            challenge_id=login_response.data["challenge_id"]
+        )
+        self.assertEqual(challenge.attempt_count, 2)
+
+    def test_password_reset_request_is_generic_and_confirm_resets_password(self):
+        RefreshToken.for_user(self.user)
+        self.assertTrue(OutstandingToken.objects.filter(user=self.user).exists())
+
+        known_response = self.client.post(
+            "/api/password-reset/request/",
+            {"email": self.user.email},
+            format="json",
+        )
+        unknown_response = self.client.post(
+            "/api/password-reset/request/",
+            {"email": "missing@example.edu"},
+            format="json",
+        )
+
+        self.assertEqual(known_response.status_code, 200)
+        self.assertEqual(unknown_response.status_code, 200)
+        self.assertEqual(known_response.data, unknown_response.data)
+        self.assertEqual(len(mail.outbox), 1)
+
+        uid, token = self.reset_link_parts()
+        confirm_response = self.client.post(
+            "/api/password-reset/confirm/",
+            {
+                "uid": uid,
+                "token": token,
+                "password": "NewStudyBuddyPassword123!",
+                "password_confirm": "NewStudyBuddyPassword123!",
+            },
+            format="json",
+        )
+
+        self.assertEqual(confirm_response.status_code, 200)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password("NewStudyBuddyPassword123!"))
+        self.assertEqual(
+            BlacklistedToken.objects.filter(token__user=self.user).count(),
+            OutstandingToken.objects.filter(user=self.user).count(),
+        )
+        self.assertEqual(len(mail.outbox), 2)
+
+    def test_password_reset_confirm_validates_password_confirmation(self):
+        self.client.post(
+            "/api/password-reset/request/",
+            {"email": self.user.email},
+            format="json",
+        )
+        uid, token = self.reset_link_parts()
+
+        response = self.client.post(
+            "/api/password-reset/confirm/",
+            {
+                "uid": uid,
+                "token": token,
+                "password": "NewStudyBuddyPassword123!",
+                "password_confirm": "DifferentStudyBuddyPassword123!",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.user.refresh_from_db()
+        self.assertFalse(self.user.check_password("NewStudyBuddyPassword123!"))

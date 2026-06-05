@@ -164,8 +164,8 @@ export const useSessionsStore = defineStore('sessions', () => {
     await fetchSessions()
   }
 
-  const cancelSession = async (id) => {
-    await api.post(`/bookings/${id}/cancel/`)
+  const cancelSession = async (id, reason) => {
+    await api.post(`/bookings/${id}/cancel/`, { reason })
     await fetchSessions()
     return fetchSessionById(id)
   }

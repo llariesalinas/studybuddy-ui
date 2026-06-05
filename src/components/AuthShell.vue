@@ -43,9 +43,7 @@ const router = useRouter()
 
   min-height: 100vh;
   position: relative;
-  background:
-    var(--sb-aurora-bg, none),
-    var(--sb-parchment);
+  background: transparent;
   display: flex;
   flex-direction: column;
   align-items: center;
