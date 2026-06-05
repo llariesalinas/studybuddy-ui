@@ -64,7 +64,7 @@ def list_chat_rooms(request):
         ChatRoom.objects.filter(
             Q(tutee=user_profile) | Q(tutor=user_profile)
         )
-        .select_related('tutee', 'tutor')
+        .select_related('tutee', 'tutor', 'ticket')
         .order_by('-updated_at', '-id')
     )
 
@@ -115,7 +115,7 @@ def list_chat_rooms(request):
     )
     last_message_map = {
         message.room_id: message
-        for message in Message.objects.filter(id__in=last_ids).select_related('sender')
+        for message in Message.objects.filter(id__in=last_ids).select_related('sender', 'sender__userprofile')
     }
     current_booking_map = get_current_booking_contexts(rooms)
 
@@ -157,8 +157,21 @@ def get_message_history(request, room_id):
     # Security: Ensure user is part of the room
     if room.tutee != user_profile and room.tutor != user_profile:
         return Response({"error": "Unauthorized"}, status=status.HTTP_403_FORBIDDEN)
-    
-    messages = list(room.messages.order_by('-created_at')[:50])[::-1]
+
+    messages_qs = room.messages.select_related('sender', 'sender__userprofile')
+    after_id = request.query_params.get('after_id')
+
+    if after_id:
+        try:
+            after_id = int(after_id)
+        except (TypeError, ValueError):
+            after_id = None
+
+    if after_id:
+        messages = list(messages_qs.filter(id__gt=after_id).order_by('id')[:50])
+    else:
+        messages = list(messages_qs.order_by('-created_at', '-id')[:50])[::-1]
+
     serializer = MessageSerializer(messages, many=True, context={'request': request})
     return Response(serializer.data)
 

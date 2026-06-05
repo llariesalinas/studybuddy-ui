@@ -661,6 +661,71 @@ class ChatFeatureTests(APITestCase):
         self.assertTrue(message.is_read)
         self.assertIsNotNone(message.read_at)
 
+    def test_message_history_returns_latest_messages_in_display_order(self):
+        room = ChatRoom.objects.create(tutee=self.tutee_profile, tutor=self.tutor_profile)
+        for index in range(55):
+            Message.objects.create(
+                room=room,
+                sender=self.tutee_user if index % 2 == 0 else self.tutor_user,
+                content=f"Message {index}",
+            )
+        self.client.force_authenticate(user=self.tutee_user)
+
+        response = self.client.get(f"/api/chat/rooms/{room.id}/history/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 50)
+        self.assertEqual(response.data[0]["content"], "Message 5")
+        self.assertEqual(response.data[-1]["content"], "Message 54")
+
+    def test_message_history_after_id_returns_newer_messages(self):
+        room = ChatRoom.objects.create(tutee=self.tutee_profile, tutor=self.tutor_profile)
+        first = Message.objects.create(room=room, sender=self.tutee_user, content="First")
+        second = Message.objects.create(room=room, sender=self.tutor_user, content="Second")
+        third = Message.objects.create(room=room, sender=self.tutee_user, content="Third")
+        self.client.force_authenticate(user=self.tutee_user)
+
+        response = self.client.get(f"/api/chat/rooms/{room.id}/history/?after_id={first.id}")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([message["id"] for message in response.data], [second.id, third.id])
+
+    def test_non_member_cannot_load_message_history(self):
+        other_user = User.objects.create_user(
+            username="chat-history-other",
+            email="chat-history-other@example.com",
+            password="password",
+        )
+        UserProfile.objects.create(
+            user=other_user,
+            fname="History",
+            mname="",
+            lname="Other",
+            role="Tutee",
+        )
+        room = ChatRoom.objects.create(tutee=self.tutee_profile, tutor=self.tutor_profile)
+        self.client.force_authenticate(user=other_user)
+
+        response = self.client.get(f"/api/chat/rooms/{room.id}/history/")
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_message_history_serializes_system_message_without_sender(self):
+        room = ChatRoom.objects.create(tutee=self.tutee_profile, tutor=self.tutor_profile)
+        Message.objects.create(
+            room=room,
+            sender=None,
+            content="System note",
+            message_type="system",
+        )
+        self.client.force_authenticate(user=self.tutee_user)
+
+        response = self.client.get(f"/api/chat/rooms/{room.id}/history/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data[0]["sender_name"], "System")
+        self.assertIsNone(response.data[0]["sender_profile_id"])
+
     def test_pending_location_update_posts_booking_event_to_canonical_room(self):
         self.client.force_authenticate(user=self.tutor_user)
 
