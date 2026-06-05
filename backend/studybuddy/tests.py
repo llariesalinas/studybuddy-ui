@@ -1841,3 +1841,35 @@ class RecommenderNeighborReuseTests(APITestCase):
         with_neighbors = CF.compute_cf_score(self.ratings, 1, 12, neighbors=neighbors)
 
         self.assertEqual(without, with_neighbors)
+
+    def test_recommend_hybrid_computes_neighbors_once(self):
+        from studybuddy.recommender import hybrid
+
+        # three candidate tutors, but neighbors should be computed only once
+        tutors = [Mock(profile_id=i, tutorsubjects_set=Mock()) for i in range(3)]
+        for t in tutors:
+            t.tutorsubjects_set.all.return_value = []
+
+        student_profile = Mock(id=1, course=None, year_level=None)
+
+        with patch.object(hybrid, "top_k", return_value=[]) as mocked_top_k, \
+             patch.object(hybrid, "get_student_subject_codes", return_value=[]), \
+             patch.object(hybrid, "compute_cbf_score", return_value=0.0), \
+             patch.object(hybrid, "normalize_tutor_queryset", return_value=tutors):
+            hybrid.recommend_tutors_hybrid(self.ratings, student_profile, None)
+
+        self.assertEqual(mocked_top_k.call_count, 1)
+
+    def test_recommend_hybrid_handles_student_with_no_ratings(self):
+        from studybuddy.recommender import hybrid
+
+        tutor = Mock(profile_id=99, tutorsubjects_set=Mock())
+        tutor.tutorsubjects_set.all.return_value = []
+        student_profile = Mock(id=4242, course=None, year_level=None)  # not in ratings
+
+        with patch.object(hybrid, "get_student_subject_codes", return_value=[]), \
+             patch.object(hybrid, "compute_cbf_score", return_value=0.5), \
+             patch.object(hybrid, "normalize_tutor_queryset", return_value=[tutor]):
+            results = hybrid.recommend_tutors_hybrid(self.ratings, student_profile, None)
+
+        self.assertEqual(len(results), 1)  # did not raise
