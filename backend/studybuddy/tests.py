@@ -1873,3 +1873,103 @@ class RecommenderNeighborReuseTests(APITestCase):
             results = hybrid.recommend_tutors_hybrid(self.ratings, student_profile, None)
 
         self.assertEqual(len(results), 1)  # did not raise
+
+
+class DashboardRecommendationServiceTests(APITestCase):
+    def setUp(self):
+        cache.clear()
+        self.subject = Subjects.objects.create(
+            subject_code="IT101",
+            subject_name="Intro to IT",
+            department="IT",
+        )
+        self.other_subject = Subjects.objects.create(
+            subject_code="BIO101",
+            subject_name="Biology",
+            department="Science",
+        )
+        self.student_user = User.objects.create_user(
+            username="dash-student", email="dash@example.com", password="password",
+        )
+        self.student = UserProfile.objects.create(
+            user=self.student_user, fname="Dash", mname="", lname="Student",
+            role="Tutee", year_level=11,
+        )
+
+    def _make_tutor(self, username, subject):
+        user = User.objects.create_user(
+            username=username, email=f"{username}@example.com", password="password",
+        )
+        profile = UserProfile.objects.create(
+            user=user, fname=username.title(), mname="", lname="Tutor",
+            role="Tutor", year_level=12,
+        )
+        tutor = Tutor.objects.create(
+            profile=profile, hourly_rate=200, can_online=True, can_f2f=False,
+            teaching_level="SHS",
+        )
+        TutorSubjects.objects.create(tutor=tutor, subject=subject, expertise_level=5)
+        return tutor
+
+    def _set_preferences(self, *subjects):
+        pref, _ = Preference.objects.get_or_create(user=self.student)
+        pref.subjects.set([s.subject_code for s in subjects])
+
+    def test_returns_only_tutors_teaching_preference_subjects(self):
+        from studybuddy.recommender.dashboard import get_dashboard_recommendations
+
+        match = self._make_tutor("itmatch", self.subject)
+        self._make_tutor("biomatch", self.other_subject)
+        self._set_preferences(self.subject)
+
+        data = get_dashboard_recommendations(self.student)
+
+        ids = {row["id"] for row in data}
+        self.assertEqual(ids, {match.profile.id})
+
+    def test_response_shape_matches_widget_contract(self):
+        from studybuddy.recommender.dashboard import get_dashboard_recommendations
+
+        self._make_tutor("itmatch", self.subject)
+        self._set_preferences(self.subject)
+
+        row = get_dashboard_recommendations(self.student)[0]
+
+        self.assertEqual(
+            set(row.keys()), {"id", "name", "rating", "subjects", "hourlyRate"},
+        )
+
+    def test_cold_start_returns_fallback_when_no_preferences(self):
+        from studybuddy.recommender.dashboard import get_dashboard_recommendations
+
+        self._make_tutor("anytutor", self.subject)
+        # no preferences set
+
+        data = get_dashboard_recommendations(self.student)
+
+        self.assertEqual(len(data), 1)
+
+    def test_second_call_served_from_cache_without_recompute(self):
+        from studybuddy.recommender import dashboard
+
+        self._make_tutor("itmatch", self.subject)
+        self._set_preferences(self.subject)
+
+        dashboard.get_dashboard_recommendations(self.student)  # warms cache
+
+        with patch.object(dashboard, "recommend_tutors_hybrid") as mocked:
+            dashboard.get_dashboard_recommendations(self.student)
+
+        mocked.assert_not_called()
+
+    def test_degrades_gracefully_when_cache_read_fails(self):
+        from studybuddy.recommender import dashboard
+
+        match = self._make_tutor("itmatch", self.subject)
+        self._set_preferences(self.subject)
+
+        with patch.object(dashboard.cache, "get", side_effect=Exception("redis down")):
+            data = dashboard.get_dashboard_recommendations(self.student)
+
+        ids = {row["id"] for row in data}
+        self.assertEqual(ids, {match.profile.id})
