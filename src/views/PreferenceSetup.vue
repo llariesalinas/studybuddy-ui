@@ -254,6 +254,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/services/api/api'
+import { useCatalogStore } from '@/stores/catalog'
 import { usePreferenceStore } from '@/stores/preferences'
 import { useProfileStore } from '@/stores/profile'
 import SbStepBar from '@/components/SbStepBar.vue'
@@ -262,6 +263,7 @@ import SbSelectModal from '@/components/SbSelectModal.vue'
 import { useToastStore } from '@/stores/toast'
 
 const router = useRouter()
+const catalogStore = useCatalogStore()
 const store = usePreferenceStore()
 const profileStore = useProfileStore()
 const toastStore = useToastStore()
@@ -386,12 +388,12 @@ const card3Label = computed(() => {
 
 onMounted(async () => {
   try {
-    const [subjectRes, courseRes] = await Promise.all([
-      api.get('subjects/'),
-      api.get('courses/')
+    const [subjectData, courseData] = await Promise.all([
+      catalogStore.fetchSubjects(),
+      catalogStore.fetchCourses(),
     ])
-    subjects.value = subjectRes.data
-    courses.value = courseRes.data
+    subjects.value = subjectData
+    courses.value = courseData
   } catch (error) {
     console.error('Failed to load onboarding data:', error)
   }

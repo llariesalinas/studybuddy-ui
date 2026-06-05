@@ -104,11 +104,13 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useRegistrationInfoStore } from '@/stores/registrationinfo'
 import api from '@/services/api/api'
+import { useCatalogStore } from '@/stores/catalog'
 import AuthShell from '@/components/AuthShell.vue'
 import SbSelectModal from '@/components/SbSelectModal.vue'
 
 const router = useRouter()
 const store = useRegistrationInfoStore()
+const catalogStore = useCatalogStore()
 
 const isSubmitting = ref(false)
 const institutions = ref([])
@@ -150,8 +152,7 @@ const emailDomainMatchesInstitution = computed(() => {
 
 const loadInstitutions = async () => {
   try {
-    const response = await api.get('partner-institutions/')
-    institutions.value = response.data
+    institutions.value = await catalogStore.fetchPartnerInstitutions()
   } catch (error) {
     console.error('Failed to load partner institutions:', error)
     generalError.value = 'Unable to load partner institutions right now. Please try again later.'

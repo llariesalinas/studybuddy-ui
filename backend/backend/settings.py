@@ -244,7 +244,11 @@ LOGIN_OTP_MAX_ATTEMPTS = 5
 # Email resilience tuning (used by studybuddy.mailer)
 # OTP is sent synchronously on the login critical path, so keep its timeout short
 # and retry only a couple of times before failing honestly back to the user.
-EMAIL_SYNC_TIMEOUT = int(os.getenv("EMAIL_SYNC_TIMEOUT") or "8")
+EMAIL_SYNC_TIMEOUT = int(os.getenv("EMAIL_SYNC_TIMEOUT") or "6")
+# Sync OTP path fails fast (fewer attempts) so a provider outage can't stall login
+# much past the original ~10s ceiling and exhaust the request/worker pool.
+EMAIL_SYNC_MAX_ATTEMPTS = int(os.getenv("EMAIL_SYNC_MAX_ATTEMPTS") or "2")
+# Async path (Q_CLUSTER) has no one waiting, so it tolerates more retries.
 EMAIL_SEND_MAX_ATTEMPTS = int(os.getenv("EMAIL_SEND_MAX_ATTEMPTS") or "3")
 EMAIL_SEND_RETRY_BACKOFF = float(os.getenv("EMAIL_SEND_RETRY_BACKOFF") or "0.5")
 # Per-recipient send cap (defence on top of the per-IP throttle) to protect the

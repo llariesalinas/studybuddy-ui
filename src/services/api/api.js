@@ -25,7 +25,7 @@ const api = axios.create({
 
 let refreshPromise = null
 
-const getApiPath = (requestUrl = '') => {
+export const getApiPath = (requestUrl = '') => {
   return String(requestUrl)
     .replace(API_BASE_URL, '')
     .replace(/^https?:\/\/[^/]+\/api\/?/i, '')

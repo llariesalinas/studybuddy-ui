@@ -21,6 +21,14 @@ export const TYPING_CLEAR_MS        = 3_500
 export const TYPING_DEBOUNCE_MS     = 1_800
 export const WS_RECONNECT_CAP_MS    = 6_000
 export const POPUP_DISMISS_MS       = 6_000  // how long the new-message toast stays visible
+export const CHAT_ROOMS_CACHE_TTL_MS   = 30_000
+export const CHAT_HISTORY_CACHE_TTL_MS = 10 * 60 * 1000
+
+// Frontend API cache
+export const CATALOG_CACHE_TTL_MS = 60 * 60 * 1000
+export const PARTNER_INSTITUTIONS_CACHE_TTL_MS = 15 * 60 * 1000
+export const PAYMENT_METHODS_CACHE_TTL_MS = 10 * 60 * 1000
+export const RECEIVING_INSTITUTIONS_CACHE_TTL_MS = 12 * 60 * 60 * 1000
 
 // UI animations
 export const CHAT_SHAKE_MS = 420

@@ -131,7 +131,7 @@ def send_login_otp(user, code):
         recipient=recipient,
         purpose=EmailSendLog.PURPOSE_LOGIN_OTP,
         timeout=settings.EMAIL_SYNC_TIMEOUT,
-        max_attempts=settings.EMAIL_SEND_MAX_ATTEMPTS,
+        max_attempts=settings.EMAIL_SYNC_MAX_ATTEMPTS,
     )
 
 

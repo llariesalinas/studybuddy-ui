@@ -442,8 +442,10 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useSubjectCatalog } from '@/composables/useSubjectCatalog'
 import api from '@/services/api/api'
+import { useCatalogStore } from '@/stores/catalog'
 import { useToastStore } from '@/stores/toast'
 
+const catalogStore = useCatalogStore()
 const toastStore = useToastStore()
 
 const profile = ref({
@@ -847,8 +849,7 @@ async function loadProfile() {
 async function loadSubjects() {
   try {
     isLoadingSubjects.value = true
-    const response = await api.get('/subjects/')
-    subjects.value = response.data
+    subjects.value = await catalogStore.fetchSubjects()
   } catch (error) {
     console.error('Failed to load subjects:', error)
     toastStore.push('Failed to load subjects.', 'error')
@@ -859,8 +860,7 @@ async function loadSubjects() {
 
 async function loadCourses() {
   try {
-    const response = await api.get('/courses/')
-    courses.value = response.data
+    courses.value = await catalogStore.fetchCourses()
   } catch (error) {
     console.error('Failed to load courses:', error)
     toastStore.push('Failed to load courses.', 'error')

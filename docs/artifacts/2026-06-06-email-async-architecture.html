@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>StudyBuddy · Async Email Architecture (Learning Artifact)</title>
+<style>
+  :root {
+    --sb-primary: #00895A;
+    --sb-primary-soft: #00895a1a;
+    --sb-dark: #0A1916;
+    --sb-bg: #F8F9FA;
+    --sb-amber: #B7791F;
+    --sb-red: #C0392B;
+    --sb-border: #e2e6e4;
+    --sb-ink: #1d2421;
+    --sb-muted: #5b6660;
+    --radius: 12px;
+    --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: var(--sans); color: var(--sb-ink);
+    background: var(--sb-bg); line-height: 1.55;
+  }
+  header.hero {
+    background: var(--sb-dark); color: #fff; padding: 32px 28px 26px;
+  }
+  header.hero h1 { margin: 0 0 6px; font-size: 24px; letter-spacing: -0.3px; }
+  header.hero p { margin: 0; color: #b8c4be; max-width: 720px; }
+  .tag {
+    display: inline-block; font-size: 11px; text-transform: uppercase;
+    letter-spacing: 1px; color: var(--sb-primary); background: #00895a26;
+    padding: 3px 9px; border-radius: 999px; margin-bottom: 12px; font-weight: 600;
+  }
+  nav.tabs {
+    position: sticky; top: 0; z-index: 10; display: flex; flex-wrap: wrap;
+    gap: 4px; padding: 10px 20px; background: #fff;
+    border-bottom: 1px solid var(--sb-border);
+  }
+  nav.tabs button {
+    border: 0; background: transparent; font: inherit; font-size: 14px;
+    color: var(--sb-muted); padding: 8px 14px; border-radius: 8px; cursor: pointer;
+    font-weight: 500; transition: all .15s;
+  }
+  nav.tabs button:hover { background: var(--sb-bg); color: var(--sb-ink); }
+  nav.tabs button.active { background: var(--sb-primary-soft); color: var(--sb-primary); font-weight: 600; }
+  main { max-width: 920px; margin: 0 auto; padding: 28px 24px 80px; }
+  section.panel { display: none; animation: fade .25s ease; }
+  section.panel.active { display: block; }
+  @keyframes fade { from { opacity: 0; transform: translateY(6px);} to {opacity:1; transform:none;} }
+  h2 { font-size: 20px; margin: 4px 0 14px; letter-spacing: -0.2px; }
+  h3 { font-size: 15px; margin: 22px 0 8px; }
+  p { margin: 0 0 12px; }
+  .lead { color: var(--sb-muted); }
+  code { font-family: var(--mono); font-size: 0.88em; background: #eef1f0; padding: 1px 5px; border-radius: 5px; }
+  pre {
+    font-family: var(--mono); font-size: 12.5px; background: var(--sb-dark);
+    color: #e7ecea; padding: 14px 16px; border-radius: var(--radius); overflow-x: auto;
+    margin: 12px 0; line-height: 1.5;
+  }
+  pre .c { color: #7e9b8f; }      /* comment */
+  pre .k { color: #6fc3a0; }      /* keyword/func */
+  pre .s { color: #e6b673; }      /* string */
+  .card {
+    background: #fff; border: 1px solid var(--sb-border); border-radius: var(--radius);
+    padding: 16px 18px; margin: 12px 0;
+  }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap: 12px; }
+  .grid .card { margin: 0; }
+  .card h4 { margin: 0 0 6px; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+  .card .ic { width: 26px; height: 26px; border-radius: 7px; display: grid; place-items: center;
+    background: var(--sb-primary-soft); color: var(--sb-primary); font-size: 14px; flex: 0 0 auto; }
+  .card p { font-size: 13px; color: var(--sb-muted); margin: 0; }
+  .pill { display:inline-block; font-size: 11px; font-weight:600; padding: 2px 8px; border-radius: 999px; }
+  .pill.sync { background:#fdeecf; color: var(--sb-amber); }
+  .pill.async { background: var(--sb-primary-soft); color: var(--sb-primary); }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13.5px; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--sb-border); vertical-align: top; }
+  th { color: var(--sb-muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .4px; }
+  .callout { border-left: 3px solid var(--sb-primary); background: #fff; padding: 12px 16px; border-radius: 8px; margin: 14px 0; }
+  .callout.warn { border-left-color: var(--sb-amber); }
+  .callout.bad { border-left-color: var(--sb-red); }
+  .callout strong { display:block; margin-bottom: 2px; }
+
+  /* flow diagram */
+  .flow-toggle { display:flex; gap:8px; margin: 8px 0 18px; }
+  .flow-toggle button {
+    border: 1px solid var(--sb-border); background:#fff; font: inherit; font-size: 13px;
+    padding: 7px 14px; border-radius: 999px; cursor:pointer; font-weight:500; color: var(--sb-muted);
+  }
+  .flow-toggle button.active { border-color: var(--sb-primary); color: var(--sb-primary); background: var(--sb-primary-soft); font-weight:600; }
+  .diagram { display:flex; align-items:center; gap: 6px; flex-wrap: wrap; padding: 18px; background:#fff; border:1px solid var(--sb-border); border-radius: var(--radius); }
+  .node {
+    border: 1.5px solid var(--sb-border); border-radius: 10px; padding: 10px 12px; font-size: 12.5px;
+    min-width: 92px; text-align:center; background: var(--sb-bg); transition: all .2s;
+  }
+  .node .lbl { font-weight: 600; display:block; }
+  .node .sub { font-size: 11px; color: var(--sb-muted); }
+  .node.hot { border-color: var(--sb-primary); background: var(--sb-primary-soft); }
+  .node.dim { opacity: .35; }
+  .arrow { color: var(--sb-muted); font-size: 18px; }
+  .arrow.async { color: var(--sb-primary); }
+  .legend { font-size: 12px; color: var(--sb-muted); margin-top: 12px; }
+  .footer { color: var(--sb-muted); font-size: 12px; margin-top: 30px; border-top: 1px solid var(--sb-border); padding-top: 14px; }
+  details { background:#fff; border:1px solid var(--sb-border); border-radius: 10px; padding: 4px 14px; margin: 10px 0; }
+  summary { cursor: pointer; font-weight: 600; font-size: 14px; padding: 8px 0; }
+  details[open] summary { color: var(--sb-primary); }
+</style>
+</head>
+<body>
+<header class="hero">
+  <span class="tag">Learning Artifact · 2026-06-06</span>
+  <h1>Async Email Architecture</h1>
+  <p>How StudyBuddy's email system is being hardened: a background queue (Django-Q2),
+     a central <code>mailer</code> service, and a hybrid model that keeps login honest
+     while moving everything else off the request thread. This page explains the design
+     before it's built &mdash; click through the tabs.</p>
+</header>
+
+<nav class="tabs" id="tabs">
+  <button class="active" data-p="why">1 · Why</button>
+  <button data-p="flow">2 · The Flow</button>
+  <button data-p="parts">3 · The Parts</button>
+  <button data-p="hybrid">4 · Hybrid Model</button>
+  <button data-p="resilience">5 · Resilience</button>
+  <button data-p="choice">6 · Why Django-Q2</button>
+  <button data-p="run">7 · Running &amp; Debugging</button>
+</nav>
+
+<main>
+  <!-- 1 WHY -->
+  <section class="panel active" id="why">
+    <h2>The problem we're solving</h2>
+    <p class="lead">Email is currently sent <em>inside the web request</em>. That couples
+       user-facing actions to a third party (Gmail) that can be slow or down.</p>
+    <table>
+      <tr><th>#</th><th>Weakness</th><th>Consequence</th></tr>
+      <tr><td>1</td><td>OTP email sent <strong>synchronously inside login</strong></td><td>Gmail slow/down &rarr; every login stalls then 500s. A single point of failure.</td></tr>
+      <tr><td>2</td><td>No retry on transient SMTP errors</td><td>One hiccup fails the whole operation.</td></tr>
+      <tr><td>3</td><td>Failures only logged; reset/notice fail silently</td><td>No visibility &mdash; you can't tell mail was dropped.</td></tr>
+      <tr><td>4</td><td>Only an IP-based rate limit</td><td>Abuse can drain Gmail's ~500/day quota.</td></tr>
+      <tr><td>5</td><td>Plain-text only</td><td>Looks unprofessional; weaker deliverability.</td></tr>
+    </table>
+    <div class="callout">
+      <strong>The core idea</strong>
+      Put a <em>queue</em> between "something happened" and "send the email." The web
+      request just drops a job on the queue and returns instantly; a separate worker
+      process delivers the mail, retries on failure, and records what happened.
+    </div>
+  </section>
+
+  <!-- 2 FLOW -->
+  <section class="panel" id="flow">
+    <h2>The request &rarr; queue &rarr; worker flow</h2>
+    <p class="lead">Toggle a flow to see which path it takes. Notice OTP is the exception &mdash; it stays in-request on purpose.</p>
+    <div class="flow-toggle" id="flowToggle">
+      <button class="active" data-f="reset">Password reset <span class="pill async">async</span></button>
+      <button data-f="otp">Login OTP <span class="pill sync">sync</span></button>
+      <button data-f="down">Worker is down</button>
+    </div>
+    <div class="diagram" id="diagram"></div>
+    <p class="legend" id="flowLegend"></p>
+  </section>
+
+  <!-- 3 PARTS -->
+  <section class="panel" id="parts">
+    <h2>The moving parts</h2>
+    <p class="lead">Each piece has one job. Hover/read the cards, then expand for detail.</p>
+    <div class="grid">
+      <div class="card"><h4><span class="ic">&#9889;</span> Django-Q2</h4><p>The task queue library. Lets you say "run this function later, in the background."</p></div>
+      <div class="card"><h4><span class="ic">&#128451;</span> ORM broker</h4><p>Where queued jobs are stored: your existing database. No Redis to install or run.</p></div>
+      <div class="card"><h4><span class="ic">&#9881;</span> qcluster worker</h4><p>A separate process (<code>manage.py qcluster</code>) that pulls jobs and runs them.</p></div>
+      <div class="card"><h4><span class="ic">&#9993;</span> mailer.py</h4><p>One module all email goes through. Renders templates, sends, retries, records.</p></div>
+      <div class="card"><h4><span class="ic">&#128203;</span> EmailSendLog</h4><p>A DB table logging every send (ok/failed). Powers the per-account cap + auditing.</p></div>
+      <div class="card"><h4><span class="ic">&#127912;</span> Email templates</h4><p>Paired <code>.html</code> + <code>.txt</code> files per email, rendered to branded mail.</p></div>
+    </div>
+
+    <details>
+      <summary>Why a dedicated <code>mailer.py</code> instead of sending from the views?</summary>
+      <p>Today the <code>send_*</code> helpers live in <code>views.py</code>. Centralizing them
+      means one place owns retries, logging, templates, and the cap &mdash; the views just
+      say <em>what</em> to send, not <em>how</em>. It also matches the project rule of routing
+      external calls through one service layer.</p>
+      <div class="callout warn"><strong>Gotcha: don't name it <code>email.py</code></strong>
+        A module named <code>email.py</code> inside the app package <em>shadows Python's
+        built-in <code>email</code> module</em>, which Django's mail code imports &mdash; it
+        breaks sending in confusing ways. We name it <code>mailer.py</code>.</div>
+    </details>
+
+    <details>
+      <summary>What does an async task function look like?</summary>
+      <pre><span class="c"># studybuddy/mailer.py</span>
+<span class="k">def</span> send_password_reset_email_task(user_id):   <span class="c"># runs in the worker</span>
+    user = User.objects.get(pk=user_id)         <span class="c"># re-fetch (args must be serializable)</span>
+    text, html = _render(<span class="s">"email/password_reset"</span>, {<span class="s">"url"</span>: reset_url(user)})
+    _deliver(<span class="s">"Reset your password"</span>, text, html, [user.email])
+
+<span class="c"># studybuddy/views.py  -> just enqueue, return immediately</span>
+async_task(<span class="s">"studybuddy.mailer.send_password_reset_email_task"</span>, user.id)</pre>
+      <p>The view never waits for Gmail. The worker picks the job up a moment later.</p>
+    </details>
+  </section>
+
+  <!-- 4 HYBRID -->
+  <section class="panel" id="hybrid">
+    <h2>The hybrid model: why OTP is different</h2>
+    <p class="lead">"Make everything async" sounds clean, but OTP breaks the rule &mdash; the
+       user is <em>staring at the screen waiting for that code.</em></p>
+    <table>
+      <tr><th>Email</th><th>Path</th><th>Why</th></tr>
+      <tr><td>Login OTP</td><td><span class="pill sync">sync, hardened</span></td><td>User is waiting for it. If it truly can't send, they deserve an <strong>immediate, honest error</strong> &mdash; not a silent queue.</td></tr>
+      <tr><td>Password-reset link</td><td><span class="pill async">async</span></td><td>User already saw "check your email." A few seconds' delay is fine.</td></tr>
+      <tr><td>Password-changed notice</td><td><span class="pill async">async</span></td><td>Purely informational. Never block on it.</td></tr>
+    </table>
+    <div class="callout bad">
+      <strong>The trap we avoided</strong>
+      If OTP were async and the worker were down, login would say "code sent" but the code
+      never arrives &mdash; with no error. The user is stuck. Keeping OTP sync means a real
+      failure surfaces right there as a 500 they can retry.
+    </div>
+    <h3>"Hardened" sync means:</h3>
+    <pre><span class="c"># short timeout so a hung SMTP can't freeze login for long</span>
+get_connection(timeout=<span class="k">8</span>)
+<span class="c"># a couple of quick retries for transient blips</span>
+<span class="k">for</span> attempt <span class="k">in</span> range(<span class="k">3</span>): try send; <span class="k">except</span>: backoff &amp; retry
+<span class="c"># final failure -> raise -> login_view returns an honest 500</span></pre>
+  </section>
+
+  <!-- 5 RESILIENCE -->
+  <section class="panel" id="resilience">
+    <h2>Resilience &amp; guardrails</h2>
+
+    <h3>Retries (async)</h3>
+    <p>Django-Q2 re-runs failed jobs automatically. We cap attempts so a permanently broken
+       send doesn't loop forever, and failed tasks are kept for inspection.</p>
+    <pre><span class="c"># settings.py</span>
+Q_CLUSTER = {
+    <span class="s">"name"</span>: <span class="s">"studybuddy"</span>,
+    <span class="s">"orm"</span>: <span class="s">"default"</span>,        <span class="c"># use the DB as the broker</span>
+    <span class="s">"retry"</span>: <span class="k">90</span>,            <span class="c"># seconds before a failed job is retried</span>
+    <span class="s">"max_attempts"</span>: <span class="k">3</span>,
+    <span class="s">"catch_up"</span>: <span class="k">False</span>,     <span class="c"># don't replay a backlog after downtime</span>
+    <span class="s">"save_limit"</span>: <span class="k">250</span>,      <span class="c"># keep recent task history</span>
+}</pre>
+
+    <h3>Per-account send cap (#4)</h3>
+    <p>On top of the existing per-IP throttle, we count rows in <code>EmailSendLog</code> for a
+       given recipient in the last hour. Over the limit &rarr; we refuse and return 429. This
+       protects the Gmail daily quota from a single abused address.</p>
+    <div class="callout warn">
+      <strong>Why a DB table, not a cache counter?</strong>
+      There's no shared cache configured &mdash; Django's default is in-memory and
+      <em>per-process</em>. The web server and the worker are different processes, so a memory
+      counter wouldn't agree between them. The database is the one source both share.
+    </div>
+
+    <h3>Failure visibility (#3)</h3>
+    <p>Two layers: Django-Q2 keeps failed tasks in its own table, and every attempt writes an
+       <code>EmailSendLog</code> row (status + error). No more silent drops on password-reset.</p>
+  </section>
+
+  <!-- 6 CHOICE -->
+  <section class="panel" id="choice">
+    <h2>Why Django-Q2 (and not Celery)?</h2>
+    <table>
+      <tr><th></th><th>Django-Q2 <span class="pill async">chosen</span></th><th>Celery + Redis</th></tr>
+      <tr><td>Broker</td><td>Your existing DB</td><td>Needs a running Redis server</td></tr>
+      <tr><td>Extra services</td><td>1 worker process</td><td>Redis + worker</td></tr>
+      <tr><td>Windows dev</td><td>Runs cleanly</td><td>Fiddly (<code>--pool=solo</code>)</td></tr>
+      <tr><td>Power/scale ceiling</td><td>Plenty for this app</td><td>Higher, but unneeded here</td></tr>
+      <tr><td>Ops burden</td><td>Low</td><td>Higher</td></tr>
+    </table>
+    <p>For StudyBuddy's scale and a Windows dev setup, Django-Q2 gives async + retries
+       without standing up and babysitting a Redis instance. Celery would be the pick at
+       much larger scale or with heavy scheduling needs.</p>
+  </section>
+
+  <!-- 7 RUN -->
+  <section class="panel" id="run">
+    <h2>Running &amp; debugging</h2>
+    <h3>Start the worker (dev)</h3>
+    <pre><span class="c"># terminal 1 - the web server</span>
+python manage.py runserver
+<span class="c"># terminal 2 - the queue worker (REQUIRED for async mail)</span>
+python manage.py qcluster</pre>
+    <div class="callout warn">
+      <strong>Most common "why didn't my email send?"</strong>
+      The <code>qcluster</code> worker isn't running. Async jobs pile up in the DB and wait.
+      Login OTP still works (it's sync) &mdash; which is exactly why we kept it that way.
+    </div>
+    <h3>Inspecting failures</h3>
+    <ul>
+      <li>Django admin &rarr; <strong>Django Q &rarr; Failed tasks</strong> shows async jobs that errored.</li>
+      <li><code>EmailSendLog</code> table shows every send attempt with status + error text.</li>
+      <li>App logs still capture hard failures via <code>logger.exception</code>.</li>
+    </ul>
+    <h3>In DEBUG with no SMTP configured</h3>
+    <p>The transport ladder falls back to the <em>console</em> backend, so the worker just
+       prints the email to its terminal &mdash; you can test the whole queue path without
+       sending a single real message.</p>
+    <div class="footer">
+      StudyBuddy learning artifact &middot; describes the planned async email design
+      (plan: <code>2026-06-06 email async hardening</code>). Generated for understanding;
+      not a substitute for reading the code once it lands.
+    </div>
+  </section>
+</main>
+
+<script>
+  // tab switching
+  const tabs = document.querySelectorAll("#tabs button");
+  const panels = document.querySelectorAll("section.panel");
+  tabs.forEach(b => b.addEventListener("click", () => {
+    tabs.forEach(x => x.classList.remove("active"));
+    panels.forEach(p => p.classList.remove("active"));
+    b.classList.add("active");
+    document.getElementById(b.dataset.p).classList.add("active");
+    window.scrollTo({top: 0, behavior: "smooth"});
+  }));
+
+  // flow diagram
+  const diagram = document.getElementById("diagram");
+  const legend = document.getElementById("flowLegend");
+  const N = (lbl, sub, cls="") => `<div class="node ${cls}"><span class="lbl">${lbl}</span><span class="sub">${sub}</span></div>`;
+  const A = (cls="") => `<span class="arrow ${cls}">&rarr;</span>`;
+  const flows = {
+    reset: {
+      html: N("Browser","POST /reset") + A("async") + N("Web request","enqueue job","hot")
+        + A("async") + N("DB queue","stores job") + A("async") + N("qcluster","worker","hot")
+        + A("async") + N("Gmail","delivers"),
+      note: "The web request returns instantly after dropping the job on the queue. The worker delivers a moment later, retrying on failure."
+    },
+    otp: {
+      html: N("Browser","POST /login") + A() + N("Web request","sends NOW","hot")
+        + A() + N("Gmail","delivers","hot") + A() + N("Response","code sent / 500","hot")
+        + `<div class="node dim">qcluster</div>`,
+      note: "OTP stays in-request: the user is waiting for the code. If sending fails after retries, login returns an honest 500 — the worker is not involved."
+    },
+    down: {
+      html: N("Browser","POST /login") + A() + N("Web request","sync OTP","hot")
+        + A() + N("Gmail","delivers","hot") + `<span class="arrow">&nbsp;</span>`
+        + N("DB queue","reset jobs wait") + A() + N("qcluster","DOWN","dim"),
+      note: "Worker down: async mail (reset/notice) safely waits in the DB — nothing is lost. Login OTP is unaffected because it never touched the queue. This is the payoff of the hybrid design."
+    }
+  };
+  const ftBtns = document.querySelectorAll("#flowToggle button");
+  function renderFlow(key){
+    diagram.innerHTML = flows[key].html;
+    legend.textContent = flows[key].note;
+    ftBtns.forEach(b => b.classList.toggle("active", b.dataset.f === key));
+  }
+  ftBtns.forEach(b => b.addEventListener("click", () => renderFlow(b.dataset.f)));
+  renderFlow("reset");
+</script>
+</body>
+</html>

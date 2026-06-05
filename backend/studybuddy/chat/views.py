@@ -159,15 +159,16 @@ def get_message_history(request, room_id):
         return Response({"error": "Unauthorized"}, status=status.HTTP_403_FORBIDDEN)
 
     messages_qs = room.messages.select_related('sender', 'sender__userprofile')
-    after_id = request.query_params.get('after_id')
+    after_id_raw = request.query_params.get('after_id')
 
-    if after_id:
+    after_id = None
+    if after_id_raw is not None:
         try:
-            after_id = int(after_id)
+            after_id = int(after_id_raw)
         except (TypeError, ValueError):
             after_id = None
 
-    if after_id:
+    if after_id is not None:
         messages = list(messages_qs.filter(id__gt=after_id).order_by('id')[:50])
     else:
         messages = list(messages_qs.order_by('-created_at', '-id')[:50])[::-1]
