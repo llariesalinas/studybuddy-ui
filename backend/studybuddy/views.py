@@ -11,11 +11,12 @@ from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth.tokens import default_token_generator
 from django.core.exceptions import ValidationError
-from django.core.mail import send_mail
+from . import mailer
+from .mailer import EmailRateLimitError
 from django.utils.timezone import now
 from django.utils.crypto import constant_time_compare
-from django.utils.encoding import force_bytes, force_str
-from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+from django.utils.encoding import force_str
+from django.utils.http import urlsafe_base64_decode
 from django.db import transaction, IntegrityError
 from datetime import datetime,timedelta, date
 from calendar import monthrange
@@ -145,20 +146,6 @@ def get_login_otp_expiry():
     return timezone.now() + timedelta(seconds=settings.LOGIN_OTP_TTL_SECONDS)
 
 
-def send_login_otp_email(user, code):
-    ttl_minutes = max(1, settings.LOGIN_OTP_TTL_SECONDS // 60)
-    send_mail(
-        subject="Your StudyBuddy login code",
-        message=(
-            f"Your StudyBuddy login verification code is {code}.\n\n"
-            f"This code expires in {ttl_minutes} minutes."
-        ),
-        from_email=None,
-        recipient_list=[user.email or user.username],
-        fail_silently=False,
-    )
-
-
 def create_login_otp_challenge(user):
     EmailOTPChallenge.objects.filter(
         user=user,
@@ -181,7 +168,10 @@ def create_login_otp_challenge(user):
     challenge.save()
 
     try:
-        send_login_otp_email(user, code)
+        mailer.send_login_otp(user, code)
+    except EmailRateLimitError:
+        challenge.delete()
+        raise
     except Exception:
         challenge.delete()
         logger.exception("Failed to send login OTP email for user_id=%s", user.id)
@@ -204,41 +194,6 @@ def build_otp_challenge_response(challenge, message):
         payload["debug_code"] = challenge.debug_code
 
     return payload
-
-
-def get_password_reset_url(user):
-    uid = urlsafe_base64_encode(force_bytes(user.pk))
-    token = default_token_generator.make_token(user)
-    return f"{settings.FRONTEND_URL.rstrip('/')}/reset-password/{uid}/{token}"
-
-
-def send_password_reset_email(user):
-    reset_url = get_password_reset_url(user)
-    send_mail(
-        subject="Reset your StudyBuddy password",
-        message=(
-            "We received a request to reset your StudyBuddy password.\n\n"
-            "Use this link to choose a new password:\n\n"
-            f"{reset_url}\n\n"
-            "If you did not request this, you can ignore this email."
-        ),
-        from_email=None,
-        recipient_list=[user.email or user.username],
-        fail_silently=False,
-    )
-
-
-def send_password_changed_email(user):
-    send_mail(
-        subject="Your StudyBuddy password was changed",
-        message=(
-            "Your StudyBuddy password was changed successfully.\n\n"
-            "If you did not make this change, please contact support immediately."
-        ),
-        from_email=None,
-        recipient_list=[user.email or user.username],
-        fail_silently=False,
-    )
 
 
 def get_user_from_reset_uid(uid):
@@ -833,6 +788,11 @@ def login_view(request):
 
     try:
         challenge = create_login_otp_challenge(user)
+    except EmailRateLimitError:
+        return Response(
+            {"error": "Too many verification emails. Please wait a while and try again."},
+            status=status.HTTP_429_TOO_MANY_REQUESTS
+        )
     except Exception:
         return Response(
             {"error": "Unable to send verification code. Please try again."},
@@ -858,9 +818,9 @@ def password_reset_request(request):
         user = User.objects.filter(Q(username__iexact=email) | Q(email__iexact=email)).first()
         if user and user.is_active and user.has_usable_password():
             try:
-                send_password_reset_email(user)
+                mailer.enqueue_password_reset(user)
             except Exception:
-                logger.exception("Failed to send password reset email for user_id=%s", user.id)
+                logger.exception("Failed to queue password reset email for user_id=%s", user.id)
 
     return Response({"message": PASSWORD_RESET_GENERIC_MESSAGE})
 
@@ -907,9 +867,9 @@ def password_reset_confirm(request):
     blacklist_user_refresh_tokens(user)
 
     try:
-        send_password_changed_email(user)
+        mailer.enqueue_password_changed(user)
     except Exception:
-        logger.exception("Failed to send password changed notification for user_id=%s", user.id)
+        logger.exception("Failed to queue password changed notification for user_id=%s", user.id)
 
     return Response({"message": "Password has been reset successfully."})
 
@@ -1011,7 +971,12 @@ def login_resend_otp(request):
     new_expiry = get_login_otp_expiry()
 
     try:
-        send_login_otp_email(challenge.user, code)
+        mailer.send_login_otp(challenge.user, code)
+    except EmailRateLimitError:
+        return Response(
+            {"error": "Too many verification emails. Please wait a while and try again."},
+            status=status.HTTP_429_TOO_MANY_REQUESTS
+        )
     except Exception:
         logger.exception("Failed to resend login OTP email for user_id=%s", challenge.user_id)
         return Response(
