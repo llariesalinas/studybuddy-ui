@@ -2023,3 +2023,22 @@ class StudentDashboardRecommendationTests(APITestCase):
             set(response.data["recommendations"][0].keys()),
             {"id", "name", "rating", "subjects", "hourlyRate"},
         )
+
+    def test_saving_preferences_busts_dashboard_cache(self):
+        from studybuddy.recommender.dashboard import dashboard_recs_cache_key
+
+        self._make_tutor("itone", self.subject)
+        pref, _ = Preference.objects.get_or_create(user=self.student)
+        pref.subjects.set([self.subject.subject_code])
+
+        # warm the cache
+        self.client.get("/api/dashboard/")
+        self.assertIsNotNone(cache.get(dashboard_recs_cache_key(self.student)))
+
+        # changing preferences must clear it
+        response = self.client.post(
+            "/api/preferences/", {"subjects": [self.subject.subject_code]},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(cache.get(dashboard_recs_cache_key(self.student)))

@@ -2639,6 +2639,8 @@ def save_preferences(request):
     if subject_ids:
         pref.subjects.set(subject_ids)
 
+    cache.delete(dashboard_recs_cache_key(profile))
+
     return Response({
         "message": "Preferences saved successfully"
     })
@@ -2910,6 +2912,8 @@ def update_tutee_profile(request):
         pref.subjects.set(subject_ids)
 
     pref.save()
+
+    cache.delete(dashboard_recs_cache_key(profile))
 
     return Response({"message": "Profile updated successfully"})
 
