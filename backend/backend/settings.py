@@ -268,6 +268,26 @@ Q_CLUSTER = {
     "label": "Django Q",
 }
 
+# Cache backend. Redis when REDIS_URL is set (preferred: fast and shared across
+# worker processes — required for correct invalidation in multi-worker prod).
+# Without REDIS_URL we fall back to a per-process in-memory cache so local dev and
+# CI run without a Redis server (degraded: not shared across processes).
+REDIS_URL = os.getenv("REDIS_URL", "")
+
+if REDIS_URL:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": REDIS_URL,
+        }
+    }
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        }
+    }
+
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
