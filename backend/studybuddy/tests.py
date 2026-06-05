@@ -1808,3 +1808,36 @@ class EmailAuthTests(APITestCase):
         self.assertEqual(response.status_code, 400)
         self.user.refresh_from_db()
         self.assertFalse(self.user.check_password("NewStudyBuddyPassword123!"))
+
+
+class RecommenderNeighborReuseTests(APITestCase):
+    def setUp(self):
+        # student 1 is our target; students 2 and 3 are potential neighbors.
+        self.ratings = {
+            1: {10: 5, 11: 4},
+            2: {10: 4, 11: 5, 12: 3},
+            3: {10: 2, 11: 1, 12: 5},
+        }
+
+    def test_compute_cf_score_uses_supplied_neighbors(self):
+        from studybuddy.recommender import CF
+
+        neighbors = CF.top_k(self.ratings, 1)
+
+        with patch.object(CF, "top_k") as mocked_top_k:
+            score = CF.compute_cf_score(
+                self.ratings, 1, 12, neighbors=neighbors
+            )
+
+        mocked_top_k.assert_not_called()
+        self.assertIsNotNone(score)
+
+    def test_compute_cf_score_matches_with_and_without_neighbors(self):
+        from studybuddy.recommender import CF
+
+        neighbors = CF.top_k(self.ratings, 1)
+
+        without = CF.compute_cf_score(self.ratings, 1, 12)
+        with_neighbors = CF.compute_cf_score(self.ratings, 1, 12, neighbors=neighbors)
+
+        self.assertEqual(without, with_neighbors)

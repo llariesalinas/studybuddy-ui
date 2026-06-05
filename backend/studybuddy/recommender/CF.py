@@ -85,12 +85,13 @@ def top_k(ratings, student_id, k=5):
 # -----------------------------
 # PREDICT RATING
 # -----------------------------
-def compute_cf_score(ratings, student_id, tutor_id, k=5):
+def compute_cf_score(ratings, student_id, tutor_id, k=5, neighbors=None):
 
     if student_id not in ratings:
         return None
 
-    neighbors = top_k(ratings, student_id, k)
+    if neighbors is None:
+        neighbors = top_k(ratings, student_id, k)
 
     numerator = 0
     denominator = 0
