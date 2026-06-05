@@ -45,6 +45,8 @@ from .recommender.hybrid import recommend_tutors_hybrid
 from .recommender.CF import build_rating_matrix
 
 from .recommender.cbf import recommend_tutors
+from .recommender.dashboard import get_dashboard_recommendations, dashboard_recs_cache_key
+from django.core.cache import cache
 from .models import Booking, Course, EmailOTPChallenge, Notification, PartnerInstitution, Payment, PaymentMethod, Preference, Rating, Subjects, Tutor, TutorAvailability, TutorAvailabilityOverride, TutorSubjects, Wallet, PlatformActivity, Transaction, TutorPayoutAccount
 from .serializers import (
     NotificationSerializer,
@@ -1162,25 +1164,9 @@ def student_dashboard(request):
         })
 
     # -----------------------
-    # RECOMMENDED TUTORS
+    # RECOMMENDED TUTORS (hybrid algorithm, cached per tutee)
     # -----------------------
-    tutors = Tutor.objects.all().select_related('profile')[:3]
-
-    recommendations = []
-
-    for tutor in tutors:
-
-        tutor_subjects = TutorSubjects.objects.filter(
-            tutor=tutor
-        ).select_related('subject')
-
-        recommendations.append({
-            "id": tutor.profile.id,
-            "name": f"{tutor.profile.fname} {tutor.profile.lname}",
-            "rating": tutor.rating_average,
-            "subjects": [ts.subject.subject_name for ts in tutor_subjects],
-            "hourlyRate": tutor.hourly_rate
-        })
+    recommendations = get_dashboard_recommendations(user_profile)
 
     return Response({
         "upcoming": upcoming,

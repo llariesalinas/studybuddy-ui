@@ -1973,3 +1973,53 @@ class DashboardRecommendationServiceTests(APITestCase):
 
         ids = {row["id"] for row in data}
         self.assertEqual(ids, {match.profile.id})
+
+
+class StudentDashboardRecommendationTests(APITestCase):
+    def setUp(self):
+        cache.clear()
+        self.subject = Subjects.objects.create(
+            subject_code="IT201", subject_name="Data Structures", department="IT",
+        )
+        self.other_subject = Subjects.objects.create(
+            subject_code="HIST201", subject_name="History", department="Arts",
+        )
+        self.student_user = User.objects.create_user(
+            username="dv-student", email="dv@example.com", password="password",
+        )
+        self.student = UserProfile.objects.create(
+            user=self.student_user, fname="Dee", mname="", lname="Vee",
+            role="Tutee", year_level=11,
+        )
+        self.client.force_authenticate(user=self.student_user)
+
+    def _make_tutor(self, username, subject):
+        user = User.objects.create_user(
+            username=username, email=f"{username}@example.com", password="password",
+        )
+        profile = UserProfile.objects.create(
+            user=user, fname=username.title(), mname="", lname="Tutor",
+            role="Tutor", year_level=12,
+        )
+        tutor = Tutor.objects.create(
+            profile=profile, hourly_rate=200, can_online=True, can_f2f=False,
+            teaching_level="SHS",
+        )
+        TutorSubjects.objects.create(tutor=tutor, subject=subject, expertise_level=5)
+        return tutor
+
+    def test_dashboard_recommends_subject_matched_tutors(self):
+        match = self._make_tutor("itone", self.subject)
+        self._make_tutor("histone", self.other_subject)
+        pref, _ = Preference.objects.get_or_create(user=self.student)
+        pref.subjects.set([self.subject.subject_code])
+
+        response = self.client.get("/api/dashboard/")
+
+        self.assertEqual(response.status_code, 200)
+        ids = {row["id"] for row in response.data["recommendations"]}
+        self.assertEqual(ids, {match.profile.id})
+        self.assertEqual(
+            set(response.data["recommendations"][0].keys()),
+            {"id", "name", "rating", "subjects", "hourlyRate"},
+        )
