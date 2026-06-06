@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Notification, Preference, Rating, Subjects, Tutor, TutorAvailability, TutorAvailabilityOverride, WithdrawalRequest, UserProfile, PartnerInstitution, PlatformActivity, Wallet
+from .models import Notification, Preference, Rating, Subjects, Tutor, TutorApplication, TutorAvailability, TutorAvailabilityOverride, WithdrawalRequest, UserProfile, PartnerInstitution, PlatformActivity, Wallet
 
 # Create Serializers here.
 
@@ -286,4 +286,42 @@ class NotificationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Notification
         fields = ['id', 'message', 'is_read', 'created_at']
+
+
+class TutorApplicationSerializer(serializers.ModelSerializer):
+    applicant_name = serializers.SerializerMethodField()
+    email = serializers.SerializerMethodField()
+    institution_name = serializers.SerializerMethodField()
+    school_id_url = serializers.SerializerMethodField()
+    enrollment_proof_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TutorApplication
+        fields = [
+            'id', 'applicant_name', 'email', 'institution_name',
+            'reason_to_tutor', 'application_status',
+            'school_id_url', 'enrollment_proof_url',
+            'rejection_reason', 'submitted_at', 'reviewed_at'
+        ]
+
+    def get_applicant_name(self, obj):
+        return f"{obj.profile.fname} {obj.profile.lname}"
+
+    def get_email(self, obj):
+        return obj.profile.user.email
+
+    def get_institution_name(self, obj):
+        return obj.profile.institution.institution_name if obj.profile.institution else "N/A"
+
+    def get_school_id_url(self, obj):
+        request = self.context.get('request')
+        if obj.school_id and request:
+            return request.build_absolute_uri(obj.school_id.url)
+        return obj.school_id.url if obj.school_id else None
+
+    def get_enrollment_proof_url(self, obj):
+        request = self.context.get('request')
+        if obj.enrollment_proof and request:
+            return request.build_absolute_uri(obj.enrollment_proof.url)
+        return obj.enrollment_proof.url if obj.enrollment_proof else None
 
