@@ -45,7 +45,11 @@ from .recommender.hybrid import recommend_tutors_hybrid
 from .recommender.CF import build_rating_matrix
 
 from .recommender.cbf import recommend_tutors
-from .recommender.dashboard import get_dashboard_recommendations, dashboard_recs_cache_key
+from .recommender.dashboard import (
+    bump_dashboard_recs_cache_version,
+    dashboard_recs_cache_key,
+    get_dashboard_recommendations,
+)
 from django.core.cache import cache
 from .models import Booking, Course, EmailOTPChallenge, Notification, PartnerInstitution, Payment, PaymentMethod, Preference, Rating, Subjects, Tutor, TutorAvailability, TutorAvailabilityOverride, TutorSubjects, Wallet, PlatformActivity, Transaction, TutorPayoutAccount
 from .serializers import (
@@ -2594,6 +2598,7 @@ def submit_session_rating(request, booking_id):
         comment=request.data.get("comment", "")
     )
     update_tutor_rating_average(representative_booking.tutor)
+    bump_dashboard_recs_cache_version()
 
     return Response({"message": "Rating submitted successfully."}, status=201)
 
@@ -2604,7 +2609,7 @@ def list_notifications(request):
 
     notifications = Notification.objects.filter(
         recipient=request.user.userprofile
-    ).order_by('-created_at')
+    ).select_related('recipient').order_by('-created_at')
 
     serializer = NotificationSerializer(notifications, many=True)
     return Response(serializer.data)
@@ -2659,6 +2664,7 @@ def tutor_setup(request):
     tutor.response_time = request.data.get("response_time", tutor.response_time)
 
     tutor.save()
+    bump_dashboard_recs_cache_version()
 
     profile.profile_completed = True
     profile.save()
@@ -3036,6 +3042,8 @@ def add_tutor_subject(request):
         tutor_subject.description = description or ''
         tutor_subject.save(update_fields=['description'])
 
+    bump_dashboard_recs_cache_version()
+
     return Response({"message": "Subject added"})
 
 @api_view(['PATCH'])
@@ -3054,6 +3062,8 @@ def update_tutor_subject(request, subject_code):
     tutor_subject.description = request.data.get("description", '') or ''
     tutor_subject.save(update_fields=['description'])
 
+    bump_dashboard_recs_cache_version()
+
     return Response({"message": "Subject updated"})
 
 @api_view(['DELETE'])
@@ -3063,10 +3073,13 @@ def remove_tutor_subject(request, subject_code):
     profile = request.user.userprofile
     tutor = Tutor.objects.get(profile=profile)
 
-    TutorSubjects.objects.filter(
+    deleted_count, _ = TutorSubjects.objects.filter(
         tutor=tutor,
         subject__subject_code=subject_code
     ).delete()
+
+    if deleted_count:
+        bump_dashboard_recs_cache_version()
 
     return Response({"message": "Subject removed"})
 
@@ -3085,6 +3098,7 @@ def update_tutor_profile(request):
     )
     serializer.is_valid(raise_exception=True)
     serializer.save()
+    bump_dashboard_recs_cache_version()
 
     return Response({
         "message": "Tutor profile updated successfully",
