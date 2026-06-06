@@ -71,6 +71,7 @@ else:
     # Transport / cookie hardening. Behind a TLS-terminating proxy (e.g. ngrok),
     # trust the forwarded-proto header so the SSL redirect doesn't loop.
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    USE_X_FORWARDED_HOST = True
     SECURE_SSL_REDIRECT = True
     SECURE_HSTS_SECONDS = 31536000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True

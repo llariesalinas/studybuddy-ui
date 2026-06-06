@@ -28,7 +28,8 @@ from .views import(
                    )
 from .admin_views import (
     AdminStatsView, AdminWithdrawalListView, AdminWithdrawalDetailView,
-    AdminUserListView, AdminInstitutionView, AdminAnalyticsView
+    AdminUserListView, AdminInstitutionView, AdminAnalyticsView,
+    AdminTutorApplicationListView, AdminTutorApplicationDetailView
 )
 from . import views
 
@@ -39,6 +40,8 @@ urlpatterns = [
     path('admin/stats/', AdminStatsView.as_view()),
     path('admin/withdrawals/', AdminWithdrawalListView.as_view()),
     path('admin/withdrawals/<int:pk>/', AdminWithdrawalDetailView.as_view()),
+    path('admin/tutor-applications/', AdminTutorApplicationListView.as_view()),
+    path('admin/tutor-applications/<int:pk>/', AdminTutorApplicationDetailView.as_view()),
     path('admin/users/', AdminUserListView.as_view()),
     path('admin/users/<int:pk>/', AdminUserListView.as_view()),
     path('admin/institutions/', AdminInstitutionView.as_view()),
@@ -116,7 +119,6 @@ urlpatterns = [
 ]
 
 if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
     urlpatterns += [path('dev/wallet/add/', views.dev_add_wallet_funds)]
     urlpatterns += [path('dev/wallet/remove/', views.dev_remove_wallet_funds)]
     urlpatterns += [

@@ -44,16 +44,18 @@ from .recommender.hybrid import recommend_tutors_hybrid
 from .recommender.CF import build_rating_matrix
 
 from .recommender.cbf import recommend_tutors
-from .models import Booking, Course, EmailOTPChallenge, Notification, PartnerInstitution, Payment, PaymentMethod, Preference, Rating, Subjects, Tutor, TutorAvailability, TutorAvailabilityOverride, TutorSubjects, Wallet, PlatformActivity, Transaction, TutorPayoutAccount
+from .models import Booking, Course, EmailOTPChallenge, Notification, PartnerInstitution, Payment, PaymentMethod, Preference, Rating, Subjects, Tutor, TutorApplication, TutorAvailability, TutorAvailabilityOverride, TutorSubjects, Wallet, PlatformActivity, Transaction, TutorPayoutAccount
 from .serializers import (
     NotificationSerializer,
     SubjectSerializer,
+    TutorApplicationSerializer,
     TutorDetailSerializer,
     TutorAvailabilityOverrideSerializer,
     TutorProfileSerializer,
     TutorProfileUpdateSerializer,
     TutorSearchSerializer,
 )
+from .email_utils import send_application_received_email
 from .chat.services import create_booking_event
 
 from .models import (
@@ -106,6 +108,14 @@ OTP_ERROR_MESSAGE = "Invalid or expired verification code."
 
 def build_login_response_payload(user, profile):
     refresh = RefreshToken.for_user(user)
+    
+    application_status = None
+    if profile.role == 'Tutor':
+        try:
+            application_status = profile.tutor_application.application_status
+        except:
+            pass
+
     return {
         "access": str(refresh.access_token),
         "refresh": str(refresh),
@@ -115,6 +125,7 @@ def build_login_response_payload(user, profile):
         "email": user.email,
         "fname": profile.fname,
         "lname": profile.lname,
+        "application_status": application_status,
     }
 
 
@@ -694,10 +705,22 @@ def register_user(request):
     existing_user = User.objects.filter(username=email).first()
 
     if existing_user and hasattr(existing_user, 'userprofile'):
-        return Response(
-            {"error": "User already exists"},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+        profile = existing_user.userprofile
+        is_rejected_tutor = False
+        if profile.role == 'Tutor':
+            try:
+                application = profile.tutor_application
+                if application.application_status == 'rejected':
+                    is_rejected_tutor = True
+            except TutorApplication.DoesNotExist:
+                pass
+        
+        if not is_rejected_tutor:
+            return Response(
+                {"error": "User already exists"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        # If is_rejected_tutor is True, proceed to update profile/application
 
     if existing_user:
         logger.warning(
@@ -716,18 +739,58 @@ def register_user(request):
             password=password
         )
 
-    profile = UserProfile.objects.create(
-        user=user,
-        fname=fname,
-        mname=mname,
-        lname=lname,
-        role=role,
-        institution=institution
-    )
+    if hasattr(user, 'userprofile'):
+        profile = user.userprofile
+        profile.fname = fname
+        profile.mname = mname
+        profile.lname = lname
+        profile.role = role
+        profile.institution = institution
+        profile.save()
+    else:
+        profile = UserProfile.objects.create(
+            user=user,
+            fname=fname,
+            mname=mname,
+            lname=lname,
+            role=role,
+            institution=institution
+        )
 
-    # 🔥 Create Tutor record if role is Tutor
+    # 🔥 Create/Update Tutor record if role is Tutor
     if role == "Tutor":
-        Tutor.objects.create(profile=profile)
+        tutor, _ = Tutor.objects.get_or_create(profile=profile)
+
+        # Handle TutorApplication (Update or Create)
+        school_id = request.FILES.get('school_id')
+        enrollment_proof = request.FILES.get('enrollment_proof')
+        reason_to_tutor = request.data.get('reason_to_tutor', '')
+
+        if not school_id or not enrollment_proof:
+            # We need to make sure we don't block if they provided these in a previous application,
+            # but if this is a NEW registration/re-application, they must be here.
+            # Assuming they must upload new docs for a new application.
+            return Response(
+                {"error": "Tutor applicants must provide a School ID and Proof of Enrollment."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        TutorApplication.objects.update_or_create(
+            profile=profile,
+            defaults={
+                'application_status': 'pending',
+                'school_id': school_id,
+                'enrollment_proof': enrollment_proof,
+                'reason_to_tutor': reason_to_tutor,
+                'submitted_at': timezone.now()
+            }
+        )
+
+        # Send confirmation email
+        try:
+            send_application_received_email(profile)
+        except Exception:
+            logger.exception("Failed to send tutor application received email for profile_id=%s", profile.id)
 
     PlatformActivity.objects.create(
         activity_type='registration',
@@ -754,10 +817,17 @@ def register_user(request):
 def profile_status(request):
 
     profile = request.user.userprofile
+    application_status = None
+    if profile.role == 'Tutor':
+        try:
+            application_status = profile.tutor_application.application_status
+        except:
+            pass
 
     return Response({
         "profile_completed": profile.profile_completed,
-        "role": profile.role
+        "role": profile.role,
+        "application_status": application_status
     })
 
 @api_view(['POST'])
@@ -796,6 +866,21 @@ def login_view(request):
             {"error": "Your account has been suspended. Please contact administration for more details."},
             status=status.HTTP_403_FORBIDDEN
         )
+
+    # 🔥 Check tutor application status
+    if profile.role == 'Tutor':
+        try:
+            application = profile.tutor_application
+            if application.application_status == 'rejected':
+                return Response(
+                    {
+                        "error": "Your application was rejected. Please contact support or reapply in the registration page.",
+                        "rejected": True
+                    },
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        except TutorApplication.DoesNotExist:
+            pass
 
     if not profile.is_domain_exempt and profile.role != 'Admin':
         email_domain = normalize_email_domain(email)
@@ -4270,3 +4355,58 @@ def admin_resolve_ticket(request, ticket_id):
     )
 
     return Response({"message": "Ticket resolved", "status": "Resolved"})
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def tutor_application_status(request):
+    try:
+        application = TutorApplication.objects.get(profile=request.user.userprofile)
+        serializer = TutorApplicationSerializer(application, context={'request': request})
+        return Response(serializer.data)
+    except TutorApplication.DoesNotExist:
+        return Response({"error": "No application found for this user."}, status=status.HTTP_404_NOT_FOUND)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@transaction.atomic
+def tutor_application_resubmit(request):
+    try:
+        application = TutorApplication.objects.get(profile=request.user.userprofile)
+    except TutorApplication.DoesNotExist:
+        return Response({"error": "No application found to resubmit."}, status=status.HTTP_404_NOT_FOUND)
+
+    school_id = request.FILES.get('school_id')
+    enrollment_proof = request.FILES.get('enrollment_proof')
+    reason_to_tutor = request.data.get('reason_to_tutor', '')
+
+    if not school_id or not enrollment_proof:
+        return Response(
+            {"error": "Please provide both your School ID and Proof of Enrollment to resubmit."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Update application
+    application.school_id = school_id
+    application.enrollment_proof = enrollment_proof
+    application.reason_to_tutor = reason_to_tutor
+    application.application_status = 'pending'
+    application.rejection_reason = ''
+    application.reviewed_at = None
+    application.reviewed_by = None
+    application.save()
+
+    # Log activity
+    PlatformActivity.objects.create(
+        activity_type='tutor_application',
+        message=f"Tutor application resubmitted: {request.user.userprofile.fname} {request.user.userprofile.lname}"
+    )
+
+    # Optional: Send email confirmation
+    try:
+        send_application_received_email(request.user.userprofile)
+    except Exception:
+        logger.exception("Failed to send tutor application resubmission email for profile_id=%s", request.user.userprofile.id)
+
+    return Response({"message": "Application resubmitted successfully. It is now back under review."})
