@@ -105,7 +105,6 @@
                       type="button"
                       class="weekly-session-card sb-interactive"
                       :class="getWeeklySessionCardClasses(session.status)"
-                      :style="getSessionCardStyle(session)"
                       @click="goToDetails(session.id)"
                     >
                       <p class="weekly-session-time">{{ formatSessionTime(session) }}</p>
@@ -142,7 +141,7 @@
           <div class="recommendation-body">
             <Transition name="fade" mode="out-in">
               <div v-if="loading" class="recommendation-skeleton placeholder-glow">
-                <div v-for="i in 6" :key="'skel-tutor-' + i" class="recommendation-skeleton-row">
+                <div v-for="i in 5" :key="'skel-tutor-' + i" class="recommendation-skeleton-row">
                   <div class="skeleton-copy">
                     <span class="placeholder col-8 rounded"></span>
                     <span class="placeholder col-5 rounded"></span>
@@ -166,15 +165,15 @@
                   >
                     <span class="tutor-copy">
                       <span class="tutor-name">{{ tutor.name }}</span>
-                      <span class="tutor-meta">
-                        Rating {{ tutor.rating || 'N/A' }} · {{ tutor.subjects?.join(', ') || 'Various Subjects' }}
+                      <span class="tutor-meta" :title="getTutorMetaTitle(tutor)">
+                        {{ formatTutorMeta(tutor) }}
                       </span>
                     </span>
                     <span class="tutor-rate">PHP {{ tutor.hourlyRate || 0 }}/hr</span>
                   </button>
                 </div>
 
-                <div class="recommendation-pagination">
+                <div v-if="totalPages > 1" class="recommendation-pagination">
                   <button class="pagination-btn sb-btn" @click="prevPage" :disabled="page === 1">Prev</button>
                   <span class="pagination-label">Page {{ page }} of {{ totalPages || 1 }}</span>
                   <button class="pagination-btn sb-btn" @click="nextPage" :disabled="page >= totalPages">Next</button>
@@ -422,10 +421,6 @@ const getSessionDurationMinutes = (session) => {
 
 const getSessionSlotSpan = (session) => Math.max(1, Math.ceil(getSessionDurationMinutes(session) / 30))
 
-const getSessionCardStyle = (session) => ({
-  minHeight: `${Math.max(74, getSessionSlotSpan(session) * 42)}px`
-})
-
 const getEmptyStateLabel = (dayIndex) => {
   if (dayIndex === 5) {
     return 'No Sessions'
@@ -463,6 +458,29 @@ const getWeeklySessionCardClasses = (status) => {
   return 'weekly-session-card-upcoming'
 }
 
+const getTutorSubjects = (tutor) => (
+  Array.isArray(tutor?.subjects)
+    ? tutor.subjects.filter(Boolean)
+    : []
+)
+
+const getTutorRatingLabel = (tutor) => tutor?.rating || 'N/A'
+
+const formatTutorMeta = (tutor) => {
+  const subjects = getTutorSubjects(tutor)
+  const visibleSubjects = subjects.slice(0, 2).join(', ') || 'Various subjects'
+  const remainingSubjects = subjects.length > 2 ? ` - +${subjects.length - 2} more` : ''
+
+  return `Rating ${getTutorRatingLabel(tutor)} - ${visibleSubjects}${remainingSubjects}`
+}
+
+const getTutorMetaTitle = (tutor) => {
+  const subjects = getTutorSubjects(tutor)
+  const subjectList = subjects.length ? subjects.join(', ') : 'Various subjects'
+
+  return `Rating ${getTutorRatingLabel(tutor)} - ${subjectList}`
+}
+
 const goToPreviousWeek = () => {
   if (canGoToPreviousWeek.value) {
     weekOffset.value -= 1
@@ -483,7 +501,7 @@ const stats = computed(() => [
 ])
 
 const page = ref(1)
-const pageSize = 6
+const pageSize = 5
 
 const totalPages = computed(() => {
   const total = sessionsStore.recommendedTutors?.length || 0
@@ -855,7 +873,12 @@ const bookTutor = (id) => router.push({
 }
 
 .weekly-session-card {
+  display: flex;
+  flex-direction: column;
   width: 100%;
+  height: 150px;
+  min-height: 150px;
+  max-height: 150px;
   border: 1px solid transparent;
   border-radius: 16px;
   padding: 0.75rem;
@@ -914,6 +937,8 @@ const bookTutor = (id) => router.push({
 .weekly-session-status {
   display: inline-flex;
   align-items: center;
+  min-width: 0;
+  max-width: 100%;
   min-height: 22px;
   padding: 0.1rem 0.45rem;
   border-radius: 999px;
@@ -923,6 +948,9 @@ const bookTutor = (id) => router.push({
   letter-spacing: 0;
   text-transform: uppercase;
   color: var(--sb-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .weekly-session-card-upcoming .weekly-session-status {
@@ -966,11 +994,15 @@ const bookTutor = (id) => router.push({
 }
 
 .weekly-session-title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
   margin: 0 0 0.25rem;
   font-size: 0.72rem;
   font-weight: 800;
   line-height: 1.3;
   color: var(--sb-ink);
+  overflow: hidden;
   word-break: break-word;
 }
 
@@ -990,8 +1022,9 @@ const bookTutor = (id) => router.push({
   margin: 0 0 0.55rem;
   font-size: 0.66rem;
   color: var(--sb-muted);
-  word-break: break-word;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .weekly-session-meta {
@@ -999,6 +1032,8 @@ const bookTutor = (id) => router.push({
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
+  min-width: 0;
+  margin-top: auto;
 }
 
 .weekly-session-duration {
@@ -1084,7 +1119,9 @@ const bookTutor = (id) => router.push({
   justify-content: space-between;
   gap: 0.9rem;
   width: 100%;
-  min-height: 76px;
+  height: 96px;
+  min-height: 96px;
+  max-height: 96px;
   border: 1px solid var(--sb-card-border);
   border-radius: 18px;
   background: color-mix(in srgb, var(--sb-card-bg) 78%, transparent);
@@ -1098,22 +1135,28 @@ const bookTutor = (id) => router.push({
   display: grid;
   gap: 0.25rem;
   min-width: 0;
+  overflow: hidden;
 }
 
 .tutor-name {
+  display: block;
   color: var(--sb-ink);
   font-size: 0.96rem;
   font-weight: 850;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tutor-meta {
-  display: block;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   color: var(--sb-muted);
   font-size: 0.78rem;
   font-weight: 650;
   line-height: 1.35;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .tutor-rate {
@@ -1129,6 +1172,8 @@ const bookTutor = (id) => router.push({
   padding: 0.35rem 0.65rem;
   font-size: 0.78rem;
   font-weight: 850;
+  min-width: 96px;
+  white-space: nowrap;
 }
 
 .recommendation-pagination {
@@ -1248,6 +1293,9 @@ const bookTutor = (id) => router.push({
   .tutor-list-item {
     align-items: flex-start;
     flex-direction: column;
+    height: 132px;
+    min-height: 132px;
+    max-height: 132px;
   }
 
   .tutor-rate,
