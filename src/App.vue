@@ -359,8 +359,6 @@ const openSupport = (type = 'Other', id = null) => {
 let pendingSessionsRefreshId = null
 let startupIdleId = null
 let startupTimeoutId = null
-const setupAuroraPointerMotion = () => {}
-const teardownAuroraPointerMotion = () => {}
 
 const deferStartupWork = (callback) => {
   if (typeof window === 'undefined') {
@@ -449,11 +447,8 @@ const handleVisibilityChange = async () => {
   }
 }
 onMounted(() => {
-  setupAuroraPointerMotion()
-
   if (authStore.isAuthenticated) {
     deferStartupWork(() => {
-      notificationsStore.fetchNotifications()
       chatStore.fetchRooms()
       chatStore.connectUpdates()
     })
@@ -470,7 +465,6 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   closeLogoutModal()
-  teardownAuroraPointerMotion()
   cancelDeferredStartupWork()
   document.removeEventListener('visibilitychange', handleVisibilityChange)
 
@@ -554,9 +548,7 @@ onBeforeUnmount(() => {
 }
 
 .app-main-surface {
-  background:
-    var(--sb-aurora-bg, none),
-    var(--sb-bg);
+  background: var(--sb-bg);
 }
 
 .app-main-chat {
@@ -578,7 +570,6 @@ onBeforeUnmount(() => {
   background: color-mix(in srgb, var(--sb-card-bg) 94%, transparent);
   color: var(--sb-text-main);
   box-shadow: 0 28px 80px rgba(0, 0, 0, 0.22);
-  backdrop-filter: blur(28px);
 }
 
 .chat-icon-btn {
@@ -722,15 +713,6 @@ onBeforeUnmount(() => {
   }
 }
 
-@keyframes sb-pulse-dot {
-  0%, 100% {
-    box-shadow: 0 0 0 0 rgba(0, 137, 90, 0.6);
-  }
-  50% {
-    box-shadow: 0 0 0 8px rgba(0, 137, 90, 0);
-  }
-}
-
 @keyframes sb-pop {
   0% {
     transform: scale(0.6);
@@ -767,11 +749,6 @@ onBeforeUnmount(() => {
   to   { opacity: 1; transform: scale(1); }
 }
 
-@keyframes sb-shimmer {
-  0%   { background-position: -600px 0; }
-  100% { background-position:  600px 0; }
-}
-
 @keyframes sb-tab-indicator {
   from { transform: scaleX(0); opacity: 0; }
   to   { transform: scaleX(1); opacity: 1; }
@@ -801,14 +778,7 @@ onBeforeUnmount(() => {
 
 /* --- Layer B: Skeleton shimmer --- */
 .sb-skeleton {
-  background: linear-gradient(
-    90deg,
-    rgba(226, 232, 240, 0.8) 25%,
-    rgba(203, 213, 225, 0.9) 50%,
-    rgba(226, 232, 240, 0.8) 75%
-  );
-  background-size: 600px 100%;
-  animation: sb-shimmer 1.6s ease-in-out infinite;
+  background: rgba(226, 232, 240, 0.86);
   border-radius: 12px;
 }
 

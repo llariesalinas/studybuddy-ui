@@ -1165,7 +1165,6 @@ onMounted(() => {
   border: 1px solid color-mix(in srgb, var(--sb-card-border) 82%, transparent);
   border-radius: 24px;
   box-shadow: 0 24px 70px rgba(15, 23, 42, 0.1);
-  backdrop-filter: blur(24px);
   padding: 1.5rem;
 }
 
@@ -1922,7 +1921,6 @@ onMounted(() => {
   place-items: center;
   padding: 1.5rem;
   background: rgba(15, 23, 42, 0.46);
-  backdrop-filter: blur(6px);
 }
 
 .glass-modal {
@@ -1935,7 +1933,6 @@ onMounted(() => {
   border-radius: 22px;
   background: rgba(255, 255, 255, 0.96);
   box-shadow: 0 28px 90px rgba(15, 23, 42, 0.26);
-  backdrop-filter: blur(24px);
   padding: 1.5rem;
 }
 

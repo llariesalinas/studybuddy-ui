@@ -14,6 +14,7 @@ export default defineConfig(({ mode }) => {
   const proxyHeaders = apiProxyTarget.includes('ngrok')
     ? { 'ngrok-skip-browser-warning': 'true' }
     : undefined
+  const enableVueDevTools = env.VITE_ENABLE_VUE_DEVTOOLS === 'true'
 
   return {
     // Strip console/debugger statements from production builds.
@@ -22,7 +23,7 @@ export default defineConfig(({ mode }) => {
     },
     plugins: [
       vue(),
-      mode === 'development' && vueDevTools(),
+      mode === 'development' && enableVueDevTools && vueDevTools(),
     ].filter(Boolean),
     resolve: {
       alias: {

@@ -964,7 +964,6 @@ onMounted(() => {
   border: 1px solid color-mix(in srgb, var(--sb-card-border) 82%, transparent);
   border-radius: 24px;
   box-shadow: 0 24px 70px rgba(15, 23, 42, 0.1);
-  backdrop-filter: blur(24px);
   padding: 1.5rem;
 }
 
@@ -1412,7 +1411,6 @@ onMounted(() => {
   justify-content: center;
   padding: 1.25rem;
   background: rgba(15, 23, 42, 0.42);
-  backdrop-filter: blur(8px);
 }
 
 .glass-modal {
@@ -1425,7 +1423,6 @@ onMounted(() => {
   border-radius: 24px;
   background: rgba(255, 255, 255, 0.9);
   box-shadow: 0 34px 90px rgba(15, 23, 42, 0.2);
-  backdrop-filter: blur(24px);
   padding: 1.5rem;
 }
 
@@ -1564,7 +1561,6 @@ onMounted(() => {
   font-weight: 850;
   text-transform: uppercase;
   letter-spacing: 0;
-  backdrop-filter: blur(14px);
 }
 
 .subject-option {

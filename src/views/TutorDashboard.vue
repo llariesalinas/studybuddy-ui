@@ -797,11 +797,4 @@ watch(
   }
 }
 
-@supports not (backdrop-filter: blur(18px)) {
-  .metric-card,
-  .bookings-panel,
-  .booking-card {
-    background: var(--sb-card-bg);
-  }
-}
 </style>
