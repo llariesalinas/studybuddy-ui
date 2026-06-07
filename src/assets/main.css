@@ -46,12 +46,6 @@
   --sb-t-quick: 120ms;
   --sb-t-normal: 250ms;
   --sb-t-slow: 400ms;
-  --sb-aurora-base-x: 0px;
-  --sb-aurora-base-y: 0px;
-  --sb-aurora-overlay-x: 0px;
-  --sb-aurora-overlay-y: 0px;
-  --sb-aurora-sheen-x: 0px;
-  --sb-aurora-sheen-y: 0px;
 }
 
 [data-sb-theme="dark"] {
@@ -128,7 +122,6 @@ body > #app::before {
   z-index: -1;
   pointer-events: none;
   background: var(--sb-aurora-overlay);
-  filter: blur(64px) saturate(1.04);
   transform: scale(1.08);
   transition: background 320ms ease;
 }

@@ -5,8 +5,7 @@
         <article
           v-for="(stat, index) in stats"
           :key="index"
-          class="glass-panel metric-card sb-stagger-item"
-          :style="{ animationDelay: `${index * 0.07}s` }"
+          class="glass-panel metric-card"
         >
           <span class="metric-icon">
             <i :class="['bi', stat.icon]"></i>
@@ -560,9 +559,9 @@ const bookTutor = (id) => router.push({
   --sb-green-tint: #edf7f3;
   --sb-green-border: #b8dece;
   position: relative;
-  min-height: 100vh;
-  overflow: hidden;
-  padding: 2rem;
+  min-height: 0;
+  overflow: visible;
+  padding: 0;
   color: var(--sb-ink);
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   background: transparent;
@@ -572,17 +571,17 @@ const bookTutor = (id) => router.push({
   position: relative;
   z-index: 1;
   display: grid;
-  gap: 1.25rem;
-  max-width: 1320px;
+  gap: 1rem;
+  width: 100%;
+  max-width: 1180px;
   margin: 0 auto;
 }
 
 .glass-panel {
   border: 1px solid var(--sb-card-border);
-  border-radius: 24px;
-  background: color-mix(in srgb, var(--sb-card-bg) 88%, transparent);
-  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.1);
-  backdrop-filter: blur(24px);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--sb-card-bg) 96%, var(--sb-bg));
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
 }
 
 .metrics-grid {
@@ -594,22 +593,22 @@ const bookTutor = (id) => router.push({
 .metric-card {
   display: flex;
   align-items: center;
-  gap: 0.9rem;
-  min-height: 104px;
-  padding: 1rem;
+  gap: 0.75rem;
+  min-height: 86px;
+  padding: 0.85rem;
 }
 
 .metric-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 52px;
-  height: 52px;
+  width: 44px;
+  height: 44px;
   flex: 0 0 auto;
-  border-radius: 18px;
+  border-radius: 14px;
   background: rgba(0, 137, 90, 0.1);
   color: var(--sb-primary);
-  font-size: 1.35rem;
+  font-size: 1.18rem;
 }
 
 .metric-copy {
@@ -629,17 +628,17 @@ const bookTutor = (id) => router.push({
 
 .metric-value {
   display: block;
-  min-height: 2rem;
+  min-height: 1.7rem;
   color: var(--sb-ink);
-  font-size: 1.85rem;
+  font-size: 1.55rem;
   font-weight: 850;
   line-height: 1;
 }
 
 .dashboard-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(340px, 0.38fr);
-  gap: 1.25rem;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 0.34fr);
+  gap: 1rem;
   align-items: stretch;
 }
 
@@ -647,8 +646,10 @@ const bookTutor = (id) => router.push({
 .recommendation-panel {
   display: flex;
   flex-direction: column;
-  min-height: 560px;
-  padding: 1.35rem;
+  height: clamp(460px, calc(100vh - 230px), 600px);
+  min-height: 0;
+  padding: 1rem;
+  overflow: hidden;
 }
 
 .panel-header {
@@ -656,7 +657,7 @@ const bookTutor = (id) => router.push({
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
-  margin-bottom: 1.2rem;
+  margin-bottom: 0.9rem;
 }
 
 .panel-heading {
@@ -675,16 +676,16 @@ const bookTutor = (id) => router.push({
 .panel-title {
   margin: 0;
   color: var(--sb-ink);
-  font-size: 1.4rem;
+  font-size: 1.18rem;
   font-weight: 850;
   letter-spacing: 0;
 }
 
 .panel-subtitle {
   max-width: 620px;
-  margin: 0.3rem 0 0;
+  margin: 0.2rem 0 0;
   color: var(--sb-muted);
-  font-size: 0.9rem;
+  font-size: 0.82rem;
   line-height: 1.45;
 }
 
@@ -739,22 +740,6 @@ const bookTutor = (id) => router.push({
   border: 1px solid rgba(0, 137, 90, 0.42);
   box-shadow: 0 0 0 3px rgba(0, 137, 90, 0.1),
               0 1px 2px rgba(17, 24, 39, 0.06);
-  animation: current-week-ring 2.4s var(--sb-spring) infinite;
-}
-
-@keyframes current-week-ring {
-  0% {
-    box-shadow: 0 0 0 0 rgba(0, 137, 90, 0.2),
-                0 1px 2px rgba(17, 24, 39, 0.06);
-  }
-  60% {
-    box-shadow: 0 0 0 6px rgba(0, 137, 90, 0),
-                0 1px 2px rgba(17, 24, 39, 0.06);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(0, 137, 90, 0),
-                0 1px 2px rgba(17, 24, 39, 0.06);
-  }
 }
 
 .schedule-nav-btn {
@@ -794,13 +779,17 @@ const bookTutor = (id) => router.push({
 
 .weekly-board-scroll {
   flex: 1;
+  min-height: 0;
   overflow-x: auto;
   overflow-y: hidden;
   padding-bottom: 4px;
+  scrollbar-gutter: stable;
+  contain: paint;
 }
 
 .weekly-board-skeleton {
   flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -815,7 +804,7 @@ const bookTutor = (id) => router.push({
 .day-column {
   display: grid;
   grid-template-rows: auto 1fr;
-  min-height: 380px;
+  min-height: 320px;
   min-width: 0;
   border: 1px solid var(--sb-card-border);
   border-radius: 20px;
@@ -865,33 +854,35 @@ const bookTutor = (id) => router.push({
   align-content: start;
   gap: 0.55rem;
   padding: 0.65rem;
-  min-height: 332px;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   min-width: 0;
   background: color-mix(in srgb, var(--sb-bg) 76%, var(--sb-card-bg));
+  scrollbar-gutter: stable;
+  contain: paint;
 }
 
 .weekly-session-card {
   display: flex;
   flex-direction: column;
   width: 100%;
-  height: 150px;
-  min-height: 150px;
-  max-height: 150px;
+  height: 128px;
+  min-height: 128px;
+  max-height: 128px;
   border: 1px solid transparent;
   border-radius: 16px;
   padding: 0.75rem;
   text-align: left;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05);
   min-width: 0;
   overflow: hidden;
 }
 
 .weekly-session-card:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 10px 24px rgba(17, 24, 39, 0.08);
+  box-shadow: 0 0 0 1px rgba(0, 137, 90, 0.18),
+              0 3px 8px rgba(15, 23, 42, 0.05);
 }
 
 .weekly-session-card-upcoming {
@@ -996,7 +987,7 @@ const bookTutor = (id) => router.push({
 .weekly-session-title {
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
   margin: 0 0 0.25rem;
   font-size: 0.72rem;
   font-weight: 800;
@@ -1046,7 +1037,7 @@ const bookTutor = (id) => router.push({
 
 
 .day-empty-state {
-  min-height: 110px;
+  min-height: 86px;
   border: 1px dashed var(--sb-card-border);
   border-radius: 16px;
   background: color-mix(in srgb, var(--sb-card-bg) 72%, transparent);
@@ -1074,12 +1065,8 @@ const bookTutor = (id) => router.push({
   box-shadow: 0 8px 20px rgba(19, 41, 34, 0.04);
 }
 
-.recommendation-panel {
-  min-height: 560px;
-}
-
 .recommendation-header {
-  margin-bottom: 1rem;
+  margin-bottom: 0.8rem;
 }
 
 .recommendation-body,
@@ -1097,6 +1084,8 @@ const bookTutor = (id) => router.push({
   min-height: 0;
   overflow-y: auto;
   padding-right: 0.15rem;
+  scrollbar-gutter: stable;
+  contain: paint;
 }
 
 .recommendation-empty {
@@ -1119,9 +1108,9 @@ const bookTutor = (id) => router.push({
   justify-content: space-between;
   gap: 0.9rem;
   width: 100%;
-  height: 96px;
-  min-height: 96px;
-  max-height: 96px;
+  height: 84px;
+  min-height: 84px;
+  max-height: 84px;
   border: 1px solid var(--sb-card-border);
   border-radius: 18px;
   background: color-mix(in srgb, var(--sb-card-bg) 78%, transparent);
@@ -1129,6 +1118,12 @@ const bookTutor = (id) => router.push({
   padding: 0.85rem;
   text-align: left;
   cursor: pointer;
+  transition: border-color 0.18s ease, background-color 0.18s ease;
+}
+
+.tutor-list-item:hover {
+  border-color: color-mix(in srgb, var(--sb-primary) 30%, var(--sb-card-border));
+  background: color-mix(in srgb, var(--sb-card-bg) 92%, var(--sb-primary));
 }
 
 .tutor-copy {
@@ -1182,8 +1177,8 @@ const bookTutor = (id) => router.push({
   justify-content: space-between;
   gap: 0.75rem;
   flex: 0 0 auto;
-  margin-top: 1rem;
-  padding-top: 1rem;
+  margin-top: 0.8rem;
+  padding-top: 0.8rem;
   border-top: 1px solid var(--sb-card-border);
 }
 
@@ -1237,6 +1232,12 @@ const bookTutor = (id) => router.push({
     grid-template-columns: 1fr;
   }
 
+  .weekly-panel,
+  .recommendation-panel {
+    height: auto;
+    max-height: none;
+  }
+
   .weekly-grid {
     grid-template-columns: repeat(7, minmax(118px, 1fr));
     min-width: 860px;
@@ -1259,7 +1260,7 @@ const bookTutor = (id) => router.push({
 
 @media (max-width: 767px) {
   .dashboard-shell {
-    padding: 1rem;
+    padding: 0;
   }
 
   .metrics-grid {
