@@ -12,6 +12,12 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
+    exclude: [
+      '**/.claude/**',
+      '**/backend/**',
+      '**/dist/**',
+      '**/node_modules/**',
+    ],
     globals: true,
   },
 })

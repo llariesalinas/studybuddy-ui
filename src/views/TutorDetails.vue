@@ -326,6 +326,8 @@ const currentWeekLabel = computed(() => {
   if (startMonth === endMonth) {
     return `${startMonth} ${start.getDate()}-${end.getDate()}, ${year}`
   }
+
+  return `${startMonth} ${start.getDate()}-${endMonth} ${end.getDate()}, ${year}`
 })
 
 const tutorProfile = computed(() => ({
@@ -381,7 +383,6 @@ const effectiveSelectedSlots = computed(() => {
       return
     }
 
-    const explicitSlotIds = new Set(explicitDaySelections.map(slot => slot.availability_id))
     const selectableDaySlots = [...day.slots]
       .filter(slot => !slot.is_booked)
       .sort((left, right) => left.time_slot.localeCompare(right.time_slot))

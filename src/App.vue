@@ -331,7 +331,6 @@ import { useAuthStore } from '@/stores/auth' // Import auth store
 import { useSessionsStore } from '@/stores/completedSessions'
 import NotificationBell from '@/components/NotificationBell.vue'
 import RatingReminderBanner from '@/components/RatingReminderBanner.vue'
-import { useNotificationsStore } from '@/stores/notifications'
 import { useChatStore } from '@/stores/chat'
 import router from './router'
 import { SESSION_POLL_INTERVAL_MS } from './config.js'
@@ -341,7 +340,6 @@ const SupportModal = defineAsyncComponent(() => import('@/components/SupportModa
 
 const route = useRoute()
 const authStore = useAuthStore()
-const notificationsStore = useNotificationsStore()
 const chatStore = useChatStore()
 const sessionStore = useSessionsStore()
 const logoutModalRef = ref(null)
