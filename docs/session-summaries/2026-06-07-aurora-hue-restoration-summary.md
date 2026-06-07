@@ -1,8 +1,9 @@
 # Session Summary - Aurora hue restoration (performant)
 
-**Date:** 2026-06-07
+**Date:** 2026-06-07 (follow-up: 2026-06-08)
 **Plan:** [`docs/plans/2026-06-07-aurora-hue-restoration.md`](../plans/2026-06-07-aurora-hue-restoration.md)
 **Branch:** `feature-aurora-hue-restoration`
+**Commits:** `80534ef` (initial restoration)
 
 ## What shipped
 
@@ -35,4 +36,24 @@ Changes, all in `src/assets/main.css`:
 
 - This restores visual depth via a single static gradient that is painted once and never repainted — the opposite of the original 3-layer, pointermove-driven, blur-heavy design documented in `docs/plans/2026-06-07-aurora-performance-fix.md` and `docs/session-summaries/2026-06-07-global-aurora-blur-performance-cleanup-summary.md`.
 - Deliberate exclusions (documented inline in `main.css` and the plan) to prevent future regressions: no `will-change` (would create a persistent GPU-resident layer for a one-shot animation), no `transition: background` (gradients can't interpolate — would crossfade via repeated repaints on every theme toggle), no `vh` sizing (mobile address-bar collapse would force relayout/repaint mid-scroll).
-- Branch `feature-aurora-hue-restoration` was created off `feature-darkmode-toggle` (the active working branch) per the "never work on main/master" rule. Not yet committed or pushed — pending user confirmation.
+- Branch `feature-aurora-hue-restoration` was created off `feature-darkmode-toggle` (the active working branch) per the "never work on main/master" rule. Initial restoration committed as `80534ef` (`feat: restore aurora hue with a single static gradient layer`) — committed as a checkpoint before the follow-up below, so it can be reverted independently if needed.
+
+## Follow-up (2026-06-08): restored the dropped cyan accent stop to the light palette
+
+After the initial restoration shipped, the user asked to bring back more of the original light-mode aurora colors — specifically the cyan accent stop trimmed during the 5→3 reduction — then asked the sharp question: **"will it eat resource again?"**
+
+**Cost analysis (full version in the plan's "Follow-up" section):** No. The original slowdown was driven by *repaint frequency* — a `pointermove`/`requestAnimationFrame` loop forcing ~60 repaints/sec, compounded by `backdrop-filter: blur(24px)` re-blurring on each (~360 blur ops/sec) — not by gradient *stop count*. Stop count only affects the cost of a single paint pass (low single-digit milliseconds for a ~680px band, whether it has 3, 4, or 6 stops), and this design still performs that pass exactly **once**, on load. Restoring the cyan stop adds roughly +1ms to a one-time operation — categorically different from a continuous, per-frame cost.
+
+**Change:** extended light theme `--sb-aurora-bg` from 3 → 4 radial-gradient stops, re-inserting `radial-gradient(circle at 52% -10%, rgba(103, 197, 220, 0.17), transparent 38%)` in its original stacking position. Dark mode is unchanged (the user scoped this to light mode).
+
+**Deliberately not restored:** the original's opaque base `linear-gradient(135deg, #f7fbf8 0%, #eef8f3 44%, #f7fbf8 100%)` layer. The original used full-viewport `position: fixed` layers with nothing "below" to blend into; this design's `680px`-tall pseudo-element instead relies on each radial-gradient's `transparent` falloff to blend seamlessly into the flat `--sb-bg` beneath. An opaque base layer would fully paint over `--sb-bg` for that band and produce a hard seam at the boundary — turning the plan's "hard edge at extreme viewport sizes" risk into a near-certainty on every viewport. This is a *visual* consideration, not a performance one.
+
+**Re-verification (live, via `Claude_Preview` + CLI):**
+- `npm run build` — PASS (2.09s, 0 errors)
+- `npm run lint` — PASS (0 issues)
+- DOM scan — 0 `backdrop-filter`/`blur`/infinite-animations (unchanged from initial verification)
+- Computed `backgroundImage` confirms all 4 stops render correctly, including the restored cyan accent
+- 60-cycle scroll stress test via `PerformanceObserver` (paint/layout-shift/longtask) — **0 entries**, identical clean result to the 3-stop version, confirming the extra stop introduced no ongoing repaint cost
+- Visual check confirms the glow blends seamlessly into `--sb-bg` with no hard seam, in both the wider hero layout and at default viewport
+
+**Note:** the user asked to commit the initial restoration first ("make a commit so we can re[ve]rt if it's affecting too much") specifically so this follow-up tweak could be reverted independently — that's why `80534ef` exists as a separate checkpoint commit before this change.
