@@ -325,7 +325,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth' // Import auth store
 import { useSessionsStore } from '@/stores/completedSessions'
@@ -337,7 +337,7 @@ import router from './router'
 import { SESSION_POLL_INTERVAL_MS } from './config.js'
 import SbToast from '@/components/SbToast.vue'
 import SbThemeToggle from '@/components/SbThemeToggle.vue'
-import SupportModal from '@/components/SupportModal.vue'
+const SupportModal = defineAsyncComponent(() => import('@/components/SupportModal.vue'))
 
 const route = useRoute()
 const authStore = useAuthStore()
@@ -357,8 +357,37 @@ const openSupport = (type = 'Other', id = null) => {
   isSupportModalOpen.value = true
 }
 let pendingSessionsRefreshId = null
+let startupIdleId = null
+let startupTimeoutId = null
 const setupAuroraPointerMotion = () => {}
 const teardownAuroraPointerMotion = () => {}
+
+const deferStartupWork = (callback) => {
+  if (typeof window === 'undefined') {
+    callback()
+    return
+  }
+
+  if ('requestIdleCallback' in window) {
+    startupIdleId = window.requestIdleCallback(callback, { timeout: 2000 })
+    return
+  }
+
+  startupTimeoutId = window.setTimeout(callback, 800)
+}
+
+const cancelDeferredStartupWork = () => {
+  if (startupIdleId && typeof window !== 'undefined' && 'cancelIdleCallback' in window) {
+    window.cancelIdleCallback(startupIdleId)
+  }
+
+  if (startupTimeoutId) {
+    window.clearTimeout(startupTimeoutId)
+  }
+
+  startupIdleId = null
+  startupTimeoutId = null
+}
 
 const clearBootstrapModalState = () => {
   document.body.classList.remove('modal-open')
@@ -423,9 +452,12 @@ onMounted(() => {
   setupAuroraPointerMotion()
 
   if (authStore.isAuthenticated) {
-    notificationsStore.fetchNotifications()
-    chatStore.fetchRooms()
-    chatStore.connectUpdates()
+    deferStartupWork(() => {
+      notificationsStore.fetchNotifications()
+      chatStore.fetchRooms()
+      chatStore.connectUpdates()
+    })
+
     if (userRole.value === 'tutor') {
       sessionStore.fetchSessions()
       document.addEventListener('visibilitychange', handleVisibilityChange)
@@ -439,6 +471,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   closeLogoutModal()
   teardownAuroraPointerMotion()
+  cancelDeferredStartupWork()
   document.removeEventListener('visibilitychange', handleVisibilityChange)
 
   if (pendingSessionsRefreshId) {

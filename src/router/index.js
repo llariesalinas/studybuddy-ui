@@ -2,8 +2,6 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useProfileStore } from '@/stores/profile'
 
-import Dashboard from '@/views/Dashboard.vue'
-
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
@@ -50,7 +48,7 @@ const router = createRouter({
     {
       path: '/dashboard',
       name: 'dashboard',
-      component: Dashboard,
+      component: () => import('@/views/Dashboard.vue'),
       meta: { requiresAuth: true, role: 'Tutee' }
     },
     {

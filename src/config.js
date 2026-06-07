@@ -12,8 +12,8 @@ export const ACCESS_REFRESH_INTERVAL_MS = 4 * 60 * 1000   // 4 min
 export const IDLE_LOGOUT_MS             = 10 * 60 * 1000  // 10 min
 
 // Polling
-export const SESSION_POLL_INTERVAL_MS      = 15_000
-export const NOTIFICATION_POLL_INTERVAL_MS = 15_000
+export const SESSION_POLL_INTERVAL_MS      = 60_000
+export const NOTIFICATION_POLL_INTERVAL_MS = 60_000
 
 // Chat / WebSocket
 export const WS_RECONNECT_DELAY_MS  = 3_000
