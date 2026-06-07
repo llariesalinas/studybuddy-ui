@@ -1,3 +1,4 @@
+import logging
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
@@ -7,13 +8,18 @@ from django.utils import timezone
 from datetime import timedelta
 from .models import (
     UserProfile, Tutor, Booking, WithdrawalRequest, 
-    PartnerInstitution, Wallet, Transaction, PlatformActivity
+    PartnerInstitution, Wallet, Transaction, PlatformActivity,
+    TutorApplication
 )
 from .serializers import (
     AdminWithdrawalSerializer, AdminUserSerializer, 
-    PartnerInstitutionSerializer, PlatformActivitySerializer
+    PartnerInstitutionSerializer, PlatformActivitySerializer,
+    TutorApplicationSerializer
 )
 from .permissions import IsAdminUser
+from .email_utils import send_application_approved_email, send_application_rejected_email
+
+logger = logging.getLogger(__name__)
 
 class AdminStatsView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdminUser]
@@ -275,3 +281,65 @@ class AdminAnalyticsView(APIView):
             },
             'top_tutors': top_tutors_data
         })
+
+
+class AdminTutorApplicationListView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdminUser]
+
+    def get(self, request):
+        status_filter = request.query_params.get('status')
+        queryset = TutorApplication.objects.all().order_by('-submitted_at')
+
+        if status_filter:
+            queryset = queryset.filter(application_status=status_filter)
+
+        serializer = TutorApplicationSerializer(queryset, many=True, context={'request': request})
+        return Response(serializer.data)
+
+
+class AdminTutorApplicationDetailView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdminUser]
+
+    def get(self, request, pk):
+        try:
+            application = TutorApplication.objects.get(pk=pk)
+            serializer = TutorApplicationSerializer(application, context={'request': request})
+            return Response(serializer.data)
+        except TutorApplication.DoesNotExist:
+            return Response({"error": "Application not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    @transaction.atomic
+    def patch(self, request, pk):
+        try:
+            application = TutorApplication.objects.select_for_update().get(pk=pk)
+        except TutorApplication.DoesNotExist:
+            return Response({"error": "Application not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        new_status = request.data.get('application_status')
+        rejection_reason = request.data.get('rejection_reason', '')
+
+        if new_status not in ['approved', 'rejected']:
+            return Response({"error": "Invalid status. Must be 'approved' or 'rejected'."}, status=status.HTTP_400_BAD_REQUEST)
+
+        application.application_status = new_status
+        application.rejection_reason = rejection_reason if new_status == 'rejected' else ''
+        application.reviewed_by = request.user.userprofile
+        application.reviewed_at = timezone.now()
+        application.save()
+
+        # Log activity
+        PlatformActivity.objects.create(
+            activity_type='admin_action',
+            message=f"Admin {request.user.userprofile.fname} {new_status} tutor application for {application.profile.fname} {application.profile.lname}"
+        )
+
+        # Send email notification
+        try:
+            if new_status == 'approved':
+                send_application_approved_email(application.profile)
+            else:
+                send_application_rejected_email(application.profile, rejection_reason)
+        except Exception:
+            logger.exception("Failed to send screening result email for application_id=%s", application.id)
+
+        return Response({"message": f"Application {new_status} successfully."})

@@ -194,6 +194,51 @@ class Tutor(models.Model):
     def __str__(self):
         return f"Tutor: {self.profile.fname} {self.profile.lname}"
 
+class TutorApplication(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Pending Review'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    ]
+
+    profile = models.OneToOneField(
+        UserProfile,
+        on_delete=models.CASCADE,
+        related_name='tutor_application'
+    )
+
+    # Required Documents Only
+    school_id = models.ImageField(upload_to='tutor_applications/school_ids/')
+    enrollment_proof = models.FileField(upload_to='tutor_applications/enrollment_proofs/')
+
+    # Optional Motivation
+    reason_to_tutor = models.TextField(
+        blank=True,
+        help_text="Why do you want to become a tutor?"
+    )
+
+    # Screening Status
+    application_status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='pending'
+    )
+
+    # Admin Feedback
+    rejection_reason = models.TextField(blank=True, default='')
+    reviewed_by = models.ForeignKey(
+        UserProfile, on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='reviewed_applications'
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    submitted_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Application: {self.profile.fname} {self.profile.lname} ({self.application_status})"
+
 class Wallet(models.Model):
     tutor = models.OneToOneField(Tutor, on_delete=models.CASCADE, related_name='wallet')
     balance = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
@@ -296,6 +341,7 @@ class PlatformActivity(models.Model):
         ('institution_added', 'New Institution Request'),
         ('withdrawal_failed', 'Withdrawal Failure'),
         ('admin_action', 'Admin Action'),
+        ('tutor_application', 'Tutor Application'),
     ]
 
     activity_type = models.CharField(max_length=30, choices=ACTIVITY_TYPES)
