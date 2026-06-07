@@ -12,19 +12,25 @@
 
 ## Status & Progress Summary
 
-**Status:** Approved — ready for execution (not started)
+**Status:** Done — implemented via subagent-driven development, all 6 code tasks committed; verification green for this feature.
 **Spec:** `docs/superpowers/specs/2026-06-06-dashboard-recommendations-design.md`
+**Summary:** `docs/session-summaries/2026-06-06-dashboard-recommendations-summary.md`
 **Tasks:** 7 (sequential, TDD; no parallel agents per author)
 
-| # | Task | State |
-|---|------|-------|
-| 1 | CF accepts precomputed neighbors | ☐ not started |
-| 2 | Hybrid computes neighbors once (+ no-ratings guard) | ☐ not started |
-| 3 | Redis cache config + `REDIS_URL` (LocMem fallback) | ☐ not started |
-| 4 | Dashboard recommendation service (cache-aside) | ☐ not started |
-| 5 | Wire `student_dashboard` to the service | ☐ not started |
-| 6 | Bust cache on preference change (both endpoints) | ☐ not started |
-| 7 | Full verification (check, tests, build) | ☐ not started |
+| # | Task | State | Commit |
+|---|------|-------|--------|
+| 1 | CF accepts precomputed neighbors | ☑ done | `4216032` |
+| 2 | Hybrid computes neighbors once (+ no-ratings guard) | ☑ done | `82b7ef6` |
+| 3 | Redis cache config + `REDIS_URL` (LocMem fallback) | ☑ done | `20f2905` |
+| 4 | Dashboard recommendation service (cache-aside) | ☑ done | `367bfa8` |
+| 5 | Wire `student_dashboard` to the service | ☑ done | `604ea6e` |
+| 6 | Bust cache on preference change (both endpoints) | ☑ done | `63be320` |
+| 7 | Full verification (check, tests, build) | ☑ done | — |
+
+**Verification:** `manage.py check` PASS · `npm run build` PASS · full backend suite
+76/78 (the 2 non-passing are pre-existing `EmailAuthTests` password-reset failures from
+the separate `feat(email)` async refactor — `mail.outbox` empty; unrelated to this
+feature). All recommendation/dashboard tests pass.
 
 **Notes for the executor:**
 - This plan's commit steps cover **code only**. Do NOT commit `docs/` — it is gitignored and the author chose to keep planning docs local.
@@ -849,3 +855,4 @@ With Redis running and `REDIS_URL` set, start the backend and frontend, log in a
 ## Changelog
 
 - **2026-06-06** — Plan created from spec `docs/superpowers/specs/2026-06-06-dashboard-recommendations-design.md`. 7 tasks (TDD, sequential). Verified URL paths against `urls.py` and corrected the preference-save test path from `/api/save-preferences/` to `/api/preferences/`. Status: Approved, ready for execution.
+- **2026-06-06** — Executed via subagent-driven development. Tasks 1–6 implemented and committed (`4216032`, `82b7ef6`, `20f2905`, `367bfa8`, `604ea6e`, `63be320`); each task's TDD tests pass. Task 7 verification: `manage.py check` PASS, `npm run build` PASS, full backend suite 76/78 (the 2 failures are pre-existing `EmailAuthTests` password-reset cases from the separate email async refactor, not this feature). Prereq cleanup before execution: committed existing email/chat work as `feat(email)`/`feat(chat)`; installed `anymail`/`django-q2`/`django-picklefield` so the backend boots. Status → Done. Summary written to `docs/session-summaries/2026-06-06-dashboard-recommendations-summary.md`.

@@ -5,6 +5,9 @@ Status moves Draft → Approved → In Progress → Done. When a plan is complet
 
 | Date | Plan | Status | Summary |
 |------|------|--------|---------|
+| 2026-06-07 | [Chat partner context display](2026-06-07-chat-partner-context-display.md) | Done | [Summary](../session-summaries/2026-06-07-chat-partner-context-display-summary.md) |
+| 2026-06-07 | [Support chat naming](2026-06-07-support-chat-naming.md) | Done | [Summary](../session-summaries/2026-06-07-support-chat-naming-summary.md) |
+| 2026-06-07 | [Dashboard card stability](2026-06-07-dashboard-card-stability.md) | Done | [Summary](../session-summaries/2026-06-07-dashboard-card-stability-summary.md) |
 | 2026-06-07 | [Notifications timeout fix](2026-06-07-notifications-timeout-fix.md) | Done | [Summary](../session-summaries/2026-06-07-notifications-timeout-fix-summary.md) |
 | 2026-06-07 | [Dashboard top 5 Redis cache](2026-06-07-dashboard-top5-redis-cache.md) | Done | [Summary](../session-summaries/2026-06-07-dashboard-top5-redis-cache-summary.md) |
 | 2026-06-07 | [Aurora performance fix — static gradient](2026-06-07-aurora-performance-fix.md) | Done | [Summary](../session-summaries/2026-06-07-aurora-performance-fix-summary.md) |
