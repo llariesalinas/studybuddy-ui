@@ -659,7 +659,7 @@ def login_view(request):
 @api_view(['GET'])
 def list_courses(request):
 
-    courses = Course.objects.all()
+    courses = Course.objects.all().order_by('course_name')
 
     data = [
         {
