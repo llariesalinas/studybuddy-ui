@@ -1942,12 +1942,58 @@ class DashboardRecommendationServiceTests(APITestCase):
     def test_cold_start_returns_fallback_when_no_preferences(self):
         from studybuddy.recommender.dashboard import get_dashboard_recommendations
 
-        self._make_tutor("anytutor", self.subject)
+        for index in range(7):
+            self._make_tutor(f"anytutor{index}", self.subject)
         # no preferences set
 
         data = get_dashboard_recommendations(self.student)
 
-        self.assertEqual(len(data), 1)
+        self.assertEqual(len(data), 5)
+
+    def test_returns_top_five_from_hybrid_algorithm_order(self):
+        from studybuddy.recommender import dashboard
+
+        tutors = [self._make_tutor(f"itmatch{index}", self.subject) for index in range(7)]
+        self._set_preferences(self.subject)
+
+        ranked = [
+            {"tutor": tutor, "score": 1 - (index / 10)}
+            for index, tutor in enumerate(reversed(tutors))
+        ]
+
+        with patch.object(dashboard, "recommend_tutors_hybrid", return_value=ranked):
+            data = dashboard.get_dashboard_recommendations(self.student)
+
+        self.assertEqual(len(data), 5)
+        self.assertEqual(
+            [row["id"] for row in data],
+            [recommendation["tutor"].profile.id for recommendation in ranked[:5]],
+        )
+
+    def test_cache_hit_is_defensively_limited_to_five(self):
+        from studybuddy.recommender.dashboard import (
+            dashboard_recs_cache_key,
+            get_dashboard_recommendations,
+        )
+
+        cache.set(
+            dashboard_recs_cache_key(self.student),
+            [
+                {
+                    "id": index,
+                    "name": f"Cached Tutor {index}",
+                    "rating": 5,
+                    "subjects": ["Intro to IT"],
+                    "hourlyRate": 200,
+                }
+                for index in range(8)
+            ],
+        )
+
+        data = get_dashboard_recommendations(self.student)
+
+        self.assertEqual(len(data), 5)
+        self.assertEqual([row["id"] for row in data], [0, 1, 2, 3, 4])
 
     def test_second_call_served_from_cache_without_recompute(self):
         from studybuddy.recommender import dashboard
@@ -2009,7 +2055,7 @@ class StudentDashboardRecommendationTests(APITestCase):
         return tutor
 
     def test_dashboard_recommends_subject_matched_tutors(self):
-        match = self._make_tutor("itone", self.subject)
+        matches = [self._make_tutor(f"itone{index}", self.subject) for index in range(7)]
         self._make_tutor("histone", self.other_subject)
         pref, _ = Preference.objects.get_or_create(user=self.student)
         pref.subjects.set([self.subject.subject_code])
@@ -2018,7 +2064,8 @@ class StudentDashboardRecommendationTests(APITestCase):
 
         self.assertEqual(response.status_code, 200)
         ids = {row["id"] for row in response.data["recommendations"]}
-        self.assertEqual(ids, {match.profile.id})
+        self.assertEqual(len(response.data["recommendations"]), 5)
+        self.assertTrue(ids.issubset({tutor.profile.id for tutor in matches}))
         self.assertEqual(
             set(response.data["recommendations"][0].keys()),
             {"id", "name", "rating", "subjects", "hourlyRate"},
@@ -2042,3 +2089,78 @@ class StudentDashboardRecommendationTests(APITestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertIsNone(cache.get(dashboard_recs_cache_key(self.student)))
+
+    def test_submitting_rating_bumps_dashboard_cache_version(self):
+        from studybuddy.recommender.dashboard import dashboard_recs_cache_key
+
+        tutor = self._make_tutor("ratedtutor", self.subject)
+        availability = TutorAvailability.objects.create(
+            tutor=tutor,
+            day="Mon",
+            time_slot=time(9, 0),
+            is_active=True,
+        )
+        booking = Booking.objects.create(
+            student=self.student,
+            tutor=tutor,
+            availability=availability,
+            session_date=date(2026, 6, 1),
+            session_mode="Online",
+            booking_request_id=uuid4(),
+            status="Completed",
+        )
+
+        old_key = dashboard_recs_cache_key(self.student)
+
+        response = self.client.post(
+            f"/api/bookings/{booking.id}/rating/",
+            {"rating_score": 5},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertNotEqual(old_key, dashboard_recs_cache_key(self.student))
+
+    def test_tutor_subject_change_bumps_dashboard_cache_version(self):
+        from studybuddy.recommender.dashboard import dashboard_recs_cache_key
+
+        tutor = self._make_tutor("subjecttutor", self.subject)
+        new_subject = Subjects.objects.create(
+            subject_code="IT301",
+            subject_name="Algorithms",
+            department="IT",
+        )
+
+        old_key = dashboard_recs_cache_key(self.student)
+        self.client.force_authenticate(user=tutor.profile.user)
+
+        response = self.client.post(
+            "/api/tutor/subjects/add/",
+            {"subject_code": new_subject.subject_code},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotEqual(old_key, dashboard_recs_cache_key(self.student))
+
+    def test_tutor_profile_change_bumps_dashboard_cache_version(self):
+        from studybuddy.recommender.dashboard import dashboard_recs_cache_key
+
+        tutor = self._make_tutor("profiletutor", self.subject)
+
+        old_key = dashboard_recs_cache_key(self.student)
+        self.client.force_authenticate(user=tutor.profile.user)
+
+        response = self.client.put(
+            "/api/tutor/update/",
+            {
+                "hourly_rate": 250,
+                "teaching_level": "SHS",
+                "can_online": True,
+                "can_f2f": False,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotEqual(old_key, dashboard_recs_cache_key(self.student))
