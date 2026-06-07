@@ -357,7 +357,6 @@ const openSupport = (type = 'Other', id = null) => {
   isSupportModalOpen.value = true
 }
 let pendingSessionsRefreshId = null
-
 const setupAuroraPointerMotion = () => {}
 const teardownAuroraPointerMotion = () => {}
 
