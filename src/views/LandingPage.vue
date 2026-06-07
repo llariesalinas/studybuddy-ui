@@ -908,6 +908,7 @@ const footerLinks = [
   font-weight: 600;
   line-height: 1.35;
   text-align: left;
+  color: var(--sb-ink);
   transition: color 0.2s ease;
 }
 

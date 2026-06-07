@@ -7,7 +7,7 @@ import django.utils.timezone
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('studybuddy', '0041_recommendation_filter_indexes'),
+        ('studybuddy', '0041_platformactivity_withdrawalrequest_failure_reason_and_more'),
     ]
 
     operations = [
