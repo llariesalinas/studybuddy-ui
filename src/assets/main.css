@@ -8,6 +8,10 @@
   --sb-primary-light: #edf6f1;
   --sb-primary-lighter: #dff1e8;
   --sb-bg: #F8F9FA;
+  --sb-aurora-bg:
+    radial-gradient(circle at 8% -8%, rgba(0, 137, 90, 0.16), transparent 34%),
+    radial-gradient(circle at 100% 8%, rgba(148, 211, 181, 0.18), transparent 34%),
+    radial-gradient(circle at 84% 88%, rgba(255, 218, 137, 0.16), transparent 32%);
   --sb-card-bg: #ffffff;
   --sb-card-border: #EAEAEA;
   --sb-surface: #ffffff;
@@ -42,6 +46,10 @@
   --sb-primary-hover:   #9CC8B8;
   --sb-primary-contrast:#071310;
   --sb-bg:              #050807;
+  --sb-aurora-bg:
+    radial-gradient(circle at 9% -4%, rgba(134, 183, 163, 0.22), transparent 34%),
+    radial-gradient(circle at 98% 12%, rgba(76, 201, 240, 0.12), transparent 34%),
+    radial-gradient(circle at 78% 86%, rgba(134, 183, 163, 0.10), transparent 34%);
   --sb-card-bg:         #0C1110;
   --sb-card-border:     #1B2A25;
   --sb-surface:         #0C1110;
@@ -66,6 +74,43 @@ body > #app {
   position: relative;
   z-index: 1;
   min-height: 100vh;
+}
+
+/*
+ * Aurora hue: a single static gradient layer behind the app shell's hero
+ * region. Deliberately NOT `position: fixed` (would force a dedicated
+ * full-viewport composited layer) and sized with a fixed pixel height
+ * rather than `vh` (mobile address-bar collapse changes `100vh` mid-scroll,
+ * forcing relayout/repaint). It paints once, fades in once, then never
+ * changes — see docs/plans/2026-06-07-aurora-hue-restoration.md.
+ */
+body > #app::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 680px;
+  background: var(--sb-aurora-bg);
+  z-index: -1;
+  pointer-events: none;
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  body > #app::before {
+    opacity: 0;
+    animation: sb-aurora-fade-in 1.2s ease forwards;
+  }
+}
+
+@keyframes sb-aurora-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
