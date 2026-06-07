@@ -213,7 +213,7 @@
                       </div>
                       <div class="mb-2">
                         <span class="text-muted d-block small">REPORTER</span>
-                        <strong>{{ chatStore.currentRoom.tutee_name }}</strong>
+                        <strong>{{ supportReporterLabel }}</strong>
                       </div>
                       <div class="mb-0">
                         <span class="text-muted d-block small">STATUS</span>
@@ -224,9 +224,9 @@
                 </template>
                 <template v-else>
                   <div class="context-profile">
-                    <div class="context-avatar">{{ getRoomInitials(chatStore.currentRoom) }}</div>
-                    <h4>{{ chatStore.getRoomPartnerName(chatStore.currentRoom) }}</h4>
-                    <p>{{ partnerSubtitle }}</p>
+                    <div class="context-avatar">{{ contextPartnerInitials }}</div>
+                    <h4>{{ contextPartnerName }}</h4>
+                    <p>{{ contextPartnerSubtitle }}</p>
                   </div>
 
                   <div class="context-section">
@@ -430,10 +430,30 @@ const typingLabel = computed(() => {
 })
 
 const partnerContext = computed(() => chatStore.currentRoom?.partner_context || {})
+const currentProfileId = computed(() => Number(authStore.user?.profile_id || localStorage.getItem('profile_id')))
+const supportReporterLabel = computed(() => {
+  const room = chatStore.currentRoom
+  const reporterName = room?.tutee_name || 'Reporter'
+
+  if (room?.room_type === 'support' && Number(room?.tutee) === currentProfileId.value) {
+    return `You (${reporterName})`
+  }
+
+  return reporterName
+})
 const partnerSubtitle = computed(() => {
   if (chatStore.currentRoom?.room_type === 'support') return 'Support Staff'
   return isTutor.value ? 'Tutee' : 'Tutor'
 })
+const contextPartnerName = computed(() => (
+  partnerContext.value.partner_name || chatStore.getRoomPartnerName(chatStore.currentRoom)
+))
+const contextPartnerInitials = computed(() => (
+  partnerContext.value.partner_initials || getRoomInitials(chatStore.currentRoom)
+))
+const contextPartnerSubtitle = computed(() => (
+  partnerContext.value.partner_subtitle || partnerSubtitle.value
+))
 const isResolvedSupport = computed(() => {
   return chatStore.currentRoom?.room_type === 'support' && chatStore.currentRoom?.ticket_status === 'Resolved'
 })
@@ -541,6 +561,10 @@ const scrollToBottom = () => {
 }
 
 const getRoomInitials = (room) => {
+  if (room?.room_type === 'support') {
+    return 'CS'
+  }
+
   const name = chatStore.getRoomPartnerName(room)
   return name.split(' ').filter(Boolean).map((part) => part[0]).join('').slice(0, 2).toUpperCase()
 }

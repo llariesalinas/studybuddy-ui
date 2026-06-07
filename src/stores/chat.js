@@ -770,8 +770,21 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   function getRoomPartnerName(room) {
+    if (room?.room_type === 'support') {
+      return 'Customer Support'
+    }
+
+    const profileId = myProfileId()
+    if (Number(room?.tutee) === profileId) {
+      return room?.tutor_name || 'Tutor'
+    }
+
+    if (Number(room?.tutor) === profileId) {
+      return room?.tutee_name || 'Tutee'
+    }
+
     const role = authStore.user?.role || localStorage.getItem('user_role')
-    return String(role).toLowerCase() === 'tutor' ? room.tutee_name : room.tutor_name
+    return String(role).toLowerCase() === 'tutor' ? room?.tutee_name : room?.tutor_name
   }
 
   function disconnectRoom() {
