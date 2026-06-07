@@ -63,4 +63,3 @@ src/views/*.zip
 *.log
 *.err.log
 *.out.log
-.gstack/
