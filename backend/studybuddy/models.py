@@ -561,6 +561,10 @@ class Booking(models.Model):
     class Meta:
         indexes = [
             models.Index(fields=['session_date', 'availability', 'status']),
+            # Hot dashboard/bookings queries filter on the owner FK + status and
+            # order by session_date (student_dashboard, list_bookings, tutor_dashboard).
+            models.Index(fields=['student', 'status', 'session_date']),
+            models.Index(fields=['tutor', 'status', 'session_date']),
         ]
         constraints = [
             models.UniqueConstraint(

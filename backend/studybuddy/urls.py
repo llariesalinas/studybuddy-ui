@@ -65,6 +65,7 @@ urlpatterns = [
     path('preferences/', views.save_preferences),
     path('partner-institutions/', views.partner_institutions_list),
     path('dashboard/', student_dashboard),
+    path('recommendations/', views.dashboard_recommendations),
     path('tutee/profile/', views.get_tutee_profile),
     path('tutee/profile/avatar/', views.upload_tutee_avatar),
     path('tutee/profile/update/', views.update_tutee_profile),

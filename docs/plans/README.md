@@ -5,6 +5,7 @@ Status moves Draft → Approved → In Progress → Done. When a plan is complet
 
 | Date | Plan | Status | Summary |
 |------|------|--------|---------|
+| 2026-06-07 | [Dashboard load performance (backend)](2026-06-07-dashboard-load-performance.md) | In Progress | [Summary](../session-summaries/2026-06-07-dashboard-load-performance-summary.md) |
 | 2026-06-07 | [Chat partner context display](2026-06-07-chat-partner-context-display.md) | Done | [Summary](../session-summaries/2026-06-07-chat-partner-context-display-summary.md) |
 | 2026-06-07 | [Support chat naming](2026-06-07-support-chat-naming.md) | Done | [Summary](../session-summaries/2026-06-07-support-chat-naming-summary.md) |
 | 2026-06-07 | [Dashboard card stability](2026-06-07-dashboard-card-stability.md) | Done | [Summary](../session-summaries/2026-06-07-dashboard-card-stability-summary.md) |

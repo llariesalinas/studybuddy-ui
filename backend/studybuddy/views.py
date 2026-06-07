@@ -1144,8 +1144,10 @@ def student_dashboard(request):
         status='Confirmed',
         session_date__gte=today
     ).select_related(
+        'student',
         'tutor__profile__course',
-        'availability'
+        'availability',
+        'rating'
     ).order_by('session_date', 'availability__time_slot')
 
     grouped_upcoming = defaultdict(list)
@@ -1202,8 +1204,10 @@ def student_dashboard(request):
         student=user_profile,
         status='Completed'
     ).select_related(
+        'student',
         'tutor__profile__course',
-        'availability'
+        'availability',
+        'rating'
     ).order_by('-session_date', 'availability__time_slot')
 
     grouped_completed = defaultdict(list)
@@ -1262,6 +1266,22 @@ def student_dashboard(request):
         "upcoming": upcoming,
         "completed": completed,
         "recommendations": recommendations
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def dashboard_recommendations(request):
+    """Return only the (cached) dashboard recommendations.
+
+    The tutee dashboard previously called student_dashboard just to read
+    `recommendations`, discarding its all-time `upcoming`/`completed` payloads.
+    This serves the cached recs directly via get_dashboard_recommendations
+    (recommender/dashboard.py), turning that call into a cache hit.
+    """
+    user_profile = request.user.userprofile
+    return Response({
+        "recommendations": get_dashboard_recommendations(user_profile)
     })
 
 #SearchTutors
@@ -2350,11 +2370,11 @@ def list_bookings(request):
     if profile.role == "Tutor":
         bookings = Booking.objects.filter(
             tutor__profile=profile
-        ).select_related('student', 'availability', 'tutor__profile', 'rating')
+        ).select_related('student', 'availability', 'tutor__profile__course', 'rating')
     else:
         bookings = Booking.objects.filter(
             student=profile
-        ).select_related('student', 'availability', 'tutor__profile', 'rating')
+        ).select_related('student', 'availability', 'tutor__profile__course', 'rating')
 
     bookings = bookings.order_by("session_date", "availability__time_slot")
 

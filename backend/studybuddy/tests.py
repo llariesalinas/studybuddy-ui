@@ -2164,3 +2164,105 @@ class StudentDashboardRecommendationTests(APITestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertNotEqual(old_key, dashboard_recs_cache_key(self.student))
+
+
+class DashboardLoadPerformanceTests(APITestCase):
+    """Phase 1 verification: the dedicated recommendations endpoint plus
+    query-count regression guards for the N+1 fixes in list_bookings and
+    student_dashboard. The N+1 guard asserts the query count is constant as the
+    number of bookings grows — if a per-row query crept back in, doubling the
+    bookings would raise the count."""
+
+    def setUp(self):
+        cache.clear()
+        self.course = Course.objects.create(
+            course_code="BSIT", course_name="BS Information Technology",
+        )
+        self.subject = Subjects.objects.create(
+            subject_code="PERF101", subject_name="Performance", department="IT",
+        )
+        self.student_user = User.objects.create_user(
+            username="perf-student", email="perf-student@example.com", password="password",
+        )
+        self.student = UserProfile.objects.create(
+            user=self.student_user, fname="Perf", mname="", lname="Student",
+            role="Tutee", year_level=11, course=self.course,
+        )
+        self.tutor_user = User.objects.create_user(
+            username="perf-tutor", email="perf-tutor@example.com", password="password",
+        )
+        self.tutor_profile = UserProfile.objects.create(
+            user=self.tutor_user, fname="Perf", mname="", lname="Tutor",
+            role="Tutor", year_level=12, course=self.course,
+        )
+        self.tutor = Tutor.objects.create(
+            profile=self.tutor_profile, hourly_rate=200, can_online=True,
+            can_f2f=True, teaching_level="SHS",
+        )
+        TutorSubjects.objects.create(
+            tutor=self.tutor, subject=self.subject, expertise_level=5,
+        )
+        self.availability = TutorAvailability.objects.create(
+            tutor=self.tutor, day="Mon", time_slot=time(14, 0), is_active=True,
+        )
+        self.client.force_authenticate(user=self.student_user)
+
+    def _make_completed(self, count, start_day):
+        """Create `count` Completed bookings on distinct dates, each rated.
+
+        Distinct session_dates avoid the (availability, session_date) unique
+        constraint. Rating rows are created directly so they exercise the
+        select_related('rating') path without bumping the recs cache version.
+        """
+        from datetime import timedelta
+        base = date(2026, 1, 1) + timedelta(days=start_day)
+        for offset in range(count):
+            booking = Booking.objects.create(
+                student=self.student, tutor=self.tutor, availability=self.availability,
+                session_date=base + timedelta(days=offset),
+                session_mode="Online", status="Completed",
+            )
+            Rating.objects.create(
+                booking=booking, student=self.student, tutor=self.tutor, rating_score=5,
+            )
+
+    def _count_queries(self, url):
+        with CaptureQueriesContext(connection) as ctx:
+            response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        return len(ctx)
+
+    def test_recommendations_endpoint_returns_only_recommendations(self):
+        response = self.client.get("/api/recommendations/")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("recommendations", response.data)
+        self.assertNotIn("upcoming", response.data)
+        self.assertNotIn("completed", response.data)
+
+    def test_recommendations_endpoint_requires_auth(self):
+        self.client.force_authenticate(user=None)
+        response = self.client.get("/api/recommendations/")
+        self.assertIn(response.status_code, (401, 403))
+
+    def test_student_dashboard_has_no_n_plus_one(self):
+        self._make_completed(3, start_day=0)
+        self.client.get("/api/dashboard/")  # warm the (cached) recommendations
+        first = self._count_queries("/api/dashboard/")
+        self._make_completed(3, start_day=400)
+        second = self._count_queries("/api/dashboard/")
+        self.assertEqual(
+            first, second,
+            f"student_dashboard query count grew with booking count "
+            f"({first} -> {second}); a per-row (N+1) query likely regressed.",
+        )
+
+    def test_list_bookings_has_no_n_plus_one(self):
+        self._make_completed(3, start_day=0)
+        first = self._count_queries("/api/bookings/")
+        self._make_completed(3, start_day=400)
+        second = self._count_queries("/api/bookings/")
+        self.assertEqual(
+            first, second,
+            f"list_bookings query count grew with booking count "
+            f"({first} -> {second}); a per-row (N+1) query likely regressed.",
+        )
