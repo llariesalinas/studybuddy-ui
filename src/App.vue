@@ -357,72 +357,9 @@ const openSupport = (type = 'Other', id = null) => {
   isSupportModalOpen.value = true
 }
 let pendingSessionsRefreshId = null
-let auroraFrameId = null
-let auroraPointerTarget = { x: 0, y: 0 }
-let auroraMotionEnabled = false
 
-const setAuroraMovement = (x = 0, y = 0) => {
-  const rootStyle = document.documentElement.style
-  rootStyle.setProperty('--sb-aurora-base-x', `${(x * 10).toFixed(2)}px`)
-  rootStyle.setProperty('--sb-aurora-base-y', `${(y * 7).toFixed(2)}px`)
-  rootStyle.setProperty('--sb-aurora-overlay-x', `${(x * 34).toFixed(2)}px`)
-  rootStyle.setProperty('--sb-aurora-overlay-y', `${(y * 26).toFixed(2)}px`)
-  rootStyle.setProperty('--sb-aurora-sheen-x', `${(x * -8).toFixed(2)}px`)
-  rootStyle.setProperty('--sb-aurora-sheen-y', `${(y * -5).toFixed(2)}px`)
-}
-
-const scheduleAuroraMovement = () => {
-  if (auroraFrameId) {
-    return
-  }
-
-  auroraFrameId = window.requestAnimationFrame(() => {
-    auroraFrameId = null
-    setAuroraMovement(auroraPointerTarget.x, auroraPointerTarget.y)
-  })
-}
-
-const handleAuroraPointerMove = (event) => {
-  auroraPointerTarget = {
-    x: ((event.clientX / window.innerWidth) - 0.5) * 2,
-    y: ((event.clientY / window.innerHeight) - 0.5) * 2
-  }
-  scheduleAuroraMovement()
-}
-
-const resetAuroraMovement = () => {
-  auroraPointerTarget = { x: 0, y: 0 }
-  scheduleAuroraMovement()
-}
-
-const setupAuroraPointerMotion = () => {
-  const finePointer = window.matchMedia?.('(pointer: fine)').matches
-  const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-
-  auroraMotionEnabled = Boolean(finePointer && !reducedMotion)
-
-  if (!auroraMotionEnabled) {
-    setAuroraMovement()
-    return
-  }
-
-  window.addEventListener('pointermove', handleAuroraPointerMove, { passive: true })
-  window.addEventListener('pointerleave', resetAuroraMovement)
-  window.addEventListener('blur', resetAuroraMovement)
-}
-
-const teardownAuroraPointerMotion = () => {
-  window.removeEventListener('pointermove', handleAuroraPointerMove)
-  window.removeEventListener('pointerleave', resetAuroraMovement)
-  window.removeEventListener('blur', resetAuroraMovement)
-
-  if (auroraFrameId) {
-    window.cancelAnimationFrame(auroraFrameId)
-    auroraFrameId = null
-  }
-
-  setAuroraMovement()
-}
+const setupAuroraPointerMotion = () => {}
+const teardownAuroraPointerMotion = () => {}
 
 const clearBootstrapModalState = () => {
   document.body.classList.remove('modal-open')

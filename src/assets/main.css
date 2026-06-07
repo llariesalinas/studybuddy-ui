@@ -106,20 +106,13 @@ body::after {
 body::before {
   background: var(--sb-aurora-bg);
   transform-origin: 50% 10%;
-  transform: translate3d(var(--sb-aurora-base-x), var(--sb-aurora-base-y), 0) scale(1.035);
-  transition:
-    background 320ms ease,
-    transform 420ms var(--sb-spring);
-  will-change: transform;
+  transform: scale(1.035);
+  transition: background 320ms ease;
 }
 
 body::after {
   background: var(--sb-aurora-sheen);
-  transform: translate3d(var(--sb-aurora-sheen-x), var(--sb-aurora-sheen-y), 0);
-  transition:
-    background 320ms ease,
-    transform 620ms var(--sb-spring);
-  will-change: transform;
+  transition: background 320ms ease;
 }
 
 body > #app {
@@ -136,11 +129,8 @@ body > #app::before {
   pointer-events: none;
   background: var(--sb-aurora-overlay);
   filter: blur(64px) saturate(1.04);
-  transform: translate3d(var(--sb-aurora-overlay-x), var(--sb-aurora-overlay-y), 0) scale(1.08);
-  transition:
-    background 320ms ease,
-    transform 520ms var(--sb-spring);
-  will-change: transform;
+  transform: scale(1.08);
+  transition: background 320ms ease;
 }
 
 @media (prefers-reduced-motion: reduce) {
