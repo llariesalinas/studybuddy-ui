@@ -2847,7 +2847,7 @@ def get_recommendation_candidate_tutors(
     if session_date and required_slots:
         weekday = WEEKDAY_MAP[session_date.weekday()]
 
-        candidates = candidates.filter(
+        exact_candidates = candidates.filter(
             tutoravailability__day=weekday,
             tutoravailability__time_slot__in=required_slots,
             tutoravailability__is_active=True,
@@ -2884,13 +2884,24 @@ def get_recommendation_candidate_tutors(
             availability__time_slot__in=required_slots,
         ).values_list("tutor_id", flat=True)
 
-        candidates = candidates.exclude(
+        exact_candidates = exact_candidates.exclude(
             profile_id__in=conflicting_tutor_ids
         ).exclude(
             profile_id__in=full_day_override_tutor_ids
         ).exclude(
             profile_id__in=slot_override_tutor_ids
         )
+
+        if exact_candidates.exists():
+            candidates = exact_candidates
+        else:
+            candidates = candidates.exclude(
+                profile_id__in=conflicting_tutor_ids
+            ).exclude(
+                profile_id__in=full_day_override_tutor_ids
+            ).exclude(
+                profile_id__in=slot_override_tutor_ids
+            )
 
     return candidates.distinct()
 

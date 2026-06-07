@@ -1,10 +1,23 @@
 export const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api/'
+export const API_PROXY_TARGET = import.meta.env.VITE_API_PROXY_TARGET || ''
 
 // Derive WebSocket server root from API_BASE_URL at runtime
 export function wsServerRoot() {
-  if (typeof window !== 'undefined') return window.location.host
-  return new URL(API_BASE_URL).host
+  const fallbackOrigin =
+    typeof window !== 'undefined' ? window.location.origin : 'http://127.0.0.1'
+  const websocketSource = API_BASE_URL.startsWith('http') ? API_BASE_URL : API_PROXY_TARGET
+
+  return new URL(websocketSource || fallbackOrigin, fallbackOrigin).host
+}
+
+export function wsServerProtocol() {
+  const fallbackOrigin =
+    typeof window !== 'undefined' ? window.location.origin : 'http://127.0.0.1'
+  const websocketSource = API_BASE_URL.startsWith('http') ? API_BASE_URL : API_PROXY_TARGET
+  const protocol = new URL(websocketSource || fallbackOrigin, fallbackOrigin).protocol
+
+  return protocol === 'https:' ? 'wss' : 'ws'
 }
 
 // Auth

@@ -7,6 +7,7 @@ import {
   CHAT_HISTORY_CACHE_TTL_MS,
   CHAT_ROOMS_CACHE_TTL_MS,
   wsServerRoot,
+  wsServerProtocol,
   WS_RECONNECT_DELAY_MS,
   TYPING_CLEAR_MS,
   TYPING_DEBOUNCE_MS,
@@ -120,8 +121,7 @@ export const useChatStore = defineStore('chat', () => {
     }
 
     const serverRoot = wsServerRoot()
-    const scheme =
-      typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss' : 'ws'
+    const scheme = wsServerProtocol()
     return `${scheme}://${serverRoot}/ws/chat/`
   })
 

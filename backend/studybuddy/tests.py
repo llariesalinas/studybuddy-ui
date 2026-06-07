@@ -24,6 +24,7 @@ from .models import (
     PaymentMethod,
     Rating,
     Subjects,
+    SupportTicket,
     Tutor,
     TutorAvailability,
     TutorAvailabilityOverride,
@@ -152,6 +153,35 @@ class RecommendTutorsViewTests(APITestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(self.response_ids(response), {complete.profile_id})
+
+    def test_falls_back_to_subject_matches_when_exact_availability_is_empty(self):
+        matching = self.create_tutor("fallback")
+        wrong_subject = self.create_tutor("wrongsubject", subject=self.other_subject)
+        f2f_only = self.create_tutor("f2ffallback", can_online=False, can_f2f=True)
+        expensive = self.create_tutor("fallbackexpensive", hourly_rate=500)
+
+        response = self.recommend()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.response_ids(response), {matching.profile_id})
+
+    def test_fallback_excludes_known_booking_conflicts(self):
+        fallback = self.create_tutor("fallbacksafe")
+        booked = self.create_tutor("fallbackbooked")
+        booked_slots = self.add_slots(booked, [time(14, 0), time(14, 30)])
+        Booking.objects.create(
+            student=self.student_profile,
+            tutor=booked,
+            availability=booked_slots[0],
+            session_date=self.search_date,
+            session_mode="Online",
+            status="Confirmed",
+        )
+
+        response = self.recommend()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.response_ids(response), {fallback.profile_id})
 
     def test_booked_slot_excludes_tutor(self):
         available = self.create_tutor("available")
@@ -644,6 +674,73 @@ class ChatFeatureTests(APITestCase):
         context = get_partner_context(room, self.tutee_user)
 
         self.assertEqual(context['topics'], ['Ethics'])
+
+    def test_partner_context_skipped_for_support_rooms(self):
+        room = ChatRoom.objects.create(
+            tutee=self.tutee_profile,
+            tutor=None,
+            room_type='support',
+        )
+        self.client.force_authenticate(user=self.tutee_user)
+
+        response = self.client.get(f"/api/chat/rooms/{room.id}/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.data['partner_context'])
+
+    def test_ticket_context_exposes_subject_category_and_status(self):
+        room = ChatRoom.objects.create(
+            tutee=self.tutee_profile,
+            tutor=None,
+            room_type='support',
+        )
+        SupportTicket.objects.create(
+            user=self.tutee_profile,
+            chatroom=room,
+            category='Technical',
+            subject='Cannot join session',
+            description='Video call will not load.',
+            status='Open',
+        )
+        self.client.force_authenticate(user=self.tutee_user)
+
+        response = self.client.get(f"/api/chat/rooms/{room.id}/")
+
+        self.assertEqual(response.status_code, 200)
+        ticket_context = response.data['ticket_context']
+        self.assertEqual(ticket_context['subject'], 'Cannot join session')
+        self.assertEqual(ticket_context['category'], 'Technical Problem')
+        self.assertEqual(ticket_context['status'], 'Open')
+        self.assertIsNotNone(ticket_context['created_at'])
+        self.assertIsNone(ticket_context['assigned_agent_name'])
+
+    def test_support_room_read_endpoint_handles_unassigned_ticket_broadcast(self):
+        room = ChatRoom.objects.create(
+            tutee=self.tutee_profile,
+            tutor=None,
+            room_type='support',
+        )
+        SupportTicket.objects.create(
+            user=self.tutee_profile,
+            chatroom=room,
+            category='Dispute',
+            subject='Need help with tutor',
+            description='The conversation needs moderation.',
+            status='Open',
+        )
+        message = Message.objects.create(
+            room=room,
+            sender=None,
+            content='Ticket created.',
+        )
+        self.client.force_authenticate(user=self.tutee_user)
+
+        response = self.client.post(f"/api/chat/rooms/{room.id}/read/")
+
+        message.refresh_from_db()
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(message.is_read)
+        self.assertIsNotNone(message.read_at)
 
     def test_room_read_endpoint_marks_other_user_messages_read(self):
         room = ChatRoom.objects.create(tutee=self.tutee_profile, tutor=self.tutor_profile)
