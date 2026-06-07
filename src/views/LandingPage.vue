@@ -402,7 +402,7 @@ const footerLinks = [
   --sb-glass-border: color-mix(in srgb, var(--sb-card-border) 72%, transparent);
 
   min-height: 100vh;
-  background: var(--sb-canvas);
+  background: transparent;
   color: var(--sb-ink);
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   text-rendering: optimizeLegibility;
@@ -418,17 +418,7 @@ const footerLinks = [
 
 /* --- the aesthetic blobs --- */
 .sb-ambient-bg {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 0;
-  pointer-events: none;
-  overflow: hidden;
-  background:
-    var(--sb-aurora-bg, none),
-    var(--sb-bg);
+  display: none;
 }
 
 .blob-interactive {

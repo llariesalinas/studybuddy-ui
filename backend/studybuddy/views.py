@@ -2,22 +2,39 @@ import json
 import logging
 import decimal
 import base64
+import hashlib
+import hmac
+import secrets
 import requests
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
+from django.contrib.auth.password_validation import validate_password
+from django.contrib.auth.tokens import default_token_generator
+from django.core.exceptions import ValidationError
+from django.core.mail import send_mail
 from django.utils.timezone import now
-from django.db import transaction
+from django.utils.crypto import constant_time_compare
+from django.utils.encoding import force_bytes, force_str
+from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+from django.db import transaction, IntegrityError
 from datetime import datetime,timedelta, date
 from calendar import monthrange
 from uuid import uuid4
 from django.conf import settings
 from django.shortcuts import get_object_or_404
-from rest_framework.decorators import api_view, authentication_classes, permission_classes
+from rest_framework.decorators import api_view, authentication_classes, permission_classes, throttle_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.throttling import AnonRateThrottle
 from django.utils import timezone
-from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.tokens import RefreshToken, TokenError
+from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
+
+
+class LoginRateThrottle(AnonRateThrottle):
+    """Per-IP throttle for unauthenticated auth endpoints (login/register)."""
+    scope = 'login'
 from rest_framework.views import APIView
 from rest_framework.generics import ListAPIView
 from django.db.models import Avg, Case, When, Value, IntegerField, Q, Count
@@ -27,16 +44,18 @@ from .recommender.hybrid import recommend_tutors_hybrid
 from .recommender.CF import build_rating_matrix
 
 from .recommender.cbf import recommend_tutors
-from .models import Booking, Course, Notification, PartnerInstitution, Payment, PaymentMethod, Preference, Rating, Subjects, Tutor, TutorAvailability, TutorAvailabilityOverride, TutorSubjects, Wallet, PlatformActivity, Transaction, TutorPayoutAccount
+from .models import Booking, Course, EmailOTPChallenge, Notification, PartnerInstitution, Payment, PaymentMethod, Preference, Rating, Subjects, Tutor, TutorApplication, TutorAvailability, TutorAvailabilityOverride, TutorSubjects, Wallet, PlatformActivity, Transaction, TutorPayoutAccount
 from .serializers import (
     NotificationSerializer,
     SubjectSerializer,
+    TutorApplicationSerializer,
     TutorDetailSerializer,
     TutorAvailabilityOverrideSerializer,
     TutorProfileSerializer,
     TutorProfileUpdateSerializer,
     TutorSearchSerializer,
 )
+from .email_utils import send_application_received_email
 from .chat.services import create_booking_event
 
 from .models import (
@@ -79,6 +98,174 @@ def get_active_institution_by_domain(domain):
         school_email_domain__iexact=normalized_domain,
         is_active=True
     ).first()
+
+
+PASSWORD_RESET_GENERIC_MESSAGE = (
+    "If an account with that email exists, password reset instructions have been sent."
+)
+OTP_ERROR_MESSAGE = "Invalid or expired verification code."
+
+
+def build_login_response_payload(user, profile):
+    refresh = RefreshToken.for_user(user)
+    
+    application_status = None
+    if profile.role == 'Tutor':
+        try:
+            application_status = profile.tutor_application.application_status
+        except:
+            pass
+
+    return {
+        "access": str(refresh.access_token),
+        "refresh": str(refresh),
+        "role": profile.role,
+        "user_id": user.id,
+        "profile_id": profile.id,
+        "email": user.email,
+        "fname": profile.fname,
+        "lname": profile.lname,
+        "application_status": application_status,
+    }
+
+
+def generate_otp_code():
+    return f"{secrets.randbelow(1000000):06d}"
+
+
+def hash_otp_code(user_id, challenge_id, purpose, code):
+    message = f"{purpose}:{user_id}:{challenge_id}:{code}".encode("utf-8")
+    return hmac.new(
+        settings.SECRET_KEY.encode("utf-8"),
+        message,
+        hashlib.sha256,
+    ).hexdigest()
+
+
+def verify_otp_code(challenge, code):
+    expected_hash = hash_otp_code(
+        challenge.user_id,
+        challenge.challenge_id,
+        challenge.purpose,
+        str(code or ""),
+    )
+    return constant_time_compare(challenge.code_hash, expected_hash)
+
+
+def get_login_otp_expiry():
+    return timezone.now() + timedelta(seconds=settings.LOGIN_OTP_TTL_SECONDS)
+
+
+def send_login_otp_email(user, code):
+    ttl_minutes = max(1, settings.LOGIN_OTP_TTL_SECONDS // 60)
+    send_mail(
+        subject="Your StudyBuddy login code",
+        message=(
+            f"Your StudyBuddy login verification code is {code}.\n\n"
+            f"This code expires in {ttl_minutes} minutes."
+        ),
+        from_email=None,
+        recipient_list=[user.email or user.username],
+        fail_silently=False,
+    )
+
+
+def create_login_otp_challenge(user):
+    EmailOTPChallenge.objects.filter(
+        user=user,
+        purpose=EmailOTPChallenge.PURPOSE_LOGIN,
+        consumed_at__isnull=True,
+    ).delete()
+
+    code = generate_otp_code()
+    challenge = EmailOTPChallenge(
+        user=user,
+        purpose=EmailOTPChallenge.PURPOSE_LOGIN,
+        expires_at=get_login_otp_expiry(),
+    )
+    challenge.code_hash = hash_otp_code(
+        user.id,
+        challenge.challenge_id,
+        challenge.purpose,
+        code,
+    )
+    challenge.save()
+
+    try:
+        send_login_otp_email(user, code)
+    except Exception:
+        challenge.delete()
+        logger.exception("Failed to send login OTP email for user_id=%s", user.id)
+        raise
+
+    if settings.DEBUG:
+        challenge.debug_code = code
+
+    return challenge
+
+
+def build_otp_challenge_response(challenge, message):
+    payload = {
+        "requires_2fa": True,
+        "challenge_id": str(challenge.challenge_id),
+        "message": message,
+    }
+
+    if settings.DEBUG and hasattr(challenge, "debug_code"):
+        payload["debug_code"] = challenge.debug_code
+
+    return payload
+
+
+def get_password_reset_url(user):
+    uid = urlsafe_base64_encode(force_bytes(user.pk))
+    token = default_token_generator.make_token(user)
+    return f"{settings.FRONTEND_URL.rstrip('/')}/reset-password/{uid}/{token}"
+
+
+def send_password_reset_email(user):
+    reset_url = get_password_reset_url(user)
+    send_mail(
+        subject="Reset your StudyBuddy password",
+        message=(
+            "We received a request to reset your StudyBuddy password.\n\n"
+            "Use this link to choose a new password:\n\n"
+            f"{reset_url}\n\n"
+            "If you did not request this, you can ignore this email."
+        ),
+        from_email=None,
+        recipient_list=[user.email or user.username],
+        fail_silently=False,
+    )
+
+
+def send_password_changed_email(user):
+    send_mail(
+        subject="Your StudyBuddy password was changed",
+        message=(
+            "Your StudyBuddy password was changed successfully.\n\n"
+            "If you did not make this change, please contact support immediately."
+        ),
+        from_email=None,
+        recipient_list=[user.email or user.username],
+        fail_silently=False,
+    )
+
+
+def get_user_from_reset_uid(uid):
+    try:
+        user_id = force_str(urlsafe_base64_decode(uid))
+        return User.objects.get(pk=user_id)
+    except (TypeError, ValueError, OverflowError, User.DoesNotExist, ValidationError):
+        return None
+
+
+def blacklist_user_refresh_tokens(user):
+    try:
+        for outstanding_token in OutstandingToken.objects.filter(user=user):
+            BlacklistedToken.objects.get_or_create(token=outstanding_token)
+    except Exception:
+        logger.exception("Failed to blacklist outstanding refresh tokens for user_id=%s", user.id)
 
 
 WEEKDAY_MAP = {
@@ -304,7 +491,7 @@ def get_display_status(raw_status, session_date, start_time, end_time):
     return raw_status
 
 
-def create_booking_status_notification(recipient, status_key, bookings, recipient_role=None):
+def create_booking_status_notification(recipient, status_key, bookings, recipient_role=None, actor_role=None, reason=None):
     context = get_session_notification_context(bookings)
 
     messages = {
@@ -316,12 +503,22 @@ def create_booking_status_notification(recipient, status_key, bookings, recipien
     }
 
     if status_key == "cancelled":
+        actor = actor_role or "tutee"
         if recipient_role == "tutor":
-            message = f"{context['tutee_name']} has cancelled your {context['subject']} session on {context['date']}."
+            if actor == "tutor":
+                message = f"You cancelled your {context['subject']} session on {context['date']}."
+            else:
+                message = f"{context['tutee_name']} has cancelled your {context['subject']} session on {context['date']}."
         elif recipient_role == "tutee":
-            message = f"Your {context['subject']} session on {context['date']} has been successfully cancelled"
+            if actor == "tutor":
+                message = f"Your {context['subject']} session on {context['date']} was cancelled by {context['tutor_name']}."
+            else:
+                message = f"Your {context['subject']} session on {context['date']} has been successfully cancelled."
         else:
             message = None
+
+        if message and reason:
+            message = f"{message} Reason: {reason}"
     else:
         message = messages.get(status_key)
 
@@ -469,6 +666,7 @@ def partner_institutions_list(request):
 
 @api_view(['POST'])
 @authentication_classes([])
+@throttle_classes([LoginRateThrottle])
 @transaction.atomic
 def register_user(request):
 
@@ -507,10 +705,22 @@ def register_user(request):
     existing_user = User.objects.filter(username=email).first()
 
     if existing_user and hasattr(existing_user, 'userprofile'):
-        return Response(
-            {"error": "User already exists"},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+        profile = existing_user.userprofile
+        is_rejected_tutor = False
+        if profile.role == 'Tutor':
+            try:
+                application = profile.tutor_application
+                if application.application_status == 'rejected':
+                    is_rejected_tutor = True
+            except TutorApplication.DoesNotExist:
+                pass
+        
+        if not is_rejected_tutor:
+            return Response(
+                {"error": "User already exists"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        # If is_rejected_tutor is True, proceed to update profile/application
 
     if existing_user:
         logger.warning(
@@ -529,18 +739,58 @@ def register_user(request):
             password=password
         )
 
-    profile = UserProfile.objects.create(
-        user=user,
-        fname=fname,
-        mname=mname,
-        lname=lname,
-        role=role,
-        institution=institution
-    )
+    if hasattr(user, 'userprofile'):
+        profile = user.userprofile
+        profile.fname = fname
+        profile.mname = mname
+        profile.lname = lname
+        profile.role = role
+        profile.institution = institution
+        profile.save()
+    else:
+        profile = UserProfile.objects.create(
+            user=user,
+            fname=fname,
+            mname=mname,
+            lname=lname,
+            role=role,
+            institution=institution
+        )
 
-    # 🔥 Create Tutor record if role is Tutor
+    # 🔥 Create/Update Tutor record if role is Tutor
     if role == "Tutor":
-        Tutor.objects.create(profile=profile)
+        tutor, _ = Tutor.objects.get_or_create(profile=profile)
+
+        # Handle TutorApplication (Update or Create)
+        school_id = request.FILES.get('school_id')
+        enrollment_proof = request.FILES.get('enrollment_proof')
+        reason_to_tutor = request.data.get('reason_to_tutor', '')
+
+        if not school_id or not enrollment_proof:
+            # We need to make sure we don't block if they provided these in a previous application,
+            # but if this is a NEW registration/re-application, they must be here.
+            # Assuming they must upload new docs for a new application.
+            return Response(
+                {"error": "Tutor applicants must provide a School ID and Proof of Enrollment."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        TutorApplication.objects.update_or_create(
+            profile=profile,
+            defaults={
+                'application_status': 'pending',
+                'school_id': school_id,
+                'enrollment_proof': enrollment_proof,
+                'reason_to_tutor': reason_to_tutor,
+                'submitted_at': timezone.now()
+            }
+        )
+
+        # Send confirmation email
+        try:
+            send_application_received_email(profile)
+        except Exception:
+            logger.exception("Failed to send tutor application received email for profile_id=%s", profile.id)
 
     PlatformActivity.objects.create(
         activity_type='registration',
@@ -567,14 +817,22 @@ def register_user(request):
 def profile_status(request):
 
     profile = request.user.userprofile
+    application_status = None
+    if profile.role == 'Tutor':
+        try:
+            application_status = profile.tutor_application.application_status
+        except:
+            pass
 
     return Response({
         "profile_completed": profile.profile_completed,
-        "role": profile.role
+        "role": profile.role,
+        "application_status": application_status
     })
 
 @api_view(['POST'])
 @authentication_classes([])
+@throttle_classes([LoginRateThrottle])
 def login_view(request):
 
     email = request.data.get("email")
@@ -595,7 +853,6 @@ def login_view(request):
             status=status.HTTP_401_UNAUTHORIZED
         )
 
-    refresh = RefreshToken.for_user(user)
     try:
         profile = UserProfile.objects.get(user=user)
     except UserProfile.DoesNotExist:
@@ -609,6 +866,21 @@ def login_view(request):
             {"error": "Your account has been suspended. Please contact administration for more details."},
             status=status.HTTP_403_FORBIDDEN
         )
+
+    # 🔥 Check tutor application status
+    if profile.role == 'Tutor':
+        try:
+            application = profile.tutor_application
+            if application.application_status == 'rejected':
+                return Response(
+                    {
+                        "error": "Your application was rejected. Please contact support or reapply in the registration page.",
+                        "rejected": True
+                    },
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        except TutorApplication.DoesNotExist:
+            pass
 
     if not profile.is_domain_exempt and profile.role != 'Admin':
         email_domain = normalize_email_domain(email)
@@ -644,16 +916,229 @@ def login_view(request):
             profile.institution = active_institution
             profile.save(update_fields=['institution', 'updated_at'])
 
-    return Response({
-        "access": str(refresh.access_token),
-        "refresh": str(refresh),
-        "role": profile.role,
-        "user_id": user.id,
-        "profile_id": profile.id,
-        "email": user.email,
-        "fname": profile.fname,
-        "lname": profile.lname
-    })
+    try:
+        challenge = create_login_otp_challenge(user)
+    except Exception:
+        return Response(
+            {"error": "Unable to send verification code. Please try again."},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+    return Response(
+        build_otp_challenge_response(
+            challenge,
+            "A verification code has been sent to your email.",
+        )
+    )
+
+
+@api_view(['POST'])
+@authentication_classes([])
+@permission_classes([])
+@throttle_classes([LoginRateThrottle])
+def password_reset_request(request):
+    email = str(request.data.get("email") or "").strip()
+
+    if email:
+        user = User.objects.filter(Q(username__iexact=email) | Q(email__iexact=email)).first()
+        if user and user.is_active and user.has_usable_password():
+            try:
+                send_password_reset_email(user)
+            except Exception:
+                logger.exception("Failed to send password reset email for user_id=%s", user.id)
+
+    return Response({"message": PASSWORD_RESET_GENERIC_MESSAGE})
+
+
+@api_view(['POST'])
+@authentication_classes([])
+@permission_classes([])
+@throttle_classes([LoginRateThrottle])
+def password_reset_confirm(request):
+    uid = request.data.get("uid") or request.data.get("uidb64")
+    token = request.data.get("token")
+    password = request.data.get("password")
+    password_confirm = request.data.get("password_confirm")
+
+    if not all([uid, token, password, password_confirm]):
+        return Response(
+            {"error": "UID, token, password, and password confirmation are required."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    if password != password_confirm:
+        return Response(
+            {"error": "Passwords do not match."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    user = get_user_from_reset_uid(uid)
+    if user is None or not default_token_generator.check_token(user, token):
+        return Response(
+            {"error": "Invalid or expired password reset link."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        validate_password(password, user)
+    except ValidationError as exc:
+        return Response(
+            {"error": exc.messages},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    user.set_password(password)
+    user.save(update_fields=["password"])
+    blacklist_user_refresh_tokens(user)
+
+    try:
+        send_password_changed_email(user)
+    except Exception:
+        logger.exception("Failed to send password changed notification for user_id=%s", user.id)
+
+    return Response({"message": "Password has been reset successfully."})
+
+
+@api_view(['POST'])
+@authentication_classes([])
+@permission_classes([])
+@throttle_classes([LoginRateThrottle])
+def login_verify_otp(request):
+    challenge_id = request.data.get("challenge_id")
+    code = request.data.get("code")
+
+    if not challenge_id or not code:
+        return Response(
+            {"error": "Challenge ID and code are required."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    challenge = EmailOTPChallenge.objects.select_related('user').filter(
+        challenge_id=challenge_id,
+        purpose=EmailOTPChallenge.PURPOSE_LOGIN,
+    ).first()
+
+    if challenge is None or challenge.consumed_at is not None or challenge.expires_at <= timezone.now():
+        return Response({"error": OTP_ERROR_MESSAGE}, status=status.HTTP_400_BAD_REQUEST)
+
+    if challenge.attempt_count >= settings.LOGIN_OTP_MAX_ATTEMPTS:
+        return Response(
+            {"error": "Too many verification attempts. Please request a new code."},
+            status=status.HTTP_429_TOO_MANY_REQUESTS
+        )
+
+    if not verify_otp_code(challenge, code):
+        challenge.attempt_count += 1
+        challenge.save(update_fields=['attempt_count'])
+
+        if challenge.attempt_count >= settings.LOGIN_OTP_MAX_ATTEMPTS:
+            return Response(
+                {"error": "Too many verification attempts. Please request a new code."},
+                status=status.HTTP_429_TOO_MANY_REQUESTS
+            )
+
+        return Response({"error": OTP_ERROR_MESSAGE}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        profile = UserProfile.objects.get(user=challenge.user)
+    except UserProfile.DoesNotExist:
+        return Response(
+            {"error": "User profile not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    if profile.is_suspended:
+        return Response(
+            {"error": "Your account has been suspended. Please contact administration for more details."},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    challenge.consumed_at = timezone.now()
+    challenge.save(update_fields=['consumed_at'])
+
+    return Response(build_login_response_payload(challenge.user, profile))
+
+
+@api_view(['POST'])
+@authentication_classes([])
+@permission_classes([])
+@throttle_classes([LoginRateThrottle])
+def login_resend_otp(request):
+    challenge_id = request.data.get("challenge_id")
+
+    if not challenge_id:
+        return Response(
+            {"error": "Challenge ID is required."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    challenge = EmailOTPChallenge.objects.select_related('user').filter(
+        challenge_id=challenge_id,
+        purpose=EmailOTPChallenge.PURPOSE_LOGIN,
+    ).first()
+
+    if challenge is None or challenge.consumed_at is not None:
+        return Response({"error": OTP_ERROR_MESSAGE}, status=status.HTTP_400_BAD_REQUEST)
+
+    if challenge.attempt_count >= settings.LOGIN_OTP_MAX_ATTEMPTS:
+        return Response(
+            {"error": "Too many verification attempts. Please start login again."},
+            status=status.HTTP_429_TOO_MANY_REQUESTS
+        )
+
+    code = generate_otp_code()
+    new_hash = hash_otp_code(
+        challenge.user_id,
+        challenge.challenge_id,
+        challenge.purpose,
+        code,
+    )
+    new_expiry = get_login_otp_expiry()
+
+    try:
+        send_login_otp_email(challenge.user, code)
+    except Exception:
+        logger.exception("Failed to resend login OTP email for user_id=%s", challenge.user_id)
+        return Response(
+            {"error": "Unable to send verification code. Please try again."},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+    challenge.code_hash = new_hash
+    challenge.expires_at = new_expiry
+    challenge.attempt_count = 0
+    challenge.resend_count += 1
+    challenge.save(update_fields=['code_hash', 'expires_at', 'attempt_count', 'resend_count'])
+
+    if settings.DEBUG:
+        challenge.debug_code = code
+
+    return Response(
+        build_otp_challenge_response(
+            challenge,
+            "A new verification code has been sent to your email.",
+        )
+    )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def logout_view(request):
+    """Blacklist the supplied refresh token so it can no longer be used."""
+    refresh = request.data.get("refresh")
+    if not refresh:
+        return Response(
+            {"error": "Refresh token required."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        RefreshToken(refresh).blacklist()
+    except TokenError:
+        # Token already invalid/expired/blacklisted — logout is idempotent.
+        return Response({"message": "Logged out."}, status=status.HTTP_200_OK)
+
+    return Response({"message": "Logged out."}, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])
@@ -1796,10 +2281,28 @@ def cancel_booking(request, booking_id):
         id=booking_id
     )
 
-    if profile != booking.student:
+    # Either party may cancel.
+    is_student = profile == booking.student
+    is_tutor = profile == booking.tutor.profile
+    if not (is_student or is_tutor):
         return Response({"error": "Unauthorized"}, status=403)
 
-    session_group_bookings = get_booking_request_bookings(booking)
+    actor_role = "tutee" if is_student else "tutor"
+
+    # Reason is required.
+    reason = str(request.data.get("reason", "")).strip()
+    if len(reason) < 5:
+        return Response(
+            {"error": "Please provide a reason for cancelling (at least 5 characters)."},
+            status=400
+        )
+
+    # Group lookup mirrors approve/reject.
+    if booking.status == "Pending":
+        session_group_bookings = get_booking_request_bookings(booking)
+    else:
+        session_group_bookings = get_session_group_bookings(booking)
+
     representative_booking = get_representative_booking(session_group_bookings)
 
     if not representative_booking:
@@ -1813,37 +2316,68 @@ def cancel_booking(request, booking_id):
         + timedelta(minutes=SESSION_SLOT_MINUTES)
     ).time()
 
+    raw_status = representative_booking.status
     display_status = get_display_status(
-        representative_booking.status,
+        raw_status,
         representative_booking.session_date,
         start_time,
         end_time
     )
 
-    if display_status != "Upcoming":
-        return Response({"error": "Only upcoming sessions can be cancelled."}, status=400)
+    # Allowed: pending requests (withdraw) or confirmed-upcoming sessions.
+    if raw_status != "Pending" and display_status != "Upcoming":
+        return Response(
+            {"error": "Only pending requests or upcoming sessions can be cancelled."},
+            status=400
+        )
 
-    if representative_booking.session_date <= timezone.localdate():
-        return Response({"error": "Only future sessions can be cancelled before the session date."}, status=400)
+    # Cutoff: cannot cancel the day of or the day before the session.
+    if representative_booking.session_date <= timezone.localdate() + timedelta(days=1):
+        return Response(
+            {"error": "Sessions can only be cancelled at least two days before the session date."},
+            status=400
+        )
 
     with transaction.atomic():
         Booking.objects.filter(id__in=[group_booking.id for group_booking in session_group_bookings]).update(
             status="Cancelled",
             tutee_confirmed=False,
             tutor_confirmed=False,
+            cancellation_reason=reason,
+            cancelled_by_role=actor_role,
         )
 
         create_booking_status_notification(
             representative_booking.tutor.profile,
             "cancelled",
             session_group_bookings,
-            recipient_role="tutor"
+            recipient_role="tutor",
+            actor_role=actor_role,
+            reason=reason,
         )
         create_booking_status_notification(
             representative_booking.student,
             "cancelled",
             session_group_bookings,
-            recipient_role="tutee"
+            recipient_role="tutee",
+            actor_role=actor_role,
+            reason=reason,
+        )
+
+    # Timeline event is best-effort: the cancellation itself must never fail
+    # because logging the chat event did.
+    representative_booking.refresh_from_db()
+    try:
+        create_booking_event(
+            representative_booking,
+            request.user,
+            f"Session cancelled by {actor_role}. Reason: {reason}",
+            "booking_cancelled",
+        )
+    except Exception:
+        logger.exception(
+            "Cancellation succeeded but recording the booking event failed for booking %s",
+            representative_booking.id,
         )
 
     return Response({"message": "Session cancelled successfully."}, status=200)
@@ -2883,10 +3417,15 @@ def get_request_tutor(request):
 
 def get_cashout_callback_url(request):
     configured_url = getattr(settings, 'PAYMONGO_CASHOUT_CALLBACK_URL', '')
-    if configured_url:
-        return configured_url
+    base_url = configured_url or request.build_absolute_uri('/api/wallet/paymongo/callback/')
 
-    return request.build_absolute_uri('/api/wallet/paymongo/callback/')
+    # Append a shared-secret token so the inbound callback can be authenticated.
+    secret = getattr(settings, 'PAYMONGO_CASHOUT_CALLBACK_SECRET', '')
+    if secret:
+        separator = '&' if '?' in base_url else '?'
+        return f"{base_url}{separator}token={secret}"
+
+    return base_url
 
 
 def get_required_cashout_rail(amount):
@@ -3319,6 +3858,19 @@ request_withdrawal = cash_outs
 @authentication_classes([])
 @permission_classes([])
 def paymongo_cashout_callback(request):
+    # Authenticate the callback with the shared secret token when configured.
+    secret = getattr(settings, 'PAYMONGO_CASHOUT_CALLBACK_SECRET', '')
+    if secret:
+        provided = request.query_params.get('token', '')
+        if not constant_time_compare(provided, secret):
+            logger.warning("Rejected PayMongo cashout callback: invalid or missing token.")
+            return Response({"error": "Unauthorized."}, status=status.HTTP_403_FORBIDDEN)
+    else:
+        logger.warning(
+            "PayMongo cashout callback received without signature verification "
+            "(PAYMONGO_CASHOUT_CALLBACK_SECRET not set)."
+        )
+
     provider_data = normalize_wallet_transaction(request.data)
     provider_transaction_id = provider_data.get('id')
 
@@ -3668,3 +4220,193 @@ def dev_remove_wallet_funds(request):
             reference_id=f'DEV-{timezone.now().timestamp()}'
         )
     return Response({'balance': str(wallet.balance)})
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_support_ticket(request):
+    user_profile = request.user.userprofile
+    data = request.data
+
+    with transaction.atomic():
+        from studybuddy.chat.models import ChatRoom
+        from .models import SupportTicket
+        room = ChatRoom.objects.create(
+            room_type='support',
+            tutee=user_profile
+        )
+
+        ticket = SupportTicket.objects.create(
+            user=user_profile,
+            category=data.get('category'),
+            subject=data.get('subject'),
+            description=data.get('description'),
+            booking_id=data.get('booking_id'),
+            transaction_id=data.get('transaction_id'),
+            chatroom=room
+        )
+
+        from studybuddy.chat.models import Message
+        Message.objects.create(
+            room=room,
+            sender=None,
+            content=f"Ticket #{ticket.id} created. Category: {ticket.category}. An agent will assist you shortly."
+        )
+
+    return Response({"message": "Ticket created", "ticket_id": ticket.id, "room_id": room.id}, status=201)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def admin_claim_ticket(request, ticket_id):
+    if request.user.userprofile.role != 'Admin':
+        return Response(status=403)
+
+    from .models import SupportTicket
+    ticket = get_object_or_404(SupportTicket, id=ticket_id)
+
+    try:
+        with transaction.atomic():
+            ticket.assigned_agent = request.user.userprofile
+            ticket.status = 'In_Progress'
+
+            ticket.chatroom.tutor = request.user.userprofile
+
+            ticket.save()
+            ticket.chatroom.save()
+    except IntegrityError:
+        return Response(
+            {"error": "User already has an active support ticket claimed by you."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    return Response({"message": "Ticket claimed"})
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def list_my_tickets(request):
+    user_profile = request.user.userprofile
+    from .models import SupportTicket
+    tickets = SupportTicket.objects.filter(user=user_profile).order_by('-created_at')
+
+    data = []
+    for ticket in tickets:
+        data.append({
+            "id": ticket.id,
+            "category": ticket.category,
+            "subject": ticket.subject,
+            "description": ticket.description,
+            "status": ticket.status,
+            "booking_id": ticket.booking_id,
+            "transaction_id": ticket.transaction_id,
+            "chatroom_id": ticket.chatroom_id,
+            "assigned_agent": f"{ticket.assigned_agent.fname} {ticket.assigned_agent.lname}" if ticket.assigned_agent else None,
+            "created_at": ticket.created_at,
+            "updated_at": ticket.updated_at,
+        })
+    return Response(data)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def admin_list_tickets(request):
+    if request.user.userprofile.role != 'Admin':
+        return Response(status=403)
+
+    from .models import SupportTicket
+    tickets = SupportTicket.objects.all().order_by('-created_at')
+
+    data = []
+    for ticket in tickets:
+        data.append({
+            "id": ticket.id,
+            "user": {
+                "id": ticket.user.id,
+                "name": f"{ticket.user.fname} {ticket.user.lname}",
+                "role": ticket.user.role
+            },
+            "category": ticket.category,
+            "subject": ticket.subject,
+            "description": ticket.description,
+            "status": ticket.status,
+            "booking_id": ticket.booking_id,
+            "transaction_id": ticket.transaction_id,
+            "chatroom_id": ticket.chatroom_id,
+            "assigned_agent": f"{ticket.assigned_agent.fname} {ticket.assigned_agent.lname}" if ticket.assigned_agent else None,
+            "assigned_agent_id": ticket.assigned_agent_id,
+            "created_at": ticket.created_at,
+            "updated_at": ticket.updated_at,
+        })
+    return Response(data)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def admin_resolve_ticket(request, ticket_id):
+    if request.user.userprofile.role != 'Admin':
+        return Response(status=403)
+
+    from .models import SupportTicket
+    ticket = get_object_or_404(SupportTicket, id=ticket_id)
+    ticket.status = 'Resolved'
+    ticket.save()
+
+    from studybuddy.chat.models import Message
+    Message.objects.create(
+        room=ticket.chatroom,
+        sender=None,
+        content="This support ticket has been marked as Resolved. The chat is now closed."
+    )
+
+    return Response({"message": "Ticket resolved", "status": "Resolved"})
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def tutor_application_status(request):
+    try:
+        application = TutorApplication.objects.get(profile=request.user.userprofile)
+        serializer = TutorApplicationSerializer(application, context={'request': request})
+        return Response(serializer.data)
+    except TutorApplication.DoesNotExist:
+        return Response({"error": "No application found for this user."}, status=status.HTTP_404_NOT_FOUND)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@transaction.atomic
+def tutor_application_resubmit(request):
+    try:
+        application = TutorApplication.objects.get(profile=request.user.userprofile)
+    except TutorApplication.DoesNotExist:
+        return Response({"error": "No application found to resubmit."}, status=status.HTTP_404_NOT_FOUND)
+
+    school_id = request.FILES.get('school_id')
+    enrollment_proof = request.FILES.get('enrollment_proof')
+    reason_to_tutor = request.data.get('reason_to_tutor', '')
+
+    if not school_id or not enrollment_proof:
+        return Response(
+            {"error": "Please provide both your School ID and Proof of Enrollment to resubmit."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Update application
+    application.school_id = school_id
+    application.enrollment_proof = enrollment_proof
+    application.reason_to_tutor = reason_to_tutor
+    application.application_status = 'pending'
+    application.rejection_reason = ''
+    application.reviewed_at = None
+    application.reviewed_by = None
+    application.save()
+
+    # Log activity
+    PlatformActivity.objects.create(
+        activity_type='tutor_application',
+        message=f"Tutor application resubmitted: {request.user.userprofile.fname} {request.user.userprofile.lname}"
+    )
+
+    # Optional: Send email confirmation
+    try:
+        send_application_received_email(request.user.userprofile)
+    except Exception:
+        logger.exception("Failed to send tutor application resubmission email for profile_id=%s", request.user.userprofile.id)
+
+    return Response({"message": "Application resubmitted successfully. It is now back under review."})

@@ -240,22 +240,28 @@ class Command(BaseCommand):
                 )
             self.stdout.write(f"  - Subjects assigned to {tutor.profile.fname}: {[s.subject_code for s in assigned]}")
 
-        # 8. Seed TutorAvailability
+        # 8. Seed TutorAvailability (contiguous 30-min blocks so multi-slot searches match)
         DAY_CHOICES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-        TIME_SLOTS = [
-            datetime.time(8, 0),
-            datetime.time(10, 0),
-            datetime.time(13, 0),
-            datetime.time(15, 0),
-            datetime.time(17, 0),
-        ]
+
+        def build_contiguous_slots(start_hour, block_hours):
+            slots = []
+            current = datetime.datetime.combine(
+                datetime.date.today(), datetime.time(start_hour, 0)
+            )
+            end = current + datetime.timedelta(hours=block_hours)
+            while current < end:
+                slots.append(current.time())
+                current += datetime.timedelta(minutes=30)
+            return slots
 
         availability_pool = []
 
         for tutor in tutors:
             assigned_days = fake.random_elements(DAY_CHOICES, length=3, unique=True)
             for day in assigned_days:
-                for time_slot in fake.random_elements(TIME_SLOTS, length=2, unique=True):
+                start_hour = fake.random_int(min=8, max=13)   # block starts 8am-1pm
+                block_hours = fake.random_int(min=4, max=6)    # 4-6 hour contiguous block
+                for time_slot in build_contiguous_slots(start_hour, block_hours):
                     slot, created = TutorAvailability.objects.get_or_create(
                         tutor=tutor,
                         day=day,

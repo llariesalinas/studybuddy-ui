@@ -28,7 +28,8 @@ from .views import(
                    )
 from .admin_views import (
     AdminStatsView, AdminWithdrawalListView, AdminWithdrawalDetailView,
-    AdminUserListView, AdminInstitutionView, AdminAnalyticsView
+    AdminUserListView, AdminInstitutionView, AdminAnalyticsView,
+    AdminTutorApplicationListView, AdminTutorApplicationDetailView
 )
 from . import views
 
@@ -39,14 +40,26 @@ urlpatterns = [
     path('admin/stats/', AdminStatsView.as_view()),
     path('admin/withdrawals/', AdminWithdrawalListView.as_view()),
     path('admin/withdrawals/<int:pk>/', AdminWithdrawalDetailView.as_view()),
+    path('admin/tutor-applications/', AdminTutorApplicationListView.as_view()),
+    path('admin/tutor-applications/<int:pk>/', AdminTutorApplicationDetailView.as_view()),
     path('admin/users/', AdminUserListView.as_view()),
     path('admin/users/<int:pk>/', AdminUserListView.as_view()),
     path('admin/institutions/', AdminInstitutionView.as_view()),
     path('admin/institutions/<int:pk>/', AdminInstitutionView.as_view()),
     path('admin/analytics/', AdminAnalyticsView.as_view()),
+    path('admin/support/tickets/', views.admin_list_tickets),
+    path('admin/support/tickets/<int:ticket_id>/claim/', views.admin_claim_ticket),
+    path('admin/support/tickets/<int:ticket_id>/resolve/', views.admin_resolve_ticket),
 
+    path('support/tickets/create/', views.create_support_ticket),
+    path('support/tickets/my/', views.list_my_tickets),
     path('register/', register_user),
     path('login/', login_view),
+    path('login/verify-otp/', views.login_verify_otp),
+    path('login/resend-otp/', views.login_resend_otp),
+    path('password-reset/request/', views.password_reset_request),
+    path('password-reset/confirm/', views.password_reset_confirm),
+    path('logout/', views.logout_view),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('profile/status/', views.profile_status),
     path('preferences/', views.save_preferences),
@@ -106,7 +119,6 @@ urlpatterns = [
 ]
 
 if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
     urlpatterns += [path('dev/wallet/add/', views.dev_add_wallet_funds)]
     urlpatterns += [path('dev/wallet/remove/', views.dev_remove_wallet_funds)]
     urlpatterns += [

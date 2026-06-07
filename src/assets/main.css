@@ -18,6 +18,19 @@
   --sb-text-subtle: #a0acb8;
   --sb-text-muted-green: #6b7d74;
   --sb-border-light: #e0e7e3;
+  --sb-aurora-bg:
+    radial-gradient(circle at 8% -8%, rgba(0, 137, 90, 0.16), transparent 34%),
+    radial-gradient(circle at 52% -10%, rgba(103, 197, 220, 0.17), transparent 38%),
+    radial-gradient(circle at 100% 8%, rgba(148, 211, 181, 0.18), transparent 34%),
+    radial-gradient(circle at 84% 88%, rgba(255, 218, 137, 0.16), transparent 32%),
+    linear-gradient(135deg, #f7fbf8 0%, #eef8f3 44%, #f7fbf8 100%);
+  --sb-aurora-overlay:
+    radial-gradient(circle at 18% 16%, rgba(0, 137, 90, 0.07), transparent 28%),
+    radial-gradient(circle at 72% 30%, rgba(103, 197, 220, 0.08), transparent 32%),
+    radial-gradient(circle at 52% 78%, rgba(255, 218, 137, 0.10), transparent 30%);
+  --sb-aurora-sheen:
+    radial-gradient(circle at 50% -10%, rgba(255, 255, 255, 0.24), transparent 36%),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.04), transparent 30%, rgba(0, 0, 0, 0.04));
   --sb-danger: #ef4444;
   --sb-danger-bs: #dc3545;
   --sb-warning-bg: #ffc107;
@@ -33,6 +46,12 @@
   --sb-t-quick: 120ms;
   --sb-t-normal: 250ms;
   --sb-t-slow: 400ms;
+  --sb-aurora-base-x: 0px;
+  --sb-aurora-base-y: 0px;
+  --sb-aurora-overlay-x: 0px;
+  --sb-aurora-overlay-y: 0px;
+  --sb-aurora-sheen-x: 0px;
+  --sb-aurora-sheen-y: 0px;
 }
 
 [data-sb-theme="dark"] {
@@ -51,16 +70,86 @@
   --sb-text-dark:       #F3F7F5;
   --sb-border-light:    #1B2A25;
   --sb-aurora-bg:
-    radial-gradient(at 10% 0%, rgba(134, 183, 163, 0.18), transparent 42%),
-    radial-gradient(at 58% 0%, rgba(38, 166, 154, 0.12), transparent 46%),
-    radial-gradient(at 100% 10%, rgba(76, 201, 240, 0.10), transparent 42%);
+    radial-gradient(circle at 9% -4%, rgba(134, 183, 163, 0.24), transparent 34%),
+    radial-gradient(circle at 56% -6%, rgba(38, 166, 154, 0.14), transparent 38%),
+    radial-gradient(circle at 98% 12%, rgba(76, 201, 240, 0.10), transparent 34%),
+    radial-gradient(circle at 78% 86%, rgba(134, 183, 163, 0.08), transparent 34%),
+    linear-gradient(135deg, #050807 0%, #08100d 48%, #030504 100%);
+  --sb-aurora-overlay:
+    radial-gradient(circle at 16% 14%, rgba(134, 183, 163, 0.16), transparent 30%),
+    radial-gradient(circle at 70% 28%, rgba(156, 200, 184, 0.08), transparent 34%),
+    radial-gradient(circle at 50% 74%, rgba(76, 201, 240, 0.055), transparent 30%);
+  --sb-aurora-sheen:
+    radial-gradient(circle at 50% -10%, rgba(255, 255, 255, 0.045), transparent 36%),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.018), transparent 28%, rgba(0, 0, 0, 0.22));
+}
+
+html,
+body {
+  min-height: 100%;
 }
 
 body {
-  background:
-    var(--sb-aurora-bg, none),
-    var(--sb-bg);
+  background: var(--sb-bg);
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+body::before {
+  background: var(--sb-aurora-bg);
+  transform-origin: 50% 10%;
+  transform: translate3d(var(--sb-aurora-base-x), var(--sb-aurora-base-y), 0) scale(1.035);
+  transition:
+    background 320ms ease,
+    transform 420ms var(--sb-spring);
+  will-change: transform;
+}
+
+body::after {
+  background: var(--sb-aurora-sheen);
+  transform: translate3d(var(--sb-aurora-sheen-x), var(--sb-aurora-sheen-y), 0);
+  transition:
+    background 320ms ease,
+    transform 620ms var(--sb-spring);
+  will-change: transform;
+}
+
+body > #app {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+}
+
+body > #app::before {
+  content: "";
+  position: fixed;
+  inset: -20vh -14vw;
+  z-index: -1;
+  pointer-events: none;
+  background: var(--sb-aurora-overlay);
+  filter: blur(64px) saturate(1.04);
+  transform: translate3d(var(--sb-aurora-overlay-x), var(--sb-aurora-overlay-y), 0) scale(1.08);
+  transition:
+    background 320ms ease,
+    transform 520ms var(--sb-spring);
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::before,
+  body::after,
+  body > #app::before {
+    transform: none;
+    transition: background 320ms ease;
+  }
 }
 
 /* Custom Utilities to extend Bootstrap */

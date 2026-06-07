@@ -114,8 +114,16 @@ def serialize_time_block(bookings):
     }
 
 
-def serialize_booking_context(booking):
-    bookings = get_booking_group(booking)
+def get_booking_context_group_key(booking):
+    if booking.booking_request_id:
+        return ('booking_request_id', booking.booking_request_id)
+    if booking.session_group_id:
+        return ('session_group_id', booking.session_group_id)
+    return ('id', booking.id)
+
+
+def serialize_booking_context(booking, grouped_bookings=None):
+    bookings = grouped_bookings if grouped_bookings is not None else get_booking_group(booking)
 
     if not bookings:
         return None
@@ -255,11 +263,179 @@ def get_current_booking_context(room):
     return None
 
 
+def get_current_booking_contexts(rooms):
+    room_list = list(rooms)
+    if not room_list:
+        return {}
+
+    room_pairs = {
+        (room.tutee_id, room.tutor_id)
+        for room in room_list
+        if room.tutee_id and room.tutor_id
+    }
+    if not room_pairs:
+        return {room.id: None for room in room_list}
+
+    tutee_ids = {tutee_id for tutee_id, _ in room_pairs}
+    tutor_profile_ids = {tutor_id for _, tutor_id in room_pairs}
+    current_date = timezone.localdate()
+
+    def booking_pair(booking):
+        return (booking.student_id, booking.tutor.profile_id)
+
+    def base_booking_query():
+        return (
+            Booking.objects
+            .filter(student_id__in=tutee_ids, tutor__profile_id__in=tutor_profile_ids)
+            .select_related('availability', 'student', 'tutor__profile__course')
+        )
+
+    selected = {}
+
+    active_bookings = (
+        base_booking_query()
+        .filter(
+            status__in=['Pending', 'Confirmed', 'Awaiting Payment Verification'],
+        )
+        .filter(Q(status='Pending') | Q(status='Confirmed') | Q(session_date__gte=current_date))
+        .order_by('session_date', 'availability__time_slot', 'id')
+    )
+    for booking in active_bookings:
+        pair = booking_pair(booking)
+        if pair in room_pairs and pair not in selected:
+            selected[pair] = booking
+
+    missing_pairs = room_pairs - set(selected.keys())
+    if missing_pairs:
+        completed_bookings = (
+            base_booking_query()
+            .filter(status='Completed')
+            .exclude(rating__isnull=False)
+            .order_by('-session_date', '-availability__time_slot', '-id')
+        )
+        for booking in completed_bookings:
+            pair = booking_pair(booking)
+            if pair in missing_pairs and pair not in selected:
+                selected[pair] = booking
+
+    missing_pairs = room_pairs - set(selected.keys())
+    if missing_pairs:
+        week_ago = current_date - timedelta(days=7)
+        terminal_bookings = (
+            base_booking_query()
+            .filter(status__in=['Rejected', 'Cancelled'], session_date__gte=week_ago)
+            .order_by('-session_date', '-availability__time_slot', '-id')
+        )
+        for booking in terminal_bookings:
+            pair = booking_pair(booking)
+            if pair in missing_pairs and pair not in selected:
+                selected[pair] = booking
+
+    grouped_bookings = get_booking_groups_for_contexts(selected.values())
+    context_by_pair = {}
+    for pair, booking in selected.items():
+        context = serialize_booking_context(
+            booking,
+            grouped_bookings.get(get_booking_context_group_key(booking), [booking]),
+        )
+        if context is None:
+            context_by_pair[pair] = None
+            continue
+
+        if booking.status == 'Pending':
+            context['status_intent'] = (
+                'pending_location' if booking.session_mode == 'F2F' else 'pending'
+            )
+        elif booking.status == 'Confirmed':
+            session_naive = datetime.combine(booking.session_date, booking.availability.time_slot)
+            session_start = timezone.make_aware(session_naive)
+            duration_minutes = context.get('duration_hours', 0.5) * 60
+            session_end = session_start + timedelta(minutes=duration_minutes)
+            now = timezone.now()
+
+            if now < session_start:
+                context['status_intent'] = 'confirmed'
+                context['status'] = 'Upcoming'
+            elif session_start <= now <= session_end:
+                context['status_intent'] = 'ongoing'
+                context['status'] = 'Ongoing'
+            else:
+                context['status_intent'] = 'payment_required'
+                context['status'] = 'Payment Required'
+        elif booking.status == 'Awaiting Payment Verification':
+            context['status_intent'] = 'awaiting_payment'
+        elif booking.status == 'Completed':
+            context['status_intent'] = 'review_pending'
+        else:
+            context['status_intent'] = booking.status.lower()
+
+        context_by_pair[pair] = context
+
+    return {
+        room.id: context_by_pair.get((room.tutee_id, room.tutor_id))
+        for room in room_list
+    }
+
+
+def get_booking_groups_for_contexts(bookings):
+    booking_list = list(bookings)
+    if not booking_list:
+        return {}
+
+    booking_request_ids = {
+        booking.booking_request_id
+        for booking in booking_list
+        if booking.booking_request_id
+    }
+    session_group_ids = {
+        booking.session_group_id
+        for booking in booking_list
+        if not booking.booking_request_id and booking.session_group_id
+    }
+    booking_ids = {
+        booking.id
+        for booking in booking_list
+        if not booking.booking_request_id and not booking.session_group_id
+    }
+
+    filters = Q()
+    has_filter = False
+    if booking_request_ids:
+        filters |= Q(booking_request_id__in=booking_request_ids)
+        has_filter = True
+    if session_group_ids:
+        filters |= Q(session_group_id__in=session_group_ids)
+        has_filter = True
+    if booking_ids:
+        filters |= Q(id__in=booking_ids)
+        has_filter = True
+
+    if not has_filter:
+        return {}
+
+    groups = {}
+    for booking in (
+        Booking.objects
+        .filter(filters)
+        .select_related('availability', 'student', 'tutor__profile__course')
+    ):
+        groups.setdefault(get_booking_context_group_key(booking), []).append(booking)
+
+    return {
+        key: sort_bookings(group)
+        for key, group in groups.items()
+    }
+
+
+
 def get_completed_session_key(booking):
     return str(booking.session_group_id or booking.booking_request_id or booking.id)
 
 
-def get_partner_context(room, user=None):
+_CURRENT_BOOKING_UNSET = object()
+
+
+def get_partner_context(room, user=None, current_booking=_CURRENT_BOOKING_UNSET):
     tutor = Tutor.objects.filter(profile=room.tutor).select_related('profile__course').first()
     completed_bookings = list(
         Booking.objects
@@ -285,7 +461,8 @@ def get_partner_context(room, user=None):
         )
 
     if not topics:
-        current_booking = get_current_booking_context(room)
+        if current_booking is _CURRENT_BOOKING_UNSET:
+            current_booking = get_current_booking_context(room)
         if current_booking and current_booking.get('subject') != 'General':
             topics = [current_booking['subject']]
 
@@ -327,7 +504,10 @@ def serialize_message_payload(message, user=None):
         sender_name = full_name(sender_profile)
         sender_profile_id = sender_profile.id
     except Exception:
-        sender_name = message.sender.get_username()
+        try:
+            sender_name = message.sender.get_username()
+        except Exception:
+            sender_name = 'System'
 
     return {
         'id': message.id,

@@ -98,6 +98,33 @@ class UserProfile(models.Model):
 
     def __str__(self):
         return f"{self.fname} {self.lname}"
+
+
+class EmailOTPChallenge(models.Model):
+    PURPOSE_LOGIN = 'login'
+    PURPOSE_CHOICES = [
+        (PURPOSE_LOGIN, 'Login'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='email_otp_challenges')
+    challenge_id = models.UUIDField(default=uuid.uuid4, unique=True, db_index=True)
+    purpose = models.CharField(max_length=20, choices=PURPOSE_CHOICES, default=PURPOSE_LOGIN)
+    code_hash = models.CharField(max_length=64)
+    expires_at = models.DateTimeField()
+    consumed_at = models.DateTimeField(null=True, blank=True)
+    attempt_count = models.PositiveSmallIntegerField(default=0)
+    resend_count = models.PositiveSmallIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['user', 'purpose', 'created_at']),
+            models.Index(fields=['expires_at']),
+        ]
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.purpose} OTP for user {self.user_id}"
     
 #TUTOR TABLE
 class Tutor(models.Model):
@@ -166,6 +193,51 @@ class Tutor(models.Model):
 
     def __str__(self):
         return f"Tutor: {self.profile.fname} {self.profile.lname}"
+
+class TutorApplication(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Pending Review'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    ]
+
+    profile = models.OneToOneField(
+        UserProfile,
+        on_delete=models.CASCADE,
+        related_name='tutor_application'
+    )
+
+    # Required Documents Only
+    school_id = models.ImageField(upload_to='tutor_applications/school_ids/')
+    enrollment_proof = models.FileField(upload_to='tutor_applications/enrollment_proofs/')
+
+    # Optional Motivation
+    reason_to_tutor = models.TextField(
+        blank=True,
+        help_text="Why do you want to become a tutor?"
+    )
+
+    # Screening Status
+    application_status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='pending'
+    )
+
+    # Admin Feedback
+    rejection_reason = models.TextField(blank=True, default='')
+    reviewed_by = models.ForeignKey(
+        UserProfile, on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='reviewed_applications'
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    submitted_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Application: {self.profile.fname} {self.profile.lname} ({self.application_status})"
 
 class Wallet(models.Model):
     tutor = models.OneToOneField(Tutor, on_delete=models.CASCADE, related_name='wallet')
@@ -269,6 +341,7 @@ class PlatformActivity(models.Model):
         ('institution_added', 'New Institution Request'),
         ('withdrawal_failed', 'Withdrawal Failure'),
         ('admin_action', 'Admin Action'),
+        ('tutor_application', 'Tutor Application'),
     ]
 
     activity_type = models.CharField(max_length=30, choices=ACTIVITY_TYPES)
@@ -432,6 +505,13 @@ class Booking(models.Model):
         max_length=40,
         choices=STATUS_CHOICES,
         default="Pending"
+    )
+    cancellation_reason = models.TextField(blank=True, default='')
+    cancelled_by_role = models.CharField(
+        max_length=10,
+        blank=True,
+        default='',
+        choices=[('tutee', 'Tutee'), ('tutor', 'Tutor')],
     )
     tutee_confirmed = models.BooleanField(default=False)
     tutor_confirmed = models.BooleanField(default=False)
@@ -598,3 +678,35 @@ class Preference(models.Model):
 
 # Import chat models to register them with the studybuddy app
 from .chat.models import ChatRoom, Message
+
+class SupportTicket(models.Model):
+    CATEGORY_CHOICES = [
+        ('Payment', 'Payment Issue'),
+        ('Booking', 'Booking/No-show'),
+        ('Technical', 'Technical Problem'),
+        ('Dispute', 'Tutee/Tutor Dispute'),
+        ('Other', 'Other'),
+    ]
+    STATUS_CHOICES = [
+        ('Open', 'Open'),
+        ('In_Progress', 'In Progress'),
+        ('Resolved', 'Resolved'),
+    ]
+
+    user = models.ForeignKey(UserProfile, on_delete=models.CASCADE, related_name="support_tickets")
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
+    subject = models.CharField(max_length=150)
+    description = models.TextField()
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="Open")
+
+    booking = models.ForeignKey('Booking', on_delete=models.SET_NULL, null=True, blank=True)
+    transaction = models.ForeignKey('Transaction', on_delete=models.SET_NULL, null=True, blank=True)
+
+    chatroom = models.OneToOneField('ChatRoom', on_delete=models.SET_NULL, null=True, related_name='ticket')
+
+    assigned_agent = models.ForeignKey(UserProfile, on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_tickets')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Ticket #{self.id} - {self.subject} ({self.status})"

@@ -52,6 +52,22 @@ export const useTutorBookingDetailStore = defineStore('tutorBookingDetail', () =
     }
   }
 
+  const cancelBooking = async (reason) => {
+    const id = booking.value?.id
+
+    if (!id) {
+      return
+    }
+
+    try {
+      await api.post(`/bookings/${id}/cancel/`, { reason })
+      await fetchBookingDetails(id)
+    } catch (err) {
+      console.error('Failed to cancel booking:', err)
+      throw err
+    }
+  }
+
   const devMarkReadyForPayment = async () => {
     const id = booking.value?.id
 
@@ -101,6 +117,7 @@ export const useTutorBookingDetailStore = defineStore('tutorBookingDetail', () =
     bookingId,
     fetchBookingDetails,
     confirmCompletion,
+    cancelBooking,
     devMarkReadyForPayment,
     confirmPayment,
     resetStore,

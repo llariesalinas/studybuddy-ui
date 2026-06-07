@@ -13,6 +13,12 @@ import 'bootstrap-icons/font/bootstrap-icons.css'
 import './assets/main.css'
 
 const app = createApp(App)
+
+// Global error boundary: keep one unhandled component error from crashing the app.
+app.config.errorHandler = (err, instance, info) => {
+  console.error('[vue:error]', info, err)
+}
+
 const pinia = createPinia()
 
 pinia.use(piniaPluginPersistedstate)

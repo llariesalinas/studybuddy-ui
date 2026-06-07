@@ -18,12 +18,13 @@
               <form @submit.prevent="handleCompleteSetup">
                 <div class="mb-4">
                   <label class="form-label fw-bold small sb-muted">TEACHING LEVEL</label>
-                  <select v-model="form.teaching_level" class="form-select border-sb shadow-none" required>
-                    <option value="" disabled>Select level</option>
-                    <option value="Elementary">Elementary</option>
-                    <option value="High School">High School</option>
-                    <option value="College">College</option>
-                  </select>
+                  <SbSelectModal
+                    v-model="form.teaching_level"
+                    :options="teachingLevelOptions"
+                    title="Teaching Level"
+                    placeholder="Select level"
+                    trigger-class="form-select border-sb shadow-none"
+                  />
                 </div>
 
                 <div class="mb-4">
@@ -62,6 +63,7 @@ import { useProfileStore } from '@/stores/profile'
 import { useToastStore } from '@/stores/toast'
 import api from '@/services/api/api'
 import SbThemeToggle from '@/components/SbThemeToggle.vue'
+import SbSelectModal from '@/components/SbSelectModal.vue'
 
 const router = useRouter()
 const profileStore = useProfileStore()
@@ -73,6 +75,12 @@ const form = ref({
   can_f2f: false,
   hourly_rate: null
 })
+
+const teachingLevelOptions = [
+  { label: 'Elementary', value: 'Elementary' },
+  { label: 'High School', value: 'High School' },
+  { label: 'College', value: 'College' },
+]
 
 
 /* LOAD EXISTING TUTOR DATA */
@@ -89,7 +97,7 @@ onMounted(async () => {
     form.value.can_f2f = tutor.can_f2f
     form.value.hourly_rate = tutor.hourly_rate
 
-  } catch (error) {
+  } catch {
 
     console.log("New tutor setup")
 
@@ -100,6 +108,11 @@ onMounted(async () => {
 
 /* SUBMIT PROFILE SETUP */
 const handleCompleteSetup = async () => {
+
+  if (!form.value.teaching_level) {
+    toastStore.push("Please select your teaching level.", 'warning')
+    return
+  }
 
   try {
 
