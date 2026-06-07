@@ -98,24 +98,40 @@
                   </div>
 
                   <div class="day-body">
-                    <button
+                    <article
                       v-for="session in daySessionsMap[day.key]"
                       :key="session.id"
-                      type="button"
                       class="weekly-session-card sb-interactive"
-                      :class="getWeeklySessionCardClasses(session.status)"
+                      :class="[
+                        getWeeklySessionCardClasses(session.status),
+                        { 'weekly-session-card-dismissible': canDismissDashboardPill(session) }
+                      ]"
+                      role="button"
+                      tabindex="0"
                       @click="goToDetails(session.id)"
+                      @keydown.enter.prevent="goToDetails(session.id)"
+                      @keydown.space.prevent="goToDetails(session.id)"
                     >
+                      <button
+                        v-if="canDismissDashboardPill(session)"
+                        type="button"
+                        class="weekly-session-dismiss-btn sb-btn"
+                        :aria-label="`Remove ${session.status} schedule pill for ${session.subject}`"
+                        title="Remove schedule pill"
+                        @click.stop="openDismissPillDialog(session)"
+                      >
+                        <i class="bi bi-trash3" aria-hidden="true"></i>
+                      </button>
                       <p class="weekly-session-time">{{ formatSessionTime(session) }}</p>
                       <h3 class="weekly-session-title">{{ session.subject }}</h3>
                       <p class="weekly-session-tutor">{{ session.tutor }}</p>
                       <div class="weekly-session-meta">
-                        <span class="weekly-session-status">{{ session.status }}</span>
+                        <span class="weekly-session-status" :title="session.status">{{ session.status }}</span>
                         <span class="weekly-session-duration">
                           {{ getSessionSlotSpan(session) }} slot{{ getSessionSlotSpan(session) === 1 ? '' : 's' }}
                         </span>
                       </div>
-                    </button>
+                    </article>
 
                     <div v-if="!daySessionsMap[day.key]?.length" class="day-empty-state">
                       <i :class="getEmptyStateIcon(day.index)"></i>
@@ -133,7 +149,7 @@
             <div class="panel-heading">
               <p class="panel-kicker">Discover</p>
               <h2 class="panel-title">Try out these tutors</h2>
-              <p class="panel-subtitle">Browse recommended tutors without leaving your dashboard rhythm.</p>
+              <p class="panel-subtitle">Recommended for your courses.</p>
             </div>
           </header>
 
@@ -151,31 +167,40 @@
 
               <div v-else class="recommendation-list-wrap">
                 <div class="recommendation-list">
-                  <div v-if="pagedTutors.length === 0" class="recommendation-empty">
+                  <div v-if="featuredTutors.length === 0" class="recommendation-empty">
                     No recommended tutors available at the moment.
                   </div>
 
                   <button
-                    v-for="tutor in pagedTutors"
+                    v-for="tutor in featuredTutors"
                     :key="tutor.id"
                     type="button"
                     class="tutor-list-item sb-interactive"
                     @click="bookTutor(tutor.id)"
                   >
+                    <span class="tutor-avatar" aria-hidden="true">{{ getTutorInitials(tutor) }}</span>
                     <span class="tutor-copy">
                       <span class="tutor-name">{{ tutor.name }}</span>
                       <span class="tutor-meta" :title="getTutorMetaTitle(tutor)">
-                        {{ formatTutorMeta(tutor) }}
+                        <span class="tutor-rating">
+                          <i class="bi bi-star-fill" aria-hidden="true"></i>
+                          {{ getTutorRatingLabel(tutor) }}
+                        </span>
+                        <span class="tutor-meta-dot" aria-hidden="true">•</span>
+                        <span class="tutor-subject">{{ getTutorPrimarySubject(tutor) }}</span>
                       </span>
                     </span>
-                    <span class="tutor-rate">PHP {{ tutor.hourlyRate || 0 }}/hr</span>
+                    <span class="tutor-rate">
+                      <span>PHP</span>
+                      <strong>{{ tutor.hourlyRate || 0 }}/hr</strong>
+                    </span>
                   </button>
                 </div>
 
-                <div v-if="totalPages > 1" class="recommendation-pagination">
-                  <button class="pagination-btn sb-btn" @click="prevPage" :disabled="page === 1">Prev</button>
-                  <span class="pagination-label">Page {{ page }} of {{ totalPages || 1 }}</span>
-                  <button class="pagination-btn sb-btn" @click="nextPage" :disabled="page >= totalPages">Next</button>
+                <div v-if="hasMoreRecommendations" class="recommendation-more">
+                  <button type="button" class="recommendation-more-btn sb-btn" @click="viewMoreTutors">
+                    View More Recommendations
+                  </button>
                 </div>
               </div>
             </Transition>
@@ -183,6 +208,53 @@
         </aside>
       </section>
     </div>
+
+    <Teleport to="body">
+      <Transition name="fade">
+        <div
+          v-if="dismissDialogSession"
+          class="dashboard-modal-backdrop"
+          @click.self="closeDismissPillDialog"
+        >
+          <section
+            class="dashboard-confirm-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="dismiss-pill-title"
+          >
+            <div class="dashboard-confirm-icon" aria-hidden="true">
+              <i class="bi bi-trash3"></i>
+            </div>
+            <div class="dashboard-confirm-copy">
+              <h2 id="dismiss-pill-title">Remove schedule pill?</h2>
+              <p>
+                This hides the {{ dismissDialogSession.status }} pill from your dashboard only.
+                Session history and details stay available.
+              </p>
+              <p v-if="dismissPillError" class="dashboard-confirm-error">{{ dismissPillError }}</p>
+            </div>
+            <div class="dashboard-confirm-actions">
+              <button
+                type="button"
+                class="dashboard-confirm-secondary sb-btn"
+                :disabled="dismissPillPending"
+                @click="closeDismissPillDialog"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                class="dashboard-confirm-danger sb-btn"
+                :disabled="dismissPillPending"
+                @click="confirmDismissDashboardPill"
+              >
+                {{ dismissPillPending ? 'Removing...' : 'Remove pill' }}
+              </button>
+            </div>
+          </section>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -196,6 +268,9 @@ const route = useRoute()
 const sessionsStore = useSessionsStore()
 const loading = ref(false)
 const weekOffset = ref(0)
+const dismissDialogSession = ref(null)
+const dismissPillPending = ref(false)
+const dismissPillError = ref('')
 
 const getSessionDateKey = (session) => {
   const rawDate = session?.date
@@ -334,6 +409,7 @@ const visibleSessions = computed(() => {
       return (
         session.dateKey >= startKey
         && session.dateKey <= endKey
+        && !session.dashboard_hidden_by_current_user
       )
     })
     .sort((left, right) => {
@@ -457,13 +533,63 @@ const getWeeklySessionCardClasses = (status) => {
   return 'weekly-session-card-upcoming'
 }
 
+const canDismissDashboardPill = (session) => {
+  const status = String(session?.status || '').toLowerCase()
+  return ['rejected', 'cancelled'].includes(status) && !session?.dashboard_hidden_by_current_user
+}
+
+const openDismissPillDialog = (session) => {
+  dismissDialogSession.value = session
+  dismissPillError.value = ''
+}
+
+const closeDismissPillDialog = () => {
+  if (dismissPillPending.value) {
+    return
+  }
+
+  dismissDialogSession.value = null
+  dismissPillError.value = ''
+}
+
+const confirmDismissDashboardPill = async () => {
+  if (!dismissDialogSession.value) {
+    return
+  }
+
+  dismissPillPending.value = true
+  dismissPillError.value = ''
+
+  try {
+    await sessionsStore.dismissDashboardPill(dismissDialogSession.value.id)
+    dismissDialogSession.value = null
+  } catch (error) {
+    console.error('Failed to remove dashboard pill:', error)
+    dismissPillError.value = 'Could not remove this pill right now. Please try again.'
+  } finally {
+    dismissPillPending.value = false
+  }
+}
+
 const getTutorSubjects = (tutor) => (
   Array.isArray(tutor?.subjects)
     ? tutor.subjects.filter(Boolean)
     : []
 )
 
+const getTutorInitials = (tutor) => {
+  const name = String(tutor?.name || 'Tutor').trim()
+  const parts = name.split(/\s+/).filter(Boolean)
+
+  return parts
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join('') || 'T'
+}
+
 const getTutorRatingLabel = (tutor) => tutor?.rating || 'N/A'
+
+const getTutorPrimarySubject = (tutor) => getTutorSubjects(tutor)[0] || 'Various subjects'
 
 const formatTutorMeta = (tutor) => {
   const subjects = getTutorSubjects(tutor)
@@ -499,31 +625,16 @@ const stats = computed(() => [
   { label: 'Completed', count: sessionsStore.completedSessions?.length || 0, icon: 'bi-check-square', bgClass: 'bg-success bg-opacity-10' }
 ])
 
-const page = ref(1)
-const pageSize = 5
+const featuredTutorLimit = 5
 
-const totalPages = computed(() => {
-  const total = sessionsStore.recommendedTutors?.length || 0
-  return Math.ceil(total / pageSize) || 1
-})
-
-const pagedTutors = computed(() => {
+const featuredTutors = computed(() => {
   const tutors = sessionsStore.recommendedTutors || []
-  const start = (page.value - 1) * pageSize
-  return tutors.slice(start, start + pageSize)
+  return tutors.slice(0, featuredTutorLimit)
 })
 
-const nextPage = () => {
-  if (page.value < totalPages.value) {
-    page.value += 1
-  }
-}
-
-const prevPage = () => {
-  if (page.value > 1) {
-    page.value -= 1
-  }
-}
+const hasMoreRecommendations = computed(() => (
+  (sessionsStore.recommendedTutors?.length || 0) > featuredTutorLimit
+))
 
 const goToDetails = (id) => {
   router.push({
@@ -536,6 +647,8 @@ const bookTutor = (id) => router.push({
   name: 'tutor-details',
   params: { id }
 })
+
+const viewMoreTutors = () => router.push({ name: 'tutors' })
 </script>
 
 <style scoped>
@@ -573,7 +686,7 @@ const bookTutor = (id) => router.push({
   display: grid;
   gap: 1rem;
   width: 100%;
-  max-width: 1180px;
+  max-width: 1280px;
   margin: 0 auto;
 }
 
@@ -780,10 +893,9 @@ const bookTutor = (id) => router.push({
 .weekly-board-scroll {
   flex: 1;
   min-height: 0;
-  overflow-x: auto;
+  overflow-x: hidden;
   overflow-y: hidden;
-  padding-bottom: 4px;
-  scrollbar-gutter: stable;
+  padding-bottom: 0;
   contain: paint;
 }
 
@@ -796,7 +908,7 @@ const bookTutor = (id) => router.push({
 .weekly-grid {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 0.7rem;
+  gap: 0.5rem;
   min-width: 0;
   align-items: start;
 }
@@ -827,7 +939,7 @@ const bookTutor = (id) => router.push({
 }
 
 .day-header {
-  padding: 0.75rem 0.65rem;
+  padding: 0.65rem 0.45rem;
   background: var(--sb-bg);
   text-align: center;
 }
@@ -852,8 +964,8 @@ const bookTutor = (id) => router.push({
 .day-body {
   display: grid;
   align-content: start;
-  gap: 0.55rem;
-  padding: 0.65rem;
+  gap: 0.45rem;
+  padding: 0.5rem;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
@@ -864,6 +976,7 @@ const bookTutor = (id) => router.push({
 }
 
 .weekly-session-card {
+  position: relative;
   display: flex;
   flex-direction: column;
   width: 100%;
@@ -871,18 +984,63 @@ const bookTutor = (id) => router.push({
   min-height: 128px;
   max-height: 128px;
   border: 1px solid transparent;
-  border-radius: 16px;
-  padding: 0.75rem;
+  border-radius: 14px;
+  padding: 0.56rem;
   text-align: left;
   transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
   box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05);
   min-width: 0;
   overflow: hidden;
+  cursor: pointer;
 }
 
 .weekly-session-card:hover {
   box-shadow: 0 0 0 1px rgba(0, 137, 90, 0.18),
               0 3px 8px rgba(15, 23, 42, 0.05);
+}
+
+.weekly-session-card:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--sb-primary) 72%, white);
+  outline-offset: 2px;
+}
+
+.weekly-session-card-dismissible .weekly-session-time {
+  padding-right: 1.45rem;
+}
+
+.weekly-session-dismiss-btn {
+  position: absolute;
+  top: 0.42rem;
+  right: 0.42rem;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border: 1px solid color-mix(in srgb, var(--sb-card-border) 80%, #dc2626);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--sb-card-bg) 90%, transparent);
+  color: #b91c1c;
+  padding: 0;
+  font-size: 0.68rem;
+  line-height: 1;
+  opacity: 0;
+  transform: translateY(-2px);
+  transition: opacity 0.15s ease, transform 0.15s ease, background-color 0.15s ease;
+}
+
+.weekly-session-card:hover .weekly-session-dismiss-btn,
+.weekly-session-card:focus-within .weekly-session-dismiss-btn {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.weekly-session-dismiss-btn:hover,
+.weekly-session-dismiss-btn:focus-visible {
+  background: #fee2e2;
+  color: #991b1b;
+  opacity: 1;
 }
 
 .weekly-session-card-upcoming {
@@ -928,13 +1086,14 @@ const bookTutor = (id) => router.push({
 .weekly-session-status {
   display: inline-flex;
   align-items: center;
+  flex: 1 1 auto;
   min-width: 0;
-  max-width: 100%;
-  min-height: 22px;
-  padding: 0.1rem 0.45rem;
+  max-width: min(100%, 58px);
+  min-height: 20px;
+  padding: 0.08rem 0.36rem;
   border-radius: 999px;
   background: var(--sb-bg);
-  font-size: 0.58rem;
+  font-size: 0.54rem;
   font-weight: 800;
   letter-spacing: 0;
   text-transform: uppercase;
@@ -988,18 +1147,18 @@ const bookTutor = (id) => router.push({
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
-  margin: 0 0 0.25rem;
-  font-size: 0.72rem;
+  margin: 0 0 0.2rem;
+  font-size: 0.68rem;
   font-weight: 800;
-  line-height: 1.3;
+  line-height: 1.25;
   color: var(--sb-ink);
   overflow: hidden;
   word-break: break-word;
 }
 
 .weekly-session-time {
-  margin: 0 0 0.45rem;
-  font-size: 0.62rem;
+  margin: 0 0 0.32rem;
+  font-size: 0.58rem;
   font-weight: 800;
   color: #006c49;
   letter-spacing: 0;
@@ -1010,8 +1169,8 @@ const bookTutor = (id) => router.push({
 }
 
 .weekly-session-tutor {
-  margin: 0 0 0.55rem;
-  font-size: 0.66rem;
+  margin: 0 0 0.36rem;
+  font-size: 0.62rem;
   color: var(--sb-muted);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1022,39 +1181,168 @@ const bookTutor = (id) => router.push({
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.5rem;
+  gap: 0.25rem;
   min-width: 0;
   margin-top: auto;
+  width: 100%;
 }
 
 .weekly-session-duration {
-  font-size: 0.58rem;
+  font-size: 0.54rem;
   font-weight: 700;
   color: var(--sb-muted);
-  flex-shrink: 0;
+  flex: 0 0 auto;
   white-space: nowrap;
+}
+
+.dashboard-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1080;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(15, 23, 42, 0.36);
+  backdrop-filter: blur(8px);
+}
+
+.dashboard-confirm-modal {
+  width: min(100%, 390px);
+  border: 1px solid var(--sb-card-border);
+  border-radius: 18px;
+  background: var(--sb-card-bg);
+  color: var(--sb-ink);
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.22);
+  padding: 1.15rem;
+}
+
+.dashboard-confirm-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.35rem;
+  height: 2.35rem;
+  border-radius: 999px;
+  background: #fee2e2;
+  color: #b91c1c;
+  margin-bottom: 0.85rem;
+}
+
+.dashboard-confirm-copy h2 {
+  margin: 0 0 0.45rem;
+  color: var(--sb-ink);
+  font-size: 1.05rem;
+  font-weight: 850;
+  letter-spacing: 0;
+}
+
+.dashboard-confirm-copy p {
+  margin: 0;
+  color: var(--sb-muted);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.dashboard-confirm-error {
+  margin-top: 0.65rem !important;
+  color: #b91c1c !important;
+  font-weight: 750;
+}
+
+.dashboard-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  margin-top: 1rem;
+}
+
+.dashboard-confirm-secondary,
+.dashboard-confirm-danger {
+  min-height: 36px;
+  border-radius: 999px;
+  padding: 0.48rem 0.85rem;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.dashboard-confirm-secondary {
+  border: 1px solid var(--sb-card-border);
+  background: var(--sb-card-bg);
+  color: var(--sb-muted);
+}
+
+.dashboard-confirm-danger {
+  border: 1px solid #dc2626;
+  background: #dc2626;
+  color: #fff;
+}
+
+.dashboard-confirm-secondary:disabled,
+.dashboard-confirm-danger:disabled {
+  opacity: 0.68;
+  cursor: not-allowed;
+}
+
+:global([data-sb-theme="dark"]) .weekly-session-dismiss-btn {
+  border-color: rgba(248, 113, 113, 0.35);
+  background: rgba(15, 23, 42, 0.72);
+  color: #fecaca;
+}
+
+:global([data-sb-theme="dark"]) .weekly-session-dismiss-btn:hover,
+:global([data-sb-theme="dark"]) .weekly-session-dismiss-btn:focus-visible {
+  background: rgba(127, 29, 29, 0.78);
+  color: #fff;
+}
+
+:global([data-sb-theme="dark"]) .dashboard-modal-backdrop {
+  background: rgba(2, 6, 23, 0.58);
+}
+
+:global([data-sb-theme="dark"]) .dashboard-confirm-icon {
+  background: rgba(127, 29, 29, 0.42);
+  color: #fecaca;
+}
+
+:global([data-sb-theme="dark"]) .dashboard-confirm-error {
+  color: #fca5a5 !important;
 }
 
 
 .day-empty-state {
-  min-height: 86px;
+  width: 100%;
+  min-height: 82px;
   border: 1px dashed var(--sb-card-border);
-  border-radius: 16px;
+  border-radius: 14px;
   background: color-mix(in srgb, var(--sb-card-bg) 72%, transparent);
-  display: grid;
-  place-items: center;
-  gap: 0.45rem;
-  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.38rem;
+  padding: 0.55rem;
   text-align: center;
   color: var(--sb-muted);
-  font-size: 0.62rem;
+  font-size: 0.58rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0;
 }
 
 .day-empty-state i {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.2rem;
+  height: 1.2rem;
   font-size: 1rem;
+  line-height: 1;
+}
+
+.day-empty-state span {
+  display: block;
+  max-width: 100%;
+  line-height: 1.25;
 }
 
 .session-card-skeleton {
@@ -1069,6 +1357,49 @@ const bookTutor = (id) => router.push({
   margin-bottom: 0.8rem;
 }
 
+.recommendation-panel {
+  --recommendation-panel-bg: color-mix(in srgb, var(--sb-card-bg) 96%, var(--sb-bg));
+  --recommendation-panel-border: var(--sb-card-border);
+  --recommendation-card-bg: color-mix(in srgb, var(--sb-card-bg) 84%, transparent);
+  --recommendation-card-border: color-mix(in srgb, var(--sb-card-border) 88%, var(--sb-primary));
+  --recommendation-card-hover: color-mix(in srgb, var(--sb-card-bg) 94%, var(--sb-primary));
+  --recommendation-title: var(--sb-ink);
+  --recommendation-muted: var(--sb-muted);
+  --recommendation-rate: var(--sb-primary);
+  --recommendation-avatar-bg: var(--sb-green-tint);
+  --recommendation-avatar-border: color-mix(in srgb, var(--sb-primary) 50%, var(--sb-card-border));
+  --recommendation-divider: color-mix(in srgb, var(--sb-card-border) 92%, transparent);
+  background: var(--recommendation-panel-bg);
+  border-color: var(--recommendation-panel-border);
+}
+
+:global([data-sb-theme="dark"]) .recommendation-panel {
+  --recommendation-panel-bg: #09231c;
+  --recommendation-panel-border: #1f4d3c;
+  --recommendation-card-bg: #172d25;
+  --recommendation-card-border: #1f3b32;
+  --recommendation-card-hover: #1b3a30;
+  --recommendation-title: #f3f7f5;
+  --recommendation-muted: #a7bbb3;
+  --recommendation-rate: #a8e5cd;
+  --recommendation-avatar-bg: #0b1815;
+  --recommendation-avatar-border: #75b59c;
+  --recommendation-divider: #1a332b;
+  box-shadow: 0 12px 28px rgba(2, 18, 13, 0.2);
+}
+
+:global([data-sb-theme="dark"]) .recommendation-panel .panel-kicker {
+  color: #789189;
+}
+
+:global([data-sb-theme="dark"]) .recommendation-panel .panel-title {
+  color: var(--recommendation-title);
+}
+
+:global([data-sb-theme="dark"]) .recommendation-panel .panel-subtitle {
+  color: #b6c8c0;
+}
+
 .recommendation-body,
 .recommendation-list-wrap {
   display: flex;
@@ -1079,11 +1410,11 @@ const bookTutor = (id) => router.push({
 
 .recommendation-list {
   display: grid;
-  gap: 0.65rem;
+  gap: 0.5rem;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding-right: 0.15rem;
+  padding-right: 0.1rem;
   scrollbar-gutter: stable;
   contain: paint;
 }
@@ -1103,106 +1434,147 @@ const bookTutor = (id) => router.push({
 }
 
 .tutor-list-item {
-  display: flex;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) minmax(54px, auto);
   align-items: center;
-  justify-content: space-between;
-  gap: 0.9rem;
+  gap: 0.55rem;
   width: 100%;
-  height: 84px;
-  min-height: 84px;
-  max-height: 84px;
-  border: 1px solid var(--sb-card-border);
-  border-radius: 18px;
-  background: color-mix(in srgb, var(--sb-card-bg) 78%, transparent);
+  height: 72px;
+  min-height: 72px;
+  max-height: 72px;
+  border: 1px solid var(--recommendation-card-border);
+  border-radius: 20px;
+  background: var(--recommendation-card-bg);
   color: inherit;
-  padding: 0.85rem;
+  padding: 0.65rem;
   text-align: left;
   cursor: pointer;
-  transition: border-color 0.18s ease, background-color 0.18s ease;
+  transition: border-color 0.18s ease, background-color 0.18s ease, transform 0.18s ease;
 }
 
 .tutor-list-item:hover {
   border-color: color-mix(in srgb, var(--sb-primary) 30%, var(--sb-card-border));
-  background: color-mix(in srgb, var(--sb-card-bg) 92%, var(--sb-primary));
+  background: var(--recommendation-card-hover);
+}
+
+.tutor-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 2px solid var(--recommendation-avatar-border);
+  border-radius: 50%;
+  background: var(--recommendation-avatar-bg);
+  color: var(--recommendation-rate);
+  font-size: 0.7rem;
+  font-weight: 900;
+  line-height: 1;
+  flex: 0 0 auto;
 }
 
 .tutor-copy {
   display: grid;
-  gap: 0.25rem;
+  gap: 0.18rem;
   min-width: 0;
   overflow: hidden;
 }
 
 .tutor-name {
   display: block;
-  color: var(--sb-ink);
-  font-size: 0.96rem;
+  color: var(--recommendation-title);
+  font-size: 0.88rem;
   font-weight: 850;
+  line-height: 1.2;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .tutor-meta {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  color: var(--sb-muted);
-  font-size: 0.78rem;
-  font-weight: 650;
-  line-height: 1.35;
+  display: flex;
+  align-items: center;
+  gap: 0.24rem;
+  min-width: 0;
+  color: var(--recommendation-muted);
+  font-size: 0.66rem;
+  font-weight: 750;
+  line-height: 1.25;
   overflow: hidden;
 }
 
-.tutor-rate {
+.tutor-rating {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
+  gap: 0.16rem;
   flex: 0 0 auto;
-  min-height: 34px;
-  border: 1px solid rgba(0, 137, 90, 0.24);
-  border-radius: 999px;
-  background: rgba(0, 137, 90, 0.09);
-  color: #07543a;
-  padding: 0.35rem 0.65rem;
-  font-size: 0.78rem;
-  font-weight: 850;
-  min-width: 96px;
+  color: #d99912;
+  font-weight: 900;
   white-space: nowrap;
 }
 
-.recommendation-pagination {
+:global([data-sb-theme="dark"]) .tutor-rating {
+  color: #ffc84d;
+}
+
+.tutor-rating i {
+  font-size: 0.64rem;
+  line-height: 1;
+}
+
+.tutor-meta-dot {
+  color: var(--recommendation-muted);
+  flex: 0 0 auto;
+  opacity: 0.9;
+}
+
+.tutor-subject {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tutor-rate {
+  display: grid;
+  align-content: center;
+  justify-items: end;
+  flex: 0 0 auto;
+  gap: 0.12rem;
+  color: var(--recommendation-rate);
+  font-weight: 900;
+  min-width: 54px;
+  white-space: nowrap;
+}
+
+.tutor-rate span {
+  font-size: 0.64rem;
+  line-height: 1;
+}
+
+.tutor-rate strong {
+  font-size: 0.8rem;
+  line-height: 1.15;
+}
+
+.recommendation-more {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
+  justify-content: center;
   flex: 0 0 auto;
-  margin-top: 0.8rem;
-  padding-top: 0.8rem;
-  border-top: 1px solid var(--sb-card-border);
+  margin-top: 0.55rem;
+  padding-top: 0.55rem;
+  border-top: 1px solid var(--recommendation-divider);
 }
 
-.pagination-btn {
-  min-height: 36px;
+.recommendation-more-btn {
   border: 0;
-  border-radius: 999px;
-  background: var(--sb-primary);
-  color: #fff;
-  padding: 0.5rem 0.85rem;
+  background: transparent;
+  color: var(--recommendation-muted);
+  padding: 0.25rem 0;
   font-size: 0.8rem;
   font-weight: 850;
-}
-
-.pagination-btn:disabled {
-  background: var(--sb-card-border);
-  color: var(--sb-muted);
-  cursor: not-allowed;
-}
-
-.pagination-label {
-  color: var(--sb-muted);
-  font-size: 0.82rem;
-  font-weight: 750;
+  text-align: center;
 }
 
 .recommendation-skeleton {
@@ -1239,8 +1611,8 @@ const bookTutor = (id) => router.push({
   }
 
   .weekly-grid {
-    grid-template-columns: repeat(7, minmax(118px, 1fr));
-    min-width: 860px;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    min-width: 0;
   }
 }
 
@@ -1277,12 +1649,12 @@ const bookTutor = (id) => router.push({
   }
 
   .weekly-grid {
-    grid-template-columns: repeat(7, minmax(150px, 1fr));
-    min-width: 1080px;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    min-width: 0;
   }
 
   .weekly-board-nav,
-  .recommendation-pagination {
+  .recommendation-more {
     width: 100%;
   }
 
@@ -1292,15 +1664,14 @@ const bookTutor = (id) => router.push({
   }
 
   .tutor-list-item {
-    align-items: flex-start;
-    flex-direction: column;
-    height: 132px;
-    min-height: 132px;
-    max-height: 132px;
+    grid-template-columns: 38px minmax(0, 1fr) minmax(54px, auto);
+    height: 72px;
+    min-height: 72px;
+    max-height: 72px;
+    padding: 0.65rem;
   }
 
-  .tutor-rate,
-  .pagination-btn {
+  .recommendation-more-btn {
     width: 100%;
   }
 }

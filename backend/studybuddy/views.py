@@ -386,6 +386,34 @@ def get_booking_request_bookings(booking):
     return sort_bookings_for_session_group(booking_group)
 
 
+def get_dashboard_pill_bookings(booking):
+    base_queryset = Booking.objects.select_related(
+        'student__course',
+        'student__user',
+        'tutor__profile__course',
+        'tutor__profile__user',
+        'availability',
+        'payment__method',
+        'rating',
+    ).filter(
+        student=booking.student,
+        tutor=booking.tutor,
+        session_date=booking.session_date,
+        status=booking.status,
+    )
+
+    if booking.booking_request_id:
+        booking_group = base_queryset.filter(booking_request_id=booking.booking_request_id)
+    elif booking.session_group_id:
+        booking_group = base_queryset.filter(session_group_id=booking.session_group_id)
+    else:
+        booking_group = base_queryset.filter(id=booking.id)
+
+    return sort_bookings_for_session_group(
+        booking_group.order_by('session_date', 'availability__time_slot', 'id')
+    )
+
+
 def get_representative_booking(bookings):
     if bookings is None:
         return None
@@ -401,6 +429,20 @@ def get_representative_booking(bookings):
         return booking
 
     return None
+
+
+def get_dashboard_hidden_for_profile(bookings, profile):
+    if not profile:
+        return False
+
+    for booking in bookings:
+        if profile == booking.student:
+            if booking.dashboard_hidden_by_student_at:
+                return True
+        elif profile == booking.tutor.profile and booking.dashboard_hidden_by_tutor_at:
+            return True
+
+    return False
 
 
 def get_session_notification_context(bookings):
@@ -1311,7 +1353,7 @@ class SubjectListView(ListAPIView):
 
 
 
-def build_combined_block(group):
+def build_combined_block(group, profile=None):
 
     sorted_group = sort_bookings_for_session_group(group)
     first = sorted_group[0]
@@ -1367,7 +1409,8 @@ def build_combined_block(group):
         "endTime": end_time.strftime("%H:%M"),
         "duration_hours": duration,
         "preferred_location": first.preferred_location,
-        "session_mode": first.session_mode
+        "session_mode": first.session_mode,
+        "dashboard_hidden_by_current_user": get_dashboard_hidden_for_profile(sorted_group, profile),
     }
 
 
@@ -1419,7 +1462,7 @@ def split_bookings_into_time_blocks(bookings):
             and previous_end == booking.availability.time_slot
         )
 
-        if same_session_group or is_contiguous:
+        if same_session_group and is_contiguous:
             current_block.append(booking)
             continue
 
@@ -1431,7 +1474,7 @@ def split_bookings_into_time_blocks(bookings):
     return [build_time_block_payload(block) for block in grouped_blocks]
 
 
-def build_booking_request_block(group):
+def build_booking_request_block(group, profile=None):
 
     sorted_group = sort_bookings_for_session_group(group)
     representative_booking = get_representative_booking(sorted_group)
@@ -1466,6 +1509,7 @@ def build_booking_request_block(group):
         "session_mode": first_booking.session_mode,
         "time_blocks": time_blocks,
         "hasMultipleTimeBlocks": len(time_blocks) > 1,
+        "dashboard_hidden_by_current_user": get_dashboard_hidden_for_profile(sorted_group, profile),
     }
 
 #Tutor Dashboard View
@@ -2381,10 +2425,16 @@ def list_bookings(request):
     grouped_bookings = defaultdict(list)
 
     for booking in bookings:
+        booking_date_key = booking.session_date.isoformat()
+
         if booking.status == "Pending" and booking.booking_request_id:
-            group_key = f"request-{booking.booking_request_id}"
+            group_key = f"request-{booking_date_key}-{booking.booking_request_id}"
         else:
-            group_key = str(booking.session_group_id) if booking.session_group_id else f"booking-{booking.id}"
+            group_key = (
+                f"group-{booking_date_key}-{booking.session_group_id}"
+                if booking.session_group_id
+                else f"booking-{booking.id}"
+            )
         grouped_bookings[group_key].append(booking)
 
     final_data = []
@@ -2393,13 +2443,54 @@ def list_bookings(request):
         representative_booking = get_representative_booking(group)
 
         if representative_booking and representative_booking.status == "Pending" and representative_booking.booking_request_id:
-            final_data.append(build_booking_request_block(group))
+            final_data.append(build_booking_request_block(group, profile))
         else:
-            final_data.append(build_combined_block(group))
+            final_data.append(build_combined_block(group, profile))
 
     final_data.sort(key=lambda booking: (booking["date"], booking["startTime"]))
 
     return Response(final_data)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def dismiss_dashboard_pill(request, booking_id):
+    profile = request.user.userprofile
+    booking = get_object_or_404(
+        Booking.objects.select_related(
+            'student',
+            'tutor__profile',
+            'availability',
+        ),
+        id=booking_id,
+    )
+
+    is_student = profile == booking.student
+    is_tutor = profile == booking.tutor.profile
+
+    if not (is_student or is_tutor):
+        return Response({"error": "Unauthorized"}, status=403)
+
+    if booking.status not in ("Rejected", "Cancelled"):
+        return Response(
+            {"error": "Only rejected or cancelled schedule pills can be removed."},
+            status=400,
+        )
+
+    session_group_bookings = get_dashboard_pill_bookings(booking)
+
+    if not session_group_bookings:
+        return Response({"error": "Booking not found."}, status=404)
+
+    hidden_field = "dashboard_hidden_by_student_at" if is_student else "dashboard_hidden_by_tutor_at"
+    Booking.objects.filter(
+        id__in=[group_booking.id for group_booking in session_group_bookings]
+    ).update(**{hidden_field: timezone.now()})
+
+    return Response({
+        "message": "Schedule pill removed from dashboard.",
+        "hidden_booking_ids": [group_booking.id for group_booking in session_group_bookings],
+    })
 
 
 def build_booking_detail_payload(session_group_bookings):

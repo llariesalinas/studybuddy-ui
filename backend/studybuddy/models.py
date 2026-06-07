@@ -555,6 +555,8 @@ class Booking(models.Model):
     )
     tutee_confirmed = models.BooleanField(default=False)
     tutor_confirmed = models.BooleanField(default=False)
+    dashboard_hidden_by_student_at = models.DateTimeField(null=True, blank=True)
+    dashboard_hidden_by_tutor_at = models.DateTimeField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
 

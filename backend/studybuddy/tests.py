@@ -2363,3 +2363,143 @@ class DashboardLoadPerformanceTests(APITestCase):
             f"list_bookings query count grew with booking count "
             f"({first} -> {second}); a per-row (N+1) query likely regressed.",
         )
+
+    def test_list_bookings_does_not_merge_same_group_across_dates(self):
+        group_id = uuid4()
+        Booking.objects.create(
+            student=self.student,
+            tutor=self.tutor,
+            availability=self.availability,
+            session_date=date(2026, 6, 6),
+            session_mode="Online",
+            session_group_id=group_id,
+            status="Rejected",
+        )
+        Booking.objects.create(
+            student=self.student,
+            tutor=self.tutor,
+            availability=self.availability,
+            session_date=date(2026, 6, 10),
+            session_mode="Online",
+            session_group_id=group_id,
+            status="Rejected",
+        )
+
+        response = self.client.get("/api/bookings/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 2)
+        self.assertEqual(
+            [str(booking["date"]) for booking in response.data],
+            ["2026-06-06", "2026-06-10"],
+        )
+
+    def test_student_can_hide_rejected_dashboard_pill_without_hiding_for_tutor(self):
+        booking = Booking.objects.create(
+            student=self.student,
+            tutor=self.tutor,
+            availability=self.availability,
+            session_date=date(2026, 6, 6),
+            session_mode="Online",
+            status="Rejected",
+        )
+
+        response = self.client.delete(f"/api/bookings/{booking.id}/dashboard-pill/")
+
+        self.assertEqual(response.status_code, 200)
+        booking.refresh_from_db()
+        self.assertIsNotNone(booking.dashboard_hidden_by_student_at)
+        self.assertIsNone(booking.dashboard_hidden_by_tutor_at)
+
+        student_response = self.client.get("/api/bookings/")
+        self.assertTrue(student_response.data[0]["dashboard_hidden_by_current_user"])
+
+        self.client.force_authenticate(user=self.tutor_user)
+        tutor_response = self.client.get("/api/bookings/")
+        self.assertFalse(tutor_response.data[0]["dashboard_hidden_by_current_user"])
+
+    def test_hide_dashboard_pill_applies_to_all_slots_in_group(self):
+        group_id = uuid4()
+        next_availability = TutorAvailability.objects.create(
+            tutor=self.tutor,
+            day="Mon",
+            time_slot=time(14, 30),
+            is_active=True,
+        )
+        first_booking = Booking.objects.create(
+            student=self.student,
+            tutor=self.tutor,
+            availability=self.availability,
+            session_date=date(2026, 6, 6),
+            session_mode="Online",
+            session_group_id=group_id,
+            status="Cancelled",
+        )
+        second_booking = Booking.objects.create(
+            student=self.student,
+            tutor=self.tutor,
+            availability=next_availability,
+            session_date=date(2026, 6, 6),
+            session_mode="Online",
+            session_group_id=group_id,
+            status="Cancelled",
+        )
+
+        response = self.client.delete(f"/api/bookings/{first_booking.id}/dashboard-pill/")
+
+        self.assertEqual(response.status_code, 200)
+        first_booking.refresh_from_db()
+        second_booking.refresh_from_db()
+        self.assertIsNotNone(first_booking.dashboard_hidden_by_student_at)
+        self.assertIsNotNone(second_booking.dashboard_hidden_by_student_at)
+        self.assertEqual(
+            sorted(response.data["hidden_booking_ids"]),
+            sorted([first_booking.id, second_booking.id]),
+        )
+
+    def test_hide_dashboard_pill_rejects_active_or_completed_statuses(self):
+        booking = Booking.objects.create(
+            student=self.student,
+            tutor=self.tutor,
+            availability=self.availability,
+            session_date=date(2026, 6, 6),
+            session_mode="Online",
+            status="Completed",
+        )
+
+        response = self.client.delete(f"/api/bookings/{booking.id}/dashboard-pill/")
+
+        self.assertEqual(response.status_code, 400)
+        booking.refresh_from_db()
+        self.assertIsNone(booking.dashboard_hidden_by_student_at)
+
+    def test_hide_dashboard_pill_rejects_unauthorized_users(self):
+        booking = Booking.objects.create(
+            student=self.student,
+            tutor=self.tutor,
+            availability=self.availability,
+            session_date=date(2026, 6, 6),
+            session_mode="Online",
+            status="Cancelled",
+        )
+        other_user = User.objects.create_user(
+            username="other-student",
+            email="other-student@example.com",
+            password="password",
+        )
+        UserProfile.objects.create(
+            user=other_user,
+            fname="Other",
+            mname="",
+            lname="Student",
+            role="Tutee",
+            year_level=11,
+            course=self.course,
+        )
+        self.client.force_authenticate(user=other_user)
+
+        response = self.client.delete(f"/api/bookings/{booking.id}/dashboard-pill/")
+
+        self.assertEqual(response.status_code, 403)
+        booking.refresh_from_db()
+        self.assertIsNone(booking.dashboard_hidden_by_student_at)
