@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>StudyBuddy · Dashboard Recommendations (Learning Artifact)</title>
+<style>
+  :root {
+    --sb-primary: #00895A;
+    --sb-primary-soft: #00895a1a;
+    --sb-dark: #0A1916;
+    --sb-bg: #F8F9FA;
+    --sb-amber: #B7791F;
+    --sb-red: #C0392B;
+    --sb-border: #e2e6e4;
+    --sb-ink: #1d2421;
+    --sb-muted: #5b6660;
+    --radius: 12px;
+    --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: var(--sans); color: var(--sb-ink);
+    background: var(--sb-bg); line-height: 1.55;
+  }
+  header.hero {
+    background: var(--sb-dark); color: #fff; padding: 32px 28px 26px;
+  }
+  header.hero h1 { margin: 0 0 6px; font-size: 24px; letter-spacing: -0.3px; }
+  header.hero p { margin: 0; color: #b8c4be; max-width: 760px; }
+  .tag {
+    display: inline-block; font-size: 11px; text-transform: uppercase;
+    letter-spacing: 1px; color: var(--sb-primary); background: #00895a26;
+    padding: 3px 9px; border-radius: 999px; margin-bottom: 12px; font-weight: 600;
+  }
+  nav.tabs {
+    position: sticky; top: 0; z-index: 10; display: flex; flex-wrap: wrap;
+    gap: 4px; padding: 10px 20px; background: #fff;
+    border-bottom: 1px solid var(--sb-border);
+  }
+  nav.tabs button {
+    border: 0; background: transparent; font: inherit; font-size: 14px;
+    color: var(--sb-muted); padding: 8px 14px; border-radius: 8px; cursor: pointer;
+    font-weight: 500; transition: all .15s;
+  }
+  nav.tabs button:hover { background: var(--sb-bg); color: var(--sb-ink); }
+  nav.tabs button.active { background: var(--sb-primary-soft); color: var(--sb-primary); font-weight: 600; }
+  main { max-width: 920px; margin: 0 auto; padding: 28px 24px 80px; }
+  section.panel { display: none; animation: fade .25s ease; }
+  section.panel.active { display: block; }
+  @keyframes fade { from { opacity: 0; transform: translateY(6px);} to {opacity:1; transform:none;} }
+  h2 { font-size: 20px; margin: 4px 0 14px; letter-spacing: -0.2px; }
+  h3 { font-size: 15px; margin: 22px 0 8px; }
+  p { margin: 0 0 12px; }
+  .lead { color: var(--sb-muted); }
+  code { font-family: var(--mono); font-size: 0.88em; background: #eef1f0; padding: 1px 5px; border-radius: 5px; }
+  pre {
+    font-family: var(--mono); font-size: 12.5px; background: var(--sb-dark);
+    color: #e7ecea; padding: 14px 16px; border-radius: var(--radius); overflow-x: auto;
+    margin: 12px 0; line-height: 1.5;
+  }
+  pre .c { color: #7e9b8f; }      /* comment */
+  pre .k { color: #6fc3a0; }      /* keyword/func */
+  pre .s { color: #e6b673; }      /* string */
+  .card {
+    background: #fff; border: 1px solid var(--sb-border); border-radius: var(--radius);
+    padding: 16px 18px; margin: 12px 0;
+  }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap: 12px; }
+  .grid .card { margin: 0; }
+  .card h4 { margin: 0 0 6px; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+  .card .ic { width: 26px; height: 26px; border-radius: 7px; display: grid; place-items: center;
+    background: var(--sb-primary-soft); color: var(--sb-primary); font-size: 14px; flex: 0 0 auto; }
+  .card p { font-size: 13px; color: var(--sb-muted); margin: 0; }
+  .pill { display:inline-block; font-size: 11px; font-weight:600; padding: 2px 8px; border-radius: 999px; }
+  .pill.now { background: var(--sb-primary-soft); color: var(--sb-primary); }
+  .pill.later { background:#fdeecf; color: var(--sb-amber); }
+  .pill.hit { background: var(--sb-primary-soft); color: var(--sb-primary); }
+  .pill.miss { background:#fdeecf; color: var(--sb-amber); }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13.5px; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--sb-border); vertical-align: top; }
+  th { color: var(--sb-muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .4px; }
+  .callout { border-left: 3px solid var(--sb-primary); background: #fff; padding: 12px 16px; border-radius: 8px; margin: 14px 0; }
+  .callout.warn { border-left-color: var(--sb-amber); }
+  .callout.bad { border-left-color: var(--sb-red); }
+  .callout strong { display:block; margin-bottom: 2px; }
+
+  /* flow diagram */
+  .flow-toggle { display:flex; gap:8px; margin: 8px 0 18px; flex-wrap: wrap; }
+  .flow-toggle button {
+    border: 1px solid var(--sb-border); background:#fff; font: inherit; font-size: 13px;
+    padding: 7px 14px; border-radius: 999px; cursor:pointer; font-weight:500; color: var(--sb-muted);
+  }
+  .flow-toggle button.active { border-color: var(--sb-primary); color: var(--sb-primary); background: var(--sb-primary-soft); font-weight:600; }
+  .diagram { display:flex; align-items:center; gap: 6px; flex-wrap: wrap; padding: 18px; background:#fff; border:1px solid var(--sb-border); border-radius: var(--radius); }
+  .node {
+    border: 1.5px solid var(--sb-border); border-radius: 10px; padding: 10px 12px; font-size: 12.5px;
+    min-width: 92px; text-align:center; background: var(--sb-bg); transition: all .2s;
+  }
+  .node .lbl { font-weight: 600; display:block; }
+  .node .sub { font-size: 11px; color: var(--sb-muted); }
+  .node.hot { border-color: var(--sb-primary); background: var(--sb-primary-soft); }
+  .node.warm { border-color: var(--sb-amber); background:#fdeecf; }
+  .node.dim { opacity: .35; }
+  .arrow { color: var(--sb-muted); font-size: 18px; }
+  .arrow.hot { color: var(--sb-primary); }
+  .legend { font-size: 12px; color: var(--sb-muted); margin-top: 12px; }
+  .footer { color: var(--sb-muted); font-size: 12px; margin-top: 30px; border-top: 1px solid var(--sb-border); padding-top: 14px; }
+  details { background:#fff; border:1px solid var(--sb-border); border-radius: 10px; padding: 4px 14px; margin: 10px 0; }
+  summary { cursor: pointer; font-weight: 600; font-size: 14px; padding: 8px 0; }
+  details[open] summary { color: var(--sb-primary); }
+  .files { font-size: 13.5px; }
+  .files td:first-child { font-family: var(--mono); font-size: 12.5px; white-space: nowrap; }
+  .badge { font-size: 10.5px; font-weight: 700; padding: 1px 7px; border-radius: 999px; text-transform: uppercase; letter-spacing: .3px; }
+  .badge.new { background: var(--sb-primary-soft); color: var(--sb-primary); }
+  .badge.mod { background:#fdeecf; color: var(--sb-amber); }
+  .badge.none { background:#eef1f0; color: var(--sb-muted); }
+  .formula { font-family: var(--mono); background:#fff; border:1px solid var(--sb-border); border-radius:10px; padding:14px 16px; margin:12px 0; font-size: 13.5px; }
+</style>
+</head>
+<body>
+<header class="hero">
+  <span class="tag">Learning Artifact · 2026-06-06</span>
+  <h1>Dashboard Recommendations: wiring the hybrid algorithm</h1>
+  <p>How the tutee dashboard's <em>"Try out these tutors"</em> widget will start using
+     StudyBuddy's real hybrid recommender &mdash; ranked by the tutee's course + profile
+     subjects and tutor ratings &mdash; without making the dashboard slow. Covers the
+     algorithm, the hidden bottleneck, the Redis caching layer, and exactly which files
+     change. This explains the design <strong>before</strong> it's built.</p>
+</header>
+
+<nav class="tabs" id="tabs">
+  <button class="active" data-p="why">1 · Why</button>
+  <button data-p="algo">2 · The Algorithm</button>
+  <button data-p="slow">3 · The Bottleneck</button>
+  <button data-p="cache">4 · Caching (Redis)</button>
+  <button data-p="stack">5 · The Tech Stack</button>
+  <button data-p="build">6 · How It's Built</button>
+  <button data-p="files">7 · Affected Files</button>
+  <button data-p="edge">8 · Edge Cases</button>
+</nav>
+
+<main>
+  <!-- 1 WHY -->
+  <section class="panel active" id="why">
+    <h2>The problem we're solving</h2>
+    <p class="lead">The hybrid recommender already exists and works &mdash; but the dashboard
+       widget doesn't use it. It shows a hard-coded stub.</p>
+    <h3>What the widget shows today</h3>
+    <pre><span class="c"># backend/studybuddy/views.py  -> student_dashboard()</span>
+tutors = Tutor.objects.all().select_related(<span class="s">'profile'</span>)[:<span class="k">3</span>]   <span class="c"># first 3 rows. that's it.</span></pre>
+    <table>
+      <tr><th>#</th><th>Weakness</th><th>Consequence</th></tr>
+      <tr><td>1</td><td>Returns the <strong>first 3 tutors</strong> in the table</td><td>No subject match, no course match, no ranking. Same 3 for everyone.</td></tr>
+      <tr><td>2</td><td>Ignores the tutee's profile</td><td>An IT student is not shown IT tutors. The widget teaches the user nothing.</td></tr>
+      <tr><td>3</td><td>Ignores ratings entirely</td><td>The collaborative-filtering signal (what similar students liked) is wasted.</td></tr>
+      <tr><td>4</td><td>The real algorithm only runs in the booking flow</td><td><code>/recommend-tutors/</code> is wired to <code>FindTutors.vue</code>, not the dashboard.</td></tr>
+    </table>
+    <div class="callout">
+      <strong>The goal</strong>
+      Make "Try out these tutors" rank by the <em>hybrid score</em> &mdash; course + profile
+      subjects (content) blended with tutor ratings (collaborative) &mdash; while keeping the
+      dashboard fast at pilot scale (hundreds of tutors, thousands of tutees and ratings) and
+      ready to scale further.
+    </div>
+  </section>
+
+  <!-- 2 ALGORITHM -->
+  <section class="panel" id="algo">
+    <h2>How the recommender works</h2>
+    <p class="lead">Three pieces already live in <code>backend/studybuddy/recommender/</code>.
+       The dashboard will reuse them unchanged in spirit.</p>
+    <div class="grid">
+      <div class="card"><h4><span class="ic">&#128218;</span> CBF &mdash; <code>cbf.py</code></h4><p>Content-based: compares the tutee's profile to each tutor (subject, expertise, course, year, level). Answers "is this tutor a good <em>academic</em> fit?"</p></div>
+      <div class="card"><h4><span class="ic">&#11088;</span> CF &mdash; <code>CF.py</code></h4><p>Collaborative: finds students similar to you (Pearson similarity over ratings) and predicts how you'd rate this tutor. Answers "did people like me rate them well?"</p></div>
+      <div class="card"><h4><span class="ic">&#9878;</span> Hybrid &mdash; <code>hybrid.py</code></h4><p>Blends the two into one score and ranks tutors high &rarr; low.</p></div>
+    </div>
+
+    <h3>The blend (as it is in code today)</h3>
+    <div class="formula">final = <strong>0.70</strong> &times; CBF&nbsp;&nbsp;+&nbsp;&nbsp;<strong>0.30</strong> &times; (CF / 5)</div>
+    <div class="callout warn">
+      <strong>Paper vs. code mismatch &mdash; noted, but out of scope here</strong>
+      Your paper states <code>0.60 &times; CBF + 0.40 &times; CF</code>. The code uses
+      <strong>0.70 / 0.30</strong> and divides CF by 5 (CF predicts a 1&ndash;5 rating; the
+      <code>/5</code> rescales it to 0&ndash;1 so it's comparable to CBF). This wiring task
+      <em>does not change the weights</em> &mdash; that's a separate decision you'll make about
+      whether to align the code to the paper or the paper to the code.
+    </div>
+
+    <h3>How "course + subjects" drives the ranking</h3>
+    <p>The CBF score is a weighted sum. Subject and course are the heaviest terms, which is why
+       an IT student naturally sees IT-course tutors who teach their subjects at the top:</p>
+    <pre><span class="c"># cbf.py weights</span>
+W_SUBJECT   = <span class="k">0.35</span>   <span class="c"># teaches a subject you need</span>
+W_EXPERTISE = <span class="k">0.20</span>   <span class="c"># how strong they are in it</span>
+W_COURSE    = <span class="k">0.20</span>   <span class="c"># same course (0.5 partial credit for same strand)</span>
+W_YEAR      = <span class="k">0.15</span>
+W_LEVEL     = <span class="k">0.10</span></pre>
+    <p>For the dashboard, <strong>subject membership becomes a hard filter</strong> (we only score
+       tutors who teach one of your preference subjects), and <strong>course stays a score term</strong>
+       (so same-course tutors rank highest). That matches what you asked for: "IT course &rarr; IT
+       tutors at the top."</p>
+  </section>
+
+  <!-- 3 BOTTLENECK -->
+  <section class="panel" id="slow">
+    <h2>The hidden bottleneck</h2>
+    <p class="lead">Before caching anything, there's a real inefficiency to fix &mdash; otherwise
+       we'd just be caching over a slow path.</p>
+    <h3>What happens now, per request</h3>
+    <p>To score a tutor, CF needs your "neighbors" (the most similar students). But the neighbor
+       set depends only on <em>you</em> &mdash; not on the tutor. The current code recomputes it
+       <strong>once for every candidate tutor</strong>:</p>
+    <pre><span class="c"># hybrid.py (today): loops tutors, and INSIDE compute_cf_score...</span>
+<span class="k">for</span> tutor <span class="k">in</span> tutors:
+    cf = compute_cf_score(ratings, student_id, tutor_id)   <span class="c"># -> top_k() recomputes</span>
+                                                           <span class="c">#    similarity to EVERY student</span>
+                                                           <span class="c">#    again, for each tutor</span></pre>
+    <div class="callout bad">
+      <strong>Cost: O(tutors &times; students &times; ratings)</strong>
+      With 300 tutors and 3,000 students, the same neighbor calculation runs 300 times per
+      dashboard load &mdash; 299 of them redundant. On the dashboard (loaded on every visit)
+      that adds up fast.
+    </div>
+    <h3>The fix: compute neighbors once</h3>
+    <pre><span class="c"># hybrid.py (fixed): hoist the student-only work out of the loop</span>
+neighbors = top_k(ratings, student_id)        <span class="c"># ONCE per request</span>
+<span class="k">for</span> tutor <span class="k">in</span> tutors:
+    cf = compute_cf_score(ratings, student_id, tutor_id, neighbors=neighbors)</pre>
+    <p>Same math, same results &mdash; cost drops to <strong>O(students &times; ratings) + O(tutors)</strong>.
+       This is a pure efficiency change with no effect on the scores, and we'll assert it with a test.</p>
+  </section>
+
+  <!-- 4 CACHE -->
+  <section class="panel" id="cache">
+    <h2>Caching: don't recompute what hasn't changed</h2>
+    <p class="lead">Your recommendation only changes when your preferences change, a new rating
+       lands, or a tutor is added. None of those happen second-to-second &mdash; so we compute
+       once and serve a stored copy for a while.</p>
+    <h3>Cache-aside (the pattern)</h3>
+    <p>Toggle a scenario to see the path:</p>
+    <div class="flow-toggle" id="flowToggle">
+      <button class="active" data-f="miss">First load <span class="pill miss">miss</span></button>
+      <button data-f="hit">Next load <span class="pill hit">hit</span></button>
+      <button data-f="bust">Preferences saved</button>
+      <button data-f="down">Redis down</button>
+    </div>
+    <div class="diagram" id="diagram"></div>
+    <p class="legend" id="flowLegend"></p>
+
+    <h3>The rules</h3>
+    <table>
+      <tr><th>Setting</th><th>Value</th><th>Why</th></tr>
+      <tr><td>Cache key</td><td><code>dash_recs:{tutee_id}</code></td><td>One cached list per tutee.</td></tr>
+      <tr><td>TTL</td><td>~600s (10 min)</td><td>New ratings/tutors appear within ~10 min. Good enough for a "discover" widget.</td></tr>
+      <tr><td>Early bust</td><td>On preference save</td><td>If you change what you want, the next load recomputes immediately &mdash; not after 10 min.</td></tr>
+    </table>
+    <div class="callout">
+      <strong>Why cache <em>after</em> the bottleneck fix, not instead of it</strong>
+      Caching hides cost on repeat loads, but the <em>first</em> load and every load right after a
+      preference change still compute live. Fixing the neighbor loop makes that live path fast too.
+      Cache + fix together = fast always, not just fast-when-warm.
+    </div>
+  </section>
+
+  <!-- 5 STACK -->
+  <section class="panel" id="stack">
+    <h2>The tech stack &mdash; and why each piece</h2>
+    <div class="grid">
+      <div class="card"><h4><span class="ic">&#9889;</span> Redis</h4><p>An in-memory key&ndash;value store. Reads/writes in well under a millisecond. Here it holds each tutee's precomputed recommendation list.</p></div>
+      <div class="card"><h4><span class="ic">&#128230;</span> Django cache framework</h4><p>Django's built-in <code>cache.get/set/delete</code> API. Our code talks to <em>this</em>, not to Redis directly &mdash; so the backend is swappable.</p></div>
+      <div class="card"><h4><span class="ic">&#128295;</span> RedisCache backend</h4><p>Django 6 ships <code>django.core.cache.backends.redis.RedisCache</code> &mdash; no extra Python package needed. Just point it at a <code>REDIS_URL</code>.</p></div>
+      <div class="card"><h4><span class="ic">&#129518;</span> The recommender package</h4><p>Existing <code>cbf.py</code> / <code>CF.py</code> / <code>hybrid.py</code>. We add a thin <code>dashboard.py</code> service on top.</p></div>
+    </div>
+
+    <h3>Why Redis (and the honest tradeoff)</h3>
+    <table>
+      <tr><th></th><th>Redis <span class="pill now">chosen</span></th><th>DB cache table</th><th>In-memory (LocMem)</th></tr>
+      <tr><td>Speed</td><td>Fastest</td><td>One indexed row read</td><td>Fastest</td></tr>
+      <tr><td>Shared across workers</td><td>Yes</td><td>Yes</td><td><strong>No</strong> &mdash; per process</td></tr>
+      <tr><td>New infrastructure</td><td><strong>Yes</strong> &mdash; a Redis server</td><td>No (uses your DB)</td><td>No</td></tr>
+      <tr><td>Scales to C</td><td>Excellent</td><td>OK</td><td>Poor</td></tr>
+    </table>
+    <div class="callout warn">
+      <strong>The tradeoff you accepted</strong>
+      Redis is this project's <em>first</em> Redis dependency &mdash; django-q2 was deliberately
+      kept on the DB broker to avoid it. The payoff: the same Redis can later back the background
+      precompute job (C-scale) and a real-time chat layer. The cost: a Redis server must be running
+      and reachable, configured via <code>REDIS_URL</code>.
+    </div>
+    <h3>Why not just hit the database harder?</h3>
+    <p>The expensive part isn't a DB query &mdash; it's the <em>Python computation</em> (similarity
+       math across thousands of ratings). A DB index can't cache the <em>result of a calculation</em>.
+       Redis can: we store the finished, ranked list and skip the math entirely on a hit.</p>
+  </section>
+
+  <!-- 6 BUILD -->
+  <section class="panel" id="build">
+    <h2>How it's going to be built</h2>
+    <p class="lead">One new service function is the spine. The dashboard view (now) and a future
+       background job (later) both call it &mdash; that's the B&rarr;C bridge.</p>
+
+    <h3>The data flow, per dashboard load</h3>
+    <pre><span class="c"># the one entry point everything goes through</span>
+<span class="k">def</span> get_dashboard_recommendations(tutee, limit=<span class="k">10</span>):
+    key = <span class="s">f"dash_recs:{tutee.id}"</span>
+    cached = cache.get(key)
+    <span class="k">if</span> cached <span class="k">is</span> <span class="k">not</span> <span class="k">None</span>:
+        <span class="k">return</span> cached                          <span class="c"># HIT: instant</span>
+
+    subjects = get_student_subject_codes(tutee)   <span class="c"># from their Preference</span>
+    candidates = tutors_teaching(subjects)        <span class="c"># hard filter</span>
+    ranked = recommend_tutors_hybrid(             <span class="c"># neighbors computed ONCE inside</span>
+        build_rating_matrix(), tutee, requested_subject=<span class="k">None</span>,
+        candidate_qs=candidates)
+    data = serialize(ranked[:limit])              <span class="c"># {id,name,rating,subjects,hourlyRate}</span>
+    cache.set(key, data, timeout=<span class="k">600</span>)
+    <span class="k">return</span> data</pre>
+
+    <h3>Build order (sequential &mdash; no parallel agents)</h3>
+    <table>
+      <tr><th>#</th><th>Step</th></tr>
+      <tr><td>1</td><td>Fix CF/hybrid: compute neighbors once, pass them in. Add a test proving it.</td></tr>
+      <tr><td>2</td><td>Add <code>recommender/dashboard.py</code> with <code>get_dashboard_recommendations</code> (+ cold-start fallback).</td></tr>
+      <tr><td>3</td><td>Configure <code>CACHES</code> (RedisCache) in <code>settings.py</code>; add <code>REDIS_URL</code> to <code>.env.example</code>.</td></tr>
+      <tr><td>4</td><td>Wire <code>student_dashboard</code> to call the service (keep the JSON shape identical).</td></tr>
+      <tr><td>5</td><td>Bust the cache key in the preference-update endpoint.</td></tr>
+      <tr><td>6</td><td>Tests: neighbor-once, cache hit/miss, bust-on-save, Redis-down, cold start. Run <code>manage.py check</code> + <code>npm run build</code>.</td></tr>
+    </table>
+    <div class="callout">
+      <strong>The frontend doesn't change</strong>
+      <code>Dashboard.vue</code> already reads <code>recommendations</code> from <code>GET /dashboard</code>.
+      As long as the backend keeps the <code>{ id, name, rating, subjects, hourlyRate }</code> shape,
+      the widget just starts showing better tutors with zero Vue edits.
+    </div>
+  </section>
+
+  <!-- 7 FILES -->
+  <section class="panel" id="files">
+    <h2>Affected areas in the codebase</h2>
+    <p class="lead">Small surface area. Backend only &mdash; the Vue side is untouched.</p>
+    <table class="files">
+      <tr><th>File</th><th>Change</th><th>What &amp; why</th></tr>
+      <tr><td>recommender/dashboard.py</td><td><span class="badge new">new</span></td><td>The service function the dashboard (and future job) call. Owns the cache-aside logic + cold-start fallback.</td></tr>
+      <tr><td>recommender/CF.py</td><td><span class="badge mod">mod</span></td><td>Accept precomputed <code>neighbors</code> so similarity is computed once per student, not per tutor.</td></tr>
+      <tr><td>recommender/hybrid.py</td><td><span class="badge mod">mod</span></td><td>Compute neighbors once, reuse across candidates. (Weights stay 0.70/0.30.)</td></tr>
+      <tr><td>views.py &rarr; student_dashboard</td><td><span class="badge mod">mod</span></td><td>Replace the <code>Tutor.objects.all()[:3]</code> stub with the service call. Keep the response shape.</td></tr>
+      <tr><td>views.py &rarr; preference update</td><td><span class="badge mod">mod</span></td><td>One line: <code>cache.delete(key)</code> on save, so changing preferences refreshes recs immediately.</td></tr>
+      <tr><td>backend/settings.py</td><td><span class="badge mod">mod</span></td><td>Add the <code>CACHES</code> block (RedisCache from <code>REDIS_URL</code>).</td></tr>
+      <tr><td>backend/.env.example</td><td><span class="badge mod">mod</span></td><td>Document <code>REDIS_URL</code> so the team knows Redis is now required.</td></tr>
+      <tr><td>Dashboard.vue / stores</td><td><span class="badge none">none</span></td><td>No change &mdash; same endpoint, same JSON shape.</td></tr>
+      <tr><td>/recommend-tutors/ &amp; FindTutors.vue</td><td><span class="badge none">none</span></td><td>The booking-flow recommender is left exactly as-is.</td></tr>
+    </table>
+    <div class="callout warn">
+      <strong>New deploy requirement</strong>
+      A Redis server must be running and reachable, with <code>REDIS_URL</code> set. In dev that's a
+      local Redis (or Memurai/WSL on Windows). The app degrades gracefully if it's missing (next tab),
+      but recommendations won't be cached until it's up.
+    </div>
+  </section>
+
+  <!-- 8 EDGE -->
+  <section class="panel" id="edge">
+    <h2>Edge cases &amp; resilience</h2>
+    <table>
+      <tr><th>Situation</th><th>Behaviour</th></tr>
+      <tr><td><strong>Redis is down/unreachable</strong></td><td>The service catches the cache error, logs a warning, and computes directly. The dashboard <strong>never 500s</strong> because the cache is offline &mdash; it just loses the speed-up.</td></tr>
+      <tr><td><strong>Tutee has no preference subjects</strong> (cold start)</td><td>Fall back to a simple recent/any-tutor list in the same JSON shape, so the widget is never empty.</td></tr>
+      <tr><td><strong>No ratings anywhere / student not in matrix</strong></td><td>CF returns <code>None</code> &rarr; contributes 0; CBF still ranks by course + subject. Confirmed by a test.</td></tr>
+      <tr><td><strong>New rating arrives</strong></td><td>Reflected on TTL expiry (&le;10 min). Acceptable for a discover widget; not the login critical path.</td></tr>
+    </table>
+    <div class="callout bad">
+      <strong>The trap we avoid</strong>
+      A naive "cache forever" would freeze recommendations &mdash; a student who fixes their
+      profile would keep seeing the old, wrong tutors. The TTL + bust-on-preference-save keeps the
+      widget honest without recomputing on every single page view.
+    </div>
+    <div class="callout">
+      <strong>Scaling to C, later (no rewrite)</strong>
+      Because all the work lives behind <code>get_dashboard_recommendations</code>, the C-scale upgrade
+      is additive: a django-q2 scheduled job calls that <em>same function</em> for active tutees every
+      N minutes and warms Redis ahead of time. The dashboard then only ever reads a hit. Nothing in the
+      view or the frontend changes.
+    </div>
+    <div class="footer">
+      StudyBuddy learning artifact &middot; describes the planned dashboard recommendation wiring
+      (spec: <code>docs/superpowers/specs/2026-06-06-dashboard-recommendations-design.md</code>).
+      Generated for understanding; not a substitute for reading the code once it lands.
+    </div>
+  </section>
+</main>
+
+<script>
+  // tab switching
+  const tabs = document.querySelectorAll("#tabs button");
+  const panels = document.querySelectorAll("section.panel");
+  tabs.forEach(b => b.addEventListener("click", () => {
+    tabs.forEach(x => x.classList.remove("active"));
+    panels.forEach(p => p.classList.remove("active"));
+    b.classList.add("active");
+    document.getElementById(b.dataset.p).classList.add("active");
+    window.scrollTo({top: 0, behavior: "smooth"});
+  }));
+
+  // flow diagram
+  const diagram = document.getElementById("diagram");
+  const legend = document.getElementById("flowLegend");
+  const N = (lbl, sub, cls="") => `<div class="node ${cls}"><span class="lbl">${lbl}</span><span class="sub">${sub}</span></div>`;
+  const A = (cls="") => `<span class="arrow ${cls}">&rarr;</span>`;
+  const flows = {
+    miss: {
+      html: N("Dashboard","GET /dashboard") + A() + N("Service","cache.get","warm")
+        + A("hot") + N("Redis","empty &mdash; miss","warm") + A() + N("Compute","filter + score","hot")
+        + A("hot") + N("Redis","cache.set 600s","hot") + A() + N("Response","top 10"),
+      note: "First load: cache is empty, so we run the algorithm once (neighbors computed once), store the result in Redis for 10 minutes, and return it."
+    },
+    hit: {
+      html: N("Dashboard","GET /dashboard") + A() + N("Service","cache.get","hot")
+        + A("hot") + N("Redis","HIT","hot") + A("hot") + N("Response","top 10","hot")
+        + `<div class="node dim">Compute</div>`,
+      note: "Next load within 10 min: one sub-millisecond Redis read. The algorithm never runs. This is the common case and it's effectively free."
+    },
+    bust: {
+      html: N("Tutee","saves preferences") + A() + N("Pref view","cache.delete","hot")
+        + A("hot") + N("Redis","key removed","warm") + A() + N("Next load","recomputes","hot"),
+      note: "Changing preferences deletes the cached key immediately, so the very next dashboard load recomputes with the new subjects — no 10-minute wait."
+    },
+    down: {
+      html: N("Dashboard","GET /dashboard") + A() + N("Service","cache.get","warm")
+        + A() + N("Redis","DOWN","dim") + A() + N("Compute","direct (no cache)","hot")
+        + A() + N("Response","top 10","hot"),
+      note: "Redis unreachable: the service catches the error, logs it, and computes directly. Slower, but the dashboard still works — it never errors out because the cache is offline."
+    }
+  };
+  const ftBtns = document.querySelectorAll("#flowToggle button");
+  function renderFlow(key){
+    diagram.innerHTML = flows[key].html;
+    legend.textContent = flows[key].note;
+    ftBtns.forEach(b => b.classList.toggle("active", b.dataset.f === key));
+  }
+  ftBtns.forEach(b => b.addEventListener("click", () => renderFlow(b.dataset.f)));
+  renderFlow("miss");
+</script>
+</body>
+</html>

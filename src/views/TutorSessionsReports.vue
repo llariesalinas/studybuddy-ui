@@ -448,8 +448,6 @@ const getStatusClass = (status) => {
 .analytics-summary {
   border: 1px solid var(--reports-border);
   background: var(--reports-glass);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
   box-shadow: 0 18px 42px rgba(15, 23, 42, 0.08);
 }
 
@@ -948,12 +946,4 @@ const getStatusClass = (status) => {
   }
 }
 
-@supports not (backdrop-filter: blur(18px)) {
-  .metric-card,
-  .reports-panel,
-  .session-row,
-  .analytics-summary {
-    background: var(--sb-card-bg);
-  }
-}
 </style>

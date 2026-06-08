@@ -325,23 +325,21 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth' // Import auth store
 import { useSessionsStore } from '@/stores/completedSessions'
 import NotificationBell from '@/components/NotificationBell.vue'
 import RatingReminderBanner from '@/components/RatingReminderBanner.vue'
-import { useNotificationsStore } from '@/stores/notifications'
 import { useChatStore } from '@/stores/chat'
 import router from './router'
 import { SESSION_POLL_INTERVAL_MS } from './config.js'
 import SbToast from '@/components/SbToast.vue'
 import SbThemeToggle from '@/components/SbThemeToggle.vue'
-import SupportModal from '@/components/SupportModal.vue'
+const SupportModal = defineAsyncComponent(() => import('@/components/SupportModal.vue'))
 
 const route = useRoute()
 const authStore = useAuthStore()
-const notificationsStore = useNotificationsStore()
 const chatStore = useChatStore()
 const sessionStore = useSessionsStore()
 const logoutModalRef = ref(null)
@@ -357,71 +355,34 @@ const openSupport = (type = 'Other', id = null) => {
   isSupportModalOpen.value = true
 }
 let pendingSessionsRefreshId = null
-let auroraFrameId = null
-let auroraPointerTarget = { x: 0, y: 0 }
-let auroraMotionEnabled = false
+let startupIdleId = null
+let startupTimeoutId = null
 
-const setAuroraMovement = (x = 0, y = 0) => {
-  const rootStyle = document.documentElement.style
-  rootStyle.setProperty('--sb-aurora-base-x', `${(x * 10).toFixed(2)}px`)
-  rootStyle.setProperty('--sb-aurora-base-y', `${(y * 7).toFixed(2)}px`)
-  rootStyle.setProperty('--sb-aurora-overlay-x', `${(x * 34).toFixed(2)}px`)
-  rootStyle.setProperty('--sb-aurora-overlay-y', `${(y * 26).toFixed(2)}px`)
-  rootStyle.setProperty('--sb-aurora-sheen-x', `${(x * -8).toFixed(2)}px`)
-  rootStyle.setProperty('--sb-aurora-sheen-y', `${(y * -5).toFixed(2)}px`)
-}
-
-const scheduleAuroraMovement = () => {
-  if (auroraFrameId) {
+const deferStartupWork = (callback) => {
+  if (typeof window === 'undefined') {
+    callback()
     return
   }
 
-  auroraFrameId = window.requestAnimationFrame(() => {
-    auroraFrameId = null
-    setAuroraMovement(auroraPointerTarget.x, auroraPointerTarget.y)
-  })
-}
-
-const handleAuroraPointerMove = (event) => {
-  auroraPointerTarget = {
-    x: ((event.clientX / window.innerWidth) - 0.5) * 2,
-    y: ((event.clientY / window.innerHeight) - 0.5) * 2
-  }
-  scheduleAuroraMovement()
-}
-
-const resetAuroraMovement = () => {
-  auroraPointerTarget = { x: 0, y: 0 }
-  scheduleAuroraMovement()
-}
-
-const setupAuroraPointerMotion = () => {
-  const finePointer = window.matchMedia?.('(pointer: fine)').matches
-  const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-
-  auroraMotionEnabled = Boolean(finePointer && !reducedMotion)
-
-  if (!auroraMotionEnabled) {
-    setAuroraMovement()
+  if ('requestIdleCallback' in window) {
+    startupIdleId = window.requestIdleCallback(callback, { timeout: 2000 })
     return
   }
 
-  window.addEventListener('pointermove', handleAuroraPointerMove, { passive: true })
-  window.addEventListener('pointerleave', resetAuroraMovement)
-  window.addEventListener('blur', resetAuroraMovement)
+  startupTimeoutId = window.setTimeout(callback, 800)
 }
 
-const teardownAuroraPointerMotion = () => {
-  window.removeEventListener('pointermove', handleAuroraPointerMove)
-  window.removeEventListener('pointerleave', resetAuroraMovement)
-  window.removeEventListener('blur', resetAuroraMovement)
-
-  if (auroraFrameId) {
-    window.cancelAnimationFrame(auroraFrameId)
-    auroraFrameId = null
+const cancelDeferredStartupWork = () => {
+  if (startupIdleId && typeof window !== 'undefined' && 'cancelIdleCallback' in window) {
+    window.cancelIdleCallback(startupIdleId)
   }
 
-  setAuroraMovement()
+  if (startupTimeoutId) {
+    window.clearTimeout(startupTimeoutId)
+  }
+
+  startupIdleId = null
+  startupTimeoutId = null
 }
 
 const clearBootstrapModalState = () => {
@@ -484,12 +445,12 @@ const handleVisibilityChange = async () => {
   }
 }
 onMounted(() => {
-  setupAuroraPointerMotion()
-
   if (authStore.isAuthenticated) {
-    notificationsStore.fetchNotifications()
-    chatStore.fetchRooms()
-    chatStore.connectUpdates()
+    deferStartupWork(() => {
+      chatStore.fetchRooms()
+      chatStore.connectUpdates()
+    })
+
     if (userRole.value === 'tutor') {
       sessionStore.fetchSessions()
       document.addEventListener('visibilitychange', handleVisibilityChange)
@@ -502,7 +463,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   closeLogoutModal()
-  teardownAuroraPointerMotion()
+  cancelDeferredStartupWork()
   document.removeEventListener('visibilitychange', handleVisibilityChange)
 
   if (pendingSessionsRefreshId) {
@@ -585,9 +546,7 @@ onBeforeUnmount(() => {
 }
 
 .app-main-surface {
-  background:
-    var(--sb-aurora-bg, none),
-    var(--sb-bg);
+  background: var(--sb-bg);
 }
 
 .app-main-chat {
@@ -609,7 +568,6 @@ onBeforeUnmount(() => {
   background: color-mix(in srgb, var(--sb-card-bg) 94%, transparent);
   color: var(--sb-text-main);
   box-shadow: 0 28px 80px rgba(0, 0, 0, 0.22);
-  backdrop-filter: blur(28px);
 }
 
 .chat-icon-btn {
@@ -753,15 +711,6 @@ onBeforeUnmount(() => {
   }
 }
 
-@keyframes sb-pulse-dot {
-  0%, 100% {
-    box-shadow: 0 0 0 0 rgba(0, 137, 90, 0.6);
-  }
-  50% {
-    box-shadow: 0 0 0 8px rgba(0, 137, 90, 0);
-  }
-}
-
 @keyframes sb-pop {
   0% {
     transform: scale(0.6);
@@ -798,11 +747,6 @@ onBeforeUnmount(() => {
   to   { opacity: 1; transform: scale(1); }
 }
 
-@keyframes sb-shimmer {
-  0%   { background-position: -600px 0; }
-  100% { background-position:  600px 0; }
-}
-
 @keyframes sb-tab-indicator {
   from { transform: scaleX(0); opacity: 0; }
   to   { transform: scaleX(1); opacity: 1; }
@@ -832,14 +776,7 @@ onBeforeUnmount(() => {
 
 /* --- Layer B: Skeleton shimmer --- */
 .sb-skeleton {
-  background: linear-gradient(
-    90deg,
-    rgba(226, 232, 240, 0.8) 25%,
-    rgba(203, 213, 225, 0.9) 50%,
-    rgba(226, 232, 240, 0.8) 75%
-  );
-  background-size: 600px 100%;
-  animation: sb-shimmer 1.6s ease-in-out infinite;
+  background: rgba(226, 232, 240, 0.86);
   border-radius: 12px;
 }
 

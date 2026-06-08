@@ -1,0 +1,7 @@
+{% extends "email/base.html" %}
+{% block content %}
+<h1 style="margin:0 0 12px;font-size:20px;">Your login code</h1>
+<p style="margin:0 0 18px;color:#5b6660;font-size:14px;">Enter this code to finish signing in:</p>
+<div style="font-size:32px;font-weight:bold;letter-spacing:6px;color:#00895A;background:#00895a14;border-radius:10px;padding:16px;text-align:center;">{{ code }}</div>
+<p style="margin:18px 0 0;color:#8a938e;font-size:13px;">This code expires in {{ ttl_minutes }} minutes. If you didn't try to sign in, you can ignore this email.</p>
+{% endblock %}

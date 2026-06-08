@@ -8,6 +8,9 @@ export const useSessionsStore = defineStore('sessions', () => {
   const error = ref(null)
   const seenPendingRequestIds = ref([])
   const recommendedTutors = ref([])
+  const SESSION_FRESHNESS_MS = 15_000
+  let sessionsRequest = null
+  let lastSessionsFetchedAt = 0
 
   if (typeof window !== 'undefined') {
     try {
@@ -26,7 +29,7 @@ export const useSessionsStore = defineStore('sessions', () => {
 
   const fetchRecommendations = async () => {
     try {
-      const response = await api.get('/dashboard')
+      const response = await api.get('/recommendations')
       recommendedTutors.value = response.data.recommendations || []
     } catch (error) {
       recommendedTutors.value = []
@@ -122,18 +125,38 @@ export const useSessionsStore = defineStore('sessions', () => {
     }
   }
 
-  const fetchSessions = async () => {
+  const fetchSessions = async ({ force = false } = {}) => {
+    const now = Date.now()
+
+    if (!force && sessionsRequest) {
+      return sessionsRequest
+    }
+
+    if (!force && lastSessionsFetchedAt && now - lastSessionsFetchedAt < SESSION_FRESHNESS_MS) {
+      return sessions.value
+    }
+
     loading.value = true
     error.value = null
 
+    sessionsRequest = (async () => {
+      try {
+        const response = await api.get('/bookings/')
+        sessions.value = mergeGroupedSessions(response.data)
+        lastSessionsFetchedAt = Date.now()
+      } catch (err) {
+        console.error('Failed to load sessions:', err)
+        error.value = 'Failed to load sessions.'
+      }
+
+      return sessions.value
+    })()
+
     try {
-      const response = await api.get('/bookings/')
-      sessions.value = mergeGroupedSessions(response.data)
-    } catch (err) {
-      console.error('Failed to load sessions:', err)
-      error.value = 'Failed to load sessions.'
+      return await sessionsRequest
     } finally {
       loading.value = false
+      sessionsRequest = null
     }
   }
 
@@ -156,17 +179,17 @@ export const useSessionsStore = defineStore('sessions', () => {
 
   const approveSession = async (id) => {
     await api.post(`/bookings/${id}/approve/`)
-    await fetchSessions()
+    await fetchSessions({ force: true })
   }
 
   const rejectSession = async (id) => {
     await api.post(`/bookings/${id}/reject/`)
-    await fetchSessions()
+    await fetchSessions({ force: true })
   }
 
   const cancelSession = async (id, reason) => {
     await api.post(`/bookings/${id}/cancel/`, { reason })
-    await fetchSessions()
+    await fetchSessions({ force: true })
     return fetchSessionById(id)
   }
 
@@ -177,13 +200,13 @@ export const useSessionsStore = defineStore('sessions', () => {
       }
     })
 
-    await fetchSessions()
+    await fetchSessions({ force: true })
     return fetchSessionById(id)
   }
 
   const verifyOnlinePayment = async (id) => {
     await api.post(`/bookings/${id}/verify-online-payment/`)
-    await fetchSessions()
+    await fetchSessions({ force: true })
     return fetchSessionById(id)
   }
 
@@ -193,7 +216,7 @@ export const useSessionsStore = defineStore('sessions', () => {
       comment
     })
 
-    await fetchSessions()
+    await fetchSessions({ force: true })
     return fetchSessionById(id)
   }
 

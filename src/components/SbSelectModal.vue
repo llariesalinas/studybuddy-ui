@@ -420,7 +420,6 @@ function unlockBodyScroll() {
   justify-content: center;
   padding: 1.25rem;
   background: rgba(7, 19, 16, 0.48);
-  backdrop-filter: blur(8px);
 }
 
 .sb-select-dialog {

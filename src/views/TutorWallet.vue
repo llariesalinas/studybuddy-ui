@@ -1,10 +1,6 @@
 <!-- src/views/TutorWallet.vue -->
 <template>
   <div class="wallet-shell">
-    <div class="wallet-aurora wallet-aurora-one"></div>
-    <div class="wallet-aurora wallet-aurora-two"></div>
-    <div class="wallet-aurora wallet-aurora-three"></div>
-
     <section class="wallet-grid wallet-top-grid">
       <article class="glass-panel performance-card sb-interactive">
         <div class="ring-wrap" aria-label="Wallet performance">
@@ -737,35 +733,6 @@ watch(showCashoutModal, async (isOpen) => {
     linear-gradient(135deg, #f8fafc 0%, #f5fbf4 100%);
 }
 
-.wallet-aurora {
-  position: absolute;
-  z-index: -2;
-  width: 280px;
-  height: 280px;
-  border-radius: 999px;
-  filter: blur(120px);
-  opacity: 0.72;
-  pointer-events: none;
-}
-
-.wallet-aurora-one {
-  top: 20px;
-  left: 8%;
-  background: rgba(16, 185, 129, 0.5);
-}
-
-.wallet-aurora-two {
-  top: 140px;
-  right: 10%;
-  background: rgba(14, 165, 233, 0.35);
-}
-
-.wallet-aurora-three {
-  bottom: 80px;
-  left: 38%;
-  background: rgba(139, 92, 246, 0.24);
-}
-
 .wallet-grid {
   display: grid;
   gap: 24px;
@@ -787,7 +754,6 @@ watch(showCashoutModal, async (isOpen) => {
 
 .glass-panel {
   background: var(--wallet-glass);
-  backdrop-filter: blur(24px);
   border: 1px solid rgba(255, 255, 255, 0.9);
   border-radius: 24px;
   box-shadow: 0 18px 60px rgba(15, 23, 42, 0.08);
@@ -961,8 +927,7 @@ watch(showCashoutModal, async (isOpen) => {
   width: 210px;
   height: 210px;
   border-radius: 999px;
-  background: rgba(140, 248, 191, 0.28);
-  filter: blur(32px);
+  background: radial-gradient(circle, rgba(140, 248, 191, 0.28), rgba(140, 248, 191, 0));
   transition: transform var(--sb-t-normal) var(--sb-spring);
 }
 
@@ -1436,7 +1401,6 @@ watch(showCashoutModal, async (isOpen) => {
   border: 1px solid rgba(255, 255, 255, 0.9);
   border-radius: 24px;
   background: rgba(255, 255, 255, 0.86);
-  backdrop-filter: blur(24px);
   box-shadow: 0 24px 80px rgba(15, 23, 42, 0.18);
 }
 

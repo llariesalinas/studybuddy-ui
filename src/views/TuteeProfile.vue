@@ -442,8 +442,10 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useSubjectCatalog } from '@/composables/useSubjectCatalog'
 import api from '@/services/api/api'
+import { useCatalogStore } from '@/stores/catalog'
 import { useToastStore } from '@/stores/toast'
 
+const catalogStore = useCatalogStore()
 const toastStore = useToastStore()
 
 const profile = ref({
@@ -847,8 +849,7 @@ async function loadProfile() {
 async function loadSubjects() {
   try {
     isLoadingSubjects.value = true
-    const response = await api.get('/subjects/')
-    subjects.value = response.data
+    subjects.value = await catalogStore.fetchSubjects()
   } catch (error) {
     console.error('Failed to load subjects:', error)
     toastStore.push('Failed to load subjects.', 'error')
@@ -859,8 +860,7 @@ async function loadSubjects() {
 
 async function loadCourses() {
   try {
-    const response = await api.get('/courses/')
-    courses.value = response.data
+    courses.value = await catalogStore.fetchCourses()
   } catch (error) {
     console.error('Failed to load courses:', error)
     toastStore.push('Failed to load courses.', 'error')
@@ -964,7 +964,6 @@ onMounted(() => {
   border: 1px solid color-mix(in srgb, var(--sb-card-border) 82%, transparent);
   border-radius: 24px;
   box-shadow: 0 24px 70px rgba(15, 23, 42, 0.1);
-  backdrop-filter: blur(24px);
   padding: 1.5rem;
 }
 
@@ -1412,7 +1411,6 @@ onMounted(() => {
   justify-content: center;
   padding: 1.25rem;
   background: rgba(15, 23, 42, 0.42);
-  backdrop-filter: blur(8px);
 }
 
 .glass-modal {
@@ -1425,7 +1423,6 @@ onMounted(() => {
   border-radius: 24px;
   background: rgba(255, 255, 255, 0.9);
   box-shadow: 0 34px 90px rgba(15, 23, 42, 0.2);
-  backdrop-filter: blur(24px);
   padding: 1.5rem;
 }
 
@@ -1564,7 +1561,6 @@ onMounted(() => {
   font-weight: 850;
   text-transform: uppercase;
   letter-spacing: 0;
-  backdrop-filter: blur(14px);
 }
 
 .subject-option {

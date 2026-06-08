@@ -196,6 +196,7 @@ import {
   useInitialBookingPrefsStore,
 } from '@/stores/initialbookingprefs'
 import { useBookedSessionStore } from '@/stores/bookedSessionDetails'
+import { useCatalogStore } from '@/stores/catalog'
 import { useFindTutorsStore } from '@/stores/findTutors'
 import { useToastStore } from '@/stores/toast'
 
@@ -204,6 +205,7 @@ const router = useRouter()
 
 const initialbookStore = useInitialBookingPrefsStore()
 const bookedSessionStore = useBookedSessionStore()
+const catalogStore = useCatalogStore()
 const findTutorsStore = useFindTutorsStore()
 const toastStore = useToastStore()
 
@@ -561,8 +563,7 @@ onMounted(async () => {
   }
 
   try {
-    const res = await api.get('/subjects/')
-    subjects.value = res.data
+    subjects.value = await catalogStore.fetchSubjects()
   } catch (error) {
     console.error('Failed to load subjects', error)
   }

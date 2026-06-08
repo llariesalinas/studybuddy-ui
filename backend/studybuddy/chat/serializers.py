@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from .models import ChatRoom, Message
-from .services import get_current_booking_context, get_partner_context
+from .services import get_current_booking_context, get_partner_context, get_ticket_context
 
 class MessageSerializer(serializers.ModelSerializer):
     sender_name = serializers.SerializerMethodField()
@@ -67,6 +67,7 @@ class ChatRoomSerializer(serializers.ModelSerializer):
     current_booking = serializers.SerializerMethodField()
     partner_context = serializers.SerializerMethodField()
     ticket_status = serializers.SerializerMethodField()
+    ticket_context = serializers.SerializerMethodField()
 
     class Meta:
         model = ChatRoom
@@ -85,12 +86,16 @@ class ChatRoomSerializer(serializers.ModelSerializer):
             'current_booking',
             'partner_context',
             'ticket_status',
+            'ticket_context',
         ]
 
     def get_ticket_status(self, obj):
         if hasattr(obj, 'ticket') and obj.ticket:
             return obj.ticket.status
         return None
+
+    def get_ticket_context(self, obj):
+        return get_ticket_context(obj)
 
     def _current_booking(self, obj):
         # Memoize per room so current_booking and partner_context don't both
@@ -145,6 +150,8 @@ class ChatRoomSerializer(serializers.ModelSerializer):
         # opened room (fetched via the room-detail endpoint). Skipping it here
         # removes the bulk of the per-room queries.
         if self.context.get('skip_partner_context'):
+            return None
+        if obj.room_type == 'support':
             return None
         request = self.context.get('request')
         user = request.user if request and request.user.is_authenticated else None

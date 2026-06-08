@@ -11,13 +11,16 @@ export const useNotificationsStore = defineStore('notifications', () => {
   )
 
   const fetchNotifications = async () => {
+    if (loading.value) return false
     loading.value = true
 
     try {
       const response = await api.get('/notifications/')
       notifications.value = response.data
+      return true
     } catch (error) {
       console.error('Failed to load notifications:', error)
+      return false
     } finally {
       loading.value = false
     }

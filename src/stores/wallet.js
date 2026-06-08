@@ -1,8 +1,10 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import api from '@/services/api/api'
+import { useCatalogStore } from '@/stores/catalog'
 
 export const useWalletStore = defineStore('wallet', () => {
+  const catalogStore = useCatalogStore()
   const balance = ref(0)
   const pendingAmount = ref(0)
   const cashoutMinimum = ref(500)
@@ -64,7 +66,7 @@ export const useWalletStore = defineStore('wallet', () => {
   }
 
   async function fetchReceivingInstitutions(provider = 'instapay') {
-    const { data } = await api.get('wallet/receiving-institutions/', { params: { provider } })
+    const data = await catalogStore.fetchReceivingInstitutions(provider)
     receivingInstitutions.value = data
     return data
   }

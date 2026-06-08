@@ -354,7 +354,6 @@ watch(
   background:
     radial-gradient(circle at 30% 35%, color-mix(in srgb, var(--sb-primary) 14%, transparent), transparent 58%),
     radial-gradient(circle at 72% 48%, rgba(56, 189, 248, 0.1), transparent 56%);
-  filter: blur(10px);
   opacity: 0.55;
   pointer-events: none;
 }
@@ -371,10 +370,8 @@ watch(
 .bookings-panel,
 .booking-card {
   border: 1px solid var(--dashboard-border);
-  background: var(--dashboard-glass);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.08);
+  background: var(--dashboard-glass-strong);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
 }
 
 .metric-card {
@@ -480,7 +477,6 @@ watch(
   width: 68px;
   height: 68px;
   transform: rotate(-90deg);
-  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--sb-primary) 20%, transparent));
 }
 
 .metric-ring-track,
@@ -519,7 +515,6 @@ watch(
     color-mix(in srgb, var(--sb-primary) 18%, transparent),
     color-mix(in srgb, var(--sb-primary) 76%, white)
   );
-  box-shadow: 0 0 10px color-mix(in srgb, var(--sb-primary) 14%, transparent);
 }
 
 .bookings-panel {
@@ -802,11 +797,4 @@ watch(
   }
 }
 
-@supports not (backdrop-filter: blur(18px)) {
-  .metric-card,
-  .bookings-panel,
-  .booking-card {
-    background: var(--sb-card-bg);
-  }
-}
 </style>

@@ -143,6 +143,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '@/services/api/api'
+import { useCatalogStore } from '@/stores/catalog'
 import { useNotificationsStore } from '@/stores/notifications'
 import { usePaymentStore } from '@/stores/tuteePaymentDetails'
 import { useSessionsStore } from '@/stores/completedSessions'
@@ -150,6 +151,7 @@ import { useToastStore } from '@/stores/toast'
 
 const route = useRoute()
 const router = useRouter()
+const catalogStore = useCatalogStore()
 const notificationsStore = useNotificationsStore()
 const paymentStore = usePaymentStore()
 const sessionsStore = useSessionsStore()
@@ -252,11 +254,11 @@ onMounted(async () => {
   try {
     const [detailResponse, methodsResponse] = await Promise.all([
       sessionsStore.fetchSessionById(bookingId),
-      api.get('payment-methods/')
+      catalogStore.fetchPaymentMethods(),
     ])
 
     bookingDetail.value = detailResponse
-    paymentMethods.value = methodsResponse.data.map(method => ({
+    paymentMethods.value = methodsResponse.map(method => ({
       id: method.id,
       label: method.name,
       code: method.code,
