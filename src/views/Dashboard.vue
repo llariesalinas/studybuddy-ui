@@ -108,28 +108,47 @@
                       ]"
                       role="button"
                       tabindex="0"
+                      :aria-label="getSessionCardAriaLabel(session)"
                       @click="goToDetails(session.id)"
                       @keydown.enter.prevent="goToDetails(session.id)"
                       @keydown.space.prevent="goToDetails(session.id)"
                     >
-                      <button
-                        v-if="canDismissDashboardPill(session)"
-                        type="button"
-                        class="weekly-session-dismiss-btn sb-btn"
-                        :aria-label="`Remove ${session.status} schedule pill for ${session.subject}`"
-                        title="Remove schedule pill"
-                        @click.stop="openDismissPillDialog(session)"
-                      >
-                        <i class="bi bi-trash3" aria-hidden="true"></i>
-                      </button>
                       <p class="weekly-session-time">{{ formatSessionTime(session) }}</p>
-                      <h3 class="weekly-session-title">{{ session.subject }}</h3>
                       <p class="weekly-session-tutor">{{ session.tutor }}</p>
-                      <div class="weekly-session-meta">
+
+                      <div class="weekly-session-popout">
+                        <p class="weekly-session-popout-time">{{ formatSessionTime(session) }}</p>
+                        <h3 class="weekly-session-title">{{ session.subject }}</h3>
+                        <div class="weekly-session-detail-grid">
+                          <span class="weekly-session-detail-row">
+                            <strong>Tutor</strong>
+                            <span>{{ session.tutor }}</span>
+                          </span>
+                          <span class="weekly-session-detail-row">
+                            <strong>Slots</strong>
+                            <span>{{ getSessionSlotLabel(session) }}</span>
+                          </span>
+                          <span class="weekly-session-detail-row">
+                            <strong>Mode</strong>
+                            <span>{{ session.session_mode || 'Online' }}</span>
+                          </span>
+                          <span class="weekly-session-detail-row">
+                            <strong>Location</strong>
+                            <span>{{ getSessionLocationLabel(session) }}</span>
+                          </span>
+                        </div>
                         <span class="weekly-session-status" :title="session.status">{{ session.status }}</span>
-                        <span class="weekly-session-duration">
-                          {{ getSessionSlotSpan(session) }} slot{{ getSessionSlotSpan(session) === 1 ? '' : 's' }}
-                        </span>
+
+                        <button
+                          v-if="canDismissDashboardPill(session)"
+                          type="button"
+                          class="weekly-session-dismiss-btn sb-btn"
+                          :aria-label="`Remove ${session.status} schedule pill for ${session.subject}`"
+                          @click.stop="openDismissPillDialog(session)"
+                        >
+                          <i class="bi bi-trash3" aria-hidden="true"></i>
+                          <span>Remove schedule pill</span>
+                        </button>
                       </div>
                     </article>
 
@@ -495,6 +514,31 @@ const getSessionDurationMinutes = (session) => {
 }
 
 const getSessionSlotSpan = (session) => Math.max(1, Math.ceil(getSessionDurationMinutes(session) / 30))
+
+const getSessionDurationLabel = (session) => {
+  const minutes = getSessionDurationMinutes(session)
+
+  if (minutes < 60) {
+    return `${minutes} mins`
+  }
+
+  const hours = minutes / 60
+  return `${Number.isInteger(hours) ? hours : hours.toFixed(1)} hr${hours === 1 ? '' : 's'}`
+}
+
+const getSessionSlotLabel = (session) => {
+  const slots = getSessionSlotSpan(session)
+  return `${slots} slot${slots === 1 ? '' : 's'} / ${getSessionDurationLabel(session)}`
+}
+
+const getSessionLocationLabel = (session) => (
+  session?.preferred_location
+  || (session?.session_mode === 'F2F' ? 'No location set' : 'Online')
+)
+
+const getSessionCardAriaLabel = (session) => (
+  `${formatSessionTime(session)} with ${session.tutor}. ${session.subject}. ${session.status}. Click for full session information.`
+)
 
 const getEmptyStateLabel = (dayIndex) => {
   if (dayIndex === 5) {

@@ -9,10 +9,10 @@
   --sb-primary-lighter: #dff1e8;
   --sb-bg: #F8F9FA;
   --sb-aurora-bg:
-    radial-gradient(circle at 8% -8%, rgba(0, 137, 90, 0.16), transparent 34%),
-    radial-gradient(circle at 52% -10%, rgba(103, 197, 220, 0.17), transparent 38%),
-    radial-gradient(circle at 100% 8%, rgba(148, 211, 181, 0.18), transparent 34%),
-    radial-gradient(circle at 84% 88%, rgba(255, 218, 137, 0.16), transparent 32%);
+    radial-gradient(circle at 8% -8%, rgba(0, 137, 90, 0.22), transparent 34%),
+    radial-gradient(circle at 52% -10%, rgba(103, 197, 220, 0.23), transparent 38%),
+    radial-gradient(circle at 100% 8%, rgba(148, 211, 181, 0.24), transparent 34%),
+    radial-gradient(circle at 84% 88%, rgba(255, 218, 137, 0.22), transparent 32%);
   --sb-card-bg: #ffffff;
   --sb-card-border: #EAEAEA;
   --sb-surface: #ffffff;

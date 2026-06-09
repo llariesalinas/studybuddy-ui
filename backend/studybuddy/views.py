@@ -137,6 +137,63 @@ def build_login_response_payload(user, profile):
     }
 
 
+def build_admin_profile_defaults(user):
+    display_name = (
+        user.get_full_name().strip()
+        or user.email.split('@', 1)[0]
+        or user.username
+        or 'Admin'
+    )
+    name_parts = display_name.replace('.', ' ').replace('_', ' ').split()
+
+    fname = user.first_name or (name_parts[0] if name_parts else 'Admin')
+    lname = user.last_name or (' '.join(name_parts[1:]) if len(name_parts) > 1 else 'User')
+
+    return {
+        'fname': fname[:100],
+        'mname': '',
+        'lname': lname[:100],
+        'role': 'Admin',
+        'profile_completed': True,
+        'is_domain_exempt': True,
+        'is_suspended': False,
+    }
+
+
+def get_login_profile_for_user(user):
+    try:
+        profile = user.userprofile
+    except UserProfile.DoesNotExist:
+        if not (user.is_staff or user.is_superuser):
+            return None
+
+        profile = UserProfile.objects.create(
+            user=user,
+            **build_admin_profile_defaults(user),
+        )
+
+    if user.is_staff or user.is_superuser:
+        updated_fields = []
+
+        if profile.role != 'Admin':
+            profile.role = 'Admin'
+            updated_fields.append('role')
+
+        if not profile.profile_completed:
+            profile.profile_completed = True
+            updated_fields.append('profile_completed')
+
+        if not profile.is_domain_exempt:
+            profile.is_domain_exempt = True
+            updated_fields.append('is_domain_exempt')
+
+        if updated_fields:
+            updated_fields.append('updated_at')
+            profile.save(update_fields=updated_fields)
+
+    return profile
+
+
 def generate_otp_code():
     return f"{secrets.randbelow(1000000):06d}"
 
@@ -820,7 +877,14 @@ def register_user(request):
 @permission_classes([IsAuthenticated])
 def profile_status(request):
 
-    profile = request.user.userprofile
+    profile = get_login_profile_for_user(request.user)
+
+    if profile is None:
+        return Response(
+            {"error": "User profile not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
     application_status = None
     if profile.role == 'Tutor':
         try:
@@ -857,9 +921,8 @@ def login_view(request):
             status=status.HTTP_401_UNAUTHORIZED
         )
 
-    try:
-        profile = UserProfile.objects.get(user=user)
-    except UserProfile.DoesNotExist:
+    profile = get_login_profile_for_user(user)
+    if profile is None:
         return Response(
             {"error": "User profile not found"},
             status=status.HTTP_404_NOT_FOUND

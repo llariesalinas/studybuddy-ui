@@ -2,12 +2,18 @@ from rest_framework import permissions
 
 class IsAdminUser(permissions.BasePermission):
     """
-    Allows access only to users with the 'Admin' role.
+    Allows access only to app admins or Django staff/superusers.
     """
     def has_permission(self, request, view):
+        user = request.user
+
+        if not user or not user.is_authenticated:
+            return False
+
+        if user.is_staff or user.is_superuser:
+            return True
+
         return bool(
-            request.user and 
-            request.user.is_authenticated and 
-            hasattr(request.user, 'userprofile') and 
-            request.user.userprofile.role == 'Admin'
+            hasattr(user, 'userprofile') and
+            user.userprofile.role == 'Admin'
         )

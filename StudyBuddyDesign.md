@@ -13,6 +13,8 @@ sources:
   - docs/superpowers/plans/2026-05-23-chat-message-redesign.md
   - docs/superpowers/plans/2026-05-23-sidebar-notification-badge.md
   - docs/superpowers/plans/2026-05-25-haptics-rollout.md
+  - docs/plans/2026-06-07-aurora-hue-restoration.md
+  - docs/session-summaries/2026-06-07-aurora-hue-restoration-summary.md
 colors:
   surface: "#f5fbf4"
   surface-dim: "#d6dcd5"
@@ -329,6 +331,40 @@ profile surfaces. Apply it inside the route view only, not the shared app shell.
 
 Bento layouts should use 2-column or 3-column CSS grids and collapse below
 tablet widths. Avoid nested cards; use flat rows inside panels.
+
+### Aurora Hue (App Shell)
+
+The shared app shell uses one static aurora layer behind `#app`
+(`body > #app::before` in `src/assets/main.css`, driven by the `--sb-aurora-bg`
+token). This is the ambient background for the whole shell — distinct from the
+route-local Aurora Bento pattern above, which is a per-page treatment.
+
+A heavier, JS-driven version of this layer was removed for performance cost
+(`3015a8f`/`2a638ca`), then deliberately rebuilt as a single static layer — see
+`docs/plans/2026-06-07-aurora-hue-restoration.md`. Hard rules for any future
+change to it:
+
+- CSS-only: static `radial-gradient` stops. No JS, pointer tracking, or
+  `requestAnimationFrame`.
+- No `backdrop-filter`, `filter: blur`, `will-change`,
+  `background-attachment: fixed`, `transition: background`, or infinite
+  animation on this layer.
+- One pseudo-element, fixed pixel `height` — not `vh` (mobile address-bar
+  collapse changes `100vh` mid-scroll and forces relayout/repaint).
+- One one-shot fade-in on mount (`prefers-reduced-motion` aware); it never
+  changes after that.
+- Keep it a single shared layer. Do not duplicate it per route, or layer a
+  second aurora background onto `.public-layout`/`.app-main-surface` — that
+  reproduces the exact cost profile that got the old version removed.
+
+**Visual gotcha — raising alpha can expose a hard edge.** Increasing the rgba
+alphas in `--sb-aurora-bg` raises contrast between the glow and the flat
+`--sb-bg`, which can make the gradient's `transparent N%` stop visible as a
+perceptible boundary (a Mach-band-style artifact) instead of a smooth fade.
+It's most visible on content-light pages where flat background dominates
+(e.g. `/login`) and easy to miss on the long, content-dense landing page.
+Before committing any opacity change to this token, check it live on both a
+short page (`/login`) and a long page (`/`, scrolled to the footer).
 
 ### Weekly Schedule Navigation
 
@@ -695,6 +731,11 @@ expand smoothly and existing chevron state should remain intact.
 
 - Do not add decorative gradient blobs inside foreground cards.
 - Do not animate aurora backgrounds continuously.
+- Do not raise `--sb-aurora-bg` alpha values without checking a short page
+  (e.g. `/login`) for a visible hard edge where the gradient meets the flat
+  background — see "Aurora Hue (App Shell)".
+- Do not duplicate the app-shell aurora layer per route or layer a second
+  aurora background onto `.public-layout`/`.app-main-surface`.
 - Do not use browser `alert()`.
 - Do not use emojis in UI copy, buttons, empty states, badges, or notifications.
 - Do not use dropdowns as the default way to expose actions or settings. Prefer

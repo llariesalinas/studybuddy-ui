@@ -5,6 +5,12 @@
 **Branch:** `feature-aurora-hue-restoration`
 **Commits:** `80534ef` (initial restoration)
 
+## Change scan - start here
+
+**The runtime change is only in `src/assets/main.css`.** The scan confirms the aurora remains CSS-only, the old pointer/rAF path was not restored, and the expensive blur/backdrop/infinite-animation properties are still absent from the aurora implementation.
+
+Key result: light mode now has the restored cyan accent stop in `--sb-aurora-bg`; dark mode is unchanged.
+
 ## What shipped
 
 Restored the "aurora hue" atmosphere (soft colored radial-gradient glow behind the app shell) that was removed in `2a638ca`/`3015a8f` for performance reasons — rebuilt as a single static layer that cannot reintroduce the costs that caused its removal.
@@ -20,6 +26,16 @@ Changes, all in `src/assets/main.css`:
 1. **App.vue cleanup was a no-op.** The plan called for removing dead `setupAuroraPointerMotion`/`teardownAuroraPointerMotion` stubs from `App.vue`. A pre-implementation grep found zero `aurora` references anywhere in `src` — commit `3015a8f` had already removed them. This narrowed the change to CSS-only.
 2. **Reduced-motion handled with one media block instead of two.** The plan specified a `no-preference` override (fade-in) plus a separate `reduce` override (`opacity: 1; animation: none`). The simpler equivalent: make the *base* rule the reduced-motion-safe state (`opacity: 1`, no `animation` property), and let `@media (prefers-reduced-motion: no-preference)` be the *only* override that adds the fade-in. Identical guarantee, one fewer rule to parse.
 3. **DevTools paint-flashing/layer-borders check replaced with an equivalent live signal.** The preview tooling (`Claude_Preview`) doesn't expose Chrome DevTools' Rendering domain (no CDP access for "Paint flashing"/"Layer borders"). Substituted a `PerformanceObserver` watching `paint`/`layout-shift`/`longtask` entries across 90 rapid scroll cycles — the same class of event DevTools paint-flashing visualizes, captured programmatically. Result: zero entries.
+
+## Change scan - details
+
+Current source scan after the 2026-06-08 follow-up:
+
+- Implementation scope is still CSS-only: aurora references are limited to `src/assets/main.css`, with no `App.vue` change required.
+- Light mode `--sb-aurora-bg` now has 4 radial-gradient stops, including the restored cyan accent at `52% -10%`; dark mode remains at the prior 3-stop palette.
+- `src` still has no `setupAuroraPointerMotion`, `teardownAuroraPointerMotion`, `pointermove`, or `requestAnimationFrame` matches, so the old per-frame JS path was not restored.
+- The aurora layer remains `position: absolute`, fixed `height: 680px`, one pseudo-element, one one-shot fade-in animation, and no `backdrop-filter`, `-webkit-backdrop-filter`, `filter: blur`, `will-change`, `transition: background`, or infinite animation on the aurora implementation.
+- Documentation touched: this summary and the plan addendum record the follow-up; runtime implementation remains scoped to `src/assets/main.css`.
 
 ## Verification (all via live browser preview at localhost:5173 + CLI)
 

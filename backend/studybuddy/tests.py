@@ -1773,6 +1773,60 @@ class EmailAuthTests(APITestCase):
         challenge.refresh_from_db()
         self.assertIsNotNone(challenge.consumed_at)
 
+    def test_staff_user_without_profile_can_login_as_admin(self):
+        admin_user = User.objects.create_user(
+            username="admin@example.edu",
+            email="admin@example.edu",
+            password="password",
+            is_staff=True,
+        )
+
+        login_response = self.client.post(
+            "/api/login/",
+            {"email": admin_user.email, "password": "password"},
+            format="json",
+        )
+
+        self.assertEqual(login_response.status_code, 200)
+        self.assertTrue(login_response.data["requires_2fa"])
+
+        profile = UserProfile.objects.get(user=admin_user)
+        self.assertEqual(profile.role, "Admin")
+        self.assertTrue(profile.profile_completed)
+        self.assertTrue(profile.is_domain_exempt)
+
+        verify_response = self.client.post(
+            "/api/login/verify-otp/",
+            {
+                "challenge_id": login_response.data["challenge_id"],
+                "code": self.latest_otp_code(),
+            },
+            format="json",
+        )
+
+        self.assertEqual(verify_response.status_code, 200)
+        self.assertEqual(verify_response.data["role"], "Admin")
+        self.assertEqual(verify_response.data["email"], admin_user.email)
+
+    def test_staff_user_without_profile_gets_admin_profile_status(self):
+        admin_user = User.objects.create_user(
+            username="status-admin@example.edu",
+            email="status-admin@example.edu",
+            password="password",
+            is_staff=True,
+        )
+        self.client.force_authenticate(user=admin_user)
+
+        response = self.client.get("/api/profile/status/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["profile_completed"])
+        self.assertEqual(response.data["role"], "Admin")
+
+        profile = UserProfile.objects.get(user=admin_user)
+        self.assertEqual(profile.role, "Admin")
+        self.assertTrue(profile.is_domain_exempt)
+
     @patch("studybuddy.views.generate_otp_code", side_effect=["123456", "654321"])
     def test_resend_replaces_otp_code_and_increments_resend_count(self, _generate_otp_code):
         login_response = self.login()
