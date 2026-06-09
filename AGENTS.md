@@ -39,6 +39,9 @@ Save each confirmed plan as its own markdown file in `docs/plans/` (`YYYY-MM-DD-
 `docs/plans/_template.md`, with frontmatter tracking `status` (Draft → Approved → In Progress → Done).
 Log every plan as a row in the `docs/plans/README.md` index, and write a completion note in
 `docs/session-summaries/` when the work ships. Document the plan before writing code.
+For Graphify upkeep, see `docs/learning/2026-06-09-graphify-studybuddy-workflow.md`: code changes use
+`graphify update .` or the post-commit hook, while new `docs/plans/` markdown needs a full `/graphify .`
+only when those docs should be semantically reflected in the graph.
 
 ## Commit & Pull Request Guidelines
 
