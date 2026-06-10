@@ -12,10 +12,11 @@ spec: ../superpowers/specs/2026-06-11-landing-page-redesign-design.md
 **Status: Approved — not started.** Design phase is complete: the "Studio Motion"
 direction was chosen after three mockup rounds, refined (campus-agnostic copy, aurora
 background, seamless marquee, per-card haptic tilt, scroll-reactive characters), and
-signed off on 2026-06-11. The approved mockup is archived at
-`docs/artifacts/2026-06-11-landing-redesign-reference.html` and the design spec at
-`docs/superpowers/specs/2026-06-11-landing-page-redesign-design.md`. No application code
-has been touched yet; implementation begins at Step 1 (tokens).
+signed off on 2026-06-11. Post-approval the page gained final step copy ("Share what you
+need / Match and book / Learn and track"), a Platform tools 4-card section, and a Common
+questions accordion — all reflected in the spec and the archived artifact at
+`docs/artifacts/2026-06-11-landing-redesign-reference.html`. No application code has
+been touched yet; implementation begins at Step 1 (tokens).
 
 ## Goal
 
@@ -115,3 +116,8 @@ Key decisions:
   7-step implementation sequence, risks (smooth-scroll vs app shell, teardown, aurora
   double-paint, marquee drift), and verification checklist. Status set to Approved;
   reference artifact and spec saved alongside.
+- **2026-06-11 (later)** — Scope update before implementation: new step copy (Share what
+  you need / Match and book / Learn and track), added Platform tools section (4 cards,
+  staggered pop-in, colored hover shadows) and Common questions accordion (spring
+  expand, rotating plus icon). Spec and reference artifact re-synced; step sequence
+  unchanged (new sections land in Steps 2–3).

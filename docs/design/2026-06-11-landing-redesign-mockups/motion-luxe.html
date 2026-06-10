@@ -160,6 +160,59 @@
   .count .n { font-size: clamp(38px, 4.6vw, 62px); font-weight: 900; letter-spacing: -0.03em; }
   .count .l { color: var(--sb-text-muted); font-size: 14px; margin-top: 6px; }
 
+  /* SECTION HEADS (tools + faq) — masked line reveals like the hero */
+  .kick2 { font-size: 13px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: var(--sb-primary); margin-bottom: 18px; display: block; }
+  .tools .head, .faq .head { max-width: 780px; margin-bottom: 54px; }
+  .tools h2, .faq h2 { font-size: clamp(34px, 4.6vw, 64px); font-weight: 900; letter-spacing: -0.035em; line-height: 1; }
+  .tools h2 .row, .faq h2 .row { display: block; overflow: hidden; }
+  .tools h2 .row > span, .faq h2 .row > span { display: inline-block; transform: translateY(112%); transition: transform .9s var(--sb-spring); }
+  .tools.in h2 .row > span, .faq.in h2 .row > span { transform: none; }
+  .tools h2 .row:nth-child(2) > span, .faq h2 .row:nth-child(2) > span { transition-delay: .08s; }
+  .tools .head p, .faq .head p { color: var(--sb-text-muted); font-size: 16.5px; margin-top: 16px; max-width: 540px; line-height: 1.65; }
+
+  /* TOOLS GRID */
+  .toolgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+  .toolcard {
+    background: var(--sb-card-bg); border: 1px solid var(--sb-card-border); border-radius: 22px; padding: 28px 24px;
+    opacity: 0; transform: translateY(36px);
+    transition: opacity .6s ease, transform .6s var(--sb-spring), box-shadow .35s ease;
+  }
+  .toolcard.in { opacity: 1; transform: none; }
+  .toolcard:nth-child(2) { transition-delay: .08s; }
+  .toolcard:nth-child(3) { transition-delay: .16s; }
+  .toolcard:nth-child(4) { transition-delay: .24s; }
+  .toolcard:hover { transition-delay: 0s; transform: translateY(-7px); }
+  .toolcard:nth-child(1):hover { box-shadow: 0 22px 50px rgba(0,137,90,.18); }
+  .toolcard:nth-child(2):hover { box-shadow: 0 22px 50px rgba(255,176,46,.24); }
+  .toolcard:nth-child(3):hover { box-shadow: 0 22px 50px rgba(255,120,70,.22); }
+  .toolcard:nth-child(4):hover { box-shadow: 0 22px 50px rgba(255,143,163,.24); }
+  .toolcard .chip { width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; margin-bottom: 16px; }
+  .chip.g { background: rgba(0,137,90,.10); }
+  .chip.y { background: rgba(255,201,77,.18); }
+  .chip.o { background: rgba(255,138,92,.16); }
+  .chip.p { background: rgba(255,143,163,.16); }
+  .toolcard h3 { font-size: 16.5px; font-weight: 800; margin-bottom: 8px; letter-spacing: -0.2px; }
+  .toolcard p { font-size: 14px; line-height: 1.6; color: var(--sb-text-muted); }
+
+  /* FAQ ACCORDION */
+  .faq { max-width: 880px; margin: 0 auto; }
+  .faqitem { border-top: 1px solid var(--sb-card-border); opacity: 0; transform: translateY(26px); transition: opacity .6s ease, transform .6s var(--sb-spring); }
+  .faqitem.in { opacity: 1; transform: none; }
+  .faqitem:nth-of-type(2) { transition-delay: .07s; }
+  .faqitem:nth-of-type(3) { transition-delay: .14s; }
+  .faqitem:nth-of-type(4) { transition-delay: .21s; }
+  .faqitem:last-of-type { border-bottom: 1px solid var(--sb-card-border); }
+  .faqq { width: 100%; background: none; border: 0; font: inherit; text-align: left; display: flex; align-items: center; gap: 22px; padding: 26px 4px; cursor: pointer; color: var(--sb-text-main); }
+  .faqq .no { font-size: 13px; font-weight: 800; color: var(--sb-primary); width: 34px; flex: none; }
+  .faqq .q { font-size: clamp(17px, 2vw, 22px); font-weight: 800; letter-spacing: -0.3px; flex: 1; transition: transform .35s var(--sb-spring), color .25s; }
+  .faqq:hover .q { transform: translateX(10px); color: var(--sb-primary); }
+  .faqq .plusw { width: 36px; height: 36px; border-radius: 50%; border: 1.5px solid var(--sb-card-border); display: grid; place-items: center; flex: none; color: var(--sb-text-main); transition: transform .45s var(--sb-spring), background .25s, border-color .25s, color .25s; }
+  .faqitem.open .plusw { transform: rotate(135deg); background: var(--sb-primary); border-color: var(--sb-primary); color: #fff; }
+  .faqa { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .5s var(--sb-spring); }
+  .faqitem.open .faqa { grid-template-rows: 1fr; }
+  .faqa > div { overflow: hidden; }
+  .faqa p { padding: 0 4px 28px 56px; color: var(--sb-text-muted); font-size: 15.5px; line-height: 1.65; max-width: 660px; }
+
   /* CTA — dark, magnetic button, hover fill */
   .ctawrap { padding: 40px 40px 120px; }
   .ctapanel {
@@ -181,11 +234,17 @@
   @media (max-width: 900px) {
     .panel { grid-template-columns: 1fr; gap: 22px; }
     .countstrip { grid-template-columns: 1fr; gap: 30px; }
+    .toolgrid { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 600px) {
+    .toolgrid { grid-template-columns: 1fr; }
+    .faqa p { padding-left: 4px; }
   }
   @media (prefers-reduced-motion: reduce) {
-    h1 .row > span, .panel h2 .row > span { transform: none; transition: none; }
+    h1 .row > span, .panel h2 .row > span, .tools h2 .row > span, .faq h2 .row > span { transform: none; transition: none; }
     .panel .viz { clip-path: none; }
-    .reveal { opacity: 1; transform: none; transition: none; }
+    .reveal, .toolcard, .faqitem { opacity: 1; transform: none; transition: none; }
+    .faqa { transition: none; }
     .marquee .track { animation: none; }
     .bgwash i { animation: none; }
     #cursor { display: none; }
@@ -237,8 +296,8 @@
       <div class="panel">
         <div class="idx"><b>01</b> / 03</div>
         <div>
-          <h2><span class="row"><span>Say what's</span></span><span class="row"><span>hurting.</span></span></h2>
-          <p>Pick the subject that's eating you alive and the hours you're actually free. Twenty seconds, tops.</p>
+          <h2><span class="row"><span>Share what</span></span><span class="row"><span>you need.</span></span></h2>
+          <p>Choose a subject, topic, and goal so Studybuddy can surface the right peers.</p>
         </div>
         <div class="viz hoverable">
           <div class="ill" data-depth="0.06">
@@ -262,8 +321,8 @@
       <div class="panel">
         <div class="idx"><b>02</b> / 03</div>
         <div>
-          <h2><span class="row"><span>Meet your</span></span><span class="row"><span>match.</span></span></h2>
-          <p>Our recommender pairs you with a fellow student from your campus who aced that exact subject — matched on what you need, when you're free, and how they teach.</p>
+          <h2><span class="row"><span>Match</span></span><span class="row"><span>and book.</span></span></h2>
+          <p>Compare tutor fit, availability, and ratings, then reserve a time that works.</p>
         </div>
         <div class="viz hoverable">
           <div class="ill" data-depth="0.09">
@@ -298,8 +357,8 @@
       <div class="panel">
         <div class="idx"><b>03</b> / 03</div>
         <div>
-          <h2><span class="row"><span>Study together,</span></span><span class="row"><span>level up.</span></span></h2>
-          <p>Book the session, meet up or hop online, and walk out actually getting it. Progress tracked, tutor paid, exam survived.</p>
+          <h2><span class="row"><span>Learn</span></span><span class="row"><span>and track.</span></span></h2>
+          <p>Wrap each session with history, compensation, and progress details in place.</p>
         </div>
         <div class="viz hoverable">
           <div class="ill" data-depth="0.07">
@@ -335,12 +394,87 @@
     </div>
   </section>
 
+  <!-- PLATFORM TOOLS -->
+  <section class="tools">
+    <div class="inner">
+      <div class="head">
+        <span class="kick2">Platform tools</span>
+        <h2><span class="row"><span>Everything the</span></span><span class="row"><span>tutoring loop needs.</span></span></h2>
+        <p>Built for peer learning programs that need matching, scheduling, reporting, and fair tutor visibility.</p>
+      </div>
+      <div class="toolgrid">
+        <div class="toolcard hoverable">
+          <div class="chip g"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#00895A" stroke-width="2.2" stroke-linecap="round"><circle cx="10" cy="10" r="6"/><path d="m15 15 5 5"/></svg></div>
+          <h3>Smart tutor matching</h3>
+          <p>Rank peer tutors by subject fit, ratings, availability, and workload balance.</p>
+        </div>
+        <div class="toolcard hoverable">
+          <div class="chip y"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#B8860B" stroke-width="2.2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></div>
+          <h3>Flexible scheduling</h3>
+          <p>Book around real tutor availability and keep upcoming sessions easy to scan.</p>
+        </div>
+        <div class="toolcard hoverable">
+          <div class="chip o"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#D2622E" stroke-width="2.2" stroke-linecap="round"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg></div>
+          <h3>Reports and earnings</h3>
+          <p>Track completed sessions, tutor compensation, and program-level performance.</p>
+        </div>
+        <div class="toolcard hoverable">
+          <div class="chip p"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#C2566E" stroke-width="2.2" stroke-linecap="round"><path d="M4 8h10M18 8h2M4 16h2M10 16h10"/><circle cx="16" cy="8" r="2.2"/><circle cx="7" cy="16" r="2.2"/></svg></div>
+          <h3>Balanced workloads</h3>
+          <p>Protect session quality by keeping tutor demand visible before calendars fill up.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- COUNT STRIP -->
   <section>
     <div class="inner countstrip">
       <div class="count reveal"><div class="n"><span data-count="20">0</span>s</div><div class="l">to tell us what's hurting</div></div>
       <div class="count reveal"><div class="n"><span data-count="98">0</span>%</div><div class="l">match scores, out in the open</div></div>
       <div class="count reveal"><div class="n"><span data-count="1">0</span> min</div><div class="l">to join with your student email</div></div>
+    </div>
+  </section>
+
+  <!-- COMMON QUESTIONS -->
+  <section>
+    <div class="inner faq">
+      <div class="head">
+        <span class="kick2">Common questions</span>
+        <h2><span class="row"><span>Asked a lot,</span></span><span class="row"><span>answered straight.</span></span></h2>
+      </div>
+      <div class="faqitem">
+        <button class="faqq hoverable" type="button">
+          <span class="no">01</span>
+          <span class="q">Who can become a tutor?</span>
+          <span class="plusw"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+        </button>
+        <div class="faqa"><div><p>Any student who's strong in a subject. Set your subjects, rate, and availability — you earn per completed session while keeping your own schedule.</p></div></div>
+      </div>
+      <div class="faqitem">
+        <button class="faqq hoverable" type="button">
+          <span class="no">02</span>
+          <span class="q">How much does it cost?</span>
+          <span class="plusw"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+        </button>
+        <div class="faqa"><div><p>Joining is free. You only pay per booked session at the tutor's listed rate, and payments are handled online inside the platform.</p></div></div>
+      </div>
+      <div class="faqitem">
+        <button class="faqq hoverable" type="button">
+          <span class="no">03</span>
+          <span class="q">Can I use it on my campus?</span>
+          <span class="plusw"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+        </button>
+        <div class="faqa"><div><p>Studybuddy is open to any campus. Sign up with your student email and you'll be matched with peers from your own school.</p></div></div>
+      </div>
+      <div class="faqitem">
+        <button class="faqq hoverable" type="button">
+          <span class="no">04</span>
+          <span class="q">What happens if a session falls through?</span>
+          <span class="plusw"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+        </button>
+        <div class="faqa"><div><p>You can reschedule or cancel ahead of time, and session history keeps everything on record. If something goes wrong, support is one tap away.</p></div></div>
+      </div>
     </div>
   </section>
 
@@ -461,7 +595,12 @@
     e.target.classList.add('in')
     e.target.querySelectorAll('[data-count]').forEach(runCount)
   }), { threshold: 0.25 })
-  document.querySelectorAll('.reveal, .panel, #heroTitle, .count').forEach((el) => io.observe(el))
+  document.querySelectorAll('.reveal, .panel, #heroTitle, .count, .tools, .faq, .toolcard, .faqitem').forEach((el) => io.observe(el))
+
+  /* ---------- FAQ accordion ---------- */
+  document.querySelectorAll('.faqitem').forEach((item) => {
+    item.querySelector('.faqq').addEventListener('click', () => item.classList.toggle('open'))
+  })
   setTimeout(() => document.getElementById('heroTitle').classList.add('in'), 80)
 
   function runCount(el) {

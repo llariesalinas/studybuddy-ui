@@ -18,9 +18,10 @@ Key decisions made during design review:
 
 - Copy is campus-agnostic. No mention of CPU anywhere; the platform is open to any campus.
 - No fake social proof. The old stats strip (500+ tutors) and testimonials are dropped;
-  a count strip of product facts (20s / 98% / 1 min) and a feature deep-dive replace them.
-- The old FAQ accordion, platform-tools grid, and multi-column footer are not part of this
-  design. Footer is a single line. (Re-adding an FAQ later is a separate decision.)
+  a count strip of product facts (20s / 98% / 1 min) replaces them.
+- The platform-tools grid and FAQ ("Common questions") were re-added on 2026-06-11 with
+  new copy, restyled in this design's motion language. The multi-column footer stays
+  dropped; footer is a single line.
 - Illustrations are inline SVG "doodle" characters (hand-drawn hair, eyebrows, blush,
   glasses, hair bun) inside clean white cards — playful characters, clean chrome.
 
@@ -36,15 +37,37 @@ Key decisions made during design review:
    "Get matched · Study together · *Actually get it* · Tutors earn · Your campus, your
    buddies" with colored dot separators (yellow/pink/orange/green). Loops seamlessly.
 4. **Panels (01–03)** — three rows, grid `90px 1fr 1fr` (index / copy / illustration card):
-   - 01 "Say what's hurting." — subject-picker illustration (chips + time pill + arrow)
-   - 02 "Meet your match." — two doodle avatars, dashed connector, star check, "98% match"
-   - 03 "Study together, level up." — two figures at a table, lightbulb, "Got it!"
-5. **Count strip** — three left-bordered numbers that count up on reveal:
+   - 01 "Share what you need." — "Choose a subject, topic, and goal so Studybuddy can
+     surface the right peers." — subject-picker illustration (chips + time pill + arrow)
+   - 02 "Match and book." — "Compare tutor fit, availability, and ratings, then reserve
+     a time that works." — two doodle avatars, dashed connector, star check, "98% match"
+   - 03 "Learn and track." — "Wrap each session with history, compensation, and progress
+     details in place." — two figures at a table, lightbulb, "Got it!"
+5. **Platform tools** — kicker "PLATFORM TOOLS"; H2 "Everything the tutoring loop needs."
+   (masked line reveal); sub "Built for peer learning programs that need matching,
+   scheduling, reporting, and fair tutor visibility."; 4-card grid (2-col <900px,
+   1-col <600px), staggered pop-in, per-card colored hover shadows:
+   - Smart tutor matching — "Rank peer tutors by subject fit, ratings, availability, and
+     workload balance."
+   - Flexible scheduling — "Book around real tutor availability and keep upcoming
+     sessions easy to scan."
+   - Reports and earnings — "Track completed sessions, tutor compensation, and
+     program-level performance."
+   - Balanced workloads — "Protect session quality by keeping tutor demand visible
+     before calendars fill up."
+6. **Count strip** — three left-bordered numbers that count up on reveal:
    `20s` to tell us what's hurting · `98%` match scores, out in the open ·
    `1 min` to join with your student email.
-6. **CTA panel** — `--sb-dark` rounded panel, radial green glow, H2 "Your study buddy is
+7. **Common questions (FAQ)** — kicker "COMMON QUESTIONS"; H2 "Asked a lot, answered
+   straight." (masked line reveal); 4 accordion items, staggered reveal:
+   - 01 Who can become a tutor?
+   - 02 How much does it cost?
+   - 03 Can I use it on my campus?
+   - 04 What happens if a session falls through?
+   (answers in the reference artifact)
+8. **CTA panel** — `--sb-dark` rounded panel, radial green glow, H2 "Your study buddy is
    *already on campus.*" (em in `--sb-pop-yellow`), magnetic "Get started" button.
-7. **Footer** — single line: "Studybuddy — built by students, for students. Bring it to
+9. **Footer** — single line: "Studybuddy — built by students, for students. Bring it to
    your campus."
 
 All "Get started"/"Find my tutor" CTAs route to `/register`; "Log in" routes to `/login`
@@ -97,6 +120,9 @@ Fixed full-viewport layer behind everything (`z-index: 0`, content above), compo
 | Card tilt (haptic) | per-card config — card1 `{max:7°, dir:+1, twist:0}`, card2 `{max:12°, dir:−1, twist:+1.4°}`, card3 `{max:9°, dir:+1, twist:−1.8°}`; `perspective(900px) rotateX/rotateY` from cursor position + `scale(1.025)`; springs back on leave (0.6s) | fine pointer + no reduced motion |
 | Hover shadows | per-card colored: green `rgba(0,137,90,.22)` / amber `rgba(255,176,46,.30)` / coral `rgba(255,120,70,.28)` + neutral layer | — |
 | Count-up numbers | 0 → target over 1100ms, cubic ease-out, triggered once on reveal | reduced motion: show final |
+| Section-head reveals | tools + FAQ H2s use the hero's masked-row reveal (`translateY(112%) → 0`, 0.9s spring, 80ms stagger), triggered by IO on the section | reduced motion: static |
+| Tool cards | staggered pop-in (80ms steps), hover lift -7px with per-card colored shadow (green/amber/coral/pink) | reduced motion: static |
+| FAQ accordion | answer wrapper `grid-template-rows: 0fr → 1fr`, 0.5s spring; plus icon rotates 135° into a filled `--sb-primary` circle; question slides +10px and tints primary on hover; items stagger in (70ms) | reduced motion: no transitions, rows still toggle |
 | Magnetic CTA | wrapper translates `(cursor − center) × 0.35`, springs back on leave | fine pointer only |
 | Button hover fill | dark layer slides up inside pill, 0.35s spring | — |
 
