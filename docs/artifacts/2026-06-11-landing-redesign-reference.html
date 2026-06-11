@@ -154,15 +154,18 @@
   .panel .viz svg { width: 100%; height: auto; display: block; }
   .char { transform-box: fill-box; transform-origin: center; will-change: transform; }
 
-  /* STATS-LIKE STRIP (numbers count) */
-  .countstrip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; padding: 90px 0; }
-  .count { border-left: 2px solid var(--sb-primary); padding-left: 22px; }
-  .count .n { font-size: clamp(38px, 4.6vw, 62px); font-weight: 900; letter-spacing: -0.03em; }
-  .count .l { color: var(--sb-text-muted); font-size: 14px; margin-top: 6px; }
+  /* STATS BAND (numbers count) — its own full-width moment */
+  .countband { background: rgba(0,137,90,.045); border-top: 1px solid var(--sb-card-border); border-bottom: 1px solid var(--sb-card-border); }
+  .countstrip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 48px; padding: 130px 0; }
+  .count { border-left: 3px solid var(--sb-primary); padding-left: 30px; }
+  .count .n { font-size: clamp(54px, 7vw, 96px); font-weight: 900; letter-spacing: -0.04em; line-height: 1; }
+  .count .l { color: var(--sb-text-muted); font-size: 15px; margin-top: 14px; max-width: 220px; line-height: 1.5; }
 
   /* SECTION HEADS (tools + faq) — masked line reveals like the hero */
+  .tools { padding-top: 40px; }
+  .faqsec { padding-top: 170px; padding-bottom: 150px; }
   .kick2 { font-size: 13px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: var(--sb-primary); margin-bottom: 18px; display: block; }
-  .tools .head, .faq .head { max-width: 780px; margin-bottom: 54px; }
+  .tools .head, .faq .head { max-width: 780px; margin-bottom: 84px; }
   .tools h2, .faq h2 { font-size: clamp(34px, 4.6vw, 64px); font-weight: 900; letter-spacing: -0.035em; line-height: 1; }
   .tools h2 .row, .faq h2 .row { display: block; overflow: hidden; }
   .tools h2 .row > span, .faq h2 .row > span { display: inline-block; transform: translateY(112%); transition: transform .9s var(--sb-spring); }
@@ -170,29 +173,41 @@
   .tools h2 .row:nth-child(2) > span, .faq h2 .row:nth-child(2) > span { transition-delay: .08s; }
   .tools .head p, .faq .head p { color: var(--sb-text-muted); font-size: 16.5px; margin-top: 16px; max-width: 540px; line-height: 1.65; }
 
-  /* TOOLS GRID */
-  .toolgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
-  .toolcard {
-    background: var(--sb-card-bg); border: 1px solid var(--sb-card-border); border-radius: 22px; padding: 28px 24px;
-    opacity: 0; transform: translateY(36px);
-    transition: opacity .6s ease, transform .6s var(--sb-spring), box-shadow .35s ease;
+  /* TOOLS — pinned horizontal rail: page anchors, white slabs ride sideways.
+     Perf: shares the page's single rAF loop, transform-only, travel cached on resize. */
+  .toolstage { height: 300vh; }
+  .toolpin { height: 100vh; display: flex; flex-direction: column; justify-content: center; overflow: hidden; will-change: transform; }
+  .tooltrack { display: flex; gap: 28px; will-change: transform; } /* section supplies the 40px gutters */
+  .tslab {
+    flex: 0 0 60vw; min-height: 30vh; position: relative; overflow: hidden;
+    background: var(--sb-card-bg); border: 1px solid var(--sb-card-border); border-radius: 30px;
+    padding: 46px 48px; display: flex; align-items: center; gap: 40px;
+    box-shadow: 0 24px 60px rgba(10,25,22,.06);
+    transition: box-shadow .35s ease;
   }
-  .toolcard.in { opacity: 1; transform: none; }
-  .toolcard:nth-child(2) { transition-delay: .08s; }
-  .toolcard:nth-child(3) { transition-delay: .16s; }
-  .toolcard:nth-child(4) { transition-delay: .24s; }
-  .toolcard:hover { transition-delay: 0s; transform: translateY(-7px); }
-  .toolcard:nth-child(1):hover { box-shadow: 0 22px 50px rgba(0,137,90,.18); }
-  .toolcard:nth-child(2):hover { box-shadow: 0 22px 50px rgba(255,176,46,.24); }
-  .toolcard:nth-child(3):hover { box-shadow: 0 22px 50px rgba(255,120,70,.22); }
-  .toolcard:nth-child(4):hover { box-shadow: 0 22px 50px rgba(255,143,163,.24); }
-  .toolcard .chip { width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; margin-bottom: 16px; }
-  .chip.g { background: rgba(0,137,90,.10); }
-  .chip.y { background: rgba(255,201,77,.18); }
-  .chip.o { background: rgba(255,138,92,.16); }
-  .chip.p { background: rgba(255,143,163,.16); }
-  .toolcard h3 { font-size: 16.5px; font-weight: 800; margin-bottom: 8px; letter-spacing: -0.2px; }
-  .toolcard p { font-size: 14px; line-height: 1.6; color: var(--sb-text-muted); }
+  .tslab .num {
+    flex: none; pointer-events: none; user-select: none;
+    font-family: Georgia, 'Times New Roman', serif; font-style: italic; font-weight: 700;
+    font-size: clamp(90px, 8.5vw, 140px); line-height: .8; opacity: .2;
+    transform: translateY(6px);
+  }
+  .tslab:nth-child(1) .num { color: var(--sb-primary); }
+  .tslab:nth-child(2) .num { color: #DCA21B; }
+  .tslab:nth-child(3) .num { color: #E0683A; }
+  .tslab:nth-child(4) .num { color: #E26D86; }
+  .tslab:nth-child(1):hover { box-shadow: 0 30px 70px rgba(0,137,90,.20); }
+  .tslab:nth-child(2):hover { box-shadow: 0 30px 70px rgba(255,176,46,.26); }
+  .tslab:nth-child(3):hover { box-shadow: 0 30px 70px rgba(255,120,70,.24); }
+  .tslab:nth-child(4):hover { box-shadow: 0 30px 70px rgba(255,143,163,.26); }
+  .tslab .ttext { flex: 1 1 auto; min-width: 0; }
+  .tslab h3 { font-size: clamp(34px, 3.4vw, 58px); font-weight: 900; letter-spacing: -0.035em; line-height: 1.02; margin-bottom: 16px; }
+  .tslab p { font-size: clamp(17px, 1.5vw, 21px); line-height: 1.6; color: var(--sb-text-muted); max-width: 560px; }
+  .tslab .tviz { flex: none; width: clamp(120px, 11.5vw, 180px); }
+  .tslab .tviz svg { width: 100%; height: auto; display: block; overflow: visible; }
+  .nopin .toolstage { height: auto; }
+  .nopin .toolpin { height: auto; padding: 110px 0 100px; transform: none !important; }
+  .nopin .tooltrack { transform: none !important; flex-wrap: wrap; }
+  .nopin .tslab { flex-basis: 100%; min-height: 0; padding: 44px 36px 40px; }
 
   /* FAQ ACCORDION */
   .faq { max-width: 880px; margin: 0 auto; }
@@ -202,7 +217,7 @@
   .faqitem:nth-of-type(3) { transition-delay: .14s; }
   .faqitem:nth-of-type(4) { transition-delay: .21s; }
   .faqitem:last-of-type { border-bottom: 1px solid var(--sb-card-border); }
-  .faqq { width: 100%; background: none; border: 0; font: inherit; text-align: left; display: flex; align-items: center; gap: 22px; padding: 26px 4px; cursor: pointer; color: var(--sb-text-main); }
+  .faqq { width: 100%; background: none; border: 0; font: inherit; text-align: left; display: flex; align-items: center; gap: 22px; padding: 38px 4px; cursor: pointer; color: var(--sb-text-main); }
   .faqq .no { font-size: 13px; font-weight: 800; color: var(--sb-primary); width: 34px; flex: none; }
   .faqq .q { font-size: clamp(17px, 2vw, 22px); font-weight: 800; letter-spacing: -0.3px; flex: 1; transition: transform .35s var(--sb-spring), color .25s; }
   .faqq:hover .q { transform: translateX(10px); color: var(--sb-primary); }
@@ -211,7 +226,7 @@
   .faqa { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .5s var(--sb-spring); }
   .faqitem.open .faqa { grid-template-rows: 1fr; }
   .faqa > div { overflow: hidden; }
-  .faqa p { padding: 0 4px 28px 56px; color: var(--sb-text-muted); font-size: 15.5px; line-height: 1.65; max-width: 660px; }
+  .faqa p { padding: 0 4px 38px 56px; color: var(--sb-text-muted); font-size: 15.5px; line-height: 1.65; max-width: 660px; }
 
   /* CTA — dark, magnetic button, hover fill */
   .ctawrap { padding: 40px 40px 120px; }
@@ -233,17 +248,26 @@
 
   @media (max-width: 900px) {
     .panel { grid-template-columns: 1fr; gap: 22px; }
-    .countstrip { grid-template-columns: 1fr; gap: 30px; }
-    .toolgrid { grid-template-columns: 1fr 1fr; }
+    .countstrip { grid-template-columns: 1fr; gap: 40px; padding: 90px 0; }
+    .faqsec { padding-top: 110px; padding-bottom: 100px; }
+    .toolstage { height: auto; }
+    .toolpin { height: auto; padding: 110px 0 100px; transform: none !important; }
+    .tooltrack { transform: none !important; flex-direction: column; padding: 0; }
+    .tslab { flex-basis: auto; min-height: 0; padding: 36px 30px; flex-direction: column; align-items: flex-start; gap: 8px; }
+    .tslab .num { font-size: 90px; transform: none; }
   }
   @media (max-width: 600px) {
-    .toolgrid { grid-template-columns: 1fr; }
     .faqa p { padding-left: 4px; }
   }
   @media (prefers-reduced-motion: reduce) {
     h1 .row > span, .panel h2 .row > span, .tools h2 .row > span, .faq h2 .row > span { transform: none; transition: none; }
     .panel .viz { clip-path: none; }
-    .reveal, .toolcard, .faqitem { opacity: 1; transform: none; transition: none; }
+    .reveal, .faqitem { opacity: 1; transform: none; transition: none; }
+    .tooltrack, .toolpin { transform: none !important; }
+    .tooltrack { flex-wrap: wrap; }
+    .tslab { flex-basis: 100%; }
+    .toolstage { height: auto; }
+    .toolpin { height: auto; padding: 110px 0; }
     .faqa { transition: none; }
     .marquee .track { animation: none; }
     .bgwash i { animation: none; }
@@ -394,41 +418,124 @@
     </div>
   </section>
 
-  <!-- PLATFORM TOOLS -->
+  <!-- PLATFORM TOOLS — page anchors while the white rail rides sideways -->
   <section class="tools">
-    <div class="inner">
-      <div class="head">
-        <span class="kick2">Platform tools</span>
-        <h2><span class="row"><span>Everything the</span></span><span class="row"><span>tutoring loop needs.</span></span></h2>
-        <p>Built for peer learning programs that need matching, scheduling, reporting, and fair tutor visibility.</p>
-      </div>
-      <div class="toolgrid">
-        <div class="toolcard hoverable">
-          <div class="chip g"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#00895A" stroke-width="2.2" stroke-linecap="round"><circle cx="10" cy="10" r="6"/><path d="m15 15 5 5"/></svg></div>
-          <h3>Smart tutor matching</h3>
-          <p>Rank peer tutors by subject fit, ratings, availability, and workload balance.</p>
+    <div class="toolstage" id="toolstage">
+      <div class="toolpin" id="toolpin">
+        <div class="inner" style="width: 100%;">
+          <div class="head">
+            <span class="kick2">Platform tools</span>
+            <h2><span class="row"><span>Everything the</span></span><span class="row"><span>tutoring loop needs.</span></span></h2>
+            <p>Built for peer learning programs that need matching, scheduling, reporting, and fair tutor visibility.</p>
+          </div>
         </div>
-        <div class="toolcard hoverable">
-          <div class="chip y"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#B8860B" stroke-width="2.2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></div>
-          <h3>Flexible scheduling</h3>
-          <p>Book around real tutor availability and keep upcoming sessions easy to scan.</p>
-        </div>
-        <div class="toolcard hoverable">
-          <div class="chip o"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#D2622E" stroke-width="2.2" stroke-linecap="round"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg></div>
-          <h3>Reports and earnings</h3>
-          <p>Track completed sessions, tutor compensation, and program-level performance.</p>
-        </div>
-        <div class="toolcard hoverable">
-          <div class="chip p"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#C2566E" stroke-width="2.2" stroke-linecap="round"><path d="M4 8h10M18 8h2M4 16h2M10 16h10"/><circle cx="16" cy="8" r="2.2"/><circle cx="7" cy="16" r="2.2"/></svg></div>
-          <h3>Balanced workloads</h3>
-          <p>Protect session quality by keeping tutor demand visible before calendars fill up.</p>
+        <div class="tooltrack" id="tooltrack">
+          <div class="tslab hoverable">
+            <span class="num" aria-hidden="true">01</span>
+            <div class="ttext">
+              <h3>Smart tutor matching</h3>
+              <p>Rank peer tutors by subject fit, ratings, availability, and workload balance.</p>
+            </div>
+            <div class="tviz" aria-hidden="true">
+              <svg viewBox="0 0 200 170" fill="none">
+                <g class="char" data-amp="3">
+                  <circle cx="86" cy="76" r="46" fill="#EAF6F0" stroke="#0A1916" stroke-width="2.5"/>
+                  <path d="M120 110 l 34 34" stroke="#0A1916" stroke-width="3" stroke-linecap="round"/>
+                  <path d="M86 56 l 6.2 13.2 14.6 1.9 -10.7 10 2.8 14.4 -12.9 -7.1 -12.9 7.1 2.8 -14.4 -10.7 -10 14.6 -1.9 z"
+                        fill="#FFC94D" stroke="#0A1916" stroke-width="2.2" stroke-linejoin="round"/>
+                </g>
+                <g class="char" data-amp="5">
+                  <path d="M160 36 q 6 -10 14 -2" stroke="#00895A" stroke-width="2.5" stroke-linecap="round"/>
+                  <path d="M156 50 q 8 -4 12 2" stroke="#00895A" stroke-width="2.5" stroke-linecap="round"/>
+                </g>
+                <g class="char" data-amp="4">
+                  <path d="M22 28 l 3 8 8 1.5 -6 5.6 1.6 8.2 -6.6 -4.4 -6.6 4.4 1.6 -8.2 -6 -5.6 8 -1.5 z"
+                        fill="#FF8FA3" stroke="#0A1916" stroke-width="2" stroke-linejoin="round" opacity=".85"/>
+                </g>
+              </svg>
+            </div>
+          </div>
+          <div class="tslab hoverable">
+            <span class="num" aria-hidden="true">02</span>
+            <div class="ttext">
+              <h3>Flexible scheduling</h3>
+              <p>Book around real tutor availability and keep upcoming sessions easy to scan.</p>
+            </div>
+            <div class="tviz" aria-hidden="true">
+              <svg viewBox="0 0 200 170" fill="none">
+                <g class="char" data-amp="2.5">
+                  <rect x="30" y="34" width="124" height="108" rx="14" fill="#fff" stroke="#0A1916" stroke-width="2.5"/>
+                  <path d="M30 64 h 124" stroke="#0A1916" stroke-width="2.5"/>
+                  <path d="M58 24 v 18 M126 24 v 18" stroke="#0A1916" stroke-width="3" stroke-linecap="round"/>
+                  <circle cx="58" cy="88" r="4" fill="#D7DDD9"/><circle cx="92" cy="88" r="4" fill="#D7DDD9"/><circle cx="126" cy="88" r="4" fill="#D7DDD9"/>
+                  <circle cx="58" cy="116" r="4" fill="#D7DDD9"/><circle cx="126" cy="116" r="4" fill="#D7DDD9"/>
+                  <circle cx="92" cy="116" r="13" fill="rgba(0,137,90,.12)" stroke="#00895A" stroke-width="2.5"/>
+                  <path d="M86.5 116 l 4 4.5 7 -9" stroke="#00895A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                </g>
+                <g class="char" data-amp="4.5">
+                  <circle cx="166" cy="52" r="20" fill="#FFF6E3" stroke="#0A1916" stroke-width="2.5"/>
+                  <path d="M166 42 v 10 l 7 5" stroke="#0A1916" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+                </g>
+              </svg>
+            </div>
+          </div>
+          <div class="tslab hoverable">
+            <span class="num" aria-hidden="true">03</span>
+            <div class="ttext">
+              <h3>Reports and earnings</h3>
+              <p>Track completed sessions, tutor compensation, and program-level performance.</p>
+            </div>
+            <div class="tviz" aria-hidden="true">
+              <svg viewBox="0 0 200 170" fill="none">
+                <g class="char" data-amp="2.5">
+                  <path d="M34 142 q 66 4 132 0" stroke="#0A1916" stroke-width="2.5" stroke-linecap="round"/>
+                  <rect x="48" y="100" width="26" height="40" rx="7" fill="#FFE0E7" stroke="#0A1916" stroke-width="2.5"/>
+                  <rect x="88" y="76" width="26" height="64" rx="7" fill="#FFF0CC" stroke="#0A1916" stroke-width="2.5"/>
+                  <rect x="128" y="50" width="26" height="90" rx="7" fill="#DDF2E9" stroke="#0A1916" stroke-width="2.5"/>
+                </g>
+                <g class="char" data-amp="4">
+                  <path d="M44 64 q 48 -34 96 -22" stroke="#00895A" stroke-width="2.5" stroke-dasharray="2 8" stroke-linecap="round" fill="none"/>
+                  <path d="M132 36 l 12 4 -6 11 z" fill="#00895A"/>
+                </g>
+                <g class="char" data-amp="5">
+                  <circle cx="170" cy="92" r="16" fill="#FFC94D" stroke="#0A1916" stroke-width="2.5"/>
+                  <path d="M170 84 v 16 M164 88 h 9 q 4 0 4 4 t -4 4 h -9" stroke="#0A1916" stroke-width="2" stroke-linecap="round" fill="none"/>
+                </g>
+              </svg>
+            </div>
+          </div>
+          <div class="tslab hoverable">
+            <span class="num" aria-hidden="true">04</span>
+            <div class="ttext">
+              <h3>Balanced workloads</h3>
+              <p>Protect session quality by keeping tutor demand visible before calendars fill up.</p>
+            </div>
+            <div class="tviz" aria-hidden="true">
+              <svg viewBox="0 0 200 170" fill="none">
+                <g class="char" data-amp="2.5">
+                  <path d="M100 50 v 64" stroke="#0A1916" stroke-width="2.5" stroke-linecap="round"/>
+                  <path d="M76 130 q 24 -8 48 0 l -6 12 q -18 -6 -36 0 z" fill="#EAF6F0" stroke="#0A1916" stroke-width="2.5" stroke-linejoin="round"/>
+                  <path d="M40 56 q 60 -12 120 0" stroke="#0A1916" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+                  <circle cx="100" cy="48" r="6" fill="#FFC94D" stroke="#0A1916" stroke-width="2.2"/>
+                </g>
+                <g class="char" data-amp="4">
+                  <path d="M40 56 l -10 26 q 10 8 20 0 z" fill="rgba(0,137,90,.15)" stroke="#0A1916" stroke-width="2.2" stroke-linejoin="round"/>
+                  <circle cx="40" cy="94" r="11" fill="#00895A" stroke="#0A1916" stroke-width="2.2"/>
+                </g>
+                <g class="char" data-amp="4.5">
+                  <path d="M160 56 l -10 26 q 10 8 20 0 z" fill="rgba(255,143,163,.18)" stroke="#0A1916" stroke-width="2.2" stroke-linejoin="round"/>
+                  <circle cx="160" cy="94" r="11" fill="#FF8FA3" stroke="#0A1916" stroke-width="2.2"/>
+                </g>
+              </svg>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   </section>
 
   <!-- COUNT STRIP -->
-  <section>
+  <section class="countband">
     <div class="inner countstrip">
       <div class="count reveal"><div class="n"><span data-count="20">0</span>s</div><div class="l">to tell us what's hurting</div></div>
       <div class="count reveal"><div class="n"><span data-count="98">0</span>%</div><div class="l">match scores, out in the open</div></div>
@@ -437,7 +544,7 @@
   </section>
 
   <!-- COMMON QUESTIONS -->
-  <section>
+  <section class="faqsec">
     <div class="inner faq">
       <div class="head">
         <span class="kick2">Common questions</span>
@@ -515,12 +622,14 @@
       smooth.style.transform = `translate3d(0, ${-current}px, 0)`
       parallax()
       charWiggle(current)
+      toolPin()
       requestAnimationFrame(raf)
     }
     requestAnimationFrame(raf)
   } else {
     smooth.style.position = 'static'
     space.remove()
+    document.body.classList.add('nopin') // native scroll: tools section flows normally
   }
 
   /* ---------- custom cursor ---------- */
@@ -564,6 +673,33 @@
     })
   }
 
+  /* ---------- pinned tools rail: page anchors, white slabs ride sideways ----------
+     Perf notes: runs inside the page's single rAF loop (no extra loop), writes one
+     transform per frame, and only measures the track on init/resize — never per frame. */
+  const toolstage = document.getElementById('toolstage')
+  const toolpin = document.getElementById('toolpin')
+  const tooltrack = document.getElementById('tooltrack')
+  const toolsSec = document.querySelector('.tools')
+  let railTravel = 0
+  function measureRail() {
+    // distance the track must travel so the last slab ends flush with the gutter
+    railTravel = Math.max(0, tooltrack.scrollWidth - (innerWidth - 80))
+  }
+  measureRail()
+  addEventListener('resize', measureRail)
+  function toolPin() {
+    const r = toolstage.getBoundingClientRect()
+    const span = r.height - innerHeight
+    if (span <= 0) return // stacked layout (narrow viewport): no pin
+    const y = Math.max(0, Math.min(span, -r.top))
+    toolpin.style.transform = `translate3d(0, ${y}px, 0)`
+    const p = y / span
+    if (p > 0.01) toolsSec.classList.add('in') // head line-masks reveal as the pin engages
+    // brief hold at the start (5%) and end (10%) so the rail settles before release
+    const rp = Math.max(0, Math.min(1, (p - 0.05) / 0.85))
+    tooltrack.style.transform = `translate3d(${(-rp * railTravel).toFixed(1)}px, 0, 0)`
+  }
+
   /* ---------- per-card cursor tilt, each with its own personality ---------- */
   const tiltCfg = [
     { max: 7, dir: 1, z: 0 },     // calm, follows the cursor
@@ -595,7 +731,7 @@
     e.target.classList.add('in')
     e.target.querySelectorAll('[data-count]').forEach(runCount)
   }), { threshold: 0.25 })
-  document.querySelectorAll('.reveal, .panel, #heroTitle, .count, .tools, .faq, .toolcard, .faqitem').forEach((el) => io.observe(el))
+  document.querySelectorAll('.reveal, .panel, #heroTitle, .count, .tools, .faq, .faqitem').forEach((el) => io.observe(el))
 
   /* ---------- FAQ accordion ---------- */
   document.querySelectorAll('.faqitem').forEach((item) => {

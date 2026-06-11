@@ -5,9 +5,11 @@ Status moves Draft → Approved → In Progress → Done. When a plan is complet
 
 | Date | Plan | Status | Summary |
 |------|------|--------|---------|
-| 2026-06-08 | [Online-only payments + proof of payment](2026-06-08-online-only-payments.md) | Approved | Pending |
+| 2026-06-11 | [Landing page redesign — Studio Motion](2026-06-11-landing-page-redesign.md) | In Progress | [Summary](../session-summaries/2026-06-11-landing-page-redesign-summary.md) |
+| 2026-06-08 | [Online-only payments + proof of payment](2026-06-08-online-only-payments.md) | Done | [Summary](../session-summaries/2026-06-11-online-only-payments-summary.md) |
+| 2026-06-11 | [PayMongo proof-of-payment validation](2026-06-11-paymongo-proof-of-payment-validation.md) | Draft | Pending |
 | 2026-06-08 | [SuperAdmin role + per-institution admin scoping](2026-06-08-superadmin-institution-hierarchy.md) | Approved | Pending |
-| 2026-06-08 | [Venue confirmation + mid-session check-in modals](2026-06-08-venue-session-checkin-modals.md) | Approved | Pending |
+| 2026-06-08 | [Venue confirmation + mid-session check-in modals](2026-06-08-venue-session-checkin-modals.md) | Done | Implemented session check-in tracking + tutee/tutor UI |
 | 2026-06-07 | [Dashboard load performance (backend)](2026-06-07-dashboard-load-performance.md) | In Progress | [Summary](../session-summaries/2026-06-07-dashboard-load-performance-summary.md) |
 | 2026-06-07 | [Chat partner context display](2026-06-07-chat-partner-context-display.md) | Done | [Summary](../session-summaries/2026-06-07-chat-partner-context-display-summary.md) |
 | 2026-06-07 | [Support chat naming](2026-06-07-support-chat-naming.md) | Done | [Summary](../session-summaries/2026-06-07-support-chat-naming-summary.md) |

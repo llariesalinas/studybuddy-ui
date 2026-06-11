@@ -19,9 +19,10 @@ Key decisions made during design review:
 - Copy is campus-agnostic. No mention of CPU anywhere; the platform is open to any campus.
 - No fake social proof. The old stats strip (500+ tutors) and testimonials are dropped;
   a count strip of product facts (20s / 98% / 1 min) replaces them.
-- The platform-tools grid and FAQ ("Common questions") were re-added on 2026-06-11 with
-  new copy, restyled in this design's motion language. The multi-column footer stays
-  dropped; footer is a single line.
+- The platform-tools section and FAQ ("Common questions") were re-added on 2026-06-11
+  with new copy. After several layout iterations (flat 4-card grid, bento, pinned
+  scrubbed assembly), the tools section's final form is a **pinned horizontal rail**
+  (structure item 5). The multi-column footer stays dropped; footer is a single line.
 - Illustrations are inline SVG "doodle" characters (hand-drawn hair, eyebrows, blush,
   glasses, hair bun) inside clean white cards — playful characters, clean chrome.
 
@@ -43,23 +44,36 @@ Key decisions made during design review:
      a time that works." — two doodle avatars, dashed connector, star check, "98% match"
    - 03 "Learn and track." — "Wrap each session with history, compensation, and progress
      details in place." — two figures at a table, lightbulb, "Got it!"
-5. **Platform tools** — kicker "PLATFORM TOOLS"; H2 "Everything the tutoring loop needs."
-   (masked line reveal); sub "Built for peer learning programs that need matching,
-   scheduling, reporting, and fair tutor visibility."; 4-card grid (2-col <900px,
-   1-col <600px), staggered pop-in, per-card colored hover shadows:
-   - Smart tutor matching — "Rank peer tutors by subject fit, ratings, availability, and
-     workload balance."
-   - Flexible scheduling — "Book around real tutor availability and keep upcoming
-     sessions easy to scan."
-   - Reports and earnings — "Track completed sessions, tutor compensation, and
-     program-level performance."
-   - Balanced workloads — "Protect session quality by keeping tutor demand visible
-     before calendars fill up."
-6. **Count strip** — three left-bordered numbers that count up on reveal:
+5. **Platform tools — pinned horizontal rail** — kicker "PLATFORM TOOLS"; H2 "Everything
+   the tutoring loop needs." (masked line reveal); sub "Built for peer learning programs
+   that need matching, scheduling, reporting, and fair tutor visibility." The page then
+   anchors for ~2 viewport-heights (300vh stage) while a rail of four white slabs rides
+   right-to-left through the frame. Each slab is a `60vw x >=30vh` banner laid out as
+   `numeral | title + copy | illustration`:
+   - numeral: italic serif watermark (Georgia stack, 90-140px, 700 italic) in the slab's
+     accent color at 20% opacity — the only color on the otherwise standard white card
+   - title 34-58px (900, -0.035em) / body 17-21px, max measure 560px
+   - object doodle on the right (120-180px wide; objects only, NO characters/stick
+     figures), ink-stroke style, split into 2-3 `.char` wiggle groups (amps 2.5-5):
+     01 magnifier with a star in the lens + star/sparkle accents ·
+     02 calendar with a circled checked date + floating clock ·
+     03 rising bar trio (pink/yellow/green), dashed trend arrow, coin ·
+     04 level balance scale with green and pink weights
+   Copy per slab: Smart tutor matching "Rank peer tutors by subject fit, ratings,
+   availability, and workload balance." · Flexible scheduling "Book around real tutor
+   availability and keep upcoming sessions easy to scan." · Reports and earnings "Track
+   completed sessions, tutor compensation, and program-level performance." · Balanced
+   workloads "Protect session quality by keeping tutor demand visible before calendars
+   fill up." Per-slab colored hover shadows (green/amber/coral/pink). On touch,
+   <900px, or reduced motion: no pin — slabs stack as a normal vertical column.
+6. **Count band** — full-width band (`--sb-primary` at ~4.5% alpha, hairline top/bottom
+   borders) holding three left-bordered numbers that count up on reveal (54-96px,
+   3px accent bar, 130px vertical padding):
    `20s` to tell us what's hurting · `98%` match scores, out in the open ·
    `1 min` to join with your student email.
 7. **Common questions (FAQ)** — kicker "COMMON QUESTIONS"; H2 "Asked a lot, answered
-   straight." (masked line reveal); 4 accordion items, staggered reveal:
+   straight." (masked line reveal); 4 accordion items (38px row padding, ~170px section
+   padding), staggered reveal:
    - 01 Who can become a tutor?
    - 02 How much does it cost?
    - 03 Can I use it on my campus?
@@ -87,8 +101,13 @@ equivalents for `[data-sb-theme="dark"]`):
 | `--sb-pop-orange` | `#FF8A5C` | lightbulb rays, card-3 shadow hue, aurora band |
 | `--sb-pop-pink` | `#FF8FA3` | character blush, marquee dot, aurora band |
 | `--sb-aurora-violet` | `#8E7CF4` | aurora band 2 only (new hue; aurora needs it) |
+| `--sb-pop-yellow-deep` | `#DCA21B` | rail numeral 02 (text-safe dark variant of pop-yellow) |
+| `--sb-pop-orange-deep` | `#E0683A` | rail numeral 03 (text-safe dark variant of pop-orange) |
+| `--sb-pop-pink-deep` | `#E26D86` | rail numeral 04 (text-safe dark variant of pop-pink) |
 
 No hardcoded hex in the component — SVG fills/strokes use classes bound to these vars.
+The rail numerals use a serif stack (`Georgia, 'Times New Roman', serif`, italic 700) —
+the page's single intentional departure from Inter; no webfont is loaded for it.
 
 ## Aurora background
 
@@ -121,7 +140,8 @@ Fixed full-viewport layer behind everything (`z-index: 0`, content above), compo
 | Hover shadows | per-card colored: green `rgba(0,137,90,.22)` / amber `rgba(255,176,46,.30)` / coral `rgba(255,120,70,.28)` + neutral layer | — |
 | Count-up numbers | 0 → target over 1100ms, cubic ease-out, triggered once on reveal | reduced motion: show final |
 | Section-head reveals | tools + FAQ H2s use the hero's masked-row reveal (`translateY(112%) → 0`, 0.9s spring, 80ms stagger), triggered by IO on the section | reduced motion: static |
-| Tool cards | staggered pop-in (80ms steps), hover lift -7px with per-card colored shadow (green/amber/coral/pink) | reduced motion: static |
+| Tools pinned rail | manual pin — 300vh stage; pin content counter-translated `translateY(y)` inside the shared rAF loop (CSS `position: sticky` CANNOT work inside the fixed+translated smooth wrapper); rail progress `rp = clamp((p - .05) / .85)` maps to `translateX(-rp * travel)` with a hold at both ends; `travel = track.scrollWidth - (innerWidth - 80)`, cached and re-measured only on init/resize — never per frame | fine pointer + no reduced motion; touch/<900px/reduced: static stacked column (`.nopin` class / media query) |
+| Rail slab content | white card chrome (card bg/border/shadow); object-doodle illustrations ride the global `.char` wiggle loop (2-3 groups per slab, amps 2.5-5); hover: per-slab colored shadow only (no transform, so the scrub owns the geometry) | reduced motion: wiggle off |
 | FAQ accordion | answer wrapper `grid-template-rows: 0fr → 1fr`, 0.5s spring; plus icon rotates 135° into a filled `--sb-primary` circle; question slides +10px and tints primary on hover; items stagger in (70ms) | reduced motion: no transitions, rows still toggle |
 | Magnetic CTA | wrapper translates `(cursor − center) × 0.35`, springs back on leave | fine pointer only |
 | Button hover fill | dark layer slides up inside pill, 0.35s spring | — |
@@ -136,9 +156,9 @@ Fixed full-viewport layer behind everything (`z-index: 0`, content above), compo
   aurora ribbon opacities roughly halved; marquee strip uses `--sb-card-bg`.
 - Semantics: one `h1`, sections with `h2`, nav/footer landmarks, focus styles on pills,
   `aria-hidden="true"` on the cursor dot, bgwash, and decorative SVGs.
-- Lifecycle: ALL rAF loops, listeners (`scroll`, `resize`, `mousemove`), and the
-  ResizeObserver must be torn down in `onUnmounted` so nothing runs after navigating
-  to `/login` or `/register`.
+- Lifecycle: ALL rAF loops, listeners (`scroll`, `resize`, `mousemove` — including the
+  rail's resize re-measure), and the ResizeObserver must be torn down in `onUnmounted`
+  so nothing runs after navigating to `/login` or `/register`.
 
 ## Performance budget
 
