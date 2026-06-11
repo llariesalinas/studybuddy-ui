@@ -7,8 +7,8 @@ Reference artifact: `docs/artifacts/2026-06-11-landing-redesign-reference.html`
 ## Implemented
 
 - Rebuilt `src/views/LandingPage.vue` around the approved Studio Motion artifact:
-  hero, marquee, three panels, Platform tools, count strip, Common questions, CTA, and
-  single-line footer.
+  hero, seamless marquee, three panels, pinned Platform tools rail, full-width count
+  band, Common questions, CTA, and single-line footer.
 - Added lifecycle-managed motion for smooth scroll, cursor, reveal/count-up effects,
   parallax, character wiggle, card tilt, and magnetic CTA.
 - Added cleanup so continuous animation stops on route leave, unmount, hidden tab, reduced
@@ -19,13 +19,20 @@ Reference artifact: `docs/artifacts/2026-06-11-landing-redesign-reference.html`
   global app aurora.
 - Fixed the smooth-scroll spacer so it contributes document height, then adjusted reveal
   rows so final settled heading text is not clipped.
+- Ported the final tools revision: tokenized object doodle slabs, manual rail pinning
+  inside the existing smooth-scroll rAF loop, cached rail travel on resize, deep numeral
+  tokens, count band, FAQ spacing pass, and static stacked fallbacks for touch,
+  reduced-motion, and narrow viewports.
 
 ## Verification
 
 - `npx oxlint .` passed with 0 warnings/errors.
 - `npx eslint . --cache --max-warnings=0` passed.
 - `npm run build` passed.
-- Browser checks on `http://127.0.0.1:5174/` confirmed all artifact sections render.
+- Code review caught and fixed the rail measurement-order issue that kept the rail from
+  moving: `.nopin` is now removed before spacer and rail travel measurement.
+- Browser checks were attempted, but the in-app browser blocked localhost in this
+  session; final visual QA should be done in a normal local browser.
 - Responsive text-fit audit at `360`, `390`, `768`, `900`, `1024`, and `1280` found no
   positive horizontal overflow and no clipped settled text.
 - Performance guardrail scan found zero `backdrop-filter`/`filter: blur`, no animated
@@ -37,16 +44,14 @@ Reference artifact: `docs/artifacts/2026-06-11-landing-redesign-reference.html`
 - Browser console still reports pre-existing app-level warnings from `SupportModal` prop
   inheritance and the router guard's deprecated `next()` callback; no new landing-specific
   console errors were observed.
-- `docs/plans/README.md` was not updated because it already contains unrelated in-flight
-  status edits.
+- `docs/plans/README.md` was updated only for the landing redesign status row.
 
-## Post-implementation design revision (pending port)
+## Final rail port
 
-After this implementation shipped, the design review continued the same day and the
-spec/artifact were revised: Platform tools became a **pinned horizontal rail** (white
-banner slabs — serif numeral watermark | larger text | object-doodle illustration; the
-page anchors while the rail rides sideways), the count strip became a full-width count
-band, and the tools/FAQ stretch gained a generous-spacing pass. The shipped
-`LandingPage.vue` still has the earlier flat 4-card tools grid; the port is tracked as
-Step 8 of the plan, which is back to **In Progress**. This summary will be updated again
-when the port lands.
+The later 2026-06-11 design revision is now shipped in Vue. Platform tools use the
+approved pinned horizontal rail (white banner slabs with serif numeral watermarks and
+object-only doodles), the old flat 4-card grid is removed, the count strip is now the
+approved full-width count band, and the tools/FAQ spacing pass is in place. Step 8 of the
+plan is complete and the plan status is **Done**. The FAQ row reveal now keeps the slide
+motion but removes opacity fading, so pressing a question no longer makes the row
+disappear and reappear.

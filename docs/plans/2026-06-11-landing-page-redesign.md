@@ -1,7 +1,7 @@
 ---
 title: Landing page redesign — Studio Motion
 date: 2026-06-11
-status: In Progress
+status: Done
 spec: ../superpowers/specs/2026-06-11-landing-page-redesign-design.md
 ---
 
@@ -9,21 +9,17 @@ spec: ../superpowers/specs/2026-06-11-landing-page-redesign-design.md
 
 ## Status & Progress Summary
 
-**Status: In Progress — base implementation shipped, tools-rail port pending.**
-The Studio Motion landing page is implemented in `src/views/LandingPage.vue` (final step
-copy, Platform tools as the earlier flat 4-card grid, Common questions, count strip, CTA,
-aurora ribbons, lifecycle-managed motion, text-fit fixes, performance guardrails; global
-tokens + landing-route aurora suppression in `src/assets/main.css`). Verification passed
-for non-mutating lint, production build, responsive text-fit checks, blur/backdrop scans,
-and `/login` route cleanup.
+**Status: Done - revised tools rail, count band, and marquee loop port shipped.**
+The Studio Motion landing page is implemented in `src/views/LandingPage.vue` with the
+approved pinned Platform tools rail, tokenized object doodles, full-width count band,
+generous FAQ spacing, seamless viewport-safe marquee loop, aurora ribbons,
+lifecycle-managed motion, text-fit fixes, and performance guardrails. Global accent
+tokens and landing-route aurora suppression live in `src/assets/main.css`.
 
-After that implementation landed, the design review continued and the spec/artifact were
-revised (2026-06-11, later): the Platform tools section became a **pinned horizontal
-rail** (white banner slabs, serif numeral watermarks, object-doodle illustrations, page
-anchors while the rail rides sideways), the count strip became a full-width **count
-band**, and the tools/FAQ stretch gained a generous-spacing pass. These are approved in
-the spec and archived artifact but **not yet ported** to the Vue implementation — that is
-Step 8 below, the only remaining work.
+Verification passed for non-mutating lint and production build. Code review also caught
+and fixed the rail measurement order so travel is measured after leaving the `.nopin`
+stacked fallback; the in-app browser blocked localhost during this session, so final
+visual/browser QA should be done from a normal local browser.
 
 ## Goal
 
@@ -234,3 +230,9 @@ Key decisions:
   demos (`tools-strip-demos.html`, `tools-layout-options.html`) updated. Status reopened
   to In Progress; the Vue port is captured as Step 8 — no application code changed in
   this revision.
+- **2026-06-11 (rail port implementation)** — Ported Step 8 into
+  `src/views/LandingPage.vue` and `src/assets/main.css`: pinned rail with manual
+  counter-translate inside the smooth-scroll rAF loop, cached rail travel on resize,
+  tokenized rail doodles and deep numeral tokens, full-width count band, FAQ spacing
+  pass, viewport-safe marquee loop, and touch/reduced-motion stacked fallbacks. Status
+  set to Done after lint/build verification and a code-level rail measurement fix.

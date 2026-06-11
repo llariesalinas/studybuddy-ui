@@ -8,6 +8,15 @@
   --sb-primary-light: #edf6f1;
   --sb-primary-lighter: #dff1e8;
   --sb-bg: #F8F9FA;
+  --sb-pop-yellow: #FFC94D;
+  --sb-pop-orange: #FF8A5C;
+  --sb-pop-pink: #FF8FA3;
+  --sb-pop-yellow-deep: #DCA21B;
+  --sb-pop-orange-deep: #E0683A;
+  --sb-pop-pink-deep: #E26D86;
+  --sb-aurora-violet: #8E7CF4;
+  --sb-aurora-wash-start: #F1FAF6;
+  --sb-aurora-wash-end: #FDF9F1;
   --sb-aurora-bg:
     radial-gradient(circle at 8% -8%, rgba(0, 137, 90, 0.22), transparent 34%),
     radial-gradient(circle at 52% -10%, rgba(103, 197, 220, 0.23), transparent 38%),
@@ -47,6 +56,15 @@
   --sb-primary-hover:   #9CC8B8;
   --sb-primary-contrast:#071310;
   --sb-bg:              #050807;
+  --sb-pop-yellow:      #8F742F;
+  --sb-pop-orange:      #8B4C38;
+  --sb-pop-pink:        #8C5662;
+  --sb-pop-yellow-deep: #C08C18;
+  --sb-pop-orange-deep: #B95632;
+  --sb-pop-pink-deep:   #BD5D73;
+  --sb-aurora-violet:   #6155A8;
+  --sb-aurora-wash-start:#071310;
+  --sb-aurora-wash-end: #0B0F0E;
   --sb-aurora-bg:
     radial-gradient(circle at 9% -4%, rgba(134, 183, 163, 0.22), transparent 34%),
     radial-gradient(circle at 98% 12%, rgba(76, 201, 240, 0.12), transparent 34%),
@@ -96,6 +114,11 @@ body > #app::before {
   z-index: -1;
   pointer-events: none;
   opacity: 1;
+}
+
+body.sb-landing-route > #app::before {
+  display: none;
+  animation: none;
 }
 
 @media (prefers-reduced-motion: no-preference) {

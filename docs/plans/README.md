@@ -5,7 +5,7 @@ Status moves Draft → Approved → In Progress → Done. When a plan is complet
 
 | Date | Plan | Status | Summary |
 |------|------|--------|---------|
-| 2026-06-11 | [Landing page redesign — Studio Motion](2026-06-11-landing-page-redesign.md) | In Progress | [Summary](../session-summaries/2026-06-11-landing-page-redesign-summary.md) |
+| 2026-06-11 | [Landing page redesign — Studio Motion](2026-06-11-landing-page-redesign.md) | Done | [Summary](../session-summaries/2026-06-11-landing-page-redesign-summary.md) |
 | 2026-06-08 | [Online-only payments + proof of payment](2026-06-08-online-only-payments.md) | Done | [Summary](../session-summaries/2026-06-11-online-only-payments-summary.md) |
 | 2026-06-11 | [PayMongo proof-of-payment validation](2026-06-11-paymongo-proof-of-payment-validation.md) | Draft | Pending |
 | 2026-06-08 | [SuperAdmin role + per-institution admin scoping](2026-06-08-superadmin-institution-hierarchy.md) | Approved | Pending |
