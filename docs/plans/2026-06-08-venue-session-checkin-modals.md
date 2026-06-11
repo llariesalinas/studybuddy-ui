@@ -1,11 +1,21 @@
 ---
 title: Venue confirmation modal + mid-session check-in modal
 date: 2026-06-08
-status: Approved
+status: Done
 spec:
 ---
 
 # Venue confirmation modal + mid-session check-in modal
+
+## Status & Progress Summary
+
+**Status:** Done - **Last updated:** 2026-06-11
+
+Implemented as tutee self-attestation with two booking-scoped check-in endpoints.
+Venue confirmation appears for face-to-face sessions during the active session window;
+the midpoint check-in appears after the computed halfway point. Responses are stored in
+`SessionCheckIn`, returned from booking detail, and shown on the tutor booking detail
+page. "No" / "having issues" answers open the existing support flow after saving.
 
 ## Goal
 
@@ -66,3 +76,11 @@ infrastructure and a parallel chat-injection mechanism.
   responses are visible to the tutor/admin afterward.
 - `npm run lint` and `npm run build` pass; backend test run
   (`backend/studybuddy/tests.py`) passes.
+
+## Changelog
+
+- **2026-06-11**: Added `SessionCheckIn` model + migration, booking-scoped venue and
+  midpoint check-in endpoints, tutee modal prompts, support routing for negative
+  responses, tutor detail check-in visibility, and focused backend coverage. Verified
+  with `python manage.py test studybuddy.tests.SessionCheckInTests --keepdb`,
+  `npm run lint`, and `npm run build`.

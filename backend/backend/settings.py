@@ -273,6 +273,10 @@ Q_CLUSTER = {
     "label": "Django Q",
 }
 
+import sys
+if 'test' in sys.argv:
+    Q_CLUSTER["sync"] = True
+
 # Cache backend. Redis when REDIS_URL is set (preferred: fast and shared across
 # worker processes — required for correct invalidation in multi-worker prod).
 # Without REDIS_URL we fall back to a per-process in-memory cache so local dev and

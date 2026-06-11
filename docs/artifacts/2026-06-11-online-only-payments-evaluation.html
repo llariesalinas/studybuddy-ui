@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StudyBuddy - Payment Flow Plan Evaluation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #0b0f19;
+      --bg-card: rgba(22, 28, 45, 0.6);
+      --bg-hover: rgba(30, 41, 59, 0.8);
+      --border-color: rgba(255, 255, 255, 0.08);
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      
+      --sb-primary: #6366f1; /* Indigo */
+      --sb-primary-glow: rgba(99, 102, 241, 0.15);
+      --sb-secondary: #06b6d4; /* Cyan */
+      --sb-success: #10b981; /* Emerald */
+      --sb-warning: #f59e0b; /* Amber */
+      --sb-danger: #ef4444; /* Rose */
+      
+      --font-title: 'Outfit', sans-serif;
+      --font-body: 'Plus Jakarta Sans', sans-serif;
+      --font-mono: 'Fira Code', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: var(--font-body);
+      line-height: 1.6;
+      padding: 2.5rem 1.5rem;
+      min-height: 100vh;
+      background-image: 
+        radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.05) 0%, transparent 40%),
+        radial-gradient(circle at 90% 80%, rgba(6, 118, 212, 0.05) 0%, transparent 40%);
+      background-attachment: fixed;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    /* HEADER */
+    header {
+      margin-bottom: 3rem;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 2rem;
+      position: relative;
+    }
+
+    header::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: 0;
+      width: 150px;
+      height: 2px;
+      background: linear-gradient(90deg, var(--sb-primary), var(--sb-secondary));
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      border-radius: 50px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 1rem;
+    }
+
+    .badge-evaluation {
+      background-color: var(--sb-primary-glow);
+      color: var(--sb-primary);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+    }
+
+    h1 {
+      font-family: var(--font-title);
+      font-size: 2.5rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.5rem;
+      background: linear-gradient(135deg, #ffffff 30%, #a5b4fc 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .subtitle {
+      color: var(--text-muted);
+      font-size: 1.1rem;
+    }
+
+    /* GRIDS & CARDS */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1.5rem;
+      margin-bottom: 2.5rem;
+    }
+
+    @media (min-width: 768px) {
+      .grid-2 {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 2rem;
+      backdrop-filter: blur(12px);
+      transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+
+    .card:hover {
+      border-color: rgba(99, 102, 241, 0.3);
+    }
+
+    .card h2 {
+      font-family: var(--font-title);
+      font-size: 1.4rem;
+      font-weight: 600;
+      margin-bottom: 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .card-title-icon {
+      color: var(--sb-secondary);
+      font-size: 1.5rem;
+    }
+
+    /* LISTS & ITEMS */
+    ul {
+      list-style-type: none;
+    }
+
+    li {
+      margin-bottom: 1rem;
+      position: relative;
+      padding-left: 1.75rem;
+    }
+
+    li::before {
+      content: "→";
+      position: absolute;
+      left: 0;
+      color: var(--sb-primary);
+      font-weight: 700;
+    }
+
+    .finding-alert {
+      background: rgba(239, 68, 68, 0.05);
+      border-left: 4px solid var(--sb-danger);
+      padding: 1rem 1.5rem;
+      border-radius: 4px 12px 12px 4px;
+      margin-bottom: 1rem;
+    }
+
+    .finding-alert strong {
+      color: #ff8a8a;
+    }
+
+    /* TABLE */
+    .table-container {
+      overflow-x: auto;
+      margin: 2.5rem 0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      overflow: hidden;
+      text-align: left;
+    }
+
+    th, td {
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    th {
+      font-family: var(--font-title);
+      font-weight: 600;
+      color: var(--text-main);
+      background: rgba(255, 255, 255, 0.02);
+      font-size: 0.95rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    tr:hover td {
+      background: rgba(255, 255, 255, 0.01);
+    }
+
+    .badge-status {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .badge-status-dead {
+      background-color: rgba(239, 68, 68, 0.15);
+      color: var(--sb-danger);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    .badge-status-changed {
+      background-color: rgba(245, 158, 11, 0.15);
+      color: var(--sb-warning);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+
+    .badge-status-valid {
+      background-color: rgba(16, 185, 129, 0.15);
+      color: var(--sb-success);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    /* COMPARISON BLOCKS (SCOPES) */
+    .scopes-container {
+      margin-top: 3rem;
+    }
+
+    .scopes-header {
+      font-family: var(--font-title);
+      font-size: 1.8rem;
+      font-weight: 600;
+      margin-bottom: 1.5rem;
+      text-align: center;
+    }
+
+    .scopes-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1.5rem;
+    }
+
+    @media (min-width: 992px) {
+      .scopes-grid {
+        grid-template-columns: 1fr 1.1fr 1fr;
+      }
+    }
+
+    .scope-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    .scope-card.recommended {
+      border: 2px solid var(--sb-primary);
+      box-shadow: 0 10px 30px rgba(99, 102, 241, 0.1);
+      transform: scale(1.02);
+    }
+
+    .scope-ribbon {
+      position: absolute;
+      top: -12px;
+      right: 20px;
+      background: linear-gradient(135deg, var(--sb-primary), var(--sb-secondary));
+      color: white;
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 0.25rem 0.75rem;
+      border-radius: 50px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    }
+
+    .scope-number {
+      font-family: var(--font-title);
+      font-size: 3rem;
+      font-weight: 800;
+      color: rgba(255, 255, 255, 0.05);
+      position: absolute;
+      top: 10px;
+      right: 20px;
+    }
+
+    .scope-title {
+      font-family: var(--font-title);
+      font-size: 1.3rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+
+    .scope-desc {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin-bottom: 1.5rem;
+      flex-grow: 0;
+    }
+
+    .scope-actions {
+      margin-bottom: 1.5rem;
+      flex-grow: 1;
+    }
+
+    .scope-action-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.5rem;
+      font-size: 0.88rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .scope-action-icon {
+      font-weight: bold;
+      margin-top: 1px;
+    }
+
+    .scope-action-item.add .scope-action-icon { color: var(--sb-success); }
+    .scope-action-item.remove .scope-action-icon { color: var(--sb-danger); }
+    .scope-action-item.neutral .scope-action-icon { color: var(--sb-secondary); }
+
+    .scope-footer {
+      border-top: 1px solid var(--border-color);
+      padding-top: 1.25rem;
+      margin-top: auto;
+    }
+
+    .scope-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .scope-meta strong {
+      color: var(--text-main);
+    }
+
+    /* CODE PREVIEW */
+    .code-preview {
+      background: #060911;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 1rem;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      overflow-x: auto;
+      margin-top: 1rem;
+    }
+
+    .code-comment { color: #5c6370; font-style: italic; }
+    .code-keyword { color: #c678dd; }
+    .code-string { color: #98c379; }
+    .code-danger { color: #e06c75; background: rgba(224, 108, 117, 0.1); display: block; }
+
+    /* FOOTER CALLOUT */
+    .next-steps {
+      margin-top: 3.5rem;
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(6, 182, 212, 0.04) 100%);
+      border: 1px solid rgba(99, 102, 241, 0.2);
+      border-radius: 16px;
+      padding: 2.5rem;
+      text-align: center;
+    }
+
+    .next-steps h3 {
+      font-family: var(--font-title);
+      font-size: 1.5rem;
+      margin-bottom: 0.75rem;
+      background: linear-gradient(90deg, #ffffff, var(--sb-secondary));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .next-steps p {
+      color: var(--text-muted);
+      max-width: 700px;
+      margin: 0 auto 1.5rem auto;
+    }
+
+    .btn-group {
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      padding: 0.75rem 1.5rem;
+      border-radius: 8px;
+      font-family: var(--font-title);
+      font-weight: 600;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: background-color 0.2s, transform 0.1s;
+      border: none;
+      text-decoration: none;
+    }
+
+    .btn-primary {
+      background-color: var(--sb-primary);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background-color: #4f46e5;
+    }
+
+    .btn-secondary {
+      background-color: transparent;
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+    }
+
+    .btn-secondary:hover {
+      background-color: rgba(255, 255, 255, 0.03);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <span class="badge badge-evaluation">Plan Assessment</span>
+      <h1>Online-Only Payments Flow</h1>
+      <div class="subtitle">Discrepancy audit & scope alignment for plan <code>2026-06-08-online-only-payments.md</code></div>
+    </header>
+
+    <div class="grid-2">
+      <!-- Ground Truth Findings -->
+      <div class="card">
+        <h2><span class="card-title-icon">🔍</span>Codebase Discoveries</h2>
+        <div class="finding-alert">
+          <strong>PaymentScreenTutee.vue is DEAD:</strong> This component is not routed in <code>router/index.js</code> and has zero active references in the app. Modifying it is completely moot.
+        </div>
+        <div class="finding-alert" style="border-left-color: var(--sb-secondary); background: rgba(6, 182, 212, 0.03);">
+          <strong>PostSessionPaymentView.vue is LIVE:</strong> Navigated to post-session from <code>TuteeSessionDetailsFlow.vue</code> via route <code>PaymentTutee</code>. This is where active tutee payment options live.
+        </div>
+        <p style="font-size: 0.9rem; color: var(--text-muted); margin-top: 1rem;">
+          In the backend database, only two methods exist and are active: <strong>CASH</strong> ("Cash Ledger") and <strong>online</strong> ("PayMongo Online Framework (GCash/Maya)").
+        </p>
+      </div>
+
+      <!-- Backend Realities -->
+      <div class="card">
+        <h2><span class="card-title-icon">⚙️</span>Backend Validation</h2>
+        <p style="font-size: 0.92rem; margin-bottom: 1rem;">
+          The API endpoint for session payment (<code>submit_session_payment</code>) checks if the method is <code>online</code> to require receipt/reference:
+        </p>
+        <div class="code-preview">
+          <span class="code-comment"># backend/studybuddy/views.py (~line 2689)</span><br>
+          is_online_payment = method.code == <span class="code-string">'online'</span><br>
+          <span class="code-keyword">if</span> is_online_payment <span class="code-keyword">and</span> receipt_image <span class="code-keyword">is</span> <span class="code-keyword">None</span>:<br>
+          &nbsp;&nbsp;&nbsp;&nbsp;<span class="code-keyword">return</span> Response({<span class="code-string">"error"</span>: <span class="code-string">"Receipt..."</span>}, status=400)<br>
+          <br>
+          <span class="code-comment"># If CASH.is_active is flipped to False, the only method returned</span><br>
+          <span class="code-comment"># is 'online', making receipt upload mandatory by definition.</span>
+        </div>
+        <p style="font-size: 0.88rem; color: var(--text-muted); margin-top: 1rem;">
+          Existing bookings with <code>CASH</code> selected will stay safe in history, but future booking flows will only list <code>online</code>, making the flow cash-free automatically.
+        </p>
+      </div>
+    </div>
+
+    <!-- Step Evaluation Table -->
+    <div class="scopes-header">Step-by-Step Feasibility Audit</div>
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 25%">Plan Step</th>
+            <th style="width: 15%">Status</th>
+            <th style="width: 35%">Audit Finding</th>
+            <th style="width: 25%">Recommendation</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>1. Set CASH is_active = False</strong></td>
+            <td><span class="badge-status badge-status-valid">Valid</span></td>
+            <td>Needed for disabling cash payments via API. Done via Django data migration.</td>
+            <td>Keep as step 1.</td>
+          </tr>
+          <tr>
+            <td><strong>2. Remove backend branch restricting receipt to online</strong></td>
+            <td><span class="badge-status badge-status-changed">Modified</span></td>
+            <td>Flipping cash active-status is enough. However, cleaning code is nice for hygiene.</td>
+            <td>Optional cleanup, or keep in code for future cash alternatives.</td>
+          </tr>
+          <tr>
+            <td><strong>3. Modify PaymentScreenTutee.vue</strong></td>
+            <td><span class="badge-status badge-status-dead">Dead File</span></td>
+            <td>The view is unrouted and dead code. Any edits here have zero functional effect.</td>
+            <td><strong>Delete the file</strong> entirely instead of refactoring it.</td>
+          </tr>
+          <tr>
+            <td><strong>4. Remove CASH flow from PostSessionPaymentView.vue</strong></td>
+            <td><span class="badge-status badge-status-valid">Valid</span></td>
+            <td>The tutee-facing "I Paid in Person" cash box becomes dead code and should be removed.</td>
+            <td>Implement to keep active view clean.</td>
+          </tr>
+          <tr>
+            <td><strong>5. Smoke-check TutorPaymentScreen.vue</strong></td>
+            <td><span class="badge-status badge-status-valid">Valid</span></td>
+            <td>Necessary to confirm tutors can still verify online-only receipts properly.</td>
+            <td>Keep.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Scopes Selection -->
+    <div class="scopes-header" id="scopes">Select the Scope of Implementation</div>
+    <div class="scopes-grid">
+      
+      <!-- Scope A -->
+      <div class="scope-card">
+        <span class="scope-number">A</span>
+        <div class="scope-title">Minimalist</div>
+        <div class="scope-desc">Strictly the bare minimum to disable cash payments function.</div>
+        <div class="scope-actions">
+          <div class="scope-action-item add">
+            <span class="scope-action-icon">✓</span>
+            <span>Run Django migration setting <code>CASH.is_active = False</code></span>
+          </div>
+          <div class="scope-action-item remove" style="opacity: 0.5;">
+            <span class="scope-action-icon">✗</span>
+            <span>No UI cleanup in <code>PostSessionPaymentView.vue</code></span>
+          </div>
+          <div class="scope-action-item remove" style="opacity: 0.5;">
+            <span class="scope-action-icon">✗</span>
+            <span>Leave dead <code>PaymentScreenTutee.vue</code> alone</span>
+          </div>
+        </div>
+        <div class="scope-footer">
+          <div class="scope-meta">
+            <span>Code impact: <strong>1 file (DB only)</strong></span>
+            <span>Complexity: <strong>Very Low</strong></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scope B -->
+      <div class="scope-card recommended">
+        <span class="scope-ribbon">Recommended</span>
+        <span class="scope-number">B</span>
+        <div class="scope-title">Pragmatic & Clean</div>
+        <div class="scope-desc">Removes dead code in live views and deletes the dead file entirely.</div>
+        <div class="scope-actions">
+          <div class="scope-action-item add">
+            <span class="scope-action-icon">✓</span>
+            <span>Django data migration (CASH deactivated)</span>
+          </div>
+          <div class="scope-action-item add">
+            <span class="scope-action-icon">✓</span>
+            <span>Remove CASH "Paid in Person" UI from <code>PostSessionPaymentView.vue</code></span>
+          </div>
+          <div class="scope-action-item remove">
+            <span class="scope-action-icon">✓</span>
+            <span><strong>Delete dead file</strong> <code>PaymentScreenTutee.vue</code></span>
+          </div>
+        </div>
+        <div class="scope-footer">
+          <div class="scope-meta">
+            <span>Code impact: <strong>3 files</strong></span>
+            <span>Complexity: <strong>Low</strong></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scope C -->
+      <div class="scope-card">
+        <span class="scope-number">C</span>
+        <div class="scope-title">Full Refactor</div>
+        <div class="scope-desc">Completes the cleaning by purging all offline logic and PAYMONGO scaffold.</div>
+        <div class="scope-actions">
+          <div class="scope-action-item add">
+            <span class="scope-action-icon">✓</span>
+            <span>All steps in Scope B</span>
+          </div>
+          <div class="scope-action-item remove">
+            <span class="scope-action-icon">✓</span>
+            <span>Purge backend check (receipts now globally required)</span>
+          </div>
+          <div class="scope-action-item remove">
+            <span class="scope-action-icon">✓</span>
+            <span>Remove dormant PayMongo UI redirect scaffold</span>
+          </div>
+        </div>
+        <div class="scope-footer">
+          <div class="scope-meta">
+            <span>Code impact: <strong>5+ files</strong></span>
+            <span>Complexity: <strong>Medium</strong></span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Next Steps callout -->
+    <div class="next-steps">
+      <h3>Ready to proceed?</h3>
+      <p>
+        I recommend <strong>Scope B (Pragmatic & Clean)</strong>. It achieves the core goal, cleans the active UI, and deletes the completely dead <code>PaymentScreenTutee.vue</code> file, maintaining a healthy codebase.
+      </p>
+      <div class="btn-group">
+        <button class="btn btn-primary" onclick="alert('Scope B selected! Please confirm your choice in the chat thread.')">Proceed with Scope B</button>
+        <a class="btn btn-secondary" href="#scopes">Compare Scopes</a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

@@ -581,6 +581,51 @@ class Booking(models.Model):
             ),
         ]
 
+
+class SessionCheckIn(models.Model):
+    EVENT_VENUE_CONFIRM = 'venue_confirm'
+    EVENT_MIDPOINT_CHECKIN = 'midpoint_checkin'
+    EVENT_TYPE_CHOICES = [
+        (EVENT_VENUE_CONFIRM, 'Venue confirmation'),
+        (EVENT_MIDPOINT_CHECKIN, 'Mid-session check-in'),
+    ]
+
+    RESPONSE_VENUE_YES = 'yes'
+    RESPONSE_VENUE_NO = 'no'
+    RESPONSE_MIDPOINT_GOOD = 'good'
+    RESPONSE_MIDPOINT_ISSUES = 'issues'
+    RESPONSE_CHOICES = [
+        (RESPONSE_VENUE_YES, 'Yes'),
+        (RESPONSE_VENUE_NO, 'No'),
+        (RESPONSE_MIDPOINT_GOOD, 'Good'),
+        (RESPONSE_MIDPOINT_ISSUES, 'Having issues'),
+    ]
+
+    booking = models.ForeignKey(
+        Booking,
+        on_delete=models.CASCADE,
+        related_name='check_ins'
+    )
+    event_type = models.CharField(max_length=30, choices=EVENT_TYPE_CHOICES)
+    response = models.CharField(max_length=30, choices=RESPONSE_CHOICES)
+    responded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-responded_at']
+        indexes = [
+            models.Index(fields=['booking', 'event_type']),
+            models.Index(fields=['event_type', 'responded_at']),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['booking', 'event_type'],
+                name='unique_session_check_in_per_booking_event',
+            ),
+        ]
+
+    def __str__(self):
+        return f"Booking {self.booking_id} {self.event_type}: {self.response}"
+
 class PaymentMethod(models.Model):
 
     METHOD_CODES = [

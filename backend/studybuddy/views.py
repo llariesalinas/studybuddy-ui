@@ -52,7 +52,7 @@ from .recommender.dashboard import (
     get_dashboard_recommendations,
 )
 from django.core.cache import cache
-from .models import Booking, Course, EmailOTPChallenge, Notification, PartnerInstitution, Payment, PaymentMethod, Preference, Rating, Subjects, Tutor, TutorApplication, TutorAvailability, TutorAvailabilityOverride, TutorSubjects, Wallet, PlatformActivity, Transaction, TutorPayoutAccount
+from .models import Booking, Course, EmailOTPChallenge, Notification, PartnerInstitution, Payment, PaymentMethod, Preference, Rating, SessionCheckIn, Subjects, Tutor, TutorApplication, TutorAvailability, TutorAvailabilityOverride, TutorSubjects, Wallet, PlatformActivity, Transaction, TutorPayoutAccount
 from .serializers import (
     NotificationSerializer,
     SubjectSerializer,
@@ -706,6 +706,51 @@ def serialize_payment_summary(representative_booking):
         "status": payment.payment_status,
         "receipt_image": payment.receipt_image.url if payment.receipt_image else None,
     }
+
+
+def serialize_session_check_ins(representative_booking):
+    responses = {
+        SessionCheckIn.EVENT_VENUE_CONFIRM: None,
+        SessionCheckIn.EVENT_MIDPOINT_CHECKIN: None,
+    }
+
+    check_ins = getattr(representative_booking, 'prefetched_check_ins', None)
+    if check_ins is None:
+        check_ins = representative_booking.check_ins.all()
+
+    for check_in in check_ins:
+        responses[check_in.event_type] = {
+            "id": check_in.id,
+            "response": check_in.response,
+            "responded_at": check_in.responded_at.isoformat(),
+        }
+
+    return responses
+
+
+def get_tutee_owned_booking_or_403(request, booking_id):
+    profile = request.user.userprofile
+    booking = get_object_or_404(
+        Booking.objects.select_related(
+            'student',
+            'availability',
+            'tutor__profile',
+        ),
+        id=booking_id,
+    )
+
+    if profile != booking.student:
+        return None, Response({"error": "Unauthorized"}, status=403)
+
+    return booking, None
+
+
+def create_session_check_in_response(booking, event_type, response_value):
+    return SessionCheckIn.objects.get_or_create(
+        booking=booking,
+        event_type=event_type,
+        defaults={"response": response_value},
+    )
 @api_view(['GET'])
 @authentication_classes([])
 def partner_institutions_list(request):
@@ -2623,6 +2668,7 @@ def build_booking_detail_payload(session_group_bookings):
             "preferred_location": representative_booking.preferred_location,
         },
         "payment": serialize_payment_summary(representative_booking),
+        "check_ins": serialize_session_check_ins(representative_booking),
     }
 
 
@@ -2648,6 +2694,80 @@ def booking_detail(request, booking_id):
 
     session_group_bookings = get_booking_request_bookings(booking)
     return Response(build_booking_detail_payload(session_group_bookings))
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def confirm_session_venue(request, booking_id):
+    booking, error_response = get_tutee_owned_booking_or_403(request, booking_id)
+    if error_response:
+        return error_response
+
+    if booking.session_mode != "F2F":
+        return Response(
+            {"error": "Venue confirmation is only available for face-to-face sessions."},
+            status=400,
+        )
+
+    response_value = str(request.data.get("response", "")).strip().lower()
+    valid_responses = {
+        SessionCheckIn.RESPONSE_VENUE_YES,
+        SessionCheckIn.RESPONSE_VENUE_NO,
+    }
+
+    if response_value not in valid_responses:
+        return Response({"error": "Response must be 'yes' or 'no'."}, status=400)
+
+    check_in, created = create_session_check_in_response(
+        booking,
+        SessionCheckIn.EVENT_VENUE_CONFIRM,
+        response_value,
+    )
+
+    return Response(
+        {
+            "id": check_in.id,
+            "event_type": check_in.event_type,
+            "response": check_in.response,
+            "responded_at": check_in.responded_at.isoformat(),
+            "created": created,
+        },
+        status=201 if created else 200,
+    )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def record_midpoint_check_in(request, booking_id):
+    booking, error_response = get_tutee_owned_booking_or_403(request, booking_id)
+    if error_response:
+        return error_response
+
+    response_value = str(request.data.get("response", "")).strip().lower()
+    valid_responses = {
+        SessionCheckIn.RESPONSE_MIDPOINT_GOOD,
+        SessionCheckIn.RESPONSE_MIDPOINT_ISSUES,
+    }
+
+    if response_value not in valid_responses:
+        return Response({"error": "Response must be 'good' or 'issues'."}, status=400)
+
+    check_in, created = create_session_check_in_response(
+        booking,
+        SessionCheckIn.EVENT_MIDPOINT_CHECKIN,
+        response_value,
+    )
+
+    return Response(
+        {
+            "id": check_in.id,
+            "event_type": check_in.event_type,
+            "response": check_in.response,
+            "responded_at": check_in.responded_at.isoformat(),
+            "created": created,
+        },
+        status=201 if created else 200,
+    )
 
 
 @api_view(['POST'])

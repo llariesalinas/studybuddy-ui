@@ -635,13 +635,6 @@ const getTutorRatingLabel = (tutor) => tutor?.rating || 'N/A'
 
 const getTutorPrimarySubject = (tutor) => getTutorSubjects(tutor)[0] || 'Various subjects'
 
-const formatTutorMeta = (tutor) => {
-  const subjects = getTutorSubjects(tutor)
-  const visibleSubjects = subjects.slice(0, 2).join(', ') || 'Various subjects'
-  const remainingSubjects = subjects.length > 2 ? ` - +${subjects.length - 2} more` : ''
-
-  return `Rating ${getTutorRatingLabel(tutor)} - ${visibleSubjects}${remainingSubjects}`
-}
 
 const getTutorMetaTitle = (tutor) => {
   const subjects = getTutorSubjects(tutor)
@@ -1006,8 +999,8 @@ const viewMoreTutors = () => router.push({ name: 'tutors' })
 }
 
 .day-body {
-  display: grid;
-  align-content: start;
+  display: flex;
+  flex-direction: column;
   gap: 0.45rem;
   padding: 0.5rem;
   min-height: 0;
@@ -1356,6 +1349,7 @@ const viewMoreTutors = () => router.push({ name: 'tutors' })
 .day-empty-state {
   width: 100%;
   min-height: 82px;
+  flex-grow: 1;
   border: 1px dashed var(--sb-card-border);
   border-radius: 14px;
   background: color-mix(in srgb, var(--sb-card-bg) 72%, transparent);

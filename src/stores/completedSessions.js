@@ -274,6 +274,18 @@ export const useSessionsStore = defineStore('sessions', () => {
     return fetchSessionById(id)
   }
 
+  const confirmVenue = async (id, response) => {
+    await api.post(`/bookings/${id}/venue-confirmation/`, { response })
+    await fetchSessions({ force: true })
+    return fetchSessionById(id)
+  }
+
+  const submitMidpointCheckIn = async (id, response) => {
+    await api.post(`/bookings/${id}/midpoint-check-in/`, { response })
+    await fetchSessions({ force: true })
+    return fetchSessionById(id)
+  }
+
   const completedSessions = computed(() =>
     sessions.value
       .filter(session => normalizeStatus(session.status) === 'completed')
@@ -367,5 +379,7 @@ export const useSessionsStore = defineStore('sessions', () => {
     submitPayment,
     verifyOnlinePayment,
     submitRating,
+    confirmVenue,
+    submitMidpointCheckIn,
   }
 })

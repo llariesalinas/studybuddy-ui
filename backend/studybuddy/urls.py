@@ -93,6 +93,8 @@ urlpatterns = [
     path('bookings/<int:booking_id>/tutor-confirm/', tutor_confirm_booking),
     path('bookings/<int:booking_id>/rating/', submit_session_rating),
     path('bookings/<int:booking_id>/cancel/', cancel_booking),
+    path('bookings/<int:booking_id>/venue-confirmation/', views.confirm_session_venue),
+    path('bookings/<int:booking_id>/midpoint-check-in/', views.record_midpoint_check_in),
     path('bookings/<int:booking_id>/dashboard-pill/', views.dismiss_dashboard_pill),
     path('template-availability/', template_availability),
     path('template-availability/<int:pk>/', template_availability),

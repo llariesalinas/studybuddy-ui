@@ -186,6 +186,22 @@
             Sessions can only be cancelled at least two days before the session date.
           </p>
         </div>
+
+        <div v-if="hasCheckInResponses" class="card shadow-sm p-4 mt-4">
+          <h5 class="fw-bold mb-3">Session Check-ins</h5>
+
+          <div v-if="venueCheckIn" class="check-in-row">
+            <span class="summary-label">Venue confirmation</span>
+            <span class="summary-value">{{ formatCheckInResponse(venueCheckIn.response) }}</span>
+            <span class="check-in-time">{{ formatCheckInTime(venueCheckIn.responded_at) }}</span>
+          </div>
+
+          <div v-if="midpointCheckIn" class="check-in-row">
+            <span class="summary-label">Mid-session check-in</span>
+            <span class="summary-value">{{ formatCheckInResponse(midpointCheckIn.response) }}</span>
+            <span class="check-in-time">{{ formatCheckInTime(midpointCheckIn.responded_at) }}</span>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -307,6 +323,32 @@ const amountPaid = computed(() => {
   const value = Number(bookingDetailsStore.paymentInfo?.amount_paid || 0)
   return value.toFixed(2)
 })
+
+const venueCheckIn = computed(() => bookingDetailsStore.booking?.check_ins?.venue_confirm || null)
+const midpointCheckIn = computed(() => bookingDetailsStore.booking?.check_ins?.midpoint_checkin || null)
+const hasCheckInResponses = computed(() => Boolean(venueCheckIn.value || midpointCheckIn.value))
+
+const formatCheckInResponse = (response) => {
+  const labels = {
+    yes: 'Confirmed at venue',
+    no: 'Not at venue',
+    good: 'All good',
+    issues: 'Having issues',
+  }
+
+  return labels[response] || 'Recorded'
+}
+
+const formatCheckInTime = (value) => {
+  if (!value) {
+    return ''
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(new Date(value))
+}
 
 const tuteeInitials = computed(() => {
   const parts = String(bookingDetailsStore.tuteeProfile?.name || '')
@@ -465,6 +507,19 @@ onBeforeUnmount(() => {
 
 .summary-row + .summary-row {
   margin-top: 12px;
+}
+
+.check-in-row + .check-in-row {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--sb-card-border);
+}
+
+.check-in-time {
+  display: block;
+  margin-top: 2px;
+  color: #6b7280;
+  font-size: 0.82rem;
 }
 
 .receipt-image {

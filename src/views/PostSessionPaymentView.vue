@@ -68,20 +68,7 @@
           </div>
 
           <div class="card border-sb rounded-4 p-3">
-            <template v-if="selectedMethod?.code === 'CASH'">
-              <div class="alert alert-info mb-3">
-                Confirm only after you have already paid the tutor in person.
-              </div>
-              <button
-                class="btn bg-sb-primary text-white w-100 sb-btn"
-                :disabled="isSubmitting"
-                @click="submitPayment"
-              >
-                {{ isSubmitting ? 'Submitting...' : 'I Paid in Person' }}
-              </button>
-            </template>
-
-            <template v-else-if="selectedMethod?.code === 'PAYMONGO'">
+            <template v-if="selectedMethod?.code === 'PAYMONGO'">
               <div class="alert alert-info mb-3 small">
                 <i class="bi bi-shield-check me-2"></i>
                 You will be redirected to a secure payment page. Accepted: GCash, Maya, Visa, Mastercard.
@@ -262,7 +249,7 @@ onMounted(async () => {
       id: method.id,
       label: method.name,
       code: method.code,
-      icon: method.code === 'CASH' ? 'bi-cash-coin' : method.code === 'PAYMONGO' ? 'bi-phone' : 'bi-credit-card'
+      icon: method.code === 'PAYMONGO' ? 'bi-phone' : 'bi-credit-card'
     }))
   } catch (error) {
     console.error('Failed to load payment page:', error)

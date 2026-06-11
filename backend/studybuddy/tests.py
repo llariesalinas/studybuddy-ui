@@ -25,6 +25,7 @@ from .models import (
     Rating,
     Subjects,
     SupportTicket,
+    SessionCheckIn,
     Tutor,
     TutorAvailability,
     TutorAvailabilityOverride,
@@ -364,9 +365,9 @@ class ChatFeatureTests(APITestCase):
         self.assertEqual(context['status_intent'], 'pending')
 
     def test_status_intent_confirmed_returns_confirmed(self):
-        from datetime import date
+        from datetime import date, timedelta
         room = ChatRoom.objects.create(tutee=self.tutee_profile, tutor=self.tutor_profile)
-        self.make_booking('Confirmed', session_date=date(2026, 6, 10))
+        self.make_booking('Confirmed', session_date=date.today() + timedelta(days=1))
         context = get_current_booking_context(room)
         self.assertIsNotNone(context)
         self.assertEqual(context['status_intent'], 'confirmed')
@@ -421,9 +422,9 @@ class ChatFeatureTests(APITestCase):
         self.assertEqual(context['status'], 'Payment Required')
 
     def test_status_intent_awaiting_payment_returns_awaiting_payment(self):
-        from datetime import date
+        from datetime import date, timedelta
         room = ChatRoom.objects.create(tutee=self.tutee_profile, tutor=self.tutor_profile)
-        self.make_booking('Awaiting Payment Verification', session_date=date(2026, 6, 10))
+        self.make_booking('Awaiting Payment Verification', session_date=date.today() + timedelta(days=1))
         context = get_current_booking_context(room)
         self.assertIsNotNone(context)
         self.assertEqual(context['status_intent'], 'awaiting_payment')
@@ -2557,3 +2558,170 @@ class DashboardLoadPerformanceTests(APITestCase):
         self.assertEqual(response.status_code, 403)
         booking.refresh_from_db()
         self.assertIsNone(booking.dashboard_hidden_by_student_at)
+
+
+class SessionCheckInTests(APITestCase):
+    def setUp(self):
+        self.course = Course.objects.create(
+            course_code="CHECK101",
+            course_name="Session Checks",
+        )
+        self.student_user = User.objects.create_user(
+            username="check-student",
+            email="check-student@example.com",
+            password="password",
+        )
+        self.student = UserProfile.objects.create(
+            user=self.student_user,
+            fname="Check",
+            mname="",
+            lname="Student",
+            role="Tutee",
+            year_level=11,
+            course=self.course,
+        )
+        self.tutor_user = User.objects.create_user(
+            username="check-tutor",
+            email="check-tutor@example.com",
+            password="password",
+        )
+        self.tutor_profile = UserProfile.objects.create(
+            user=self.tutor_user,
+            fname="Check",
+            mname="",
+            lname="Tutor",
+            role="Tutor",
+            year_level=12,
+            course=self.course,
+        )
+        self.tutor = Tutor.objects.create(
+            profile=self.tutor_profile,
+            hourly_rate=200,
+            can_online=True,
+            can_f2f=True,
+            teaching_level="SHS",
+        )
+        self.availability = TutorAvailability.objects.create(
+            tutor=self.tutor,
+            day="Mon",
+            time_slot=time(14, 0),
+            is_active=True,
+        )
+        self.booking = Booking.objects.create(
+            student=self.student,
+            tutor=self.tutor,
+            availability=self.availability,
+            session_date=date(2026, 6, 15),
+            session_mode="F2F",
+            preferred_location="Library",
+            status="Confirmed",
+        )
+        self.client.force_authenticate(user=self.student_user)
+
+    def test_tutee_can_record_venue_confirmation(self):
+        response = self.client.post(
+            f"/api/bookings/{self.booking.id}/venue-confirmation/",
+            {"response": "yes"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["response"], "yes")
+        self.assertTrue(
+            SessionCheckIn.objects.filter(
+                booking=self.booking,
+                event_type=SessionCheckIn.EVENT_VENUE_CONFIRM,
+                response="yes",
+            ).exists()
+        )
+
+    def test_venue_confirmation_is_f2f_only(self):
+        self.booking.session_mode = "Online"
+        self.booking.save(update_fields=["session_mode"])
+
+        response = self.client.post(
+            f"/api/bookings/{self.booking.id}/venue-confirmation/",
+            {"response": "yes"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(SessionCheckIn.objects.exists())
+
+    def test_tutee_can_record_midpoint_check_in(self):
+        response = self.client.post(
+            f"/api/bookings/{self.booking.id}/midpoint-check-in/",
+            {"response": "issues"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["response"], "issues")
+        self.assertTrue(
+            SessionCheckIn.objects.filter(
+                booking=self.booking,
+                event_type=SessionCheckIn.EVENT_MIDPOINT_CHECKIN,
+                response="issues",
+            ).exists()
+        )
+
+    def test_duplicate_check_in_returns_existing_response(self):
+        first = self.client.post(
+            f"/api/bookings/{self.booking.id}/midpoint-check-in/",
+            {"response": "good"},
+            format="json",
+        )
+        second = self.client.post(
+            f"/api/bookings/{self.booking.id}/midpoint-check-in/",
+            {"response": "issues"},
+            format="json",
+        )
+
+        self.assertEqual(first.status_code, 201)
+        self.assertEqual(second.status_code, 200)
+        self.assertEqual(second.data["response"], "good")
+        self.assertEqual(
+            SessionCheckIn.objects.filter(
+                booking=self.booking,
+                event_type=SessionCheckIn.EVENT_MIDPOINT_CHECKIN,
+            ).count(),
+            1,
+        )
+
+    def test_booking_detail_includes_check_in_state(self):
+        SessionCheckIn.objects.create(
+            booking=self.booking,
+            event_type=SessionCheckIn.EVENT_VENUE_CONFIRM,
+            response="no",
+        )
+
+        response = self.client.get(f"/api/bookings/{self.booking.id}/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["check_ins"]["venue_confirm"]["response"], "no")
+        self.assertIsNone(response.data["check_ins"]["midpoint_checkin"])
+
+    def test_other_users_cannot_record_check_in(self):
+        other_user = User.objects.create_user(
+            username="check-other",
+            email="check-other@example.com",
+            password="password",
+        )
+        UserProfile.objects.create(
+            user=other_user,
+            fname="Other",
+            mname="",
+            lname="User",
+            role="Tutee",
+            year_level=11,
+        )
+        self.client.force_authenticate(user=other_user)
+
+        response = self.client.post(
+            f"/api/bookings/{self.booking.id}/midpoint-check-in/",
+            {"response": "good"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(SessionCheckIn.objects.exists())
