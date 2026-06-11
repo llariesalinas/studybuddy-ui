@@ -21,6 +21,12 @@ and fixed the rail measurement order so travel is measured after leaving the `.n
 stacked fallback; the in-app browser blocked localhost during this session, so final
 visual/browser QA should be done from a normal local browser.
 
+Post-merge status: this work is committed on `feature-aurora-hue-restoration`, merged
+with the latest `origin/main` (`0fa4869`, including admin-side and dark-mode updates),
+and pushed to `origin/feature-aurora-hue-restoration` for PR. The Dashboard merge kept
+this branch's newer session-pill/modal and recommendation-card behavior where main had
+older overlapping UI; main's non-conflicting admin updates remain included.
+
 ## Goal
 
 Replace `src/views/LandingPage.vue` with the approved "Studio Motion" design: oversized
@@ -236,3 +242,8 @@ Key decisions:
   tokenized rail doodles and deep numeral tokens, full-width count band, FAQ spacing
   pass, viewport-safe marquee loop, and touch/reduced-motion stacked fallbacks. Status
   set to Done after lint/build verification and a code-level rail measurement fix.
+- **2026-06-11 (main merge + PR readiness)** - Committed the online-payment/session
+  check-in work and the landing rail port, fetched and merged latest `origin/main`
+  (`0fa4869`, including admin-side and dark-mode updates), resolved conflicts, and
+  pushed `feature-aurora-hue-restoration` to origin. Verification passed:
+  `npx oxlint .`, `npx eslint . --cache --max-warnings=0`, and `npm run build`.

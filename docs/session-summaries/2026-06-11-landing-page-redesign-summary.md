@@ -55,3 +55,20 @@ approved full-width count band, and the tools/FAQ spacing pass is in place. Step
 plan is complete and the plan status is **Done**. The FAQ row reveal now keeps the slide
 motion but removes opacity fading, so pressing a question no longer makes the row
 disappear and reappear.
+
+## Merge and PR readiness
+
+The landing rail port and online-payment/session check-in work were committed on
+`feature-aurora-hue-restoration`, then merged with the latest `origin/main` at `0fa4869`
+(`Feature darkmode toggle (#90)`). That merge includes the main-branch admin-side updates
+and dark-mode work. Overlapping Dashboard conflicts were resolved by keeping this
+branch's newer session-pill/modal and recommendation-card behavior; main's
+non-conflicting admin updates remain included.
+
+Post-merge verification passed:
+
+- `npx oxlint .`
+- `npx eslint . --cache --max-warnings=0`
+- `npm run build`
+
+The branch was pushed to `origin/feature-aurora-hue-restoration` for PR.
