@@ -40,13 +40,6 @@ export default defineConfig(({ mode }) => {
                 secure: false,
                 headers: proxyHeaders,
               },
-              '/ws': {
-                target: apiProxyTarget,
-                changeOrigin: true,
-                secure: false,
-                ws: true,
-                headers: proxyHeaders,
-              },
             },
           }
         : {}),

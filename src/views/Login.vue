@@ -136,6 +136,7 @@ const redirectForRole = (role) => {
   if (normalizedRole === 'tutor') router.push('/tch-dashboard')
   else if (normalizedRole === 'tutee') router.push('/dashboard')
   else if (normalizedRole === 'admin') router.push('/admin/dashboard')
+  else if (normalizedRole === 'superadmin') router.push('/superadmin/dashboard')
   else router.push('/')
 }
 

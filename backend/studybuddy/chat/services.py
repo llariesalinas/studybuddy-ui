@@ -436,6 +436,16 @@ _CURRENT_BOOKING_UNSET = object()
 
 
 def get_partner_context(room, user=None, current_booking=_CURRENT_BOOKING_UNSET):
+    if room.room_type == 'support':
+        return {
+            'partner_name': 'Support Team',
+            'partner_initials': 'ST',
+            'partner_subtitle': 'Platform Support',
+            'sessions_together': 0,
+            'focused_hours': 0,
+            'topics': [],
+        }
+
     tutor = Tutor.objects.filter(profile=room.tutor).select_related('profile__course').first()
     completed_bookings = list(
         Booking.objects
@@ -474,6 +484,16 @@ def get_partner_context(room, user=None, current_booking=_CURRENT_BOOKING_UNSET)
                 partner = room.tutee
         except Exception:
             partner = room.tutor
+
+    if partner is None:
+        return {
+            'partner_name': 'Support Team',
+            'partner_initials': 'ST',
+            'partner_subtitle': 'Platform Support',
+            'sessions_together': 0,
+            'focused_hours': 0,
+            'topics': [],
+        }
 
     subtitle_parts = []
     if partner.role:

@@ -15,13 +15,13 @@
       </div>
 
       <ul class="nav nav-pills flex-column mb-auto">
-        <li v-if="userRole!== 'admin'" class="nav-item mb-2">
+        <li v-if="userRole!== 'admin' && userRole !==  'superadmin'" class="nav-item mb-2">
           <router-link :to="userRole === 'tutor' ? '/tch-dashboard' : '/dashboard'" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
             <i class="bi bi-grid-1x2 me-3"></i> Dashboard
           </router-link>
         </li>
 
-        <li v-if="userRole!== 'admin'" class="nav-item mb-2">
+        <li v-if="userRole!== 'admin' && userRole !==  'superadmin'" class="nav-item mb-2">
           <router-link :to="userRole === 'tutor' ? '/tutor-profile' : '/tutee-profile'" class="nav-link text-white opacity-75 d-flex align-items-center">
             <i class="bi bi-person me-3"></i> Profile
           </router-link>
@@ -73,11 +73,7 @@
           </router-link>
         </li>
 
-        <li class="nav-item mb-2" v-if="userRole === 'admin'">
-          <router-link to="/admin/institutions" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
-            <i class="bi bi-building me-3"></i> Institutions
-          </router-link>
-        </li>
+
 
         <li class="nav-item mb-2" v-if="userRole === 'admin'">
           <router-link to="/admin/reports" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
@@ -88,6 +84,30 @@
         <li class="nav-item mb-2" v-if="userRole === 'admin'">
           <router-link to="/admin/support" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
             <i class="bi bi-headset me-3"></i> Support Desk
+          </router-link>
+        </li>
+
+        <li class="nav-item mb-2" v-if="userRole === 'superadmin'">
+          <router-link to="/superadmin/dashboard" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
+            <i class="bi bi-grid-1x2 me-3"></i> Dashboard
+          </router-link>
+        </li>
+
+        <li class="nav-item mb-2" v-if="userRole === 'superadmin'">
+          <router-link to="/superadmin/institutions" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
+            <i class="bi bi-building me-3"></i> Institutions
+          </router-link>
+        </li>
+
+        <li class="nav-item mb-2" v-if="userRole === 'superadmin'">
+          <router-link to="/superadmin/users" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
+            <i class="bi bi-people me-3"></i> All Users
+          </router-link>
+        </li>
+
+        <li class="nav-item mb-2" v-if="userRole === 'superadmin'">
+          <router-link to="/superadmin/reports" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
+            <i class="bi bi-bar-chart-line me-3"></i> Reports
           </router-link>
         </li>
 
@@ -233,17 +253,12 @@
 
           <div v-if="route.path === '/admin/users'">
             <h2 class="fw-bold sb-text">Users</h2>
-            <p class="sb-muted">Search, filter, and manage all platform users.</p>
+            <p class="sb-muted">Search, filter, and manage users.</p>
           </div>
 
           <div v-if="route.path === '/admin/withdrawals'">
             <h2 class="fw-bold sb-text">Cash Outs</h2>
-            <p class="sb-muted">Search, filter, and manage all user cash-outs.</p>
-          </div>
-
-          <div v-if="route.path === '/admin/institutions'">
-            <h2 class="fw-bold sb-text">Institutions</h2>
-            <p class="sb-muted">View and manage requests from partnered institutions.</p>
+            <p class="sb-muted">Search, filter, and manage user cash-outs.</p>
           </div>
 
           <div v-if="route.path === '/admin/reports'">
@@ -254,6 +269,26 @@
           <div v-if="route.path === '/admin/support'">
             <h2 class="fw-bold sb-text">Support Desk</h2>
             <p class="sb-muted">Claim, manage, and resolve user support tickets in real-time.</p>
+          </div>
+
+          <div v-if="route.path === '/superadmin/dashboard'">
+            <h2 class="fw-bold sb-text">Dashboard</h2>
+            <p class="sb-muted">Global platform overview and cross-institution performance.</p>
+          </div>
+
+          <div v-if="route.path === '/superadmin/institutions'">
+            <h2 class="fw-bold sb-text">Institutions</h2>
+            <p class="sb-muted">Add, activate, and manage all partner institutions.</p>
+          </div>
+
+          <div v-if="route.path === '/superadmin/users'">
+            <h2 class="fw-bold sb-text">Users</h2>
+            <p class="sb-muted">View and manage every user across all partner institutions.</p>
+          </div>
+
+          <div v-if="route.path === '/superadmin/reports'">
+            <h2 class="fw-bold sb-text">Platform Reports</h2>
+            <p class="sb-muted">Cross-institution analytics — filter by institution or view globally.</p>
           </div>
 
           <div v-if="route.path === '/tch-requestedSessions'">
@@ -357,72 +392,6 @@ const openSupport = (type = 'Other', id = null) => {
   isSupportModalOpen.value = true
 }
 let pendingSessionsRefreshId = null
-let auroraFrameId = null
-let auroraPointerTarget = { x: 0, y: 0 }
-let auroraMotionEnabled = false
-
-const setAuroraMovement = (x = 0, y = 0) => {
-  const rootStyle = document.documentElement.style
-  rootStyle.setProperty('--sb-aurora-base-x', `${(x * 10).toFixed(2)}px`)
-  rootStyle.setProperty('--sb-aurora-base-y', `${(y * 7).toFixed(2)}px`)
-  rootStyle.setProperty('--sb-aurora-overlay-x', `${(x * 34).toFixed(2)}px`)
-  rootStyle.setProperty('--sb-aurora-overlay-y', `${(y * 26).toFixed(2)}px`)
-  rootStyle.setProperty('--sb-aurora-sheen-x', `${(x * -8).toFixed(2)}px`)
-  rootStyle.setProperty('--sb-aurora-sheen-y', `${(y * -5).toFixed(2)}px`)
-}
-
-const scheduleAuroraMovement = () => {
-  if (auroraFrameId) {
-    return
-  }
-
-  auroraFrameId = window.requestAnimationFrame(() => {
-    auroraFrameId = null
-    setAuroraMovement(auroraPointerTarget.x, auroraPointerTarget.y)
-  })
-}
-
-const handleAuroraPointerMove = (event) => {
-  auroraPointerTarget = {
-    x: ((event.clientX / window.innerWidth) - 0.5) * 2,
-    y: ((event.clientY / window.innerHeight) - 0.5) * 2
-  }
-  scheduleAuroraMovement()
-}
-
-const resetAuroraMovement = () => {
-  auroraPointerTarget = { x: 0, y: 0 }
-  scheduleAuroraMovement()
-}
-
-const setupAuroraPointerMotion = () => {
-  const finePointer = window.matchMedia?.('(pointer: fine)').matches
-  const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-
-  auroraMotionEnabled = Boolean(finePointer && !reducedMotion)
-
-  if (!auroraMotionEnabled) {
-    setAuroraMovement()
-    return
-  }
-
-  window.addEventListener('pointermove', handleAuroraPointerMove, { passive: true })
-  window.addEventListener('pointerleave', resetAuroraMovement)
-  window.addEventListener('blur', resetAuroraMovement)
-}
-
-const teardownAuroraPointerMotion = () => {
-  window.removeEventListener('pointermove', handleAuroraPointerMove)
-  window.removeEventListener('pointerleave', resetAuroraMovement)
-  window.removeEventListener('blur', resetAuroraMovement)
-
-  if (auroraFrameId) {
-    window.cancelAnimationFrame(auroraFrameId)
-    auroraFrameId = null
-  }
-
-  setAuroraMovement()
-}
 
 const clearBootstrapModalState = () => {
   document.body.classList.remove('modal-open')
@@ -484,8 +453,6 @@ const handleVisibilityChange = async () => {
   }
 }
 onMounted(() => {
-  setupAuroraPointerMotion()
-
   if (authStore.isAuthenticated) {
     notificationsStore.fetchNotifications()
     chatStore.fetchRooms()
@@ -502,7 +469,6 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   closeLogoutModal()
-  teardownAuroraPointerMotion()
   document.removeEventListener('visibilitychange', handleVisibilityChange)
 
   if (pendingSessionsRefreshId) {

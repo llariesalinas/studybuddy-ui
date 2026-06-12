@@ -426,8 +426,8 @@ const getStatusClass = (status) => {
 
 <style scoped>
 .reports-content {
-  --reports-glass: color-mix(in srgb, var(--sb-card-bg) 76%, transparent);
-  --reports-glass-strong: color-mix(in srgb, var(--sb-card-bg) 88%, transparent);
+  --reports-glass: color-mix(in srgb, var(--sb-card-bg) 85%, transparent);
+  --reports-glass-strong: color-mix(in srgb, var(--sb-card-bg) 92%, transparent);
   --reports-border: color-mix(in srgb, var(--sb-card-border) 82%, transparent);
   --reports-muted: var(--sb-text-muted);
   --reports-ink: var(--sb-text-main);
@@ -443,13 +443,18 @@ const getStatusClass = (status) => {
 }
 
 .metric-card,
-.reports-panel,
 .session-row,
 .analytics-summary {
   border: 1px solid var(--reports-border);
+  background: var(--reports-glass-strong);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.04);
+}
+
+.reports-panel {
+  border: 1px solid var(--reports-border);
   background: var(--reports-glass);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   box-shadow: 0 18px 42px rgba(15, 23, 42, 0.08);
 }
 

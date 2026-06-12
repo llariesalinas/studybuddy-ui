@@ -1255,4 +1255,32 @@ const bookTutor = (id) => router.push({
     width: 100%;
   }
 }
+
+/* Remove Animations and Hover Effects for Tutee Dashboard */
+
+/* 1. Remove hover effects from interactive elements */
+.week-range-pill:hover,
+.schedule-nav-btn:hover:not(:disabled),
+.weekly-session-card:hover,
+.tutor-list-item:hover {
+  transform: none !important;
+  box-shadow: 0 1px 2px rgba(17, 24, 39, 0.06) !important; /* Restore base shadow, no hover shadow */
+  background-color: inherit !important;
+  border-color: inherit !important;
+  color: inherit !important;
+}
+
+/* 2. Remove animations from elements */
+.week-range-pill-current {
+  animation: none !important;
+}
+
+.weekly-session-card {
+  transition: none !important;
+}
+
+/* 3. Remove stagger animation from metric cards */
+.metric-card {
+  animation: none !important;
+}
 </style>

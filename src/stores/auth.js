@@ -206,6 +206,9 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('user_id')
     localStorage.removeItem('profile_id')
     findTutorsStore.reset()
+    
+    // Clear any persisted Pinia stores in sessionStorage to prevent data leaks across sessions
+    sessionStorage.clear()
   }
 
   const initializeAuth = () => {

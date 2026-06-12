@@ -89,6 +89,7 @@ class UserProfile(models.Model):
         ('Tutee', 'Tutee'),
         ('Tutor', 'Tutor'),
         ('Admin', 'Admin'),
+        ('SuperAdmin', 'SuperAdmin'),
     ]
 
     role = models.CharField(max_length=20, choices=ROLE_CHOICES)
@@ -346,6 +347,13 @@ class PlatformActivity(models.Model):
 
     activity_type = models.CharField(max_length=30, choices=ACTIVITY_TYPES)
     message = models.CharField(max_length=255)
+    institution = models.ForeignKey(
+        'PartnerInstitution', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name='activities'
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
