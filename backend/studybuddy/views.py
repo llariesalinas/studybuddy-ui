@@ -756,7 +756,8 @@ def register_user(request):
 
     PlatformActivity.objects.create(
         activity_type='registration',
-        message=f"New {role} registered: {fname} {lname} ({email})"
+        message=f"New {role} registered: {fname} {lname} ({email})",
+        institution=profile.institution
     )
 
     logger.info(
@@ -844,7 +845,7 @@ def login_view(request):
         except TutorApplication.DoesNotExist:
             pass
 
-    if not profile.is_domain_exempt and profile.role != 'Admin':
+    if not profile.is_domain_exempt and profile.role not in ['Admin', 'SuperAdmin']:
         email_domain = normalize_email_domain(email)
         active_institution = get_active_institution_by_domain(email_domain)
 
@@ -2620,7 +2621,8 @@ def tutor_confirm_booking(request, booking_id):
 
         PlatformActivity.objects.create(
             activity_type='booking_completed',
-            message=f"Session completed: {representative_booking.student.fname} with {representative_booking.tutor.profile.fname}"
+            message=f"Session completed: {representative_booking.student.fname} with {representative_booking.tutor.profile.fname}",
+            institution=representative_booking.tutor.profile.institution
         )
 
     return Response({"message": "Session marked as completed successfully."})
@@ -2826,28 +2828,29 @@ def get_recommendation_candidate_tutors(
     start_time=None,
     end_time=None,
 ):
-    candidates = Tutor.objects.filter(
+    base_candidates = Tutor.objects.filter(
         tutorsubjects__subject__subject_code=subject
     )
 
     if preferred_mode == "Online":
-        candidates = candidates.filter(can_online=True)
+        base_candidates = base_candidates.filter(can_online=True)
     elif preferred_mode in ["Face-to-face", "F2F"]:
-        candidates = candidates.filter(can_f2f=True)
+        base_candidates = base_candidates.filter(can_f2f=True)
 
     if min_budget not in [None, ""]:
-        candidates = candidates.filter(hourly_rate__gte=min_budget)
+        base_candidates = base_candidates.filter(hourly_rate__gte=min_budget)
 
     if max_budget not in [None, ""]:
-        candidates = candidates.filter(hourly_rate__lte=max_budget)
+        base_candidates = base_candidates.filter(hourly_rate__lte=max_budget)
 
     session_date = parse_request_date(requested_date)
     required_slots = get_recommendation_time_slots(start_time, end_time)
 
+    # Stage 1: Exact Match (Date + All Time Slots)
     if session_date and required_slots:
         weekday = WEEKDAY_MAP[session_date.weekday()]
-
-        exact_candidates = candidates.filter(
+        
+        stage1_candidates = base_candidates.filter(
             tutoravailability__day=weekday,
             tutoravailability__time_slot__in=required_slots,
             tutoravailability__is_active=True,
@@ -2868,9 +2871,8 @@ def get_recommendation_candidate_tutors(
         conflicting_tutor_ids = Booking.objects.filter(
             session_date=session_date,
             status__in=RECOMMENDATION_BLOCKING_STATUSES,
-            availability__day=weekday,
             availability__time_slot__in=required_slots,
-        ).values_list("tutor_id", flat=True)
+        ).values_list('tutor_id', flat=True)
 
         full_day_override_tutor_ids = TutorAvailabilityOverride.objects.filter(
             override_date=session_date,
@@ -2884,26 +2886,30 @@ def get_recommendation_candidate_tutors(
             availability__time_slot__in=required_slots,
         ).values_list("tutor_id", flat=True)
 
-        exact_candidates = exact_candidates.exclude(
-            profile_id__in=conflicting_tutor_ids
+        stage1_candidates = stage1_candidates.exclude(
+            id__in=conflicting_tutor_ids
         ).exclude(
-            profile_id__in=full_day_override_tutor_ids
+            id__in=full_day_override_tutor_ids
         ).exclude(
-            profile_id__in=slot_override_tutor_ids
+            id__in=slot_override_tutor_ids
         )
 
-        if exact_candidates.exists():
-            candidates = exact_candidates
-        else:
-            candidates = candidates.exclude(
-                profile_id__in=conflicting_tutor_ids
-            ).exclude(
-                profile_id__in=full_day_override_tutor_ids
-            ).exclude(
-                profile_id__in=slot_override_tutor_ids
-            )
+        if stage1_candidates.exists():
+            return stage1_candidates
 
-    return candidates.distinct()
+    # Stage 2: Fallback (Date only, ignore time slots)
+    if session_date:
+        weekday = WEEKDAY_MAP[session_date.weekday()]
+        stage2_candidates = base_candidates.filter(
+            tutoravailability__day=weekday,
+            tutoravailability__is_active=True,
+        ).distinct()
+        
+        if stage2_candidates.exists():
+            return stage2_candidates
+
+    # Stage 3: Broad Fallback (Subject only, ignore date/time)
+    return base_candidates.distinct()
 
 
 @api_view(['POST'])
@@ -4258,18 +4264,23 @@ def create_support_ticket(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def admin_claim_ticket(request, ticket_id):
-    if request.user.userprofile.role != 'Admin':
+    profile = request.user.userprofile
+    if profile.role not in ('Admin', 'SuperAdmin'):
         return Response(status=403)
 
     from .models import SupportTicket
-    ticket = get_object_or_404(SupportTicket, id=ticket_id)
+    queryset = SupportTicket.objects.all()
+    if profile.role != 'SuperAdmin':
+        queryset = queryset.filter(user__institution=profile.institution)
+
+    ticket = get_object_or_404(queryset, id=ticket_id)
 
     try:
         with transaction.atomic():
-            ticket.assigned_agent = request.user.userprofile
+            ticket.assigned_agent = profile
             ticket.status = 'In_Progress'
 
-            ticket.chatroom.tutor = request.user.userprofile
+            ticket.chatroom.tutor = profile
 
             ticket.save()
             ticket.chatroom.save()
@@ -4308,11 +4319,15 @@ def list_my_tickets(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def admin_list_tickets(request):
-    if request.user.userprofile.role != 'Admin':
+    profile = request.user.userprofile
+    if profile.role not in ('Admin', 'SuperAdmin'):
         return Response(status=403)
 
     from .models import SupportTicket
-    tickets = SupportTicket.objects.all().order_by('-created_at')
+    tickets = SupportTicket.objects.select_related('user', 'assigned_agent').all().order_by('-created_at')
+    
+    if profile.role != 'SuperAdmin':
+        tickets = tickets.filter(user__institution=profile.institution)
 
     data = []
     for ticket in tickets:
@@ -4340,11 +4355,16 @@ def admin_list_tickets(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def admin_resolve_ticket(request, ticket_id):
-    if request.user.userprofile.role != 'Admin':
+    profile = request.user.userprofile
+    if profile.role not in ('Admin', 'SuperAdmin'):
         return Response(status=403)
 
     from .models import SupportTicket
-    ticket = get_object_or_404(SupportTicket, id=ticket_id)
+    queryset = SupportTicket.objects.all()
+    if profile.role != 'SuperAdmin':
+        queryset = queryset.filter(user__institution=profile.institution)
+
+    ticket = get_object_or_404(queryset, id=ticket_id)
     ticket.status = 'Resolved'
     ticket.save()
 
@@ -4401,7 +4421,8 @@ def tutor_application_resubmit(request):
     # Log activity
     PlatformActivity.objects.create(
         activity_type='tutor_application',
-        message=f"Tutor application resubmitted: {request.user.userprofile.fname} {request.user.userprofile.lname}"
+        message=f"Tutor application resubmitted: {request.user.userprofile.fname} {request.user.userprofile.lname}",
+        institution=request.user.userprofile.institution
     )
 
     # Optional: Send email confirmation

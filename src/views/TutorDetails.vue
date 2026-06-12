@@ -326,8 +326,7 @@ const currentWeekLabel = computed(() => {
   if (startMonth === endMonth) {
     return `${startMonth} ${start.getDate()}-${end.getDate()}, ${year}`
   }
-
-  return `${startMonth} ${start.getDate()}-${endMonth} ${end.getDate()}, ${year}`
+  return `${startMonth} ${start.getDate()} - ${endMonth} ${end.getDate()}, ${year}`
 })
 
 const tutorProfile = computed(() => ({

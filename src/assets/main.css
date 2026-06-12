@@ -8,17 +8,8 @@
   --sb-primary-light: #edf6f1;
   --sb-primary-lighter: #dff1e8;
   --sb-bg: #F8F9FA;
+  --sb-bg-gradient: linear-gradient(135deg, #f7fbf8 0%, #eef8f3 44%, #f7fbf8 100%);
   --sb-card-bg: #ffffff;
-  --sb-card-border: #EAEAEA;
-  --sb-surface: #ffffff;
-  --sb-text-main: #163127;
-  --sb-text-muted: #6B7280;
-  --sb-text-secondary: #495057;
-  --sb-text-dark: #212529;
-  --sb-text-subtle: #a0acb8;
-  --sb-text-muted-green: #6b7d74;
-  --sb-border-light: #e0e7e3;
-  --sb-danger: #ef4444;
   --sb-danger-bs: #dc3545;
   --sb-warning-bg: #ffc107;
   --sb-warning-text: #997404;
@@ -42,14 +33,8 @@
   --sb-primary-hover:   #9CC8B8;
   --sb-primary-contrast:#071310;
   --sb-bg:              #050807;
+  --sb-bg-gradient: linear-gradient(135deg, #050807 0%, #08100d 48%, #030504 100%);
   --sb-card-bg:         #0C1110;
-  --sb-card-border:     #1B2A25;
-  --sb-surface:         #0C1110;
-  --sb-text-main:       #F3F7F5;
-  --sb-text-muted:      #9AA8A1;
-  --sb-text-secondary:  #BAC8C1;
-  --sb-text-dark:       #F3F7F5;
-  --sb-border-light:    #1B2A25;
 }
 
 html,
@@ -58,7 +43,8 @@ body {
 }
 
 body {
-  background: var(--sb-bg);
+  background: var(--sb-bg-gradient);
+  background-attachment: fixed;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
@@ -66,12 +52,6 @@ body > #app {
   position: relative;
   z-index: 1;
   min-height: 100vh;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  body {
-    transition: none;
-  }
 }
 
 /* Custom Utilities to extend Bootstrap */

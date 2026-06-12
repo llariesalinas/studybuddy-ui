@@ -67,7 +67,7 @@ class ChatRoomSerializer(serializers.ModelSerializer):
     current_booking = serializers.SerializerMethodField()
     partner_context = serializers.SerializerMethodField()
     ticket_status = serializers.SerializerMethodField()
-    ticket_context = serializers.SerializerMethodField()
+    ticket = serializers.SerializerMethodField()
 
     class Meta:
         model = ChatRoom
@@ -86,7 +86,7 @@ class ChatRoomSerializer(serializers.ModelSerializer):
             'current_booking',
             'partner_context',
             'ticket_status',
-            'ticket_context',
+            'ticket',
         ]
 
     def get_ticket_status(self, obj):
@@ -94,8 +94,17 @@ class ChatRoomSerializer(serializers.ModelSerializer):
             return obj.ticket.status
         return None
 
-    def get_ticket_context(self, obj):
-        return get_ticket_context(obj)
+    def get_ticket(self, obj):
+        if hasattr(obj, 'ticket') and obj.ticket:
+            ticket = obj.ticket
+            return {
+                'id': ticket.id,
+                'subject': ticket.subject,
+                'category': ticket.category,
+                'status': ticket.status,
+                'description': ticket.description,
+            }
+        return None
 
     def _current_booking(self, obj):
         # Memoize per room so current_booking and partner_context don't both

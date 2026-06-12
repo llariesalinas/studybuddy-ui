@@ -733,6 +733,35 @@ watch(showCashoutModal, async (isOpen) => {
     linear-gradient(135deg, #f8fafc 0%, #f5fbf4 100%);
 }
 
+.wallet-aurora {
+  position: absolute;
+  z-index: -2;
+  width: 280px;
+  height: 280px;
+  border-radius: 999px;
+  filter: blur(60px);
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.wallet-aurora-one {
+  top: 20px;
+  left: 8%;
+  background: rgba(16, 185, 129, 0.4);
+}
+
+.wallet-aurora-two {
+  top: 140px;
+  right: 10%;
+  background: rgba(14, 165, 233, 0.25);
+}
+
+.wallet-aurora-three {
+  bottom: 80px;
+  left: 38%;
+  background: rgba(139, 92, 246, 0.15);
+}
+
 .wallet-grid {
   display: grid;
   gap: 24px;
@@ -754,9 +783,10 @@ watch(showCashoutModal, async (isOpen) => {
 
 .glass-panel {
   background: var(--wallet-glass);
+  backdrop-filter: blur(8px);
   border: 1px solid rgba(255, 255, 255, 0.9);
   border-radius: 24px;
-  box-shadow: 0 18px 60px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 12px 48px rgba(15, 23, 42, 0.06);
 }
 
 .performance-card {
@@ -927,7 +957,8 @@ watch(showCashoutModal, async (isOpen) => {
   width: 210px;
   height: 210px;
   border-radius: 999px;
-  background: radial-gradient(circle, rgba(140, 248, 191, 0.28), rgba(140, 248, 191, 0));
+  background: rgba(140, 248, 191, 0.28);
+  filter: blur(16px);
   transition: transform var(--sb-t-normal) var(--sb-spring);
 }
 

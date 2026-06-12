@@ -1,15 +1,29 @@
 <template>
-  <div class="admin-users p-4">
+  <div class="superadmin-users p-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
-      <h3 class="mb-0">User Management</h3>
+      <h3 class="mb-0">All Users</h3>
       <div class="d-flex gap-2">
-        <input v-model="filters.search" type="text" class="form-control form-control-sm rounded-pill px-3" placeholder="Search by name or email..." style="width: 250px;">
-        <select v-model="filters.role" class="form-select form-select-sm rounded-pill" style="width: 120px;">
+        <input
+          v-model="filters.search"
+          type="text"
+          class="form-control form-control-sm rounded-pill px-3"
+          placeholder="Search by name or email..."
+          style="width: 250px;"
+        >
+        <select v-model="filters.role" class="form-select form-select-sm rounded-pill" style="width: 140px;">
           <option value="">All Roles</option>
           <option value="Tutee">Tutee</option>
           <option value="Tutor">Tutor</option>
+          <option value="Admin">Admin</option>
+          <option value="SuperAdmin">SuperAdmin</option>
         </select>
-        <select v-model="filters.status" class="form-select form-select-sm rounded-pill" style="width: 120px;">
+        <select v-model="filters.institution" class="form-select form-select-sm rounded-pill" style="width: 200px;">
+          <option value="">All Institutions</option>
+          <option v-for="inst in store.institutions" :key="inst.id" :value="inst.institution_name">
+            {{ inst.institution_name }}
+          </option>
+        </select>
+        <select v-model="filters.status" class="form-select form-select-sm rounded-pill" style="width: 130px;">
           <option value="">All Status</option>
           <option value="Active">Active</option>
           <option value="Suspended">Suspended</option>
@@ -32,7 +46,7 @@
               </tr>
             </thead>
             <tbody class="placeholder-glow">
-              <tr v-for="i in 5" :key="'user-skeleton-' + i">
+              <tr v-for="i in 6" :key="'sk-' + i">
                 <td class="ps-4">
                   <div class="d-flex align-items-center">
                     <div class="placeholder rounded-circle me-3" style="width: 32px; height: 32px;"></div>
@@ -46,13 +60,12 @@
                 <td><span class="placeholder col-8 rounded"></span></td>
                 <td><span class="placeholder col-5 rounded-pill"></span></td>
                 <td><span class="placeholder col-6 rounded small"></span></td>
-                <td class="pe-4 text-end">
-                  <span class="placeholder col-6 rounded"></span>
-                </td>
+                <td class="pe-4 text-end"><span class="placeholder col-6 rounded"></span></td>
               </tr>
             </tbody>
           </table>
         </div>
+
         <div v-else class="table-responsive">
           <table class="table table-hover align-middle mb-0">
             <thead class="bg-light">
@@ -70,7 +83,7 @@
                 <td class="ps-4">
                   <div class="d-flex align-items-center">
                     <div class="avatar-sm bg-primary-subtle text-primary rounded-circle d-flex align-items-center justify-content-center fw-bold me-3">
-                      {{ user.fname[0] }}{{ user.lname[0] }}
+                      {{ user.fname?.[0] }}{{ user.lname?.[0] }}
                     </div>
                     <div>
                       <p class="mb-0 fw-bold">{{ user.full_name }}</p>
@@ -89,12 +102,14 @@
                 <td class="small text-muted">{{ formatDate(user.created_at) }}</td>
                 <td class="pe-4 text-end">
                   <button @click="openDetail(user)" class="btn btn-sm btn-light rounded-circle sb-btn">
-                    <i class="bi bi-eye"></i></button>
+                    <i class="bi bi-eye"></i>
+                  </button>
                 </td>
               </tr>
             </tbody>
           </table>
-          <div v-if="!store.users.length" class="text-center py-5">
+          <div v-if="!filteredUsers.length" class="text-center py-5">
+            <i class="bi bi-people fs-1 d-block mb-2 text-muted"></i>
             <p class="text-muted">No users found matching your filters.</p>
           </div>
         </div>
@@ -109,8 +124,11 @@
       </div>
       <div v-if="selectedUser" class="offcanvas-body">
         <div class="text-center mb-4">
-          <div class="avatar-lg bg-primary-subtle text-primary rounded-circle d-flex align-items-center justify-content-center fw-bold mx-auto mb-3" style="width: 80px; height: 80px; font-size: 2rem;">
-            {{ selectedUser.fname[0] }}{{ selectedUser.lname[0] }}
+          <div
+            class="avatar-lg bg-primary-subtle text-primary rounded-circle d-flex align-items-center justify-content-center fw-bold mx-auto mb-3"
+            style="width: 80px; height: 80px; font-size: 2rem;"
+          >
+            {{ selectedUser.fname?.[0] }}{{ selectedUser.lname?.[0] }}
           </div>
           <h4 class="fw-bold mb-1">{{ selectedUser.full_name }}</h4>
           <p class="text-muted mb-3">{{ selectedUser.email }}</p>
@@ -138,7 +156,7 @@
           </div>
         </div>
 
-        <div v-if="selectedUser.role === 'Tutor'" class="card border-0 bg-light rounded-4 p-3">
+        <div v-if="selectedUser.role === 'Tutor'" class="card border-0 bg-light rounded-4 p-3 mb-4">
           <h6 class="fw-bold mb-3 small text-muted">TUTOR DATA</h6>
           <div class="mb-2">
             <p class="small text-muted mb-0">Wallet Balance</p>
@@ -151,10 +169,10 @@
         </div>
 
         <div class="mt-4 pt-4 border-top">
-          <button 
-            @click="toggleSuspension(selectedUser)" 
+          <button
+            @click="toggleSuspension(selectedUser)"
             :disabled="suspending"
-            class="btn w-100 mb-2 rounded-pill py-2 sb-btn" 
+            class="btn w-100 mb-2 rounded-pill py-2 sb-btn"
             :class="selectedUser.is_suspended ? 'btn-success' : 'btn-outline-danger'"
           >
             <span v-if="suspending" class="spinner-border spinner-border-sm me-2"></span>
@@ -168,45 +186,43 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue';
-import { useAdminStore } from '@/stores/admin';
+import { ref, reactive, onMounted, computed } from 'vue'
+import { useSuperAdminStore } from '@/stores/superadmin'
 import { useToastStore } from '@/stores/toast'
 
-const store = useAdminStore()
+const store = useSuperAdminStore()
 const toastStore = useToastStore()
 const selectedUser = ref(null)
+const suspending = ref(false)
 
-const filters = reactive({
-  search: '',
-  role: '',
-  status: ''
-})
+const filters = reactive({ search: '', role: '', institution: '', status: '' })
 
 onMounted(() => {
-  store.fetchUsers({})
+  store.fetchUsers({}, true)
+  store.fetchInstitutions()
 })
 
 const filteredUsers = computed(() => {
   return store.users.filter(user => {
     const search = filters.search.toLowerCase()
     const matchesSearch = !search ||
-      user.full_name.toLowerCase().includes(search) ||
-      user.email.toLowerCase().includes(search)
-
+      user.full_name?.toLowerCase().includes(search) ||
+      user.email?.toLowerCase().includes(search)
     const matchesRole = !filters.role || user.role === filters.role
+    const matchesInstitution = !filters.institution || user.institution_name === filters.institution
     const matchesStatus = !filters.status ||
       (filters.status === 'Active' && !user.is_suspended) ||
       (filters.status === 'Suspended' && user.is_suspended)
-
-    return matchesSearch && matchesRole && matchesStatus
+    return matchesSearch && matchesRole && matchesInstitution && matchesStatus
   })
 })
 
 const getRoleBadgeClass = (role) => {
   switch (role) {
-    case 'Admin': return 'badge bg-dark rounded-pill px-3';
-    case 'Tutor': return 'badge bg-primary rounded-pill px-3';
-    default: return 'badge bg-info-subtle text-info rounded-pill px-3';
+    case 'SuperAdmin': return 'badge bg-dark rounded-pill px-3'
+    case 'Admin': return 'badge bg-secondary rounded-pill px-3'
+    case 'Tutor': return 'badge bg-primary rounded-pill px-3'
+    default: return 'badge bg-info-subtle text-info rounded-pill px-3'
   }
 }
 
@@ -220,11 +236,7 @@ const formatDateFull = (dateStr) => {
   return date.toLocaleString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
 }
 
-const openDetail = (user) => {
-  selectedUser.value = user
-}
-
-const suspending = ref(false)
+const openDetail = (user) => { selectedUser.value = user }
 
 const toggleSuspension = async (user) => {
   const action = user.is_suspended ? 'reactivate' : 'suspend'
@@ -232,7 +244,6 @@ const toggleSuspension = async (user) => {
     suspending.value = true
     try {
       await store.updateUserStatus(user.id, !user.is_suspended)
-      // No manual patch needed — store mutation is reactive
     } catch {
       toastStore.push('Failed to update user status.', 'error')
     } finally {
@@ -240,32 +251,12 @@ const toggleSuspension = async (user) => {
     }
   }
 }
-
-const deleteUser = async (user) => {
-  if (confirm(`CRITICAL ACTION: Are you sure you want to PERMANENTLY DELETE ${user.full_name}? This cannot be undone.`)) {
-    try {
-      await store.deleteUser(user.id)
-      selectedUser.value = null
-    } catch {
-      toastStore.push('Failed to delete user.', 'error')
-    }
-  }
-}
 </script>
 
 <style scoped>
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.2s ease;
-}
-
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
-
+.fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
 .avatar-sm { width: 32px; height: 32px; font-size: 0.8rem; }
-.admin-users .table thead th { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: none; }
-.admin-users .table tbody td { border-bottom: 1px solid #f8f9fa; }
-.dropdown-item:active { background-color: var(--sb-primary); }
+.superadmin-users .table thead th { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: none; }
+.superadmin-users .table tbody td { border-bottom: 1px solid #f8f9fa; }
 </style>
