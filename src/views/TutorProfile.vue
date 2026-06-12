@@ -548,9 +548,11 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/services/api/api'
+import { useCatalogStore } from '@/stores/catalog'
 import { useToastStore } from '@/stores/toast'
 
 const router = useRouter()
+const catalogStore = useCatalogStore()
 const toastStore = useToastStore()
 
 const minHourlyRate = 50
@@ -1018,8 +1020,7 @@ async function loadSubjects() {
   subjectsLoadError.value = ''
 
   try {
-    const response = await api.get('/subjects/')
-    allSubjects.value = response.data
+    allSubjects.value = await catalogStore.fetchSubjects()
   } catch (error) {
     console.error('Failed to load subjects:', error)
     subjectsLoadError.value = 'Could not load subjects right now.'
@@ -1030,8 +1031,7 @@ async function loadSubjects() {
 
 async function loadCourses() {
   try {
-    const response = await api.get('/courses/')
-    courses.value = response.data
+    courses.value = await catalogStore.fetchCourses()
   } catch (error) {
     console.error('Failed to load courses:', error)
     toastStore.push('Failed to load courses.', 'error')
@@ -1924,7 +1924,6 @@ onMounted(() => {
   place-items: center;
   padding: 1.5rem;
   background: rgba(15, 23, 42, 0.46);
-  backdrop-filter: blur(6px);
 }
 
 .glass-modal {

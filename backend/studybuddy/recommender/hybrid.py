@@ -1,13 +1,13 @@
 import logging
 
 from ..models import Tutor
-from .CF import compute_cf_score
+from .CF import compute_cf_score, top_k
 from .cbf import compute_cbf_score, get_student_subject_codes
 
 logger = logging.getLogger(__name__)
 
 
-def hybrid_prediction(ratings, student_profile, tutor, requested_subject, student_subjects=None):
+def hybrid_prediction(ratings, student_profile, tutor, requested_subject, student_subjects=None, neighbors=None):
     cbf_score = compute_cbf_score(
         student_profile,
         tutor,
@@ -22,6 +22,7 @@ def hybrid_prediction(ratings, student_profile, tutor, requested_subject, studen
         ratings,
         student_profile.id,
         tutor_id,
+        neighbors=neighbors,
     )
 
     if cf_score is None:
@@ -61,6 +62,10 @@ def normalize_tutor_queryset(candidate_qs=None):
 def recommend_tutors_hybrid(ratings, student_profile, requested_subject, candidate_qs=None):
     tutors = normalize_tutor_queryset(candidate_qs)
     student_subjects = get_student_subject_codes(student_profile)
+
+    student_id = student_profile.id
+    neighbors = top_k(ratings, student_id) if student_id in ratings else []
+
     recommendations = []
 
     for tutor in tutors:
@@ -70,6 +75,7 @@ def recommend_tutors_hybrid(ratings, student_profile, requested_subject, candida
             tutor,
             requested_subject,
             student_subjects=student_subjects,
+            neighbors=neighbors,
         )
 
         recommendations.append({

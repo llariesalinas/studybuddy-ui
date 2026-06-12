@@ -207,26 +207,42 @@
                   <div class="context-section">
                     <h5>Ticket Details</h5>
                     <div class="card border-0 bg-light p-3 rounded-4 small">
+                      <div v-if="ticketContext.subject" class="mb-2">
+                        <span class="text-muted d-block small">SUBJECT</span>
+                        <strong>{{ ticketContext.subject }}</strong>
+                      </div>
+                      <div v-if="ticketContext.category" class="mb-2">
+                        <span class="text-muted d-block small">CATEGORY</span>
+                        <strong>{{ ticketContext.category }}</strong>
+                      </div>
+                      <div v-if="formattedTicketOpenedDate" class="mb-2">
+                        <span class="text-muted d-block small">OPENED</span>
+                        <strong>{{ formattedTicketOpenedDate }}</strong>
+                      </div>
                       <div class="mb-2">
                         <span class="text-muted d-block small">ROOM TYPE</span>
                         <strong>Official Support</strong>
                       </div>
                       <div class="mb-2">
                         <span class="text-muted d-block small">REPORTER</span>
-                        <strong>{{ chatStore.currentRoom.tutee_name }}</strong>
+                        <strong>{{ supportReporterLabel }}</strong>
+                      </div>
+                      <div v-if="ticketContext.assigned_agent_name" class="mb-2">
+                        <span class="text-muted d-block small">ASSIGNED AGENT</span>
+                        <strong>{{ ticketContext.assigned_agent_name }}</strong>
                       </div>
                       <div class="mb-0">
                         <span class="text-muted d-block small">STATUS</span>
-                        <span class="badge rounded-pill bg-sb-primary text-white py-1 px-2 mt-1">{{ chatStore.currentRoom.ticket_status || 'Active' }}</span>
+                        <span class="badge rounded-pill bg-sb-primary text-white py-1 px-2 mt-1">{{ ticketStatusLabel }}</span>
                       </div>
                     </div>
                   </div>
                 </template>
                 <template v-else>
                   <div class="context-profile">
-                    <div class="context-avatar">{{ getRoomInitials(chatStore.currentRoom) }}</div>
-                    <h4>{{ chatStore.getRoomPartnerName(chatStore.currentRoom) }}</h4>
-                    <p>{{ partnerSubtitle }}</p>
+                    <div class="context-avatar">{{ contextPartnerInitials }}</div>
+                    <h4>{{ contextPartnerName }}</h4>
+                    <p>{{ contextPartnerSubtitle }}</p>
                   </div>
 
                   <div class="context-section">
@@ -430,10 +446,46 @@ const typingLabel = computed(() => {
 })
 
 const partnerContext = computed(() => chatStore.currentRoom?.partner_context || {})
+const ticketContext = computed(() => chatStore.currentRoom?.ticket_context || {})
+const currentProfileId = computed(() => Number(authStore.user?.profile_id || localStorage.getItem('profile_id')))
+const supportReporterLabel = computed(() => {
+  const room = chatStore.currentRoom
+  const reporterName = room?.tutee_name || 'Reporter'
+
+  if (room?.room_type === 'support' && Number(room?.tutee) === currentProfileId.value) {
+    return `You (${reporterName})`
+  }
+
+  return reporterName
+})
+const ticketStatusLabel = computed(() => (
+  ticketContext.value.status || chatStore.currentRoom?.ticket_status || 'Active'
+))
+const formattedTicketOpenedDate = computed(() => {
+  if (!ticketContext.value.created_at) return ''
+
+  const date = new Date(ticketContext.value.created_at)
+  if (Number.isNaN(date.getTime())) return ''
+
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+})
 const partnerSubtitle = computed(() => {
   if (chatStore.currentRoom?.room_type === 'support') return 'Support Staff'
   return isTutor.value ? 'Tutee' : 'Tutor'
 })
+const contextPartnerName = computed(() => (
+  partnerContext.value.partner_name || chatStore.getRoomPartnerName(chatStore.currentRoom)
+))
+const contextPartnerInitials = computed(() => (
+  partnerContext.value.partner_initials || getRoomInitials(chatStore.currentRoom)
+))
+const contextPartnerSubtitle = computed(() => (
+  partnerContext.value.partner_subtitle || partnerSubtitle.value
+))
 const isResolvedSupport = computed(() => {
   return chatStore.currentRoom?.room_type === 'support' && chatStore.currentRoom?.ticket_status === 'Resolved'
 })
@@ -541,6 +593,10 @@ const scrollToBottom = () => {
 }
 
 const getRoomInitials = (room) => {
+  if (room?.room_type === 'support') {
+    return 'CS'
+  }
+
   const name = chatStore.getRoomPartnerName(room)
   return name.split(' ').filter(Boolean).map((part) => part[0]).join('').slice(0, 2).toUpperCase()
 }
@@ -785,7 +841,6 @@ onUnmounted(() => {
 }
 
 .rooms-loading-dot {
-  animation: sb-pulse-dot 1s ease infinite;
   background: var(--sb-primary);
   border-radius: 50%;
   display: inline-block;
@@ -886,7 +941,6 @@ onUnmounted(() => {
 }
 
 .pulse-once {
-  animation: sb-pulse-dot 600ms ease forwards;
   border-radius: 50%;
 }
 
@@ -966,7 +1020,6 @@ onUnmounted(() => {
   border: 1px solid rgba(255, 255, 255, 0.88);
   border-radius: 28px;
   box-shadow: 0 20px 60px rgba(15, 23, 42, 0.08);
-  backdrop-filter: blur(24px);
 }
 
 .message-wrapper {
@@ -1007,7 +1060,6 @@ onUnmounted(() => {
 }
 
 .is-pending .send-indicator-dot {
-  animation: sb-pulse-dot 1s ease infinite;
   border-radius: 50%;
 }
 
@@ -1297,7 +1349,6 @@ onUnmounted(() => {
   border: 1px solid rgba(255, 255, 255, 0.82);
   border-radius: 28px;
   box-shadow: 0 20px 60px rgba(15, 23, 42, 0.07);
-  backdrop-filter: blur(24px);
   padding: 24px;
 }
 

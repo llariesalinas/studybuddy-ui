@@ -953,12 +953,4 @@ const getStatusClass = (status) => {
   }
 }
 
-@supports not (backdrop-filter: blur(18px)) {
-  .metric-card,
-  .reports-panel,
-  .session-row,
-  .analytics-summary {
-    background: var(--sb-card-bg);
-  }
-}
 </style>

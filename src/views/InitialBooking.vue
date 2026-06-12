@@ -119,12 +119,13 @@ import {
   INITIAL_BUDGET_MIN,
   useInitialBookingPrefsStore,
 } from '@/stores/initialbookingprefs'
+import { useCatalogStore } from '@/stores/catalog'
 import { useFindTutorsStore } from '@/stores/findTutors'
 import { useToastStore } from '@/stores/toast'
-import api from '@/services/api/api'
 
 const router = useRouter()
 const store = useInitialBookingPrefsStore()
+const catalogStore = useCatalogStore()
 const findTutorsStore = useFindTutorsStore()
 const toastStore = useToastStore()
 
@@ -264,8 +265,7 @@ const subjectGroups = computed(() => {
 // Load subjects from backend
 onMounted(async () => {
   try {
-    const response = await api.get('/subjects/')
-    subjects.value = response.data
+    subjects.value = await catalogStore.fetchSubjects()
   } catch (error) {
     console.error('Failed to load subjects', error)
   }

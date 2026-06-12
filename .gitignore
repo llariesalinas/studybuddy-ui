@@ -44,9 +44,9 @@ __screenshots__/
 # Local handoff notes and plans
 PROJECT_HANDOFF_DUMP.md
 *project handoff*.md
-plans and handoffs/
-plans/
-handoffs/
+/plans and handoffs/
+/plans/
+/handoffs/
 .claude/
 .gemini/
 .superpowers/

@@ -1,10 +1,6 @@
 <!-- src/views/TutorWallet.vue -->
 <template>
   <div class="wallet-shell">
-    <div class="wallet-aurora wallet-aurora-one"></div>
-    <div class="wallet-aurora wallet-aurora-two"></div>
-    <div class="wallet-aurora wallet-aurora-three"></div>
-
     <section class="wallet-grid wallet-top-grid">
       <article class="glass-panel performance-card sb-interactive">
         <div class="ring-wrap" aria-label="Wallet performance">
@@ -1436,7 +1432,6 @@ watch(showCashoutModal, async (isOpen) => {
   border: 1px solid rgba(255, 255, 255, 0.9);
   border-radius: 24px;
   background: rgba(255, 255, 255, 0.86);
-  backdrop-filter: blur(24px);
   box-shadow: 0 24px 80px rgba(15, 23, 42, 0.18);
 }
 

@@ -34,6 +34,3 @@ const themeStore = useThemeStore()
 themeStore.initTheme()
 
 app.mount('#app')
-
-// 3. Import Bootstrap JS at the end so it loads after the DOM
-import 'bootstrap/dist/js/bootstrap.bundle.min.js'

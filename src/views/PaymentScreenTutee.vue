@@ -126,6 +126,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '@/services/api/api'
+import { useCatalogStore } from '@/stores/catalog'
 import { usePaymentStore } from '@/stores/tuteePaymentDetails'
 import { useBookedSessionStore } from '@/stores/bookedSessionDetails'
 import { useToastStore } from '@/stores/toast'
@@ -135,6 +136,7 @@ const router = useRouter()
 
 const paymentStore = usePaymentStore()
 const bookedSessionStore = useBookedSessionStore()
+const catalogStore = useCatalogStore()
 const toastStore = useToastStore()
 
 const tutorId = route.params.tutorId
@@ -207,8 +209,8 @@ onMounted(async () => {
     tutor.value = tutorRes.data
 
     // Load payment methods from backend
-    const methodsRes = await api.get('payment-methods/')
-    paymentMethods.value = methodsRes.data.map(m => ({
+    const methods = await catalogStore.fetchPaymentMethods()
+    paymentMethods.value = methods.map(m => ({
       id: m.id,
       label: m.name,
       icon: m.code === 'CASH' ? 'bi-cash-coin' : 'bi-credit-card'

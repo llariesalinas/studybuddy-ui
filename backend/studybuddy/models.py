@@ -126,7 +126,47 @@ class EmailOTPChallenge(models.Model):
 
     def __str__(self):
         return f"{self.purpose} OTP for user {self.user_id}"
-    
+
+
+class EmailSendLog(models.Model):
+    """Audit row written for every outbound email attempt.
+
+    Backs two features: the per-recipient send cap (counting recent rows) and
+    failure visibility (a queryable history of what was sent and what failed).
+    """
+    PURPOSE_LOGIN_OTP = 'login_otp'
+    PURPOSE_PASSWORD_RESET = 'password_reset'
+    PURPOSE_PASSWORD_CHANGED = 'password_changed'
+    PURPOSE_CHOICES = [
+        (PURPOSE_LOGIN_OTP, 'Login OTP'),
+        (PURPOSE_PASSWORD_RESET, 'Password reset'),
+        (PURPOSE_PASSWORD_CHANGED, 'Password changed'),
+    ]
+
+    STATUS_SENT = 'sent'
+    STATUS_FAILED = 'failed'
+    STATUS_CHOICES = [
+        (STATUS_SENT, 'Sent'),
+        (STATUS_FAILED, 'Failed'),
+    ]
+
+    recipient = models.EmailField()
+    purpose = models.CharField(max_length=32, choices=PURPOSE_CHOICES)
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES)
+    error = models.TextField(blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['recipient', 'purpose', 'created_at']),
+            models.Index(fields=['created_at']),
+        ]
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.purpose} -> {self.recipient} [{self.status}]"
+
+
 #TUTOR TABLE
 class Tutor(models.Model):
 
@@ -529,6 +569,10 @@ class Booking(models.Model):
     class Meta:
         indexes = [
             models.Index(fields=['session_date', 'availability', 'status']),
+            # Hot dashboard/bookings queries filter on the owner FK + status and
+            # order by session_date (student_dashboard, list_bookings, tutor_dashboard).
+            models.Index(fields=['student', 'status', 'session_date']),
+            models.Index(fields=['tutor', 'status', 'session_date']),
         ]
         constraints = [
             models.UniqueConstraint(
@@ -636,6 +680,9 @@ class Notification(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['recipient', '-created_at'], name='notif_recipient_date_idx'),
+        ]
 
     def __str__(self):
         return f"Notification for {self.recipient} - {'Read' if self.is_read else 'Unread'}"

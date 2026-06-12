@@ -24,6 +24,7 @@ from .models import (
     PaymentMethod,
     Rating,
     Subjects,
+    SupportTicket,
     Tutor,
     TutorAvailability,
     TutorAvailabilityOverride,
@@ -152,6 +153,35 @@ class RecommendTutorsViewTests(APITestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(self.response_ids(response), {complete.profile_id})
+
+    def test_falls_back_to_subject_matches_when_exact_availability_is_empty(self):
+        matching = self.create_tutor("fallback")
+        wrong_subject = self.create_tutor("wrongsubject", subject=self.other_subject)
+        f2f_only = self.create_tutor("f2ffallback", can_online=False, can_f2f=True)
+        expensive = self.create_tutor("fallbackexpensive", hourly_rate=500)
+
+        response = self.recommend()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.response_ids(response), {matching.profile_id})
+
+    def test_fallback_excludes_known_booking_conflicts(self):
+        fallback = self.create_tutor("fallbacksafe")
+        booked = self.create_tutor("fallbackbooked")
+        booked_slots = self.add_slots(booked, [time(14, 0), time(14, 30)])
+        Booking.objects.create(
+            student=self.student_profile,
+            tutor=booked,
+            availability=booked_slots[0],
+            session_date=self.search_date,
+            session_mode="Online",
+            status="Confirmed",
+        )
+
+        response = self.recommend()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.response_ids(response), {fallback.profile_id})
 
     def test_booked_slot_excludes_tutor(self):
         available = self.create_tutor("available")
@@ -645,6 +675,73 @@ class ChatFeatureTests(APITestCase):
 
         self.assertEqual(context['topics'], ['Ethics'])
 
+    def test_partner_context_skipped_for_support_rooms(self):
+        room = ChatRoom.objects.create(
+            tutee=self.tutee_profile,
+            tutor=None,
+            room_type='support',
+        )
+        self.client.force_authenticate(user=self.tutee_user)
+
+        response = self.client.get(f"/api/chat/rooms/{room.id}/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.data['partner_context'])
+
+    def test_ticket_context_exposes_subject_category_and_status(self):
+        room = ChatRoom.objects.create(
+            tutee=self.tutee_profile,
+            tutor=None,
+            room_type='support',
+        )
+        SupportTicket.objects.create(
+            user=self.tutee_profile,
+            chatroom=room,
+            category='Technical',
+            subject='Cannot join session',
+            description='Video call will not load.',
+            status='Open',
+        )
+        self.client.force_authenticate(user=self.tutee_user)
+
+        response = self.client.get(f"/api/chat/rooms/{room.id}/")
+
+        self.assertEqual(response.status_code, 200)
+        ticket_context = response.data['ticket_context']
+        self.assertEqual(ticket_context['subject'], 'Cannot join session')
+        self.assertEqual(ticket_context['category'], 'Technical Problem')
+        self.assertEqual(ticket_context['status'], 'Open')
+        self.assertIsNotNone(ticket_context['created_at'])
+        self.assertIsNone(ticket_context['assigned_agent_name'])
+
+    def test_support_room_read_endpoint_handles_unassigned_ticket_broadcast(self):
+        room = ChatRoom.objects.create(
+            tutee=self.tutee_profile,
+            tutor=None,
+            room_type='support',
+        )
+        SupportTicket.objects.create(
+            user=self.tutee_profile,
+            chatroom=room,
+            category='Dispute',
+            subject='Need help with tutor',
+            description='The conversation needs moderation.',
+            status='Open',
+        )
+        message = Message.objects.create(
+            room=room,
+            sender=None,
+            content='Ticket created.',
+        )
+        self.client.force_authenticate(user=self.tutee_user)
+
+        response = self.client.post(f"/api/chat/rooms/{room.id}/read/")
+
+        message.refresh_from_db()
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(message.is_read)
+        self.assertIsNotNone(message.read_at)
+
     def test_room_read_endpoint_marks_other_user_messages_read(self):
         room = ChatRoom.objects.create(tutee=self.tutee_profile, tutor=self.tutor_profile)
         message = Message.objects.create(
@@ -660,6 +757,71 @@ class ChatFeatureTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(message.is_read)
         self.assertIsNotNone(message.read_at)
+
+    def test_message_history_returns_latest_messages_in_display_order(self):
+        room = ChatRoom.objects.create(tutee=self.tutee_profile, tutor=self.tutor_profile)
+        for index in range(55):
+            Message.objects.create(
+                room=room,
+                sender=self.tutee_user if index % 2 == 0 else self.tutor_user,
+                content=f"Message {index}",
+            )
+        self.client.force_authenticate(user=self.tutee_user)
+
+        response = self.client.get(f"/api/chat/rooms/{room.id}/history/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 50)
+        self.assertEqual(response.data[0]["content"], "Message 5")
+        self.assertEqual(response.data[-1]["content"], "Message 54")
+
+    def test_message_history_after_id_returns_newer_messages(self):
+        room = ChatRoom.objects.create(tutee=self.tutee_profile, tutor=self.tutor_profile)
+        first = Message.objects.create(room=room, sender=self.tutee_user, content="First")
+        second = Message.objects.create(room=room, sender=self.tutor_user, content="Second")
+        third = Message.objects.create(room=room, sender=self.tutee_user, content="Third")
+        self.client.force_authenticate(user=self.tutee_user)
+
+        response = self.client.get(f"/api/chat/rooms/{room.id}/history/?after_id={first.id}")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([message["id"] for message in response.data], [second.id, third.id])
+
+    def test_non_member_cannot_load_message_history(self):
+        other_user = User.objects.create_user(
+            username="chat-history-other",
+            email="chat-history-other@example.com",
+            password="password",
+        )
+        UserProfile.objects.create(
+            user=other_user,
+            fname="History",
+            mname="",
+            lname="Other",
+            role="Tutee",
+        )
+        room = ChatRoom.objects.create(tutee=self.tutee_profile, tutor=self.tutor_profile)
+        self.client.force_authenticate(user=other_user)
+
+        response = self.client.get(f"/api/chat/rooms/{room.id}/history/")
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_message_history_serializes_system_message_without_sender(self):
+        room = ChatRoom.objects.create(tutee=self.tutee_profile, tutor=self.tutor_profile)
+        Message.objects.create(
+            room=room,
+            sender=None,
+            content="System note",
+            message_type="system",
+        )
+        self.client.force_authenticate(user=self.tutee_user)
+
+        response = self.client.get(f"/api/chat/rooms/{room.id}/history/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data[0]["sender_name"], "System")
+        self.assertIsNone(response.data[0]["sender_profile_id"])
 
     def test_pending_location_update_posts_booking_event_to_canonical_room(self):
         self.client.force_authenticate(user=self.tutor_user)
@@ -1743,3 +1905,461 @@ class EmailAuthTests(APITestCase):
         self.assertEqual(response.status_code, 400)
         self.user.refresh_from_db()
         self.assertFalse(self.user.check_password("NewStudyBuddyPassword123!"))
+
+
+class RecommenderNeighborReuseTests(APITestCase):
+    def setUp(self):
+        # student 1 is our target; students 2 and 3 are potential neighbors.
+        self.ratings = {
+            1: {10: 5, 11: 4},
+            2: {10: 4, 11: 5, 12: 3},
+            3: {10: 2, 11: 1, 12: 5},
+        }
+
+    def test_compute_cf_score_uses_supplied_neighbors(self):
+        from studybuddy.recommender import CF
+
+        neighbors = CF.top_k(self.ratings, 1)
+
+        with patch.object(CF, "top_k") as mocked_top_k:
+            score = CF.compute_cf_score(
+                self.ratings, 1, 12, neighbors=neighbors
+            )
+
+        mocked_top_k.assert_not_called()
+        self.assertIsNotNone(score)
+
+    def test_compute_cf_score_matches_with_and_without_neighbors(self):
+        from studybuddy.recommender import CF
+
+        neighbors = CF.top_k(self.ratings, 1)
+
+        without = CF.compute_cf_score(self.ratings, 1, 12)
+        with_neighbors = CF.compute_cf_score(self.ratings, 1, 12, neighbors=neighbors)
+
+        self.assertEqual(without, with_neighbors)
+
+    def test_recommend_hybrid_computes_neighbors_once(self):
+        from studybuddy.recommender import hybrid
+
+        # three candidate tutors, but neighbors should be computed only once
+        tutors = [Mock(profile_id=i, tutorsubjects_set=Mock()) for i in range(3)]
+        for t in tutors:
+            t.tutorsubjects_set.all.return_value = []
+
+        student_profile = Mock(id=1, course=None, year_level=None)
+
+        with patch.object(hybrid, "top_k", return_value=[]) as mocked_top_k, \
+             patch.object(hybrid, "get_student_subject_codes", return_value=[]), \
+             patch.object(hybrid, "compute_cbf_score", return_value=0.0), \
+             patch.object(hybrid, "normalize_tutor_queryset", return_value=tutors):
+            hybrid.recommend_tutors_hybrid(self.ratings, student_profile, None)
+
+        self.assertEqual(mocked_top_k.call_count, 1)
+
+    def test_recommend_hybrid_handles_student_with_no_ratings(self):
+        from studybuddy.recommender import hybrid
+
+        tutor = Mock(profile_id=99, tutorsubjects_set=Mock())
+        tutor.tutorsubjects_set.all.return_value = []
+        student_profile = Mock(id=4242, course=None, year_level=None)  # not in ratings
+
+        with patch.object(hybrid, "get_student_subject_codes", return_value=[]), \
+             patch.object(hybrid, "compute_cbf_score", return_value=0.5), \
+             patch.object(hybrid, "normalize_tutor_queryset", return_value=[tutor]):
+            results = hybrid.recommend_tutors_hybrid(self.ratings, student_profile, None)
+
+        self.assertEqual(len(results), 1)  # did not raise
+
+
+class DashboardRecommendationServiceTests(APITestCase):
+    def setUp(self):
+        cache.clear()
+        self.subject = Subjects.objects.create(
+            subject_code="IT101",
+            subject_name="Intro to IT",
+            department="IT",
+        )
+        self.other_subject = Subjects.objects.create(
+            subject_code="BIO101",
+            subject_name="Biology",
+            department="Science",
+        )
+        self.student_user = User.objects.create_user(
+            username="dash-student", email="dash@example.com", password="password",
+        )
+        self.student = UserProfile.objects.create(
+            user=self.student_user, fname="Dash", mname="", lname="Student",
+            role="Tutee", year_level=11,
+        )
+
+    def _make_tutor(self, username, subject):
+        user = User.objects.create_user(
+            username=username, email=f"{username}@example.com", password="password",
+        )
+        profile = UserProfile.objects.create(
+            user=user, fname=username.title(), mname="", lname="Tutor",
+            role="Tutor", year_level=12,
+        )
+        tutor = Tutor.objects.create(
+            profile=profile, hourly_rate=200, can_online=True, can_f2f=False,
+            teaching_level="SHS",
+        )
+        TutorSubjects.objects.create(tutor=tutor, subject=subject, expertise_level=5)
+        return tutor
+
+    def _set_preferences(self, *subjects):
+        pref, _ = Preference.objects.get_or_create(user=self.student)
+        pref.subjects.set([s.subject_code for s in subjects])
+
+    def test_returns_only_tutors_teaching_preference_subjects(self):
+        from studybuddy.recommender.dashboard import get_dashboard_recommendations
+
+        match = self._make_tutor("itmatch", self.subject)
+        self._make_tutor("biomatch", self.other_subject)
+        self._set_preferences(self.subject)
+
+        data = get_dashboard_recommendations(self.student)
+
+        ids = {row["id"] for row in data}
+        self.assertEqual(ids, {match.profile.id})
+
+    def test_response_shape_matches_widget_contract(self):
+        from studybuddy.recommender.dashboard import get_dashboard_recommendations
+
+        self._make_tutor("itmatch", self.subject)
+        self._set_preferences(self.subject)
+
+        row = get_dashboard_recommendations(self.student)[0]
+
+        self.assertEqual(
+            set(row.keys()), {"id", "name", "rating", "subjects", "hourlyRate"},
+        )
+
+    def test_cold_start_returns_fallback_when_no_preferences(self):
+        from studybuddy.recommender.dashboard import get_dashboard_recommendations
+
+        for index in range(7):
+            self._make_tutor(f"anytutor{index}", self.subject)
+        # no preferences set
+
+        data = get_dashboard_recommendations(self.student)
+
+        self.assertEqual(len(data), 5)
+
+    def test_returns_top_five_from_hybrid_algorithm_order(self):
+        from studybuddy.recommender import dashboard
+
+        tutors = [self._make_tutor(f"itmatch{index}", self.subject) for index in range(7)]
+        self._set_preferences(self.subject)
+
+        ranked = [
+            {"tutor": tutor, "score": 1 - (index / 10)}
+            for index, tutor in enumerate(reversed(tutors))
+        ]
+
+        with patch.object(dashboard, "recommend_tutors_hybrid", return_value=ranked):
+            data = dashboard.get_dashboard_recommendations(self.student)
+
+        self.assertEqual(len(data), 5)
+        self.assertEqual(
+            [row["id"] for row in data],
+            [recommendation["tutor"].profile.id for recommendation in ranked[:5]],
+        )
+
+    def test_cache_hit_is_defensively_limited_to_five(self):
+        from studybuddy.recommender.dashboard import (
+            dashboard_recs_cache_key,
+            get_dashboard_recommendations,
+        )
+
+        cache.set(
+            dashboard_recs_cache_key(self.student),
+            [
+                {
+                    "id": index,
+                    "name": f"Cached Tutor {index}",
+                    "rating": 5,
+                    "subjects": ["Intro to IT"],
+                    "hourlyRate": 200,
+                }
+                for index in range(8)
+            ],
+        )
+
+        data = get_dashboard_recommendations(self.student)
+
+        self.assertEqual(len(data), 5)
+        self.assertEqual([row["id"] for row in data], [0, 1, 2, 3, 4])
+
+    def test_second_call_served_from_cache_without_recompute(self):
+        from studybuddy.recommender import dashboard
+
+        self._make_tutor("itmatch", self.subject)
+        self._set_preferences(self.subject)
+
+        dashboard.get_dashboard_recommendations(self.student)  # warms cache
+
+        with patch.object(dashboard, "recommend_tutors_hybrid") as mocked:
+            dashboard.get_dashboard_recommendations(self.student)
+
+        mocked.assert_not_called()
+
+    def test_degrades_gracefully_when_cache_read_fails(self):
+        from studybuddy.recommender import dashboard
+
+        match = self._make_tutor("itmatch", self.subject)
+        self._set_preferences(self.subject)
+
+        with patch.object(dashboard.cache, "get", side_effect=Exception("redis down")):
+            data = dashboard.get_dashboard_recommendations(self.student)
+
+        ids = {row["id"] for row in data}
+        self.assertEqual(ids, {match.profile.id})
+
+
+class StudentDashboardRecommendationTests(APITestCase):
+    def setUp(self):
+        cache.clear()
+        self.subject = Subjects.objects.create(
+            subject_code="IT201", subject_name="Data Structures", department="IT",
+        )
+        self.other_subject = Subjects.objects.create(
+            subject_code="HIST201", subject_name="History", department="Arts",
+        )
+        self.student_user = User.objects.create_user(
+            username="dv-student", email="dv@example.com", password="password",
+        )
+        self.student = UserProfile.objects.create(
+            user=self.student_user, fname="Dee", mname="", lname="Vee",
+            role="Tutee", year_level=11,
+        )
+        self.client.force_authenticate(user=self.student_user)
+
+    def _make_tutor(self, username, subject):
+        user = User.objects.create_user(
+            username=username, email=f"{username}@example.com", password="password",
+        )
+        profile = UserProfile.objects.create(
+            user=user, fname=username.title(), mname="", lname="Tutor",
+            role="Tutor", year_level=12,
+        )
+        tutor = Tutor.objects.create(
+            profile=profile, hourly_rate=200, can_online=True, can_f2f=False,
+            teaching_level="SHS",
+        )
+        TutorSubjects.objects.create(tutor=tutor, subject=subject, expertise_level=5)
+        return tutor
+
+    def test_dashboard_recommends_subject_matched_tutors(self):
+        matches = [self._make_tutor(f"itone{index}", self.subject) for index in range(7)]
+        self._make_tutor("histone", self.other_subject)
+        pref, _ = Preference.objects.get_or_create(user=self.student)
+        pref.subjects.set([self.subject.subject_code])
+
+        response = self.client.get("/api/dashboard/")
+
+        self.assertEqual(response.status_code, 200)
+        ids = {row["id"] for row in response.data["recommendations"]}
+        self.assertEqual(len(response.data["recommendations"]), 5)
+        self.assertTrue(ids.issubset({tutor.profile.id for tutor in matches}))
+        self.assertEqual(
+            set(response.data["recommendations"][0].keys()),
+            {"id", "name", "rating", "subjects", "hourlyRate"},
+        )
+
+    def test_saving_preferences_busts_dashboard_cache(self):
+        from studybuddy.recommender.dashboard import dashboard_recs_cache_key
+
+        self._make_tutor("itone", self.subject)
+        pref, _ = Preference.objects.get_or_create(user=self.student)
+        pref.subjects.set([self.subject.subject_code])
+
+        # warm the cache
+        self.client.get("/api/dashboard/")
+        self.assertIsNotNone(cache.get(dashboard_recs_cache_key(self.student)))
+
+        # changing preferences must clear it
+        response = self.client.post(
+            "/api/preferences/", {"subjects": [self.subject.subject_code]},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(cache.get(dashboard_recs_cache_key(self.student)))
+
+    def test_submitting_rating_bumps_dashboard_cache_version(self):
+        from studybuddy.recommender.dashboard import dashboard_recs_cache_key
+
+        tutor = self._make_tutor("ratedtutor", self.subject)
+        availability = TutorAvailability.objects.create(
+            tutor=tutor,
+            day="Mon",
+            time_slot=time(9, 0),
+            is_active=True,
+        )
+        booking = Booking.objects.create(
+            student=self.student,
+            tutor=tutor,
+            availability=availability,
+            session_date=date(2026, 6, 1),
+            session_mode="Online",
+            booking_request_id=uuid4(),
+            status="Completed",
+        )
+
+        old_key = dashboard_recs_cache_key(self.student)
+
+        response = self.client.post(
+            f"/api/bookings/{booking.id}/rating/",
+            {"rating_score": 5},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertNotEqual(old_key, dashboard_recs_cache_key(self.student))
+
+    def test_tutor_subject_change_bumps_dashboard_cache_version(self):
+        from studybuddy.recommender.dashboard import dashboard_recs_cache_key
+
+        tutor = self._make_tutor("subjecttutor", self.subject)
+        new_subject = Subjects.objects.create(
+            subject_code="IT301",
+            subject_name="Algorithms",
+            department="IT",
+        )
+
+        old_key = dashboard_recs_cache_key(self.student)
+        self.client.force_authenticate(user=tutor.profile.user)
+
+        response = self.client.post(
+            "/api/tutor/subjects/add/",
+            {"subject_code": new_subject.subject_code},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotEqual(old_key, dashboard_recs_cache_key(self.student))
+
+    def test_tutor_profile_change_bumps_dashboard_cache_version(self):
+        from studybuddy.recommender.dashboard import dashboard_recs_cache_key
+
+        tutor = self._make_tutor("profiletutor", self.subject)
+
+        old_key = dashboard_recs_cache_key(self.student)
+        self.client.force_authenticate(user=tutor.profile.user)
+
+        response = self.client.put(
+            "/api/tutor/update/",
+            {
+                "hourly_rate": 250,
+                "teaching_level": "SHS",
+                "can_online": True,
+                "can_f2f": False,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotEqual(old_key, dashboard_recs_cache_key(self.student))
+
+
+class DashboardLoadPerformanceTests(APITestCase):
+    """Phase 1 verification: the dedicated recommendations endpoint plus
+    query-count regression guards for the N+1 fixes in list_bookings and
+    student_dashboard. The N+1 guard asserts the query count is constant as the
+    number of bookings grows — if a per-row query crept back in, doubling the
+    bookings would raise the count."""
+
+    def setUp(self):
+        cache.clear()
+        self.course = Course.objects.create(
+            course_code="BSIT", course_name="BS Information Technology",
+        )
+        self.subject = Subjects.objects.create(
+            subject_code="PERF101", subject_name="Performance", department="IT",
+        )
+        self.student_user = User.objects.create_user(
+            username="perf-student", email="perf-student@example.com", password="password",
+        )
+        self.student = UserProfile.objects.create(
+            user=self.student_user, fname="Perf", mname="", lname="Student",
+            role="Tutee", year_level=11, course=self.course,
+        )
+        self.tutor_user = User.objects.create_user(
+            username="perf-tutor", email="perf-tutor@example.com", password="password",
+        )
+        self.tutor_profile = UserProfile.objects.create(
+            user=self.tutor_user, fname="Perf", mname="", lname="Tutor",
+            role="Tutor", year_level=12, course=self.course,
+        )
+        self.tutor = Tutor.objects.create(
+            profile=self.tutor_profile, hourly_rate=200, can_online=True,
+            can_f2f=True, teaching_level="SHS",
+        )
+        TutorSubjects.objects.create(
+            tutor=self.tutor, subject=self.subject, expertise_level=5,
+        )
+        self.availability = TutorAvailability.objects.create(
+            tutor=self.tutor, day="Mon", time_slot=time(14, 0), is_active=True,
+        )
+        self.client.force_authenticate(user=self.student_user)
+
+    def _make_completed(self, count, start_day):
+        """Create `count` Completed bookings on distinct dates, each rated.
+
+        Distinct session_dates avoid the (availability, session_date) unique
+        constraint. Rating rows are created directly so they exercise the
+        select_related('rating') path without bumping the recs cache version.
+        """
+        from datetime import timedelta
+        base = date(2026, 1, 1) + timedelta(days=start_day)
+        for offset in range(count):
+            booking = Booking.objects.create(
+                student=self.student, tutor=self.tutor, availability=self.availability,
+                session_date=base + timedelta(days=offset),
+                session_mode="Online", status="Completed",
+            )
+            Rating.objects.create(
+                booking=booking, student=self.student, tutor=self.tutor, rating_score=5,
+            )
+
+    def _count_queries(self, url):
+        with CaptureQueriesContext(connection) as ctx:
+            response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        return len(ctx)
+
+    def test_recommendations_endpoint_returns_only_recommendations(self):
+        response = self.client.get("/api/recommendations/")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("recommendations", response.data)
+        self.assertNotIn("upcoming", response.data)
+        self.assertNotIn("completed", response.data)
+
+    def test_recommendations_endpoint_requires_auth(self):
+        self.client.force_authenticate(user=None)
+        response = self.client.get("/api/recommendations/")
+        self.assertIn(response.status_code, (401, 403))
+
+    def test_student_dashboard_has_no_n_plus_one(self):
+        self._make_completed(3, start_day=0)
+        self.client.get("/api/dashboard/")  # warm the (cached) recommendations
+        first = self._count_queries("/api/dashboard/")
+        self._make_completed(3, start_day=400)
+        second = self._count_queries("/api/dashboard/")
+        self.assertEqual(
+            first, second,
+            f"student_dashboard query count grew with booking count "
+            f"({first} -> {second}); a per-row (N+1) query likely regressed.",
+        )
+
+    def test_list_bookings_has_no_n_plus_one(self):
+        self._make_completed(3, start_day=0)
+        first = self._count_queries("/api/bookings/")
+        self._make_completed(3, start_day=400)
+        second = self._count_queries("/api/bookings/")
+        self.assertEqual(
+            first, second,
+            f"list_bookings query count grew with booking count "
+            f"({first} -> {second}); a per-row (N+1) query likely regressed.",
+        )

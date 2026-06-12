@@ -487,7 +487,6 @@ watch(
   width: 68px;
   height: 68px;
   transform: rotate(-90deg);
-  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--sb-primary) 20%, transparent));
 }
 
 .metric-ring-track,
@@ -526,7 +525,6 @@ watch(
     color-mix(in srgb, var(--sb-primary) 18%, transparent),
     color-mix(in srgb, var(--sb-primary) 76%, white)
   );
-  box-shadow: 0 0 10px color-mix(in srgb, var(--sb-primary) 14%, transparent);
 }
 
 .bookings-panel {
@@ -809,11 +807,4 @@ watch(
   }
 }
 
-@supports not (backdrop-filter: blur(18px)) {
-  .metric-card,
-  .bookings-panel,
-  .booking-card {
-    background: var(--sb-card-bg);
-  }
-}
 </style>
