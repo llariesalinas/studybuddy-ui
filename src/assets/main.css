@@ -24,6 +24,16 @@
     radial-gradient(circle at 100% 8%, rgba(148, 211, 181, 0.24), transparent 34%),
     radial-gradient(circle at 84% 88%, rgba(255, 218, 137, 0.22), transparent 32%);
   --sb-card-bg: #ffffff;
+  --sb-card-border: #EAEAEA;
+  --sb-surface: #ffffff;
+  --sb-text-main: #163127;
+  --sb-text-muted: #6B7280;
+  --sb-text-secondary: #495057;
+  --sb-text-dark: #212529;
+  --sb-text-subtle: #a0acb8;
+  --sb-text-muted-green: #6b7d74;
+  --sb-border-light: #e0e7e3;
+  --sb-danger: #ef4444;
   --sb-danger-bs: #dc3545;
   --sb-warning-bg: #ffc107;
   --sb-warning-text: #997404;
@@ -62,6 +72,13 @@
     radial-gradient(circle at 98% 12%, rgba(76, 201, 240, 0.12), transparent 34%),
     radial-gradient(circle at 78% 86%, rgba(134, 183, 163, 0.10), transparent 34%);
   --sb-card-bg:         #0C1110;
+  --sb-card-border:     #1B2A25;
+  --sb-surface:         #0C1110;
+  --sb-text-main:       #F3F7F5;
+  --sb-text-muted:      #9AA8A1;
+  --sb-text-secondary:  #BAC8C1;
+  --sb-text-dark:       #F3F7F5;
+  --sb-border-light:    #1B2A25;
 }
 
 html,
