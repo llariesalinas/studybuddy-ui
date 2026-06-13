@@ -390,6 +390,35 @@ const openSupport = (type = 'Other', id = null) => {
   isSupportModalOpen.value = true
 }
 let pendingSessionsRefreshId = null
+let startupIdleId = null
+let startupTimeoutId = null
+
+const deferStartupWork = (callback) => {
+  if (typeof window === 'undefined') {
+    callback()
+    return
+  }
+
+  if ('requestIdleCallback' in window) {
+    startupIdleId = window.requestIdleCallback(callback, { timeout: 2000 })
+    return
+  }
+
+  startupTimeoutId = window.setTimeout(callback, 800)
+}
+
+const cancelDeferredStartupWork = () => {
+  if (startupIdleId && typeof window !== 'undefined' && 'cancelIdleCallback' in window) {
+    window.cancelIdleCallback(startupIdleId)
+  }
+
+  if (startupTimeoutId) {
+    window.clearTimeout(startupTimeoutId)
+  }
+
+  startupIdleId = null
+  startupTimeoutId = null
+}
 
 const clearBootstrapModalState = () => {
   document.body.classList.remove('modal-open')
@@ -469,6 +498,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   closeLogoutModal()
+  cancelDeferredStartupWork()
   document.removeEventListener('visibilitychange', handleVisibilityChange)
 
   if (pendingSessionsRefreshId) {

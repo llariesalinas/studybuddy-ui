@@ -802,6 +802,10 @@ const viewMoreTutors = () => router.push({ name: 'tutors' })
   overflow: hidden;
 }
 
+.weekly-panel {
+  overflow: visible;
+}
+
 .panel-header {
   display: flex;
   align-items: flex-start;
@@ -930,10 +934,8 @@ const viewMoreTutors = () => router.push({ name: 'tutors' })
 .weekly-board-scroll {
   flex: 1;
   min-height: 0;
-  overflow-x: hidden;
-  overflow-y: hidden;
+  overflow: visible;
   padding-bottom: 0;
-  contain: paint;
 }
 
 .weekly-board-skeleton {
@@ -958,7 +960,7 @@ const viewMoreTutors = () => router.push({ name: 'tutors' })
   border: 1px solid var(--sb-card-border);
   border-radius: 20px;
   background: transparent;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .day-column-today {
@@ -1004,22 +1006,20 @@ const viewMoreTutors = () => router.push({ name: 'tutors' })
   gap: 0.45rem;
   padding: 0.5rem;
   min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: visible;
   min-width: 0;
   background: color-mix(in srgb, var(--sb-bg) 76%, var(--sb-card-bg));
-  scrollbar-gutter: stable;
-  contain: paint;
 }
 
 .weekly-session-card {
   position: relative;
   display: flex;
   flex-direction: column;
+  justify-content: center;
   width: 100%;
-  height: 128px;
-  min-height: 128px;
-  max-height: 128px;
+  height: 58px;
+  min-height: 58px;
+  max-height: 58px;
   border: 1px solid transparent;
   border-radius: 14px;
   padding: 0.56rem;
@@ -1027,11 +1027,12 @@ const viewMoreTutors = () => router.push({ name: 'tutors' })
   transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
   box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05);
   min-width: 0;
-  overflow: hidden;
+  overflow: visible;
   cursor: pointer;
 }
 
 .weekly-session-card:hover {
+  z-index: 10;
   box-shadow: 0 0 0 1px rgba(0, 137, 90, 0.18),
               0 3px 8px rgba(15, 23, 42, 0.05);
 }
@@ -1042,42 +1043,144 @@ const viewMoreTutors = () => router.push({ name: 'tutors' })
 }
 
 .weekly-session-card-dismissible .weekly-session-time {
-  padding-right: 1.45rem;
+  padding-right: 0;
 }
 
-.weekly-session-dismiss-btn {
+.weekly-session-popout {
   position: absolute;
-  top: 0.42rem;
-  right: 0.42rem;
-  z-index: 2;
+  left: 50%;
+  top: calc(100% + 0.45rem);
+  z-index: 20;
+  width: min(240px, calc(100vw - 40px));
+  border: 1px solid var(--sb-card-border);
+  border-radius: 14px;
+  background: var(--sb-card-bg);
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.16);
+  padding: 0.75rem;
+  opacity: 0;
+  visibility: hidden;
+  transform: translate(-50%, -4px) scale(0.98);
+  transition:
+    opacity 0.18s ease 0.2s,
+    transform 0.18s ease 0.2s,
+    visibility 0s linear 0.38s;
+}
+
+.weekly-session-card:hover .weekly-session-popout,
+.weekly-session-card:focus-within .weekly-session-popout,
+.weekly-session-card:focus-visible .weekly-session-popout {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(-50%, 0) scale(1);
+  transition-delay: 0s;
+}
+
+.weekly-session-popout::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -7px;
+  width: 12px;
+  height: 12px;
+  border-left: 1px solid var(--sb-card-border);
+  border-top: 1px solid var(--sb-card-border);
+  background: var(--sb-card-bg);
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.day-column:nth-child(n + 6) .weekly-session-popout {
+  right: 0;
+  left: auto;
+  transform: translateY(-4px) scale(0.98);
+}
+
+.day-column:nth-child(n + 6) .weekly-session-card:hover .weekly-session-popout,
+.day-column:nth-child(n + 6) .weekly-session-card:focus-within .weekly-session-popout,
+.day-column:nth-child(n + 6) .weekly-session-card:focus-visible .weekly-session-popout {
+  transform: translateY(0) scale(1);
+}
+
+.day-column:nth-child(n + 6) .weekly-session-popout::before {
+  right: 1rem;
+  left: auto;
+  transform: rotate(45deg);
+}
+
+.weekly-session-popout-time {
+  margin: 0 0 0.25rem;
+  color: #006c49;
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.weekly-session-detail-grid {
+  display: grid;
+  gap: 0.38rem;
+}
+
+.weekly-session-detail-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.65rem;
+  min-width: 0;
+  color: var(--sb-muted);
+  font-size: 0.68rem;
+  line-height: 1.25;
+}
+
+.weekly-session-detail-row strong {
+  flex: 0 0 auto;
+  color: var(--sb-ink);
+  font-size: 0.6rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.weekly-session-detail-row span {
+  min-width: 0;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.weekly-session-popout .weekly-session-dismiss-btn {
+  position: static;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.35rem;
-  height: 1.35rem;
-  border: 1px solid color-mix(in srgb, var(--sb-card-border) 80%, #dc2626);
+  gap: 0.35rem;
+  width: 100%;
+  min-height: 30px;
+  margin-top: 0.65rem;
+  border: 1px solid #dc2626;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--sb-card-bg) 90%, transparent);
+  background: transparent;
   color: #b91c1c;
-  padding: 0;
+  padding: 0.3rem 0.55rem;
   font-size: 0.68rem;
+  font-weight: 850;
   line-height: 1;
-  opacity: 0;
-  transform: translateY(-2px);
   transition: opacity 0.15s ease, transform 0.15s ease, background-color 0.15s ease;
 }
 
-.weekly-session-card:hover .weekly-session-dismiss-btn,
-.weekly-session-card:focus-within .weekly-session-dismiss-btn {
-  opacity: 1;
-  transform: translateY(0);
+.weekly-session-popout .weekly-session-status {
+  flex: 0 0 auto;
+  max-width: 100%;
+  margin-top: 0.5rem;
+  padding: 0.16rem 0.5rem;
+  font-size: 0.6rem;
 }
 
 .weekly-session-dismiss-btn:hover,
 .weekly-session-dismiss-btn:focus-visible {
   background: #fee2e2;
   color: #991b1b;
-  opacity: 1;
 }
 
 .weekly-session-card-upcoming {
@@ -1324,6 +1427,29 @@ const viewMoreTutors = () => router.push({ name: 'tutors' })
   border-color: rgba(248, 113, 113, 0.35);
   background: rgba(15, 23, 42, 0.72);
   color: #fecaca;
+}
+
+:global([data-sb-theme="dark"]) .weekly-session-popout {
+  background: #0b241c;
+  border-color: #1d4537;
+  box-shadow: 0 20px 54px rgba(2, 18, 13, 0.34);
+}
+
+:global([data-sb-theme="dark"]) .weekly-session-popout::before {
+  background: #0b241c;
+  border-color: #1d4537;
+}
+
+:global([data-sb-theme="dark"]) .weekly-session-popout-time {
+  color: #8ee4bf;
+}
+
+:global([data-sb-theme="dark"]) .weekly-session-detail-row {
+  color: #a8bbb3;
+}
+
+:global([data-sb-theme="dark"]) .weekly-session-detail-row strong {
+  color: #f3f7f5;
 }
 
 :global([data-sb-theme="dark"]) .weekly-session-dismiss-btn:hover,

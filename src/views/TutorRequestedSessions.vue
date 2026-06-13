@@ -130,43 +130,45 @@
         </div>
     </div>
 
-    <div ref="locationModalRef" class="modal fade" id="locationModal" tabindex="-1">
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content rounded-4">
-          
-          <div class="modal-header border-0 pb-0">
-            <h5 class="modal-title fw-bold">Edit Location</h5>
-            <button type="button" class="btn-close" @click="closeLocationModal" aria-label="Close"></button>
+    <Teleport to="body">
+      <div ref="locationModalRef" class="modal fade" id="locationModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content rounded-4">
+            
+            <div class="modal-header border-0 pb-0">
+              <h5 class="modal-title fw-bold">Edit Location</h5>
+              <button type="button" class="btn-close" @click="closeLocationModal" aria-label="Close"></button>
+            </div>
+            
+            <div class="modal-body text-muted">
+              <p class="mb-3">
+                Set location for session with <span class="fw-semibold text-dark">{{ activeSession?.tuteeName }}</span>
+              </p>
+              <input
+                type="text"
+                class="form-control shadow-none"
+                v-model="tempLocation"
+                @keyup.enter="saveLocation"
+                @keyup.esc="closeLocationModal"
+                placeholder="Enter location (e.g. Library, Cafe)"
+              />
+            </div>
+            
+            <div class="modal-footer border-0 pt-0">
+              <button type="button" class="btn btn-light sb-btn" @click="closeLocationModal">Cancel</button>
+              <button type="button" class="btn bg-sb-primary text-white sb-btn" @click="saveLocation">Save Location</button>
+            </div>
+            
           </div>
-          
-          <div class="modal-body text-muted">
-            <p class="mb-3">
-              Set location for session with <span class="fw-semibold text-dark">{{ activeSession?.tuteeName }}</span>
-            </p>
-            <input
-              type="text"
-              class="form-control shadow-none"
-              v-model="tempLocation"
-              @keyup.enter="saveLocation"
-              @keyup.esc="closeLocationModal"
-              placeholder="Enter location (e.g. Library, Cafe)"
-            />
-          </div>
-          
-          <div class="modal-footer border-0 pt-0">
-            <button type="button" class="btn btn-light sb-btn" @click="closeLocationModal">Cancel</button>
-            <button type="button" class="btn bg-sb-primary text-white sb-btn" @click="saveLocation">Save Location</button>
-          </div>
-          
         </div>
       </div>
-    </div>
+    </Teleport>
 
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onBeforeUnmount, onMounted } from 'vue'
 import { useSessionsStore } from '@/stores/completedSessions'
 import api from '@/services/api/api'
 import * as bootstrap from 'bootstrap'
@@ -185,10 +187,26 @@ const locationModalRef = ref(null)
 const activeSession = ref(null)
 const tempLocation = ref('')
 
+const resetLocationModal = () => {
+  activeSession.value = null
+  tempLocation.value = ''
+}
+
 onMounted(async () => {
   await sessionStore.fetchSessions()
   highlightedRequestIds.value = [...sessionStore.unseenPendingRequestIds]
   sessionStore.markPendingRequestsSeen()
+
+  locationModalRef.value?.addEventListener('hidden.bs.modal', resetLocationModal)
+})
+
+onBeforeUnmount(() => {
+  if (locationModalRef.value) {
+    const modalInstance = bootstrap.Modal.getInstance(locationModalRef.value)
+    modalInstance?.hide()
+    modalInstance?.dispose()
+    locationModalRef.value.removeEventListener('hidden.bs.modal', resetLocationModal)
+  }
 })
 
 const openLocationModal = (session) => {
@@ -206,9 +224,6 @@ const closeLocationModal = () => {
     const modalInstance = bootstrap.Modal.getInstance(locationModalRef.value)
     modalInstance?.hide()
   }
-  
-  activeSession.value = null
-  tempLocation.value = ''
 }
 
 const saveLocation = async () => {
