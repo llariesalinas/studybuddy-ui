@@ -258,32 +258,17 @@
       :context-id="supportContextId"
       @close="isSupportModalOpen = false"
     />
-    <VenueConfirmModal
-      :open="isVenueConfirmModalOpen"
-      :location="sessionDetail?.session?.preferred_location"
-      :submitting="isSubmittingCheckIn"
-      @close="dismissVenuePrompt"
-      @confirm="handleVenueConfirmation"
-    />
-    <SessionCheckInModal
-      :open="isMidpointCheckInModalOpen"
-      :submitting="isSubmittingCheckIn"
-      @close="dismissMidpointPrompt"
-      @confirm="handleMidpointCheckIn"
-    />
   </div>
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useSessionsStore } from '@/stores/completedSessions'
 import { useNotificationsStore } from '@/stores/notifications'
 import { useToastStore } from '@/stores/toast'
 import RatingStackModal from '@/components/RatingStackModal.vue'
 import SupportModal from '@/components/SupportModal.vue'
-import SessionCheckInModal from '@/components/SessionCheckInModal.vue'
-import VenueConfirmModal from '@/components/VenueConfirmModal.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -301,13 +286,6 @@ const cancelReason = ref('')
 const paymentSyncing = ref(false)
 const paymentReturnMessage = ref('')
 const paymentReturnState = ref('info')
-const isVenueConfirmModalOpen = ref(false)
-const isMidpointCheckInModalOpen = ref(false)
-const isSubmittingCheckIn = ref(false)
-const venuePromptDismissed = ref(false)
-const midpointPromptDismissed = ref(false)
-const currentTime = ref(new Date())
-let checkInClock = null
 
 const isSupportModalOpen = ref(false)
 const supportContextType = ref('Booking')
@@ -325,12 +303,6 @@ const isAwaitingPaymentVerification = computed(() => normalizedStatus.value === 
 const isCompleted = computed(() => normalizedStatus.value === 'completed')
 const isUpcoming = computed(() => normalizedStatus.value === 'upcoming')
 const isPending = computed(() => normalizedStatus.value === 'pending')
-const isRawConfirmed = computed(() =>
-  String(sessionDetail.value?.session?.raw_status || '').toLowerCase() === 'confirmed',
-)
-const isFaceToFaceSession = computed(() => sessionDetail.value?.session?.session_mode === 'F2F')
-const venueCheckIn = computed(() => sessionDetail.value?.check_ins?.venue_confirm || null)
-const midpointCheckIn = computed(() => sessionDetail.value?.check_ins?.midpoint_checkin || null)
 const reasonValid = computed(() => cancelReason.value.trim().length >= 5)
 const tomorrowKey = computed(() => {
   const d = new Date()
@@ -389,56 +361,6 @@ const formattedTimeRange = computed(() => {
 
   return `${formatTime(start)} - ${formatTime(end)}`
 })
-
-const parseSessionDateTime = (timeValue) => {
-  const dateValue = sessionDetail.value?.session?.date
-
-  if (!dateValue || !timeValue) {
-    return null
-  }
-
-  const normalizedTime = String(timeValue).length === 5 ? `${timeValue}:00` : timeValue
-  const parsed = new Date(`${dateValue}T${normalizedTime}`)
-
-  return Number.isNaN(parsed.getTime()) ? null : parsed
-}
-
-const sessionStartAt = computed(() => parseSessionDateTime(sessionDetail.value?.session?.start_time))
-const sessionEndAt = computed(() => parseSessionDateTime(sessionDetail.value?.session?.end_time))
-const sessionMidpointAt = computed(() => {
-  if (!sessionStartAt.value || !sessionEndAt.value) {
-    return null
-  }
-
-  return new Date((sessionStartAt.value.getTime() + sessionEndAt.value.getTime()) / 2)
-})
-
-const isWithinSessionWindow = computed(() => {
-  if (!sessionStartAt.value || !sessionEndAt.value) {
-    return false
-  }
-
-  const now = currentTime.value.getTime()
-  return now >= sessionStartAt.value.getTime() && now < sessionEndAt.value.getTime()
-})
-
-const shouldPromptVenueConfirmation = computed(() => (
-  isRawConfirmed.value
-  && isFaceToFaceSession.value
-  && isWithinSessionWindow.value
-  && !venueCheckIn.value
-  && !venuePromptDismissed.value
-))
-
-const shouldPromptMidpointCheckIn = computed(() => (
-  isRawConfirmed.value
-  && isWithinSessionWindow.value
-  && sessionMidpointAt.value
-  && currentTime.value.getTime() >= sessionMidpointAt.value.getTime()
-  && !midpointCheckIn.value
-  && !midpointPromptDismissed.value
-  && !isVenueConfirmModalOpen.value
-))
 
 const statusClass = computed(() => {
   switch (normalizedStatus.value) {
@@ -547,105 +469,10 @@ const handleRated = async () => {
   }
 }
 
-const dismissVenuePrompt = () => {
-  if (isSubmittingCheckIn.value) {
-    return
-  }
-
-  venuePromptDismissed.value = true
-  isVenueConfirmModalOpen.value = false
-}
-
-const dismissMidpointPrompt = () => {
-  if (isSubmittingCheckIn.value) {
-    return
-  }
-
-  midpointPromptDismissed.value = true
-  isMidpointCheckInModalOpen.value = false
-}
-
-const handleVenueConfirmation = async (response) => {
-  if (isSubmittingCheckIn.value) {
-    return
-  }
-
-  isSubmittingCheckIn.value = true
-
-  try {
-    sessionDetail.value = await sessionsStore.confirmVenue(route.params.id, response)
-    venuePromptDismissed.value = true
-    isVenueConfirmModalOpen.value = false
-
-    if (response === 'no') {
-      toastStore.push('Venue response saved. You can report a session issue if you need help.', 'warning')
-      openSupport('Booking', sessionDetail.value?.id || route.params.id)
-    } else {
-      toastStore.push('Venue confirmation saved.')
-    }
-  } catch (error) {
-    toastStore.push(error.response?.data?.error || 'Failed to save venue confirmation.', 'error')
-  } finally {
-    isSubmittingCheckIn.value = false
-  }
-}
-
-const handleMidpointCheckIn = async (response) => {
-  if (isSubmittingCheckIn.value) {
-    return
-  }
-
-  isSubmittingCheckIn.value = true
-
-  try {
-    sessionDetail.value = await sessionsStore.submitMidpointCheckIn(route.params.id, response)
-    midpointPromptDismissed.value = true
-    isMidpointCheckInModalOpen.value = false
-
-    if (response === 'issues') {
-      toastStore.push('Check-in saved. Opening support so you can tell us what happened.', 'warning')
-      openSupport('Booking', sessionDetail.value?.id || route.params.id)
-    } else {
-      toastStore.push('Thanks, your check-in was saved.')
-    }
-  } catch (error) {
-    toastStore.push(error.response?.data?.error || 'Failed to save session check-in.', 'error')
-  } finally {
-    isSubmittingCheckIn.value = false
-  }
-}
-
-watch(
-  shouldPromptVenueConfirmation,
-  (shouldOpen) => {
-    if (shouldOpen && !isMidpointCheckInModalOpen.value) {
-      isVenueConfirmModalOpen.value = true
-    }
-  },
-)
-
-watch(
-  shouldPromptMidpointCheckIn,
-  (shouldOpen) => {
-    if (shouldOpen) {
-      isMidpointCheckInModalOpen.value = true
-    }
-  },
-)
 
 onMounted(async () => {
   await loadSession()
   await syncReturnedOnlinePayment()
-  currentTime.value = new Date()
-  checkInClock = window.setInterval(() => {
-    currentTime.value = new Date()
-  }, 30_000)
-})
-
-onBeforeUnmount(() => {
-  if (checkInClock) {
-    window.clearInterval(checkInClock)
-  }
 })
 </script>
 
