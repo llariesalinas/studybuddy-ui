@@ -3120,10 +3120,41 @@ def get_recommendation_candidate_tutors(
     session_date = parse_request_date(requested_date)
     required_slots = get_recommendation_time_slots(start_time, end_time)
 
+    # Tutors with a known conflict for this date (an existing booking, a full-day
+    # override, or a slot override) must be excluded from every stage below — a
+    # booked/unavailable tutor should never surface, even in the broad fallbacks.
+    excluded_tutor_ids = set()
+    if session_date:
+        weekday = WEEKDAY_MAP[session_date.weekday()]
+
+        if required_slots:
+            excluded_tutor_ids.update(
+                Booking.objects.filter(
+                    session_date=session_date,
+                    status__in=RECOMMENDATION_BLOCKING_STATUSES,
+                    availability__time_slot__in=required_slots,
+                ).values_list('tutor_id', flat=True)
+            )
+            excluded_tutor_ids.update(
+                TutorAvailabilityOverride.objects.filter(
+                    override_date=session_date,
+                    is_full_day=False,
+                    availability__day=weekday,
+                    availability__time_slot__in=required_slots,
+                ).values_list('tutor_id', flat=True)
+            )
+
+        excluded_tutor_ids.update(
+            TutorAvailabilityOverride.objects.filter(
+                override_date=session_date,
+                is_full_day=True,
+            ).values_list('tutor_id', flat=True)
+        )
+
     # Stage 1: Exact Match (Date + All Time Slots)
     if session_date and required_slots:
         weekday = WEEKDAY_MAP[session_date.weekday()]
-        
+
         stage1_candidates = base_candidates.filter(
             tutoravailability__day=weekday,
             tutoravailability__time_slot__in=required_slots,
@@ -3140,32 +3171,8 @@ def get_recommendation_candidate_tutors(
             )
         ).filter(
             matching_available_slots=len(required_slots)
-        )
-
-        conflicting_tutor_ids = Booking.objects.filter(
-            session_date=session_date,
-            status__in=RECOMMENDATION_BLOCKING_STATUSES,
-            availability__time_slot__in=required_slots,
-        ).values_list('tutor_id', flat=True)
-
-        full_day_override_tutor_ids = TutorAvailabilityOverride.objects.filter(
-            override_date=session_date,
-            is_full_day=True,
-        ).values_list("tutor_id", flat=True)
-
-        slot_override_tutor_ids = TutorAvailabilityOverride.objects.filter(
-            override_date=session_date,
-            is_full_day=False,
-            availability__day=weekday,
-            availability__time_slot__in=required_slots,
-        ).values_list("tutor_id", flat=True)
-
-        stage1_candidates = stage1_candidates.exclude(
-            id__in=conflicting_tutor_ids
         ).exclude(
-            id__in=full_day_override_tutor_ids
-        ).exclude(
-            id__in=slot_override_tutor_ids
+            profile_id__in=excluded_tutor_ids
         )
 
         if stage1_candidates.exists():
@@ -3177,13 +3184,17 @@ def get_recommendation_candidate_tutors(
         stage2_candidates = base_candidates.filter(
             tutoravailability__day=weekday,
             tutoravailability__is_active=True,
+        ).exclude(
+            profile_id__in=excluded_tutor_ids
         ).distinct()
-        
+
         if stage2_candidates.exists():
             return stage2_candidates
 
     # Stage 3: Broad Fallback (Subject only, ignore date/time)
-    return base_candidates.distinct()
+    return base_candidates.exclude(
+        profile_id__in=excluded_tutor_ids
+    ).distinct()
 
 
 @api_view(['POST'])
