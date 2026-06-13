@@ -2,7 +2,7 @@
 title: Landing page redesign — Studio Motion
 date: 2026-06-11
 status: Done
-spec: ../superpowers/specs/2026-06-11-landing-page-redesign-design.md
+spec: ../specs/2026-06-11-landing-page-redesign-design.md
 ---
 
 # Landing page redesign — Studio Motion

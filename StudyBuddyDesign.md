@@ -5,14 +5,14 @@ description: >
   Current StudyBuddy product design language: quiet foregrounds, StudyBuddy-green
   feedback, aurora glass depth, tactile haptics, and truthful academic data.
 sources:
-  - docs/superpowers/specs/2026-05-08-landing-redesign-design.md
-  - docs/superpowers/specs/2026-05-22-feel-haptics-design.md
-  - docs/superpowers/specs/2026-05-25-animation-system-design.md
-  - docs/superpowers/specs/2026-05-25-tutee-profile-redesign.md
-  - docs/superpowers/plans/2026-05-08-auth-pages-redesign.md
-  - docs/superpowers/plans/2026-05-23-chat-message-redesign.md
-  - docs/superpowers/plans/2026-05-23-sidebar-notification-badge.md
-  - docs/superpowers/plans/2026-05-25-haptics-rollout.md
+  - docs/specs/2026-05-08-landing-redesign-design.md
+  - docs/specs/2026-05-22-feel-haptics-design.md
+  - docs/specs/2026-05-25-animation-system-design.md
+  - docs/specs/2026-05-25-tutee-profile-redesign.md
+  - docs/plans/2026-05-08-auth-pages-redesign.md
+  - docs/plans/2026-05-23-chat-message-redesign.md
+  - docs/plans/2026-05-23-sidebar-notification-badge.md
+  - docs/plans/2026-05-25-haptics-rollout.md
   - docs/plans/2026-06-07-aurora-hue-restoration.md
   - docs/session-summaries/2026-06-07-aurora-hue-restoration-summary.md
 colors:

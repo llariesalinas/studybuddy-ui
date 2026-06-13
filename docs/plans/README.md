@@ -5,6 +5,7 @@ Status moves Draft → Approved → In Progress → Done. When a plan is complet
 
 | Date | Plan | Status | Summary |
 |------|------|--------|---------|
+| 2026-06-14 | [Chat accept/reject pending sessions](../plans/2026-06-14-chat-accept-reject.md) | Approved | Pending |
 | 2026-06-11 | [Landing page redesign — Studio Motion](2026-06-11-landing-page-redesign.md) | Done | [Summary](../session-summaries/2026-06-11-landing-page-redesign-summary.md) |
 | 2026-06-08 | [Online-only payments + proof of payment](2026-06-08-online-only-payments.md) | Done | [Summary](../session-summaries/2026-06-11-online-only-payments-summary.md) |
 | 2026-06-11 | [PayMongo proof-of-payment validation](2026-06-11-paymongo-proof-of-payment-validation.md) | Draft | Pending |
@@ -20,5 +21,5 @@ Status moves Draft → Approved → In Progress → Done. When a plan is complet
 | 2026-06-07 | [Aurora performance fix — static gradient](2026-06-07-aurora-performance-fix.md) | Done | [Summary](../session-summaries/2026-06-07-aurora-performance-fix-summary.md) |
 | 2026-06-07 | [Aurora hue restoration (performant)](2026-06-07-aurora-hue-restoration.md) | Done | [Summary](../session-summaries/2026-06-07-aurora-hue-restoration-summary.md) |
 | 2026-06-06 | [Frontend and chat caching](2026-06-06-frontend-chat-caching.md) | Approved | Pending |
-| 2026-06-06 | [Resend email integration](../superpowers/plans/2026-06-06-resend-email-integration.md) | Done | [Summary](../session-summaries/2026-06-06-resend-email-integration-summary.md) |
-| 2026-06-06 | [Email system hardening (async queue + resilience)](../superpowers/plans/2026-06-06-email-async-hardening.md) | Done | [Summary](../session-summaries/2026-06-06-email-async-hardening-summary.md) |
+| 2026-06-06 | [Resend email integration](../plans/2026-06-06-resend-email-integration.md) | Done | [Summary](../session-summaries/2026-06-06-resend-email-integration-summary.md) |
+| 2026-06-06 | [Email system hardening (async queue + resilience)](../plans/2026-06-06-email-async-hardening.md) | Done | [Summary](../session-summaries/2026-06-06-email-async-hardening-summary.md) |
