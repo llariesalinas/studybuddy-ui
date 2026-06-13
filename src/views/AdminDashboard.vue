@@ -141,16 +141,6 @@
         <div class="card border-0 sb-card-surface shadow-sm rounded-4 p-4 mb-4">
           <h5 class="fw-bold sb-text mb-4">Quick Actions</h5>
           <div class="d-grid gap-3">
-            <router-link to="/admin/institutions" class="btn action-surface border-0 text-start rounded-3 p-3 shadow-none position-relative sb-btn">
-              <div class="d-flex align-items-center">
-                <i class="bi bi-building fs-4 me-3 text-primary"></i>
-                <div>
-                  <p class="fw-bold mb-0">Manage Institutions</p>
-                  <p class="small sb-muted mb-0">Toggle partner status and domains</p>
-                </div>
-              </div>
-            </router-link>
-
             <router-link to="/admin/withdrawals" class="btn action-surface border-0 text-start rounded-3 p-3 shadow-none position-relative sb-btn">
               <div class="d-flex align-items-center">
                 <i class="bi bi-cash-stack fs-4 me-3 text-success"></i>

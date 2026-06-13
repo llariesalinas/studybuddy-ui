@@ -9,8 +9,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "lint": "run-s lint:*",
-    "lint:oxlint": "oxlint . --fix",
-    "lint:eslint": "eslint . --fix --cache",
+    "lint:oxlint": "oxlint src/ --fix",
+    "lint:eslint": "eslint src/ --fix --cache",
     "format": "prettier --write --experimental-cli src/"
   },
   "dependencies": {

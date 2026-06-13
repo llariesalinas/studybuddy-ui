@@ -904,6 +904,7 @@ function setAccordionClosed(element) {
 }
 
 function openAccordionPanel(element) {
+   
   void element.offsetHeight
   element.style.maxHeight = `${element.scrollHeight}px`
   element.style.opacity = '1'
@@ -920,6 +921,7 @@ function setAccordionOpen(element) {
 }
 
 function closeAccordionPanel(element) {
+   
   void element.offsetHeight
   element.style.maxHeight = '0'
   element.style.opacity = '0'
@@ -1165,6 +1167,7 @@ onMounted(() => {
   border: 1px solid color-mix(in srgb, var(--sb-card-border) 82%, transparent);
   border-radius: 24px;
   box-shadow: 0 24px 70px rgba(15, 23, 42, 0.1);
+  backdrop-filter: blur(8px);
   padding: 1.5rem;
 }
 
@@ -1933,6 +1936,7 @@ onMounted(() => {
   border-radius: 22px;
   background: rgba(255, 255, 255, 0.96);
   box-shadow: 0 28px 90px rgba(15, 23, 42, 0.26);
+  backdrop-filter: blur(8px);
   padding: 1.5rem;
 }
 

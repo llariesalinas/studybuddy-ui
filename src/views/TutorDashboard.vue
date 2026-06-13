@@ -197,8 +197,10 @@ const loadTutorDashboard = async () => {
   errorMessage.value = ''
 
   try {
-    await sessionsStore.fetchSessions()
-    const response = await api.get('tutor-dashboard/')
+    const [_, response] = await Promise.all([
+      sessionsStore.fetchSessions(),
+      api.get('tutor-dashboard/'),
+    ])
 
     totalSessions.value = response.data.total_sessions
     avgRating.value = response.data.rating_average
@@ -333,8 +335,8 @@ watch(
 
 <style scoped>
 .tutor-dashboard {
-  --dashboard-glass: color-mix(in srgb, var(--sb-card-bg) 76%, transparent);
-  --dashboard-glass-strong: color-mix(in srgb, var(--sb-card-bg) 88%, transparent);
+  --dashboard-glass: color-mix(in srgb, var(--sb-card-bg) 85%, transparent);
+  --dashboard-glass-strong: color-mix(in srgb, var(--sb-card-bg) 92%, transparent);
   --dashboard-border: color-mix(in srgb, var(--sb-card-border) 82%, transparent);
   --dashboard-muted: var(--sb-text-muted);
   --dashboard-ink: var(--sb-text-main);
@@ -354,6 +356,7 @@ watch(
   background:
     radial-gradient(circle at 30% 35%, color-mix(in srgb, var(--sb-primary) 14%, transparent), transparent 58%),
     radial-gradient(circle at 72% 48%, rgba(56, 189, 248, 0.1), transparent 56%);
+  filter: blur(40px);
   opacity: 0.55;
   pointer-events: none;
 }
@@ -367,11 +370,18 @@ watch(
 }
 
 .metric-card,
-.bookings-panel,
 .booking-card {
   border: 1px solid var(--dashboard-border);
   background: var(--dashboard-glass-strong);
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.04);
+}
+
+.bookings-panel {
+  border: 1px solid var(--dashboard-border);
+  background: var(--dashboard-glass);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.08);
 }
 
 .metric-card {

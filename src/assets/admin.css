@@ -24,10 +24,10 @@
   --sb-outline: #6e7a71;
   --sb-outline-variant: #bdcabf;
 
-  /* Surface Glass */
-  --sb-glass-light: rgba(255, 255, 255, 0.64);
-  --sb-glass-light-strong: rgba(255, 255, 255, 0.86);
-  --sb-glass-dark: rgba(15, 23, 42, 0.7);
+  /* Glass and Surfaces */
+  --sb-glass-light: #ffffff;
+  --sb-glass-light-strong: #ffffff;
+  --sb-glass-dark: rgba(15, 23, 42, 0.9);
 
   /* Motion */
   --sb-spring: cubic-bezier(0.16, 1, 0.3, 1);
@@ -50,7 +50,7 @@
 /* Glassmorphism Cards */
 .sb-glass-card {
   background: var(--sb-glass-light);
-  border: 1px solid rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--sb-outline-variant);
   border-radius: 24px;
   box-shadow: 0 18px 60px rgba(15, 23, 42, 0.08);
   padding: 1.5rem;
