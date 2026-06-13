@@ -114,7 +114,12 @@
                       @keydown.space.prevent="goToDetails(session.id)"
                     >
                       <p class="weekly-session-time">{{ formatSessionTime(session) }}</p>
+                      <h4 class="weekly-session-subject">{{ session.subject }}</h4>
                       <p class="weekly-session-tutor">{{ session.tutor }}</p>
+                      <span
+                        class="weekly-session-status weekly-session-status-face"
+                        :title="session.status"
+                      >{{ session.status }}</span>
 
                       <div class="weekly-session-popout">
                         <p class="weekly-session-popout-time">{{ formatSessionTime(session) }}</p>
@@ -1015,11 +1020,11 @@ const viewMoreTutors = () => router.push({ name: 'tutors' })
   position: relative;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   width: 100%;
-  height: 58px;
-  min-height: 58px;
-  max-height: 58px;
+  height: 104px;
+  min-height: 104px;
+  max-height: 104px;
   border: 1px solid transparent;
   border-radius: 14px;
   padding: 0.56rem;
@@ -1308,6 +1313,19 @@ const viewMoreTutors = () => router.push({ name: 'tutors' })
   text-overflow: ellipsis;
 }
 
+.weekly-session-subject {
+  margin: 0 0 0.18rem;
+  font-size: 0.66rem;
+  font-weight: 800;
+  line-height: 1.2;
+  color: var(--sb-ink);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  word-break: break-word;
+}
+
 .weekly-session-tutor {
   margin: 0 0 0.36rem;
   font-size: 0.62rem;
@@ -1315,6 +1333,13 @@ const viewMoreTutors = () => router.push({ name: 'tutors' })
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.weekly-session-status-face {
+  margin-top: auto;
+  max-width: 100%;
+  align-self: flex-start;
+  flex: 0 0 auto;
 }
 
 .weekly-session-meta {
