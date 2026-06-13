@@ -5,6 +5,7 @@ Status moves Draft → Approved → In Progress → Done. When a plan is complet
 
 | Date | Plan | Status | Summary |
 |------|------|--------|---------|
+| 2026-06-14 | [Ongoing-booking live status surface](2026-06-14-ongoing-booking-live-status.md) | In Progress | [Spec](../specs/2026-06-14-ongoing-booking-live-status-design.md) |
 | 2026-06-14 | [Chat accept/reject pending sessions](2026-06-14-chat-accept-reject.md) | Approved | Pending |
 | 2026-06-11 | [Landing page redesign — Studio Motion](2026-06-11-landing-page-redesign.md) | Done | [Summary](../session-summaries/2026-06-11-landing-page-redesign-summary.md) |
 | 2026-06-08 | [Online-only payments + proof of payment](2026-06-08-online-only-payments.md) | Done | [Summary](../session-summaries/2026-06-11-online-only-payments-summary.md) |

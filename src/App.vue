@@ -356,16 +356,41 @@
     </main>
   </div>
 
+  <template v-if="authStore.isAuthenticated && !isPublicRoute">
+    <OngoingBookingBar />
+
+    <template v-if="userRole === 'tutee'">
+      <VenueConfirmModal
+        :open="isVenueModalOpen"
+        :location="activeSession.preferredLocation"
+        :submitting="isSubmittingCheckIn"
+        @close="dismissCheckIn('venue')"
+        @confirm="handleVenueConfirmation"
+      />
+      <SessionCheckInModal
+        :open="isMidpointModalOpen"
+        :submitting="isSubmittingCheckIn"
+        @close="dismissCheckIn('midpoint')"
+        @confirm="handleMidpointCheckIn"
+      />
+    </template>
+  </template>
+
   <SbToast />
 </template>
 
 <script setup>
-import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth' // Import auth store
 import { useSessionsStore } from '@/stores/completedSessions'
+import { useActiveSessionStore } from '@/stores/activeSession'
+import { useToastStore } from '@/stores/toast'
 import NotificationBell from '@/components/NotificationBell.vue'
 import RatingReminderBanner from '@/components/RatingReminderBanner.vue'
+import OngoingBookingBar from '@/components/OngoingBookingBar.vue'
+import VenueConfirmModal from '@/components/VenueConfirmModal.vue'
+import SessionCheckInModal from '@/components/SessionCheckInModal.vue'
 import { useChatStore } from '@/stores/chat'
 import router from './router'
 import { SESSION_POLL_INTERVAL_MS } from './config.js'
@@ -377,8 +402,86 @@ const route = useRoute()
 const authStore = useAuthStore()
 const chatStore = useChatStore()
 const sessionStore = useSessionsStore()
+const activeSession = useActiveSessionStore()
+const toastStore = useToastStore()
 const logoutModalRef = ref(null)
 const showLogoutModal = ref(false)
+
+const isVenueModalOpen = ref(false)
+const isMidpointModalOpen = ref(false)
+const isSubmittingCheckIn = ref(false)
+
+watch(
+  () => activeSession.dueCheckIn,
+  (due) => {
+    isVenueModalOpen.value = due === 'venue'
+    isMidpointModalOpen.value = due === 'midpoint'
+  },
+)
+
+const dismissCheckIn = (event) => {
+  if (isSubmittingCheckIn.value) {
+    return
+  }
+
+  activeSession.dismiss(event)
+
+  if (event === 'venue') {
+    isVenueModalOpen.value = false
+  } else {
+    isMidpointModalOpen.value = false
+  }
+}
+
+const handleVenueConfirmation = async (response) => {
+  if (isSubmittingCheckIn.value) {
+    return
+  }
+
+  isSubmittingCheckIn.value = true
+
+  try {
+    const bookingId = activeSession.activeBooking?.id
+    await activeSession.confirmVenue(response)
+    isVenueModalOpen.value = false
+
+    if (response === 'no') {
+      toastStore.push('Venue response saved. You can report a session issue if you need help.', 'warning')
+      openSupport('Booking', bookingId)
+    } else {
+      toastStore.push('Venue confirmation saved.')
+    }
+  } catch (error) {
+    toastStore.push(error.response?.data?.error || 'Failed to save venue confirmation.', 'error')
+  } finally {
+    isSubmittingCheckIn.value = false
+  }
+}
+
+const handleMidpointCheckIn = async (response) => {
+  if (isSubmittingCheckIn.value) {
+    return
+  }
+
+  isSubmittingCheckIn.value = true
+
+  try {
+    const bookingId = activeSession.activeBooking?.id
+    await activeSession.submitMidpointCheckIn(response)
+    isMidpointModalOpen.value = false
+
+    if (response === 'issues') {
+      toastStore.push('Check-in saved. Opening support so you can tell us what happened.', 'warning')
+      openSupport('Booking', bookingId)
+    } else {
+      toastStore.push('Thanks, your check-in was saved.')
+    }
+  } catch (error) {
+    toastStore.push(error.response?.data?.error || 'Failed to save session check-in.', 'error')
+  } finally {
+    isSubmittingCheckIn.value = false
+  }
+}
 
 const isSupportModalOpen = ref(false)
 const supportContextType = ref('Other')
@@ -441,6 +544,7 @@ const logout = async () => {
   closeLogoutModal()
   await nextTick()
   chatStore.disconnectAll()
+  activeSession.stopPolling()
   authStore.logout()
   await router.replace('/login')
   await nextTick()
@@ -486,6 +590,8 @@ onMounted(() => {
       chatStore.connectUpdates()
     })
 
+    activeSession.startPolling()
+
     if (userRole.value === 'tutor') {
       sessionStore.fetchSessions()
       document.addEventListener('visibilitychange', handleVisibilityChange)
@@ -505,6 +611,7 @@ onBeforeUnmount(() => {
     window.clearInterval(pendingSessionsRefreshId)
   }
 
+  activeSession.stopPolling()
   chatStore.disconnectAll()
 })
 </script>
