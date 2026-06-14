@@ -1,7 +1,7 @@
 ---
 title: Tutor Wallet Cash-In (Top-Up)
 date: 2026-06-14
-status: Approved
+status: Done
 spec: ../specs/2026-06-14-tutor-wallet-cash-in-design.md
 ---
 
@@ -27,17 +27,18 @@ Sessions, Vue 3 `<script setup>` + Pinia, Axios via `src/services/api/api.js`.
 
 ## Status & Progress Summary
 
-**Status:** Approved — not yet started.
+**Status:** Done — all tasks implemented, committed, and verified. Summary:
+[2026-06-14-tutor-wallet-cash-in-summary.md](../session-summaries/2026-06-14-tutor-wallet-cash-in-summary.md).
 
 | Task | Description | State |
 |------|-------------|-------|
-| 1 | `WalletTopUp` model + `cash_in` transaction type + migration | Not started |
-| 2 | `serialize_cash_in` + `initiate_cash_in` view (TDD) | Not started |
-| 3 | `verify_cash_in` view (TDD) | Not started |
-| 4 | Store actions (`initiateCashIn`/`verifyCashIn`) | Not started |
-| 5 | `CashInModal.vue` component | Not started |
-| 6 | Wire modal + redirect handling into `TutorWallet.vue` | Not started |
-| 7 | Full verification (backend tests, lint, build) | Not started |
+| 1 | `WalletTopUp` model + `cash_in` transaction type + migration | Done (commit 2f3290c) |
+| 2 | `serialize_cash_in` + `initiate_cash_in` view (TDD) | Done (commit d76fd19) |
+| 3 | `verify_cash_in` view (TDD) | Done (commit d76fd19) |
+| 4 | Store actions (`initiateCashIn`/`verifyCashIn`) | Done (frontend commit) |
+| 5 | `CashInModal.vue` component | Done (frontend commit) |
+| 6 | Wire modal + redirect handling into `TutorWallet.vue` | Done (frontend commit) |
+| 7 | Full verification (backend tests, lint, build) | Done — 111/111 backend tests pass, lint clean, build OK |
 
 ---
 
@@ -969,3 +970,11 @@ behavior and tests.
 - 2026-06-14 — Plan created from the design spec
   (`docs/specs/2026-06-14-tutor-wallet-cash-in-design.md`); code references verified against the
   current codebase; status set to Approved.
+- 2026-06-14 — Executed Tasks 1-6: added `WalletTopUp` model + `cash_in` transaction type
+  (migration 0058), `serialize_cash_in` / `initiate_cash_in` / `verify_cash_in` views + routes,
+  `TutorCashInTests` (6 tests, green via TDD), wallet store actions, `CashInModal.vue`, and wired
+  the modal + PayMongo redirect handling into `TutorWallet.vue`. Frontend lint clean and
+  `npm run build` passes. Deviation: both backend test groups (Task 2 + Task 3) were written in one
+  pass rather than strictly one task at a time. Full backend suite run in progress.
+- 2026-06-14 — Full backend suite green (111/111). Added a small consistency tweak so the idempotent
+  `verify_cash_in` early-return also includes `balance`. Status set to Done; session summary written.

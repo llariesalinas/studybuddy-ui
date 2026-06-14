@@ -5,7 +5,7 @@ Status moves Draft → Approved → In Progress → Done. When a plan is complet
 
 | Date | Plan | Status | Summary |
 |------|------|--------|---------|
-| 2026-06-14 | [Tutor wallet cash-in (top-up)](2026-06-14-tutor-wallet-cash-in.md) | Approved | [Spec](../specs/2026-06-14-tutor-wallet-cash-in-design.md) |
+| 2026-06-14 | [Tutor wallet cash-in (top-up)](2026-06-14-tutor-wallet-cash-in.md) | Done | [Summary](../session-summaries/2026-06-14-tutor-wallet-cash-in-summary.md) |
 | 2026-06-14 | [Antigravity Edge-Case Scan](2026-06-14-antigravity-edgecase-scan.md) | In Progress | [Summary](../session-summaries/2026-06-14-antigravity-edgecase-scan-summary.md) |
 | 2026-06-14 | [Ongoing-booking live status surface](2026-06-14-ongoing-booking-live-status.md) | In Progress | [Spec](../specs/2026-06-14-ongoing-booking-live-status-design.md) |
 | 2026-06-14 | [Chat accept/reject pending sessions](2026-06-14-chat-accept-reject.md) | Approved | Pending |
