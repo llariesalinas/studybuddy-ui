@@ -4571,7 +4571,10 @@ def verify_cash_in(request, topup_id):
     topup = get_object_or_404(WalletTopUp, id=topup_id, tutor=tutor)
 
     if topup.status == 'paid':
-        return Response(serialize_cash_in(topup))
+        wallet, _ = Wallet.objects.get_or_create(tutor=tutor)
+        payload = serialize_cash_in(topup)
+        payload["balance"] = float(wallet.balance)
+        return Response(payload)
 
     if not topup.provider_reference:
         return Response({"error": "No PayMongo checkout for this top-up."}, status=400)
