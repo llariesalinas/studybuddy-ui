@@ -75,6 +75,10 @@
         </div>
 
         <div class="balance-actions">
+          <button class="balance-cashout-btn sb-btn" @click="showCashinModal = true">
+            <i class="bi bi-plus-circle"></i>
+            Cash In
+          </button>
           <button class="balance-cashout-btn sb-btn" @click="showCashoutModal = true">
             <i class="bi bi-cash-coin"></i>
             Cash Out
@@ -403,17 +407,24 @@
         </div>
       </div>
     </div>
+
+    <CashInModal v-if="showCashinModal" @close="showCashinModal = false" />
   </div>
 </template>
 
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import SbSelectModal from '@/components/SbSelectModal.vue'
+import CashInModal from '@/components/CashInModal.vue'
 import { useWalletStore } from '@/stores/wallet'
 import { useToastStore } from '@/stores/toast'
 
+const route = useRoute()
+const router = useRouter()
 const toastStore = useToastStore()
 const walletStore = useWalletStore()
+const showCashinModal = ref(false)
 const showCashoutModal = ref(false)
 const showDestinationModal = ref(false)
 const isSubmitting = ref(false)
@@ -641,6 +652,7 @@ const transactionIcon = (type) => {
     cashout_fee: 'bi bi-receipt',
     cashout_fee_reversal: 'bi bi-arrow-counterclockwise',
     commission_deduction: 'bi bi-bank',
+    cash_in: 'bi bi-plus-circle',
   }
   return icons[type] || 'bi bi-wallet2'
 }
@@ -653,6 +665,7 @@ const transactionTone = (type) => {
     cashout_fee: 'tone-negative',
     cashout_fee_reversal: 'tone-warning',
     commission_deduction: 'tone-negative',
+    cash_in: 'tone-positive',
   }
   return tones[type] || 'tone-neutral'
 }
@@ -679,6 +692,23 @@ onMounted(async () => {
     refreshData(),
     walletStore.fetchReceivingInstitutions(accountForm.provider),
   ])
+
+  if (route.query.cashin === 'success' && route.query.id) {
+    try {
+      await walletStore.verifyCashIn(route.query.id)
+      toastStore.push('Wallet topped up successfully.', 'success')
+    } catch {
+      toastStore.push(
+        'We could not confirm your top-up. Refresh to check your balance.',
+        'error'
+      )
+    } finally {
+      router.replace({ query: {} })
+    }
+  } else if (route.query.cashin === 'cancelled') {
+    toastStore.push('Cash-in cancelled.', 'info')
+    router.replace({ query: {} })
+  }
 })
 
 watch(

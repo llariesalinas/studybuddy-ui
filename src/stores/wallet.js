@@ -99,6 +99,18 @@ export const useWalletStore = defineStore('wallet', () => {
     }
   }
 
+  async function initiateCashIn(amount) {
+    const { data } = await api.post('wallet/cash-in/', { amount })
+    return data // { checkout_url, id }
+  }
+
+  async function verifyCashIn(id) {
+    const { data } = await api.post(`wallet/cash-in/${id}/verify/`)
+    await fetchWallet()
+    await fetchTransactions()
+    return data
+  }
+
   async function devAddFunds(amount) {
     await api.post('dev/wallet/add/', { amount })
   }
@@ -112,6 +124,6 @@ export const useWalletStore = defineStore('wallet', () => {
            grossEarned, totalDeductions, netEarned,
            fetchWallet, fetchTransactions, fetchWithdrawals, fetchPayoutAccounts,
            fetchReceivingInstitutions, savePayoutAccount, deactivatePayoutAccount,
-           requestWithdrawal, devAddFunds,
+           requestWithdrawal, initiateCashIn, verifyCashIn, devAddFunds,
            devRemoveFunds }
 })
