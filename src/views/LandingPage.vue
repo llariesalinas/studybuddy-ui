@@ -1277,7 +1277,7 @@ section {
   overflow: hidden;
   box-shadow: 0 24px 60px color-mix(in srgb, var(--sb-dark) 7%, transparent);
   clip-path: inset(12% 6% 12% 6% round 26px);
-  transition: clip-path .9s var(--sb-spring), box-shadow .4s ease;
+  transition: clip-path .9s var(--sb-spring), box-shadow .4s ease, border-color .4s ease;
   min-width: 0;
 }
 
@@ -1286,15 +1286,18 @@ section {
 }
 
 .panel:nth-of-type(1) .viz:hover {
-  box-shadow: 0 34px 80px color-mix(in srgb, var(--sb-primary) 22%, transparent), 0 10px 28px color-mix(in srgb, var(--sb-dark) 10%, transparent);
+  border-color: color-mix(in srgb, var(--sb-primary) 55%, var(--sb-card-border));
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--sb-dark) 22%, transparent), 0 28px 56px color-mix(in srgb, var(--sb-dark) 26%, transparent), 0 48px 110px color-mix(in srgb, var(--sb-primary) 55%, transparent);
 }
 
 .panel:nth-of-type(2) .viz:hover {
-  box-shadow: 0 34px 80px color-mix(in srgb, var(--sb-pop-yellow) 30%, transparent), 0 10px 28px color-mix(in srgb, var(--sb-dark) 10%, transparent);
+  border-color: color-mix(in srgb, var(--sb-pop-yellow) 55%, var(--sb-card-border));
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--sb-dark) 22%, transparent), 0 28px 56px color-mix(in srgb, var(--sb-dark) 26%, transparent), 0 48px 110px color-mix(in srgb, var(--sb-pop-yellow) 60%, transparent);
 }
 
 .panel:nth-of-type(3) .viz:hover {
-  box-shadow: 0 34px 80px color-mix(in srgb, var(--sb-pop-orange) 28%, transparent), 0 10px 28px color-mix(in srgb, var(--sb-dark) 10%, transparent);
+  border-color: color-mix(in srgb, var(--sb-pop-orange) 55%, var(--sb-card-border));
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--sb-dark) 22%, transparent), 0 28px 56px color-mix(in srgb, var(--sb-dark) 26%, transparent), 0 48px 110px color-mix(in srgb, var(--sb-pop-orange) 58%, transparent);
 }
 
 .ill {
