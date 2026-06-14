@@ -3655,13 +3655,15 @@ def update_booking_location(request, booking_request_id):
     return Response({"message": "Location updated."})
 
 # --- WALLET & PAYMENT VIEWS ---
-from .models import Transaction, WithdrawalRequest
+from .models import Transaction, WithdrawalRequest, WalletTopUp
 from .paymongo_money_movement import (
     PayMongoCashOutError,
     create_wallet_transaction,
     list_receiving_institutions,
     normalize_wallet_transaction,
 )
+
+PAYMONGO_REQUEST_TIMEOUT = 20  # seconds
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -3764,6 +3766,18 @@ def serialize_cash_out(withdrawal):
         "requested_at": withdrawal.requested_at,
         "processed_at": withdrawal.processed_at,
         "payout_account_id": withdrawal.payout_account_id,
+    }
+
+
+def serialize_cash_in(topup):
+    return {
+        "id": topup.id,
+        "amount": float(topup.amount),
+        "status": topup.status,
+        "provider": topup.provider,
+        "provider_reference": topup.provider_reference,
+        "created_at": topup.created_at,
+        "paid_at": topup.paid_at,
     }
 
 
@@ -4461,6 +4475,155 @@ def credit_tutor_wallet(booking):
                 description=f"Platform Commission for {rep_booking.session_date} (10% of ₱{total_amount})",
                 reference_id=ref_id
             )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def initiate_cash_in(request):
+    """Create a PayMongo Checkout Session for a wallet top-up."""
+    tutor = get_request_tutor(request)
+    if tutor is None:
+        return Response({"error": "Not a tutor"}, status=403)
+
+    amount = parse_money_amount(request.data.get('amount'))
+    if amount is None:
+        return Response({"error": "Enter a valid cash-in amount."}, status=400)
+
+    topup = WalletTopUp.objects.create(
+        tutor=tutor, amount=amount, status='pending', provider='paymongo'
+    )
+
+    amount_cents = int(amount * decimal.Decimal("100"))
+    label = f"StudyBuddy Wallet Top-Up TOPUP-{topup.id}"
+    url = "https://api.paymongo.com/v1/checkout_sessions"
+    payload = {
+        "data": {
+            "attributes": {
+                "line_items": [
+                    {
+                        "currency": "PHP",
+                        "amount": amount_cents,
+                        "name": label,
+                        "quantity": 1,
+                    }
+                ],
+                "payment_method_types": ["gcash", "card", "paymaya"],
+                "description": label,
+                "success_url": f"{settings.FRONTEND_URL}/tch-wallet?cashin=success&id={topup.id}",
+                "cancel_url": f"{settings.FRONTEND_URL}/tch-wallet?cashin=cancelled&id={topup.id}",
+            }
+        }
+    }
+
+    try:
+        response = requests.post(
+            url,
+            json=payload,
+            headers=get_paymongo_auth_headers(),
+            timeout=PAYMONGO_REQUEST_TIMEOUT,
+        )
+        try:
+            res_data = response.json()
+        except ValueError:
+            res_data = {"raw": getattr(response, "text", "")}
+
+        if response.status_code in (200, 201):
+            checkout_url = (
+                res_data.get('data', {}).get('attributes', {}).get('checkout_url')
+            )
+            if not checkout_url:
+                topup.status = 'failed'
+                topup.save(update_fields=['status'])
+                return Response(
+                    {"error": "Payment provider did not return a checkout URL."},
+                    status=status.HTTP_502_BAD_GATEWAY,
+                )
+
+            topup.provider_reference = res_data['data']['id']
+            topup.save(update_fields=['provider_reference'])
+            return Response({"checkout_url": checkout_url, "id": topup.id})
+
+        topup.status = 'failed'
+        topup.save(update_fields=['status'])
+        provider_message = get_paymongo_error_message(res_data)
+        logger.error(
+            "Cash-in checkout failed status=%s error=%s", response.status_code, provider_message
+        )
+        return Response({"error": provider_message}, status=status.HTTP_502_BAD_GATEWAY)
+    except requests.RequestException as exc:
+        topup.status = 'failed'
+        topup.save(update_fields=['status'])
+        logger.error("Cash-in checkout request failed: %s", exc)
+        return Response(
+            {"error": "Could not reach the payment provider. Please try again."},
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def verify_cash_in(request, topup_id):
+    """Confirm a PayMongo checkout was paid and credit the wallet (idempotent)."""
+    tutor = get_request_tutor(request)
+    if tutor is None:
+        return Response({"error": "Not a tutor"}, status=403)
+
+    topup = get_object_or_404(WalletTopUp, id=topup_id, tutor=tutor)
+
+    if topup.status == 'paid':
+        return Response(serialize_cash_in(topup))
+
+    if not topup.provider_reference:
+        return Response({"error": "No PayMongo checkout for this top-up."}, status=400)
+
+    url = f"https://api.paymongo.com/v1/checkout_sessions/{topup.provider_reference}"
+    try:
+        response = requests.get(
+            url, headers=get_paymongo_auth_headers(), timeout=PAYMONGO_REQUEST_TIMEOUT
+        )
+        try:
+            res_data = response.json()
+        except ValueError:
+            res_data = {"raw": getattr(response, "text", "")}
+    except requests.RequestException as exc:
+        logger.error("Cash-in verify request failed: %s", exc)
+        return Response(
+            {"error": "Could not reach the payment provider. Please try again."},
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
+
+    if response.status_code != 200:
+        return Response(
+            {"error": "Payment provider error."}, status=status.HTTP_502_BAD_GATEWAY
+        )
+
+    if not is_paymongo_checkout_paid(res_data):
+        return Response({"error": "Payment not completed yet."}, status=400)
+
+    with transaction.atomic():
+        wallet = Wallet.objects.select_for_update().get(tutor=tutor)
+        topup.refresh_from_db()
+        if topup.status != 'paid':
+            topup.status = 'paid'
+            topup.paid_at = timezone.now()
+            topup.save(update_fields=['status', 'paid_at'])
+
+            ref_id = f"TOPUP-{topup.id}"
+            if not Transaction.objects.filter(reference_id=ref_id).exists():
+                wallet.balance += topup.amount
+                wallet.save(update_fields=['balance'])
+                Transaction.objects.create(
+                    wallet=wallet,
+                    transaction_type='cash_in',
+                    amount=topup.amount,
+                    description=f"Wallet Top-Up {ref_id}",
+                    reference_id=ref_id,
+                )
+
+    wallet.refresh_from_db()
+    payload = serialize_cash_in(topup)
+    payload["balance"] = float(wallet.balance)
+    return Response(payload)
 
 
 @api_view(['POST'])

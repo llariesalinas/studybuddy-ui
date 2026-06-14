@@ -34,6 +34,7 @@ from .models import (
     Transaction,
     TutorPayoutAccount,
     Wallet,
+    WalletTopUp,
     WithdrawalRequest,
     Preference,
 )
@@ -2725,3 +2726,150 @@ class SessionCheckInTests(APITestCase):
 
         self.assertEqual(response.status_code, 403)
         self.assertFalse(SessionCheckIn.objects.exists())
+
+
+class TutorCashInTests(APITestCase):
+    def setUp(self):
+        self.tutor_user = User.objects.create_user(
+            username="cashin-tutor",
+            email="cashin-tutor@example.com",
+            password="password",
+        )
+        self.tutor_profile = UserProfile.objects.create(
+            user=self.tutor_user,
+            fname="Cash",
+            mname="",
+            lname="In",
+            role="Tutor",
+        )
+        self.tutor = Tutor.objects.create(
+            profile=self.tutor_profile,
+            hourly_rate=Decimal("300.00"),
+            can_online=True,
+            can_f2f=True,
+            teaching_level="SHS",
+        )
+        self.wallet = Wallet.objects.get(tutor=self.tutor)
+        self.wallet.balance = Decimal("-50.00")
+        self.wallet.save(update_fields=["balance"])
+        self.client.force_authenticate(user=self.tutor_user)
+
+    def checkout_ok(self):
+        class Resp:
+            status_code = 200
+
+            @staticmethod
+            def json():
+                return {
+                    "data": {
+                        "id": "cs_test_123",
+                        "attributes": {"checkout_url": "https://pm.test/checkout/cs_test_123"},
+                    }
+                }
+        return Resp()
+
+    def checkout_paid(self):
+        class Resp:
+            status_code = 200
+
+            @staticmethod
+            def json():
+                return {"data": {"attributes": {"status": "paid"}}}
+        return Resp()
+
+    def make_topup(self, status_value="pending", ref="cs_test_123", amount="100.00"):
+        return WalletTopUp.objects.create(
+            tutor=self.tutor,
+            amount=Decimal(amount),
+            status=status_value,
+            provider="paymongo",
+            provider_reference=ref,
+        )
+
+    def test_initiate_rejects_invalid_amount(self):
+        response = self.client.post(
+            "/api/wallet/cash-in/", {"amount": "0"}, format="json"
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_non_tutor_gets_403(self):
+        plain = User.objects.create_user(username="plain", email="p@e.com", password="x")
+        self.client.force_authenticate(user=plain)
+        response = self.client.post(
+            "/api/wallet/cash-in/", {"amount": "100"}, format="json"
+        )
+        self.assertEqual(response.status_code, 403)
+
+    @patch("studybuddy.views.requests.post")
+    def test_initiate_creates_topup_and_returns_checkout_url(self, mock_post):
+        mock_post.return_value = self.checkout_ok()
+        response = self.client.post(
+            "/api/wallet/cash-in/", {"amount": "100.00"}, format="json"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["checkout_url"], "https://pm.test/checkout/cs_test_123")
+        topup = WalletTopUp.objects.get(id=response.data["id"])
+        self.assertEqual(topup.status, "pending")
+        self.assertEqual(topup.amount, Decimal("100.00"))
+        self.assertEqual(topup.provider_reference, "cs_test_123")
+        sent = mock_post.call_args.kwargs["json"]
+        self.assertEqual(
+            sent["data"]["attributes"]["line_items"][0]["amount"], 10000
+        )
+
+    @patch("studybuddy.views.requests.get")
+    def test_verify_credits_wallet_and_writes_transaction(self, mock_get):
+        mock_get.return_value = self.checkout_paid()
+        topup = self.make_topup()
+
+        response = self.client.post(f"/api/wallet/cash-in/{topup.id}/verify/")
+
+        self.assertEqual(response.status_code, 200)
+        topup.refresh_from_db()
+        self.wallet.refresh_from_db()
+        self.assertEqual(topup.status, "paid")
+        self.assertIsNotNone(topup.paid_at)
+        self.assertEqual(self.wallet.balance, Decimal("50.00"))
+        self.assertTrue(
+            Transaction.objects.filter(
+                wallet=self.wallet,
+                transaction_type="cash_in",
+                amount=Decimal("100.00"),
+                reference_id=f"TOPUP-{topup.id}",
+            ).exists()
+        )
+
+    @patch("studybuddy.views.requests.get")
+    def test_verify_is_idempotent(self, mock_get):
+        mock_get.return_value = self.checkout_paid()
+        topup = self.make_topup()
+
+        first = self.client.post(f"/api/wallet/cash-in/{topup.id}/verify/")
+        second = self.client.post(f"/api/wallet/cash-in/{topup.id}/verify/")
+
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 200)
+        self.wallet.refresh_from_db()
+        self.assertEqual(self.wallet.balance, Decimal("50.00"))
+        self.assertEqual(
+            Transaction.objects.filter(reference_id=f"TOPUP-{topup.id}").count(), 1
+        )
+
+    @patch("studybuddy.views.requests.get")
+    def test_verify_unpaid_returns_400_and_no_credit(self, mock_get):
+        class Unpaid:
+            status_code = 200
+
+            @staticmethod
+            def json():
+                return {"data": {"attributes": {"status": "unpaid"}}}
+        mock_get.return_value = Unpaid()
+        topup = self.make_topup()
+
+        response = self.client.post(f"/api/wallet/cash-in/{topup.id}/verify/")
+
+        self.assertEqual(response.status_code, 400)
+        self.wallet.refresh_from_db()
+        self.assertEqual(self.wallet.balance, Decimal("-50.00"))
+        topup.refresh_from_db()
+        self.assertEqual(topup.status, "pending")

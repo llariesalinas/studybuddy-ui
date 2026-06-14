@@ -117,6 +117,8 @@ urlpatterns = [
     path('wallet/paymongo/callback/', views.paymongo_cashout_callback),
     path('wallet/withdraw/', views.cash_outs),
     path('wallet/withdrawals/', views.list_withdrawals),
+    path('wallet/cash-in/', views.initiate_cash_in),
+    path('wallet/cash-in/<int:topup_id>/verify/', views.verify_cash_in),
     path('payments/initiate/', views.initiate_online_payment),
     path('bookings/<int:booking_id>/verify-online-payment/', views.verify_online_payment),
     path('tutor/setup/', views.tutor_setup),
