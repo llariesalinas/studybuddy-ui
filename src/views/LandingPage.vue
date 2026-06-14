@@ -6,7 +6,6 @@
       <i class="b3"></i>
     </div>
 
-    <div ref="cursorRef" class="studio-cursor" aria-hidden="true"></div>
     <div ref="scrollSpaceRef" class="scroll-space" aria-hidden="true"></div>
 
     <nav class="studio-nav" aria-label="Main navigation">
@@ -386,7 +385,6 @@ const route = useRoute()
 const pageRef = ref(null)
 const smoothRef = ref(null)
 const scrollSpaceRef = ref(null)
-const cursorRef = ref(null)
 const heroTitleRef = ref(null)
 const magnetRef = ref(null)
 const toolsSectionRef = ref(null)
@@ -483,16 +481,11 @@ let pointerQuery = null
 let resizeObserver = null
 let revealObserver = null
 let smoothRafId = null
-let cursorRafId = null
 let heroTimeoutId = null
 let motionRunning = false
 let isMounted = false
 let targetScroll = 0
 let currentScroll = 0
-let mouseX = -100
-let mouseY = -100
-let cursorX = -100
-let cursorY = -100
 let railTravel = 0
 const cleanupFns = []
 const motionCleanupFns = []
@@ -601,15 +594,6 @@ const runSmoothLoop = () => {
   smoothRafId = window.requestAnimationFrame(runSmoothLoop)
 }
 
-const runCursorLoop = () => {
-  if (!motionRunning || !cursorRef.value) return
-
-  cursorX += (mouseX - cursorX) * 0.2
-  cursorY += (mouseY - cursorY) * 0.2
-  cursorRef.value.style.transform = `translate(${cursorX}px, ${cursorY}px) translate(-50%, -50%)`
-  cursorRafId = window.requestAnimationFrame(runCursorLoop)
-}
-
 const setupTilt = () => {
   if (!pageRef.value) return
   pageRef.value.querySelectorAll('.panel .viz').forEach((card, index) => {
@@ -677,51 +661,22 @@ const startContinuousMotion = () => {
     measureRail()
   }, { passive: true }, motionCleanupFns)
 
-  addCleanup(window, 'mousemove', (event) => {
-    mouseX = event.clientX
-    mouseY = event.clientY
-  }, { passive: true }, motionCleanupFns)
-
-  addCleanup(document, 'mouseover', (event) => {
-    if (event.target.closest?.('.hoverable, a, button')) {
-      cursorRef.value?.classList.add('big')
-    }
-  }, undefined, motionCleanupFns)
-
-  addCleanup(document, 'mouseout', (event) => {
-    if (event.target.closest?.('.hoverable, a, button')) {
-      cursorRef.value?.classList.remove('big')
-    }
-  }, undefined, motionCleanupFns)
-
-  if (cursorRef.value) {
-    cursorRef.value.style.opacity = '0.85'
-  }
-
   setupTilt()
   setupMagnet()
   runSmoothLoop()
-  runCursorLoop()
 }
 
 const stopContinuousMotion = ({ reset = false } = {}) => {
   motionRunning = false
 
   if (smoothRafId) window.cancelAnimationFrame(smoothRafId)
-  if (cursorRafId) window.cancelAnimationFrame(cursorRafId)
   smoothRafId = null
-  cursorRafId = null
 
   motionCleanupFns.splice(0).forEach((cleanup) => cleanup())
 
   if (resizeObserver) {
     resizeObserver.disconnect()
     resizeObserver = null
-  }
-
-  if (cursorRef.value) {
-    cursorRef.value.classList.remove('big')
-    cursorRef.value.style.opacity = '0'
   }
 
   if (!reset) return
@@ -968,29 +923,6 @@ onUnmounted(() => {
 .smooth-root {
   position: relative;
   z-index: 1;
-}
-
-.studio-cursor {
-  position: fixed;
-  z-index: 200;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--sb-primary);
-  pointer-events: none;
-  top: 0;
-  left: 0;
-  transform: translate(-50%, -50%);
-  transition: width .25s, height .25s, opacity .25s, background .25s;
-  mix-blend-mode: multiply;
-  opacity: 0;
-}
-
-.studio-cursor.big {
-  width: 56px;
-  height: 56px;
-  background: var(--sb-pop-yellow);
-  opacity: .9;
 }
 
 .studio-nav {
@@ -1949,10 +1881,6 @@ footer {
 }
 
 @media (pointer: coarse) {
-  .studio-cursor {
-    display: none;
-  }
-
   .toolstage {
     height: auto;
   }
@@ -2019,10 +1947,6 @@ footer {
   .bgwash i,
   .scroll-cue .bar::after {
     animation: none;
-  }
-
-  .studio-cursor {
-    display: none;
   }
 }
 </style>
