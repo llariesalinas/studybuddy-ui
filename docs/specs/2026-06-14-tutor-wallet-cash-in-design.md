@@ -1,7 +1,7 @@
 ---
 title: Tutor Wallet Cash-In (Top-Up)
 date: 2026-06-14
-status: Draft
+status: Approved
 feature-slug: tutor-wallet-cash-in
 roles: tutor
 ---
