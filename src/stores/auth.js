@@ -12,6 +12,21 @@ import { API_BASE_URL, ACCESS_REFRESH_INTERVAL_MS } from '../config.js'
 
 let refreshIntervalId = null
 
+const clearStudyBuddySessionCache = () => {
+  if (typeof window === 'undefined' || !window.sessionStorage) {
+    return
+  }
+
+  const keys = []
+  for (let index = 0; index < window.sessionStorage.length; index += 1) {
+    const key = window.sessionStorage.key(index)
+    if (key?.startsWith('sb-')) {
+      keys.push(key)
+    }
+  }
+  keys.forEach((key) => window.sessionStorage.removeItem(key))
+}
+
 export const useAuthStore = defineStore('auth', () => {
   const profileStore = useProfileStore()
   const findTutorsStore = useFindTutorsStore()
@@ -194,6 +209,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     stopIdleSessionTracking()
     stopAccessTokenRefresh()
+    clearStudyBuddySessionCache()
 
     token.value = null
     refreshToken.value = null
@@ -206,6 +222,9 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('user_id')
     localStorage.removeItem('profile_id')
     findTutorsStore.reset()
+    
+    // Clear any persisted Pinia stores in sessionStorage to prevent data leaks across sessions
+    sessionStorage.clear()
   }
 
   const initializeAuth = () => {

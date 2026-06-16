@@ -178,7 +178,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { useSessionsStore } from '@/stores/sessionsStore'
 import { useToastStore } from '@/stores/toast'
 import * as bootstrap from 'bootstrap'
@@ -258,7 +258,7 @@ const formatTime = (timeString) => {
     const ampm = h >= 12 ? 'PM' : 'AM'
     const formattedHour = h % 12 || 12
     return `${formattedHour}:${minute} ${ampm}`
-  } catch (e) {
+  } catch {
     return timeString 
   }
 }

@@ -8,7 +8,6 @@
           <option value="">All Roles</option>
           <option value="Tutee">Tutee</option>
           <option value="Tutor">Tutor</option>
-          <option value="Admin">Admin</option>
         </select>
         <select v-model="filters.status" class="form-select form-select-sm rounded-pill" style="width: 120px;">
           <option value="">All Status</option>
@@ -89,8 +88,7 @@
                 </td>
                 <td class="small text-muted">{{ formatDate(user.created_at) }}</td>
                 <td class="pe-4 text-end">
-                  <button @click="openDetail(user)"class="btn btn-sm btn-light rounded-circle sb-btn"
-                  >
+                  <button @click="openDetail(user)" class="btn btn-sm btn-light rounded-circle sb-btn">
                     <i class="bi bi-eye"></i></button>
                 </td>
               </tr>
@@ -235,19 +233,20 @@ const toggleSuspension = async (user) => {
     try {
       await store.updateUserStatus(user.id, !user.is_suspended)
       // No manual patch needed — store mutation is reactive
-    } catch (err) {
+    } catch {
       toastStore.push('Failed to update user status.', 'error')
     } finally {
       suspending.value = false
     }
   }
 }
-const confirmDelete = async (user) => {
+
+const deleteUser = async (user) => {
   if (confirm(`CRITICAL ACTION: Are you sure you want to PERMANENTLY DELETE ${user.full_name}? This cannot be undone.`)) {
     try {
       await store.deleteUser(user.id)
       selectedUser.value = null
-    } catch (err) {
+    } catch {
       toastStore.push('Failed to delete user.', 'error')
     }
   }

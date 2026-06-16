@@ -295,7 +295,7 @@ const toggleActive = async (inst) => {
       if (updated) {
         selectedInstitution.value = updated
       }
-    } catch (err) {
+    } catch {
       toastStore.push('Failed to update institution status.', 'error')
     } finally {
       toggling.value = false
@@ -323,7 +323,7 @@ const submitAdd = async () => {
     await store.addInstitution(form)
     showAddModal.value = false
     Object.assign(form, { institution_name: '', school_email_domain: '', contact_person: '' })
-  } catch (err) {
+  } catch {
     toastStore.push('Failed to add institution. Domain might already exist.', 'error')
   }
 }

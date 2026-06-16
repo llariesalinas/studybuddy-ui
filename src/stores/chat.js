@@ -4,12 +4,86 @@ import api from '@/services/api/api'
 import { useAuthStore } from './auth'
 import {
   API_BASE_URL,
+  CHAT_HISTORY_CACHE_TTL_MS,
+  CHAT_ROOMS_CACHE_TTL_MS,
   wsServerRoot,
+  wsServerProtocol,
   WS_RECONNECT_DELAY_MS,
   TYPING_CLEAR_MS,
   TYPING_DEBOUNCE_MS,
   POPUP_DISMISS_MS,
 } from '../config.js'
+
+const CHAT_CACHE_SCOPE = 'chat'
+
+const canUseSessionStorage = () => typeof window !== 'undefined' && window.sessionStorage
+
+const getStoredUserId = () => {
+  if (typeof window === 'undefined') {
+    return 'anon'
+  }
+
+  return window.localStorage.getItem('user_id') || 'anon'
+}
+
+const getChatCacheUserId = (authStore) => String(authStore.user?.id || getStoredUserId())
+const getRoomsCacheKey = (userId) => `sb-${CHAT_CACHE_SCOPE}-${userId}-rooms`
+const getHistoryCacheKey = (userId, roomId) => `sb-${CHAT_CACHE_SCOPE}-${userId}-room-${roomId}-history`
+
+const readChatCache = (key) => {
+  if (!canUseSessionStorage()) {
+    return null
+  }
+
+  const raw = window.sessionStorage.getItem(key)
+  if (!raw) {
+    return null
+  }
+
+  try {
+    const entry = JSON.parse(raw)
+    if (!entry || typeof entry.expiresAt !== 'number' || entry.expiresAt <= Date.now()) {
+      window.sessionStorage.removeItem(key)
+      return null
+    }
+    return entry
+  } catch {
+    window.sessionStorage.removeItem(key)
+    return null
+  }
+}
+
+const writeChatCache = (key, value, ttlMs, userId) => {
+  if (!canUseSessionStorage()) {
+    return
+  }
+
+  const now = Date.now()
+  window.sessionStorage.setItem(
+    key,
+    JSON.stringify({
+      ...value,
+      userId,
+      cachedAt: now,
+      expiresAt: now + ttlMs,
+    }),
+  )
+}
+
+export const clearChatCache = () => {
+  if (!canUseSessionStorage()) {
+    return
+  }
+
+  const keys = []
+  for (let index = 0; index < window.sessionStorage.length; index += 1) {
+    const key = window.sessionStorage.key(index)
+    if (key?.startsWith(`sb-${CHAT_CACHE_SCOPE}-`)) {
+      keys.push(key)
+    }
+  }
+  keys.forEach((key) => window.sessionStorage.removeItem(key))
+}
 
 export const useChatStore = defineStore('chat', () => {
   const authStore = useAuthStore()
@@ -47,8 +121,7 @@ export const useChatStore = defineStore('chat', () => {
     }
 
     const serverRoot = wsServerRoot()
-    const scheme =
-      typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss' : 'ws'
+    const scheme = wsServerProtocol()
     return `${scheme}://${serverRoot}/ws/chat/`
   })
 
@@ -68,6 +141,18 @@ export const useChatStore = defineStore('chat', () => {
 
   const myUserId = () => Number(authStore.user?.id || localStorage.getItem('user_id'))
   const myProfileId = () => Number(authStore.user?.profile_id || localStorage.getItem('profile_id'))
+  const cacheUserId = () => getChatCacheUserId(authStore)
+
+  const normalizeRoomsPayload = (data) => (
+    Array.isArray(data)
+      ? {
+          results: data,
+          next_cursor: null,
+          has_more: false,
+          total_unread: data.reduce((total, room) => total + Number(room.unread_count || 0), 0),
+        }
+      : data
+  )
 
   const isMine = (payload) => {
     const senderUserId = Number(payload?.sender_id ?? payload?.sender)
@@ -79,6 +164,121 @@ export const useChatStore = defineStore('chat', () => {
     ...message,
     is_me: message.is_me ?? isMine(message),
   })
+
+  const sanitizeMessageForCache = (message) => {
+    const numericId = Number(message?.id)
+    if (!Number.isFinite(numericId) || message.pending || message.failed) {
+      return null
+    }
+
+    const stableMessage = { ...message }
+    delete stableMessage.pending
+    delete stableMessage.failed
+    delete stableMessage.temp_id
+
+    return {
+      ...stableMessage,
+      id: numericId,
+    }
+  }
+
+  const getLatestMessageId = (messageList) => {
+    return messageList.reduce((latest, message) => {
+      const id = Number(message.id)
+      return Number.isFinite(id) ? Math.max(latest, id) : latest
+    }, 0)
+  }
+
+  const mergeMessages = (existingMessages, incomingMessages) => {
+    const byId = new Map()
+    const pendingMessages = []
+
+    for (const message of existingMessages) {
+      const numericId = Number(message.id)
+      if (Number.isFinite(numericId) && !message.pending) {
+        byId.set(numericId, message)
+      } else {
+        pendingMessages.push(message)
+      }
+    }
+
+    for (const message of incomingMessages) {
+      const numericId = Number(message.id)
+      if (Number.isFinite(numericId)) {
+        byId.set(numericId, message)
+      }
+    }
+
+    return [
+      ...Array.from(byId.values()).sort((left, right) => Number(left.id) - Number(right.id)),
+      ...pendingMessages,
+    ]
+  }
+
+  const persistRoomsCache = () => {
+    const userId = cacheUserId()
+    writeChatCache(
+      getRoomsCacheKey(userId),
+      {
+        rooms: rooms.value,
+        nextCursor: nextCursor.value,
+        hasMore: hasMoreRooms.value,
+        totalUnread: totalUnread.value,
+      },
+      CHAT_ROOMS_CACHE_TTL_MS,
+      userId,
+    )
+  }
+
+  const loadRoomsCache = () => {
+    const entry = readChatCache(getRoomsCacheKey(cacheUserId()))
+    if (!entry?.rooms || !Array.isArray(entry.rooms)) {
+      return false
+    }
+
+    rooms.value = entry.rooms
+    nextCursor.value = entry.nextCursor || null
+    hasMoreRooms.value = Boolean(entry.hasMore)
+    totalUnread.value = Number(entry.totalUnread ?? 0)
+    hasLoadedRooms.value = true
+    return true
+  }
+
+  const persistHistoryCache = (roomId) => {
+    if (!roomId) {
+      return
+    }
+
+    const stableMessages = messages.value
+      .map(sanitizeMessageForCache)
+      .filter(Boolean)
+      .slice(-50)
+
+    const userId = cacheUserId()
+    writeChatCache(
+      getHistoryCacheKey(userId, roomId),
+      {
+        messages: stableMessages,
+        latestMessageId: getLatestMessageId(stableMessages),
+        roomUpdatedAt: currentRoom.value?.updated_at || null,
+      },
+      CHAT_HISTORY_CACHE_TTL_MS,
+      userId,
+    )
+  }
+
+  const loadHistoryCache = (roomId) => {
+    const entry = readChatCache(getHistoryCacheKey(cacheUserId(), roomId))
+    if (!Array.isArray(entry?.messages)) {
+      return null
+    }
+
+    return {
+      messages: entry.messages.map(withMeFlag),
+      latestMessageId: Number(entry.latestMessageId || getLatestMessageId(entry.messages)),
+      roomUpdatedAt: entry.roomUpdatedAt || null,
+    }
+  }
 
   const upsertRoom = (room, { preserveUnread = false } = {}) => {
     if (!room?.id) return
@@ -116,6 +316,8 @@ export const useChatStore = defineStore('chat', () => {
         ...rooms.value.find((existing) => existing.id === room.id),
       }
     }
+
+    persistRoomsCache()
   }
 
   const applyMessageToRoom = (roomId, message, previousUnread = null) => {
@@ -139,6 +341,8 @@ export const useChatStore = defineStore('chat', () => {
         }
       }, POPUP_DISMISS_MS)
     }
+
+    persistRoomsCache()
   }
 
   const addOrReplaceMessage = (incoming) => {
@@ -156,6 +360,7 @@ export const useChatStore = defineStore('chat', () => {
         pending: false,
         failed: false,
       }
+      persistHistoryCache(message.room || currentRoom.value?.id)
       return
     }
 
@@ -163,14 +368,20 @@ export const useChatStore = defineStore('chat', () => {
       messages.value = messages.value.map((candidate) => (
         candidate.id === message.id ? { ...candidate, ...message } : candidate
       ))
+      persistHistoryCache(message.room || currentRoom.value?.id)
       return
     }
 
     messages.value.push(message)
+    persistHistoryCache(message.room || currentRoom.value?.id)
   }
 
-  async function fetchRooms() {
+  async function fetchRooms({ force = false } = {}) {
     if (isLoadingRooms.value) return
+    if (!force) {
+      loadRoomsCache()
+    }
+
     isLoadingRooms.value = true
 
     try {
@@ -178,20 +389,14 @@ export const useChatStore = defineStore('chat', () => {
       hasMoreRooms.value = false
 
       const response = await api.get('chat/rooms/')
-      const payload = Array.isArray(response.data)
-        ? {
-            results: response.data,
-            next_cursor: null,
-            has_more: false,
-            total_unread: response.data.reduce((total, room) => total + Number(room.unread_count || 0), 0),
-          }
-        : response.data
+      const payload = normalizeRoomsPayload(response.data)
 
       rooms.value = payload.results || []
       nextCursor.value = payload.next_cursor || null
       hasMoreRooms.value = Boolean(payload.has_more)
       totalUnread.value = Number(payload.total_unread ?? 0)
       hasLoadedRooms.value = true
+      persistRoomsCache()
     } catch (error) {
       console.error('Error fetching chat rooms:', error)
     } finally {
@@ -228,6 +433,7 @@ export const useChatStore = defineStore('chat', () => {
       nextCursor.value = payload.next_cursor || null
       hasMoreRooms.value = Boolean(payload.has_more)
       totalUnread.value = Number(payload.total_unread ?? totalUnread.value ?? 0)
+      persistRoomsCache()
     } catch (error) {
       console.error('Error fetching more chat rooms:', error)
     } finally {
@@ -249,11 +455,27 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  async function fetchHistory(roomId) {
+  async function fetchHistory(roomId, { preferCache = false } = {}) {
     try {
-      messages.value = []
-      const response = await api.get(`chat/rooms/${roomId}/history/`)
-      messages.value = response.data.map(withMeFlag)
+      const cachedHistory = loadHistoryCache(roomId)
+      const hasCachedMessages = Boolean(cachedHistory?.messages?.length)
+
+      if (preferCache && hasCachedMessages) {
+        messages.value = cachedHistory.messages
+      } else if (!hasCachedMessages) {
+        messages.value = []
+      }
+
+      const params = hasCachedMessages && cachedHistory.latestMessageId
+        ? { after_id: cachedHistory.latestMessageId }
+        : undefined
+      const response = await api.get(`chat/rooms/${roomId}/history/`, { params })
+      const incomingMessages = response.data.map(withMeFlag)
+
+      messages.value = hasCachedMessages
+        ? mergeMessages(messages.value, incomingMessages)
+        : incomingMessages
+      persistHistoryCache(roomId)
     } catch (error) {
       console.error('Error fetching message history:', error)
     }
@@ -270,8 +492,8 @@ export const useChatStore = defineStore('chat', () => {
   async function selectRoom(room) {
     currentRoom.value = room
     upsertRoom({ ...room, unread_count: 0 })
-    await fetchHistory(room.id)
     connectToRoom(room.id)
+    await fetchHistory(room.id, { preferCache: true })
     await markRoomRead(room.id)
     // Load the rich context (partner stats, current booking) that the list
     // endpoint no longer ships; non-blocking so the conversation opens instantly.
@@ -397,6 +619,7 @@ export const useChatStore = defineStore('chat', () => {
         messages.value = messages.value.map((message) => (
           message.is_me ? { ...message, is_read: true } : message
         ))
+        persistHistoryCache(event.room_id)
       } else {
         upsertRoom({ id: event.room_id, unread_count: 0 })
       }
@@ -493,6 +716,7 @@ export const useChatStore = defineStore('chat', () => {
           pending: false,
           failed: false,
         }
+        persistHistoryCache(roomId)
       } else {
         addOrReplaceMessage(savedMessage)
       }
@@ -541,13 +765,26 @@ export const useChatStore = defineStore('chat', () => {
     const response = await api.patch(`bookings/${bookingRequestId}/location/`, {
       preferred_location: preferredLocation,
     })
-    await fetchRooms()
+    await fetchRooms({ force: true })
     return response.data
   }
 
   function getRoomPartnerName(room) {
+    if (room?.room_type === 'support') {
+      return 'Customer Support'
+    }
+
+    const profileId = myProfileId()
+    if (Number(room?.tutee) === profileId) {
+      return room?.tutor_name || 'Tutor'
+    }
+
+    if (Number(room?.tutor) === profileId) {
+      return room?.tutee_name || 'Tutee'
+    }
+
     const role = authStore.user?.role || localStorage.getItem('user_role')
-    return String(role).toLowerCase() === 'tutor' ? room.tutee_name : room.tutor_name
+    return String(role).toLowerCase() === 'tutor' ? room?.tutee_name : room?.tutor_name
   }
 
   function disconnectRoom() {

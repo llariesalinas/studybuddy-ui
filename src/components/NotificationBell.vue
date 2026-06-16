@@ -56,6 +56,8 @@ const notificationsStore = useNotificationsStore()
 const isOpen = ref(false)
 const wrapperRef = ref(null)
 let refreshIntervalId = null
+let errorTicksRemaining = 0
+let consecutiveErrors = 0
 
 const toggleDropdown = async () => {
   isOpen.value = !isOpen.value
@@ -99,8 +101,20 @@ onMounted(() => {
   window.addEventListener('click', handleClickOutside)
   document.addEventListener('visibilitychange', handleVisibilityChange)
   notificationsStore.fetchNotifications()
-  refreshIntervalId = window.setInterval(() => {
-    notificationsStore.fetchNotifications()
+  refreshIntervalId = window.setInterval(async () => {
+    if (document.hidden) return
+    if (errorTicksRemaining > 0) {
+      errorTicksRemaining--
+      return
+    }
+    const success = await notificationsStore.fetchNotifications()
+    if (success) {
+      consecutiveErrors = 0
+      errorTicksRemaining = 0
+    } else {
+      consecutiveErrors++
+      errorTicksRemaining = Math.min(2 ** (consecutiveErrors - 1), 8)
+    }
   }, NOTIFICATION_POLL_INTERVAL_MS)
 })
 

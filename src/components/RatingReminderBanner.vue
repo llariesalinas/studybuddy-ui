@@ -27,11 +27,12 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useSessionsStore } from '@/stores/completedSessions'
-import RatingStackModal from '@/components/RatingStackModal.vue'
+
+const RatingStackModal = defineAsyncComponent(() => import('@/components/RatingStackModal.vue'))
 
 const route = useRoute()
 const authStore = useAuthStore()
@@ -51,7 +52,7 @@ const handleRated = () => {
 }
 
 onMounted(() => {
-  if (authStore.userRole === 'tutee') {
+  if (authStore.userRole === 'tutee' && route.path !== '/dashboard') {
     sessionsStore.fetchSessions()
   }
 })

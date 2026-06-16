@@ -173,15 +173,18 @@ const goToNextOrClose = () => {
 const submitRating = async () => {
   if (!activeSession.value || !isFormValid.value) return
   isSubmitting.value = true
+  const submittedSessionId = activeSession.value.id
+  const submittedOverallRating = ratings.value.overall
+  const submittedComment = ratingComment.value
 
   try {
     await sessionsStore.submitRating(
-      activeSession.value.id,
-      { ...ratings.value },
-      ratingComment.value
+      submittedSessionId,
+      submittedOverallRating,
+      submittedComment
     )
 
-    emit('rated', activeSession.value.id)
+    emit('rated', submittedSessionId)
     resetDraft()
     await nextTick()
 
@@ -190,7 +193,7 @@ const submitRating = async () => {
     }
   } catch (error) {
     console.error('Failed to submit rating:', error)
-    toastStore.push('Failed to submit rating.', 'error')
+    toastStore.push(error.response?.data?.error || 'Failed to submit rating.', 'error')
   } finally {
     isSubmitting.value = false
   }

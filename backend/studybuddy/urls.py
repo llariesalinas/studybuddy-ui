@@ -29,7 +29,8 @@ from .views import(
 from .admin_views import (
     AdminStatsView, AdminWithdrawalListView, AdminWithdrawalDetailView,
     AdminUserListView, AdminInstitutionView, AdminAnalyticsView,
-    AdminTutorApplicationListView, AdminTutorApplicationDetailView
+    AdminTutorApplicationListView, AdminTutorApplicationDetailView,
+    SuperAdminInstitutionPerformanceView
 )
 from . import views
 
@@ -46,6 +47,7 @@ urlpatterns = [
     path('admin/users/<int:pk>/', AdminUserListView.as_view()),
     path('admin/institutions/', AdminInstitutionView.as_view()),
     path('admin/institutions/<int:pk>/', AdminInstitutionView.as_view()),
+    path('admin/institutions/performance/', SuperAdminInstitutionPerformanceView.as_view()),
     path('admin/analytics/', AdminAnalyticsView.as_view()),
     path('admin/support/tickets/', views.admin_list_tickets),
     path('admin/support/tickets/<int:ticket_id>/claim/', views.admin_claim_ticket),
@@ -65,6 +67,7 @@ urlpatterns = [
     path('preferences/', views.save_preferences),
     path('partner-institutions/', views.partner_institutions_list),
     path('dashboard/', student_dashboard),
+    path('recommendations/', views.dashboard_recommendations),
     path('tutee/profile/', views.get_tutee_profile),
     path('tutee/profile/avatar/', views.upload_tutee_avatar),
     path('tutee/profile/update/', views.update_tutee_profile),

@@ -15,13 +15,13 @@
       </div>
 
       <ul class="nav nav-pills flex-column mb-auto">
-        <li v-if="userRole!== 'admin'" class="nav-item mb-2">
+        <li v-if="userRole!== 'admin' && userRole !==  'superadmin'" class="nav-item mb-2">
           <router-link :to="userRole === 'tutor' ? '/tch-dashboard' : '/dashboard'" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
             <i class="bi bi-grid-1x2 me-3"></i> Dashboard
           </router-link>
         </li>
 
-        <li v-if="userRole!== 'admin'" class="nav-item mb-2">
+        <li v-if="userRole!== 'admin' && userRole !==  'superadmin'" class="nav-item mb-2">
           <router-link :to="userRole === 'tutor' ? '/tutor-profile' : '/tutee-profile'" class="nav-link text-white opacity-75 d-flex align-items-center">
             <i class="bi bi-person me-3"></i> Profile
           </router-link>
@@ -73,11 +73,7 @@
           </router-link>
         </li>
 
-        <li class="nav-item mb-2" v-if="userRole === 'admin'">
-          <router-link to="/admin/institutions" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
-            <i class="bi bi-building me-3"></i> Institutions
-          </router-link>
-        </li>
+
 
         <li class="nav-item mb-2" v-if="userRole === 'admin'">
           <router-link to="/admin/reports" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
@@ -88,6 +84,30 @@
         <li class="nav-item mb-2" v-if="userRole === 'admin'">
           <router-link to="/admin/support" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
             <i class="bi bi-headset me-3"></i> Support Desk
+          </router-link>
+        </li>
+
+        <li class="nav-item mb-2" v-if="userRole === 'superadmin'">
+          <router-link to="/superadmin/dashboard" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
+            <i class="bi bi-grid-1x2 me-3"></i> Dashboard
+          </router-link>
+        </li>
+
+        <li class="nav-item mb-2" v-if="userRole === 'superadmin'">
+          <router-link to="/superadmin/institutions" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
+            <i class="bi bi-building me-3"></i> Institutions
+          </router-link>
+        </li>
+
+        <li class="nav-item mb-2" v-if="userRole === 'superadmin'">
+          <router-link to="/superadmin/users" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
+            <i class="bi bi-people me-3"></i> All Users
+          </router-link>
+        </li>
+
+        <li class="nav-item mb-2" v-if="userRole === 'superadmin'">
+          <router-link to="/superadmin/reports" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
+            <i class="bi bi-bar-chart-line me-3"></i> Reports
           </router-link>
         </li>
 
@@ -233,17 +253,12 @@
 
           <div v-if="route.path === '/admin/users'">
             <h2 class="fw-bold sb-text">Users</h2>
-            <p class="sb-muted">Search, filter, and manage all platform users.</p>
+            <p class="sb-muted">Search, filter, and manage users.</p>
           </div>
 
           <div v-if="route.path === '/admin/withdrawals'">
             <h2 class="fw-bold sb-text">Cash Outs</h2>
-            <p class="sb-muted">Search, filter, and manage all user cash-outs.</p>
-          </div>
-
-          <div v-if="route.path === '/admin/institutions'">
-            <h2 class="fw-bold sb-text">Institutions</h2>
-            <p class="sb-muted">View and manage requests from partnered institutions.</p>
+            <p class="sb-muted">Search, filter, and manage user cash-outs.</p>
           </div>
 
           <div v-if="route.path === '/admin/reports'">
@@ -254,6 +269,26 @@
           <div v-if="route.path === '/admin/support'">
             <h2 class="fw-bold sb-text">Support Desk</h2>
             <p class="sb-muted">Claim, manage, and resolve user support tickets in real-time.</p>
+          </div>
+
+          <div v-if="route.path === '/superadmin/dashboard'">
+            <h2 class="fw-bold sb-text">Dashboard</h2>
+            <p class="sb-muted">Global platform overview and cross-institution performance.</p>
+          </div>
+
+          <div v-if="route.path === '/superadmin/institutions'">
+            <h2 class="fw-bold sb-text">Institutions</h2>
+            <p class="sb-muted">Add, activate, and manage all partner institutions.</p>
+          </div>
+
+          <div v-if="route.path === '/superadmin/users'">
+            <h2 class="fw-bold sb-text">Users</h2>
+            <p class="sb-muted">View and manage every user across all partner institutions.</p>
+          </div>
+
+          <div v-if="route.path === '/superadmin/reports'">
+            <h2 class="fw-bold sb-text">Platform Reports</h2>
+            <p class="sb-muted">Cross-institution analytics — filter by institution or view globally.</p>
           </div>
 
           <div v-if="route.path === '/tch-requestedSessions'">
@@ -325,23 +360,21 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth' // Import auth store
 import { useSessionsStore } from '@/stores/completedSessions'
 import NotificationBell from '@/components/NotificationBell.vue'
 import RatingReminderBanner from '@/components/RatingReminderBanner.vue'
-import { useNotificationsStore } from '@/stores/notifications'
 import { useChatStore } from '@/stores/chat'
 import router from './router'
 import { SESSION_POLL_INTERVAL_MS } from './config.js'
 import SbToast from '@/components/SbToast.vue'
 import SbThemeToggle from '@/components/SbThemeToggle.vue'
-import SupportModal from '@/components/SupportModal.vue'
+const SupportModal = defineAsyncComponent(() => import('@/components/SupportModal.vue'))
 
 const route = useRoute()
 const authStore = useAuthStore()
-const notificationsStore = useNotificationsStore()
 const chatStore = useChatStore()
 const sessionStore = useSessionsStore()
 const logoutModalRef = ref(null)
@@ -357,72 +390,6 @@ const openSupport = (type = 'Other', id = null) => {
   isSupportModalOpen.value = true
 }
 let pendingSessionsRefreshId = null
-let auroraFrameId = null
-let auroraPointerTarget = { x: 0, y: 0 }
-let auroraMotionEnabled = false
-
-const setAuroraMovement = (x = 0, y = 0) => {
-  const rootStyle = document.documentElement.style
-  rootStyle.setProperty('--sb-aurora-base-x', `${(x * 10).toFixed(2)}px`)
-  rootStyle.setProperty('--sb-aurora-base-y', `${(y * 7).toFixed(2)}px`)
-  rootStyle.setProperty('--sb-aurora-overlay-x', `${(x * 34).toFixed(2)}px`)
-  rootStyle.setProperty('--sb-aurora-overlay-y', `${(y * 26).toFixed(2)}px`)
-  rootStyle.setProperty('--sb-aurora-sheen-x', `${(x * -8).toFixed(2)}px`)
-  rootStyle.setProperty('--sb-aurora-sheen-y', `${(y * -5).toFixed(2)}px`)
-}
-
-const scheduleAuroraMovement = () => {
-  if (auroraFrameId) {
-    return
-  }
-
-  auroraFrameId = window.requestAnimationFrame(() => {
-    auroraFrameId = null
-    setAuroraMovement(auroraPointerTarget.x, auroraPointerTarget.y)
-  })
-}
-
-const handleAuroraPointerMove = (event) => {
-  auroraPointerTarget = {
-    x: ((event.clientX / window.innerWidth) - 0.5) * 2,
-    y: ((event.clientY / window.innerHeight) - 0.5) * 2
-  }
-  scheduleAuroraMovement()
-}
-
-const resetAuroraMovement = () => {
-  auroraPointerTarget = { x: 0, y: 0 }
-  scheduleAuroraMovement()
-}
-
-const setupAuroraPointerMotion = () => {
-  const finePointer = window.matchMedia?.('(pointer: fine)').matches
-  const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-
-  auroraMotionEnabled = Boolean(finePointer && !reducedMotion)
-
-  if (!auroraMotionEnabled) {
-    setAuroraMovement()
-    return
-  }
-
-  window.addEventListener('pointermove', handleAuroraPointerMove, { passive: true })
-  window.addEventListener('pointerleave', resetAuroraMovement)
-  window.addEventListener('blur', resetAuroraMovement)
-}
-
-const teardownAuroraPointerMotion = () => {
-  window.removeEventListener('pointermove', handleAuroraPointerMove)
-  window.removeEventListener('pointerleave', resetAuroraMovement)
-  window.removeEventListener('blur', resetAuroraMovement)
-
-  if (auroraFrameId) {
-    window.cancelAnimationFrame(auroraFrameId)
-    auroraFrameId = null
-  }
-
-  setAuroraMovement()
-}
 
 const clearBootstrapModalState = () => {
   document.body.classList.remove('modal-open')
@@ -484,12 +451,12 @@ const handleVisibilityChange = async () => {
   }
 }
 onMounted(() => {
-  setupAuroraPointerMotion()
-
   if (authStore.isAuthenticated) {
-    notificationsStore.fetchNotifications()
-    chatStore.fetchRooms()
-    chatStore.connectUpdates()
+    deferStartupWork(() => {
+      chatStore.fetchRooms()
+      chatStore.connectUpdates()
+    })
+
     if (userRole.value === 'tutor') {
       sessionStore.fetchSessions()
       document.addEventListener('visibilitychange', handleVisibilityChange)
@@ -502,7 +469,6 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   closeLogoutModal()
-  teardownAuroraPointerMotion()
   document.removeEventListener('visibilitychange', handleVisibilityChange)
 
   if (pendingSessionsRefreshId) {
@@ -585,9 +551,7 @@ onBeforeUnmount(() => {
 }
 
 .app-main-surface {
-  background:
-    var(--sb-aurora-bg, none),
-    var(--sb-bg);
+  background: var(--sb-bg);
 }
 
 .app-main-chat {
@@ -609,7 +573,6 @@ onBeforeUnmount(() => {
   background: color-mix(in srgb, var(--sb-card-bg) 94%, transparent);
   color: var(--sb-text-main);
   box-shadow: 0 28px 80px rgba(0, 0, 0, 0.22);
-  backdrop-filter: blur(28px);
 }
 
 .chat-icon-btn {
@@ -753,15 +716,6 @@ onBeforeUnmount(() => {
   }
 }
 
-@keyframes sb-pulse-dot {
-  0%, 100% {
-    box-shadow: 0 0 0 0 rgba(0, 137, 90, 0.6);
-  }
-  50% {
-    box-shadow: 0 0 0 8px rgba(0, 137, 90, 0);
-  }
-}
-
 @keyframes sb-pop {
   0% {
     transform: scale(0.6);
@@ -798,11 +752,6 @@ onBeforeUnmount(() => {
   to   { opacity: 1; transform: scale(1); }
 }
 
-@keyframes sb-shimmer {
-  0%   { background-position: -600px 0; }
-  100% { background-position:  600px 0; }
-}
-
 @keyframes sb-tab-indicator {
   from { transform: scaleX(0); opacity: 0; }
   to   { transform: scaleX(1); opacity: 1; }
@@ -832,14 +781,7 @@ onBeforeUnmount(() => {
 
 /* --- Layer B: Skeleton shimmer --- */
 .sb-skeleton {
-  background: linear-gradient(
-    90deg,
-    rgba(226, 232, 240, 0.8) 25%,
-    rgba(203, 213, 225, 0.9) 50%,
-    rgba(226, 232, 240, 0.8) 75%
-  );
-  background-size: 600px 100%;
-  animation: sb-shimmer 1.6s ease-in-out infinite;
+  background: rgba(226, 232, 240, 0.86);
   border-radius: 12px;
 }
 

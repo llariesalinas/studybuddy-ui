@@ -2,8 +2,6 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useProfileStore } from '@/stores/profile'
 
-import Dashboard from '@/views/Dashboard.vue'
-
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
@@ -50,7 +48,7 @@ const router = createRouter({
     {
       path: '/dashboard',
       name: 'dashboard',
-      component: Dashboard,
+      component: () => import('@/views/Dashboard.vue'),
       meta: { requiresAuth: true, role: 'Tutee' }
     },
     {
@@ -167,10 +165,10 @@ const router = createRouter({
       meta: { requiresAuth: true, role: 'Admin' }
     },
     {
-      path: '/admin/institutions',
-      name: 'admin-institutions',
+      path: '/superadmin/institutions',
+      name: 'superadmin-institutions',
       component: () => import('@/views/AdminInstitutions.vue'),
-      meta: { requiresAuth: true, role: 'Admin' }
+      meta: { requiresAuth: true, role: 'SuperAdmin' }
     },
     {
       path: '/admin/reports',
@@ -185,6 +183,26 @@ const router = createRouter({
       meta: { requiresAuth: true, role: 'Admin' }
     },
 
+
+    // ---------- SUPERADMIN ROUTES ----------
+    {
+      path: '/superadmin/dashboard',
+      name: 'superadmin-dashboard',
+      component: () => import('@/views/SuperAdminDashboard.vue'),
+      meta: { requiresAuth: true, role: 'SuperAdmin' }
+    },
+    {
+      path: '/superadmin/users',
+      name: 'superadmin-users',
+      component: () => import('@/views/SuperAdminUsers.vue'),
+      meta: { requiresAuth: true, role: 'SuperAdmin' }
+    },
+    {
+      path: '/superadmin/reports',
+      name: 'superadmin-reports',
+      component: () => import('@/views/SuperAdminReports.vue'),
+      meta: { requiresAuth: true, role: 'SuperAdmin' }
+    },
 
     // ---------- SHARED ROUTES ----------
     {
@@ -257,7 +275,7 @@ router.beforeEach(async (to, from, next) => {
         return next('/tutor-setup')
       }
 
-      if (role === 'admin') {
+      if (role === 'admin' || role === 'superadmin') {
         return next()
       }
 
@@ -277,6 +295,10 @@ router.beforeEach(async (to, from, next) => {
 
       if (normalizedUserRole === 'admin') {
         return next('/admin/dashboard')
+      }
+
+      if (normalizedUserRole === 'superadmin') {
+        return next('/superadmin/dashboard')
       }
 
       return next('/')
