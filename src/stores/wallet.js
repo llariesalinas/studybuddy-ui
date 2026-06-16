@@ -1,8 +1,10 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import api from '@/services/api/api'
+import { useCatalogStore } from '@/stores/catalog'
 
 export const useWalletStore = defineStore('wallet', () => {
+  const catalogStore = useCatalogStore()
   const balance = ref(0)
   const pendingAmount = ref(0)
   const cashoutMinimum = ref(500)
@@ -13,27 +15,29 @@ export const useWalletStore = defineStore('wallet', () => {
   const receivingInstitutions = ref([])
   const loading = ref(false)
 
-  const grossEarned = computed(() => {
-    const credits = transactions.value
-      .filter(t => t.transaction_type === 'session_credit')
-      .reduce((sum, t) => sum + Number(t.amount), 0)
-    const deductions = transactions.value
-      .filter(t => t.transaction_type === 'commission_deduction')
-      .reduce((sum, t) => sum + Math.abs(Number(t.amount)), 0)
-    return credits + deductions
+  const totals = computed(() => {
+    let gross = 0
+    let deductions = 0
+    let net = 0
+
+    transactions.value.forEach(t => {
+      const amount = Number(t.amount) || 0
+      if (t.transaction_type === 'session_credit') {
+        gross += amount
+        net += amount
+      } else if (t.transaction_type === 'commission_deduction') {
+        const absAmount = Math.abs(amount)
+        gross += absAmount
+        deductions += absAmount
+      }
+    })
+
+    return { gross, deductions, net }
   })
 
-  const totalDeductions = computed(() =>
-    transactions.value
-      .filter(t => t.transaction_type === 'commission_deduction')
-      .reduce((sum, t) => sum + Math.abs(Number(t.amount)), 0)
-  )
-
-  const netEarned = computed(() =>
-    transactions.value
-      .filter(t => t.transaction_type === 'session_credit')
-      .reduce((sum, t) => sum + Number(t.amount), 0)
-  )
+  const grossEarned = computed(() => totals.value.gross)
+  const totalDeductions = computed(() => totals.value.deductions)
+  const netEarned = computed(() => totals.value.net)
 
   async function fetchWallet() {
     loading.value = true
@@ -64,7 +68,7 @@ export const useWalletStore = defineStore('wallet', () => {
   }
 
   async function fetchReceivingInstitutions(provider = 'instapay') {
-    const { data } = await api.get('wallet/receiving-institutions/', { params: { provider } })
+    const data = await catalogStore.fetchReceivingInstitutions(provider)
     receivingInstitutions.value = data
     return data
   }

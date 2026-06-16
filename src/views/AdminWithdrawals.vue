@@ -547,7 +547,7 @@ const markProcessed = async (w) => {
   if (confirm(`Confirm you have manually sent ₱${w.amount} to ${w.tutor_name}?`)) {
     try {
       await store.updateWithdrawalStatus(w.id, { status: 'processed' })
-    } catch (err) {
+    } catch {
       toastStore.push('Update failed.', 'error')
     }
   }
@@ -561,7 +561,7 @@ const updateStatus = async (status) => {
         failure_reason: failureReason.value
       })
       activeWithdrawal.value = null
-    } catch (err) {
+    } catch {
       toastStore.push('Update failed.', 'error')
     }
   }

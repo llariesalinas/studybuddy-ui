@@ -11,13 +11,15 @@ export const useAdminStore = defineStore(
     const withdrawals = ref([])
     const institutions = ref([])
     const analytics = ref(null)
+    const tutorApplications = ref([])
 
     const loading = ref({
       stats: false,
       users: false,
       withdrawals: false,
       institutions: false,
-      analytics: false
+      analytics: false,
+      tutorApplications: false
     })
 
     const error = ref({
@@ -25,7 +27,8 @@ export const useAdminStore = defineStore(
       users: null,
       withdrawals: null,
       institutions: null,
-      analytics: null
+      analytics: null,
+      tutorApplications: null
     })
 
     let statsPromise = null
@@ -46,7 +49,7 @@ export const useAdminStore = defineStore(
 
       statsPromise = (async () => {
         try {
-          const response = await api.get('/admin/stats')
+          const response = await api.get('/admin/stats/')
           stats.value = response.data
         } catch (err) {
           console.error('Failed to load statistics:', err)
@@ -75,7 +78,7 @@ export const useAdminStore = defineStore(
 
       usersPromise = (async () => {
         try {
-          const response = await api.get('/admin/users', { params })
+          const response = await api.get('/admin/users/', { params })
           users.value = response.data
         } catch (err) {
           console.error('Failed to load users:', err)
@@ -144,7 +147,7 @@ export const useAdminStore = defineStore(
       withdrawalsPromise = (async () => {
         try {
           const params = status ? { status } : {}
-          const response = await api.get('/admin/withdrawals', { params })
+          const response = await api.get('/admin/withdrawals/', { params })
           withdrawals.value = response.data
         } catch (err) {
           console.error('Failed to load withdrawals:', err)
@@ -183,7 +186,7 @@ export const useAdminStore = defineStore(
 
       institutionsPromise = (async () => {
         try {
-          const response = await api.get('/admin/institutions')
+          const response = await api.get('/admin/institutions/')
           institutions.value = response.data
         } catch (err) {
           console.error('Failed to load institutions:', err)
@@ -245,7 +248,7 @@ export const useAdminStore = defineStore(
 
       analyticsPromise = (async () => {
         try {
-          const response = await api.get('/admin/analytics')
+          const response = await api.get('/admin/analytics/')
           analytics.value = response.data
         } catch (err) {
           console.error('Failed to load analytics:', err)
@@ -259,12 +262,56 @@ export const useAdminStore = defineStore(
       return analyticsPromise
     }
 
+    let tutorApplicationsPromise = null
+    const fetchTutorApplications = async (status = null, force = false) => {
+      const params = status ? { status } : {}
+      if (tutorApplications.value.length && !status && !force) return
+
+      if (tutorApplicationsPromise) {
+        await tutorApplicationsPromise
+        if (!force) return
+      }
+
+      loading.value.tutorApplications = true
+      error.value.tutorApplications = null
+
+      tutorApplicationsPromise = (async () => {
+        try {
+          const response = await api.get('/admin/tutor-applications/', { params })
+          tutorApplications.value = response.data
+        } catch (err) {
+          console.error('Failed to load tutor applications:', err)
+          error.value.tutorApplications = 'Failed to load tutor applications.'
+        } finally {
+          loading.value.tutorApplications = false
+          tutorApplicationsPromise = null
+        }
+      })()
+
+      return tutorApplicationsPromise
+    }
+
+    const updateTutorApplicationStatus = async (id, applicationStatus, rejectionReason = '') => {
+      try {
+        await api.patch(`/admin/tutor-applications/${id}/`, {
+          application_status: applicationStatus,
+          rejection_reason: rejectionReason
+        })
+        await fetchTutorApplications(null, true)
+        await fetchStats(true)
+      } catch (err) {
+        console.error('Failed to update tutor application:', err)
+        throw err
+      }
+    }
+
     return {
       stats,
       users,
       withdrawals,
       institutions,
       analytics,
+      tutorApplications,
       loading,
       error,
 
@@ -280,7 +327,10 @@ export const useAdminStore = defineStore(
       addInstitution,
       toggleInstitutionActive,
 
-      fetchAnalytics
+      fetchAnalytics,
+
+      fetchTutorApplications,
+      updateTutorApplicationStatus
     }
 
   },
@@ -294,7 +344,8 @@ export const useAdminStore = defineStore(
         'stats',
         'users',
         'withdrawals',
-        'institutions'
+        'institutions',
+        'tutorApplications'
       ]
     }
   }

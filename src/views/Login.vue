@@ -133,9 +133,15 @@ const getErrorMessage = (error, fallback) => {
 const redirectForRole = (role) => {
   const normalizedRole = role?.toLowerCase()
 
-  if (normalizedRole === 'tutor') router.push('/tch-dashboard')
+  if (
+    normalizedRole === 'tutor' &&
+    ['pending', 'rejected'].includes(authStore.user?.application_status)
+  ) {
+    router.push('/application-status')
+  } else if (normalizedRole === 'tutor') router.push('/tch-dashboard')
   else if (normalizedRole === 'tutee') router.push('/dashboard')
   else if (normalizedRole === 'admin') router.push('/admin/dashboard')
+  else if (normalizedRole === 'superadmin') router.push('/superadmin/dashboard')
   else router.push('/')
 }
 

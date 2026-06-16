@@ -93,6 +93,7 @@ REST_FRAMEWORK = {
         'anon': '60/min',
         'user': '240/min',
         'login': '5/min',
+        'register': '10/hour',
     },
 }
 
@@ -110,6 +111,8 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
+    'anymail',
+    'django_q',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -210,6 +213,12 @@ _configured_default_from_email = os.getenv("DEFAULT_FROM_EMAIL", "")
 DEFAULT_FROM_EMAIL = _configured_default_from_email or "StudyBuddy <no-reply@localhost>"
 EMAIL_TIMEOUT = int(os.getenv("EMAIL_TIMEOUT") or "10")
 
+# Resend (https://resend.com) via django-anymail. Preferred transport when an API key
+# is present; falls back to SMTP (legacy) or the console backend (local dev).
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
+ANYMAIL = {"RESEND_API_KEY": RESEND_API_KEY}
+_resend_configured = bool(RESEND_API_KEY and _configured_default_from_email)
+
 _smtp_configured = all([
     EMAIL_HOST,
     EMAIL_HOST_USER,
@@ -217,19 +226,80 @@ _smtp_configured = all([
     _configured_default_from_email,
 ])
 
-if DEBUG and not _smtp_configured:
+if _resend_configured:
+    EMAIL_BACKEND = "anymail.backends.resend.EmailBackend"
+elif DEBUG and not _smtp_configured:
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 elif not _smtp_configured:
     raise RuntimeError(
-        "SMTP email env vars are required when DEBUG=false: "
-        "EMAIL_HOST, EMAIL_HOST_USER, EMAIL_HOST_PASSWORD, DEFAULT_FROM_EMAIL"
+        "Email transport not configured when DEBUG=false: set RESEND_API_KEY + "
+        "DEFAULT_FROM_EMAIL, or the SMTP env vars "
+        "(EMAIL_HOST, EMAIL_HOST_USER, EMAIL_HOST_PASSWORD, DEFAULT_FROM_EMAIL)."
     )
 else:
     EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend")
 
+# Limit upload size to prevent large files from tying up worker threads.
+# Files larger than FILE_UPLOAD_MAX_MEMORY_SIZE are streamed to a temp file.
+# The hard ceiling (DATA_UPLOAD_MAX_MEMORY_SIZE) is enforced by Django before
+# the view code runs.
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024   # 10 MB hard ceiling on non-file POST data
+FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024    # 5 MB — files above this go to temp disk
+
 PASSWORD_RESET_TIMEOUT = 3600
 LOGIN_OTP_TTL_SECONDS = 600
 LOGIN_OTP_MAX_ATTEMPTS = 5
+
+# Email resilience tuning (used by studybuddy.mailer)
+# OTP is sent synchronously on the login critical path, so keep its timeout short
+# and retry only a couple of times before failing honestly back to the user.
+EMAIL_SYNC_TIMEOUT = int(os.getenv("EMAIL_SYNC_TIMEOUT") or "6")
+# Sync OTP path fails fast (fewer attempts) so a provider outage can't stall login
+# much past the original ~10s ceiling and exhaust the request/worker pool.
+EMAIL_SYNC_MAX_ATTEMPTS = int(os.getenv("EMAIL_SYNC_MAX_ATTEMPTS") or "2")
+# Async path (Q_CLUSTER) has no one waiting, so it tolerates more retries.
+EMAIL_SEND_MAX_ATTEMPTS = int(os.getenv("EMAIL_SEND_MAX_ATTEMPTS") or "3")
+EMAIL_SEND_RETRY_BACKOFF = float(os.getenv("EMAIL_SEND_RETRY_BACKOFF") or "0.5")
+# Per-recipient send cap (defence on top of the per-IP throttle) to protect the
+# provider's daily quota from a single abused address.
+EMAIL_SEND_CAP_PER_HOUR = int(os.getenv("EMAIL_SEND_CAP_PER_HOUR") or "10")
+
+
+# Django-Q2 background task queue. Uses the existing database as the broker (ORM
+# broker) so no Redis/extra service is required. Run the worker with
+# `python manage.py qcluster`. Async email (password reset / notices) is dispatched
+# here; login OTP stays synchronous by design.
+Q_CLUSTER = {
+    "name": "studybuddy",
+    "orm": "default",
+    "workers": int(os.getenv("Q_WORKERS") or "2"),
+    "timeout": 60,
+    "retry": 120,
+    "max_attempts": EMAIL_SEND_MAX_ATTEMPTS,
+    "save_limit": 250,
+    "catch_up": False,
+    "label": "Django Q",
+}
+
+# Cache backend. Redis when REDIS_URL is set (preferred: fast and shared across
+# worker processes — required for correct invalidation in multi-worker prod).
+# Without REDIS_URL we fall back to a per-process in-memory cache so local dev and
+# CI run without a Redis server (degraded: not shared across processes).
+REDIS_URL = os.getenv("REDIS_URL", "")
+
+if REDIS_URL:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": REDIS_URL,
+        }
+    }
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        }
+    }
 
 
 # Static files (CSS, JavaScript, Images)

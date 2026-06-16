@@ -11,6 +11,8 @@ from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth.tokens import default_token_generator
 from django.core.exceptions import ValidationError
+from . import mailer
+from .mailer import EmailRateLimitError
 from django.core.mail import send_mail
 from django.utils.timezone import now
 from django.utils.crypto import constant_time_compare
@@ -33,8 +35,14 @@ from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, Ou
 
 
 class LoginRateThrottle(AnonRateThrottle):
-    """Per-IP throttle for unauthenticated auth endpoints (login/register)."""
+    """Per-IP throttle for unauthenticated auth endpoints (login/OTP)."""
     scope = 'login'
+
+
+class RegisterRateThrottle(AnonRateThrottle):
+    """Per-IP throttle for registration — more lenient than login to allow
+    form correction attempts, but still capped to prevent abuse."""
+    scope = 'register'
 from rest_framework.views import APIView
 from rest_framework.generics import ListAPIView
 from django.db.models import Avg, Case, When, Value, IntegerField, Q, Count
@@ -44,6 +52,12 @@ from .recommender.hybrid import recommend_tutors_hybrid
 from .recommender.CF import build_rating_matrix
 
 from .recommender.cbf import recommend_tutors
+from .recommender.dashboard import (
+    bump_dashboard_recs_cache_version,
+    dashboard_recs_cache_key,
+    get_dashboard_recommendations,
+)
+from django.core.cache import cache
 from .models import Booking, Course, EmailOTPChallenge, Notification, PartnerInstitution, Payment, PaymentMethod, Preference, Rating, Subjects, Tutor, TutorApplication, TutorAvailability, TutorAvailabilityOverride, TutorSubjects, Wallet, PlatformActivity, Transaction, TutorPayoutAccount
 from .serializers import (
     NotificationSerializer,
@@ -108,7 +122,7 @@ OTP_ERROR_MESSAGE = "Invalid or expired verification code."
 
 def build_login_response_payload(user, profile):
     refresh = RefreshToken.for_user(user)
-    
+
     application_status = None
     if profile.role == 'Tutor':
         try:
@@ -156,20 +170,6 @@ def get_login_otp_expiry():
     return timezone.now() + timedelta(seconds=settings.LOGIN_OTP_TTL_SECONDS)
 
 
-def send_login_otp_email(user, code):
-    ttl_minutes = max(1, settings.LOGIN_OTP_TTL_SECONDS // 60)
-    send_mail(
-        subject="Your StudyBuddy login code",
-        message=(
-            f"Your StudyBuddy login verification code is {code}.\n\n"
-            f"This code expires in {ttl_minutes} minutes."
-        ),
-        from_email=None,
-        recipient_list=[user.email or user.username],
-        fail_silently=False,
-    )
-
-
 def create_login_otp_challenge(user):
     EmailOTPChallenge.objects.filter(
         user=user,
@@ -192,7 +192,10 @@ def create_login_otp_challenge(user):
     challenge.save()
 
     try:
-        send_login_otp_email(user, code)
+        mailer.send_login_otp(user, code)
+    except EmailRateLimitError:
+        challenge.delete()
+        raise
     except Exception:
         challenge.delete()
         logger.exception("Failed to send login OTP email for user_id=%s", user.id)
@@ -215,41 +218,6 @@ def build_otp_challenge_response(challenge, message):
         payload["debug_code"] = challenge.debug_code
 
     return payload
-
-
-def get_password_reset_url(user):
-    uid = urlsafe_base64_encode(force_bytes(user.pk))
-    token = default_token_generator.make_token(user)
-    return f"{settings.FRONTEND_URL.rstrip('/')}/reset-password/{uid}/{token}"
-
-
-def send_password_reset_email(user):
-    reset_url = get_password_reset_url(user)
-    send_mail(
-        subject="Reset your StudyBuddy password",
-        message=(
-            "We received a request to reset your StudyBuddy password.\n\n"
-            "Use this link to choose a new password:\n\n"
-            f"{reset_url}\n\n"
-            "If you did not request this, you can ignore this email."
-        ),
-        from_email=None,
-        recipient_list=[user.email or user.username],
-        fail_silently=False,
-    )
-
-
-def send_password_changed_email(user):
-    send_mail(
-        subject="Your StudyBuddy password was changed",
-        message=(
-            "Your StudyBuddy password was changed successfully.\n\n"
-            "If you did not make this change, please contact support immediately."
-        ),
-        from_email=None,
-        recipient_list=[user.email or user.username],
-        fail_silently=False,
-    )
 
 
 def get_user_from_reset_uid(uid):
@@ -666,7 +634,7 @@ def partner_institutions_list(request):
 
 @api_view(['POST'])
 @authentication_classes([])
-@throttle_classes([LoginRateThrottle])
+@throttle_classes([RegisterRateThrottle])
 @transaction.atomic
 def register_user(request):
 
@@ -714,7 +682,7 @@ def register_user(request):
                     is_rejected_tutor = True
             except TutorApplication.DoesNotExist:
                 pass
-        
+
         if not is_rejected_tutor:
             return Response(
                 {"error": "User already exists"},
@@ -775,6 +743,13 @@ def register_user(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        MAX_UPLOAD_SIZE = 5 * 1024 * 1024  # 5 MB
+        if school_id.size > MAX_UPLOAD_SIZE or enrollment_proof.size > MAX_UPLOAD_SIZE:
+            return Response(
+                {"error": "Each uploaded file must be under 5 MB. Please compress your images and try again."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         TutorApplication.objects.update_or_create(
             profile=profile,
             defaults={
@@ -786,15 +761,21 @@ def register_user(request):
             }
         )
 
-        # Send confirmation email
-        try:
-            send_application_received_email(profile)
-        except Exception:
-            logger.exception("Failed to send tutor application received email for profile_id=%s", profile.id)
+        # Send confirmation email after the transaction commits so the DB write is
+        # guaranteed to be visible and the email send does not block/extend the lock.
+        def _send_confirmation():
+            try:
+                send_application_received_email(profile)
+            except Exception:
+                logger.exception(
+                    "Failed to send tutor application received email for profile_id=%s", profile.id
+                )
+        transaction.on_commit(_send_confirmation)
 
     PlatformActivity.objects.create(
         activity_type='registration',
-        message=f"New {role} registered: {fname} {lname} ({email})"
+        message=f"New {role} registered: {fname} {lname} ({email})",
+        institution=profile.institution
     )
 
     logger.info(
@@ -854,7 +835,7 @@ def login_view(request):
         )
 
     try:
-        profile = UserProfile.objects.get(user=user)
+        profile = UserProfile.objects.select_related('tutor_application', 'institution').get(user=user)
     except UserProfile.DoesNotExist:
         return Response(
             {"error": "User profile not found"},
@@ -867,22 +848,18 @@ def login_view(request):
             status=status.HTTP_403_FORBIDDEN
         )
 
-    # 🔥 Check tutor application status
+    # Block login if tutor application is still pending
     if profile.role == 'Tutor':
         try:
-            application = profile.tutor_application
-            if application.application_status == 'rejected':
+            if hasattr(profile, 'tutor_application') and profile.tutor_application.application_status == 'pending':
                 return Response(
-                    {
-                        "error": "Your application was rejected. Please contact support or reapply in the registration page.",
-                        "rejected": True
-                    },
+                    {"error": "Your application is still being processed. We will email you once it is approved."},
                     status=status.HTTP_403_FORBIDDEN
                 )
-        except TutorApplication.DoesNotExist:
-            pass
+        except Exception:
+            logger.exception("Error checking tutor application status for profile_id=%s", profile.id)
 
-    if not profile.is_domain_exempt and profile.role != 'Admin':
+    if not profile.is_domain_exempt and profile.role not in ['Admin', 'SuperAdmin']:
         email_domain = normalize_email_domain(email)
         active_institution = get_active_institution_by_domain(email_domain)
 
@@ -918,6 +895,11 @@ def login_view(request):
 
     try:
         challenge = create_login_otp_challenge(user)
+    except EmailRateLimitError:
+        return Response(
+            {"error": "Too many verification emails. Please wait a while and try again."},
+            status=status.HTTP_429_TOO_MANY_REQUESTS
+        )
     except Exception:
         return Response(
             {"error": "Unable to send verification code. Please try again."},
@@ -943,9 +925,9 @@ def password_reset_request(request):
         user = User.objects.filter(Q(username__iexact=email) | Q(email__iexact=email)).first()
         if user and user.is_active and user.has_usable_password():
             try:
-                send_password_reset_email(user)
+                mailer.enqueue_password_reset(user)
             except Exception:
-                logger.exception("Failed to send password reset email for user_id=%s", user.id)
+                logger.exception("Failed to queue password reset email for user_id=%s", user.id)
 
     return Response({"message": PASSWORD_RESET_GENERIC_MESSAGE})
 
@@ -992,9 +974,9 @@ def password_reset_confirm(request):
     blacklist_user_refresh_tokens(user)
 
     try:
-        send_password_changed_email(user)
+        mailer.enqueue_password_changed(user)
     except Exception:
-        logger.exception("Failed to send password changed notification for user_id=%s", user.id)
+        logger.exception("Failed to queue password changed notification for user_id=%s", user.id)
 
     return Response({"message": "Password has been reset successfully."})
 
@@ -1096,7 +1078,12 @@ def login_resend_otp(request):
     new_expiry = get_login_otp_expiry()
 
     try:
-        send_login_otp_email(challenge.user, code)
+        mailer.send_login_otp(challenge.user, code)
+    except EmailRateLimitError:
+        return Response(
+            {"error": "Too many verification emails. Please wait a while and try again."},
+            status=status.HTTP_429_TOO_MANY_REQUESTS
+        )
     except Exception:
         logger.exception("Failed to resend login OTP email for user_id=%s", challenge.user_id)
         return Response(
@@ -1172,8 +1159,10 @@ def student_dashboard(request):
         status='Confirmed',
         session_date__gte=today
     ).select_related(
+        'student',
         'tutor__profile__course',
-        'availability'
+        'availability',
+        'rating'
     ).order_by('session_date', 'availability__time_slot')
 
     grouped_upcoming = defaultdict(list)
@@ -1230,8 +1219,10 @@ def student_dashboard(request):
         student=user_profile,
         status='Completed'
     ).select_related(
+        'student',
         'tutor__profile__course',
-        'availability'
+        'availability',
+        'rating'
     ).order_by('-session_date', 'availability__time_slot')
 
     grouped_completed = defaultdict(list)
@@ -1282,30 +1273,30 @@ def student_dashboard(request):
         })
 
     # -----------------------
-    # RECOMMENDED TUTORS
+    # RECOMMENDED TUTORS (hybrid algorithm, cached per tutee)
     # -----------------------
-    tutors = Tutor.objects.all().select_related('profile')[:3]
-
-    recommendations = []
-
-    for tutor in tutors:
-
-        tutor_subjects = TutorSubjects.objects.filter(
-            tutor=tutor
-        ).select_related('subject')
-
-        recommendations.append({
-            "id": tutor.profile.id,
-            "name": f"{tutor.profile.fname} {tutor.profile.lname}",
-            "rating": tutor.rating_average,
-            "subjects": [ts.subject.subject_name for ts in tutor_subjects],
-            "hourlyRate": tutor.hourly_rate
-        })
+    recommendations = get_dashboard_recommendations(user_profile)
 
     return Response({
         "upcoming": upcoming,
         "completed": completed,
         "recommendations": recommendations
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def dashboard_recommendations(request):
+    """Return only the (cached) dashboard recommendations.
+
+    The tutee dashboard previously called student_dashboard just to read
+    `recommendations`, discarding its all-time `upcoming`/`completed` payloads.
+    This serves the cached recs directly via get_dashboard_recommendations
+    (recommender/dashboard.py), turning that call into a cache hit.
+    """
+    user_profile = request.user.userprofile
+    return Response({
+        "recommendations": get_dashboard_recommendations(user_profile)
     })
 
 #SearchTutors
@@ -1331,7 +1322,7 @@ class SearchTutorsView(APIView):
 
 class SubjectListView(ListAPIView):
     queryset = Subjects.objects.all()
-    serializer_class = SubjectSerializer    
+    serializer_class = SubjectSerializer
 
 
 
@@ -1725,7 +1716,7 @@ def tutor_availability(request, tutor_id):
         "month_offset": month_offset,
         "weeks": weeks
     })
-    
+
 
 #bulk booking request
 
@@ -1771,8 +1762,8 @@ def bulk_booking(request):
 
     return Response({"message": "Booking successful"})"""
 
-#Confirm payment View 
-# Confirm payment View 
+#Confirm payment View
+# Confirm payment View
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def confirm_payment_and_book(request):
@@ -2394,11 +2385,11 @@ def list_bookings(request):
     if profile.role == "Tutor":
         bookings = Booking.objects.filter(
             tutor__profile=profile
-        ).select_related('student', 'availability', 'tutor__profile', 'rating')
+        ).select_related('student', 'availability', 'tutor__profile__course', 'rating')
     else:
         bookings = Booking.objects.filter(
             student=profile
-        ).select_related('student', 'availability', 'tutor__profile', 'rating')
+        ).select_related('student', 'availability', 'tutor__profile__course', 'rating')
 
     bookings = bookings.order_by("session_date", "availability__time_slot")
 
@@ -2644,7 +2635,8 @@ def tutor_confirm_booking(request, booking_id):
 
         PlatformActivity.objects.create(
             activity_type='booking_completed',
-            message=f"Session completed: {representative_booking.student.fname} with {representative_booking.tutor.profile.fname}"
+            message=f"Session completed: {representative_booking.student.fname} with {representative_booking.tutor.profile.fname}",
+            institution=representative_booking.tutor.profile.institution
         )
 
     return Response({"message": "Session marked as completed successfully."})
@@ -2728,6 +2720,7 @@ def submit_session_rating(request, booking_id):
         comment=request.data.get("comment", "")
     )
     update_tutor_rating_average(representative_booking.tutor)
+    bump_dashboard_recs_cache_version()
 
     return Response({"message": "Rating submitted successfully."}, status=201)
 
@@ -2738,7 +2731,7 @@ def list_notifications(request):
 
     notifications = Notification.objects.filter(
         recipient=request.user.userprofile
-    ).order_by('-created_at')
+    ).select_related('recipient').order_by('-created_at')
 
     serializer = NotificationSerializer(notifications, many=True)
     return Response(serializer.data)
@@ -2773,6 +2766,8 @@ def save_preferences(request):
     if subject_ids:
         pref.subjects.set(subject_ids)
 
+    cache.delete(dashboard_recs_cache_key(profile))
+
     return Response({
         "message": "Preferences saved successfully"
     })
@@ -2791,6 +2786,7 @@ def tutor_setup(request):
     tutor.response_time = request.data.get("response_time", tutor.response_time)
 
     tutor.save()
+    bump_dashboard_recs_cache_version()
 
     profile.profile_completed = True
     profile.save()
@@ -2846,28 +2842,29 @@ def get_recommendation_candidate_tutors(
     start_time=None,
     end_time=None,
 ):
-    candidates = Tutor.objects.filter(
+    base_candidates = Tutor.objects.filter(
         tutorsubjects__subject__subject_code=subject
     )
 
     if preferred_mode == "Online":
-        candidates = candidates.filter(can_online=True)
+        base_candidates = base_candidates.filter(can_online=True)
     elif preferred_mode in ["Face-to-face", "F2F"]:
-        candidates = candidates.filter(can_f2f=True)
+        base_candidates = base_candidates.filter(can_f2f=True)
 
     if min_budget not in [None, ""]:
-        candidates = candidates.filter(hourly_rate__gte=min_budget)
+        base_candidates = base_candidates.filter(hourly_rate__gte=min_budget)
 
     if max_budget not in [None, ""]:
-        candidates = candidates.filter(hourly_rate__lte=max_budget)
+        base_candidates = base_candidates.filter(hourly_rate__lte=max_budget)
 
     session_date = parse_request_date(requested_date)
     required_slots = get_recommendation_time_slots(start_time, end_time)
 
+    # Stage 1: Exact Match (Date + All Time Slots)
     if session_date and required_slots:
         weekday = WEEKDAY_MAP[session_date.weekday()]
 
-        candidates = candidates.filter(
+        stage1_candidates = base_candidates.filter(
             tutoravailability__day=weekday,
             tutoravailability__time_slot__in=required_slots,
             tutoravailability__is_active=True,
@@ -2888,9 +2885,8 @@ def get_recommendation_candidate_tutors(
         conflicting_tutor_ids = Booking.objects.filter(
             session_date=session_date,
             status__in=RECOMMENDATION_BLOCKING_STATUSES,
-            availability__day=weekday,
             availability__time_slot__in=required_slots,
-        ).values_list("tutor_id", flat=True)
+        ).values_list('tutor_id', flat=True)
 
         full_day_override_tutor_ids = TutorAvailabilityOverride.objects.filter(
             override_date=session_date,
@@ -2904,15 +2900,30 @@ def get_recommendation_candidate_tutors(
             availability__time_slot__in=required_slots,
         ).values_list("tutor_id", flat=True)
 
-        candidates = candidates.exclude(
-            profile_id__in=conflicting_tutor_ids
+        stage1_candidates = stage1_candidates.exclude(
+            id__in=conflicting_tutor_ids
         ).exclude(
-            profile_id__in=full_day_override_tutor_ids
+            id__in=full_day_override_tutor_ids
         ).exclude(
-            profile_id__in=slot_override_tutor_ids
+            id__in=slot_override_tutor_ids
         )
 
-    return candidates.distinct()
+        if stage1_candidates.exists():
+            return stage1_candidates
+
+    # Stage 2: Fallback (Date only, ignore time slots)
+    if session_date:
+        weekday = WEEKDAY_MAP[session_date.weekday()]
+        stage2_candidates = base_candidates.filter(
+            tutoravailability__day=weekday,
+            tutoravailability__is_active=True,
+        ).distinct()
+
+        if stage2_candidates.exists():
+            return stage2_candidates
+
+    # Stage 3: Broad Fallback (Subject only, ignore date/time)
+    return base_candidates.distinct()
 
 
 @api_view(['POST'])
@@ -2984,7 +2995,7 @@ def recommend_tutors_view(request):
 
     return Response(data, status=200)
 
-#Setup Profile 
+#Setup Profile
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def setup_profile(request):
@@ -3045,6 +3056,8 @@ def update_tutee_profile(request):
 
     pref.save()
 
+    cache.delete(dashboard_recs_cache_key(profile))
+
     return Response({"message": "Profile updated successfully"})
 
 
@@ -3078,11 +3091,11 @@ def get_tutee_profile(request):
 def upload_tutee_avatar(request):
     if 'avatar' not in request.FILES:
         return Response({'error': 'No avatar provided'}, status=400)
-    
+
     avatar = request.FILES['avatar']
     if not avatar.content_type.startswith('image/'):
         return Response({'error': 'File must be an image'}, status=400)
-    
+
     if avatar.size > 5 * 1024 * 1024:
         return Response({'error': 'Image must be under 5MB'}, status=400)
 
@@ -3091,7 +3104,7 @@ def upload_tutee_avatar(request):
         profile.profile_picture.delete(save=False)
     profile.profile_picture = avatar
     profile.save()
-    
+
     return Response({
         "profile_picture_url": request.build_absolute_uri(profile.profile_picture.url)
     })
@@ -3166,6 +3179,8 @@ def add_tutor_subject(request):
         tutor_subject.description = description or ''
         tutor_subject.save(update_fields=['description'])
 
+    bump_dashboard_recs_cache_version()
+
     return Response({"message": "Subject added"})
 
 @api_view(['PATCH'])
@@ -3184,6 +3199,8 @@ def update_tutor_subject(request, subject_code):
     tutor_subject.description = request.data.get("description", '') or ''
     tutor_subject.save(update_fields=['description'])
 
+    bump_dashboard_recs_cache_version()
+
     return Response({"message": "Subject updated"})
 
 @api_view(['DELETE'])
@@ -3193,10 +3210,13 @@ def remove_tutor_subject(request, subject_code):
     profile = request.user.userprofile
     tutor = Tutor.objects.get(profile=profile)
 
-    TutorSubjects.objects.filter(
+    deleted_count, _ = TutorSubjects.objects.filter(
         tutor=tutor,
         subject__subject_code=subject_code
     ).delete()
+
+    if deleted_count:
+        bump_dashboard_recs_cache_version()
 
     return Response({"message": "Subject removed"})
 
@@ -3215,6 +3235,7 @@ def update_tutor_profile(request):
     )
     serializer.is_valid(raise_exception=True)
     serializer.save()
+    bump_dashboard_recs_cache_version()
 
     return Response({
         "message": "Tutor profile updated successfully",
@@ -3379,9 +3400,9 @@ def wallet_status(request):
         tutor = Tutor.objects.get(profile__user=request.user)
     except Tutor.DoesNotExist:
         return Response({"error": "Not a tutor"}, status=403)
-        
+
     wallet, created = Wallet.objects.get_or_create(tutor=tutor)
-    
+
     return Response({
         "balance": float(wallet.balance),
         "pending_amount": float(wallet.pending_amount),
@@ -3567,10 +3588,10 @@ def wallet_transactions(request):
         tutor = Tutor.objects.get(profile__user=request.user)
     except Tutor.DoesNotExist:
         return Response({"error": "Not a tutor"}, status=403)
-        
+
     wallet, _ = Wallet.objects.get_or_create(tutor=tutor)
     transactions = Transaction.objects.filter(wallet=wallet).order_by('-created_at')
-    
+
     data = []
     for tx in transactions:
         payment_transaction_id = get_wallet_transaction_payment_reference(tx)
@@ -3596,9 +3617,9 @@ def list_withdrawals(request):
         tutor = Tutor.objects.get(profile__user=request.user)
     except Tutor.DoesNotExist:
         return Response({"error": "Not a tutor"}, status=403)
-        
+
     withdrawals = WithdrawalRequest.objects.filter(tutor=tutor).order_by('-requested_at')
-    
+
     data = []
     for w in withdrawals:
         data.append({
@@ -3621,13 +3642,13 @@ def request_withdrawal(request):
         tutor = Tutor.objects.get(profile__user=request.user)
     except Tutor.DoesNotExist:
         return Response({"error": "Not a tutor"}, status=403)
-        
+
     wallet, _ = Wallet.objects.get_or_create(tutor=tutor)
-    
+
     amount = request.data.get('amount')
     if not amount or decimal.Decimal(str(amount)) > wallet.balance:
         return Response({"error": "Insufficient balance"}, status=400)
-    
+
     if decimal.Decimal(str(amount)) < 500:
         return Response({"error": "Minimum withdrawal is ₱500"}, status=400)
 
@@ -3641,10 +3662,10 @@ def request_withdrawal(request):
             bank_name=request.data.get('bank_name', ''),
             status='pending'
         )
-        
+
         wallet.balance -= decimal.Decimal(str(amount))
         wallet.save()
-        
+
         Transaction.objects.create(
             wallet=wallet,
             transaction_type='withdrawal',
@@ -3896,7 +3917,7 @@ def initiate_online_payment(request):
     """Creates a PayMongo Checkout Session."""
     booking_id = request.data.get('booking_id')
     booking = get_object_or_404(Booking, id=booking_id, student__user=request.user)
-    
+
     # Calculate amount: Hourly Rate * Duration (sum of slots)
     group_bookings = get_booking_request_bookings(booking)
     representative_booking = get_representative_booking(group_bookings)
@@ -3904,7 +3925,7 @@ def initiate_online_payment(request):
     total_amount = decimal.Decimal(str(representative_booking.tutor.hourly_rate)) * decimal.Decimal(
         str(duration_hours)
     )
-    
+
     # PayMongo amount in centavos
     amount_cents = int(total_amount * decimal.Decimal("100"))
     reference_code = f"SB-BK-{representative_booking.id}"
@@ -3935,7 +3956,7 @@ def initiate_online_payment(request):
             }
         }
     }
-    
+
     try:
         response = requests.post(url, json=payload, headers=get_paymongo_auth_headers())
         try:
@@ -3947,7 +3968,7 @@ def initiate_online_payment(request):
             "PayMongo checkout response status=%s",
             response.status_code,
         )
-        
+
         if response.status_code in (200, 201):
             checkout_url = (
                 res_data
@@ -3967,13 +3988,13 @@ def initiate_online_payment(request):
                     error_response["provider_error"] = res_data
 
                 return Response(error_response, status=status.HTTP_502_BAD_GATEWAY)
-            
+
             # Store payment record
             method_online, _ = PaymentMethod.objects.get_or_create(
                 code='PAYMONGO',
                 defaults={'method_name': 'Pay Online (GCash / Card)', 'is_active': True}
             )
-            
+
             payment, _ = Payment.objects.get_or_create(
                 booking=representative_booking,
                 defaults={
@@ -3992,7 +4013,7 @@ def initiate_online_payment(request):
                 'payment_status',
                 'transaction_reference',
             ])
-            
+
             return Response({"payment_url": checkout_url})
 
         provider_message = get_paymongo_error_message(res_data)
@@ -4257,18 +4278,23 @@ def create_support_ticket(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def admin_claim_ticket(request, ticket_id):
-    if request.user.userprofile.role != 'Admin':
+    profile = request.user.userprofile
+    if profile.role not in ('Admin', 'SuperAdmin'):
         return Response(status=403)
 
     from .models import SupportTicket
-    ticket = get_object_or_404(SupportTicket, id=ticket_id)
+    queryset = SupportTicket.objects.all()
+    if profile.role != 'SuperAdmin':
+        queryset = queryset.filter(user__institution=profile.institution)
+
+    ticket = get_object_or_404(queryset, id=ticket_id)
 
     try:
         with transaction.atomic():
-            ticket.assigned_agent = request.user.userprofile
+            ticket.assigned_agent = profile
             ticket.status = 'In_Progress'
 
-            ticket.chatroom.tutor = request.user.userprofile
+            ticket.chatroom.tutor = profile
 
             ticket.save()
             ticket.chatroom.save()
@@ -4307,11 +4333,15 @@ def list_my_tickets(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def admin_list_tickets(request):
-    if request.user.userprofile.role != 'Admin':
+    profile = request.user.userprofile
+    if profile.role not in ('Admin', 'SuperAdmin'):
         return Response(status=403)
 
     from .models import SupportTicket
-    tickets = SupportTicket.objects.all().order_by('-created_at')
+    tickets = SupportTicket.objects.select_related('user', 'assigned_agent').all().order_by('-created_at')
+
+    if profile.role != 'SuperAdmin':
+        tickets = tickets.filter(user__institution=profile.institution)
 
     data = []
     for ticket in tickets:
@@ -4339,11 +4369,16 @@ def admin_list_tickets(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def admin_resolve_ticket(request, ticket_id):
-    if request.user.userprofile.role != 'Admin':
+    profile = request.user.userprofile
+    if profile.role not in ('Admin', 'SuperAdmin'):
         return Response(status=403)
 
     from .models import SupportTicket
-    ticket = get_object_or_404(SupportTicket, id=ticket_id)
+    queryset = SupportTicket.objects.all()
+    if profile.role != 'SuperAdmin':
+        queryset = queryset.filter(user__institution=profile.institution)
+
+    ticket = get_object_or_404(queryset, id=ticket_id)
     ticket.status = 'Resolved'
     ticket.save()
 
@@ -4400,7 +4435,8 @@ def tutor_application_resubmit(request):
     # Log activity
     PlatformActivity.objects.create(
         activity_type='tutor_application',
-        message=f"Tutor application resubmitted: {request.user.userprofile.fname} {request.user.userprofile.lname}"
+        message=f"Tutor application resubmitted: {request.user.userprofile.fname} {request.user.userprofile.lname}",
+        institution=request.user.userprofile.institution
     )
 
     # Optional: Send email confirmation

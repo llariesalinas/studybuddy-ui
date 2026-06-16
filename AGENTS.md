@@ -33,6 +33,13 @@ There is no frontend test script in `package.json`; use `npm run lint` and `npm 
 baseline frontend checks. Backend tests use Django's test runner. Add tests in the relevant app,
 such as `backend/studybuddy/tests.py`, and name methods with `test_` so Django discovers them.
 
+## Documentation
+
+Save each confirmed plan as its own markdown file in `docs/plans/` (`YYYY-MM-DD-<topic>.md`), based on
+`docs/plans/_template.md`, with frontmatter tracking `status` (Draft → Approved → In Progress → Done).
+Log every plan as a row in the `docs/plans/README.md` index, and write a completion note in
+`docs/session-summaries/` when the work ships. Document the plan before writing code.
+
 ## Commit & Pull Request Guidelines
 
 Recent history mixes concise feature commits with conventional fixes, for example

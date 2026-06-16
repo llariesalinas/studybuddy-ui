@@ -96,6 +96,13 @@
         {{ isSubmitting ? 'Processing...' : 'Create Account' }}
       </button>
     </form>
+
+    <TutorScreeningModal
+      :is-open="showScreeningModal"
+      :is-submitting="isSubmitting"
+      @close="showScreeningModal = false"
+      @submit="handleTutorScreeningSubmit"
+    />
   </AuthShell>
 </template>
 
@@ -104,13 +111,17 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useRegistrationInfoStore } from '@/stores/registrationinfo'
 import api from '@/services/api/api'
+import { useCatalogStore } from '@/stores/catalog'
 import AuthShell from '@/components/AuthShell.vue'
 import SbSelectModal from '@/components/SbSelectModal.vue'
+import TutorScreeningModal from '@/components/TutorScreeningModal.vue'
 
 const router = useRouter()
 const store = useRegistrationInfoStore()
+const catalogStore = useCatalogStore()
 
 const isSubmitting = ref(false)
+const showScreeningModal = ref(false)
 const institutions = ref([])
 
 const generalError = ref('')
@@ -150,15 +161,14 @@ const emailDomainMatchesInstitution = computed(() => {
 
 const loadInstitutions = async () => {
   try {
-    const response = await api.get('partner-institutions/')
-    institutions.value = response.data
+    institutions.value = await catalogStore.fetchPartnerInstitutions()
   } catch (error) {
     console.error('Failed to load partner institutions:', error)
     generalError.value = 'Unable to load partner institutions right now. Please try again later.'
   }
 }
 
-const handleRegister = async () => {
+const validateBaseRegistration = () => {
   generalError.value = ''
   emailError.value = ''
   institutionError.value = ''
@@ -170,47 +180,86 @@ const handleRegister = async () => {
     !store.newUserPassword
   ) {
     generalError.value = 'Please fill in all required fields.'
-    return
+    return false
   }
 
   if (!store.selectedInstitutionId) {
     institutionError.value = 'Please select your institution.'
-    return
+    return false
   }
 
   if (!store.newUserType) {
     generalError.value = 'Please select your role.'
-    return
+    return false
   }
 
   if (!emailDomainMatchesInstitution.value) {
     institutionError.value =
       'Your email domain does not match the selected institution. Please check and try again.'
-    return
+    return false
   }
 
+  return true
+}
+
+const buildRegistrationPayload = () => {
+  const role = store.newUserType
+
+  if (role !== 'Tutor') {
+    return {
+      payload: {
+        fname: store.newUserFname,
+        mname: store.newUserMname,
+        lname: store.newUserLname,
+        email: store.newUserEmail,
+        password: store.newUserPassword,
+        role,
+        institution_id: store.selectedInstitutionId,
+      },
+      config: undefined,
+    }
+  }
+
+  const formData = new FormData()
+  formData.append('fname', store.newUserFname)
+  formData.append('mname', store.newUserMname)
+  formData.append('lname', store.newUserLname)
+  formData.append('email', store.newUserEmail)
+  formData.append('password', store.newUserPassword)
+  formData.append('role', role)
+  formData.append('institution_id', store.selectedInstitutionId)
+  formData.append('school_id', store.schoolIdFile)
+  formData.append('enrollment_proof', store.enrollmentProofFile)
+  formData.append('reason_to_tutor', store.reasonToTutor)
+
+  return {
+    payload: formData,
+    config: {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    },
+  }
+}
+
+const submitRegistration = async () => {
   isSubmitting.value = true
 
   try {
+    const email = store.newUserEmail
     const role = store.newUserType
+    const { payload, config } = buildRegistrationPayload()
 
-    await api.post('register/', {
-      fname: store.newUserFname,
-      mname: store.newUserMname,
-      lname: store.newUserLname,
-      email: store.newUserEmail,
-      password: store.newUserPassword,
-      role: role,
-      institution_id: store.selectedInstitutionId,
-    })
+    await api.post('register/', payload, config)
 
-    router.push({
-      name: 'login',
+    store.reset()
+
+    await router.push({
+      name: role === 'Tutor' ? 'tutor-application-submitted' : 'login',
       query: {
-        registered: 'success',
-        email: store.newUserEmail,
+        ...(role !== 'Tutor' ? { registered: 'success' } : {}),
+        email,
       },
     })
+    return true
   } catch (error) {
     console.error('Registration Error:', error)
 
@@ -226,8 +275,28 @@ const handleRegister = async () => {
     } else {
       generalError.value = 'An unexpected error occurred.'
     }
-  } finally {
     isSubmitting.value = false
+    return false
+  }
+}
+
+const handleRegister = async () => {
+  if (!validateBaseRegistration()) return
+
+  if (store.newUserType === 'Tutor') {
+    showScreeningModal.value = true
+    return
+  }
+
+  await submitRegistration()
+}
+
+const handleTutorScreeningSubmit = async () => {
+  generalError.value = ''
+
+  const success = await submitRegistration()
+  if (!success) {
+    showScreeningModal.value = false
   }
 }
 

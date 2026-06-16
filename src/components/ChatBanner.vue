@@ -326,7 +326,6 @@ async function saveLocation() {
   border-radius: 20px;
   background: rgba(255, 255, 255, 0.66);
   box-shadow: 0 14px 36px rgba(15, 23, 42, 0.06);
-  backdrop-filter: blur(22px);
   flex-shrink: 0;
 }
 

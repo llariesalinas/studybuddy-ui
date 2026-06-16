@@ -432,9 +432,9 @@ const footerLinks = [
 .sb-blob {
   position: absolute;
   border-radius: 50%;
-  filter: blur(140px);
   mix-blend-mode: multiply;
   animation: swoopIn 2.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  opacity: 0.18;
 }
 
 .sb-blob-1 {
@@ -479,9 +479,8 @@ const footerLinks = [
   top: 0;
   z-index: 20;
   min-height: 60px;
-  background: color-mix(in srgb, var(--sb-surface) 82%, transparent);
+  background: color-mix(in srgb, var(--sb-surface) 96%, transparent);
   border-bottom: 1px solid var(--sb-glass-border);
-  backdrop-filter: blur(24px) saturate(200%);
   transition: all 0.3s ease;
 }
 
@@ -546,14 +545,12 @@ const footerLinks = [
 .sb-tile { margin: 0; }
 
 .sb-tile-glass {
-  background: color-mix(in srgb, var(--sb-surface) 56%, transparent);
-  backdrop-filter: blur(20px);
+  background: color-mix(in srgb, var(--sb-surface) 94%, transparent);
   border-top: 1px solid var(--sb-glass-border);
 }
 
 .glass-panel-dark {
-  background: rgba(15, 23, 42, 0.7);
-  backdrop-filter: blur(24px);
+  background: rgba(15, 23, 42, 0.92);
   border-top: 1px solid rgba(255,255,255,0.1);
   border-bottom: 1px solid rgba(0,0,0,0.5);
   color: #fff;
@@ -583,7 +580,6 @@ const footerLinks = [
   align-items: center;
   justify-content: center;
   background: var(--sb-glass-surface);
-  backdrop-filter: blur(12px);
   max-width: 380px;
   margin: 0 auto;
 }
@@ -677,7 +673,6 @@ const footerLinks = [
 .sb-badge {
   display: inline-block;
   background: var(--sb-glass-strong);
-  backdrop-filter: blur(10px);
   color: var(--sb-ink);
   border: 1px solid var(--sb-glass-border);
   border-radius: 9999px;
@@ -740,7 +735,6 @@ const footerLinks = [
 
 .interactive-card, .sb-step-card {
   background: var(--sb-glass-surface);
-  backdrop-filter: blur(24px);
   border: 1px solid var(--sb-glass-border);
   border-radius: 24px;
   padding: 32px;
@@ -815,7 +809,6 @@ const footerLinks = [
 
 .interactive-card-dark {
   background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 24px;
   padding: 32px;
@@ -937,7 +930,6 @@ const footerLinks = [
 .sb-btn-outline-dark {
   color: #fff;
   background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: 9999px;
   padding: 14px 32px;

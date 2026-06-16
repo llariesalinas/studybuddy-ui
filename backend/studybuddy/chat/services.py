@@ -13,6 +13,8 @@ SESSION_SLOT_MINUTES = 30
 
 
 def full_name(profile):
+    if not profile:
+        return ''
     return f"{profile.fname} {profile.lname}".strip()
 
 
@@ -30,11 +32,15 @@ def get_canonical_room_for_booking(booking):
 
 
 def get_participant_user_ids(room):
-    return [room.tutee.user_id, room.tutor.user_id]
+    return [
+        user_id
+        for user_id in [room.tutee.user_id, room.tutor.user_id if room.tutor else None]
+        if user_id
+    ]
 
 
 def get_participant_profile_ids(room):
-    return [room.tutee_id, room.tutor_id]
+    return [profile_id for profile_id in [room.tutee_id, room.tutor_id] if profile_id]
 
 
 def user_is_room_member(user, room):
@@ -436,6 +442,16 @@ _CURRENT_BOOKING_UNSET = object()
 
 
 def get_partner_context(room, user=None, current_booking=_CURRENT_BOOKING_UNSET):
+    if room.room_type == 'support':
+        return {
+            'partner_name': 'Support Team',
+            'partner_initials': 'ST',
+            'partner_subtitle': 'Platform Support',
+            'sessions_together': 0,
+            'focused_hours': 0,
+            'topics': [],
+        }
+
     tutor = Tutor.objects.filter(profile=room.tutor).select_related('profile__course').first()
     completed_bookings = list(
         Booking.objects
@@ -475,6 +491,16 @@ def get_partner_context(room, user=None, current_booking=_CURRENT_BOOKING_UNSET)
         except Exception:
             partner = room.tutor
 
+    if partner is None:
+        return {
+            'partner_name': 'Support Team',
+            'partner_initials': 'ST',
+            'partner_subtitle': 'Platform Support',
+            'sessions_together': 0,
+            'focused_hours': 0,
+            'topics': [],
+        }
+
     subtitle_parts = []
     if partner.role:
         subtitle_parts.append(partner.role)
@@ -492,6 +518,22 @@ def get_partner_context(room, user=None, current_booking=_CURRENT_BOOKING_UNSET)
         'sessions_together': len(session_keys),
         'focused_hours': len(completed_bookings) * (SESSION_SLOT_MINUTES / 60),
         'topics': topics[:6],
+    }
+
+
+def get_ticket_context(room):
+    ticket = getattr(room, 'ticket', None)
+    if not ticket:
+        return None
+
+    agent = ticket.assigned_agent
+    return {
+        'id': ticket.id,
+        'subject': ticket.subject,
+        'category': ticket.get_category_display(),
+        'status': ticket.status,
+        'created_at': ticket.created_at.isoformat() if ticket.created_at else None,
+        'assigned_agent_name': full_name(agent) if agent else None,
     }
 
 
@@ -530,6 +572,7 @@ def serialize_message_payload(message, user=None):
 def serialize_room_payload(room, user=None):
     last_message = room.messages.order_by('-created_at').first()
     unread_count = 0
+    ticket_context = get_ticket_context(room)
 
     if user and user.is_authenticated:
         unread_count = room.messages.filter(is_read=False).exclude(sender=user).count()
@@ -541,12 +584,15 @@ def serialize_room_payload(room, user=None):
         'booking': room.booking_id,
         'created_at': room.created_at.isoformat(),
         'updated_at': room.updated_at.isoformat() if room.updated_at else None,
+        'room_type': room.room_type,
         'tutee_name': full_name(room.tutee),
-        'tutor_name': full_name(room.tutor),
+        'tutor_name': full_name(room.tutor) if room.tutor else 'Support Agent',
         'last_message': serialize_message_payload(last_message, user) if last_message else None,
         'unread_count': unread_count,
         'current_booking': get_current_booking_context(room),
         'partner_context': get_partner_context(room, user),
+        'ticket_status': ticket_context['status'] if ticket_context else None,
+        'ticket_context': ticket_context,
     }
 
 

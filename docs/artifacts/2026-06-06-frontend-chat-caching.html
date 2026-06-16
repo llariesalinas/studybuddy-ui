@@ -1,0 +1,658 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Frontend and Chat Caching Plan</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #17211b;
+        --muted: #5b675f;
+        --line: #d8e3dc;
+        --panel: #ffffff;
+        --page: #f5f8f6;
+        --green: #176b4c;
+        --green-soft: #dff1e8;
+        --blue: #245f8f;
+        --blue-soft: #e3eef8;
+        --amber: #8a5d12;
+        --amber-soft: #f7ecd3;
+        --rose: #8f3434;
+        --rose-soft: #f6dfdf;
+        --shadow: 0 18px 60px rgba(23, 33, 27, 0.08);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--page);
+        color: var(--ink);
+        font-family:
+          Inter,
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+        line-height: 1.55;
+      }
+
+      main {
+        width: min(1180px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 40px 0 56px;
+      }
+
+      header {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 24px;
+        align-items: end;
+        padding: 32px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        box-shadow: var(--shadow);
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        max-width: 760px;
+        font-size: clamp(2rem, 5vw, 4.8rem);
+        line-height: 0.95;
+        letter-spacing: 0;
+      }
+
+      h2 {
+        font-size: 1.35rem;
+        margin-bottom: 14px;
+      }
+
+      h3 {
+        font-size: 1rem;
+        margin-bottom: 8px;
+      }
+
+      .eyebrow {
+        margin-bottom: 14px;
+        color: var(--green);
+        font-size: 0.78rem;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .summary {
+        max-width: 710px;
+        margin-top: 20px;
+        color: var(--muted);
+        font-size: 1.06rem;
+      }
+
+      .status {
+        display: grid;
+        gap: 10px;
+        min-width: 210px;
+        padding: 18px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fbfdfc;
+      }
+
+      .status span {
+        color: var(--muted);
+        font-size: 0.82rem;
+      }
+
+      .status strong {
+        display: block;
+        font-size: 1rem;
+      }
+
+      .grid {
+        display: grid;
+        gap: 18px;
+      }
+
+      .two {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .three {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      section {
+        margin-top: 22px;
+        padding: 26px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+      }
+
+      .card {
+        padding: 18px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fbfdfc;
+      }
+
+      .card p,
+      li {
+        color: var(--muted);
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        min-height: 26px;
+        padding: 3px 9px;
+        border-radius: 999px;
+        font-size: 0.78rem;
+        font-weight: 750;
+      }
+
+      .pill.green {
+        color: var(--green);
+        background: var(--green-soft);
+      }
+
+      .pill.blue {
+        color: var(--blue);
+        background: var(--blue-soft);
+      }
+
+      .pill.amber {
+        color: var(--amber);
+        background: var(--amber-soft);
+      }
+
+      .flow {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+        margin-top: 14px;
+      }
+
+      .flow div {
+        position: relative;
+        min-height: 122px;
+        padding: 16px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fbfdfc;
+      }
+
+      .flow div:not(:last-child)::after {
+        content: "";
+        position: absolute;
+        top: 50%;
+        right: -10px;
+        width: 16px;
+        height: 2px;
+        background: var(--green);
+      }
+
+      .number {
+        display: inline-grid;
+        width: 30px;
+        height: 30px;
+        place-items: center;
+        margin-bottom: 12px;
+        border-radius: 50%;
+        color: #fff;
+        background: var(--green);
+        font-weight: 800;
+      }
+
+      ul {
+        padding-left: 20px;
+        margin: 10px 0 0;
+      }
+
+      code {
+        padding: 2px 5px;
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        background: #f7faf8;
+        color: #1d4738;
+        font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+        font-size: 0.9em;
+      }
+
+      .risk {
+        border-left: 4px solid var(--rose);
+        background: var(--rose-soft);
+      }
+
+      .checklist {
+        display: grid;
+        gap: 10px;
+        margin-top: 12px;
+      }
+
+      .check {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 10px;
+        align-items: start;
+        padding: 12px 14px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fbfdfc;
+      }
+
+      .check::before {
+        content: "✓";
+        display: inline-grid;
+        width: 22px;
+        height: 22px;
+        place-items: center;
+        border-radius: 50%;
+        color: #fff;
+        background: var(--green);
+        font-size: 0.82rem;
+        font-weight: 900;
+      }
+
+      footer {
+        margin-top: 18px;
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
+
+      @media (max-width: 860px) {
+        header,
+        .two,
+        .three,
+        .flow {
+          grid-template-columns: 1fr;
+        }
+
+        header {
+          padding: 24px;
+        }
+
+        section {
+          padding: 20px;
+        }
+
+        .flow div:not(:last-child)::after {
+          display: none;
+        }
+
+        .status {
+          min-width: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <p class="eyebrow">StudyBuddy caching plan artifact</p>
+          <h1>Frontend and chat caching</h1>
+          <p class="summary">
+            A frontend-first caching rollout to make stable catalog pages and the messaging
+            experience feel faster. This artifact explains the reason, tech stack, affected
+            code areas, and implementation path before and after the change lands.
+          </p>
+        </div>
+        <aside class="status" aria-label="Plan status">
+          <div>
+            <span>Status</span>
+            <strong>Approved</strong>
+          </div>
+          <div>
+            <span>Date</span>
+            <strong>2026-06-06</strong>
+          </div>
+          <div>
+            <span>Source</span>
+            <strong><code>docs/plans/2026-06-06-frontend-chat-caching.md</code></strong>
+          </div>
+        </aside>
+      </header>
+
+      <section>
+        <h2>What This Improves</h2>
+        <div class="grid three">
+          <article class="card">
+            <span class="pill green">Catalog data</span>
+            <h3>Reference lists load once per TTL</h3>
+            <p>
+              Subjects, courses, institutions, payment methods, and receiving institutions
+              can reuse session cache instead of repeating the same GET calls on every visit.
+            </p>
+          </article>
+          <article class="card">
+            <span class="pill blue">Messaging</span>
+            <h3>Chats render immediately on revisit</h3>
+            <p>
+              Recent rooms and room history are restored from sessionStorage first, then
+              refreshed through REST and WebSocket updates.
+            </p>
+          </article>
+          <article class="card">
+            <span class="pill amber">Safety</span>
+            <h3>Short-lived and user-scoped</h3>
+            <p>
+              Cache keys include the user id, chat bodies stay in sessionStorage only, and
+              logout clears <code>sb-*</code> session entries.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <h2>Why We Need It</h2>
+        <div class="grid two">
+          <article class="card">
+            <h3>Repeated reference requests</h3>
+            <p>
+              Several pages ask for the same stable lists: <code>subjects/</code>,
+              <code>courses/</code>, <code>partner-institutions/</code>, and
+              <code>payment-methods/</code>. Those values do not change minute to minute,
+              so repeatedly blocking screens on the same network calls wastes time.
+            </p>
+          </article>
+          <article class="card">
+            <h3>Slow perceived chat loading</h3>
+            <p>
+              Messages feel slow when the user revisits a conversation and the UI waits for
+              REST history before showing anything. The better experience is to show the
+              recent session cache immediately, then quietly sync newer messages.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <h2>Tech Stack Purpose</h2>
+        <div class="grid three">
+          <article class="card">
+            <span class="pill green">sessionStorage</span>
+            <h3>Short-lived browser cache</h3>
+            <p>
+              Chosen because chat bodies should not persist forever. Data disappears when
+              the browser session ends and is cleared on logout/user switch.
+            </p>
+          </article>
+          <article class="card">
+            <span class="pill blue">Pinia</span>
+            <h3>Shared frontend state</h3>
+            <p>
+              Catalog and chat data already live naturally in stores, so Pinia keeps cached
+              results reusable across views without adding a new state framework.
+            </p>
+          </article>
+          <article class="card">
+            <span class="pill amber">Axios helper</span>
+            <h3>One cache contract</h3>
+            <p>
+              A dedicated <code>cachedGet</code> wrapper keeps TTL, user scoping, path
+              normalization, and in-flight dedupe in one place instead of scattering cache
+              logic through Vue pages.
+            </p>
+          </article>
+          <article class="card">
+            <span class="pill blue">Django REST</span>
+            <h3>Incremental history</h3>
+            <p>
+              The backend keeps the same history endpoint but accepts <code>after_id</code>
+              so the frontend can fetch only messages newer than the cached high-water mark.
+            </p>
+          </article>
+          <article class="card">
+            <span class="pill green">WebSocket</span>
+            <h3>Live reconciliation</h3>
+            <p>
+              Existing live chat events continue to be the freshest source for new messages,
+              read receipts, room updates, and booking context changes.
+            </p>
+          </article>
+          <article class="card">
+            <span class="pill amber">Vitest</span>
+            <h3>Cache behavior tests</h3>
+            <p>
+              Cache bugs are subtle, so unit tests cover hit/miss behavior, TTL expiry,
+              malformed entries, user scoping, duplicate prevention, and logout clearing.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <h2>Execution Shape</h2>
+        <div class="flow" aria-label="Implementation flow">
+          <div>
+            <span class="number">1</span>
+            <h3>Test harness</h3>
+            <p>Add Vitest so frontend cache behavior can be verified directly.</p>
+          </div>
+          <div>
+            <span class="number">2</span>
+            <h3>Shared helper</h3>
+            <p>Create <code>cachedGet</code> with TTL, force refresh, user keys, and deduping.</p>
+          </div>
+          <div>
+            <span class="number">3</span>
+            <h3>Catalog store</h3>
+            <p>Route stable reference endpoints through one Pinia store.</p>
+          </div>
+          <div>
+            <span class="number">4</span>
+            <h3>Chat cache</h3>
+            <p>Render cached rooms/history first, then sync new messages using <code>after_id</code>.</p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>How It Will Be Implemented</h2>
+        <div class="grid two">
+          <article class="card">
+            <h3>1. Shared GET caching</h3>
+            <p>
+              Add <code>src/services/api/cache.js</code>. It wraps Axios GETs, returns
+              <code>{ data }</code>, stores successful responses in sessionStorage, ignores
+              failed responses, removes malformed entries, and dedupes identical in-flight
+              requests.
+            </p>
+          </article>
+          <article class="card">
+            <h3>2. Catalog store</h3>
+            <p>
+              Add <code>src/stores/catalog.js</code>. Vue pages stop calling stable catalog
+              endpoints directly and instead ask the catalog store for subjects, courses,
+              institutions, payment methods, and receiving institutions.
+            </p>
+          </article>
+          <article class="card">
+            <h3>3. Chat session cache</h3>
+            <p>
+              Update <code>src/stores/chat.js</code> so room lists and recent room history
+              are cached per user. Only confirmed server messages are stored; pending,
+              failed, and temporary optimistic messages are excluded.
+            </p>
+          </article>
+          <article class="card">
+            <h3>4. Backend incremental sync</h3>
+            <p>
+              Update <code>backend/studybuddy/chat/views.py</code> so
+              <code>history/?after_id=:id</code> returns only newer messages. Normal history
+              requests continue returning the latest 50 messages in the existing array shape.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <h2>Affected Code Areas</h2>
+        <div class="grid two">
+          <article class="card">
+            <h3>New shared files</h3>
+            <ul>
+              <li><code>src/services/api/cache.js</code> for cached GET behavior.</li>
+              <li><code>src/stores/catalog.js</code> for stable reference data.</li>
+              <li><code>vitest.config.js</code> and frontend cache tests.</li>
+            </ul>
+          </article>
+          <article class="card">
+            <h3>Existing shared files</h3>
+            <ul>
+              <li><code>src/services/api/api.js</code> exports path normalization.</li>
+              <li><code>src/config.js</code> adds TTL constants using the existing <code>*_MS</code> style.</li>
+              <li><code>src/stores/auth.js</code> clears <code>sb-*</code> session cache on logout.</li>
+            </ul>
+          </article>
+          <article class="card">
+            <h3>Catalog call sites</h3>
+            <ul>
+              <li><code>Register.vue</code>, <code>InitialBooking.vue</code>, <code>FindTutors.vue</code>, <code>PreferenceSetup.vue</code>.</li>
+              <li><code>TuteeProfile.vue</code>, <code>TutorProfile.vue</code>, payment screens, and <code>stores/wallet.js</code>.</li>
+              <li><code>/tutor/subjects/</code> remains uncached because it is per-tutor mutable data.</li>
+            </ul>
+          </article>
+          <article class="card">
+            <h3>Messaging files</h3>
+            <ul>
+              <li><code>src/stores/chat.js</code> handles cached render, background sync, reconciliation, read receipts, and room updates.</li>
+              <li><code>backend/studybuddy/chat/views.py</code> handles <code>after_id</code>.</li>
+              <li><code>backend/studybuddy/tests.py</code> adds chat history contract coverage.</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <h2>Cache Behavior Rules</h2>
+        <div class="grid two">
+          <article class="card">
+            <h3>What can be cached</h3>
+            <ul>
+              <li>Stable catalog/reference data with practical TTLs.</li>
+              <li>First chat room page for quick revisit rendering.</li>
+              <li>Recent confirmed messages for each room during the browser session.</li>
+            </ul>
+          </article>
+          <article class="card">
+            <h3>What should not be cached</h3>
+            <ul>
+              <li>Failed API responses.</li>
+              <li>Pending or failed optimistic chat messages.</li>
+              <li>Per-tutor mutable data such as <code>/tutor/subjects/</code>.</li>
+              <li>Anything that must survive logout or cross browser sessions.</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <h2>Core Contracts</h2>
+        <div class="grid two">
+          <article class="card">
+            <h3>Frontend cache helper</h3>
+            <ul>
+              <li><code>cachedGet(url, options)</code> returns a response-like <code>{ data }</code> object.</li>
+              <li>Keys start with <code>sb-</code> and include scope, user id, normalized path, and params.</li>
+              <li>Failed responses are never stored, malformed entries are removed, and identical requests dedupe while in flight.</li>
+            </ul>
+          </article>
+          <article class="card">
+            <h3>Backend chat history</h3>
+            <ul>
+              <li><code>GET chat/rooms/:roomId/history/</code> keeps the latest-50 array response.</li>
+              <li><code>?after_id=:id</code> returns newer messages only, ordered by id and capped at 50.</li>
+              <li>History queries include sender profile data to avoid extra serializer lookups.</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <h2>Chat Revisit Flow</h2>
+        <div class="grid two">
+          <article class="card">
+            <h3>Fast path</h3>
+            <p>
+              When a user opens a room, cached messages appear immediately if present. The
+              UI no longer has to wait for the full history request before showing recent
+              conversation context.
+            </p>
+          </article>
+          <article class="card">
+            <h3>Freshness path</h3>
+            <p>
+              The store connects the WebSocket, marks the room read, asks the backend for
+              messages newer than the cached high-water mark, then reconciles by message id.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <h2>Risks To Watch</h2>
+        <div class="grid two">
+          <article class="card risk">
+            <h3>Stale chat state</h3>
+            <p>
+              Read receipts and unread counts can briefly show cached values until the
+              background refresh lands.
+            </p>
+          </article>
+          <article class="card risk">
+            <h3>Privacy on shared devices</h3>
+            <p>
+              Recent message bodies live in sessionStorage during the browser session, so
+              logout and user-switch clearing must stay reliable.
+            </p>
+          </article>
+          <article class="card risk">
+            <h3>Duplicate messages</h3>
+            <p>
+              Cached, REST, optimistic, and WebSocket messages must reconcile through stable
+              ids and reuse existing replacement logic.
+            </p>
+          </article>
+          <article class="card risk">
+            <h3>Mutation invalidation</h3>
+            <p>
+              Catalog and chat updates need explicit refresh or cache clearing where data can
+              change underneath the TTL.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <h2>Verification Checklist</h2>
+        <div class="checklist">
+          <div class="check"><code>npm run test</code> covers cache hit/miss, expiry, force refresh, dedupe, malformed cache, user scoping, catalog keys, and chat cache behavior.</div>
+          <div class="check"><code>npm run build</code> confirms the frontend compiles with the new store/helper imports.</div>
+          <div class="check"><code>npm run lint</code> should pass without new caching-related lint issues.</div>
+          <div class="check"><code>python manage.py test studybuddy.tests.ChatFeatureTests --keepdb</code> verifies normal history, incremental history, authorization, and null-sender system messages.</div>
+          <div class="check">Manual smoke: revisit Messages, send/reload, switch users, and confirm repeated catalog calls are reduced.</div>
+        </div>
+      </section>
+
+      <footer>
+        Artifact saved for the StudyBuddy docs collection. Keep this file near the approved
+        Markdown plan so future caching work has both the implementation checklist and the
+        visual explanation.
+      </footer>
+    </main>
+  </body>
+</html>
