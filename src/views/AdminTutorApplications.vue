@@ -201,7 +201,7 @@ const viewDetails = (app) => {
 
 const handleStatusUpdate = async (status) => {
   if (!selectedApp.value) return
-  
+
   processing.value = true
   try {
     await adminStore.updateTutorApplicationStatus(selectedApp.value.id, status, rejectionReason.value)

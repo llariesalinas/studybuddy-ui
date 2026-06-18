@@ -241,16 +241,6 @@ const toggleSuspension = async (user) => {
   }
 }
 
-const deleteUser = async (user) => {
-  if (confirm(`CRITICAL ACTION: Are you sure you want to PERMANENTLY DELETE ${user.full_name}? This cannot be undone.`)) {
-    try {
-      await store.deleteUser(user.id)
-      selectedUser.value = null
-    } catch {
-      toastStore.push('Failed to delete user.', 'error')
-    }
-  }
-}
 </script>
 
 <style scoped>

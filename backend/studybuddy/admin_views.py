@@ -9,12 +9,12 @@ from django.db.models import Count, Q, Sum
 from django.utils import timezone
 from datetime import timedelta
 from .models import (
-    UserProfile, Tutor, Booking, WithdrawalRequest, 
+    UserProfile, Tutor, Booking, WithdrawalRequest,
     PartnerInstitution, Wallet, Transaction, PlatformActivity,
     TutorApplication, Payment
 )
 from .serializers import (
-    AdminWithdrawalSerializer, AdminUserSerializer, 
+    AdminWithdrawalSerializer, AdminUserSerializer,
     PartnerInstitutionSerializer, PlatformActivitySerializer,
     TutorApplicationSerializer
 )
@@ -28,13 +28,13 @@ class BaseAdminView(APIView):
         profile = request.user.userprofile
         if profile.role == 'SuperAdmin':
             return queryset
-        
+
         # Build the filter kwarg dynamically
         if user_path:
             kwarg = f"{user_path}__institution"
         else:
             kwarg = "institution"
-            
+
         return queryset.filter(**{kwarg: profile.institution})
 
 class AdminStatsView(BaseAdminView):
@@ -86,11 +86,11 @@ class AdminWithdrawalListView(BaseAdminView):
     def get(self, request):
         queryset = self.get_queryset_for_user(request, WithdrawalRequest.objects.select_related('tutor__profile__user').all(), user_path='tutor__profile')
         queryset = queryset.order_by('-requested_at')
-        
+
         status_filter = request.query_params.get('status')
         if status_filter:
             queryset = queryset.filter(status=status_filter)
-            
+
         serializer = AdminWithdrawalSerializer(queryset, many=True)
         return Response(serializer.data)
 
@@ -109,10 +109,10 @@ class AdminWithdrawalDetailView(APIView):
         withdrawal.status = new_status
         if failure_reason:
             withdrawal.failure_reason = failure_reason
-            
+
         if new_status in ['processed', 'rejected', 'failed', 'flagged']:
             withdrawal.processed_at = timezone.now()
-        
+
         if new_status in ['rejected', 'failed']:
             with transaction.atomic():
                 wallet = Wallet.objects.select_for_update().get(tutor=withdrawal.tutor)
@@ -160,7 +160,7 @@ class AdminWithdrawalDetailView(APIView):
             'failed': 'withdrawal_failed',
             'flagged': 'admin_action'
         }
-        
+
         PlatformActivity.objects.create(
             activity_type=activity_map.get(new_status, 'admin_action'),
             message=f"Admin marked withdrawal #{withdrawal.id} for {withdrawal.tutor.profile.fname} as {new_status}",
@@ -176,24 +176,24 @@ class AdminUserListView(BaseAdminView):
     def get(self, request):
         queryset = self.get_queryset_for_user(request, UserProfile.objects.select_related('user', 'institution', 'tutor__wallet').all())
         queryset = queryset.order_by('-created_at')
-        
+
         # Only show Tutees and Tutors to normal Admins
         profile = request.user.userprofile
         if profile.role != 'SuperAdmin':
             queryset = queryset.filter(role__in=['Tutee', 'Tutor'])
-        
+
         search = request.query_params.get('search')
         if search:
             queryset = queryset.filter(
-                Q(fname__icontains=search) | 
-                Q(lname__icontains=search) | 
+                Q(fname__icontains=search) |
+                Q(lname__icontains=search) |
                 Q(user__email__icontains=search)
             )
 
         role = request.query_params.get('role')
         if role:
             queryset = queryset.filter(role=role)
-            
+
         status_filter = request.query_params.get('status')
         if status_filter == 'Suspended':
             queryset = queryset.filter(is_suspended=True)
@@ -207,17 +207,17 @@ class AdminUserListView(BaseAdminView):
         queryset = self.get_queryset_for_user(request, UserProfile.objects.all())
         profile = get_object_or_404(queryset, pk=pk)
         is_suspended = request.data.get('is_suspended')
-        
+
         if is_suspended is not None:
             profile.is_suspended = is_suspended
             profile.save()
-            
+
             PlatformActivity.objects.create(
                 activity_type='admin_action',
                 message=f"Admin {'suspended' if is_suspended else 'reactivated'} user {profile.fname} {profile.lname}",
                 institution=request.user.userprofile.institution
             )
-            
+
         serializer = AdminUserSerializer(profile)
         return Response(serializer.data)
 
@@ -225,13 +225,13 @@ class AdminUserListView(BaseAdminView):
         queryset = self.get_queryset_for_user(request, UserProfile.objects.all())
         profile = get_object_or_404(queryset, pk=pk)
         user = profile.user
-        
+
         PlatformActivity.objects.create(
             activity_type='admin_action',
             message=f"Admin deleted user {profile.fname} {profile.lname} ({user.email})",
             institution=request.user.userprofile.institution
         )
-        
+
         user.delete() # This cascades to UserProfile
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -260,7 +260,7 @@ class AdminInstitutionView(APIView):
             institution = PartnerInstitution.objects.get(pk=pk)
         except PartnerInstitution.DoesNotExist:
             return Response({"error": "Institution not found"}, status=status.HTTP_404_NOT_FOUND)
-        
+
         data = request.data
         updated = False
 
@@ -270,7 +270,7 @@ class AdminInstitutionView(APIView):
             # Handle potential string booleans
             if isinstance(is_active, str):
                 is_active = is_active.lower() == 'true'
-            
+
             institution.is_active = bool(is_active)
             updated = True
             msg = f"Admin {'reactivated' if institution.is_active else 'deactivated'} institution {institution.institution_name}"
@@ -282,7 +282,7 @@ class AdminInstitutionView(APIView):
 
         if updated:
             institution.save()
-            
+
         serializer = PartnerInstitutionSerializer(institution)
         return Response(serializer.data)
 
@@ -419,7 +419,7 @@ class SuperAdminInstitutionPerformanceView(APIView):
                 'revenue': float(abs(revenue)),
                 'avg_rating': avg_rating
             })
-            
+
         return Response(data)
 
 

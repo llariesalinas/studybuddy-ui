@@ -54,7 +54,7 @@
         <!-- Resubmission Form -->
         <form @submit.prevent="handleResubmit" class="sb-resubmit-form">
           <div v-if="resubmitError" class="sb-auth-alert mb-3">{{ resubmitError }}</div>
-          
+
           <div class="sb-auth-field">
             <label class="sb-auth-label">Updated School ID (Image)</label>
             <input
@@ -95,12 +95,12 @@
       </div>
 
       <hr class="my-4 opacity-10" />
-      
+
       <div class="d-flex flex-column gap-3 align-items-center text-center">
         <button @click="handleLogout" class="btn btn-link text-muted small p-0 text-decoration-none shadow-none">
           <i class="bi bi-box-arrow-left me-1"></i> Log out from {{ application.email }}
         </button>
-        
+
         <p class="small text-muted mb-0">
           Need help? Contact <a href="mailto:StudyBuddySupport@gmail.com" class="text-primary fw-bold">StudyBuddySupport@gmail.com</a>
         </p>
@@ -216,7 +216,7 @@ const handleResubmit = async () => {
     await api.post('tutor-application/resubmit/', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
-    
+
     // Refresh status
     await fetchStatus()
   } catch (err) {

@@ -13,8 +13,10 @@
             <i class="bi bi-x-lg"></i>
           </button>
         </div>
-        
+
         <p class="sb-modal-subtitle">Tutors are reviewed by our team before approval.</p>
+
+        <div v-if="localError" class="sb-auth-alert" style="margin-top: 1rem; margin-bottom: 0;">{{ localError }}</div>
 
         <div class="sb-modal-body">
           <div class="sb-auth-field">
@@ -50,8 +52,8 @@
 
         <div class="sb-modal-actions">
           <button type="button" class="sb-btn-pill sb-btn-outline" @click="close" :disabled="isSubmitting">Cancel</button>
-          <button type="button" class="sb-btn-pill sb-btn-primary" @click="submit" :disabled="isSubmitting">
-            <span v-if="isSubmitting" class="spinner-border spinner-border-sm me-2"></span>
+          <button type="button" class="sb-btn-pill sb-btn-primary d-flex justify-content-center align-items-center gap-2" @click="submit" :disabled="isSubmitting">
+            <span v-if="isSubmitting" class="sb-spinner" aria-hidden="true"></span>
             {{ isSubmitting ? 'Submitting...' : 'Confirm & Submit' }}
           </button>
         </div>
@@ -64,18 +66,30 @@
 import { ref } from 'vue'
 import { useRegistrationInfoStore } from '@/stores/registrationinfo'
 
-defineProps({
-  isOpen: Boolean
+const props = defineProps({
+  isOpen: Boolean,
+  isSubmitting: Boolean
 })
 
 const emit = defineEmits(['close', 'submit'])
 const store = useRegistrationInfoStore()
-const isSubmitting = ref(false)
 
 const localReason = ref(store.reasonToTutor)
+const localError = ref('')
+
+const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5 MB
 
 const handleFileChange = (event, type) => {
   const file = event.target.files[0]
+  if (!file) return
+
+  if (file.size > MAX_FILE_SIZE) {
+    localError.value = `"${file.name}" is too large. Each file must be under 5 MB.`
+    event.target.value = '' // reset the input
+    return
+  }
+
+  localError.value = ''
   if (type === 'schoolId') {
     store.schoolIdFile = file
   } else if (type === 'enrollmentProof') {
@@ -84,15 +98,19 @@ const handleFileChange = (event, type) => {
 }
 
 const close = () => {
-  if (isSubmitting.value) return
+  if (props.isSubmitting) return
   emit('close')
 }
 
 const submit = async () => {
-  isSubmitting.value = true
+  localError.value = ''
+  if (!store.schoolIdFile || !store.enrollmentProofFile) {
+    localError.value = 'Please upload both your School ID and Proof of Enrollment.'
+    return
+  }
+
   store.reasonToTutor = localReason.value
   await emit('submit')
-  isSubmitting.value = false
 }
 </script>
 
@@ -211,5 +229,21 @@ const submit = async () => {
   background: transparent;
   border: 1px solid var(--sb-card-border);
   color: var(--sb-text-main);
+}
+
+.sb-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: sb-spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes sb-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>

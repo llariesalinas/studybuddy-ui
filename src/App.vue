@@ -73,7 +73,11 @@
           </router-link>
         </li>
 
-
+        <li class="nav-item mb-2" v-if="userRole === 'admin' || userRole === 'superadmin'">
+          <router-link to="/admin/tutor-applications" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
+            <i class="bi bi-person-check me-3"></i> Tutor Applications
+          </router-link>
+        </li>
 
         <li class="nav-item mb-2" v-if="userRole === 'admin'">
           <router-link to="/admin/reports" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
@@ -261,6 +265,11 @@
             <p class="sb-muted">Search, filter, and manage user cash-outs.</p>
           </div>
 
+          <div v-if="route.path === '/admin/tutor-applications'">
+            <h2 class="fw-bold sb-text">Tutor Applications</h2>
+            <p class="sb-muted">Review submitted tutor screening documents.</p>
+          </div>
+
           <div v-if="route.path === '/admin/reports'">
             <h2 class="fw-bold sb-text">Reports</h2>
             <p class="sb-muted">View and review platform analytics.</p>
@@ -391,6 +400,17 @@ const openSupport = (type = 'Other', id = null) => {
 }
 let pendingSessionsRefreshId = null
 
+const deferStartupWork = (callback) => {
+  if (typeof window === 'undefined') return
+
+  if ('requestIdleCallback' in window) {
+    window.requestIdleCallback(callback, { timeout: 1500 })
+    return
+  }
+
+  window.setTimeout(callback, 0)
+}
+
 const clearBootstrapModalState = () => {
   document.body.classList.remove('modal-open')
   document.body.style.removeProperty('overflow')
@@ -425,6 +445,7 @@ const isPublicRoute = computed(() => {
     'home',
     'login',
     'register',
+    'tutor-application-submitted',
     'forgot-password',
     'reset-password',
     'password-reset-confirm',

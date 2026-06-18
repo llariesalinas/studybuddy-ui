@@ -58,7 +58,6 @@ PROJECT_HANDOFF_DUMP.md
 Algorithm Improvements documentation.md
 backend/studybuddy/migrations/0041_recommendation_filter_indexes.py
 tatusQ
-backend/{
 src/views/*.zip
 *.log
 *.err.log

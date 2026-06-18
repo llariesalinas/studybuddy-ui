@@ -35,8 +35,14 @@ from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, Ou
 
 
 class LoginRateThrottle(AnonRateThrottle):
-    """Per-IP throttle for unauthenticated auth endpoints (login/register)."""
+    """Per-IP throttle for unauthenticated auth endpoints (login/OTP)."""
     scope = 'login'
+
+
+class RegisterRateThrottle(AnonRateThrottle):
+    """Per-IP throttle for registration — more lenient than login to allow
+    form correction attempts, but still capped to prevent abuse."""
+    scope = 'register'
 from rest_framework.views import APIView
 from rest_framework.generics import ListAPIView
 from django.db.models import Avg, Case, When, Value, IntegerField, Q, Count
@@ -628,7 +634,7 @@ def partner_institutions_list(request):
 
 @api_view(['POST'])
 @authentication_classes([])
-@throttle_classes([LoginRateThrottle])
+@throttle_classes([RegisterRateThrottle])
 @transaction.atomic
 def register_user(request):
 
@@ -676,7 +682,7 @@ def register_user(request):
                     is_rejected_tutor = True
             except TutorApplication.DoesNotExist:
                 pass
-        
+
         if not is_rejected_tutor:
             return Response(
                 {"error": "User already exists"},
@@ -737,6 +743,13 @@ def register_user(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        MAX_UPLOAD_SIZE = 5 * 1024 * 1024  # 5 MB
+        if school_id.size > MAX_UPLOAD_SIZE or enrollment_proof.size > MAX_UPLOAD_SIZE:
+            return Response(
+                {"error": "Each uploaded file must be under 5 MB. Please compress your images and try again."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         TutorApplication.objects.update_or_create(
             profile=profile,
             defaults={
@@ -748,11 +761,16 @@ def register_user(request):
             }
         )
 
-        # Send confirmation email
-        try:
-            send_application_received_email(profile)
-        except Exception:
-            logger.exception("Failed to send tutor application received email for profile_id=%s", profile.id)
+        # Send confirmation email after the transaction commits so the DB write is
+        # guaranteed to be visible and the email send does not block/extend the lock.
+        def _send_confirmation():
+            try:
+                send_application_received_email(profile)
+            except Exception:
+                logger.exception(
+                    "Failed to send tutor application received email for profile_id=%s", profile.id
+                )
+        transaction.on_commit(_send_confirmation)
 
     PlatformActivity.objects.create(
         activity_type='registration',
@@ -817,7 +835,7 @@ def login_view(request):
         )
 
     try:
-        profile = UserProfile.objects.get(user=user)
+        profile = UserProfile.objects.select_related('tutor_application', 'institution').get(user=user)
     except UserProfile.DoesNotExist:
         return Response(
             {"error": "User profile not found"},
@@ -830,20 +848,16 @@ def login_view(request):
             status=status.HTTP_403_FORBIDDEN
         )
 
-    # 🔥 Check tutor application status
+    # Block login if tutor application is still pending
     if profile.role == 'Tutor':
         try:
-            application = profile.tutor_application
-            if application.application_status == 'rejected':
+            if hasattr(profile, 'tutor_application') and profile.tutor_application.application_status == 'pending':
                 return Response(
-                    {
-                        "error": "Your application was rejected. Please contact support or reapply in the registration page.",
-                        "rejected": True
-                    },
+                    {"error": "Your application is still being processed. We will email you once it is approved."},
                     status=status.HTTP_403_FORBIDDEN
                 )
-        except TutorApplication.DoesNotExist:
-            pass
+        except Exception:
+            logger.exception("Error checking tutor application status for profile_id=%s", profile.id)
 
     if not profile.is_domain_exempt and profile.role not in ['Admin', 'SuperAdmin']:
         email_domain = normalize_email_domain(email)
@@ -1308,7 +1322,7 @@ class SearchTutorsView(APIView):
 
 class SubjectListView(ListAPIView):
     queryset = Subjects.objects.all()
-    serializer_class = SubjectSerializer    
+    serializer_class = SubjectSerializer
 
 
 
@@ -1702,7 +1716,7 @@ def tutor_availability(request, tutor_id):
         "month_offset": month_offset,
         "weeks": weeks
     })
-    
+
 
 #bulk booking request
 
@@ -1748,8 +1762,8 @@ def bulk_booking(request):
 
     return Response({"message": "Booking successful"})"""
 
-#Confirm payment View 
-# Confirm payment View 
+#Confirm payment View
+# Confirm payment View
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def confirm_payment_and_book(request):
@@ -2849,7 +2863,7 @@ def get_recommendation_candidate_tutors(
     # Stage 1: Exact Match (Date + All Time Slots)
     if session_date and required_slots:
         weekday = WEEKDAY_MAP[session_date.weekday()]
-        
+
         stage1_candidates = base_candidates.filter(
             tutoravailability__day=weekday,
             tutoravailability__time_slot__in=required_slots,
@@ -2904,7 +2918,7 @@ def get_recommendation_candidate_tutors(
             tutoravailability__day=weekday,
             tutoravailability__is_active=True,
         ).distinct()
-        
+
         if stage2_candidates.exists():
             return stage2_candidates
 
@@ -2981,7 +2995,7 @@ def recommend_tutors_view(request):
 
     return Response(data, status=200)
 
-#Setup Profile 
+#Setup Profile
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def setup_profile(request):
@@ -3077,11 +3091,11 @@ def get_tutee_profile(request):
 def upload_tutee_avatar(request):
     if 'avatar' not in request.FILES:
         return Response({'error': 'No avatar provided'}, status=400)
-    
+
     avatar = request.FILES['avatar']
     if not avatar.content_type.startswith('image/'):
         return Response({'error': 'File must be an image'}, status=400)
-    
+
     if avatar.size > 5 * 1024 * 1024:
         return Response({'error': 'Image must be under 5MB'}, status=400)
 
@@ -3090,7 +3104,7 @@ def upload_tutee_avatar(request):
         profile.profile_picture.delete(save=False)
     profile.profile_picture = avatar
     profile.save()
-    
+
     return Response({
         "profile_picture_url": request.build_absolute_uri(profile.profile_picture.url)
     })
@@ -3386,9 +3400,9 @@ def wallet_status(request):
         tutor = Tutor.objects.get(profile__user=request.user)
     except Tutor.DoesNotExist:
         return Response({"error": "Not a tutor"}, status=403)
-        
+
     wallet, created = Wallet.objects.get_or_create(tutor=tutor)
-    
+
     return Response({
         "balance": float(wallet.balance),
         "pending_amount": float(wallet.pending_amount),
@@ -3574,10 +3588,10 @@ def wallet_transactions(request):
         tutor = Tutor.objects.get(profile__user=request.user)
     except Tutor.DoesNotExist:
         return Response({"error": "Not a tutor"}, status=403)
-        
+
     wallet, _ = Wallet.objects.get_or_create(tutor=tutor)
     transactions = Transaction.objects.filter(wallet=wallet).order_by('-created_at')
-    
+
     data = []
     for tx in transactions:
         payment_transaction_id = get_wallet_transaction_payment_reference(tx)
@@ -3603,9 +3617,9 @@ def list_withdrawals(request):
         tutor = Tutor.objects.get(profile__user=request.user)
     except Tutor.DoesNotExist:
         return Response({"error": "Not a tutor"}, status=403)
-        
+
     withdrawals = WithdrawalRequest.objects.filter(tutor=tutor).order_by('-requested_at')
-    
+
     data = []
     for w in withdrawals:
         data.append({
@@ -3628,13 +3642,13 @@ def request_withdrawal(request):
         tutor = Tutor.objects.get(profile__user=request.user)
     except Tutor.DoesNotExist:
         return Response({"error": "Not a tutor"}, status=403)
-        
+
     wallet, _ = Wallet.objects.get_or_create(tutor=tutor)
-    
+
     amount = request.data.get('amount')
     if not amount or decimal.Decimal(str(amount)) > wallet.balance:
         return Response({"error": "Insufficient balance"}, status=400)
-    
+
     if decimal.Decimal(str(amount)) < 500:
         return Response({"error": "Minimum withdrawal is ₱500"}, status=400)
 
@@ -3648,10 +3662,10 @@ def request_withdrawal(request):
             bank_name=request.data.get('bank_name', ''),
             status='pending'
         )
-        
+
         wallet.balance -= decimal.Decimal(str(amount))
         wallet.save()
-        
+
         Transaction.objects.create(
             wallet=wallet,
             transaction_type='withdrawal',
@@ -3903,7 +3917,7 @@ def initiate_online_payment(request):
     """Creates a PayMongo Checkout Session."""
     booking_id = request.data.get('booking_id')
     booking = get_object_or_404(Booking, id=booking_id, student__user=request.user)
-    
+
     # Calculate amount: Hourly Rate * Duration (sum of slots)
     group_bookings = get_booking_request_bookings(booking)
     representative_booking = get_representative_booking(group_bookings)
@@ -3911,7 +3925,7 @@ def initiate_online_payment(request):
     total_amount = decimal.Decimal(str(representative_booking.tutor.hourly_rate)) * decimal.Decimal(
         str(duration_hours)
     )
-    
+
     # PayMongo amount in centavos
     amount_cents = int(total_amount * decimal.Decimal("100"))
     reference_code = f"SB-BK-{representative_booking.id}"
@@ -3942,7 +3956,7 @@ def initiate_online_payment(request):
             }
         }
     }
-    
+
     try:
         response = requests.post(url, json=payload, headers=get_paymongo_auth_headers())
         try:
@@ -3954,7 +3968,7 @@ def initiate_online_payment(request):
             "PayMongo checkout response status=%s",
             response.status_code,
         )
-        
+
         if response.status_code in (200, 201):
             checkout_url = (
                 res_data
@@ -3974,13 +3988,13 @@ def initiate_online_payment(request):
                     error_response["provider_error"] = res_data
 
                 return Response(error_response, status=status.HTTP_502_BAD_GATEWAY)
-            
+
             # Store payment record
             method_online, _ = PaymentMethod.objects.get_or_create(
                 code='PAYMONGO',
                 defaults={'method_name': 'Pay Online (GCash / Card)', 'is_active': True}
             )
-            
+
             payment, _ = Payment.objects.get_or_create(
                 booking=representative_booking,
                 defaults={
@@ -3999,7 +4013,7 @@ def initiate_online_payment(request):
                 'payment_status',
                 'transaction_reference',
             ])
-            
+
             return Response({"payment_url": checkout_url})
 
         provider_message = get_paymongo_error_message(res_data)
@@ -4325,7 +4339,7 @@ def admin_list_tickets(request):
 
     from .models import SupportTicket
     tickets = SupportTicket.objects.select_related('user', 'assigned_agent').all().order_by('-created_at')
-    
+
     if profile.role != 'SuperAdmin':
         tickets = tickets.filter(user__institution=profile.institution)
 

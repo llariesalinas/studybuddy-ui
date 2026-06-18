@@ -16,7 +16,7 @@ class Strand(models.Model):
 
     def __str__(self):
         return f"{self.strand_code} - {self.strand_name}"
-    
+
 class Course(models.Model):
 
     course_code = models.CharField(max_length=20, primary_key=True)
@@ -298,7 +298,7 @@ class Transaction(models.Model):
         ('cashout_fee_reversal', 'Cash-Out Provider Fee Reversal'),
         ('commission_deduction', 'Commission Deduction'),
     ]
-    
+
     wallet = models.ForeignKey(Wallet, on_delete=models.CASCADE, related_name='transactions')
     transaction_type = models.CharField(max_length=30, choices=TRANSACTION_TYPES)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
@@ -388,9 +388,9 @@ class PlatformActivity(models.Model):
     activity_type = models.CharField(max_length=30, choices=ACTIVITY_TYPES)
     message = models.CharField(max_length=255)
     institution = models.ForeignKey(
-        'PartnerInstitution', 
-        on_delete=models.SET_NULL, 
-        null=True, 
+        'PartnerInstitution',
+        on_delete=models.SET_NULL,
+        null=True,
         blank=True,
         related_name='activities'
     )
@@ -408,7 +408,7 @@ def create_tutor_wallet(sender, instance, created, **kwargs):
     if created:
         Wallet.objects.get_or_create(tutor=instance)
 
-#Subjects Table 
+#Subjects Table
 class Subjects(models.Model):
     subject_code = models.CharField(max_length=20, primary_key=True)
     subject_name = models.CharField(max_length=100)
@@ -417,13 +417,13 @@ class Subjects(models.Model):
 
     def __str__(self):
         return f"{self.subject_code} - {self.subject_name}"
-    
+
 #Tutor Subjects Table
 
 class TutorSubjects(models.Model):
     tutor = models.ForeignKey(Tutor, on_delete=models.CASCADE)
     subject = models.ForeignKey(Subjects, on_delete=models.CASCADE)
-    
+
     expertise_level = models.IntegerField()  # e.g., Beginner, Intermediate, Advanced
     description = models.TextField(blank=True, default='')
 
@@ -497,7 +497,7 @@ class TutorAvailabilityOverride(models.Model):
         if self.is_full_day:
             return f"{self.tutor.profile.fname} full-day override on {self.override_date}"
         return f"{self.tutor.profile.fname} override on {self.override_date} for {self.availability_id}"
-    
+
 class Booking(models.Model):
 
     STATUS_CHOICES = [
@@ -598,7 +598,7 @@ class PaymentMethod(models.Model):
 
     method_id = models.AutoField(primary_key=True)
 
-    code = models.CharField(             
+    code = models.CharField(
         max_length=20,
         choices=METHOD_CODES,
         unique=True,
@@ -686,7 +686,7 @@ class Notification(models.Model):
 
     def __str__(self):
         return f"Notification for {self.recipient} - {'Read' if self.is_read else 'Unread'}"
-    
+
 class Rating(models.Model):
 
     booking = models.OneToOneField(
@@ -714,7 +714,7 @@ class Rating(models.Model):
 
     def __str__(self):
         return f"{self.rating_score} ⭐ for {self.tutor.profile.fname}"
-    
+
 class Preference(models.Model):
 
     MODE_CHOICES = [

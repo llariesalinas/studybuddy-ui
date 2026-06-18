@@ -23,6 +23,11 @@ const router = createRouter({
       component: () => import('@/views/Register.vue')
     },
     {
+      path: '/tutor-application-submitted',
+      name: 'tutor-application-submitted',
+      component: () => import('@/views/TutorApplicationSubmitted.vue')
+    },
+    {
       path: '/forgot-password',
       name: 'forgot-password',
       component: () => import('@/views/ForgotPassword.vue')
@@ -103,6 +108,12 @@ const router = createRouter({
       meta: { requiresAuth: true }
     },
     {
+      path: '/application-status',
+      name: 'tutor-application-status',
+      component: () => import('@/views/TutorApplicationStatus.vue'),
+      meta: { requiresAuth: true, role: 'Tutor' }
+    },
+    {
       path: '/tch-dashboard',
       name: 'tch-dashboard',
       component: () => import('@/views/TutorDashboard.vue'),
@@ -163,6 +174,12 @@ const router = createRouter({
       name: 'admin-users',
       component: () => import('@/views/AdminUsers.vue'),
       meta: { requiresAuth: true, role: 'Admin' }
+    },
+    {
+      path: '/admin/tutor-applications',
+      name: 'admin-tutor-applications',
+      component: () => import('@/views/AdminTutorApplications.vue'),
+      meta: { requiresAuth: true, role: ['Admin', 'SuperAdmin'] }
     },
     {
       path: '/superadmin/institutions',
@@ -235,7 +252,11 @@ router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
   const profileStore = useProfileStore()
   const normalizedUserRole = authStore.userRole?.toLowerCase?.() || null
-  const normalizedRouteRole = to.meta.role?.toLowerCase?.() || null
+  const normalizedRouteRoles = Array.isArray(to.meta.role)
+    ? to.meta.role.map((role) => role.toLowerCase())
+    : to.meta.role
+      ? [to.meta.role.toLowerCase()]
+      : []
 
   // 1️⃣ Protect routes requiring authentication
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
@@ -262,12 +283,25 @@ router.beforeEach(async (to, from, next) => {
       }
     }
 
+    const applicationStatus = profileStore.applicationStatus || authStore.user?.application_status || null
+    const hasUnapprovedTutorApplication =
+      normalizedUserRole === 'tutor' &&
+      ['pending', 'rejected'].includes(applicationStatus)
+
+    if (hasUnapprovedTutorApplication && to.name !== 'tutor-application-status') {
+      return next('/application-status')
+    }
+
     // 3️⃣ Profile completion guard
     if (!profileStore.profileCompleted) {
 
       const role = normalizedUserRole
 
-      if (to.path === '/preferencesetup' || to.path === '/tutor-setup') {
+      if (
+        to.path === '/preferencesetup' ||
+        to.path === '/tutor-setup' ||
+        to.path === '/application-status'
+      ) {
         return next()
       }
 
@@ -283,7 +317,7 @@ router.beforeEach(async (to, from, next) => {
     }
 
     // 4️⃣ Role protection
-    if (normalizedRouteRole && normalizedUserRole !== normalizedRouteRole) {
+    if (normalizedRouteRoles.length && !normalizedRouteRoles.includes(normalizedUserRole)) {
 
       if (normalizedUserRole === 'tutor') {
         return next('/tch-dashboard')

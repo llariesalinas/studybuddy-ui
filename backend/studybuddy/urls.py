@@ -64,6 +64,8 @@ urlpatterns = [
     path('logout/', views.logout_view),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('profile/status/', views.profile_status),
+    path('tutor-application/status/', views.tutor_application_status),
+    path('tutor-application/resubmit/', views.tutor_application_resubmit),
     path('preferences/', views.save_preferences),
     path('partner-institutions/', views.partner_institutions_list),
     path('dashboard/', student_dashboard),

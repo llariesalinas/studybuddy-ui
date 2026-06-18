@@ -154,12 +154,18 @@ export const useAuthStore = defineStore('auth', () => {
       id: Number(authPayload.user_id),
       profile_id: Number(authPayload.profile_id),
       fname: authPayload.fname,
-      lname: authPayload.lname
+      lname: authPayload.lname,
+      application_status: authPayload.application_status || null
     }
 
     localStorage.setItem('user_role', normalizedRole)
     localStorage.setItem('user_id', authPayload.user_id)
     localStorage.setItem('profile_id', authPayload.profile_id)
+    if (authPayload.application_status) {
+      localStorage.setItem('application_status', authPayload.application_status)
+    } else {
+      localStorage.removeItem('application_status')
+    }
     profileStore.resetProfileState()
 
     startSessionTracking()
@@ -221,8 +227,9 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('user_role')
     localStorage.removeItem('user_id')
     localStorage.removeItem('profile_id')
+    localStorage.removeItem('application_status')
     findTutorsStore.reset()
-    
+
     // Clear any persisted Pinia stores in sessionStorage to prevent data leaks across sessions
     sessionStorage.clear()
   }
@@ -241,10 +248,12 @@ export const useAuthStore = defineStore('auth', () => {
     if (storedRole) {
       const storedUserId = localStorage.getItem('user_id')
       const storedProfileId = localStorage.getItem('profile_id')
+      const storedApplicationStatus = localStorage.getItem('application_status')
       user.value = {
         role: normalizeRole(storedRole),
         id: storedUserId ? parseInt(storedUserId) : undefined,
-        profile_id: storedProfileId ? parseInt(storedProfileId) : undefined
+        profile_id: storedProfileId ? parseInt(storedProfileId) : undefined,
+        application_status: storedApplicationStatus || null
       }
     }
   }

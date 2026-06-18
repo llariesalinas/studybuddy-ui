@@ -89,7 +89,7 @@ Ensure `UserProfileSerializer` is imported.
 @permission_classes([IsAuthenticated])
 def get_tutee_profile(request):
     profile = request.user.userprofile
-    
+
     try:
         pref = Preference.objects.get(user=profile)
         subject_ids = list(pref.subjects.values_list("subject_code", flat=True))
@@ -100,7 +100,7 @@ def get_tutee_profile(request):
     data['email'] = request.user.email
     data['subjects'] = subject_ids
     data['profile_picture_url'] = request.build_absolute_uri(profile.profile_picture.url) if profile.profile_picture else None
-    
+
     return Response(data)
 ```
 

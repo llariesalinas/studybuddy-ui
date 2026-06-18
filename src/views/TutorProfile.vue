@@ -904,7 +904,6 @@ function setAccordionClosed(element) {
 }
 
 function openAccordionPanel(element) {
-   
   void element.offsetHeight
   element.style.maxHeight = `${element.scrollHeight}px`
   element.style.opacity = '1'
@@ -921,7 +920,6 @@ function setAccordionOpen(element) {
 }
 
 function closeAccordionPanel(element) {
-   
   void element.offsetHeight
   element.style.maxHeight = '0'
   element.style.opacity = '0'

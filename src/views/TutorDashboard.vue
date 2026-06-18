@@ -197,7 +197,7 @@ const loadTutorDashboard = async () => {
   errorMessage.value = ''
 
   try {
-    const [_, response] = await Promise.all([
+    const [, response] = await Promise.all([
       sessionsStore.fetchSessions(),
       api.get('tutor-dashboard/'),
     ])

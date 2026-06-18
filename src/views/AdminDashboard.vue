@@ -164,6 +164,16 @@
               </div>
             </router-link>
 
+            <router-link to="/admin/tutor-applications" class="btn action-surface border-0 text-start rounded-3 p-3 shadow-none sb-btn">
+              <div class="d-flex align-items-center">
+                <i class="bi bi-person-check fs-4 me-3 text-primary"></i>
+                <div>
+                  <p class="fw-bold mb-0">Tutor Applications</p>
+                  <p class="small sb-muted mb-0">Review tutor screening submissions</p>
+                </div>
+              </div>
+            </router-link>
+
             <router-link to="/admin/support" class="btn action-surface border-0 text-start rounded-3 p-3 shadow-none sb-btn">
               <div class="d-flex align-items-center">
                 <i class="bi bi-headset fs-4 me-3 text-info"></i>

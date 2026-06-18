@@ -93,6 +93,7 @@ REST_FRAMEWORK = {
         'anon': '60/min',
         'user': '240/min',
         'login': '5/min',
+        'register': '10/hour',
     },
 }
 
@@ -237,6 +238,13 @@ elif not _smtp_configured:
     )
 else:
     EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend")
+
+# Limit upload size to prevent large files from tying up worker threads.
+# Files larger than FILE_UPLOAD_MAX_MEMORY_SIZE are streamed to a temp file.
+# The hard ceiling (DATA_UPLOAD_MAX_MEMORY_SIZE) is enforced by Django before
+# the view code runs.
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024   # 10 MB hard ceiling on non-file POST data
+FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024    # 5 MB — files above this go to temp disk
 
 PASSWORD_RESET_TIMEOUT = 3600
 LOGIN_OTP_TTL_SECONDS = 600
