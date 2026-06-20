@@ -172,6 +172,7 @@ class AdminStatsView(BaseAdminView):
         ]
 
         stats = {
+            'institution_name': inst.institution_name if inst else 'All institutions',
             'total_tutors': qs_tutors.count(),
             'total_tutees': qs_tutees.count(),
             'active_sessions_today': qs_bookings.count(),
