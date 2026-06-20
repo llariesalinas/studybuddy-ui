@@ -1,11 +1,13 @@
 import re
-from datetime import date, time
+from io import StringIO
+from datetime import date, time, timedelta
 from decimal import Decimal
 from unittest.mock import Mock, patch
 from uuid import uuid4
 
 from django.core.cache import cache
 from django.core import mail
+from django.core.management import call_command
 from django.contrib.auth.models import User
 from django.db import connection
 from django.test import override_settings
@@ -16,9 +18,11 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from .chat.services import get_current_booking_context, get_current_booking_contexts, get_partner_context
 from .models import (
+    AdminAccountRequest,
     Booking,
     Course,
     EmailOTPChallenge,
+    InstitutionRequest,
     PartnerInstitution,
     Payment,
     PaymentMethod,
@@ -39,6 +43,228 @@ from .models import (
     Preference,
 )
 from .chat.models import ChatRoom, Message
+
+
+class SuperAdminRedesignApiTests(APITestCase):
+    def setUp(self):
+        self.institution = PartnerInstitution.objects.create(
+            institution_name="Central Philippine University",
+            school_email_domain="cpu.edu.ph",
+            is_active=True,
+            contact_person="Registrar",
+        )
+        self.inactive_institution = PartnerInstitution.objects.create(
+            institution_name="Dormant College",
+            school_email_domain="dormant.edu.ph",
+            is_active=False,
+        )
+        self.super_user = User.objects.create_user(
+            username="superadmin",
+            email="superadmin@studybuddy.test",
+            password="password",
+        )
+        self.super_profile = UserProfile.objects.create(
+            user=self.super_user,
+            fname="Super",
+            mname="",
+            lname="Admin",
+            role="SuperAdmin",
+            profile_completed=True,
+            is_domain_exempt=True,
+        )
+        self.admin_user = User.objects.create_user(
+            username="admin",
+            email="admin@cpu.edu.ph",
+            password="password",
+        )
+        self.admin_profile = UserProfile.objects.create(
+            user=self.admin_user,
+            fname="Inst",
+            mname="",
+            lname="Admin",
+            role="Admin",
+            institution=self.institution,
+            profile_completed=True,
+        )
+        self.target_user = User.objects.create_user(
+            username="target",
+            email="target@cpu.edu.ph",
+            password="password",
+        )
+        self.target_profile = UserProfile.objects.create(
+            user=self.target_user,
+            fname="Target",
+            mname="",
+            lname="User",
+            role="Tutee",
+            institution=self.institution,
+            profile_completed=True,
+        )
+        self.domain_user = User.objects.create_user(
+            username="external",
+            email="external@gmail.com",
+            password="password",
+        )
+        self.domain_profile = UserProfile.objects.create(
+            user=self.domain_user,
+            fname="External",
+            mname="",
+            lname="Learner",
+            role="Tutee",
+            profile_completed=True,
+            is_domain_exempt=False,
+        )
+        self.client.force_authenticate(user=self.super_user)
+
+    def test_pending_actions_aggregates_superadmin_only_items(self):
+        InstitutionRequest.objects.create(
+            institution_name="West Visayas State University",
+            school_email_domain="wvsu.edu.ph",
+            contact_person="WVSU Admin",
+            contact_email="admin@wvsu.edu.ph",
+        )
+        AdminAccountRequest.objects.create(
+            requesting_admin=self.admin_profile,
+            institution=self.institution,
+            note="Promote target user.",
+        )
+
+        response = self.client.get("/api/admin/pending-actions/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["count"], 4)
+        self.assertEqual(
+            {
+                item["type"]
+                for item in response.data["items"]
+            },
+            {
+                "institution_request",
+                "institution_activation",
+                "admin_account_request",
+                "domain_exemption",
+            },
+        )
+
+    def test_institution_request_approval_creates_active_partner_institution(self):
+        request_obj = InstitutionRequest.objects.create(
+            institution_name="West Visayas State University",
+            school_email_domain="wvsu.edu.ph",
+            contact_person="WVSU Admin",
+            contact_email="admin@wvsu.edu.ph",
+        )
+
+        response = self.client.patch(
+            f"/api/admin/institution-requests/{request_obj.id}/",
+            {"action": "approve"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["status"], "approved")
+        self.assertTrue(
+            PartnerInstitution.objects.filter(
+                school_email_domain="wvsu.edu.ph",
+                is_active=True,
+            ).exists()
+        )
+
+    def test_superadmin_can_patch_role_institution_and_domain_exemption(self):
+        response = self.client.patch(
+            f"/api/admin/users/{self.target_profile.id}/",
+            {
+                "role": "Admin",
+                "institution": self.inactive_institution.id,
+                "is_domain_exempt": True,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.target_profile.refresh_from_db()
+        self.assertEqual(self.target_profile.role, "Admin")
+        self.assertEqual(self.target_profile.institution, self.inactive_institution)
+        self.assertTrue(self.target_profile.is_domain_exempt)
+
+    def test_admin_account_request_approval_promotes_target_user(self):
+        request_obj = AdminAccountRequest.objects.create(
+            requesting_admin=self.admin_profile,
+            institution=self.institution,
+            note="Promote target user.",
+        )
+
+        response = self.client.patch(
+            f"/api/admin/admin-account-requests/{request_obj.id}/",
+            {"action": "approve", "target_user_id": self.target_profile.id},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.target_profile.refresh_from_db()
+        self.assertEqual(self.target_profile.role, "Admin")
+        self.assertEqual(self.target_profile.institution, self.institution)
+
+    def test_analytics_includes_completion_subject_popularity_and_csv(self):
+        course = Course.objects.create(course_code="MATH", course_name="Mathematics")
+        subject = Subjects.objects.create(
+            subject_code="ALG101",
+            subject_name="College Algebra",
+            department="Math",
+        )
+        tutor_user = User.objects.create_user(
+            username="tutor",
+            email="tutor@cpu.edu.ph",
+            password="password",
+        )
+        tutor_profile = UserProfile.objects.create(
+            user=tutor_user,
+            fname="Tutor",
+            mname="",
+            lname="One",
+            role="Tutor",
+            institution=self.institution,
+            course=course,
+            profile_completed=True,
+        )
+        tutor = Tutor.objects.create(
+            profile=tutor_profile,
+            hourly_rate=Decimal("500.00"),
+            total_sessions=1,
+        )
+        TutorSubjects.objects.create(tutor=tutor, subject=subject, expertise_level=5)
+        availability = TutorAvailability.objects.create(
+            tutor=tutor,
+            day="Mon",
+            time_slot=time(9, 0),
+            is_active=True,
+        )
+        booking = Booking.objects.create(
+            student=self.target_profile,
+            tutor=tutor,
+            availability=availability,
+            session_date=date.today(),
+            session_mode="Online",
+            status="Completed",
+        )
+        payment_method = PaymentMethod.objects.create(code="online", method_name="Online Payment")
+        Payment.objects.create(
+            booking=booking,
+            method=payment_method,
+            amount=Decimal("500.00"),
+            payment_status="Paid",
+        )
+
+        response = self.client.get("/api/admin/analytics/?period=7d")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["completion_rate"], 100.0)
+        self.assertEqual(response.data["subject_popularity"][0]["subject_name"], "College Algebra")
+        self.assertEqual(response.data["top_tutors"][0]["earnings"], 450.0)
+
+        export_response = self.client.get("/api/admin/analytics/export/?period=7d")
+        self.assertEqual(export_response.status_code, 200)
+        self.assertEqual(export_response["Content-Type"], "text/csv")
+        self.assertIn("date,institution,tutors,tutees,sessions,completion_rate,gross_revenue,commissions", export_response.content.decode())
 
 
 class RecommendTutorsViewTests(APITestCase):
@@ -1810,6 +2036,108 @@ class EmailAuthTests(APITestCase):
         self.assertEqual(verify_response.data["role"], "Admin")
         self.assertEqual(verify_response.data["email"], admin_user.email)
 
+    def test_staff_user_with_superadmin_profile_keeps_superadmin_on_login(self):
+        admin_user = User.objects.create_user(
+            username="superadmin@example.edu",
+            email="superadmin@example.edu",
+            password="password",
+            is_staff=True,
+        )
+        UserProfile.objects.create(
+            user=admin_user,
+            fname="Super",
+            mname="",
+            lname="Admin",
+            role="SuperAdmin",
+            profile_completed=True,
+            is_domain_exempt=True,
+        )
+
+        login_response = self.client.post(
+            "/api/login/",
+            {"email": admin_user.email, "password": "password"},
+            format="json",
+        )
+
+        self.assertEqual(login_response.status_code, 200)
+
+        verify_response = self.client.post(
+            "/api/login/verify-otp/",
+            {
+                "challenge_id": login_response.data["challenge_id"],
+                "code": self.latest_otp_code(),
+            },
+            format="json",
+        )
+
+        self.assertEqual(verify_response.status_code, 200)
+        self.assertEqual(verify_response.data["role"], "SuperAdmin")
+
+        profile = UserProfile.objects.get(user=admin_user)
+        self.assertEqual(profile.role, "SuperAdmin")
+
+    def test_make_superadmin_command_promotes_existing_user(self):
+        target_user = User.objects.create_user(
+            username="target@example.edu",
+            email="target@example.edu",
+            password="password",
+        )
+        profile = UserProfile.objects.create(
+            user=target_user,
+            fname="Target",
+            mname="",
+            lname="User",
+            role="Tutee",
+            profile_completed=False,
+            is_domain_exempt=False,
+            is_suspended=True,
+        )
+
+        output = StringIO()
+        call_command("make_superadmin", target_user.email, stdout=output)
+
+        profile.refresh_from_db()
+        self.assertEqual(profile.role, "SuperAdmin")
+        self.assertTrue(profile.profile_completed)
+        self.assertTrue(profile.is_domain_exempt)
+        self.assertFalse(profile.is_suspended)
+        self.assertIn("Promoted target@example.edu to SuperAdmin.", output.getvalue())
+
+    def test_make_superadmin_command_prefers_login_username_when_email_is_duplicated(self):
+        legacy_user = User.objects.create_user(
+            username="duplicate",
+            email="duplicate@example.edu",
+            password="password",
+        )
+        legacy_profile = UserProfile.objects.create(
+            user=legacy_user,
+            fname="Legacy",
+            mname="",
+            lname="Admin",
+            role="Admin",
+        )
+        login_user = User.objects.create_user(
+            username="duplicate@example.edu",
+            email="duplicate@example.edu",
+            password="password",
+        )
+        login_profile = UserProfile.objects.create(
+            user=login_user,
+            fname="Login",
+            mname="",
+            lname="Admin",
+            role="Admin",
+        )
+
+        output = StringIO()
+        call_command("make_superadmin", login_user.email, stdout=output)
+
+        legacy_profile.refresh_from_db()
+        login_profile.refresh_from_db()
+        self.assertEqual(legacy_profile.role, "Admin")
+        self.assertEqual(login_profile.role, "SuperAdmin")
+        self.assertIn(f"Promoting login username match user_id={login_user.id}.", output.getvalue())
+
     def test_staff_user_without_profile_gets_admin_profile_status(self):
         admin_user = User.objects.create_user(
             username="status-admin@example.edu",
@@ -2728,6 +3056,156 @@ class SessionCheckInTests(APITestCase):
         self.assertFalse(SessionCheckIn.objects.exists())
 
 
+class DevLiveSessionTests(APITestCase):
+    def setUp(self):
+        cache.clear()
+        self.course = Course.objects.create(
+            course_code="DEVLIVE",
+            course_name="Dev Live",
+        )
+        self.student_user = User.objects.create_user(
+            username="dev-live-student",
+            email="dev-live-student@example.com",
+            password="password",
+        )
+        self.student = UserProfile.objects.create(
+            user=self.student_user,
+            fname="Dev",
+            mname="",
+            lname="Student",
+            role="Tutee",
+            year_level=11,
+            course=self.course,
+        )
+        self.tutor_user = User.objects.create_user(
+            username="dev-live-tutor",
+            email="dev-live-tutor@example.com",
+            password="password",
+        )
+        self.tutor_profile = UserProfile.objects.create(
+            user=self.tutor_user,
+            fname="Dev",
+            mname="",
+            lname="Tutor",
+            role="Tutor",
+            year_level=12,
+            course=self.course,
+        )
+        self.tutor = Tutor.objects.create(
+            profile=self.tutor_profile,
+            hourly_rate=200,
+            can_online=True,
+            can_f2f=True,
+            teaching_level="SHS",
+        )
+        TutorSubjects.objects.create(
+            tutor=self.tutor,
+            subject=Subjects.objects.create(
+                subject_code="DEV101",
+                subject_name="Dev QA",
+                department="QA",
+            ),
+            expertise_level=5,
+        )
+        self.availability = TutorAvailability.objects.create(
+            tutor=self.tutor,
+            day="Mon",
+            time_slot=time(14, 0),
+            is_active=True,
+        )
+        self.booking = Booking.objects.create(
+            student=self.student,
+            tutor=self.tutor,
+            availability=self.availability,
+            session_date=date.today() + timedelta(days=3),
+            session_mode="F2F",
+            preferred_location="Library",
+            status="Confirmed",
+        )
+        self.client.force_authenticate(user=self.student_user)
+
+    def tearDown(self):
+        cache.clear()
+
+    @override_settings(DEBUG=False)
+    def test_force_live_returns_404_when_debug_is_false(self):
+        response = self.client.post(
+            f"/api/dev/bookings/{self.booking.id}/force-live/",
+            {"phase": "start"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    @override_settings(DEBUG=True)
+    def test_force_live_rejects_unrelated_users(self):
+        other_user = User.objects.create_user(
+            username="dev-live-other",
+            email="dev-live-other@example.com",
+            password="password",
+        )
+        UserProfile.objects.create(
+            user=other_user,
+            fname="Other",
+            mname="",
+            lname="User",
+            role="Tutee",
+            year_level=11,
+            course=self.course,
+        )
+        self.client.force_authenticate(user=other_user)
+
+        response = self.client.post(
+            f"/api/dev/bookings/{self.booking.id}/force-live/",
+            {"phase": "start"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+    @override_settings(DEBUG=True)
+    def test_force_live_updates_detail_and_list_payloads(self):
+        response = self.client.post(
+            f"/api/dev/bookings/{self.booking.id}/force-live/",
+            {"phase": "midpoint"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["session"]["status"], "Ongoing")
+
+        list_response = self.client.get("/api/bookings/")
+        self.assertEqual(list_response.status_code, 200)
+        booking_payload = next(
+            item for item in list_response.data if item["id"] == self.booking.id
+        )
+
+        self.assertEqual(booking_payload["status"], "Ongoing")
+        self.assertEqual(str(booking_payload["date"]), response.data["session"]["date"])
+        self.assertEqual(booking_payload["startTime"], response.data["session"]["start_time"])
+        self.assertEqual(booking_payload["endTime"], response.data["session"]["end_time"])
+
+    @override_settings(DEBUG=True)
+    def test_tutor_can_force_and_clear_live_session(self):
+        self.client.force_authenticate(user=self.tutor_user)
+
+        force_response = self.client.post(
+            f"/api/dev/bookings/{self.booking.id}/force-live/",
+            {"phase": "ending"},
+            format="json",
+        )
+        self.assertEqual(force_response.status_code, 200)
+        self.assertEqual(force_response.data["session"]["status"], "Ongoing")
+
+        clear_response = self.client.post(
+            f"/api/dev/bookings/{self.booking.id}/clear-force-live/",
+            format="json",
+        )
+
+        self.assertEqual(clear_response.status_code, 200)
+        self.assertEqual(clear_response.data["session"]["status"], "Upcoming")
+
+
 class TutorCashInTests(APITestCase):
     def setUp(self):
         self.tutor_user = User.objects.create_user(
@@ -2873,3 +3351,66 @@ class TutorCashInTests(APITestCase):
         self.assertEqual(self.wallet.balance, Decimal("-50.00"))
         topup.refresh_from_db()
         self.assertEqual(topup.status, "pending")
+
+
+class AvatarCompressionTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="tutor_avatar",
+            email="tutor_avatar@example.com",
+            password="password",
+        )
+        self.profile = UserProfile.objects.create(
+            user=self.user,
+            fname="Avatar",
+            mname="",
+            lname="Tutor",
+            role="Tutor",
+            year_level=12,
+        )
+        Tutor.objects.create(
+            profile=self.profile,
+            hourly_rate=200,
+            teaching_level="College",
+        )
+        self.client.force_authenticate(user=self.user)
+
+    def _png_upload(self, name, size):
+        from io import BytesIO
+        from PIL import Image
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        buffer = BytesIO()
+        Image.new("RGB", size, (120, 80, 200)).save(buffer, format="PNG")
+        buffer.seek(0)
+        return SimpleUploadedFile(name, buffer.read(), content_type="image/png")
+
+    def test_oversized_image_is_compressed_to_webp(self):
+        from io import BytesIO
+        from PIL import Image
+
+        upload = self._png_upload("huge.png", (1000, 1000))
+        response = self.client.post(
+            "/api/tutor/profile/avatar/", {"avatar": upload}, format="multipart"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.profile.refresh_from_db()
+        self.assertTrue(self.profile.profile_picture.name.endswith(".webp"))
+
+        self.profile.profile_picture.open()
+        stored = Image.open(BytesIO(self.profile.profile_picture.read()))
+        self.assertEqual(stored.format, "WEBP")
+        self.assertLessEqual(max(stored.size), 512)
+
+    def test_unreadable_image_is_rejected(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        bogus = SimpleUploadedFile(
+            "broken.png", b"not a real image", content_type="image/png"
+        )
+        response = self.client.post(
+            "/api/tutor/profile/avatar/", {"avatar": bogus}, format="multipart"
+        )
+
+        self.assertEqual(response.status_code, 400)

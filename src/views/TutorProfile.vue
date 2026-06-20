@@ -548,10 +548,12 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/services/api/api'
+import { useAuthStore } from '@/stores/auth'
 import { useCatalogStore } from '@/stores/catalog'
 import { useToastStore } from '@/stores/toast'
 
 const router = useRouter()
+const authStore = useAuthStore()
 const catalogStore = useCatalogStore()
 const toastStore = useToastStore()
 
@@ -560,6 +562,8 @@ const hourlyRateStep = 10
 
 const profile = ref({
   fullName: '',
+  fname: '',
+  lname: '',
   email: '',
   course: '',
   year_level: null,
@@ -641,7 +645,10 @@ const normalizedRate = computed(() => {
 const avatarUrl = computed(() => profile.value.profile_picture_url || '')
 
 const initials = computed(() => {
-  const parts = String(profile.value.fullName || '')
+  const displayName = profile.value.fullName
+    || [profile.value.fname, profile.value.lname].filter(Boolean).join(' ')
+
+  const parts = String(displayName || '')
     .trim()
     .split(/\s+/)
     .filter(Boolean)
@@ -966,6 +973,7 @@ async function handleAvatarUpload(event) {
     isUploadingAvatar.value = true
     const response = await api.post('/tutor/profile/avatar/', formData)
     profile.value.profile_picture_url = response.data.profile_picture_url || ''
+    authStore.patchUserProfile({ profile_picture_url: profile.value.profile_picture_url })
     toastStore.push('Photo updated successfully.')
   } catch (error) {
     console.error('Avatar upload failed:', error)
@@ -981,6 +989,8 @@ async function loadProfile() {
     const profileResponse = await api.get('/tutor/profile/')
     const data = profileResponse.data
 
+    profile.value.fname = data.fname || ''
+    profile.value.lname = data.lname || ''
     profile.value.fullName = [data.fname, data.lname].filter(Boolean).join(' ')
     profile.value.email = data.email || ''
     profile.value.course = data.course || ''
@@ -1106,6 +1116,7 @@ async function saveProfile() {
     await api.put('/tutee/profile/update/', profilePayload)
     await api.put('/tutor/update/', tutorPayload)
     await syncSubjects()
+    authStore.patchUserProfile({ fname: names.fname, lname: names.lname })
     toastStore.push('Profile updated successfully.')
     await loadProfile()
   } catch (error) {

@@ -5,16 +5,22 @@ Status moves Draft → Approved → In Progress → Done. When a plan is complet
 
 | Date | Plan | Status | Summary |
 |------|------|--------|---------|
+| 2026-06-21 | [Tutor profile real-time reflection + avatar compression](2026-06-21-tutor-profile-realtime-image-compression.md) | In Progress | [Spec](../specs/2026-06-21-tutor-profile-realtime-image-compression-design.md) |
+| 2026-06-17 | [Super Admin Redesign](2026-06-17-superadmin-redesign.md) | Approved | [Spec](../specs/2026-06-17-superadmin-redesign-design.md) · [Artifact](../artifacts/2026-06-17-superadmin-redesign-preview.html) |
+| 2026-06-15 | [Session Details "alive" redesign (tutee + tutor)](2026-06-15-session-details-alive-redesign.md) | Done | [Summary](../session-summaries/2026-06-15-session-details-alive-redesign-summary.md) · [Reference](../artifacts/2026-06-15-session-details-alive-redesign-preview.html) |
+| 2026-06-15 | [Chat banner & booking card compact-timeline redesign](2026-06-15-chat-banner-card-redesign.md) | Approved | |
+| 2026-06-15 | [Tutor details slot range clarity](2026-06-15-tutor-details-slot-clarity.md) | Implemented (pending preview) | |
+| 2026-06-15 | [Tutor schedule AM/PM period rail](2026-06-15-schedule-am-pm-rail.md) | Done | [Summary](../session-summaries/2026-06-15-schedule-am-pm-rail-summary.md) |
 | 2026-06-14 | [Tutor wallet cash-in (top-up)](2026-06-14-tutor-wallet-cash-in.md) | Done | [Summary](../session-summaries/2026-06-14-tutor-wallet-cash-in-summary.md) |
 | 2026-06-14 | [Antigravity Edge-Case Scan](2026-06-14-antigravity-edgecase-scan.md) | In Progress | [Summary](../session-summaries/2026-06-14-antigravity-edgecase-scan-summary.md) |
 | 2026-06-14 | [Ongoing-booking live status surface](2026-06-14-ongoing-booking-live-status.md) | In Progress | [Spec](../specs/2026-06-14-ongoing-booking-live-status-design.md) |
-| 2026-06-14 | [Chat accept/reject pending sessions](2026-06-14-chat-accept-reject.md) | Approved | Pending |
+| 2026-06-14 | [Chat accept/reject pending sessions](2026-06-14-chat-accept-reject.md) | Done | [Summary](../session-summaries/2026-06-15-chat-accept-reject-summary.md) |
 | 2026-06-11 | [Landing page redesign — Studio Motion](2026-06-11-landing-page-redesign.md) | Done | [Summary](../session-summaries/2026-06-11-landing-page-redesign-summary.md) |
 | 2026-06-08 | [Online-only payments + proof of payment](2026-06-08-online-only-payments.md) | Done | [Summary](../session-summaries/2026-06-11-online-only-payments-summary.md) |
 | 2026-06-11 | [PayMongo proof-of-payment validation](2026-06-11-paymongo-proof-of-payment-validation.md) | Draft | Pending |
 | 2026-06-08 | [SuperAdmin role + per-institution admin scoping](2026-06-08-superadmin-institution-hierarchy.md) | Approved | Pending |
 | 2026-06-08 | [Venue confirmation + mid-session check-in modals](2026-06-08-venue-session-checkin-modals.md) | Done | Implemented session check-in tracking + tutee/tutor UI |
-| 2026-06-07 | [Dashboard load performance (backend)](2026-06-07-dashboard-load-performance.md) | In Progress | [Summary](../session-summaries/2026-06-07-dashboard-load-performance-summary.md) |
+| 2026-06-07 | [Dashboard load performance (backend)](2026-06-07-dashboard-load-performance.md) | Done | [Summary](../session-summaries/2026-06-07-dashboard-load-performance-summary.md) |
 | 2026-06-07 | [Chat partner context display](2026-06-07-chat-partner-context-display.md) | Done | [Summary](../session-summaries/2026-06-07-chat-partner-context-display-summary.md) |
 | 2026-06-07 | [Support chat naming](2026-06-07-support-chat-naming.md) | Done | [Summary](../session-summaries/2026-06-07-support-chat-naming-summary.md) |
 | 2026-06-07 | [Dashboard card stability](2026-06-07-dashboard-card-stability.md) | Done | [Summary](../session-summaries/2026-06-07-dashboard-card-stability-summary.md) |

@@ -65,6 +65,7 @@ from .serializers import (
 )
 from .email_utils import send_application_received_email
 from .chat.services import create_booking_event
+from .image_utils import compress_image
 
 from .models import (
     UserProfile,
@@ -175,7 +176,7 @@ def get_login_profile_for_user(user):
     if user.is_staff or user.is_superuser:
         updated_fields = []
 
-        if profile.role != 'Admin':
+        if profile.role not in ('Admin', 'SuperAdmin'):
             profile.role = 'Admin'
             updated_fields.append('role')
 
@@ -527,6 +528,85 @@ def get_session_notification_context(bookings):
         "tutor_name": tutor_name,
         "tutee_name": tutee_name,
     }
+
+
+DEV_LIVE_PHASES = {
+    'start': (-5, 55),
+    'midpoint': (-30, 30),
+    'ending': (-55, 5),
+}
+DEV_LIVE_CACHE_TIMEOUT_SECONDS = 60 * 60 * 6
+
+
+def get_dev_live_cache_keys_for_booking(booking):
+    if booking.status == "Pending" and booking.booking_request_id:
+        return [f"studybuddy:dev-live:request:{booking.booking_request_id}"]
+
+    if booking.session_group_id:
+        return [f"studybuddy:dev-live:group:{booking.session_group_id}"]
+
+    if booking.booking_request_id:
+        return [f"studybuddy:dev-live:request:{booking.booking_request_id}"]
+
+    return [f"studybuddy:dev-live:booking:{booking.id}"]
+
+
+def get_dev_live_override_for_bookings(bookings):
+    if not settings.DEBUG:
+        return None
+
+    for booking in sort_bookings_for_session_group(bookings):
+        for key in get_dev_live_cache_keys_for_booking(booking):
+            override = cache.get(key)
+            if override:
+                return override
+
+    return None
+
+
+def set_dev_live_override_for_bookings(bookings, override):
+    keys = {
+        key
+        for booking in sort_bookings_for_session_group(bookings)
+        for key in get_dev_live_cache_keys_for_booking(booking)
+    }
+
+    for key in keys:
+        cache.set(key, override, DEV_LIVE_CACHE_TIMEOUT_SECONDS)
+
+
+def clear_dev_live_override_for_bookings(bookings):
+    for booking in sort_bookings_for_session_group(bookings):
+        for key in get_dev_live_cache_keys_for_booking(booking):
+            cache.delete(key)
+
+
+def build_dev_live_override(phase):
+    offsets = DEV_LIVE_PHASES[phase]
+    current_time = timezone.localtime(timezone.now()).replace(second=0, microsecond=0)
+    start_at = current_time + timedelta(minutes=offsets[0])
+    end_at = current_time + timedelta(minutes=offsets[1])
+
+    return {
+        "phase": phase,
+        "date": start_at.date().isoformat(),
+        "start_time": start_at.time().strftime("%H:%M"),
+        "end_time": end_at.time().strftime("%H:%M"),
+        "forced_at": current_time.isoformat(),
+    }
+
+
+def apply_dev_live_override(bookings, session_date, start_time, end_time):
+    override = get_dev_live_override_for_bookings(bookings)
+
+    if not override:
+        return session_date, start_time, end_time
+
+    return (
+        datetime.strptime(override["date"], "%Y-%m-%d").date(),
+        datetime.strptime(override["start_time"], "%H:%M").time(),
+        datetime.strptime(override["end_time"], "%H:%M").time(),
+    )
 
 
 def get_display_status(raw_status, session_date, start_time, end_time):
@@ -1470,11 +1550,17 @@ def build_combined_block(group, profile=None):
     representative_booking = get_representative_booking(sorted_group)
 
     start_time = first.availability.time_slot
-
     end_time = (
         datetime.combine(first.session_date, last.availability.time_slot)
         + timedelta(minutes=SESSION_SLOT_MINUTES)
     ).time()
+    has_dev_live_override = get_dev_live_override_for_bookings(sorted_group) is not None
+    session_date, start_time, end_time = apply_dev_live_override(
+        sorted_group,
+        first.session_date,
+        start_time,
+        end_time,
+    )
 
     duration = get_duration_hours_for_bookings(sorted_group)
 
@@ -1482,13 +1568,14 @@ def build_combined_block(group, profile=None):
     group_status = first.status
     display_status = get_display_status(
         group_status,
-        first.session_date,
+        session_date,
         start_time,
         end_time
     )
 
     if (
         settings.DEBUG
+        and not has_dev_live_override
         and representative_booking.status == "Confirmed"
         and representative_booking.tutor_confirmed
     ):
@@ -1500,7 +1587,7 @@ def build_combined_block(group, profile=None):
         "booking_request_id": str(representative_booking.booking_request_id) if representative_booking.booking_request_id else None,
         "status": display_status,
         "raw_status": group_status,
-        "date": first.session_date,
+        "date": session_date,
         "student": f"{first.student.fname} {first.student.lname}",
         "tuteeName": f"{first.student.fname} {first.student.lname}",
         "tutor": f"{first.tutor.profile.fname} {first.tutor.profile.lname}",
@@ -1744,7 +1831,7 @@ def tutor_detail(request, profile_id):
     except Tutor.DoesNotExist:
         return Response({"error": "Tutor not found"}, status=404)
 
-    serializer = TutorDetailSerializer(tutor)
+    serializer = TutorDetailSerializer(tutor, context={'request': request})
     return Response(serializer.data)
 
 #tutor availability schedule thing  vview
@@ -2612,15 +2699,23 @@ def build_booking_detail_payload(session_group_bookings):
         datetime.combine(first_booking.session_date, last_booking.availability.time_slot)
         + timedelta(minutes=SESSION_SLOT_MINUTES)
     ).time()
+    has_dev_live_override = get_dev_live_override_for_bookings(session_group_bookings) is not None
+    session_date, start_time, end_time = apply_dev_live_override(
+        session_group_bookings,
+        representative_booking.session_date,
+        start_time,
+        end_time,
+    )
     display_status = get_display_status(
         representative_booking.status,
-        representative_booking.session_date,
+        session_date,
         start_time,
         end_time
     )
 
     if (
         settings.DEBUG
+        and not has_dev_live_override
         and representative_booking.status == "Confirmed"
         and representative_booking.tutor_confirmed
     ):
@@ -2658,7 +2753,7 @@ def build_booking_detail_payload(session_group_bookings):
         },
         "session": {
             "subject": representative_booking.tutor.profile.course.course_name if representative_booking.tutor.profile.course else "General",
-            "date": representative_booking.session_date.strftime("%Y-%m-%d"),
+            "date": session_date.strftime("%Y-%m-%d"),
             "start_time": start_time.strftime("%H:%M"),
             "end_time": end_time.strftime("%H:%M"),
             "duration_hours": get_duration_hours_for_bookings(session_group_bookings),
@@ -2906,6 +3001,67 @@ def tutor_confirm_booking(request, booking_id):
 @permission_classes([IsAuthenticated])
 def complete_booking(request, booking_id):
     return tutor_confirm_booking(request, booking_id)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def dev_force_booking_live(request, booking_id):
+    if not settings.DEBUG:
+        return Response(status=404)
+
+    profile = request.user.userprofile
+    booking = get_object_or_404(
+        Booking.objects.select_related('student', 'tutor__profile', 'availability'),
+        id=booking_id,
+    )
+
+    if profile not in (booking.student, booking.tutor.profile):
+        return Response({"error": "Unauthorized"}, status=403)
+
+    session_group_bookings = get_session_group_bookings(booking)
+
+    if any(group_booking.status != "Confirmed" for group_booking in session_group_bookings):
+        return Response(
+            {"error": "Only confirmed sessions can be forced live."},
+            status=400,
+        )
+
+    phase = str(request.data.get("phase", "start")).strip().lower()
+    if phase not in DEV_LIVE_PHASES:
+        return Response(
+            {"error": "Phase must be 'start', 'midpoint', or 'ending'."},
+            status=400,
+        )
+
+    set_dev_live_override_for_bookings(
+        session_group_bookings,
+        build_dev_live_override(phase),
+    )
+    refreshed_group = get_session_group_bookings(booking)
+
+    return Response(build_booking_detail_payload(refreshed_group))
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def dev_clear_booking_live(request, booking_id):
+    if not settings.DEBUG:
+        return Response(status=404)
+
+    profile = request.user.userprofile
+    booking = get_object_or_404(
+        Booking.objects.select_related('student', 'tutor__profile', 'availability'),
+        id=booking_id,
+    )
+
+    if profile not in (booking.student, booking.tutor.profile):
+        return Response({"error": "Unauthorized"}, status=403)
+
+    session_group_bookings = get_session_group_bookings(booking)
+    clear_dev_live_override_for_bookings(session_group_bookings)
+    refreshed_group = get_session_group_bookings(booking)
+
+    return Response(build_booking_detail_payload(refreshed_group))
 
 
 @api_view(['POST'])
@@ -3370,12 +3526,17 @@ def upload_tutee_avatar(request):
     if avatar.size > 5 * 1024 * 1024:
         return Response({'error': 'Image must be under 5MB'}, status=400)
 
+    try:
+        compressed = compress_image(avatar)
+    except Exception:
+        return Response({'error': 'Invalid image file'}, status=400)
+
     profile = request.user.userprofile
     if profile.profile_picture:
         profile.profile_picture.delete(save=False)
-    profile.profile_picture = avatar
+    profile.profile_picture = compressed
     profile.save()
-    
+
     return Response({
         "profile_picture_url": request.build_absolute_uri(profile.profile_picture.url)
     })
@@ -3394,10 +3555,15 @@ def upload_tutor_avatar(request):
     if avatar.size > 5 * 1024 * 1024:
         return Response({'error': 'Image must be under 5MB'}, status=400)
 
+    try:
+        compressed = compress_image(avatar)
+    except Exception:
+        return Response({'error': 'Invalid image file'}, status=400)
+
     profile = request.user.userprofile
     if profile.profile_picture:
         profile.profile_picture.delete(save=False)
-    profile.profile_picture = avatar
+    profile.profile_picture = compressed
     profile.save()
 
     return Response({
