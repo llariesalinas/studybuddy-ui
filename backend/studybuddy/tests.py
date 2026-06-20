@@ -3414,3 +3414,123 @@ class AvatarCompressionTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, 400)
+
+
+class AdminDashboardMetricsTests(APITestCase):
+    """Phase 1: institution-scoped /admin/stats metrics + operational queue."""
+
+    def setUp(self):
+        self.inst = PartnerInstitution.objects.create(
+            institution_name="College of Computer Studies",
+            school_email_domain="ccs.edu.ph",
+            is_active=True,
+        )
+        self.other_inst = PartnerInstitution.objects.create(
+            institution_name="Other College",
+            school_email_domain="other.edu.ph",
+            is_active=True,
+        )
+
+        admin_user = User.objects.create_user(
+            username="inst_admin", email="admin@ccs.edu.ph", password="password"
+        )
+        self.admin_profile = UserProfile.objects.create(
+            user=admin_user, fname="Inst", mname="", lname="Admin",
+            role="Admin", institution=self.inst, year_level=16,
+        )
+        self.client.force_authenticate(user=admin_user)
+
+        self.subject = Subjects.objects.create(
+            subject_code="CS101", subject_name="Data Structures", department="CS"
+        )
+
+        # Tutee in-institution with a subject preference (demand)
+        tutee_user = User.objects.create_user(
+            username="ccs_tutee", email="tutee@ccs.edu.ph", password="password"
+        )
+        tutee_profile = UserProfile.objects.create(
+            user=tutee_user, fname="Tess", mname="", lname="Tutee",
+            role="Tutee", institution=self.inst, year_level=14,
+        )
+        pref = Preference.objects.create(user=tutee_profile)
+        pref.subjects.add(self.subject)
+
+        # Tutor in-institution teaching the subject (supply) + completed sessions
+        tutor_user = User.objects.create_user(
+            username="ccs_tutor", email="tutor@ccs.edu.ph", password="password"
+        )
+        tutor_profile = UserProfile.objects.create(
+            user=tutor_user, fname="Tom", mname="", lname="Tutor",
+            role="Tutor", institution=self.inst, year_level=16,
+        )
+        self.tutor = Tutor.objects.create(
+            profile=tutor_profile, hourly_rate=200, teaching_level="College"
+        )
+        TutorSubjects.objects.create(tutor=self.tutor, subject=self.subject, expertise_level=5)
+
+        availability = TutorAvailability.objects.create(
+            tutor=self.tutor, day="Mon", time_slot=time(9, 0), is_active=True
+        )
+        # 1 completed + 1 cancelled this week -> completion_rate 50.0, sessions_this_week counts completed only via active_statuses
+        completed = Booking.objects.create(
+            student=tutee_profile, tutor=self.tutor, availability=availability,
+            session_date=date.today(), session_mode="Online", status="Completed",
+        )
+        Booking.objects.create(
+            student=tutee_profile, tutor=self.tutor, availability=availability,
+            session_date=date.today(), session_mode="Online", status="Cancelled",
+        )
+        Rating.objects.create(
+            booking=completed, student=tutee_profile, tutor=self.tutor, rating_score=5
+        )
+
+        # Operational queue items in-institution
+        WithdrawalRequest.objects.create(
+            tutor=self.tutor, amount=Decimal("500.00"), method="gcash", status="pending"
+        )
+        SupportTicket.objects.create(
+            user=tutee_profile, category="Technical", subject="Cannot log in",
+            description="help", status="Open",
+        )
+
+        # Out-of-institution noise that must be excluded by scoping
+        other_tutor_user = User.objects.create_user(
+            username="other_tutor", email="t@other.edu.ph", password="password"
+        )
+        other_tutor_profile = UserProfile.objects.create(
+            user=other_tutor_user, fname="Olive", mname="", lname="Other",
+            role="Tutor", institution=self.other_inst, year_level=16,
+        )
+        other_tutor = Tutor.objects.create(
+            profile=other_tutor_profile, hourly_rate=200, teaching_level="College"
+        )
+        WithdrawalRequest.objects.create(
+            tutor=other_tutor, amount=Decimal("999.00"), method="gcash", status="pending"
+        )
+
+    def test_stats_includes_institution_scoped_metrics(self):
+        response = self.client.get("/api/admin/stats")
+        self.assertEqual(response.status_code, 200)
+        data = response.data
+
+        self.assertEqual(data["institution_name"], "College of Computer Studies")
+        self.assertEqual(data["sessions_this_week"], 1)  # only the Completed one
+        self.assertEqual(data["completed_sessions"], 1)
+        self.assertEqual(data["cancelled_sessions"], 1)
+        self.assertEqual(data["completion_rate"], 50.0)
+
+        self.assertTrue(any(s["subject_name"] == "Data Structures" for s in data["subject_demand"]))
+        self.assertEqual(len(data["top_tutors"]), 1)
+        self.assertEqual(data["top_tutors"][0]["completed_sessions"], 1)
+        self.assertEqual(data["top_tutors"][0]["avg_rating"], 5.0)
+
+    def test_operational_queue_is_scoped(self):
+        response = self.client.get("/api/admin/operational-queue/")
+        self.assertEqual(response.status_code, 200)
+        data = response.data
+
+        # 1 withdrawal (own inst, not the other) + 1 open ticket = 2
+        self.assertEqual(data["count"], 2)
+        types = {item["type"] for item in data["items"]}
+        self.assertIn("withdrawal", types)
+        self.assertIn("support", types)
