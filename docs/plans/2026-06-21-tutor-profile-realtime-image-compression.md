@@ -9,8 +9,13 @@ spec: ../specs/2026-06-21-tutor-profile-realtime-image-compression-design.md
 
 ## Status & Progress Summary
 
-**Status:** In Progress — plan and spec written; implementation starting.
-Tasks 1-5 not yet done.
+**Status:** Done — all 5 tasks implemented and committed. Frontend `lint`
+(scoped to changed files) and `build` pass. `compress_image` verified standalone
+(1500x1000 RGBA PNG -> 512x341 WebP; corrupt input raises). Backend endpoint
+tests are written but could NOT be executed via the Django test runner: the
+remote Supabase-pooled `test_postgres` cannot be dropped/recreated (a pooled
+session holds it) and has pre-existing inconsistent migration history. See
+summary for details.
 
 ## Goal
 
@@ -82,3 +87,7 @@ WebP) so full-size phone photos are no longer stored or served raw.
 ## Changelog
 
 - 2026-06-21: Plan and spec authored; status set to In Progress; index row added.
+- 2026-06-21: Implemented all 5 tasks (auth store `patchUserProfile`, TutorProfile
+  wiring, `image_utils.compress_image`, avatar-view compression, tests). Frontend
+  lint/build pass; compression verified standalone. Backend endpoint tests blocked
+  by remote test-DB pooler. Committed; status set to Done.

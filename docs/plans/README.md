@@ -5,7 +5,7 @@ Status moves Draft → Approved → In Progress → Done. When a plan is complet
 
 | Date | Plan | Status | Summary |
 |------|------|--------|---------|
-| 2026-06-21 | [Tutor profile real-time reflection + avatar compression](2026-06-21-tutor-profile-realtime-image-compression.md) | In Progress | [Spec](../specs/2026-06-21-tutor-profile-realtime-image-compression-design.md) |
+| 2026-06-21 | [Tutor profile real-time reflection + avatar compression](2026-06-21-tutor-profile-realtime-image-compression.md) | Done | [Summary](../session-summaries/2026-06-21-tutor-profile-realtime-image-compression-summary.md) · [Spec](../specs/2026-06-21-tutor-profile-realtime-image-compression-design.md) |
 | 2026-06-17 | [Super Admin Redesign](2026-06-17-superadmin-redesign.md) | Approved | [Spec](../specs/2026-06-17-superadmin-redesign-design.md) · [Artifact](../artifacts/2026-06-17-superadmin-redesign-preview.html) |
 | 2026-06-15 | [Session Details "alive" redesign (tutee + tutor)](2026-06-15-session-details-alive-redesign.md) | Done | [Summary](../session-summaries/2026-06-15-session-details-alive-redesign-summary.md) · [Reference](../artifacts/2026-06-15-session-details-alive-redesign-preview.html) |
 | 2026-06-15 | [Chat banner & booking card compact-timeline redesign](2026-06-15-chat-banner-card-redesign.md) | Approved | |
