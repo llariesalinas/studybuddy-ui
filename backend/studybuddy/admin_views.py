@@ -14,9 +14,9 @@ from django.utils.timesince import timesince
 from datetime import timedelta
 from .models import (
     AdminAccountRequest, InstitutionRequest,
-    UserProfile, Tutor, Booking, WithdrawalRequest, 
+    UserProfile, Tutor, Booking, WithdrawalRequest,
     PartnerInstitution, Wallet, Transaction, PlatformActivity,
-    TutorApplication, Payment, TutorSubjects
+    TutorApplication, Payment, TutorSubjects, Subjects, SupportTicket
 )
 from .serializers import (
     AdminAccountRequestSerializer, InstitutionRequestSerializer,
@@ -99,6 +99,78 @@ class AdminStatsView(BaseAdminView):
                 'new_tutees': qs_tutees.filter(user__date_joined__date=day).count(),
             })
 
+        # Institution-scoped dashboard metrics (None for SuperAdmin = platform-wide)
+        inst = None if profile.role == 'SuperAdmin' else profile.institution
+
+        new_members_this_month = (
+            qs_tutors.filter(profile__user__date_joined__date__gte=month_start).count()
+            + qs_tutees.filter(user__date_joined__date__gte=month_start).count()
+        )
+
+        # Sessions per week + 30-day completion rate
+        week_start = today - timedelta(days=today.weekday())
+        last_week_start = week_start - timedelta(days=7)
+        window_start = today - timedelta(days=30)
+        active_statuses = ['Confirmed', 'Completed']
+
+        qs_all_bookings = Booking.objects.all()
+        if inst:
+            qs_all_bookings = qs_all_bookings.filter(tutor__profile__institution=inst)
+
+        sessions_this_week = qs_all_bookings.filter(
+            session_date__gte=week_start, status__in=active_statuses
+        ).count()
+        sessions_last_week = qs_all_bookings.filter(
+            session_date__gte=last_week_start, session_date__lt=week_start,
+            status__in=active_statuses
+        ).count()
+
+        window_bookings = qs_all_bookings.filter(session_date__gte=window_start)
+        completed_sessions = window_bookings.filter(status='Completed').count()
+        cancelled_sessions = window_bookings.filter(status__in=['Cancelled', 'Rejected']).count()
+        completion_denom = completed_sessions + cancelled_sessions
+        completion_rate = round(completed_sessions / completion_denom * 100, 1) if completion_denom else 0.0
+
+        # Subject demand (tutee preferences) vs supply (tutor subjects)
+        demand_filter = Q(preference__user__role='Tutee')
+        supply_filter = Q()
+        if inst:
+            demand_filter &= Q(preference__user__institution=inst)
+            supply_filter = Q(tutorsubjects__tutor__profile__institution=inst)
+
+        demand_rows = (
+            Subjects.objects.annotate(
+                demand=Count('preference', filter=demand_filter, distinct=True),
+                supply=Count('tutorsubjects', filter=supply_filter, distinct=True),
+            )
+            .filter(demand__gt=0)
+            .order_by('-demand')[:5]
+        )
+        subject_demand = [
+            {
+                'subject_name': s.subject_name,
+                'demand': s.demand,
+                'supply': s.supply,
+                'gap': s.demand > 0 and s.supply == 0,
+            }
+            for s in demand_rows
+        ]
+
+        # Top tutors by completed sessions (+ avg rating)
+        qs_top = qs_tutors.select_related('profile', 'profile__course').annotate(
+            completed=Count('tutor_bookings', filter=Q(tutor_bookings__status='Completed'), distinct=True),
+            avg_rating=Avg('ratings__rating_score'),
+        ).order_by('-completed')[:4]
+        top_tutors = [
+            {
+                'name': f"{t.profile.fname} {t.profile.lname}".strip(),
+                'completed_sessions': t.completed,
+                'avg_rating': round(t.avg_rating, 1) if t.avg_rating else 0.0,
+                'course': t.profile.course.course_code if t.profile.course else '',
+            }
+            for t in qs_top
+        ]
+
         stats = {
             'total_tutors': qs_tutors.count(),
             'total_tutees': qs_tutees.count(),
@@ -107,9 +179,77 @@ class AdminStatsView(BaseAdminView):
             'pending_withdrawals': qs_withdrawals.filter(status='pending').count(),
             'failed_withdrawals': qs_withdrawals.filter(status='failed').count(),
             'recent_activity': activity_serializer.data,
-            'enrollment_trend': enrollment_trend
+            'enrollment_trend': enrollment_trend,
+            'new_members_this_month': new_members_this_month,
+            'sessions_this_week': sessions_this_week,
+            'sessions_last_week': sessions_last_week,
+            'completed_sessions': completed_sessions,
+            'cancelled_sessions': cancelled_sessions,
+            'completion_rate': completion_rate,
+            'subject_demand': subject_demand,
+            'top_tutors': top_tutors,
         }
         return Response(stats)
+
+
+class AdminOperationalQueueView(BaseAdminView):
+    """Institution-scoped operational to-do feed for the Admin dashboard.
+
+    Groups the items an institution admin must act on (withdrawals, support
+    tickets, tutor applications) into summary rows. Each row routes to the
+    existing screen that resolves it; the dashboard performs no mutations.
+    """
+    permission_classes = [permissions.IsAuthenticated, IsAdminUser]
+
+    def get(self, request):
+        profile = request.user.userprofile
+        inst = None if profile.role == 'SuperAdmin' else profile.institution
+
+        withdrawals = WithdrawalRequest.objects.filter(status__in=['pending', 'failed'])
+        tickets = SupportTicket.objects.filter(status__in=['Open', 'In_Progress'])
+        applications = TutorApplication.objects.filter(application_status='pending')
+        if inst:
+            withdrawals = withdrawals.filter(tutor__profile__institution=inst)
+            tickets = tickets.filter(user__institution=inst)
+            applications = applications.filter(profile__institution=inst)
+
+        items = []
+
+        wd_count = withdrawals.count()
+        if wd_count:
+            failed = withdrawals.filter(status='failed').count()
+            total_amount = withdrawals.aggregate(total=Sum('amount'))['total'] or 0
+            meta = f"PHP {float(total_amount):,.0f} total"
+            if failed:
+                meta += f" - {failed} failed"
+            items.append({
+                'type': 'withdrawal',
+                'title': f"{wd_count} withdrawal{'s' if wd_count != 1 else ''} need review",
+                'meta': meta,
+                'route': '/admin/withdrawals',
+            })
+
+        ticket_count = tickets.count()
+        if ticket_count:
+            unassigned = tickets.filter(status='Open').count()
+            items.append({
+                'type': 'support',
+                'title': f"{ticket_count} open support ticket{'s' if ticket_count != 1 else ''}",
+                'meta': f"{unassigned} unassigned",
+                'route': '/admin/support',
+            })
+
+        app_count = applications.count()
+        if app_count:
+            items.append({
+                'type': 'tutor_application',
+                'title': f"{app_count} tutor application{'s' if app_count != 1 else ''}",
+                'meta': 'Awaiting screening',
+                'route': '/admin/users',
+            })
+
+        return Response({'count': wd_count + ticket_count + app_count, 'items': items})
+
 
 class AdminWithdrawalListView(BaseAdminView):
     permission_classes = [permissions.IsAuthenticated, IsAdminUser]

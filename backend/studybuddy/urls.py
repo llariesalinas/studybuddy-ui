@@ -32,7 +32,7 @@ from .admin_views import (
     AdminUserListView, AdminInstitutionView, AdminAnalyticsView,
     AdminPendingActionsView, InstitutionRequestView,
     AdminTutorApplicationListView, AdminTutorApplicationDetailView,
-    SuperAdminInstitutionPerformanceView
+    SuperAdminInstitutionPerformanceView, AdminOperationalQueueView
 )
 from . import views
 
@@ -41,6 +41,7 @@ print("STUDYBUDDY URLS LOADED")
 urlpatterns = [
     # Admin Routes
     path('admin/stats/', AdminStatsView.as_view()),
+    path('admin/operational-queue/', AdminOperationalQueueView.as_view()),
     path('admin/withdrawals/', AdminWithdrawalListView.as_view()),
     path('admin/withdrawals/<int:pk>/', AdminWithdrawalDetailView.as_view()),
     path('admin/tutor-applications/', AdminTutorApplicationListView.as_view()),
