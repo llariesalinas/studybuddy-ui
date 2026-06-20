@@ -135,7 +135,7 @@
 
     <SupportModal
       :open="isSupportModalOpen"
-      :type="supportContextType"
+      :context-type="supportContextType"
       :context-id="supportContextId"
       @close="isSupportModalOpen = false"
     />
@@ -357,7 +357,7 @@
   </div>
 
   <template v-if="authStore.isAuthenticated && !isPublicRoute">
-    <OngoingBookingBar />
+    <OngoingBookingBar v-if="!hideOngoingBookingBar" />
 
     <template v-if="userRole === 'tutee'">
       <VenueConfirmModal
@@ -397,6 +397,7 @@ import { SESSION_POLL_INTERVAL_MS } from './config.js'
 import SbToast from '@/components/SbToast.vue'
 import SbThemeToggle from '@/components/SbThemeToggle.vue'
 const SupportModal = defineAsyncComponent(() => import('@/components/SupportModal.vue'))
+const DEV_LIVE_REFRESH_KEY = 'studybuddy_dev_live_refresh'
 
 const route = useRoute()
 const authStore = useAuthStore()
@@ -566,6 +567,10 @@ const isPublicRoute = computed(() => {
   ].includes(route.name)
 })
 
+const hideOngoingBookingBar = computed(() => (
+  ['tuteeSessionDetails', 'booking-details'].includes(route.name)
+))
+
 // Get the role from the store to control the sidebar links
 const userRole = computed(() => authStore.user?.role?.toLowerCase() || null)
 const userFname =  computed(() => authStore.user?.fname || null)
@@ -583,6 +588,25 @@ const handleVisibilityChange = async () => {
     await refreshTutorPendingSessions()
   }
 }
+
+const refreshLiveSessionSurfaces = async () => {
+  if (!authStore.isAuthenticated) {
+    return
+  }
+
+  activeSession.currentTime = new Date()
+  await sessionStore.fetchSessions({ force: true })
+  await activeSession.refreshActive()
+}
+
+const handleDevLiveRefresh = async (event) => {
+  if (event.key !== DEV_LIVE_REFRESH_KEY) {
+    return
+  }
+
+  await refreshLiveSessionSurfaces()
+}
+
 onMounted(() => {
   if (authStore.isAuthenticated) {
     deferStartupWork(() => {
@@ -591,6 +615,7 @@ onMounted(() => {
     })
 
     activeSession.startPolling()
+    window.addEventListener('storage', handleDevLiveRefresh)
 
     if (userRole.value === 'tutor') {
       sessionStore.fetchSessions()
@@ -606,6 +631,7 @@ onBeforeUnmount(() => {
   closeLogoutModal()
   cancelDeferredStartupWork()
   document.removeEventListener('visibilitychange', handleVisibilityChange)
+  window.removeEventListener('storage', handleDevLiveRefresh)
 
   if (pendingSessionsRefreshId) {
     window.clearInterval(pendingSessionsRefreshId)

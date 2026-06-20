@@ -1,7 +1,7 @@
 ---
 title: Chat Accept / Reject pending sessions
 date: 2026-06-14
-status: Approved
+status: Done
 spec: ../specs/2026-06-14-chat-accept-reject-design.md
 ---
 
@@ -18,12 +18,14 @@ alongside the existing edit-location control (Option C — "Confirm & Accept").
 
 ## Status / Progress Summary
 
-- **Current status:** Approved — not started.
-- **Tasks:** 0 / 2 complete.
+- **Current status:** Done.
+- **Tasks:** 2 / 2 complete.
 
 ## Changelog
 
 - 2026-06-14: Plan created from approved spec.
+- 2026-06-15: Implementation started.
+- 2026-06-15: Implemented, previewed, and verified.
 
 ---
 
@@ -32,7 +34,7 @@ alongside the existing edit-location control (Option C — "Confirm & Accept").
 **Files:**
 - Modify: `src/stores/chat.js`
 
-- [ ] Step 1: Below `updatePendingLocation` (around `src/stores/chat.js:764`), add two
+- [x] Step 1: Below `updatePendingLocation` (around `src/stores/chat.js:764`), add two
   functions mirroring its pattern (call endpoint via the authenticated `api` instance, then
   force-refresh rooms):
   ```js
@@ -48,8 +50,8 @@ alongside the existing edit-location control (Option C — "Confirm & Accept").
     return response.data
   }
   ```
-- [ ] Step 2: Export both from the store's returned object, next to `updatePendingLocation`.
-- [ ] Step 3: Verify — `npm run lint` passes clean.
+- [x] Step 2: Export both from the store's returned object, next to `updatePendingLocation`.
+- [x] Step 3: Verify — targeted ESLint passed.
 - [ ] Step 4: Commit — `git commit -m "feat: add chat store accept/reject booking actions"`
 
 ## Task 2: Add tutor Accept / Reject controls to `ChatBanner.vue`
@@ -57,10 +59,10 @@ alongside the existing edit-location control (Option C — "Confirm & Accept").
 **Files:**
 - Modify: `src/components/ChatBanner.vue`
 
-- [ ] Step 1: In `<script setup>`, add `const accepting = ref(false)` and
+- [x] Step 1: In `<script setup>`, add `const accepting = ref(false)` and
   `const rejecting = ref(false)`. Reuse the existing `locationError`, `locationDraft`,
   and `editing` refs.
-- [ ] Step 2: Add three handlers:
+- [x] Step 2: Add three handlers:
   - `confirmAndAccept()` (F2F): trim `locationDraft`; if empty set
     `locationError = 'Location is required.'` and return; if changed vs
     `bannerContext.preferred_location` call `chatStore.updatePendingLocation(id, loc)`;
@@ -70,20 +72,20 @@ alongside the existing edit-location control (Option C — "Confirm & Accept").
     same error handling.
   - `reject()`: toggle `rejecting`, call `chatStore.rejectBooking(bannerContext.id)`,
     same error handling.
-- [ ] Step 3: In the `pending_location` template, inside the existing tutor branch
+- [x] Step 3: In the `pending_location` template, inside the existing tutor branch
   (`v-if="isTutor"` area, around `src/components/ChatBanner.vue:49-60`), render the Option C
   layout: the editable location chip (reuse existing Edit/Save flow), a
   `.chat-banner__btn--primary` button "Confirm & Accept" (`@click="confirmAndAccept"`,
   `:disabled="accepting"`, label `accepting ? 'Accepting…' : 'Confirm & Accept'`), and a
   `.chat-banner__btn--danger-text` button "Reject" (`@click="reject"`, `:disabled="rejecting"`).
   Leave the tutee branch (`Suggest change`) unchanged.
-- [ ] Step 4: In the `pending` template (online, around `src/components/ChatBanner.vue:66-80`),
+- [x] Step 4: In the `pending` template (online, around `src/components/ChatBanner.vue:66-80`),
   add a tutor-only (`v-if="isTutor"`) action area with an "Accept" primary button
   (`@click="accept"`) and the "Reject" text button. Tutee keeps the "Waiting for confirmation"
   copy.
-- [ ] Step 5: In `<style scoped>`, add `.chat-banner__btn--danger-text { color: var(--sb-danger-bs); font-weight: 600; }`
+- [x] Step 5: In `<style scoped>`, add `.chat-banner__btn--danger-text { color: var(--sb-danger-bs); font-weight: 600; }`
   and a `.chat-banner__loc-chip` rule using existing CSS variables only (no hardcoded hex).
-- [ ] Step 6: Verify — `npm run lint` clean, `npm run build` succeeds, `npm run test` green.
+- [x] Step 6: Verify — targeted ESLint clean, `npm run build` succeeds, `npm run test` green.
 - [ ] Step 7: Commit — `git commit -m "feat: tutor accept/reject pending session in chat banner"`
 
 ---
@@ -104,3 +106,9 @@ alongside the existing edit-location control (Option C — "Confirm & Accept").
 - `npm run test` — existing suite green.
 - Manual: tutor F2F → edit location → Confirm & Accept → banner flips to Confirmed; tutor
   online → Accept; tutor Reject → banner flips to Rejected; tutee sees no accept/reject.
+
+## Outcome
+
+Implemented the approved frontend-only flow in `src/stores/chat.js` and
+`src/components/ChatBanner.vue`. Added a preview artifact showing F2F tutor, online tutor, and tutee
+pending states. Verified with targeted ESLint, production build, and the frontend test suite.

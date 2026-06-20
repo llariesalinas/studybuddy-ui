@@ -286,6 +286,18 @@ export const useSessionsStore = defineStore('sessions', () => {
     return fetchSessionById(id)
   }
 
+  const devForceLive = async (id, phase = 'start') => {
+    const response = await api.post(`/dev/bookings/${id}/force-live/`, { phase })
+    await fetchSessions({ force: true })
+    return response.data
+  }
+
+  const devClearForceLive = async (id) => {
+    const response = await api.post(`/dev/bookings/${id}/clear-force-live/`)
+    await fetchSessions({ force: true })
+    return response.data
+  }
+
   const completedSessions = computed(() =>
     sessions.value
       .filter(session => normalizeStatus(session.status) === 'completed')
@@ -381,5 +393,7 @@ export const useSessionsStore = defineStore('sessions', () => {
     submitRating,
     confirmVenue,
     submitMidpointCheckIn,
+    devForceLive,
+    devClearForceLive,
   }
 })

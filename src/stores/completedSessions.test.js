@@ -142,4 +142,44 @@ describe('completed sessions store', () => {
     expect(store.sessions.find((session) => session.id === 21).dashboard_hidden_by_current_user).toBe(true)
     expect(store.sessions.find((session) => session.id === 30).dashboard_hidden_by_current_user).toBe(false)
   })
+
+  it('forces a session live through the dev endpoint and refreshes sessions', async () => {
+    apiPost.mockResolvedValueOnce({
+      data: {
+        id: 42,
+        session: {
+          status: 'Ongoing',
+          start_time: '10:00',
+          end_time: '11:00',
+        },
+      },
+    })
+    apiGet.mockResolvedValueOnce({ data: [] })
+
+    const result = await useSessionsStore().devForceLive(42, 'midpoint')
+
+    expect(apiPost).toHaveBeenCalledWith('/dev/bookings/42/force-live/', {
+      phase: 'midpoint',
+    })
+    expect(apiGet).toHaveBeenCalledWith('/bookings/')
+    expect(result.session.status).toBe('Ongoing')
+  })
+
+  it('clears a forced live session through the dev endpoint and refreshes sessions', async () => {
+    apiPost.mockResolvedValueOnce({
+      data: {
+        id: 42,
+        session: {
+          status: 'Upcoming',
+        },
+      },
+    })
+    apiGet.mockResolvedValueOnce({ data: [] })
+
+    const result = await useSessionsStore().devClearForceLive(42)
+
+    expect(apiPost).toHaveBeenCalledWith('/dev/bookings/42/clear-force-live/')
+    expect(apiGet).toHaveBeenCalledWith('/bookings/')
+    expect(result.session.status).toBe('Upcoming')
+  })
 })

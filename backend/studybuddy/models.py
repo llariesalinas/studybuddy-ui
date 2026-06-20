@@ -101,6 +101,68 @@ class UserProfile(models.Model):
         return f"{self.fname} {self.lname}"
 
 
+class InstitutionRequest(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    ]
+
+    institution_name = models.CharField(max_length=200)
+    school_email_domain = models.CharField(max_length=100)
+    contact_person = models.CharField(max_length=200)
+    contact_email = models.EmailField()
+    note = models.TextField(blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    reviewed_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='institution_requests_reviewed'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f"{self.institution_name} ({self.status})"
+
+
+class AdminAccountRequest(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    ]
+
+    requesting_admin = models.ForeignKey(
+        UserProfile,
+        on_delete=models.CASCADE,
+        related_name='admin_requests_sent'
+    )
+    institution = models.ForeignKey(PartnerInstitution, on_delete=models.CASCADE)
+    target_user = models.ForeignKey(
+        UserProfile,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='admin_requests_received'
+    )
+    note = models.TextField(blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    created_at = models.DateTimeField(auto_now_add=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f"Admin request for {self.institution.institution_name} ({self.status})"
+
+
 class EmailOTPChallenge(models.Model):
     PURPOSE_LOGIN = 'login'
     PURPOSE_CHOICES = [

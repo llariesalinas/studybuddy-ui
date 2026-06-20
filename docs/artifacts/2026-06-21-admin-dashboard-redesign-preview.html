@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Institutional Admin Dashboard — Redesign Preview</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" />
+<style>
+  :root {
+    /* Mirrors src/App.vue tokens so this preview matches the real app */
+    --sb-primary: #00895a;
+    --sb-primary-hover: #00734c;
+    --sb-dark: #0a1916;
+    --sb-bg: #f8f9fa;
+    --sb-card-bg: #ffffff;
+    --sb-card-border: #e6ece9;
+    --sb-text-main: #10231d;
+    --sb-text-muted: #65756d;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    color: var(--sb-text-main);
+    background:
+      radial-gradient(1200px 600px at 80% -10%, rgba(0, 137, 90, 0.10), transparent),
+      radial-gradient(900px 500px at -10% 10%, rgba(29, 78, 216, 0.06), transparent),
+      var(--sb-bg);
+    min-height: 100vh;
+  }
+
+  /* ---------- preview chrome (not part of the app) ---------- */
+  .preview-bar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    padding: 12px 24px;
+    background: rgba(10, 25, 22, 0.96);
+    color: #fff;
+    box-shadow: 0 8px 24px rgba(10, 25, 22, 0.18);
+  }
+  .preview-bar strong { font-size: 14px; }
+  .preview-bar .spacer { flex: 1; }
+  .variant-btn {
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+    font-weight: 700;
+    font-size: 13px;
+    padding: 7px 14px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .variant-btn:hover { background: rgba(255, 255, 255, 0.18); }
+  .variant-btn.active { background: var(--sb-primary); border-color: var(--sb-primary); }
+  .kpi-counter { font-size: 12px; opacity: 0.85; }
+  .kpi-counter b { color: #7ee0b6; }
+
+  .stage { padding: 24px; max-width: 1280px; margin: 0 auto; }
+
+  /* ---------- shared app tokens (copied from SuperAdminDashboard.vue) ---------- */
+  .dashboard-role-header {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; margin-bottom: 18px; padding: 18px 20px;
+    border: 1px solid var(--sb-card-border); border-radius: 18px;
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: 0 12px 32px rgba(10, 25, 22, 0.06);
+  }
+  .eyebrow { color: var(--sb-text-muted); font-size: 11px; font-weight: 700; text-transform: uppercase; margin: 0; }
+  .dashboard-role-header h1 { margin: 4px 0 0; font-size: 30px; line-height: 1.1; font-weight: 800; }
+  .header-sub { margin: 6px 0 0; color: var(--sb-text-muted); font-size: 13px; }
+  .admin-role-pill {
+    display: inline-flex; align-items: center; gap: 8px; border-radius: 999px;
+    background: var(--sb-primary); color: #fff; font-size: 13px; font-weight: 800;
+    padding: 8px 14px; white-space: nowrap;
+  }
+
+  .kpi-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 18px; }
+  .kpi-card, .surface-panel {
+    background: rgba(255, 255, 255, 0.9); border: 1px solid var(--sb-card-border);
+    border-radius: 18px; box-shadow: 0 12px 32px rgba(10, 25, 22, 0.06);
+  }
+  .kpi-card { padding: 18px; min-height: 150px; position: relative; cursor: pointer; transition: transform 0.15s ease, box-shadow 0.15s ease; }
+  .kpi-card:hover { transform: translateY(-2px); box-shadow: 0 18px 40px rgba(10, 25, 22, 0.10); }
+  .kpi-card.selected { outline: 2.5px solid var(--sb-primary); outline-offset: 2px; }
+  .kpi-card .pick-dot {
+    position: absolute; top: 12px; right: 12px; width: 22px; height: 22px; border-radius: 999px;
+    border: 2px solid var(--sb-card-border); display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 11px; background: #fff;
+  }
+  .kpi-card.selected .pick-dot { background: var(--sb-primary); border-color: var(--sb-primary); }
+  .kpi-icon { width: 42px; height: 42px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 20px; margin-bottom: 16px; }
+  .tone-primary { background: #edf6f1; color: var(--sb-primary); }
+  .tone-info { background: #eff6ff; color: #1d4ed8; }
+  .tone-warning { background: #fffbeb; color: #92400e; }
+  .tone-danger { background: #fef2f2; color: #991b1b; }
+  .tone-purple { background: #f5f3ff; color: #5b21b6; }
+  .tone-pink { background: #fdf2f8; color: #9d174f; }
+  .kpi-card p.kpi-label { color: var(--sb-text-muted); font-size: 11px; font-weight: 700; text-transform: uppercase; margin: 0; }
+  .kpi-card h2 { font-size: 28px; line-height: 1.1; margin: 2px 0 8px; font-weight: 800; }
+  .kpi-delta { font-size: 13px; color: var(--sb-text-muted); display: inline-flex; align-items: center; gap: 5px; }
+  .delta-up { color: var(--sb-primary); font-weight: 700; }
+  .delta-down { color: #b91c1c; font-weight: 700; }
+
+  .surface-panel { padding: 20px; }
+  .panel-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+  .panel-heading h3 { font-size: 20px; line-height: 1.2; margin: 4px 0 0; font-weight: 800; }
+  .soft-pill, .metric-pill {
+    border-radius: 999px; background: #edf6f1; color: var(--sb-primary);
+    font-size: 12px; font-weight: 800; padding: 5px 11px; white-space: nowrap;
+  }
+  .link-button { color: var(--sb-primary); font-weight: 700; font-size: 13px; text-decoration: none; }
+
+  .dashboard-split { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(340px, 0.75fr); gap: 18px; margin-bottom: 18px; }
+
+  .sparkline-wrap { height: 220px; border-radius: 16px; background: linear-gradient(180deg, rgba(0, 137, 90, 0.06), rgba(255, 255, 255, 0)); display: flex; align-items: center; }
+  .sparkline-wrap svg { width: 100%; height: 180px; }
+  .trend-legend { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; color: var(--sb-text-muted); font-size: 13px; }
+  .trend-legend i { color: var(--sb-primary); font-size: 9px; margin-right: 6px; }
+
+  /* operational queue */
+  .pending-list { display: grid; gap: 12px; }
+  .pending-item { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 12px; border: 1px solid var(--sb-card-border); border-radius: 14px; background: #fff; }
+  .pending-icon { width: 40px; height: 40px; border-radius: 14px; display: flex; align-items: center; justify-content: center; }
+  .pending-copy { min-width: 0; }
+  .pending-copy p { margin: 0; font-weight: 700; font-size: 14px; }
+  .pending-copy span { color: var(--sb-text-muted); font-size: 12px; }
+  .action-button { border: 1px solid var(--sb-primary); color: var(--sb-primary); background: #fff; font-weight: 700; font-size: 12px; padding: 6px 12px; border-radius: 999px; cursor: pointer; white-space: nowrap; }
+  .action-button:hover { background: var(--sb-primary); color: #fff; }
+
+  /* subject demand bars */
+  .demand-row { display: grid; grid-template-columns: 120px 1fr 44px; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .demand-label { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .demand-track { height: 12px; border-radius: 999px; background: #eef2f0; overflow: hidden; }
+  .demand-fill { height: 100%; border-radius: 999px; }
+  .demand-count { font-size: 13px; font-weight: 800; text-align: right; }
+  .demand-gap { color: #b91c1c; font-size: 11px; font-weight: 700; }
+
+  /* tutor leaderboard */
+  .lead-row { display: grid; grid-template-columns: 28px 36px 1fr auto; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--sb-card-border); }
+  .lead-row:last-child { border-bottom: 0; }
+  .lead-rank { font-weight: 800; color: var(--sb-text-muted); text-align: center; }
+  .lead-avatar { width: 36px; height: 36px; border-radius: 999px; background: var(--sb-primary); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 13px; }
+  .lead-name { font-weight: 700; font-size: 14px; }
+  .lead-meta { color: var(--sb-text-muted); font-size: 12px; }
+  .rating-text { color: #92400e; font-weight: 800; font-size: 13px; }
+  .rating-text i { margin-right: 4px; }
+
+  table.perf { width: 100%; border-collapse: collapse; }
+  table.perf th { text-align: left; font-size: 11px; text-transform: uppercase; color: var(--sb-text-muted); font-weight: 800; padding: 8px 10px; }
+  table.perf td { padding: 12px 10px; border-top: 1px solid var(--sb-card-border); font-size: 14px; }
+
+  .completion-ring { display: flex; align-items: center; gap: 18px; }
+  .ring-num { font-size: 34px; font-weight: 800; }
+
+  .two-up { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 18px; }
+  .three-up { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 18px; margin-bottom: 18px; }
+
+  .note { font-size: 12px; color: var(--sb-text-muted); margin: 4px 0 14px; }
+
+  [data-variant] { display: none; }
+  [data-variant].show { display: block; }
+
+  @media (max-width: 900px) {
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    .dashboard-split, .two-up, .three-up { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+  <div class="preview-bar">
+    <strong><i class="bi bi-easel2"></i> Admin Dashboard — Redesign Preview</strong>
+    <span class="kpi-counter">Click KPI cards to mark your final 4 &middot; selected: <b id="kpiCount">0</b>/4</span>
+    <span class="spacer"></span>
+    <button class="variant-btn active" data-go="A">A · Operations-first</button>
+    <button class="variant-btn" data-go="B">B · Insight-first</button>
+    <button class="variant-btn" data-go="C">C · Compact</button>
+  </div>
+
+  <div class="stage">
+    <p class="note">Sample data is for one institution (College of Computer Studies). All six KPI candidates are shown — click to mark the four you want. The lower panels (enrollment, operational queue, subject demand, top tutors) are the same across variants; only their arrangement differs.</p>
+
+    <header class="dashboard-role-header">
+      <div>
+        <p class="eyebrow">Dashboard view</p>
+        <h1>Admin</h1>
+        <p class="header-sub"><i class="bi bi-building"></i> College of Computer Studies &middot; Central Philippine University</p>
+      </div>
+      <span class="admin-role-pill"><i class="bi bi-building-lock"></i> Institution Admin</span>
+    </header>
+
+    <!-- ============ VARIANT A — Operations-first ============ -->
+    <div data-variant="A" class="show">
+      <section class="kpi-grid" id="kpiGridA"></section>
+      <section class="dashboard-split">
+        <article class="surface-panel" id="sparkA"></article>
+        <article class="surface-panel" id="queueA"></article>
+      </section>
+      <section class="two-up">
+        <article class="surface-panel" id="demandA"></article>
+        <article class="surface-panel" id="tutorsA"></article>
+      </section>
+    </div>
+
+    <!-- ============ VARIANT B — Insight-first ============ -->
+    <div data-variant="B">
+      <section class="kpi-grid" id="kpiGridB"></section>
+      <section class="two-up" style="grid-template-columns: 1.5fr 1fr;">
+        <article class="surface-panel" id="sparkB"></article>
+        <article class="surface-panel" id="ringB"></article>
+      </section>
+      <section class="surface-panel" id="queueB" style="margin-bottom:18px;"></section>
+      <section class="two-up">
+        <article class="surface-panel" id="demandB"></article>
+        <article class="surface-panel" id="tutorsB"></article>
+      </section>
+    </div>
+
+    <!-- ============ VARIANT C — Compact ============ -->
+    <div data-variant="C">
+      <section class="kpi-grid" id="kpiGridC"></section>
+      <section class="three-up">
+        <article class="surface-panel" id="sparkC"></article>
+        <article class="surface-panel" id="queueC"></article>
+        <article class="surface-panel" id="demandC"></article>
+      </section>
+      <section class="surface-panel" id="tutorsC"></section>
+    </div>
+  </div>
+
+<script>
+  // ---------- sample institution-scoped data ----------
+  const KPIS = [
+    { key: 'members', label: 'Active Members', value: '432', icon: 'bi-people-fill', tone: 'tone-primary', delta: '188 tutors / 244 tutees', dir: 'up', deltaNum: '+19 this month' },
+    { key: 'sessions', label: 'Sessions This Week', value: '96', icon: 'bi-calendar-check', tone: 'tone-info', delta: 'vs 81 last week', dir: 'up', deltaNum: '+18%' },
+    { key: 'completion', label: 'Completion Rate', value: '88.5%', icon: 'bi-patch-check', tone: 'tone-primary', delta: 'completed vs cancelled', dir: 'up', deltaNum: '+2.1 pts' },
+    { key: 'attention', label: 'Needs Attention', value: '7', icon: 'bi-inbox-fill', tone: 'tone-danger', delta: 'items in your queue', dir: 'down', deltaNum: '3 urgent' },
+    { key: 'rating', label: 'Avg Tutor Rating', value: '4.6', icon: 'bi-star-fill', tone: 'tone-warning', delta: 'across 188 tutors', dir: 'up', deltaNum: '+0.1' },
+    { key: 'earnings', label: 'Tutor Earnings Facilitated', value: '₱148K', icon: 'bi-wallet2', tone: 'tone-purple', delta: 'this month', dir: 'up', deltaNum: '+12%' },
+  ];
+
+  const QUEUE = [
+    { icon: 'bi-cash-stack', tone: 'tone-primary', title: '2 withdrawals awaiting review', meta: '₱9,400 total · oldest 2 days ago', action: 'Review' },
+    { icon: 'bi-exclamation-octagon', tone: 'tone-danger', title: '1 failed cash-out', meta: 'Provider error · needs retry', action: 'Resolve' },
+    { icon: 'bi-headset', tone: 'tone-info', title: '3 open support tickets', meta: '1 unassigned · 4h SLA', action: 'Open desk' },
+    { icon: 'bi-person-plus', tone: 'tone-warning', title: '1 new tutor application', meta: 'BSCS · submitted 6h ago', action: 'Vet' },
+  ];
+
+  const DEMAND = [
+    { subject: 'Data Structures', count: 38, pct: 100, color: 'var(--sb-primary)', gap: false },
+    { subject: 'Calculus II', count: 31, pct: 82, color: '#1d4ed8', gap: true },
+    { subject: 'Web Dev', count: 24, pct: 63, color: '#92400e', gap: false },
+    { subject: 'Statistics', count: 19, pct: 50, color: '#5b21b6', gap: true },
+    { subject: 'Networking', count: 12, pct: 32, color: '#9d174f', gap: false },
+  ];
+
+  const TUTORS = [
+    { name: 'Maria Santos', meta: '41 sessions · BSCS', rating: '4.9', initials: 'MS' },
+    { name: 'JP Reyes', meta: '37 sessions · BSIT', rating: '4.8', initials: 'JR' },
+    { name: 'Aldrin Cruz', meta: '33 sessions · BSCS', rating: '4.7', initials: 'AC' },
+    { name: 'Bea Lim', meta: '29 sessions · BSIS', rating: '4.7', initials: 'BL' },
+  ];
+
+  // 14-day enrollment trend (new tutors + tutees per day)
+  const TREND = [2,3,1,4,3,5,2,6,4,7,5,8,6,9];
+
+  // ---------- builders ----------
+  let selected = new Set(['members','sessions','completion','attention']);
+
+  function kpiCardHTML(k) {
+    const sel = selected.has(k.key) ? ' selected' : '';
+    const arrow = k.dir === 'up' ? 'bi-arrow-up-right delta-up' : 'bi-arrow-down-right delta-down';
+    return `<article class="kpi-card${sel}" data-kpi="${k.key}">
+      <span class="pick-dot"><i class="bi bi-check-lg"></i></span>
+      <div class="kpi-icon ${k.tone}"><i class="bi ${k.icon}"></i></div>
+      <p class="kpi-label">${k.label}</p>
+      <h2>${k.value}</h2>
+      <span class="kpi-delta"><i class="bi ${arrow}"></i><span class="${k.dir==='up'?'delta-up':'delta-down'}">${k.deltaNum}</span> · ${k.delta}</span>
+    </article>`;
+  }
+
+  function renderKpis() {
+    const html = KPIS.map(kpiCardHTML).join('');
+    ['kpiGridA','kpiGridB','kpiGridC'].forEach(id => { document.getElementById(id).innerHTML = html; });
+    document.getElementById('kpiCount').textContent = selected.size;
+    document.querySelectorAll('[data-kpi]').forEach(el => {
+      el.addEventListener('click', () => {
+        const key = el.dataset.kpi;
+        if (selected.has(key)) selected.delete(key);
+        else selected.add(key);
+        renderKpis();
+      });
+    });
+  }
+
+  function sparkSVG() {
+    const w = 580, h = 130, max = Math.max(...TREND, 1);
+    const step = w / (TREND.length - 1);
+    const pts = TREND.map((v,i) => `${(i*step).toFixed(1)},${(145-(v/max)*h).toFixed(1)}`);
+    const area = `M ${pts[0]} L ${pts.join(' L ')} L 580,150 L 0,150 Z`;
+    const total = TREND.reduce((a,b)=>a+b,0);
+    return `<div class="panel-heading"><div><p class="eyebrow">Enrollment</p><h3>New members</h3></div><span class="soft-pill">14 days</span></div>
+      <div class="sparkline-wrap"><svg viewBox="0 0 580 160" preserveAspectRatio="none">
+        <defs><linearGradient id="g" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="var(--sb-primary)" stop-opacity="0.2"/><stop offset="100%" stop-color="var(--sb-primary)" stop-opacity="0"/></linearGradient></defs>
+        <path d="${area}" fill="url(#g)"/>
+        <polyline points="${pts.join(' ')}" fill="none" stroke="var(--sb-primary)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg></div>
+      <div class="trend-legend"><span><i class="bi bi-circle-fill"></i>${total} new profiles</span><span>Jun 8 – Jun 21</span></div>`;
+  }
+
+  function queueHTML(compact) {
+    const items = QUEUE.map(q => `<div class="pending-item">
+        <div class="pending-icon ${q.tone}"><i class="bi ${q.icon}"></i></div>
+        <div class="pending-copy"><p>${q.title}</p><span>${q.meta}</span></div>
+        <button class="action-button">${q.action}</button>
+      </div>`).join('');
+    return `<div class="panel-heading"><div><p class="eyebrow">Operational queue</p><h3>Needs your action</h3></div><span class="soft-pill">${QUEUE.length}</span></div>
+      <div class="pending-list">${items}</div>`;
+  }
+
+  function demandHTML() {
+    const rows = DEMAND.map(d => `<div class="demand-row">
+        <span class="demand-label">${d.subject}</span>
+        <div class="demand-track"><div class="demand-fill" style="width:${d.pct}%;background:${d.color}"></div></div>
+        <span class="demand-count">${d.count}${d.gap?' <span class="demand-gap" title="low tutor supply">⚠</span>':''}</span>
+      </div>`).join('');
+    return `<div class="panel-heading"><div><p class="eyebrow">Demand</p><h3>Most requested subjects</h3></div><span class="soft-pill">⚠ = supply gap</span></div>${rows}`;
+  }
+
+  function tutorsHTML() {
+    const rows = TUTORS.map((t,i) => `<div class="lead-row">
+        <span class="lead-rank">${i+1}</span>
+        <span class="lead-avatar">${t.initials}</span>
+        <div><div class="lead-name">${t.name}</div><div class="lead-meta">${t.meta}</div></div>
+        <span class="rating-text"><i class="bi bi-star-fill"></i>${t.rating}</span>
+      </div>`).join('');
+    return `<div class="panel-heading"><div><p class="eyebrow">Community</p><h3>Top tutors</h3></div><a class="link-button" href="#">All tutors <i class="bi bi-arrow-right"></i></a></div>${rows}`;
+  }
+
+  function ringHTML() {
+    return `<div class="panel-heading"><div><p class="eyebrow">Quality</p><h3>Completion rate</h3></div></div>
+      <div class="completion-ring">
+        <svg width="120" height="120" viewBox="0 0 120 120">
+          <circle cx="60" cy="60" r="50" fill="none" stroke="#eef2f0" stroke-width="12"/>
+          <circle cx="60" cy="60" r="50" fill="none" stroke="var(--sb-primary)" stroke-width="12" stroke-linecap="round"
+            stroke-dasharray="${(2*Math.PI*50).toFixed(1)}" stroke-dashoffset="${(2*Math.PI*50*(1-0.885)).toFixed(1)}" transform="rotate(-90 60 60)"/>
+        </svg>
+        <div><div class="ring-num">88.5%</div><div class="lead-meta">340 completed · 44 cancelled / no-show</div></div>
+      </div>`;
+  }
+
+  function renderPanels() {
+    document.getElementById('sparkA').innerHTML = sparkSVG();
+    document.getElementById('queueA').innerHTML = queueHTML();
+    document.getElementById('demandA').innerHTML = demandHTML();
+    document.getElementById('tutorsA').innerHTML = tutorsHTML();
+
+    document.getElementById('sparkB').innerHTML = sparkSVG();
+    document.getElementById('ringB').innerHTML = ringHTML();
+    document.getElementById('queueB').innerHTML = queueHTML();
+    document.getElementById('demandB').innerHTML = demandHTML();
+    document.getElementById('tutorsB').innerHTML = tutorsHTML();
+
+    document.getElementById('sparkC').innerHTML = sparkSVG();
+    document.getElementById('queueC').innerHTML = queueHTML(true);
+    document.getElementById('demandC').innerHTML = demandHTML();
+    document.getElementById('tutorsC').innerHTML = tutorsHTML();
+  }
+
+  document.querySelectorAll('[data-go]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('[data-go]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.querySelectorAll('[data-variant]').forEach(v => v.classList.remove('show'));
+      document.querySelector(`[data-variant="${btn.dataset.go}"]`).classList.add('show');
+    });
+  });
+
+  renderKpis();
+  renderPanels();
+</script>
+</body>
+</html>

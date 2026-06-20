@@ -340,6 +340,30 @@ const BookingCard = defineComponent({
       return props.isTutor ? props.booking.detail_url : props.booking.tutee_detail_url
     })
 
+    const statusAccent = computed(() => {
+      const map = {
+        Pending: 'booking-card--warning',
+        Confirmed: 'booking-card--primary',
+        Completed: 'booking-card--info',
+        'Awaiting Payment Verification': 'booking-card--info',
+        Rejected: 'booking-card--danger',
+        Cancelled: 'booking-card--danger',
+      }
+      return map[props.booking.status] || 'booking-card--neutral'
+    })
+
+    const statusIcon = computed(() => {
+      const map = {
+        Pending: 'bi-hourglass-split',
+        Confirmed: 'bi-calendar-check-fill',
+        Completed: 'bi-check2-circle',
+        'Awaiting Payment Verification': 'bi-clock-history',
+        Rejected: 'bi-x-circle-fill',
+        Cancelled: 'bi-slash-circle-fill',
+      }
+      return map[props.booking.status] || 'bi-calendar3'
+    })
+
     const saveLocation = async () => {
       const nextLocation = location.value.trim()
       if (!nextLocation) {
@@ -362,14 +386,19 @@ const BookingCard = defineComponent({
     }
 
     return () => h('article', {
-      class: ['booking-card', { compact: props.compact }],
+      class: ['booking-card', statusAccent.value, { compact: props.compact }],
     }, [
       h('div', { class: 'booking-card-header' }, [
-        h('div', [
-          h('span', { class: 'booking-eyebrow' }, props.booking.status),
-          h('h4', props.booking.subject || 'Study session'),
+        h('div', { class: 'booking-card-headtext' }, [
+          h('span', { class: ['booking-avatar', statusAccent.value], 'aria-hidden': 'true' }, [
+            h('i', { class: ['bi', statusIcon.value] }),
+          ]),
+          h('div', [
+            h('h4', props.booking.subject || 'Study session'),
+            h('span', { class: 'booking-card-mode' }, props.booking.session_mode),
+          ]),
         ]),
-        h('span', { class: 'mode-pill' }, props.booking.session_mode),
+        h('span', { class: ['booking-pill', statusAccent.value] }, props.booking.status),
       ]),
       h('div', { class: 'booking-grid' }, [
         h('span', [h('i', { class: 'bi bi-calendar3' }), props.booking.date]),
@@ -379,35 +408,39 @@ const BookingCard = defineComponent({
           ? h('span', [h('i', { class: 'bi bi-geo-alt' }), props.booking.preferred_location || 'No location'])
           : null,
       ]),
-      canEditLocation.value
-        ? h('div', { class: 'location-editor' }, [
-          editing.value
-            ? h('div', { class: 'location-edit-row' }, [
-              h('input', {
-                value: location.value,
-                disabled: saving.value,
-                onInput: (event) => {
-                  location.value = event.target.value
-                },
-              }),
-              h('button', {
-                type: 'button',
-                disabled: saving.value,
-                onClick: saveLocation,
-              }, saving.value ? 'Saving' : 'Save'),
+      canEditLocation.value || detailsTarget.value
+        ? h('div', { class: 'booking-card-footer' }, [
+          canEditLocation.value
+            ? h('div', { class: 'location-editor' }, [
+              editing.value
+                ? h('div', { class: 'location-edit-row' }, [
+                  h('input', {
+                    value: location.value,
+                    disabled: saving.value,
+                    onInput: (event) => {
+                      location.value = event.target.value
+                    },
+                  }),
+                  h('button', {
+                    type: 'button',
+                    disabled: saving.value,
+                    onClick: saveLocation,
+                  }, saving.value ? 'Saving' : 'Save'),
+                ])
+                : h('button', {
+                  type: 'button',
+                  class: 'text-action',
+                  onClick: () => {
+                    editing.value = true
+                  },
+                }, 'Edit location'),
+              error.value ? h('p', { class: 'location-error' }, error.value) : null,
             ])
-            : h('button', {
-              type: 'button',
-              class: 'text-action',
-              onClick: () => {
-                editing.value = true
-              },
-            }, 'Edit location'),
-          error.value ? h('p', { class: 'location-error' }, error.value) : null,
+            : null,
+          detailsTarget.value
+            ? h(RouterLink, { to: detailsTarget.value, class: 'details-link' }, () => 'View session details')
+            : null,
         ])
-        : null,
-      detailsTarget.value
-        ? h(RouterLink, { to: detailsTarget.value, class: 'details-link' }, () => 'View session details')
         : null,
     ])
   },
@@ -1197,8 +1230,9 @@ onUnmounted(() => {
 
 .booking-card {
   background: #ffffff;
-  border: 1px solid #e8e8e8;
-  border-radius: 8px;
+  border: 1px solid rgba(20, 30, 40, 0.04);
+  border-radius: 14px;
+  box-shadow: 0 4px 14px rgba(20, 30, 40, 0.08);
   padding: 14px;
   width: 100%;
 }
@@ -1209,23 +1243,99 @@ onUnmounted(() => {
 
 .booking-card-header {
   display: flex;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 10px;
 }
 
+.booking-card-headtext {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.booking-avatar {
+  align-items: center;
+  background: var(--sb-bg);
+  border-radius: 50%;
+  color: var(--sb-text-muted);
+  display: inline-flex;
+  flex: 0 0 38px;
+  font-size: 17px;
+  height: 38px;
+  justify-content: center;
+  width: 38px;
+}
+
+.booking-avatar.booking-card--warning {
+  background: rgba(255, 193, 7, 0.16);
+  color: var(--sb-warning-text);
+}
+
+.booking-avatar.booking-card--primary {
+  background: var(--sb-primary-light);
+  color: var(--sb-primary-dark);
+}
+
+.booking-avatar.booking-card--info {
+  background: rgba(13, 202, 240, 0.16);
+  color: #0a58ca;
+}
+
+.booking-avatar.booking-card--danger {
+  background: rgba(220, 53, 69, 0.1);
+  color: var(--sb-danger-bs);
+}
+
 .booking-card h4 {
   font-size: 16px;
   font-weight: 800;
-  margin: 2px 0 0;
+  margin: 0;
   color: var(--sb-text-main);
 }
 
-.booking-eyebrow {
+.booking-card-mode {
+  color: var(--sb-text-secondary);
+  display: block;
   font-size: 11px;
+  line-height: 1.4;
+  margin-top: 2px;
+}
+
+.booking-pill {
+  display: inline-flex;
+  flex-shrink: 0;
+  font-size: 10px;
   font-weight: 800;
-  color: var(--sb-primary);
+  letter-spacing: 0.04em;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--sb-bg);
+  color: var(--sb-text-muted);
   text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.booking-pill.booking-card--warning {
+  background: rgba(255, 193, 7, 0.16);
+  color: var(--sb-warning-text);
+}
+
+.booking-pill.booking-card--primary {
+  background: var(--sb-primary-light);
+  color: var(--sb-primary-dark);
+}
+
+.booking-pill.booking-card--info {
+  background: rgba(13, 202, 240, 0.16);
+  color: #0a58ca;
+}
+
+.booking-pill.booking-card--danger {
+  background: rgba(220, 53, 69, 0.1);
+  color: var(--sb-danger-bs);
 }
 
 .booking-grid {
@@ -1242,9 +1352,20 @@ onUnmounted(() => {
   align-items: center;
 }
 
+.booking-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+  border-top: 1px solid var(--sb-card-border);
+  padding-top: 10px;
+}
+
 .location-editor,
 .details-link {
-  margin-top: 12px;
+  margin-top: 0;
 }
 
 .location-edit-row {
@@ -1496,6 +1617,20 @@ onUnmounted(() => {
 
   .booking-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 700px) {
+  .booking-card-header {
+    flex-wrap: wrap;
+  }
+
+  .booking-card-headtext {
+    flex: 1 1 180px;
+  }
+
+  .booking-pill {
+    margin-left: auto;
   }
 }
 

@@ -1,5 +1,16 @@
 <template>
   <div class="admin-dashboard p-4">
+    <header class="dashboard-role-header" aria-label="Current admin dashboard">
+      <div>
+        <p class="role-eyebrow">Dashboard view</p>
+        <h1>Admin</h1>
+      </div>
+      <span class="admin-role-pill">
+        <i class="bi bi-building-lock" aria-hidden="true"></i>
+        Admin
+      </span>
+    </header>
+
     <!-- Error Alert -->
     <div v-if="store.error.stats" class="alert alert-danger border-0 shadow-sm rounded-4 mb-4 d-flex align-items-center">
       <i class="bi bi-exclamation-triangle-fill fs-4 me-3"></i>
@@ -223,6 +234,47 @@ const formatDate = (dateStr) => {
   color: var(--sb-text-main);
 }
 
+.dashboard-role-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+  padding: 18px 20px;
+  border: 1px solid var(--sb-card-border);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 12px 32px rgba(10, 25, 22, 0.06);
+}
+
+.role-eyebrow {
+  color: var(--sb-text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+.dashboard-role-header h1 {
+  margin: 4px 0 0;
+  font-size: 30px;
+  line-height: 1.1;
+  font-weight: 800;
+}
+
+.admin-role-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 999px;
+  background: var(--sb-primary);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 8px 14px;
+  white-space: nowrap;
+}
+
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
@@ -266,5 +318,12 @@ const formatDate = (dateStr) => {
   color: var(--sb-text-main);
   transform: translateY(-2px);
   transition: all 0.2s ease;
+}
+
+@media (max-width: 760px) {
+  .dashboard-role-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }
 </style>

@@ -1,5 +1,5 @@
 <template>
-  <div class="booking-details container py-2">
+  <div class="booking-details session-details-page container py-2">
     <div v-if="bookingDetailsStore.isLoading" class="text-center py-5">
       <div class="spinner-border text-primary" role="status"></div>
     </div>
@@ -8,202 +8,219 @@
       <div class="alert alert-warning">Booking not found.</div>
     </div>
 
-    <div v-else class="row g-4">
-      <div class="col-12 col-lg-8">
-        <div class="card shadow-sm p-4 h-100">
-          <div class="d-flex gap-3 align-items-start">
-            <div class="avatar-shell">
-              <img
-                v-if="bookingDetailsStore.tuteeProfile?.avatar"
-                :src="bookingDetailsStore.tuteeProfile.avatar"
-                alt="Tutee Avatar"
-                class="avatar-image"
-              />
-              <div v-else class="avatar-fallback">
-                {{ tuteeInitials }}
-              </div>
-            </div>
-
-            <div class="flex-grow-1">
-              <h3 class="fw-bold mb-2">{{ bookingDetailsStore.tuteeProfile?.name || 'N/A' }}</h3>
-              <p class="text-muted mb-1">
-                <strong>Email:</strong> {{ bookingDetailsStore.tuteeProfile?.email || 'N/A' }}
-              </p>
-              <p class="text-muted mb-1">
-                <strong>Course:</strong> {{ bookingDetailsStore.tuteeProfile?.course || 'N/A' }}
-              </p>
-              <p class="text-muted mb-1">
-                <strong>Year Level:</strong>
-                {{ bookingDetailsStore.tuteeProfile?.year_level || 'N/A' }}
-              </p>
-              <p class="text-muted mb-0">
-                <strong>Bio:</strong> {{ bookingDetailsStore.tuteeProfile?.bio || 'N/A' }}
-              </p>
-            </div>
-          </div>
-
-          <hr class="my-4" />
-
-          <h5 class="fw-bold mb-3">Session Information</h5>
-          <div class="row g-3">
-            <div class="col-sm-6">
-              <div class="info-card">
-                <span class="info-label">Subject</span>
-                <div class="info-value">
-                  {{ bookingDetailsStore.sessionInfo?.subject || 'N/A' }}
-                </div>
-              </div>
-            </div>
-            <div class="col-sm-6">
-              <div class="info-card">
-                <span class="info-label">Date</span>
-                <div class="info-value">{{ bookingDetailsStore.sessionInfo?.date || 'N/A' }}</div>
-              </div>
-            </div>
-            <div class="col-sm-6">
-              <div class="info-card">
-                <span class="info-label">Time</span>
-                <div class="info-value">
-                  {{ bookingDetailsStore.sessionInfo?.start_time || 'N/A' }} -
-                  {{ bookingDetailsStore.sessionInfo?.end_time || 'N/A' }}
-                </div>
-              </div>
-            </div>
-            <div class="col-sm-6">
-              <div class="info-card">
-                <span class="info-label">Status</span>
-                <div class="info-value">
-                  <span class="badge rounded-pill px-3 py-2" :class="statusClass">
-                    {{ bookingDetailsStore.sessionInfo?.status || 'N/A' }}
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div class="col-sm-6">
-              <div class="info-card">
-                <span class="info-label">Session Mode</span>
-                <div class="info-value">
-                  {{ bookingDetailsStore.sessionInfo?.session_mode || 'N/A' }}
-                </div>
-              </div>
-            </div>
-            <div class="col-sm-6">
-              <div class="info-card">
-                <span class="info-label">Preferred Location</span>
-                <div class="info-value">
-                  {{
-                    bookingDetailsStore.sessionInfo?.preferred_location ||
-                    (bookingDetailsStore.sessionInfo?.session_mode === 'Online' ? 'Online' : 'N/A')
-                  }}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+    <section v-else class="session-alive-frame">
+      <SessionAurora />
+      <div v-if="showConfetti" class="session-confetti" aria-hidden="true">
+        <i
+          v-for="piece in confettiPieces"
+          :key="piece"
+          :style="{
+            '--session-confetti-index': piece,
+            '--session-confetti-x': `${(piece % 11) - 5}`,
+            '--session-confetti-color': confettiColors[piece % confettiColors.length],
+          }"
+        ></i>
       </div>
 
-      <div class="col-12 col-lg-4">
-        <div class="card shadow-sm p-4 h-100">
-          <h5 class="fw-bold mb-3">Payment Summary</h5>
-
-          <div class="summary-row">
-            <span class="summary-label">Transaction ID</span>
-            <span class="summary-value">{{
-              bookingDetailsStore.paymentInfo?.transaction_id || 'N/A'
-            }}</span>
-          </div>
-
-          <div class="summary-row">
-            <span class="summary-label">Method</span>
-            <span class="summary-value">{{
-              bookingDetailsStore.paymentInfo?.method || 'N/A'
-            }}</span>
-          </div>
-
-          <div class="summary-row">
-            <span class="summary-label">Amount Paid</span>
-            <span class="summary-value">PHP {{ amountPaid }}</span>
-          </div>
-
-          <div class="summary-row">
-            <span class="summary-label">Payment Status</span>
-            <span class="summary-value">{{
-              bookingDetailsStore.paymentInfo?.status || 'Pending'
-            }}</span>
-          </div>
-
-          <div v-if="bookingDetailsStore.paymentInfo?.receipt_image" class="mt-4">
-            <h6 class="fw-bold mb-2">Receipt Image</h6>
-            <img
-              :src="bookingDetailsStore.paymentInfo.receipt_image"
-              alt="Payment Receipt"
-              class="receipt-image"
+      <div class="session-alive-stage">
+        <div class="session-alive-grid">
+          <div class="session-alive-column">
+            <SessionHero
+              :profile="counterpartProfile"
+              :subject="bookingDetailsStore.sessionInfo?.subject"
+              :status="normalizedStatus"
+              :status-label="bookingDetailsStore.sessionInfo?.status || 'Session'"
+              :is-ongoing="isOngoing"
+              :clock="heroClock"
             />
-          </div>
 
-          <div v-if="isAwaitingVerification" class="alert alert-info mt-4 mb-3">
-            The tutoring session has ended and the tutee has submitted payment for review.
-          </div>
+            <div class="session-detail-pair">
+              <SessionInfoGrid :items="sessionInfoItems" />
 
-          <p v-if="isAwaitingVerification" class="small text-muted mb-3">
-            If payment cannot be verified, contact support.
-          </p>
-
-          <div v-if="showDevReadyForPayment" class="alert alert-warning mt-4 mb-3">
-            <div class="fw-bold mb-1">Dev option</div>
-            <div class="small">
-              End this session now so the tutee can open the post-session payment flow.
+              <SessionTimeline
+                :status="normalizedStatus"
+                :is-ongoing="isOngoing"
+                :date-label="formattedSessionDate"
+                :time-label="formattedTimeRange"
+                :live-caption="`${heroClock.formattedElapsed} elapsed`"
+              />
             </div>
           </div>
 
-          <button
-            v-if="showDevReadyForPayment"
-            class="btn btn-warning fw-bold mb-3 sb-btn"
-            :disabled="isDevSubmitting"
-            @click="handleDevReadyForPayment"
-          >
-            {{ isDevSubmitting ? 'Updating...' : 'Dev: End Session Now' }}
-          </button>
+          <div class="session-alive-column">
+            <section class="session-action-card">
+              <div class="session-action-head">
+                <h4>{{ actionTitle }}</h4>
+                <span v-if="isOngoing" class="session-live-pill">
+                  <span></span>
+                  Live
+                </span>
+              </div>
 
-          <button
-            v-if="isAwaitingVerification"
-            class="btn btn-success mt-auto sb-btn"
-            :disabled="isSubmitting"
-            @click="handleComplete"
-          >
-            {{ isSubmitting ? 'Updating...' : 'Mark as Complete' }}
-          </button>
+              <template v-if="isOngoing">
+                <p>Session is live. Keep your tutee in sync, then end the session when it is ready for payment.</p>
+                <button class="session-action-button session-action-primary" @click="handleLightAction(goToChat)">
+                  <i class="bi bi-chat-dots"></i>
+                  Open chat
+                </button>
+                <button
+                  class="session-action-button session-action-ink"
+                  :disabled="!showDevReadyForPayment || isDevSubmitting"
+                  @click="handleMediumAction(handleDevReadyForPayment)"
+                >
+                  <i class="bi bi-stop-circle"></i>
+                  {{ isDevSubmitting ? 'Updating...' : 'End session now' }}
+                </button>
+                <p v-if="!showDevReadyForPayment" class="session-note">
+                  Ending from this screen is available when the booking is confirmed and ready for the existing payment handoff.
+                </p>
+              </template>
 
-          <button
-            v-if="showCancelButton"
-            class="btn btn-outline-danger mt-3 sb-btn"
-            :disabled="isCancelling || !canCancel"
-            @click="isCancelModalOpen = true"
-          >
-            {{ isCancelling ? 'Cancelling...' : 'Cancel Session' }}
-          </button>
-          <p v-if="showCancelButton && !canCancel" class="small text-muted mt-2 mb-0">
-            Sessions can only be cancelled at least two days before the session date.
-          </p>
-        </div>
+              <template v-else-if="isAwaitingVerification">
+                <p>The tutoring session has ended and the tutee has submitted payment for review.</p>
+                <div class="summary-row">
+                  <span class="summary-label">Amount paid</span>
+                  <span class="summary-value">PHP {{ amountPaid }}</span>
+                </div>
+                <div class="summary-row">
+                  <span class="summary-label">Method</span>
+                  <span class="summary-value">{{ bookingDetailsStore.paymentInfo?.method || 'N/A' }}</span>
+                </div>
+                <div class="summary-row">
+                  <span class="summary-label">Status</span>
+                  <span class="summary-value">{{ bookingDetailsStore.paymentInfo?.status || 'Submitted' }}</span>
+                </div>
+                <button
+                  class="session-action-button session-action-primary"
+                  :disabled="isSubmitting"
+                  @click="handleCelebrationAction(handleComplete)"
+                >
+                  <i class="bi bi-check2-circle"></i>
+                  {{ isSubmitting ? 'Updating...' : 'Mark as Complete' }}
+                </button>
+              </template>
 
-        <div v-if="hasCheckInResponses" class="card shadow-sm p-4 mt-4">
-          <h5 class="fw-bold mb-3">Session Check-ins</h5>
+              <template v-else-if="showDevReadyForPayment">
+                <p>Dev option: end this session now so the tutee can open the post-session payment flow.</p>
+                <button
+                  class="session-action-button session-action-yellow"
+                  :disabled="isDevSubmitting"
+                  @click="handleMediumAction(handleDevReadyForPayment)"
+                >
+                  {{ isDevSubmitting ? 'Updating...' : 'Dev: End Session Now' }}
+                </button>
+              </template>
 
-          <div v-if="venueCheckIn" class="check-in-row">
-            <span class="summary-label">Venue confirmation</span>
-            <span class="summary-value">{{ formatCheckInResponse(venueCheckIn.response) }}</span>
-            <span class="check-in-time">{{ formatCheckInTime(venueCheckIn.responded_at) }}</span>
-          </div>
+              <template v-else-if="showCancelButton">
+                <p>Confirmed. Coordinate with your tutee or cancel 2+ days ahead.</p>
+                <button class="session-action-button session-action-primary" @click="handleLightAction(goToChat)">
+                  <i class="bi bi-chat-dots"></i>
+                  Message tutee
+                </button>
+                <button
+                  class="session-action-button session-action-danger"
+                  :disabled="isCancelling || !canCancel"
+                  @click="handleLightAction(() => { isCancelModalOpen = true })"
+                >
+                  {{ isCancelling ? 'Cancelling...' : 'Cancel Session' }}
+                </button>
+                <p v-if="!canCancel" class="session-note">
+                  Sessions can only be cancelled at least two days before the session date.
+                </p>
+              </template>
 
-          <div v-if="midpointCheckIn" class="check-in-row">
-            <span class="summary-label">Mid-session check-in</span>
-            <span class="summary-value">{{ formatCheckInResponse(midpointCheckIn.response) }}</span>
-            <span class="check-in-time">{{ formatCheckInTime(midpointCheckIn.responded_at) }}</span>
+              <template v-else>
+                <div class="summary-row">
+                  <span class="summary-label">Transaction ID</span>
+                  <span class="summary-value">{{ bookingDetailsStore.paymentInfo?.transaction_id || 'N/A' }}</span>
+                </div>
+                <div class="summary-row">
+                  <span class="summary-label">Payment</span>
+                  <span class="summary-value">{{ bookingDetailsStore.paymentInfo?.status || 'Pending' }}</span>
+                </div>
+                <div class="summary-row">
+                  <span class="summary-label">Amount paid</span>
+                  <span class="summary-value">PHP {{ amountPaid }}</span>
+                </div>
+              </template>
+            </section>
+
+            <section v-if="bookingDetailsStore.paymentInfo?.receipt_image" class="session-action-card">
+              <h4>Receipt image</h4>
+              <img
+                :src="bookingDetailsStore.paymentInfo.receipt_image"
+                alt="Payment Receipt"
+                class="receipt-image"
+              />
+            </section>
+
+            <section v-if="isOngoing" class="session-action-card">
+              <h4>Quick actions</h4>
+              <div class="session-quick-grid">
+                <button class="session-quick-button session-quick-hot" @click="handleTutorCheckInPrompt">
+                  <i class="bi bi-geo-alt"></i>
+                  Confirm venue
+                </button>
+                <button class="session-quick-button" @click="handleLightAction(goToChat)">
+                  <i class="bi bi-chat-dots"></i>
+                  Message
+                </button>
+                <button class="session-quick-button" @click="handleTutorCheckInPrompt">
+                  <i class="bi bi-clock-history"></i>
+                  Mid check-in
+                </button>
+                <button
+                  class="session-quick-button"
+                  :disabled="!showDevReadyForPayment || isDevSubmitting"
+                  @click="handleMediumAction(handleDevReadyForPayment)"
+                >
+                  <i class="bi bi-stop-circle"></i>
+                  End
+                </button>
+              </div>
+            </section>
+
+            <section v-if="hasCheckInResponses" class="session-action-card">
+              <h4>Session check-ins</h4>
+
+              <div v-if="venueCheckIn" class="check-in-row">
+                <span class="summary-label">Venue confirmation</span>
+                <span class="summary-value">{{ formatCheckInResponse(venueCheckIn.response) }}</span>
+                <span class="check-in-time">{{ formatCheckInTime(venueCheckIn.responded_at) }}</span>
+              </div>
+
+              <div v-if="midpointCheckIn" class="check-in-row">
+                <span class="summary-label">Mid-session check-in</span>
+                <span class="summary-value">{{ formatCheckInResponse(midpointCheckIn.response) }}</span>
+                <span class="check-in-time">{{ formatCheckInTime(midpointCheckIn.responded_at) }}</span>
+              </div>
+            </section>
+
+            <section class="session-action-card">
+              <h4>Support</h4>
+              <p>Something off with this session?</p>
+              <button
+                class="session-action-button session-action-danger"
+                @click="handleLightAction(() => openSupport('Booking', bookingDetailsStore.booking?.id))"
+              >
+                <i class="bi bi-exclamation-circle"></i>
+                Report issue
+              </button>
+            </section>
+
           </div>
         </div>
       </div>
-    </div>
+    </section>
+
+    <DevSessionQaPanel
+      v-if="bookingDetailsStore.booking"
+      class="mt-3"
+      :booking-id="bookingDetailsStore.booking?.id"
+      :session-mode="bookingDetailsStore.sessionInfo?.session_mode"
+      :location="bookingDetailsStore.sessionInfo?.preferred_location"
+      @refresh="refreshBookingDetails"
+    />
 
     <div
       v-if="isCancelModalOpen"
@@ -270,27 +287,56 @@
       </div>
     </div>
     <div v-if="isCancelModalOpen" class="modal-backdrop fade show"></div>
+    <SupportModal
+      :open="isSupportModalOpen"
+      :context-type="supportContextType"
+      :context-id="supportContextId"
+      @close="isSupportModalOpen = false"
+    />
   </div>
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useNotificationsStore } from '@/stores/notifications'
 import { useTutorBookingDetailStore } from '@/stores/tutorBookingDetails'
 import { useToastStore } from '@/stores/toast'
+import { useHaptics } from '@/composables/useHaptics'
+import { useSessionClock } from '@/composables/useSessionClock'
+import DevSessionQaPanel from '@/components/DevSessionQaPanel.vue'
+import SupportModal from '@/components/SupportModal.vue'
+import SessionAurora from '@/components/session/SessionAurora.vue'
+import SessionHero from '@/components/session/SessionHero.vue'
+import SessionInfoGrid from '@/components/session/SessionInfoGrid.vue'
+import SessionTimeline from '@/components/session/SessionTimeline.vue'
 
 const route = useRoute()
 const router = useRouter()
 const bookingDetailsStore = useTutorBookingDetailStore()
 const notificationsStore = useNotificationsStore()
 const toastStore = useToastStore()
+const { vibrate, patterns } = useHaptics()
 const isSubmitting = ref(false)
 const isDevSubmitting = ref(false)
 const isCancelling = ref(false)
 const isCancelModalOpen = ref(false)
+const isSupportModalOpen = ref(false)
+const supportContextType = ref('Booking')
+const supportContextId = ref(null)
 const cancelReason = ref('')
+const showConfetti = ref(false)
 const isDev = import.meta.env.DEV
+
+const confettiPieces = Array.from({ length: 26 }, (_, index) => index)
+const confettiColors = [
+  'var(--sb-primary)',
+  'var(--sb-primary-mid)',
+  'var(--sb-pop-yellow)',
+  'var(--sb-pop-pink)',
+  'var(--sb-pop-orange)',
+  'var(--sb-aurora-violet)',
+]
 
 const normalizedStatus = computed(() =>
   String(bookingDetailsStore.sessionInfo?.status || '').toLowerCase(),
@@ -298,7 +344,9 @@ const normalizedStatus = computed(() =>
 const normalizedRawStatus = computed(() =>
   String(bookingDetailsStore.sessionInfo?.raw_status || '').toLowerCase(),
 )
+const statusOngoing = computed(() => normalizedStatus.value === 'ongoing')
 const isAwaitingVerification = computed(() => normalizedStatus.value === 'awaiting verification')
+const isCompleted = computed(() => normalizedStatus.value === 'completed')
 const showDevReadyForPayment = computed(
   () =>
     isDev &&
@@ -328,6 +376,119 @@ const venueCheckIn = computed(() => bookingDetailsStore.booking?.check_ins?.venu
 const midpointCheckIn = computed(() => bookingDetailsStore.booking?.check_ins?.midpoint_checkin || null)
 const hasCheckInResponses = computed(() => Boolean(venueCheckIn.value || midpointCheckIn.value))
 
+const counterpartProfile = computed(() => ({
+  avatar: bookingDetailsStore.tuteeProfile?.avatar || '',
+  name: bookingDetailsStore.tuteeProfile?.name || 'Tutee',
+  meta: [
+    'Your tutee',
+    bookingDetailsStore.tuteeProfile?.course,
+    bookingDetailsStore.tuteeProfile?.year_level,
+  ].filter(Boolean).join(' · '),
+}))
+
+const formatSessionDate = (dateValue) => {
+  if (!dateValue) {
+    return 'N/A'
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: 'medium',
+    timeZone: 'Asia/Manila',
+  }).format(new Date(`${String(dateValue).slice(0, 10)}T00:00:00+08:00`))
+}
+
+const formatTime = (value) => {
+  if (!value) {
+    return 'N/A'
+  }
+
+  const [hour, minute] = String(value).split(':').map(Number)
+  const suffix = hour >= 12 ? 'PM' : 'AM'
+  const displayHour = hour % 12 || 12
+  return `${displayHour}:${String(minute).padStart(2, '0')} ${suffix}`
+}
+
+const formattedSessionDate = computed(() => formatSessionDate(bookingDetailsStore.sessionInfo?.date))
+const formattedTimeRange = computed(() => {
+  const start = bookingDetailsStore.sessionInfo?.start_time
+  const end = bookingDetailsStore.sessionInfo?.end_time
+
+  if (!start || !end) {
+    return 'N/A'
+  }
+
+  return `${formatTime(start)} - ${formatTime(end)}`
+})
+
+const clock = useSessionClock({
+  date: computed(() => bookingDetailsStore.sessionInfo?.date),
+  startTime: computed(() => bookingDetailsStore.sessionInfo?.start_time),
+  endTime: computed(() => bookingDetailsStore.sessionInfo?.end_time),
+  isOngoing: statusOngoing,
+})
+
+const isOngoing = computed(() => statusOngoing.value || clock.isLive.value)
+
+const heroClock = computed(() => ({
+  formattedElapsed: clock.formattedElapsed.value,
+  progress: clock.progress.value,
+  startedLabel: clock.startedLabel.value,
+  endsLabel: clock.endsLabel.value,
+  minutesLeft: clock.minutesLeft.value,
+}))
+
+const sessionInfoItems = computed(() => [
+  { label: 'Subject', value: bookingDetailsStore.sessionInfo?.subject },
+  { label: 'Date', value: formattedSessionDate.value },
+  { label: 'Time', value: formattedTimeRange.value },
+  { label: 'Mode', value: bookingDetailsStore.sessionInfo?.session_mode },
+  {
+    label: 'Location',
+    value: bookingDetailsStore.sessionInfo?.preferred_location
+      || (bookingDetailsStore.sessionInfo?.session_mode === 'Online' ? 'Online' : 'N/A'),
+  },
+  { label: 'Status', value: bookingDetailsStore.sessionInfo?.status },
+])
+
+const actionTitle = computed(() => {
+  if (isOngoing.value) return 'Happening now'
+  if (isAwaitingVerification.value) return 'Verify payment'
+  if (showDevReadyForPayment.value) return 'Next action'
+  if (isCompleted.value) return 'Summary'
+  return 'Payment summary'
+})
+
+const openSupport = (type = 'Booking', id = null) => {
+  supportContextType.value = type
+  supportContextId.value = id
+  isSupportModalOpen.value = true
+}
+
+const prefersReducedMotion = () => (
+  typeof window !== 'undefined'
+  && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+)
+
+const fireConfetti = () => {
+  if (prefersReducedMotion()) {
+    return
+  }
+
+  showConfetti.value = false
+  window.setTimeout(() => {
+    showConfetti.value = true
+    window.setTimeout(() => {
+      showConfetti.value = false
+    }, 1300)
+  }, 0)
+}
+
+watch(isCompleted, (completed, wasCompleted) => {
+  if (completed && !wasCompleted) {
+    fireConfetti()
+  }
+})
+
 const formatCheckInResponse = (response) => {
   const labels = {
     yes: 'Confirmed at venue',
@@ -350,40 +511,26 @@ const formatCheckInTime = (value) => {
   }).format(new Date(value))
 }
 
-const tuteeInitials = computed(() => {
-  const parts = String(bookingDetailsStore.tuteeProfile?.name || '')
-    .split(' ')
-    .filter(Boolean)
-  return (
-    parts
-      .slice(0, 2)
-      .map((part) => part[0])
-      .join('')
-      .toUpperCase() || 'SB'
-  )
-})
+const handleLightAction = (callback) => {
+  vibrate(patterns.light)
+  callback()
+}
 
-const statusClass = computed(() => {
-  switch (normalizedStatus.value) {
-    case 'pending':
-      return 'bg-warning text-dark'
-    case 'upcoming':
-      return 'bg-primary text-white'
-    case 'ongoing':
-      return 'bg-info text-white'
-    case 'payment required':
-      return 'bg-warning-subtle text-dark'
-    case 'awaiting verification':
-      return 'bg-info text-dark'
-    case 'completed':
-      return 'bg-success text-white'
-    case 'rejected':
-    case 'cancelled':
-      return 'bg-danger text-white'
-    default:
-      return 'bg-secondary text-white'
-  }
-})
+const handleMediumAction = (callback) => {
+  vibrate(patterns.medium)
+  callback()
+}
+
+const handleCelebrationAction = (callback) => {
+  vibrate(patterns.celebratory)
+  callback()
+}
+
+const handleTutorCheckInPrompt = () => {
+  vibrate(patterns.light)
+  toastStore.push('Ask your tutee to answer this check-in from their session screen.')
+  goToChat()
+}
 
 const handleComplete = async () => {
   isSubmitting.value = true
@@ -400,6 +547,10 @@ const handleComplete = async () => {
 }
 
 const handleDevReadyForPayment = async () => {
+  if (!showDevReadyForPayment.value) {
+    return
+  }
+
   isDevSubmitting.value = true
 
   try {
@@ -411,6 +562,10 @@ const handleDevReadyForPayment = async () => {
   } finally {
     isDevSubmitting.value = false
   }
+}
+
+const refreshBookingDetails = () => {
+  bookingDetailsStore.fetchBookingDetails(route.params.id)
 }
 
 const goToChat = () => {
@@ -448,6 +603,10 @@ const handleCancel = async () => {
 
 onMounted(() => {
   bookingDetailsStore.fetchBookingDetails(route.params.id)
+
+  if (isCompleted.value) {
+    fireConfetti()
+  }
 })
 
 onBeforeUnmount(() => {
@@ -456,57 +615,275 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.avatar-shell {
-  width: 108px;
-  height: 108px;
-  flex-shrink: 0;
+.session-details-page {
+  color: var(--sb-text-main);
 }
 
-.avatar-image,
-.avatar-fallback {
-  width: 100%;
-  height: 100%;
-  border-radius: 20px;
+.session-alive-frame {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--sb-border-light);
+  border-radius: 22px;
+  background: linear-gradient(
+    180deg,
+    var(--sb-aurora-wash-start),
+    var(--sb-aurora-wash-end) 60%,
+    color-mix(in srgb, var(--sb-pop-pink) 14%, var(--sb-card-bg))
+  );
 }
 
-.avatar-image {
-  object-fit: cover;
+.session-alive-stage {
+  position: relative;
+  z-index: 1;
+  padding: 14px;
 }
 
-.avatar-fallback {
+.session-alive-grid {
   display: grid;
-  place-items: center;
-  background: rgba(0, 137, 90, 0.1);
-  color: var(--sb-primary);
-  font-size: 1.75rem;
-  font-weight: 700;
+  grid-template-columns: minmax(0, 1.7fr) minmax(280px, 1fr);
+  gap: 13px;
 }
 
-.info-card {
-  border: 1px solid var(--sb-card-border);
-  border-radius: 16px;
-  padding: 16px;
-  height: 100%;
+.session-alive-column {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 13px;
 }
 
-.info-label,
-.summary-label {
-  display: block;
-  font-size: 0.78rem;
-  font-weight: 700;
+.session-detail-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 13px;
+}
+
+.session-action-card {
+  border: 1px solid color-mix(in srgb, var(--sb-card-border) 70%, transparent);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--sb-card-bg) 88%, transparent);
+  box-shadow: 0 14px 36px var(--sb-shadow-soft);
+  padding: 15px;
+  backdrop-filter: blur(10px);
+  transition:
+    transform var(--sb-t-normal) var(--sb-spring),
+    box-shadow var(--sb-t-normal) var(--sb-spring),
+    border-color var(--sb-t-normal) var(--sb-spring),
+    background-color var(--sb-t-normal) var(--sb-spring);
+}
+
+.session-action-card:hover {
+  border-color: color-mix(in srgb, var(--sb-primary) 22%, var(--sb-card-border));
+  background: color-mix(in srgb, var(--sb-card-bg) 94%, transparent);
+  box-shadow: 0 22px 54px color-mix(in srgb, var(--sb-shadow-soft) 74%, rgba(15, 23, 42, 0.12));
+  transform: translateY(-3px);
+}
+
+.session-alive-column > .session-action-card:first-child {
+  border-left: 4px solid var(--sb-primary);
+}
+
+.session-action-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 11px;
+}
+
+.session-action-card h4 {
+  margin: 0 0 11px;
+  color: var(--sb-text-main);
+  font-size: 0.92rem;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.session-action-head h4 {
+  margin: 0;
+}
+
+.session-action-card p {
+  margin: 0 0 11px;
+  color: var(--sb-text-muted);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.session-note {
+  margin-top: 9px;
+  font-size: 0.72rem;
+}
+
+.session-live-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--sb-pop-pink) 16%, var(--sb-card-bg));
+  color: var(--sb-pop-pink-deep);
+  padding: 4px 10px;
+  font-size: 0.64rem;
+  font-weight: 800;
   text-transform: uppercase;
-  color: #6b7280;
-  margin-bottom: 4px;
 }
 
-.info-value,
+.session-live-pill span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: session-live-beat 1.1s ease-in-out infinite;
+}
+
+.session-action-button,
+.session-quick-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: 100%;
+  border: 0;
+  border-radius: 12px;
+  padding: 11px;
+  font: inherit;
+  font-size: 0.83rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    transform var(--sb-t-quick) var(--sb-spring-fast),
+    box-shadow var(--sb-t-normal) var(--sb-spring),
+    background-color var(--sb-t-normal) var(--sb-spring),
+    border-color var(--sb-t-normal) var(--sb-spring),
+    color var(--sb-t-normal) var(--sb-spring);
+}
+
+.session-action-button + .session-action-button {
+  margin-top: 9px;
+}
+
+.session-action-button:hover:not(:disabled),
+.session-quick-button:hover:not(:disabled) {
+  transform: translateY(-3px);
+}
+
+.session-action-button:focus-visible,
+.session-quick-button:focus-visible {
+  outline: 0;
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--sb-primary) 18%, transparent),
+    0 10px 24px var(--sb-shadow-soft);
+}
+
+.session-action-button:active:not(:disabled),
+.session-quick-button:active:not(:disabled) {
+  transform: scale(0.96) translateY(0);
+}
+
+.session-action-button:disabled,
+.session-quick-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.session-action-primary {
+  background: var(--sb-primary);
+  color: var(--sb-primary-contrast);
+  box-shadow: 0 8px 20px var(--sb-shadow-primary);
+}
+
+.session-action-primary:hover:not(:disabled) {
+  background: var(--sb-primary-hover);
+  box-shadow: 0 14px 30px var(--sb-shadow-primary);
+}
+
+.session-action-yellow {
+  background: var(--sb-pop-yellow);
+  color: var(--sb-dark);
+}
+
+.session-action-yellow:hover:not(:disabled) {
+  box-shadow: 0 14px 30px color-mix(in srgb, var(--sb-pop-yellow) 36%, transparent);
+}
+
+.session-action-danger {
+  border: 1px solid color-mix(in srgb, var(--sb-danger) 24%, var(--sb-card-border));
+  background: var(--sb-card-bg);
+  color: var(--sb-danger);
+}
+
+.session-action-danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--sb-danger) 8%, var(--sb-card-bg));
+  border-color: color-mix(in srgb, var(--sb-danger) 42%, var(--sb-card-border));
+}
+
+.session-action-ink {
+  background: var(--sb-dark);
+  color: var(--sb-primary-contrast);
+}
+
+.session-action-ink:hover:not(:disabled) {
+  box-shadow: 0 14px 30px color-mix(in srgb, var(--sb-dark) 28%, transparent);
+}
+
+.session-quick-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.session-quick-button {
+  min-height: 78px;
+  flex-direction: column;
+  border: 1px solid var(--sb-card-border);
+  background: color-mix(in srgb, var(--sb-card-bg) 82%, transparent);
+  color: var(--sb-text-secondary);
+  font-size: 0.72rem;
+  line-height: 1.1;
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--sb-shadow-soft) 76%, transparent);
+}
+
+.session-quick-button:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--sb-primary) 34%, var(--sb-card-border));
+  background: color-mix(in srgb, var(--sb-card-bg) 96%, transparent);
+  box-shadow: 0 16px 34px color-mix(in srgb, var(--sb-shadow-soft) 78%, rgba(15, 23, 42, 0.1));
+}
+
+.session-quick-button i {
+  color: var(--sb-primary);
+  font-size: 21px;
+  transition: transform var(--sb-t-normal) var(--sb-spring);
+}
+
+.session-quick-button:hover:not(:disabled) i {
+  transform: scale(1.12);
+}
+
+.session-quick-hot {
+  border-color: color-mix(in srgb, var(--sb-primary) 32%, var(--sb-card-border));
+  background: linear-gradient(180deg, var(--sb-live-hero-start), var(--sb-card-bg));
+}
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 0;
+  border-bottom: 1px dashed var(--sb-card-border);
+  font-size: 0.79rem;
+}
+
+.summary-row:last-of-type {
+  border-bottom: 0;
+}
+
+.summary-label {
+  color: var(--sb-text-muted);
+}
+
 .summary-value {
-  font-weight: 600;
-  color: #1f2937;
-}
-
-.summary-row + .summary-row {
-  margin-top: 12px;
+  color: var(--sb-text-dark);
+  font-weight: 700;
+  text-align: right;
 }
 
 .check-in-row + .check-in-row {
@@ -518,7 +895,7 @@ onBeforeUnmount(() => {
 .check-in-time {
   display: block;
   margin-top: 2px;
-  color: #6b7280;
+  color: var(--sb-text-muted);
   font-size: 0.82rem;
 }
 
@@ -526,5 +903,87 @@ onBeforeUnmount(() => {
   width: 100%;
   border-radius: 16px;
   object-fit: cover;
+}
+
+.session-confetti {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.session-confetti i {
+  position: absolute;
+  top: 26%;
+  left: 50%;
+  width: 9px;
+  height: 5px;
+  border-radius: 2px;
+  background: var(--session-confetti-color);
+  animation: session-confetti-burst 1.2s ease-out forwards;
+  animation-delay: calc(var(--session-confetti-index) * 14ms);
+}
+
+.modal {
+  background: rgba(17, 24, 39, 0.35);
+}
+
+@keyframes session-live-beat {
+  50% {
+    transform: scale(1.7);
+    opacity: 0.4;
+  }
+}
+
+@keyframes session-confetti-burst {
+  to {
+    transform:
+      translate(
+        calc(var(--session-confetti-x) * 34px),
+        calc(260px + (var(--session-confetti-index) % 5) * 24px)
+      )
+      rotate(calc(var(--session-confetti-index) * 28deg));
+    opacity: 0;
+  }
+}
+
+@media (max-width: 900px) {
+  .session-alive-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .session-detail-pair {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 575px) {
+  .session-quick-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .session-live-pill span,
+  .session-confetti i {
+    animation: none;
+  }
+
+  .session-action-card,
+  .session-action-button,
+  .session-quick-button,
+  .session-quick-button i {
+    transition: none;
+  }
+
+  .session-action-card:hover,
+  .session-action-button:hover:not(:disabled),
+  .session-quick-button:hover:not(:disabled),
+  .session-quick-button:hover:not(:disabled) i {
+    transform: none;
+  }
 }
 </style>

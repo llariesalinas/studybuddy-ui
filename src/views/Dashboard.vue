@@ -206,12 +206,7 @@
                     <span class="tutor-copy">
                       <span class="tutor-name">{{ tutor.name }}</span>
                       <span class="tutor-meta" :title="getTutorMetaTitle(tutor)">
-                        <span class="tutor-rating">
-                          <i class="bi bi-star-fill" aria-hidden="true"></i>
-                          {{ getTutorRatingLabel(tutor) }}
-                        </span>
-                        <span class="tutor-meta-dot" aria-hidden="true">•</span>
-                        <span class="tutor-subject">{{ getTutorPrimarySubject(tutor) }}</span>
+                        {{ formatTutorMeta(tutor) }}
                       </span>
                     </span>
                     <span class="tutor-rate">
@@ -620,11 +615,16 @@ const confirmDismissDashboardPill = async () => {
   }
 }
 
-const getTutorSubjects = (tutor) => (
-  Array.isArray(tutor?.subjects)
-    ? tutor.subjects.filter(Boolean)
-    : []
-)
+const getTutorSubjects = (tutor) => Array.isArray(tutor?.subjects) ? tutor.subjects.filter(Boolean) : []
+
+const formatTutorMeta = (tutor) => {
+  const rating = tutor?.rating || 'N/A'
+  const subjects = getTutorSubjects(tutor)
+  const visible = subjects.slice(0, 2).join(', ') || 'Various subjects'
+  const remaining = subjects.length > 2 ? ` · +${subjects.length - 2} more` : ''
+
+  return `Rating ${rating} · ${visible}${remaining}`
+}
 
 const getTutorInitials = (tutor) => {
   const name = String(tutor?.name || 'Tutor').trim()
@@ -643,9 +643,7 @@ const getTutorPrimarySubject = (tutor) => getTutorSubjects(tutor)[0] || 'Various
 
 const getTutorMetaTitle = (tutor) => {
   const subjects = getTutorSubjects(tutor)
-  const subjectList = subjects.length ? subjects.join(', ') : 'Various subjects'
-
-  return `Rating ${getTutorRatingLabel(tutor)} - ${subjectList}`
+  return subjects.length ? `Rating ${tutor?.rating || 'N/A'} · ${subjects.join(', ')}` : 'Various subjects'
 }
 
 const goToPreviousWeek = () => {
@@ -1022,9 +1020,9 @@ const viewMoreTutors = () => router.push({ name: 'tutors' })
   flex-direction: column;
   justify-content: flex-start;
   width: 100%;
-  height: 104px;
-  min-height: 104px;
-  max-height: 104px;
+  height: 150px;
+  min-height: 150px;
+  max-height: 150px;
   border: 1px solid transparent;
   border-radius: 14px;
   padding: 0.56rem;
@@ -1321,7 +1319,7 @@ const viewMoreTutors = () => router.push({ name: 'tutors' })
   color: var(--sb-ink);
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
   overflow: hidden;
   word-break: break-word;
 }
@@ -1628,9 +1626,9 @@ const viewMoreTutors = () => router.push({ name: 'tutors' })
   align-items: center;
   gap: 0.55rem;
   width: 100%;
-  height: 72px;
-  min-height: 72px;
-  max-height: 72px;
+  height: 96px;
+  min-height: 96px;
+  max-height: 96px;
   border: 1px solid var(--recommendation-card-border);
   border-radius: 20px;
   background: var(--recommendation-card-bg);
@@ -1681,15 +1679,14 @@ const viewMoreTutors = () => router.push({ name: 'tutors' })
 }
 
 .tutor-meta {
-  display: flex;
-  align-items: center;
-  gap: 0.24rem;
-  min-width: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
   color: var(--recommendation-muted);
   font-size: 0.66rem;
   font-weight: 750;
   line-height: 1.25;
-  overflow: hidden;
 }
 
 .tutor-rating {

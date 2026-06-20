@@ -8,7 +8,8 @@
       <div class="chat-banner__body">
         <i class="bi bi-geo-alt-fill chat-banner__icon"></i>
         <div class="chat-banner__text">
-          <span class="chat-banner__label">Session Pending</span>
+          <span class="chat-banner__eyebrow">Booking request</span>
+          <span class="chat-banner__label">Confirm this session</span>
           <span class="chat-banner__sub">
             {{
               isTutor
@@ -26,36 +27,69 @@
       </div>
 
       <div class="chat-banner__action">
-        <div v-if="editing" class="chat-banner__location-row">
+        <div v-if="editing" class="chat-banner__decision-card">
+          <span class="chat-banner__field-label">Meeting place</span>
+          <div class="chat-banner__location-row">
           <input
             v-model="locationDraft"
             class="chat-banner__location-input"
             placeholder="Enter location"
-            :disabled="saving"
+            :disabled="saving || accepting || rejecting"
           />
           <button
             type="button"
             class="chat-banner__btn chat-banner__btn--primary sb-btn"
-            :disabled="saving"
+            :disabled="saving || accepting || rejecting"
             @click="saveLocation"
           >
             {{ saving ? 'Saving...' : 'Save' }}
           </button>
-          <button type="button" class="chat-banner__btn sb-btn" @click="editing = false">
-            Cancel
-          </button>
-        </div>
-
-        <div v-else class="chat-banner__location-display">
-          <span class="chat-banner__location-value">
-            {{ bannerContext.preferred_location || 'No location set' }}
-          </span>
           <button
             type="button"
-            class="chat-banner__btn chat-banner__btn--ghost sb-btn"
-            @click="startEditing"
+            class="chat-banner__btn sb-btn"
+            :disabled="saving || accepting || rejecting"
+            @click="editing = false"
           >
-            {{ isTutor ? 'Edit' : 'Suggest change' }}
+            Cancel
+          </button>
+          </div>
+        </div>
+
+        <div v-else class="chat-banner__decision-card">
+          <span class="chat-banner__field-label">
+            {{ isTutor ? 'Meeting place' : 'Suggested place' }}
+          </span>
+          <div class="chat-banner__location-display">
+            <span class="chat-banner__loc-chip">
+              {{ bannerContext.preferred_location || 'No location set' }}
+            </span>
+            <button
+              type="button"
+              class="chat-banner__btn chat-banner__btn--ghost sb-btn"
+              :disabled="accepting || rejecting"
+              @click="startEditing"
+            >
+              {{ isTutor ? 'Edit' : 'Suggest change' }}
+            </button>
+          </div>
+        </div>
+
+        <div v-if="isTutor" class="chat-banner__action-row">
+          <button
+            type="button"
+            class="chat-banner__btn chat-banner__btn--primary sb-btn"
+            :disabled="saving || accepting || rejecting"
+            @click="confirmAndAccept"
+          >
+            {{ accepting ? 'Accepting...' : 'Confirm & Accept' }}
+          </button>
+          <button
+            type="button"
+            class="chat-banner__btn chat-banner__btn--danger-text sb-btn"
+            :disabled="saving || accepting || rejecting"
+            @click="reject"
+          >
+            {{ rejecting ? 'Rejecting...' : 'Reject' }}
           </button>
         </div>
 
@@ -67,8 +101,11 @@
       <div class="chat-banner__body">
         <i class="bi bi-hourglass-split chat-banner__icon"></i>
         <div class="chat-banner__text">
-          <span class="chat-banner__label">Session Request Pending</span>
-          <span class="chat-banner__sub">Waiting for confirmation.</span>
+          <span class="chat-banner__eyebrow">Booking request</span>
+          <span class="chat-banner__label">Session request pending</span>
+          <span class="chat-banner__sub">
+            {{ isTutor ? 'Ready for your response.' : 'Waiting for confirmation.' }}
+          </span>
         </div>
         <span
           v-if="statusBadge.label"
@@ -76,6 +113,28 @@
           :class="`chat-banner__badge--${statusBadge.variant}`"
           >{{ statusBadge.label }}</span
         >
+      </div>
+
+      <div v-if="isTutor" class="chat-banner__quick-actions">
+        <div class="chat-banner__action-row chat-banner__action-row--inline">
+          <button
+            type="button"
+            class="chat-banner__btn chat-banner__btn--primary sb-btn"
+            :disabled="accepting || rejecting"
+            @click="accept"
+          >
+            {{ accepting ? 'Accepting...' : 'Accept' }}
+          </button>
+          <button
+            type="button"
+            class="chat-banner__btn chat-banner__btn--danger-text sb-btn"
+            :disabled="accepting || rejecting"
+            @click="reject"
+          >
+            {{ rejecting ? 'Rejecting...' : 'Reject' }}
+          </button>
+        </div>
+        <p v-if="locationError" class="chat-banner__error">{{ locationError }}</p>
       </div>
     </template>
 
@@ -259,6 +318,8 @@ const statusBadge = computed(() => {
 const editing = ref(false)
 const locationDraft = ref(props.bannerContext?.preferred_location || '')
 const saving = ref(false)
+const accepting = ref(false)
+const rejecting = ref(false)
 const locationError = ref('')
 const dismissed = ref(false)
 
@@ -268,6 +329,8 @@ watch(
     dismissed.value = false
     editing.value = false
     locationError.value = ''
+    accepting.value = false
+    rejecting.value = false
     locationDraft.value = props.bannerContext?.preferred_location || ''
   },
 )
@@ -313,6 +376,63 @@ async function saveLocation() {
     saving.value = false
   }
 }
+
+function getActionError(error, fallback) {
+  return error?.response?.data?.error || fallback
+}
+
+async function confirmAndAccept() {
+  const trimmed = locationDraft.value.trim()
+
+  if (!trimmed) {
+    locationError.value = 'Location is required.'
+    return
+  }
+
+  accepting.value = true
+  locationError.value = ''
+
+  try {
+    if (trimmed !== (props.bannerContext?.preferred_location || '')) {
+      await chatStore.updatePendingLocation(props.bannerContext.booking_request_id, trimmed)
+    }
+
+    await chatStore.acceptBooking(props.bannerContext.id)
+    editing.value = false
+    emit('location-saved')
+  } catch (error) {
+    locationError.value = getActionError(error, 'Could not accept.')
+  } finally {
+    accepting.value = false
+  }
+}
+
+async function accept() {
+  accepting.value = true
+  locationError.value = ''
+
+  try {
+    await chatStore.acceptBooking(props.bannerContext.id)
+  } catch (error) {
+    locationError.value = getActionError(error, 'Could not accept.')
+  } finally {
+    accepting.value = false
+  }
+}
+
+async function reject() {
+  rejecting.value = true
+  locationError.value = ''
+
+  try {
+    await chatStore.rejectBooking(props.bannerContext.id)
+    editing.value = false
+  } catch (error) {
+    locationError.value = getActionError(error, 'Could not reject.')
+  } finally {
+    rejecting.value = false
+  }
+}
 </script>
 
 <style scoped>
@@ -320,40 +440,41 @@ async function saveLocation() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 14px 18px;
-  border: 1px solid rgba(255, 255, 255, 0.86);
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.66);
-  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.06);
+  gap: 16px;
+  padding: 10px 14px;
+  border: 1px solid var(--sb-card-border);
+  border-left: 3px solid var(--sb-border-light);
+  border-radius: 14px;
+  background: var(--sb-card-bg);
   flex-shrink: 0;
 }
 
 .chat-banner--pending,
 .chat-banner--pending_location,
 .chat-banner--payment_required {
-  background: rgba(255, 193, 7, 0.15);
+  border-left-color: var(--sb-warning-bg);
 }
 
 .chat-banner--confirmed {
-  background: rgba(13, 110, 253, 0.12);
+  border-left-color: var(--sb-primary);
 }
 
 .chat-banner--awaiting_payment,
 .chat-banner--review_pending,
 .chat-banner--ongoing {
-  background: rgba(13, 202, 240, 0.15);
+  border-left-color: var(--sb-info-bg);
 }
 
 .chat-banner--rejected,
 .chat-banner--cancelled {
-  background: rgba(220, 53, 69, 0.12);
+  border-left-color: var(--sb-danger-bs);
 }
 
 .chat-banner__body {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+  flex: 1 1 auto;
   min-width: 0;
 }
 
@@ -388,14 +509,24 @@ async function saveLocation() {
 }
 
 .chat-banner__icon {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(0, 137, 90, 0.14);
+  border-radius: 50%;
+  background: rgba(0, 137, 90, 0.08);
   color: var(--sb-primary);
   flex-shrink: 0;
-  font-size: 16px;
+  font-size: 14px;
 }
 
 .chat-banner--pending .chat-banner__icon,
 .chat-banner--pending_location .chat-banner__icon,
 .chat-banner--payment_required .chat-banner__icon {
+  border-color: rgba(153, 116, 4, 0.18);
+  background: rgba(255, 193, 7, 0.16);
   color: var(--sb-warning-text);
 }
 
@@ -420,10 +551,19 @@ async function saveLocation() {
   min-width: 0;
 }
 
+.chat-banner__eyebrow {
+  color: var(--sb-primary);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
 .chat-banner__label {
   color: var(--sb-text-main);
-  font-size: 13px;
-  font-weight: 700;
+  font-size: 14px;
+  font-weight: 800;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -436,7 +576,29 @@ async function saveLocation() {
 }
 
 .chat-banner__action {
+  display: grid;
+  gap: 10px;
+  flex: 0 0 auto;
+  min-width: min(360px, 44%);
+}
+
+.chat-banner__action-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.chat-banner__action-row--inline {
   flex-shrink: 0;
+}
+
+.chat-banner__quick-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex-shrink: 0;
+  gap: 4px;
 }
 
 .chat-banner__location-row,
@@ -447,12 +609,45 @@ async function saveLocation() {
 }
 
 .chat-banner__location-display {
+  justify-content: space-between;
   gap: 10px;
 }
 
 .chat-banner__location-value {
   color: var(--sb-text-secondary);
   font-size: 13px;
+}
+
+.chat-banner__decision-card {
+  display: grid;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px solid rgba(0, 137, 90, 0.1);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.chat-banner__field-label {
+  color: var(--sb-text-muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.chat-banner__loc-chip {
+  max-width: 260px;
+  overflow: hidden;
+  padding: 7px 11px;
+  border: 1px solid rgba(0, 137, 90, 0.18);
+  border-radius: 999px;
+  background: rgba(237, 247, 243, 0.9);
+  color: var(--sb-text-main);
+  font-size: 13px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .chat-banner__location-input {
@@ -466,23 +661,48 @@ async function saveLocation() {
 .chat-banner__btn {
   background: transparent;
   border: 0;
-  border-radius: 8px;
+  border-radius: 999px;
   color: var(--sb-text-secondary);
   cursor: pointer;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
+  min-height: 30px;
   padding: 7px 14px;
   text-decoration: none;
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease,
+    transform 150ms ease, box-shadow 150ms ease;
+}
+
+.chat-banner__btn:hover:not(:disabled) {
+  transform: translateY(-1px);
 }
 
 .chat-banner__btn--primary {
   background: var(--sb-primary);
   color: #ffffff;
+  box-shadow: 0 8px 16px rgba(0, 137, 90, 0.18);
+}
+
+.chat-banner__btn--primary:hover:not(:disabled) {
+  background: var(--sb-primary-hover);
 }
 
 .chat-banner__btn--ghost {
+  background: rgba(0, 137, 90, 0.08);
   color: var(--sb-primary);
   font-weight: 700;
+}
+
+.chat-banner__btn--danger-text {
+  border: 1px solid rgba(220, 53, 69, 0.16);
+  background: rgba(220, 53, 69, 0.06);
+  color: var(--sb-danger-bs);
+  font-weight: 700;
+}
+
+.chat-banner__btn--danger-text:hover:not(:disabled) {
+  border-color: rgba(220, 53, 69, 0.24);
+  background: rgba(220, 53, 69, 0.1);
 }
 
 .chat-banner__btn:disabled {
@@ -510,18 +730,29 @@ async function saveLocation() {
 @media (max-width: 700px) {
   .chat-banner,
   .chat-banner__location-row,
-  .chat-banner__location-display {
+  .chat-banner__location-display,
+  .chat-banner__action-row {
     align-items: stretch;
     flex-direction: column;
   }
 
   .chat-banner__action {
     width: 100%;
+    min-width: 0;
+  }
+
+  .chat-banner__quick-actions {
+    align-items: stretch;
+    width: 100%;
   }
 
   .chat-banner__location-input {
     min-width: 0;
     width: 100%;
+  }
+
+  .chat-banner__loc-chip {
+    max-width: none;
   }
 }
 </style>
