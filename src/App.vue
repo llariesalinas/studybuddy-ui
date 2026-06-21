@@ -272,7 +272,6 @@ import { useChatStore } from '@/stores/chat'
 import router from './router'
 import { SESSION_POLL_INTERVAL_MS } from './config.js'
 import SbToast from '@/components/SbToast.vue'
-import SbThemeToggle from '@/components/SbThemeToggle.vue'
 import AppSidebar from '@/components/AppSidebar.vue'
 const SupportModal = defineAsyncComponent(() => import('@/components/SupportModal.vue'))
 const DEV_LIVE_REFRESH_KEY = 'studybuddy_dev_live_refresh'
