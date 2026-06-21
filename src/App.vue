@@ -8,130 +8,7 @@
   </div>
 
   <div v-else class="d-flex vh-100 overflow-hidden">
-    <aside class="sidebar d-flex flex-column text-white p-3 shadow-sm" style="width: 250px; background-color: var(--sb-dark);">
-      <div class="d-flex align-items-center mb-5 mt-3 px-2">
-        <i class="bi bi-book text-sb-primary fs-4 me-2"></i>
-        <h4 class="mb-0 fw-bold">StudyBuddy</h4>
-      </div>
-
-      <ul class="nav nav-pills flex-column mb-auto">
-        <li v-if="userRole!== 'admin' && userRole !==  'superadmin'" class="nav-item mb-2">
-          <router-link :to="userRole === 'tutor' ? '/tch-dashboard' : '/dashboard'" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
-            <i class="bi bi-grid-1x2 me-3"></i> Dashboard
-          </router-link>
-        </li>
-
-        <li v-if="userRole!== 'admin' && userRole !==  'superadmin'" class="nav-item mb-2">
-          <router-link :to="userRole === 'tutor' ? '/tutor-profile' : '/tutee-profile'" class="nav-link text-white opacity-75 d-flex align-items-center">
-            <i class="bi bi-person me-3"></i> Profile
-          </router-link>
-        </li>
-
-        <li class="nav-item mb-2" v-if="userRole === 'tutee'">
-          <router-link to="/tuteeSessions" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
-            <i class="bi bi-search me-3"></i> Sessions
-          </router-link>
-        </li>
-
-        <li class="nav-item mb-2" v-if="userRole === 'tutor'">
-          <router-link
-            to="/tch-availability"
-            class="nav-link text-white opacity-75 d-flex align-items-center"
-            active-class="active-nav"
-          >
-            <i class="bi bi-calendar3 me-3"></i> Schedule
-          </router-link>
-        </li>
-
-        <li class="nav-item mb-2" v-if="userRole === 'tutor'">
-          <router-link to="/reports" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
-            <i class="bi bi-file-earmark-text me-3"></i> Sessions & Reports
-          </router-link>
-        </li>
-
-        <li class="nav-item mb-2" v-if="userRole === 'tutor'">
-          <router-link to="/tch-wallet" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
-            <i class="bi bi-wallet2 me-3"></i> Wallet
-          </router-link>
-        </li>
-
-        <li class="nav-item mb-2" v-if="userRole === 'admin'">
-          <router-link to="/admin/dashboard" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
-            <i class="bi bi-grid-1x2 me-3"></i> Dashboard
-          </router-link>
-        </li>
-
-        <li class="nav-item mb-2" v-if="userRole === 'admin'">
-          <router-link to="/admin/withdrawals" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
-            <i class="bi bi-wallet2 me-3"></i> Withdrawals
-          </router-link>
-        </li>
-
-        <li class="nav-item mb-2" v-if="userRole === 'admin'">
-          <router-link to="/admin/users" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
-            <i class="bi bi-people me-3"></i> Users
-          </router-link>
-        </li>
-
-
-
-        <li class="nav-item mb-2" v-if="userRole === 'admin'">
-          <router-link to="/admin/reports" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
-            <i class="bi bi-bar-chart-line me-3"></i> Reports
-          </router-link>
-        </li>
-
-        <li class="nav-item mb-2" v-if="userRole === 'admin'">
-          <router-link to="/admin/support" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
-            <i class="bi bi-headset me-3"></i> Support Desk
-          </router-link>
-        </li>
-
-        <li class="nav-item mb-2" v-if="userRole === 'superadmin'">
-          <router-link to="/superadmin/dashboard" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
-            <i class="bi bi-grid-1x2 me-3"></i> Dashboard
-          </router-link>
-        </li>
-
-        <li class="nav-item mb-2" v-if="userRole === 'superadmin'">
-          <router-link to="/superadmin/institutions" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
-            <i class="bi bi-building me-3"></i> Institutions
-          </router-link>
-        </li>
-
-        <li class="nav-item mb-2" v-if="userRole === 'superadmin'">
-          <router-link to="/superadmin/users" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
-            <i class="bi bi-people me-3"></i> All Users
-          </router-link>
-        </li>
-
-        <li class="nav-item mb-2" v-if="userRole === 'superadmin'">
-          <router-link to="/superadmin/reports" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
-            <i class="bi bi-bar-chart-line me-3"></i> Reports
-          </router-link>
-        </li>
-
-        <li class="nav-item mb-2">
-          <button
-           class="nav-link border-0 shadow-none bg-transparent text-white opacity-75 d-flex align-items-center sb-btn"
-           @click="openLogoutModal"
-           >
-            <i class="bi bi-box-arrow-right me-3"></i> Log-out
-          </button>
-        </li>
-      </ul>
-
-      <!-- Footer utility items: Help and Theme toggle -->
-      <div class="mt-auto pt-3 border-top border-secondary border-opacity-25 d-flex align-items-center justify-content-between px-2">
-        <button
-          class="btn p-0 text-white opacity-75 d-flex align-items-center sb-btn"
-          @click="openSupport('Other')"
-        >
-          <i class="bi bi-question-circle me-2"></i> Help
-        </button>
-        <SbThemeToggle />
-      </div>
-    </aside>
+    <AppSidebar @logout="openLogoutModal" @open-support="() => openSupport('Other')" />
 
     <SupportModal
       :open="isSupportModalOpen"
@@ -396,6 +273,7 @@ import router from './router'
 import { SESSION_POLL_INTERVAL_MS } from './config.js'
 import SbToast from '@/components/SbToast.vue'
 import SbThemeToggle from '@/components/SbThemeToggle.vue'
+import AppSidebar from '@/components/AppSidebar.vue'
 const SupportModal = defineAsyncComponent(() => import('@/components/SupportModal.vue'))
 const DEV_LIVE_REFRESH_KEY = 'studybuddy_dev_live_refresh'
 
@@ -695,18 +573,6 @@ onBeforeUnmount(() => {
   border-radius: 50%;
   background: var(--sb-danger);
   box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.18);
-}
-
-/* --- Sidebar Navigation Styles --- */
-.active-nav {
-  background-color: rgba(0, 137, 90, 0.1) !important;
-  color: var(--sb-primary) !important;
-  font-weight: 600;
-  border-radius: 8px;
-  opacity: 1 !important;
-}
-.nav-link:hover {
-  opacity: 1 !important;
 }
 
 .app-main {
