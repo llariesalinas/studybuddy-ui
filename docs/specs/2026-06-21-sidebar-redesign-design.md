@@ -39,10 +39,10 @@ component, and store collapse state in a small Pinia store that persists to `loc
   startup alongside the existing theme init.
 - **`src/App.vue`** (edit) — swap the `<aside class="sidebar">` block for `<AppSidebar @logout="openLogoutModal" @open-support="openSupport('Other')" />`. Sidebar-specific CSS moves
   into `AppSidebar.vue`'s scoped styles; the shared `.active-nav`/`.nav-link` rules used only by the
-  sidebar move with it.
-- **`src/assets/main.css`** (edit) — promote `--sb-green-tint` and `--sb-green-border` (currently
-  local to `.dashboard-shell`) into the global `:root` (and the dark block) so both the Dashboard
-  and the sidebar share them instead of redefining. No value changes.
+  sidebar move with it. `main.css` is **not** modified.
+- **Green-tint tokens** — defined **locally** in `AppSidebar.vue`'s scoped styles (light + dark
+  values), mirroring how `Dashboard.vue`'s `.dashboard-shell` defines its own `--sb-green-tint`/
+  `--sb-green-border`. This keeps the change pattern-consistent and avoids touching global tokens.
 
 ### Layout (top → bottom)
 
@@ -119,9 +119,8 @@ Bootstrap Icons throughout (as today): `bi-grid-1x2` (dashboard), `bi-person` (p
   global style. Moving them into a scoped component must not break other `.nav-link` usages
   elsewhere. Mitigation: these rules are sidebar-specific; confirm no other view depends on them
   before moving (grep `active-nav`).
-- **Token promotion**: moving `--sb-green-tint`/`--sb-green-border` to `:root` must not change the
-  Dashboard (same values). Mitigation: keep identical values; the `.dashboard-shell` local
-  definitions can stay or be removed — keeping them is harmless (same value).
+- **Green-tint tokens**: defined locally in the component (not promoted to `:root`), so there is no
+  risk to the Dashboard or other consumers. Light/dark values are set on the sidebar root.
 - **Collapse + layout**: ensure collapsed width doesn't clip content or break the chat view
   (`app-main-chat`). Mitigation: width is on the sidebar only; test chat route collapsed/expanded.
 - **Mobile**: current layout has no mobile drawer; this redesign does not add one (out of scope).
