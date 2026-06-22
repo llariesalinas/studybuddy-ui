@@ -7,6 +7,11 @@ spec: this document
 
 # System Background Unification
 
+> **Visual reference (viewable HTML):**
+> [`docs/artifacts/2026-06-22-system-background-preview.html`](../artifacts/2026-06-22-system-background-preview.html)
+> — side-by-side current-vs-proposed comparison with a light/dark toggle. The proposed
+> pane is the visual target this spec implements as `SbBgWash.vue`.
+
 ## Goal
 
 Replace the system-wide background used on every non-landing screen (public auth pages
@@ -136,7 +141,8 @@ becomes dead.
 - `npm run build`
 - Dev server: load `/login` (public) and one authenticated page in both light and dark
   mode; screenshot to confirm no seam at any scroll depth and that the palette matches the
-  landing page.
+  landing page. Compare the result against the proposed pane in
+  `docs/artifacts/2026-06-22-system-background-preview.html`.
 - Navigate to `/` (landing) and back; confirm no double background or flash.
 
 ## Reference
