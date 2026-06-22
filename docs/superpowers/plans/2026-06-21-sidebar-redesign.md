@@ -10,7 +10,9 @@
 
 ## Status & Progress Summary
 
-- **Status:** Approved — not started.
+- **Status:** Done — all 4 tasks complete, final whole-branch review approved, manual browser
+  verification skipped by explicit user choice. See
+  `docs/session-summaries/2026-06-22-sidebar-redesign-summary.md`.
 - **Branch:** `feature-sidebar-redesign` (spec committed `105491b`).
 - **Spec:** `docs/specs/2026-06-21-sidebar-redesign-design.md`.
 - **Progress:** 0/4 tasks complete.
@@ -823,3 +825,11 @@ git commit -m "feat: replace App.vue sidebar with AppSidebar component"
 
 - **2026-06-21** — Plan created from the approved spec (4 tasks: store, startup init, component,
   App.vue wiring). Recorded the local green-tint-token deviation from the spec.
+- **2026-06-22** — Executed via subagent-driven-development: all 4 tasks implemented, reviewed,
+  and merged onto `feature-sidebar-redesign`; final whole-branch review approved with no findings.
+  Manual browser verification (this plan's Step 5) was attempted but skipped by explicit user
+  choice after a login-flow detour required resetting a local dev account's password. The
+  PostToolUse build-commit hook contaminated this branch with an unrelated haptics-unification
+  WIP three separate times during execution; each time reverted to an uncommitted state on this
+  branch without losing content. Full account in
+  `docs/session-summaries/2026-06-22-sidebar-redesign-summary.md`.
