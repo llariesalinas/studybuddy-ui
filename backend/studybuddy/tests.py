@@ -3534,3 +3534,106 @@ class AdminDashboardMetricsTests(APITestCase):
         types = {item["type"] for item in data["items"]}
         self.assertIn("withdrawal", types)
         self.assertIn("support", types)
+
+
+class InstitutionScopedMatchingTests(APITestCase):
+    def setUp(self):
+        cache.clear()
+
+        self.inst_a = PartnerInstitution.objects.create(
+            institution_name="Central Philippine University",
+            school_email_domain="cpu.edu.ph",
+            is_active=True,
+            contact_person="Registrar",
+        )
+        self.inst_b = PartnerInstitution.objects.create(
+            institution_name="Western Visayas University",
+            school_email_domain="wvu.edu.ph",
+            is_active=True,
+            contact_person="Registrar",
+        )
+        self.subject = Subjects.objects.create(
+            subject_code="SCOPE101",
+            subject_name="Scoping Test Subject",
+            department="Test",
+        )
+
+        # Tutee from inst_a
+        tutee_user = User.objects.create_user(
+            username="scope_tutee_a", email="tutee@cpu.edu.ph", password="pass"
+        )
+        self.tutee = UserProfile.objects.create(
+            user=tutee_user, fname="Ana", mname="", lname="Cruz",
+            role="Tutee", institution=self.inst_a,
+        )
+
+        # Tutor from inst_a
+        tutor_a_user = User.objects.create_user(
+            username="scope_tutor_a", email="tutor_a@cpu.edu.ph", password="pass"
+        )
+        tutor_a_profile = UserProfile.objects.create(
+            user=tutor_a_user, fname="Ben", mname="", lname="Santos",
+            role="Tutor", institution=self.inst_a,
+        )
+        self.tutor_a = Tutor.objects.create(
+            profile=tutor_a_profile, hourly_rate=250,
+            can_online=True, can_f2f=True, teaching_level="SHS",
+        )
+        TutorSubjects.objects.create(
+            tutor=self.tutor_a, subject=self.subject, expertise_level=5
+        )
+
+        # Tutor from inst_b
+        tutor_b_user = User.objects.create_user(
+            username="scope_tutor_b", email="tutor_b@wvu.edu.ph", password="pass"
+        )
+        tutor_b_profile = UserProfile.objects.create(
+            user=tutor_b_user, fname="Cal", mname="", lname="Ramos",
+            role="Tutor", institution=self.inst_b,
+        )
+        self.tutor_b = Tutor.objects.create(
+            profile=tutor_b_profile, hourly_rate=250,
+            can_online=True, can_f2f=True, teaching_level="SHS",
+        )
+        TutorSubjects.objects.create(
+            tutor=self.tutor_b, subject=self.subject, expertise_level=5
+        )
+
+        # Tutor with no institution
+        tutor_null_user = User.objects.create_user(
+            username="scope_tutor_null", email="tutor_null@example.com", password="pass"
+        )
+        tutor_null_profile = UserProfile.objects.create(
+            user=tutor_null_user, fname="Dan", mname="", lname="Lee",
+            role="Tutor", institution=None,
+        )
+        self.tutor_null = Tutor.objects.create(
+            profile=tutor_null_profile, hourly_rate=250,
+            can_online=True, can_f2f=True, teaching_level="SHS",
+        )
+        TutorSubjects.objects.create(
+            tutor=self.tutor_null, subject=self.subject, expertise_level=5
+        )
+
+    def _set_preferences(self, *subjects):
+        pref, _ = Preference.objects.get_or_create(user=self.tutee)
+        pref.subjects.set([s.subject_code for s in subjects])
+
+    def test_helper_filters_by_institution(self):
+        from .recommender.utils import filter_tutors_by_institution
+        qs = filter_tutors_by_institution(Tutor.objects.all(), self.tutee)
+        self.assertIn(self.tutor_a, qs)
+        self.assertNotIn(self.tutor_b, qs)
+        self.assertNotIn(self.tutor_null, qs)
+
+    def test_helper_returns_empty_when_tutee_has_no_institution(self):
+        from .recommender.utils import filter_tutors_by_institution
+        no_inst_user = User.objects.create_user(
+            username="scope_no_inst", email="noinst@test.com", password="pass"
+        )
+        no_inst_tutee = UserProfile.objects.create(
+            user=no_inst_user, fname="No", mname="", lname="Inst",
+            role="Tutee", institution=None,
+        )
+        qs = filter_tutors_by_institution(Tutor.objects.all(), no_inst_tutee)
+        self.assertFalse(qs.exists())
