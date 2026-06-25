@@ -9,7 +9,7 @@
         <input
           v-model="filters.search"
           type="text"
-          class="search-input"
+          class="search-input sb-field"
           placeholder="Search name or email"
         >
         <button type="button" class="export-button" :disabled="store.loading.export" @click="exportUsers">

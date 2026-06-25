@@ -32,7 +32,7 @@
 
     <!-- KPI grid -->
     <section class="kpi-grid" aria-label="Institution overview">
-      <article v-for="card in kpiCards" :key="card.label" class="kpi-card">
+      <article v-for="card in kpiCards" :key="card.label" class="kpi-card sb-card-lift">
         <div class="kpi-icon" :class="card.tone">
           <i class="bi" :class="card.icon"></i>
         </div>
@@ -149,7 +149,7 @@
               <div class="demand-track">
                 <div
                   class="demand-fill"
-                  :style="{ width: demandWidth(row) + '%', background: demandColor(index) }"
+                  :style="{ transform: `scaleX(${demandWidth(row) / 100})`, background: demandColor(index) }"
                 ></div>
               </div>
               <span class="demand-count">
@@ -589,7 +589,7 @@ onMounted(() => {
   border-radius: 999px;
   cursor: pointer;
   white-space: nowrap;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition: none;
 }
 
 .action-button:hover { background: var(--sb-primary); color: #fff; }
@@ -631,7 +631,13 @@ onMounted(() => {
   overflow: hidden;
 }
 
-.demand-fill { height: 100%; border-radius: 999px; transition: width 0.3s ease; }
+.demand-fill {
+  width: 100%;
+  height: 100%;
+  border-radius: 999px;
+  transform-origin: left center;
+  transition: transform var(--sb-t-normal) var(--sb-spring);
+}
 
 .demand-count {
   font-size: 13px;

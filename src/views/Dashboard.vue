@@ -5,7 +5,7 @@
         <article
           v-for="(stat, index) in stats"
           :key="index"
-          class="glass-panel metric-card"
+          class="glass-panel metric-card sb-card-lift sb-elevated"
         >
           <span class="metric-icon">
             <i :class="['bi', stat.icon]"></i>
@@ -45,7 +45,7 @@
               </button>
               <button
                 type="button"
-                class="week-range-pill sb-btn"
+                class="week-range-pill sb-btn sb-pill"
                 :class="{ 'week-range-pill-current': isViewingCurrentWeek }"
                 :aria-label="weekRangeAriaLabel"
                 :aria-current="isViewingCurrentWeek ? 'date' : undefined"
@@ -101,7 +101,7 @@
                     <article
                       v-for="session in daySessionsMap[day.key]"
                       :key="session.id"
-                      class="weekly-session-card sb-interactive"
+                      class="weekly-session-card sb-interactive sb-elevated"
                       :class="[
                         getWeeklySessionCardClasses(session.status),
                         { 'weekly-session-card-dismissible': canDismissDashboardPill(session) }
@@ -694,7 +694,7 @@ const viewMoreTutors = () => router.push({ name: 'tutors' })
 <style scoped>
 .fade-enter-active,
 .fade-leave-active {
-  transition: opacity 0.24s var(--sb-spring, cubic-bezier(0.16, 1, 0.3, 1));
+  transition: opacity var(--sb-t-normal) var(--sb-spring);
 }
 
 .fade-enter-from,
@@ -880,9 +880,7 @@ const viewMoreTutors = () => router.push({ name: 'tutors' })
   white-space: nowrap;
   user-select: none;
   box-shadow: 0 1px 2px rgba(17, 24, 39, 0.06);
-  transition: border-color var(--sb-t-normal) var(--sb-spring),
-              box-shadow var(--sb-t-normal) var(--sb-spring),
-              color var(--sb-t-normal) var(--sb-spring);
+  transition: none;
 }
 
 .week-range-pill:hover {
@@ -909,7 +907,7 @@ const viewMoreTutors = () => router.push({ name: 'tutors' })
   border-radius: 999px;
   background: transparent;
   color: var(--sb-muted);
-  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+  transition: transform var(--sb-t-normal) var(--sb-spring);
 }
 
 .schedule-nav-btn:hover:not(:disabled) {
@@ -1027,7 +1025,7 @@ const viewMoreTutors = () => router.push({ name: 'tutors' })
   border-radius: 14px;
   padding: 0.56rem;
   text-align: left;
-  transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+  transition: transform var(--sb-t-normal) var(--sb-spring);
   box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05);
   min-width: 0;
   overflow: visible;
@@ -1169,7 +1167,9 @@ const viewMoreTutors = () => router.push({ name: 'tutors' })
   font-size: 0.68rem;
   font-weight: 850;
   line-height: 1;
-  transition: opacity 0.15s ease, transform 0.15s ease, background-color 0.15s ease;
+  transition:
+    opacity var(--sb-t-normal) var(--sb-spring),
+    transform var(--sb-t-normal) var(--sb-spring);
 }
 
 .weekly-session-popout .weekly-session-status {
@@ -1366,7 +1366,6 @@ const viewMoreTutors = () => router.push({ name: 'tutors' })
   place-items: center;
   padding: 1rem;
   background: rgba(15, 23, 42, 0.36);
-  backdrop-filter: blur(8px);
 }
 
 .dashboard-confirm-modal {
@@ -1597,18 +1596,18 @@ const viewMoreTutors = () => router.push({ name: 'tutors' })
 
 .recommendation-list {
   display: grid;
-  gap: 0.5rem;
+  grid-template-rows: repeat(5, minmax(0, 1fr));
+  gap: 0.45rem;
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
-  padding-right: 0.1rem;
-  scrollbar-gutter: stable;
+  overflow: hidden;
   contain: paint;
 }
 
 .recommendation-empty {
   display: grid;
-  min-height: 160px;
+  grid-row: 1 / -1;
+  min-height: 0;
   place-items: center;
   border: 1px dashed var(--sb-card-border);
   border-radius: 18px;
@@ -1622,21 +1621,25 @@ const viewMoreTutors = () => router.push({ name: 'tutors' })
 
 .tutor-list-item {
   display: grid;
-  grid-template-columns: 38px minmax(0, 1fr) minmax(54px, auto);
+  grid-template-columns: 36px minmax(0, 1fr) minmax(58px, auto);
   align-items: center;
-  gap: 0.55rem;
+  gap: 0.5rem;
   width: 100%;
-  height: 96px;
-  min-height: 96px;
-  max-height: 96px;
+  height: 100%;
+  min-height: 0;
+  max-height: none;
   border: 1px solid var(--recommendation-card-border);
-  border-radius: 20px;
+  border-radius: 16px;
   background: var(--recommendation-card-bg);
   color: inherit;
-  padding: 0.65rem;
+  padding: 0.55rem;
   text-align: left;
   cursor: pointer;
-  transition: border-color 0.18s ease, background-color 0.18s ease, transform 0.18s ease;
+  overflow: hidden;
+  transition:
+    transform var(--sb-t-normal) var(--sb-spring),
+    border-color var(--sb-t-normal) var(--sb-spring),
+    background-color var(--sb-t-normal) var(--sb-spring);
 }
 
 .tutor-list-item:hover {
@@ -1662,7 +1665,8 @@ const viewMoreTutors = () => router.push({ name: 'tutors' })
 
 .tutor-copy {
   display: grid;
-  gap: 0.18rem;
+  align-content: center;
+  gap: 0.16rem;
   min-width: 0;
   overflow: hidden;
 }
@@ -1850,11 +1854,7 @@ const viewMoreTutors = () => router.push({ name: 'tutors' })
   }
 
   .tutor-list-item {
-    grid-template-columns: 38px minmax(0, 1fr) minmax(54px, auto);
-    height: 72px;
-    min-height: 72px;
-    max-height: 72px;
-    padding: 0.65rem;
+    grid-template-columns: 36px minmax(0, 1fr) minmax(58px, auto);
   }
 
   .recommendation-more-btn {
@@ -1862,31 +1862,4 @@ const viewMoreTutors = () => router.push({ name: 'tutors' })
   }
 }
 
-/* Remove Animations and Hover Effects for Tutee Dashboard */
-
-/* 1. Remove hover effects from interactive elements */
-.week-range-pill:hover,
-.schedule-nav-btn:hover:not(:disabled),
-.weekly-session-card:hover,
-.tutor-list-item:hover {
-  transform: none !important;
-  box-shadow: 0 1px 2px rgba(17, 24, 39, 0.06) !important; /* Restore base shadow, no hover shadow */
-  background-color: inherit !important;
-  border-color: inherit !important;
-  color: inherit !important;
-}
-
-/* 2. Remove animations from elements */
-.week-range-pill-current {
-  animation: none !important;
-}
-
-.weekly-session-card {
-  transition: none !important;
-}
-
-/* 3. Remove stagger animation from metric cards */
-.metric-card {
-  animation: none !important;
-}
 </style>

@@ -42,8 +42,9 @@
               v-for="period in periods"
               :key="period"
               type="button"
-              class="time-segmented-option sb-btn"
+              class="time-segmented-option sb-btn sb-pill"
               :class="{ 'time-segmented-option-active': activePeriod === period }"
+              :aria-pressed="activePeriod === period"
               @click="activePeriod = period"
             >
               {{ period }}
@@ -55,8 +56,9 @@
               v-for="slot in visibleTimeSlots"
               :key="slot.value"
               type="button"
-              class="time-chip sb-btn"
+              class="time-chip sb-btn sb-pill"
               :class="{ 'time-chip-active': slot.value === modelValue }"
+              :aria-pressed="slot.value === modelValue"
               :disabled="slot.disabled"
               @click="selectTime(slot.value)"
             >
@@ -341,11 +343,7 @@ defineExpose({
   padding: 0.7rem 0.5rem;
   font-weight: 700;
   color: var(--sb-text-dark);
-  transition:
-    background-color 150ms ease,
-    border-color 150ms ease,
-    color 150ms ease,
-    box-shadow 150ms ease;
+  transition: transform var(--sb-t-normal) var(--sb-spring);
 }
 
 .time-chip:hover:not(:disabled) {

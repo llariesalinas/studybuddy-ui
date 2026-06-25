@@ -365,8 +365,9 @@ const menuItems = computed(() => {
 
 /* Collapsed state */
 .sb-sidebar--collapsed .sb-brand { justify-content: center; }
+.sb-sidebar--collapsed .sb-brand-badge { display: none; }
+.sb-sidebar--collapsed .sb-collapse-btn { margin-left: 0; }
 .sb-sidebar--collapsed .sb-brand-word,
-.sb-sidebar--collapsed .sb-collapse-btn,
 .sb-sidebar--collapsed .sb-profile-copy,
 .sb-sidebar--collapsed .sb-section-label,
 .sb-sidebar--collapsed .sb-item-label,

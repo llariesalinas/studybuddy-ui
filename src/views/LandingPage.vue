@@ -883,10 +883,7 @@ onUnmounted(() => {
   top: -14vh;
   width: 150vw;
   height: 58vh;
-  background:
-    radial-gradient(42% 58% at 28% 52%, color-mix(in srgb, var(--sb-primary) 18%, transparent), transparent 70%),
-    radial-gradient(36% 52% at 55% 44%, color-mix(in srgb, var(--sb-primary-mid) 15%, transparent), transparent 70%),
-    radial-gradient(30% 50% at 78% 56%, color-mix(in srgb, var(--sb-pop-yellow) 13%, transparent), transparent 70%);
+  background: var(--sb-wash-blob-1);
   animation: sway1 36s ease-in-out infinite alternate;
 }
 
@@ -895,9 +892,7 @@ onUnmounted(() => {
   top: 20vh;
   width: 135vw;
   height: 50vh;
-  background:
-    radial-gradient(40% 55% at 35% 50%, color-mix(in srgb, var(--sb-aurora-violet) 11%, transparent), transparent 70%),
-    radial-gradient(34% 52% at 62% 46%, color-mix(in srgb, var(--sb-pop-pink) 13%, transparent), transparent 70%);
+  background: var(--sb-wash-blob-2);
   animation: sway2 44s ease-in-out infinite alternate;
 }
 
@@ -906,9 +901,7 @@ onUnmounted(() => {
   bottom: -18vh;
   width: 145vw;
   height: 52vh;
-  background:
-    radial-gradient(40% 55% at 30% 50%, color-mix(in srgb, var(--sb-pop-orange) 11%, transparent), transparent 70%),
-    radial-gradient(38% 55% at 64% 46%, color-mix(in srgb, var(--sb-primary) 14%, transparent), transparent 70%);
+  background: var(--sb-wash-blob-3);
   animation: sway3 40s ease-in-out infinite alternate;
 }
 

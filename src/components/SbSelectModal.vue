@@ -47,7 +47,7 @@
             :id="searchId"
             ref="searchRef"
             v-model.trim="searchQuery"
-            class="sb-select-search"
+          class="sb-select-search sb-field"
             type="text"
             :placeholder="searchPlaceholder || `Search ${title.toLowerCase()}`"
             :aria-controls="listboxId"
@@ -384,7 +384,7 @@ function unlockBodyScroll() {
   font: inherit;
   text-align: left;
   cursor: pointer;
-  transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+  transition: none;
 }
 
 .sb-select-trigger:hover,
@@ -550,7 +550,7 @@ function unlockBodyScroll() {
   font: inherit;
   text-align: left;
   cursor: pointer;
-  transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+  transition: none;
 }
 
 .sb-select-option:hover,

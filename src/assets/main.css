@@ -13,7 +13,6 @@
   --sb-live-hero-border: #CFE8DB;
   --sb-live-track: rgba(0, 137, 90, 0.12);
   --sb-bg: #F8F9FA;
-  --sb-bg-gradient: linear-gradient(135deg, #f7fbf8 0%, #eef8f3 44%, #f7fbf8 100%);
   --sb-pop-yellow: #FFC94D;
   --sb-pop-orange: #FF8A5C;
   --sb-pop-pink: #FF8FA3;
@@ -23,11 +22,16 @@
   --sb-aurora-violet: #8E7CF4;
   --sb-aurora-wash-start: #F1FAF6;
   --sb-aurora-wash-end: #FDF9F1;
-  --sb-aurora-bg:
-    radial-gradient(circle at 8% -8%, rgba(0, 137, 90, 0.22), transparent 34%),
-    radial-gradient(circle at 52% -10%, rgba(103, 197, 220, 0.23), transparent 38%),
-    radial-gradient(circle at 100% 8%, rgba(148, 211, 181, 0.24), transparent 34%),
-    radial-gradient(circle at 84% 88%, rgba(255, 218, 137, 0.22), transparent 32%);
+  --sb-wash-blob-1:
+    radial-gradient(42% 58% at 28% 52%, color-mix(in srgb, var(--sb-primary) 18%, transparent), transparent 70%),
+    radial-gradient(36% 52% at 55% 44%, color-mix(in srgb, var(--sb-primary-mid) 15%, transparent), transparent 70%),
+    radial-gradient(30% 50% at 78% 56%, color-mix(in srgb, var(--sb-pop-yellow) 13%, transparent), transparent 70%);
+  --sb-wash-blob-2:
+    radial-gradient(40% 55% at 35% 50%, color-mix(in srgb, var(--sb-aurora-violet) 11%, transparent), transparent 70%),
+    radial-gradient(34% 52% at 62% 46%, color-mix(in srgb, var(--sb-pop-pink) 13%, transparent), transparent 70%);
+  --sb-wash-blob-3:
+    radial-gradient(40% 55% at 30% 50%, color-mix(in srgb, var(--sb-pop-orange) 11%, transparent), transparent 70%),
+    radial-gradient(38% 55% at 64% 46%, color-mix(in srgb, var(--sb-primary) 14%, transparent), transparent 70%);
   --sb-card-bg: #ffffff;
   --sb-card-border: #EAEAEA;
   --sb-surface: #ffffff;
@@ -50,11 +54,19 @@
   --sb-bell-size: 52px;
   --sb-bell-gap: 1.5rem;
   --sb-main-padding: 3rem;
+  /* Balanced interaction calibration — docs/artifacts/2026-06-21-feel-haptics-calibrations-reference.html */
   --sb-spring: cubic-bezier(0.16, 1, 0.3, 1);
-  --sb-spring-fast: cubic-bezier(0.34, 1.56, 0.64, 1);
-  --sb-t-quick: 120ms;
-  --sb-t-normal: 250ms;
-  --sb-t-slow: 400ms;
+  --sb-t-quick: 130ms;
+  --sb-t-normal: 180ms;
+  --sb-lift-control: -4px;
+  --sb-lift-surface: -6px;
+  --sb-press: 0.97;
+  --sb-focus-ring: rgba(0, 137, 90, 0.12);
+  --sb-halo: 0 0 0 4px var(--sb-focus-ring);
+  --sb-shadow-rest: 0 6px 16px rgba(15, 23, 42, 0.06);
+  --sb-shadow-hover: 0 16px 36px rgba(15, 23, 42, 0.12);
+  --sb-shadow-rest-brand: 0 8px 18px rgba(0, 137, 90, 0.20);
+  --sb-shadow-hover-brand: 0 14px 30px rgba(0, 137, 90, 0.28);
 }
 
 [data-sb-theme="dark"] {
@@ -69,7 +81,6 @@
   --sb-live-hero-border:#263C34;
   --sb-live-track:      rgba(134, 183, 163, 0.16);
   --sb-bg:              #050807;
-  --sb-bg-gradient: linear-gradient(135deg, #050807 0%, #08100d 48%, #030504 100%);
   --sb-pop-yellow:      #8F742F;
   --sb-pop-orange:      #8B4C38;
   --sb-pop-pink:        #8C5662;
@@ -79,10 +90,16 @@
   --sb-aurora-violet:   #6155A8;
   --sb-aurora-wash-start:#071310;
   --sb-aurora-wash-end: #0B0F0E;
-  --sb-aurora-bg:
-    radial-gradient(circle at 9% -4%, rgba(134, 183, 163, 0.22), transparent 34%),
-    radial-gradient(circle at 98% 12%, rgba(76, 201, 240, 0.12), transparent 34%),
-    radial-gradient(circle at 78% 86%, rgba(134, 183, 163, 0.10), transparent 34%);
+  --sb-wash-blob-1:
+    radial-gradient(42% 58% at 28% 52%, color-mix(in srgb, var(--sb-primary) 18%, transparent), transparent 70%),
+    radial-gradient(36% 52% at 55% 44%, color-mix(in srgb, var(--sb-primary-mid) 15%, transparent), transparent 70%),
+    radial-gradient(30% 50% at 78% 56%, color-mix(in srgb, var(--sb-pop-yellow) 13%, transparent), transparent 70%);
+  --sb-wash-blob-2:
+    radial-gradient(40% 55% at 35% 50%, color-mix(in srgb, var(--sb-aurora-violet) 11%, transparent), transparent 70%),
+    radial-gradient(34% 52% at 62% 46%, color-mix(in srgb, var(--sb-pop-pink) 13%, transparent), transparent 70%);
+  --sb-wash-blob-3:
+    radial-gradient(40% 55% at 30% 50%, color-mix(in srgb, var(--sb-pop-orange) 11%, transparent), transparent 70%),
+    radial-gradient(38% 55% at 64% 46%, color-mix(in srgb, var(--sb-primary) 14%, transparent), transparent 70%);
   --sb-card-bg:         #0C1110;
   --sb-card-border:     #1B2A25;
   --sb-surface:         #0C1110;
@@ -93,16 +110,20 @@
   --sb-border-light:    #1B2A25;
   --sb-shadow-soft:     rgba(0, 0, 0, 0.22);
   --sb-shadow-primary:  rgba(134, 183, 163, 0.20);
+  --sb-focus-ring:      rgba(134, 183, 163, 0.18);
+  --sb-shadow-rest:     0 6px 16px rgba(0, 0, 0, 0.22);
+  --sb-shadow-hover:    0 16px 36px rgba(0, 0, 0, 0.38);
+  --sb-shadow-rest-brand: 0 8px 18px rgba(134, 183, 163, 0.18);
+  --sb-shadow-hover-brand: 0 14px 30px rgba(134, 183, 163, 0.26);
 }
 
 html,
 body {
-  min-height: 100%;
+  min-height: 100vh;
 }
 
 body {
-  background: var(--sb-bg-gradient);
-  background-attachment: fixed;
+  background: var(--sb-bg);
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
@@ -110,54 +131,6 @@ body > #app {
   position: relative;
   z-index: 1;
   min-height: 100vh;
-}
-
-/*
- * Aurora hue: a single static gradient layer behind the app shell's hero
- * region. Deliberately NOT `position: fixed` (would force a dedicated
- * full-viewport composited layer) and sized with a fixed pixel height
- * rather than `vh` (mobile address-bar collapse changes `100vh` mid-scroll,
- * forcing relayout/repaint). It paints once, fades in once, then never
- * changes — see docs/plans/2026-06-07-aurora-hue-restoration.md.
- */
-body > #app::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 680px;
-  background: var(--sb-aurora-bg);
-  z-index: -1;
-  pointer-events: none;
-  opacity: 1;
-}
-
-body.sb-landing-route > #app::before {
-  display: none;
-  animation: none;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  body > #app::before {
-    opacity: 0;
-    animation: sb-aurora-fade-in 1.2s ease forwards;
-  }
-}
-
-@keyframes sb-aurora-fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  body {
-    transition: none;
-  }
 }
 
 /* Custom Utilities to extend Bootstrap */
@@ -168,3 +141,281 @@ body.sb-landing-route > #app::before {
 .sb-text { color: var(--sb-text-main); }
 .sb-muted { color: var(--sb-text-muted); }
 .sb-card-surface { background-color: var(--sb-card-bg); border-color: var(--sb-card-border); }
+
+/* --- Canonical interaction feel --- */
+.sb-btn,
+.sb-interactive,
+.sb-pill {
+  cursor: pointer;
+  transition: transform var(--sb-t-normal) var(--sb-spring);
+}
+
+.sb-btn,
+.sb-pill {
+  --sb-motion-lift: var(--sb-lift-control);
+}
+
+.sb-interactive {
+  --sb-motion-lift: var(--sb-lift-surface);
+}
+
+.sb-btn:active:not(:disabled):not([aria-disabled='true']),
+.sb-interactive:active:not([aria-disabled='true']),
+.sb-pill:active:not(:disabled):not([aria-disabled='true']) {
+  transform: scale(var(--sb-press)) translateY(0);
+  transition-duration: 70ms;
+}
+
+.sb-btn:disabled,
+.sb-btn[disabled],
+.sb-btn[aria-disabled='true'],
+.sb-interactive[aria-disabled='true'],
+.sb-pill:disabled,
+.sb-pill[disabled],
+.sb-pill[aria-disabled='true'] {
+  cursor: not-allowed;
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .sb-btn:hover:not(:disabled):not([aria-disabled='true']),
+  .sb-interactive:hover:not([aria-disabled='true']),
+  .sb-pill:hover:not(:disabled):not([aria-disabled='true']) {
+    transform: translateY(var(--sb-motion-lift));
+  }
+}
+
+/* Cards lift globally without implying that static surfaces are clickable. */
+body:not(.sb-landing-route) :where(.card:not(.sb-card-static), .sb-card-lift) {
+  transition: transform var(--sb-t-normal) var(--sb-spring);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  body:not(.sb-landing-route) :where(.card:not(.sb-card-static), .sb-card-lift):hover {
+    transform: translateY(var(--sb-lift-surface));
+  }
+}
+
+/* Interactive pills keep a visible boundary after selection. */
+.sb-pill {
+  --sb-pill-outline-color: var(--sb-primary);
+}
+
+body:not(.sb-landing-route) :where(button.rounded-pill, a.rounded-pill, [role='button'].rounded-pill) {
+  --sb-motion-lift: var(--sb-lift-control);
+  --sb-pill-outline-color: var(--sb-primary);
+  cursor: pointer;
+  transition: transform var(--sb-t-normal) var(--sb-spring);
+}
+
+body:not(.sb-landing-route) :where(button.rounded-pill, a.rounded-pill, [role='button'].rounded-pill):active:not(:disabled):not([aria-disabled='true']) {
+  transform: scale(var(--sb-press)) translateY(0);
+  transition-duration: 70ms;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  body:not(.sb-landing-route) :where(button.rounded-pill, a.rounded-pill, [role='button'].rounded-pill):hover:not(:disabled):not([aria-disabled='true']) {
+    transform: translateY(var(--sb-motion-lift));
+  }
+}
+
+.sb-pill:active:not(:disabled):not([aria-disabled='true']),
+body:not(.sb-landing-route) :where(button.rounded-pill, a.rounded-pill, [role='button'].rounded-pill):active:not(:disabled):not([aria-disabled='true']),
+.sb-pill:is(
+  .active,
+  .selected,
+  [aria-pressed='true'],
+  [aria-selected='true'],
+  [aria-checked='true'],
+  [aria-current]:not([aria-current='false'])
+) {
+  outline: 2px solid var(--sb-pill-outline-color);
+  outline-offset: 2px;
+}
+
+.sb-elevated {
+  --sb-elevated-rest: var(--sb-shadow-rest);
+  --sb-elevated-hover: var(--sb-shadow-hover);
+  isolation: isolate;
+  position: relative;
+  box-shadow: var(--sb-elevated-rest);
+}
+
+.sb-elevated--brand {
+  --sb-elevated-rest: var(--sb-shadow-rest-brand);
+  --sb-elevated-hover: var(--sb-shadow-hover-brand);
+}
+
+.sb-elevated::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  box-shadow: var(--sb-elevated-hover);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--sb-t-normal) var(--sb-spring);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .sb-elevated:hover::after {
+    opacity: 1;
+  }
+}
+
+.sb-field {
+  transition: none;
+}
+
+.sb-field:focus,
+.sb-field:focus-visible {
+  border-color: var(--sb-primary);
+  box-shadow: var(--sb-halo);
+  outline: none;
+}
+
+:where(
+  a[href],
+  button,
+  [role='button'],
+  input:not([type='hidden']),
+  select,
+  textarea,
+  [tabindex]:not([tabindex='-1'])
+):focus-visible {
+  outline: 4px solid var(--sb-focus-ring);
+  outline-offset: 2px;
+}
+
+:where(.sb-theme-toggle, .mode-check):has(input:focus-visible) {
+  outline: 4px solid var(--sb-focus-ring);
+  outline-offset: 2px;
+}
+
+.page-enter-active {
+  transition:
+    opacity var(--sb-t-normal) var(--sb-spring),
+    transform var(--sb-t-normal) var(--sb-spring);
+}
+
+.page-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.page-leave-active {
+  transition: opacity var(--sb-t-quick) var(--sb-spring);
+}
+
+.page-leave-to {
+  opacity: 0;
+}
+
+@keyframes sb-bubble-in {
+  from { opacity: 0; transform: translateY(12px) scale(0.94); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes sb-pop {
+  0% { transform: scale(0.6); opacity: 0; }
+  60% { transform: scale(1.08); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes sb-shake {
+  0% { transform: translateX(0); }
+  15% { transform: translateX(-5px); }
+  30% { transform: translateX(4px); }
+  45% { transform: translateX(-3px); }
+  60% { transform: translateX(2px); }
+  75% { transform: translateX(-1px); }
+  100% { transform: translateX(0); }
+}
+
+@keyframes sb-stagger-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes sb-scale-in {
+  from { opacity: 0; transform: scale(0.94); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes sb-toast-in {
+  from { opacity: 0; transform: translateY(-14px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes sb-success-border {
+  0% { opacity: 0.8; transform: scale(0.98); }
+  100% { opacity: 0; transform: scale(1.04); }
+}
+
+.sb-stagger-item {
+  animation: sb-stagger-in var(--sb-t-normal) var(--sb-spring) both;
+  opacity: 0;
+}
+
+.modal.show .modal-content {
+  animation: sb-scale-in var(--sb-t-normal) var(--sb-spring) both;
+}
+
+.sb-skeleton {
+  background: rgba(226, 232, 240, 0.86);
+  border-radius: 12px;
+}
+
+.sb-success-card {
+  isolation: isolate;
+  position: relative;
+}
+
+.sb-success-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border: 2px solid var(--sb-primary);
+  border-radius: inherit;
+  opacity: 0;
+  pointer-events: none;
+  animation: sb-success-border 600ms var(--sb-spring) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 1ms !important;
+  }
+
+  .sb-btn,
+  .sb-interactive,
+  .sb-pill,
+  .card,
+  .sb-card-lift,
+  button.rounded-pill,
+  a.rounded-pill,
+  [role='button'].rounded-pill,
+  .sb-btn:hover,
+  .sb-interactive:hover,
+  .sb-pill:hover,
+  .card:hover,
+  .sb-card-lift:hover,
+  button.rounded-pill:hover,
+  a.rounded-pill:hover,
+  [role='button'].rounded-pill:hover,
+  button.rounded-pill:active,
+  a.rounded-pill:active,
+  [role='button'].rounded-pill:active,
+  .sb-btn:active,
+  .sb-interactive:active,
+  .sb-pill:active {
+    transform: none !important;
+  }
+}

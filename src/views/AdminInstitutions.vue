@@ -208,7 +208,7 @@
                 <input
                   v-model="form.institution_name"
                   type="text"
-                  class="form-control rounded-3"
+                  class="form-control rounded-3 sb-field"
                   required
                   placeholder="e.g. University of the Philippines"
                 >
@@ -222,7 +222,7 @@
                 <input
                   v-model="form.school_email_domain"
                   type="text"
-                  class="form-control rounded-3"
+                  class="form-control rounded-3 sb-field"
                   required
                   placeholder="e.g. up.edu.ph"
                 >
@@ -236,7 +236,7 @@
                 <input
                   v-model="form.contact_person"
                   type="text"
-                  class="form-control rounded-3"
+                  class="form-control rounded-3 sb-field"
                   placeholder="Name or Department"
                 >
               </div>

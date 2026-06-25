@@ -12,11 +12,13 @@ from django.contrib.auth.models import User
 from django.db import connection
 from django.test import override_settings
 from django.test.utils import CaptureQueriesContext
-from rest_framework.test import APITestCase
+from rest_framework.test import APITestCase, APIRequestFactory, force_authenticate
 from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from .chat.services import get_current_booking_context, get_current_booking_contexts, get_partner_context
+from .paymongo_money_movement import PayMongoCashOutError
+from .views import credit_tutor_wallet, dev_add_wallet_funds, dev_remove_wallet_funds
 from .models import (
     AdminAccountRequest,
     Booking,
@@ -1803,6 +1805,525 @@ class TutorCashOutTests(APITestCase):
             ).count(),
             2,
         )
+
+
+@override_settings(
+    PAYMONGO_WALLET_ID="wallet_test",
+    PAYMONGO_CASHOUT_CALLBACK_URL="https://api.test/api/wallet/paymongo/callback/",
+    CASHOUT_PROVIDER_FEE_PHP="10",
+    CASHOUT_MIN_PHP="500",
+)
+class WalletCashOutEdgeCaseTests(APITestCase):
+    def setUp(self):
+        self.tutor_user = User.objects.create_user(
+            username="cashout-edge-tutor",
+            email="cashout-edge-tutor@example.com",
+            password="password",
+        )
+        self.tutor_profile = UserProfile.objects.create(
+            user=self.tutor_user,
+            fname="Edge",
+            mname="",
+            lname="Tutor",
+            role="Tutor",
+        )
+        self.tutor = Tutor.objects.create(
+            profile=self.tutor_profile,
+            hourly_rate=Decimal("300.00"),
+            can_online=True,
+            can_f2f=True,
+            teaching_level="SHS",
+        )
+        self.wallet = Wallet.objects.get(tutor=self.tutor)
+        self.wallet.balance = Decimal("1000.00")
+        self.wallet.save(update_fields=["balance"])
+        self.client.force_authenticate(user=self.tutor_user)
+
+    def create_account(self, provider="instapay", is_active=True, tutor=None):
+        return TutorPayoutAccount.objects.create(
+            tutor=tutor or self.tutor,
+            destination_type="gcash",
+            provider=provider,
+            receiving_institution_id="inst_gcash",
+            receiving_institution_name="GCash",
+            receiving_institution_code="GCASH",
+            account_number="09171234567",
+            account_name="Edge Tutor",
+            is_active=is_active,
+        )
+
+    def test_cashout_rejects_rail_mismatch(self):
+        self.wallet.balance = Decimal("100000.00")
+        self.wallet.save(update_fields=["balance"])
+        account = self.create_account(provider="instapay")
+
+        response = self.client.post(
+            "/api/wallet/cash-outs/",
+            {"amount": "60000.00", "payout_account_id": account.id},
+            format="json",
+        )
+
+        self.wallet.refresh_from_db()
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("pesonet", response.data["error"])
+        self.assertEqual(self.wallet.balance, Decimal("100000.00"))
+        self.assertFalse(WithdrawalRequest.objects.filter(tutor=self.tutor).exists())
+
+    def test_cashout_404s_for_unknown_account(self):
+        response = self.client.post(
+            "/api/wallet/cash-outs/",
+            {"amount": "500.00", "payout_account_id": 999999},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_cashout_404s_for_inactive_account(self):
+        account = self.create_account(is_active=False)
+
+        response = self.client.post(
+            "/api/wallet/cash-outs/",
+            {"amount": "500.00", "payout_account_id": account.id},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_cashout_404s_for_another_tutors_account(self):
+        other_user = User.objects.create_user(
+            username="other-edge-tutor",
+            email="other-edge-tutor@example.com",
+            password="password",
+        )
+        other_profile = UserProfile.objects.create(
+            user=other_user, fname="Other", mname="", lname="Tutor", role="Tutor",
+        )
+        other_tutor = Tutor.objects.create(
+            profile=other_profile,
+            hourly_rate=Decimal("300.00"),
+            can_online=True,
+            can_f2f=True,
+            teaching_level="SHS",
+        )
+        other_account = self.create_account(tutor=other_tutor)
+
+        response = self.client.post(
+            "/api/wallet/cash-outs/",
+            {"amount": "500.00", "payout_account_id": other_account.id},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    @patch("studybuddy.views.create_wallet_transaction")
+    def test_cashout_synchronous_paymongo_failure_reverses_immediately(self, mock_create):
+        account = self.create_account()
+        mock_create.side_effect = PayMongoCashOutError("Receiving account rejected the transfer.")
+
+        response = self.client.post(
+            "/api/wallet/cash-outs/",
+            {"amount": "500.00", "payout_account_id": account.id},
+            format="json",
+        )
+
+        self.wallet.refresh_from_db()
+        withdrawal = WithdrawalRequest.objects.get(id=response.data["id"])
+
+        self.assertEqual(response.status_code, 502)
+        self.assertEqual(withdrawal.status, "failed")
+        self.assertEqual(self.wallet.balance, Decimal("1000.00"))
+        self.assertEqual(
+            Transaction.objects.filter(
+                wallet=self.wallet,
+                transaction_type__in=["withdrawal_reversal", "cashout_fee_reversal"],
+            ).count(),
+            2,
+        )
+
+
+class WalletCashInTests(APITestCase):
+    def setUp(self):
+        self.tutor_user = User.objects.create_user(
+            username="cashin-tutor",
+            email="cashin-tutor@example.com",
+            password="password",
+        )
+        self.tutor_profile = UserProfile.objects.create(
+            user=self.tutor_user,
+            fname="CashIn",
+            mname="",
+            lname="Tutor",
+            role="Tutor",
+        )
+        self.tutor = Tutor.objects.create(
+            profile=self.tutor_profile,
+            hourly_rate=Decimal("300.00"),
+            can_online=True,
+            can_f2f=True,
+            teaching_level="SHS",
+        )
+        self.wallet = Wallet.objects.get(tutor=self.tutor)
+        self.client.force_authenticate(user=self.tutor_user)
+
+    def paymongo_response(self, status_code, payload):
+        response = Mock()
+        response.status_code = status_code
+        response.json.return_value = payload
+        return response
+
+    def checkout_session_payload(self, session_id="cs_topup_123"):
+        return {
+            "data": {
+                "id": session_id,
+                "attributes": {"checkout_url": "https://checkout.paymongo.com/topup-session"},
+            },
+        }
+
+    def retrieve_payload(self, status_value="paid"):
+        return {
+            "data": {
+                "id": "cs_topup_123",
+                "attributes": {"status": status_value},
+            },
+        }
+
+    @patch("studybuddy.views.requests.post")
+    def test_initiate_cash_in_creates_pending_topup_and_checkout(self, mock_post):
+        mock_post.return_value = self.paymongo_response(200, self.checkout_session_payload())
+
+        response = self.client.post("/api/wallet/cash-in/", {"amount": "500.00"}, format="json")
+
+        topup = WalletTopUp.objects.get(id=response.data["id"])
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["checkout_url"], "https://checkout.paymongo.com/topup-session")
+        self.assertEqual(topup.status, "pending")
+        self.assertEqual(topup.amount, Decimal("500.00"))
+        self.assertEqual(topup.provider_reference, "cs_topup_123")
+
+    def test_initiate_cash_in_rejects_invalid_amount(self):
+        response = self.client.post("/api/wallet/cash-in/", {"amount": "0"}, format="json")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(WalletTopUp.objects.filter(tutor=self.tutor).exists())
+
+    @patch("studybuddy.views.requests.post")
+    def test_initiate_cash_in_marks_failed_on_missing_checkout_url(self, mock_post):
+        mock_post.return_value = self.paymongo_response(
+            200, {"data": {"id": "cs_missing_url", "attributes": {}}}
+        )
+
+        response = self.client.post("/api/wallet/cash-in/", {"amount": "500.00"}, format="json")
+
+        topup = WalletTopUp.objects.get(tutor=self.tutor)
+        self.assertEqual(response.status_code, 502)
+        self.assertEqual(topup.status, "failed")
+
+    @patch("studybuddy.views.requests.post")
+    def test_initiate_cash_in_marks_failed_on_provider_error(self, mock_post):
+        mock_post.return_value = self.paymongo_response(
+            400, {"errors": [{"detail": "Invalid line item."}]}
+        )
+
+        response = self.client.post("/api/wallet/cash-in/", {"amount": "500.00"}, format="json")
+
+        topup = WalletTopUp.objects.get(tutor=self.tutor)
+        self.assertEqual(response.status_code, 502)
+        self.assertEqual(response.data["error"], "Invalid line item.")
+        self.assertEqual(topup.status, "failed")
+
+    @patch("studybuddy.views.requests.post")
+    def test_initiate_cash_in_marks_failed_on_network_error(self, mock_post):
+        import requests
+
+        mock_post.side_effect = requests.RequestException("connection reset")
+
+        response = self.client.post("/api/wallet/cash-in/", {"amount": "500.00"}, format="json")
+
+        topup = WalletTopUp.objects.get(tutor=self.tutor)
+        self.assertEqual(response.status_code, 502)
+        self.assertEqual(topup.status, "failed")
+
+    @patch("studybuddy.views.requests.get")
+    @patch("studybuddy.views.requests.post")
+    def test_verify_cash_in_credits_wallet_exactly_once(self, mock_post, mock_get):
+        mock_post.return_value = self.paymongo_response(200, self.checkout_session_payload())
+        mock_get.return_value = self.paymongo_response(200, self.retrieve_payload("paid"))
+
+        create_response = self.client.post("/api/wallet/cash-in/", {"amount": "500.00"}, format="json")
+        topup_id = create_response.data["id"]
+
+        first_verify = self.client.post(f"/api/wallet/cash-in/{topup_id}/verify/")
+        second_verify = self.client.post(f"/api/wallet/cash-in/{topup_id}/verify/")
+
+        self.wallet.refresh_from_db()
+        self.assertEqual(first_verify.status_code, 200)
+        self.assertEqual(second_verify.status_code, 200)
+        self.assertEqual(self.wallet.balance, Decimal("500.00"))
+        self.assertEqual(mock_get.call_count, 1)
+        self.assertEqual(
+            Transaction.objects.filter(wallet=self.wallet, transaction_type="cash_in").count(),
+            1,
+        )
+
+    @patch("studybuddy.views.requests.get")
+    @patch("studybuddy.views.requests.post")
+    def test_verify_cash_in_rejects_unpaid_checkout(self, mock_post, mock_get):
+        mock_post.return_value = self.paymongo_response(200, self.checkout_session_payload())
+        mock_get.return_value = self.paymongo_response(200, self.retrieve_payload("pending"))
+
+        create_response = self.client.post("/api/wallet/cash-in/", {"amount": "500.00"}, format="json")
+        response = self.client.post(f"/api/wallet/cash-in/{create_response.data['id']}/verify/")
+
+        self.wallet.refresh_from_db()
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(self.wallet.balance, Decimal("0.00"))
+
+    def test_verify_cash_in_rejects_missing_provider_reference(self):
+        topup = WalletTopUp.objects.create(tutor=self.tutor, amount=Decimal("500.00"), status="pending")
+
+        response = self.client.post(f"/api/wallet/cash-in/{topup.id}/verify/")
+
+        self.assertEqual(response.status_code, 400)
+
+    @patch("studybuddy.views.requests.get")
+    @patch("studybuddy.views.requests.post")
+    def test_verify_cash_in_returns_502_on_provider_error(self, mock_post, mock_get):
+        mock_post.return_value = self.paymongo_response(200, self.checkout_session_payload())
+        mock_get.return_value = self.paymongo_response(500, {"errors": []})
+
+        create_response = self.client.post("/api/wallet/cash-in/", {"amount": "500.00"}, format="json")
+        response = self.client.post(f"/api/wallet/cash-in/{create_response.data['id']}/verify/")
+
+        self.wallet.refresh_from_db()
+        self.assertEqual(response.status_code, 502)
+        self.assertEqual(self.wallet.balance, Decimal("0.00"))
+
+    @patch("studybuddy.views.requests.post")
+    def test_verify_cash_in_404s_for_another_tutors_topup(self, mock_post):
+        mock_post.return_value = self.paymongo_response(200, self.checkout_session_payload())
+        create_response = self.client.post("/api/wallet/cash-in/", {"amount": "500.00"}, format="json")
+        topup_id = create_response.data["id"]
+
+        other_user = User.objects.create_user(
+            username="other-cashin-tutor",
+            email="other-cashin-tutor@example.com",
+            password="password",
+        )
+        other_profile = UserProfile.objects.create(
+            user=other_user, fname="Other", mname="", lname="Tutor", role="Tutor",
+        )
+        Tutor.objects.create(
+            profile=other_profile,
+            hourly_rate=Decimal("300.00"),
+            can_online=True,
+            can_f2f=True,
+            teaching_level="SHS",
+        )
+        self.client.force_authenticate(user=other_user)
+
+        response = self.client.post(f"/api/wallet/cash-in/{topup_id}/verify/")
+
+        self.assertEqual(response.status_code, 404)
+
+
+class SessionCreditWalletTests(APITestCase):
+    def setUp(self):
+        self.tutee_profile = UserProfile.objects.create(
+            user=User.objects.create_user(
+                username="credit-tutee", email="credit-tutee@example.com", password="password",
+            ),
+            fname="Credit",
+            mname="",
+            lname="Tutee",
+            role="Tutee",
+        )
+        self.tutor_profile = UserProfile.objects.create(
+            user=User.objects.create_user(
+                username="credit-tutor", email="credit-tutor@example.com", password="password",
+            ),
+            fname="Credit",
+            mname="",
+            lname="Tutor",
+            role="Tutor",
+        )
+        self.tutor = Tutor.objects.create(
+            profile=self.tutor_profile,
+            hourly_rate=Decimal("300.00"),
+            can_online=True,
+            can_f2f=True,
+            teaching_level="SHS",
+        )
+        self.wallet = Wallet.objects.get(tutor=self.tutor)
+        self.availability = TutorAvailability.objects.create(
+            tutor=self.tutor, day="Mon", time_slot=time(14, 0), is_active=True,
+        )
+        self.booking = Booking.objects.create(
+            student=self.tutee_profile,
+            tutor=self.tutor,
+            availability=self.availability,
+            session_date=date(2026, 4, 12),
+            session_mode="Online",
+            booking_request_id=uuid4(),
+            status="Confirmed",
+        )
+
+    def create_payment(self, code, amount=Decimal("1000.00")):
+        method, _ = PaymentMethod.objects.get_or_create(
+            code=code, defaults={"method_name": code, "is_active": True}
+        )
+        return Payment.objects.create(
+            booking=self.booking, amount=amount, method=method, payment_status="Paid",
+        )
+
+    def test_paymongo_settled_booking_credits_90_percent(self):
+        self.create_payment("PAYMONGO")
+
+        credit_tutor_wallet(self.booking)
+
+        self.wallet.refresh_from_db()
+        self.assertEqual(self.wallet.balance, Decimal("900.00"))
+        self.assertTrue(
+            Transaction.objects.filter(
+                wallet=self.wallet, transaction_type="session_credit", amount=Decimal("900.00"),
+            ).exists()
+        )
+
+    def test_cash_booking_deducts_10_percent_commission(self):
+        self.create_payment("CASH")
+
+        credit_tutor_wallet(self.booking)
+
+        self.wallet.refresh_from_db()
+        self.assertEqual(self.wallet.balance, Decimal("-100.00"))
+        self.assertTrue(
+            Transaction.objects.filter(
+                wallet=self.wallet, transaction_type="commission_deduction", amount=Decimal("-100.00"),
+            ).exists()
+        )
+
+    def test_credit_tutor_wallet_is_idempotent(self):
+        self.create_payment("PAYMONGO")
+
+        credit_tutor_wallet(self.booking)
+        credit_tutor_wallet(self.booking)
+
+        self.wallet.refresh_from_db()
+        self.assertEqual(self.wallet.balance, Decimal("900.00"))
+        self.assertEqual(
+            Transaction.objects.filter(wallet=self.wallet, transaction_type="session_credit").count(),
+            1,
+        )
+
+
+class WalletStatusAndTransactionsTests(APITestCase):
+    def setUp(self):
+        self.tutor_user = User.objects.create_user(
+            username="status-tutor", email="status-tutor@example.com", password="password",
+        )
+        self.tutor_profile = UserProfile.objects.create(
+            user=self.tutor_user, fname="Status", mname="", lname="Tutor", role="Tutor",
+        )
+        self.tutor = Tutor.objects.create(
+            profile=self.tutor_profile,
+            hourly_rate=Decimal("300.00"),
+            can_online=True,
+            can_f2f=True,
+            teaching_level="SHS",
+        )
+        self.wallet = Wallet.objects.get(tutor=self.tutor)
+        self.wallet.balance = Decimal("750.00")
+        self.wallet.pending_amount = Decimal("50.00")
+        self.wallet.save(update_fields=["balance", "pending_amount"])
+        self.client.force_authenticate(user=self.tutor_user)
+
+    def test_wallet_status_returns_balance_and_cashout_settings(self):
+        response = self.client.get("/api/wallet/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["balance"], 750.00)
+        self.assertEqual(response.data["pending_amount"], 50.00)
+        self.assertIn("cashout_minimum", response.data)
+        self.assertIn("cashout_provider_fee", response.data)
+
+    def test_wallet_transactions_returns_history_ordered_newest_first(self):
+        older = Transaction.objects.create(
+            wallet=self.wallet,
+            transaction_type="session_credit",
+            amount=Decimal("100.00"),
+            description="Older credit",
+        )
+        newer = Transaction.objects.create(
+            wallet=self.wallet,
+            transaction_type="cash_in",
+            amount=Decimal("200.00"),
+            description="Newer top-up",
+        )
+
+        response = self.client.get("/api/wallet/transactions/")
+
+        self.assertEqual(response.status_code, 200)
+        ids = [tx["id"] for tx in response.data]
+        self.assertEqual(ids[0], newer.id)
+        self.assertIn(older.id, ids)
+
+
+class DevWalletFundsTests(APITestCase):
+    """Calls the dev_add/remove_wallet_funds views directly via APIRequestFactory.
+
+    /api/dev/wallet/add/ and /remove/ are only added to urlpatterns when
+    settings.DEBUG is True at process startup (see urls.py); override_settings
+    in a test can't retroactively register them. Calling the view functions
+    directly exercises their real DEBUG check without depending on urlconf.
+    """
+
+    def setUp(self):
+        self.factory = APIRequestFactory()
+        self.tutor_user = User.objects.create_user(
+            username="dev-funds-tutor", email="dev-funds-tutor@example.com", password="password",
+        )
+        self.tutor_profile = UserProfile.objects.create(
+            user=self.tutor_user, fname="Dev", mname="", lname="Tutor", role="Tutor",
+        )
+        self.tutor = Tutor.objects.create(
+            profile=self.tutor_profile,
+            hourly_rate=Decimal("300.00"),
+            can_online=True,
+            can_f2f=True,
+            teaching_level="SHS",
+        )
+        self.wallet = Wallet.objects.get(tutor=self.tutor)
+
+    def call_view(self, view, amount):
+        request = self.factory.post(f"/api/dev/wallet/_/", {"amount": amount}, format="json")
+        force_authenticate(request, user=self.tutor_user)
+        return view(request)
+
+    @override_settings(DEBUG=True)
+    def test_dev_add_wallet_funds_increases_balance(self):
+        response = self.call_view(dev_add_wallet_funds, "300")
+
+        self.wallet.refresh_from_db()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.wallet.balance, Decimal("300.00"))
+
+    @override_settings(DEBUG=True)
+    def test_dev_remove_wallet_funds_decreases_balance(self):
+        self.wallet.balance = Decimal("300.00")
+        self.wallet.save(update_fields=["balance"])
+
+        response = self.call_view(dev_remove_wallet_funds, "100")
+
+        self.wallet.refresh_from_db()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.wallet.balance, Decimal("200.00"))
+
+    @override_settings(DEBUG=False)
+    def test_dev_wallet_funds_404s_when_debug_disabled(self):
+        add_response = self.call_view(dev_add_wallet_funds, "300")
+        remove_response = self.call_view(dev_remove_wallet_funds, "100")
+
+        self.assertEqual(add_response.status_code, 404)
+        self.assertEqual(remove_response.status_code, 404)
 
 
 class TuteeProfileTests(APITestCase):

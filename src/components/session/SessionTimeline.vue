@@ -98,19 +98,14 @@ const steps = computed(() => [
   border-radius: 18px;
   background: color-mix(in srgb, var(--sb-card-bg) 88%, transparent);
   box-shadow: 0 14px 36px var(--sb-shadow-soft);
-  backdrop-filter: blur(10px);
-  transition:
-    transform var(--sb-t-normal) var(--sb-spring),
-    box-shadow var(--sb-t-normal) var(--sb-spring),
-    border-color var(--sb-t-normal) var(--sb-spring),
-    background-color var(--sb-t-normal) var(--sb-spring);
+  transition: transform var(--sb-t-normal) var(--sb-spring);
 }
 
 .session-card:hover {
   border-color: color-mix(in srgb, var(--sb-primary) 22%, var(--sb-card-border));
   background: color-mix(in srgb, var(--sb-card-bg) 94%, transparent);
   box-shadow: 0 22px 54px color-mix(in srgb, var(--sb-shadow-soft) 74%, rgba(15, 23, 42, 0.12));
-  transform: translateY(-3px);
+  transform: translateY(var(--sb-lift-surface));
 }
 
 .session-timeline-card {
@@ -160,6 +155,7 @@ const steps = computed(() => [
 }
 
 .session-timeline-node {
+  position: relative;
   z-index: 1;
   flex: none;
   width: 16px;
@@ -180,7 +176,17 @@ const steps = computed(() => [
 .session-timeline-step-now .session-timeline-node {
   border-color: var(--sb-primary);
   background: var(--sb-primary);
-  animation: session-timeline-ring 1.6s ease-out infinite;
+}
+
+.session-timeline-step-now .session-timeline-node::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border: 2px solid color-mix(in srgb, var(--sb-primary) 50%, transparent);
+  border-radius: inherit;
+  opacity: 0;
+  pointer-events: none;
+  animation: session-timeline-ring 1.6s var(--sb-spring) infinite;
 }
 
 .session-timeline-step strong {
@@ -203,15 +209,17 @@ const steps = computed(() => [
 
 @keyframes session-timeline-ring {
   from {
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--sb-primary) 50%, transparent);
+    opacity: 0.8;
+    transform: scale(0.65);
   }
   to {
-    box-shadow: 0 0 0 10px transparent;
+    opacity: 0;
+    transform: scale(1.45);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .session-timeline-step-now .session-timeline-node {
+  .session-timeline-step-now .session-timeline-node::after {
     animation: none;
   }
 

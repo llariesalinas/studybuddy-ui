@@ -32,7 +32,7 @@
           <div class="chat-banner__location-row">
           <input
             v-model="locationDraft"
-            class="chat-banner__location-input"
+              class="chat-banner__location-input sb-field"
             placeholder="Enter location"
             :disabled="saving || accepting || rejecting"
           />
@@ -669,8 +669,7 @@ async function reject() {
   min-height: 30px;
   padding: 7px 14px;
   text-decoration: none;
-  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease,
-    transform 150ms ease, box-shadow 150ms ease;
+  transition: transform var(--sb-t-normal) var(--sb-spring);
 }
 
 .chat-banner__btn:hover:not(:disabled) {

@@ -259,7 +259,7 @@
         </div>
       </div>
       <div class="dev-actions">
-        <input v-model.number="devAmount" type="number" min="1" aria-label="Dev amount" />
+        <input v-model.number="devAmount" class="sb-field" type="number" min="1" aria-label="Dev amount" />
         <button class="sb-btn" @click="addDevFunds">Add Test Funds</button>
         <button class="sb-btn secondary" @click="removeDevFunds">Remove Funds</button>
       </div>
@@ -316,12 +316,12 @@
 
               <label>
                 <span>Account Number</span>
-                <input v-model.trim="accountForm.account_number" required />
+                <input v-model.trim="accountForm.account_number" class="sb-field" required />
               </label>
 
               <label>
                 <span>Account Name</span>
-                <input v-model.trim="accountForm.account_name" required />
+                <input v-model.trim="accountForm.account_name" class="sb-field" required />
               </label>
             </div>
             <div class="modal-footer border-0">
@@ -367,6 +367,7 @@
                 <span>Amount You Receive</span>
                 <input
                   v-model.number="cashoutForm.amount"
+                  class="sb-field"
                   type="number"
                   step="0.01"
                   :min="walletStore.cashoutMinimum"
@@ -769,7 +770,6 @@ watch(showCashoutModal, async (isOpen) => {
   width: 280px;
   height: 280px;
   border-radius: 999px;
-  filter: blur(60px);
   opacity: 0.45;
   pointer-events: none;
 }
@@ -813,7 +813,6 @@ watch(showCashoutModal, async (isOpen) => {
 
 .glass-panel {
   background: var(--wallet-glass);
-  backdrop-filter: blur(8px);
   border: 1px solid rgba(255, 255, 255, 0.9);
   border-radius: 24px;
   box-shadow: 0 12px 48px rgba(15, 23, 42, 0.06);
@@ -988,7 +987,6 @@ watch(showCashoutModal, async (isOpen) => {
   height: 210px;
   border-radius: 999px;
   background: rgba(140, 248, 191, 0.28);
-  filter: blur(16px);
   transition: transform var(--sb-t-normal) var(--sb-spring);
 }
 

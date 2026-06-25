@@ -83,11 +83,12 @@
                   v-for="slot in groupedSlots[day.code]"
                   :key="slot.availability_id"
                   type="button"
-                  class="slot-pill sb-btn"
+                  class="slot-pill sb-btn sb-pill"
                   :class="{
                     selected: isSlotSelected(slot.availability_id),
                     blocked: isSlotBlocked(day.date, slot.availability_id)
                   }"
+                  :aria-pressed="isSlotSelected(slot.availability_id)"
                   @click="toggleSlotSelection(slot.availability_id)"
                 >
                   <span
@@ -197,16 +198,18 @@
             <div class="time-period-toggle">
               <button
                 type="button"
-                class="time-period-btn sb-btn"
+                class="time-period-btn sb-btn sb-pill"
                 :class="{ active: startPeriod === 'AM' }"
+                :aria-pressed="startPeriod === 'AM'"
                 @click="startPeriod = 'AM'"
               >
                 AM
               </button>
               <button
                 type="button"
-                class="time-period-btn sb-btn"
+                class="time-period-btn sb-btn sb-pill"
                 :class="{ active: startPeriod === 'PM' }"
+                :aria-pressed="startPeriod === 'PM'"
                 @click="startPeriod = 'PM'"
               >
                 PM
@@ -218,8 +221,9 @@
                 v-for="time in visibleStartTimes"
                 :key="`start-${time}`"
                 type="button"
-                class="time-grid-btn sb-btn"
+                class="time-grid-btn sb-btn sb-pill"
                 :class="{ active: newSlot.start_time === time }"
+                :aria-pressed="newSlot.start_time === time"
                 @click="selectStartTime(time)"
               >
                 {{ formatDisplayTime(time) }}
@@ -248,16 +252,18 @@
             <div class="time-period-toggle">
               <button
                 type="button"
-                class="time-period-btn sb-btn"
+                class="time-period-btn sb-btn sb-pill"
                 :class="{ active: endPeriod === 'AM' }"
+                :aria-pressed="endPeriod === 'AM'"
                 @click="endPeriod = 'AM'"
               >
                 AM
               </button>
               <button
                 type="button"
-                class="time-period-btn sb-btn"
+                class="time-period-btn sb-btn sb-pill"
                 :class="{ active: endPeriod === 'PM' }"
+                :aria-pressed="endPeriod === 'PM'"
                 @click="endPeriod = 'PM'"
               >
                 PM
@@ -269,8 +275,9 @@
                 v-for="time in visibleEndTimes"
                 :key="`end-${time}`"
                 type="button"
-                class="time-grid-btn sb-btn"
+                class="time-grid-btn sb-btn sb-pill"
                 :class="{ active: newSlot.end_time === time }"
+                :aria-pressed="newSlot.end_time === time"
                 @click="selectEndTime(time)"
               >
                 {{ formatDisplayTime(time) }}
@@ -862,7 +869,7 @@ function addThirtyMinutes(timeString) {
   border-radius: 14px;
   background: #edf6f1;
   color: #0a7a51;
-  transition: background-color 150ms ease, transform 150ms ease, box-shadow 150ms ease;
+  transition: transform var(--sb-t-normal) var(--sb-spring);
 }
 
 .week-nav-btn:hover:not(:disabled) {
@@ -1048,7 +1055,7 @@ function addThirtyMinutes(timeString) {
   font-weight: 700;
   font-size: 1rem;
   text-align: left;
-  transition: transform 150ms ease, box-shadow 150ms ease, background-color 150ms ease, border-color 150ms ease;
+  transition: transform var(--sb-t-normal) var(--sb-spring);
 }
 
 .slot-pill:hover:not(:disabled) {
@@ -1066,6 +1073,7 @@ function addThirtyMinutes(timeString) {
 }
 
 .slot-pill.blocked {
+  --sb-pill-outline-color: #b42318;
   background: #fff2f0;
   border-color: #f3b7b0;
   color: #b42318;
@@ -1251,7 +1259,7 @@ function addThirtyMinutes(timeString) {
   color: #163127;
   font-size: 0.92rem;
   padding: 0;
-  transition: color 150ms ease, transform 150ms ease;
+  transition: transform var(--sb-t-normal) var(--sb-spring);
 }
 
 .time-picker-close:hover {
@@ -1293,7 +1301,7 @@ function addThirtyMinutes(timeString) {
   color: #315447;
   font-weight: 700;
   padding: 8px 0;
-  transition: background-color 150ms ease, color 150ms ease, transform 150ms ease, box-shadow 150ms ease;
+  transition: transform var(--sb-t-normal) var(--sb-spring);
 }
 
 .time-period-btn:hover:not(.active) {
@@ -1322,7 +1330,7 @@ function addThirtyMinutes(timeString) {
   padding: 10px 12px;
   font-weight: 600;
   text-align: center;
-  transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease, transform 150ms ease, box-shadow 150ms ease;
+  transition: transform var(--sb-t-normal) var(--sb-spring);
 }
 
 .time-grid-btn:hover:not(.active) {
@@ -1340,7 +1348,7 @@ function addThirtyMinutes(timeString) {
 }
 
 .modal-box :deep(select.form-control) {
-  transition: border-color 150ms ease, box-shadow 150ms ease, background-color 150ms ease;
+  transition: none;
 }
 
 .modal-box :deep(select.form-control:hover) {
@@ -1351,7 +1359,7 @@ function addThirtyMinutes(timeString) {
 
 .modal-box :deep(.btn-secondary),
 .modal-box :deep(.btn-success) {
-  transition: transform 150ms ease, box-shadow 150ms ease, filter 150ms ease;
+  transition: transform var(--sb-t-normal) var(--sb-spring);
 }
 
 .modal-box :deep(.btn-secondary:hover),
@@ -1373,7 +1381,7 @@ function addThirtyMinutes(timeString) {
   background: #e1f5ee;
   color: #085041;
   text-align: left;
-  transition: transform 150ms ease, box-shadow 150ms ease, background-color 150ms ease, border-color 150ms ease;
+  transition: transform var(--sb-t-normal) var(--sb-spring);
 }
 
 .selected-time-card:hover {

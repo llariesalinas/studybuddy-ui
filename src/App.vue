@@ -1,4 +1,6 @@
 <template>
+  <SbBgWash v-if="route.name !== 'home'" />
+
   <div v-if="isPublicRoute" class="public-layout">
     <router-view v-slot="{ Component }">
       <Transition name="page" mode="out-in">
@@ -49,7 +51,7 @@
             </button>
 
             <button
-              class="btn bg-sb-primary text-white sb-btn"
+              class="btn bg-sb-primary text-white sb-btn sb-elevated sb-elevated--brand"
               @click="logout"
             >
               Yes, Log out
@@ -179,14 +181,14 @@
           </div>
 
           <div class="d-flex gap-3 align-items-center ms-auto">
-            <router-link v-if="userRole === 'tutee' && route.path !== '/book'" to="/book" class="btn bg-sb-primary text-white px-4 py-2 rounded-3 fw-semibold shadow-sm sb-btn">
+            <router-link v-if="userRole === 'tutee' && route.path !== '/book'" to="/book" class="btn bg-sb-primary text-white px-4 py-2 rounded-3 fw-semibold sb-btn sb-elevated sb-elevated--brand">
               Book Session
             </router-link>
 
             <router-link
               v-if="userRole === 'tutor' && route.path !== '/tch-requestedSessions'"
               to="/tch-requestedSessions"
-              class="btn bg-sb-primary text-white px-4 py-2 rounded-3 fw-semibold shadow-sm pending-request-btn d-inline-flex align-items-center gap-2 sb-btn"
+              class="btn bg-sb-primary text-white px-4 py-2 rounded-3 fw-semibold pending-request-btn d-inline-flex align-items-center gap-2 sb-btn sb-elevated sb-elevated--brand"
             >
               <span v-if="sessionStore.hasNewPendingRequests" class="pending-request-dot" aria-hidden="true"></span>
               <span>Manage Pending Sessions</span>
@@ -200,10 +202,8 @@
             </router-link>
 
             <div v-if="authStore.isAuthenticated && !isPublicRoute" class="d-flex align-items-center gap-2 ms-auto">
-              <router-link to="/chat" class="chat-icon-btn" aria-label="Open chat">
-                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                </svg>
+              <router-link to="/chat" class="chat-icon-btn sb-btn" aria-label="Open chat">
+                <i class="bi bi-chat-dots fs-5" aria-hidden="true"></i>
                 <span
                   v-if="chatStore.totalUnread"
                   class="chat-unread-count"
@@ -273,6 +273,7 @@ import router from './router'
 import { SESSION_POLL_INTERVAL_MS } from './config.js'
 import SbToast from '@/components/SbToast.vue'
 import AppSidebar from '@/components/AppSidebar.vue'
+import SbBgWash from '@/components/SbBgWash.vue'
 const SupportModal = defineAsyncComponent(() => import('@/components/SupportModal.vue'))
 const DEV_LIVE_REFRESH_KEY = 'studybuddy_dev_live_refresh'
 
@@ -541,7 +542,7 @@ onBeforeUnmount(() => {
 
 .pending-request-btn {
   position: relative;
-  transition: transform 180ms ease, box-shadow 180ms ease, filter 180ms ease;
+  transition: transform var(--sb-t-normal) var(--sb-spring);
 }
 
 .pending-request-count {
@@ -579,7 +580,7 @@ onBeforeUnmount(() => {
 }
 
 .app-main-surface {
-  background: var(--sb-bg);
+  background: transparent;
 }
 
 .app-main-chat {
@@ -609,19 +610,28 @@ onBeforeUnmount(() => {
   justify-content: center;
   width: var(--sb-bell-size);
   height: var(--sb-bell-size);
-  border-radius: 50%;
-  border: 1.5px solid var(--sb-card-border);
-  background: var(--sb-card-bg);
-  color: var(--sb-text-muted);
+  border-radius: 16px;
+  border: 1px solid #dbe4dd;
+  background: #ffffff;
+  color: #153326;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.06);
   text-decoration: none;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  transition:
+    transform var(--sb-t-normal) var(--sb-spring),
+    border-color var(--sb-t-normal) var(--sb-spring),
+    box-shadow var(--sb-t-normal) var(--sb-spring),
+    background-color var(--sb-t-normal) var(--sb-spring),
+    color var(--sb-t-normal) var(--sb-spring);
   position: relative;
 }
+
 .chat-icon-btn:hover,
 .chat-icon-btn.router-link-active {
-  background: var(--sb-primary);
-  color: #fff;
-  border-color: var(--sb-primary);
+  transform: translateY(-1px);
+  border-color: #b9cfbf;
+  background: #ffffff;
+  color: #153326;
+  box-shadow: 0 16px 28px rgba(15, 23, 42, 0.09);
 }
 
 .chat-unread-count {
@@ -674,158 +684,4 @@ onBeforeUnmount(() => {
   font-size: 12px;
 }
 
-/* --- Button Haptics Utility --- */
-.sb-btn {
-  transition: transform var(--sb-t-quick) var(--sb-spring-fast),
-              box-shadow var(--sb-t-quick) var(--sb-spring-fast),
-              background-color var(--sb-t-quick) var(--sb-spring-fast);
-  cursor: pointer;
-}
-.sb-btn:hover:not(:disabled) {
-  transform: translateY(-3px);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
-}
-.sb-btn:active:not(:disabled) {
-  transform: scale(0.96) translateY(0);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
-  transition-duration: 60ms;
-}
-.sb-btn:disabled,
-.sb-btn[disabled] {
-  opacity: 0.4;
-  pointer-events: none;
-}
-
-/* --- Interactive Card/Item Haptics Utility --- */
-.sb-interactive {
-  transition: transform var(--sb-t-normal) var(--sb-spring),
-              box-shadow var(--sb-t-normal) var(--sb-spring),
-              border-color var(--sb-t-normal) var(--sb-spring),
-              background-color var(--sb-t-normal) var(--sb-spring);
-  cursor: pointer;
-  border-bottom: 2px solid transparent;
-}
-.sb-interactive:hover {
-  transform: translateY(-6px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
-  background-color: rgba(255, 255, 255, 0.08);
-  border-bottom-color: var(--sb-primary);
-}
-.sb-interactive:active {
-  transform: scale(0.98) translateY(0);
-  transition-duration: 60ms;
-}
-
-/* --- Page Route Transition --- */
-.page-enter-active {
-  transition: opacity var(--sb-t-normal) var(--sb-spring),
-              transform var(--sb-t-normal) var(--sb-spring);
-}
-.page-enter-from {
-  opacity: 0;
-  transform: translateY(8px);
-}
-.page-leave-active {
-  transition: opacity var(--sb-t-quick) ease;
-}
-.page-leave-to {
-  opacity: 0;
-}
-
-/* --- Animation Keyframes --- */
-@keyframes sb-bubble-in {
-  from {
-    opacity: 0;
-    transform: translateY(12px) scale(0.94);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-@keyframes sb-pop {
-  0% {
-    transform: scale(0.6);
-    opacity: 0;
-  }
-  60% {
-    transform: scale(1.3);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-
-@keyframes sb-shake {
-  0%   { transform: translateX(0); }
-  15%  { transform: translateX(-5px); }
-  30%  { transform: translateX(4px); }
-  45%  { transform: translateX(-3px); }
-  60%  { transform: translateX(2px); }
-  75%  { transform: translateX(-1px); }
-  100% { transform: translateX(0); }
-}
-
-/* --- Layer A/B/C Keyframes --- */
-@keyframes sb-stagger-in {
-  from { opacity: 0; transform: translateY(10px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes sb-scale-in {
-  from { opacity: 0; transform: scale(0.94); }
-  to   { opacity: 1; transform: scale(1); }
-}
-
-@keyframes sb-tab-indicator {
-  from { transform: scaleX(0); opacity: 0; }
-  to   { transform: scaleX(1); opacity: 1; }
-}
-
-@keyframes sb-toast-in {
-  from { opacity: 0; transform: translateY(-14px) scale(0.95); }
-  to   { opacity: 1; transform: translateY(0)   scale(1); }
-}
-
-@keyframes sb-success-border {
-  0%   { box-shadow: 0 0 0 0 rgba(0, 137, 90, 0.5); }
-  60%  { box-shadow: 0 0 0 6px rgba(0, 137, 90, 0); }
-  100% { box-shadow: none; }
-}
-
-/* --- Layer A: Stagger entrance --- */
-.sb-stagger-item {
-  animation: sb-stagger-in var(--sb-t-normal) var(--sb-spring) both;
-  opacity: 0;
-}
-
-/* --- Layer A: Modal scale-in (all Bootstrap modals, no per-modal changes needed) --- */
-.modal.show .modal-content {
-  animation: sb-scale-in var(--sb-t-normal) var(--sb-spring) both;
-}
-
-/* --- Layer B: Skeleton shimmer --- */
-.sb-skeleton {
-  background: rgba(226, 232, 240, 0.86);
-  border-radius: 12px;
-}
-
-/* --- Layer C: Success card border pulse --- */
-.sb-success-card {
-  animation: sb-success-border 600ms var(--sb-spring) both;
-}
-
-/* --- Accessibility: kill all motion for users who ask --- */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 1ms !important;
-    animation-delay: 0ms !important;
-    transition-duration: 1ms !important;
-  }
-}
 </style>

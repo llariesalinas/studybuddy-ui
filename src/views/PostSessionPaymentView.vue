@@ -87,7 +87,7 @@
                 <label class="form-label">Transaction Reference</label>
                 <input
                   type="text"
-                  class="form-control"
+                  class="form-control sb-field"
                   v-model="transactionReference"
                   placeholder="Enter the transfer reference"
                 />
@@ -338,6 +338,6 @@ onMounted(async () => {
 }
 
 .pop-enter-active {
-  animation: sb-pop 350ms var(--sb-spring-fast) both;
+  animation: sb-pop var(--sb-t-normal) var(--sb-spring) both;
 }
 </style>

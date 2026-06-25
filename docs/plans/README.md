@@ -5,6 +5,10 @@ Status moves Draft → Approved → In Progress → Done. When a plan is complet
 
 | Date | Plan | Status | Summary |
 |------|------|--------|---------|
+| 2026-06-26 | [Institution-scoped tutor matching](2026-06-26-institution-scoped-matching.md) | Approved | [Spec](../specs/2026-06-26-institution-scoped-matching-design.md) |
+| 2026-06-22 | [Booking card glow-avatar redesign](2026-06-22-booking-card-glow-avatar-redesign.md) | Done | [Summary](../session-summaries/2026-06-22-booking-card-glow-avatar-redesign-summary.md) · [Spec](../specs/2026-06-22-booking-card-glow-avatar-redesign-design.md) |
+| 2026-06-21 | [Unified feel & haptics (Balanced calibration)](2026-06-21-feel-haptics-unification.md) | Done | [Summary](../session-summaries/2026-06-21-feel-haptics-unification-summary.md) · [Spec](../specs/2026-06-21-feel-haptics-unification-design.md) · [Reference](../artifacts/2026-06-21-feel-haptics-calibrations-reference.html) |
+| 2026-06-22 | [System background unification](2026-06-22-system-background-unification.md) | Done | [Summary](../session-summaries/2026-06-22-system-background-unification-summary.md) · [Spec](../specs/2026-06-22-system-background-unification-design.md) · [Preview](../artifacts/2026-06-22-system-background-preview.html) |
 | 2026-06-21 | [Institutional Admin dashboard redesign (Phase 1)](2026-06-21-admin-dashboard-redesign.md) | Done | [Summary](../session-summaries/2026-06-21-admin-dashboard-redesign-summary.md) · [Spec](../specs/2026-06-21-admin-dashboard-redesign-design.md) · [Preview](../artifacts/2026-06-21-admin-dashboard-redesign-preview.html) |
 | 2026-06-21 | [Tutor profile real-time reflection + avatar compression](2026-06-21-tutor-profile-realtime-image-compression.md) | Done | [Summary](../session-summaries/2026-06-21-tutor-profile-realtime-image-compression-summary.md) · [Spec](../specs/2026-06-21-tutor-profile-realtime-image-compression-design.md) |
 | 2026-06-17 | [Super Admin Redesign](2026-06-17-superadmin-redesign.md) | Approved | [Spec](../specs/2026-06-17-superadmin-redesign-design.md) · [Artifact](../artifacts/2026-06-17-superadmin-redesign-preview.html) |

@@ -247,7 +247,7 @@
             <label class="form-label fw-semibold small">Reason (required)</label>
             <textarea
               v-model="cancelReason"
-              class="form-control shadow-none"
+              class="form-control shadow-none sb-field"
               rows="3"
               placeholder="Let your tutee know why you're cancelling..."
               :disabled="isCancelling"
@@ -663,12 +663,7 @@ onBeforeUnmount(() => {
   background: color-mix(in srgb, var(--sb-card-bg) 88%, transparent);
   box-shadow: 0 14px 36px var(--sb-shadow-soft);
   padding: 15px;
-  backdrop-filter: blur(10px);
-  transition:
-    transform var(--sb-t-normal) var(--sb-spring),
-    box-shadow var(--sb-t-normal) var(--sb-spring),
-    border-color var(--sb-t-normal) var(--sb-spring),
-    background-color var(--sb-t-normal) var(--sb-spring);
+  transition: transform var(--sb-t-normal) var(--sb-spring);
 }
 
 .session-action-card:hover {
@@ -749,12 +744,7 @@ onBeforeUnmount(() => {
   font-size: 0.83rem;
   font-weight: 700;
   cursor: pointer;
-  transition:
-    transform var(--sb-t-quick) var(--sb-spring-fast),
-    box-shadow var(--sb-t-normal) var(--sb-spring),
-    background-color var(--sb-t-normal) var(--sb-spring),
-    border-color var(--sb-t-normal) var(--sb-spring),
-    color var(--sb-t-normal) var(--sb-spring);
+  transition: transform var(--sb-t-quick) var(--sb-spring);
 }
 
 .session-action-button + .session-action-button {

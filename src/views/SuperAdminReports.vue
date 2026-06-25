@@ -36,7 +36,7 @@
     </header>
 
     <section class="metric-grid">
-      <article v-for="metric in metrics" :key="metric.label" class="metric-card" :class="{ primary: metric.primary }">
+      <article v-for="metric in metrics" :key="metric.label" class="metric-card sb-card-lift" :class="{ primary: metric.primary }">
         <p>{{ metric.label }}</p>
         <h2>{{ metric.value }}</h2>
         <span>{{ metric.caption }}</span>

@@ -146,19 +146,14 @@ const statusClass = computed(() => {
   border-radius: 18px;
   background: color-mix(in srgb, var(--sb-card-bg) 88%, transparent);
   box-shadow: 0 14px 36px var(--sb-shadow-soft);
-  backdrop-filter: blur(10px);
-  transition:
-    transform var(--sb-t-normal) var(--sb-spring),
-    box-shadow var(--sb-t-normal) var(--sb-spring),
-    border-color var(--sb-t-normal) var(--sb-spring),
-    background-color var(--sb-t-normal) var(--sb-spring);
+  transition: transform var(--sb-t-normal) var(--sb-spring);
 }
 
 .session-card:hover {
   border-color: color-mix(in srgb, var(--sb-primary) 22%, var(--sb-card-border));
   background: color-mix(in srgb, var(--sb-card-bg) 94%, transparent);
   box-shadow: 0 22px 54px color-mix(in srgb, var(--sb-shadow-soft) 74%, rgba(15, 23, 42, 0.12));
-  transform: translateY(-3px);
+  transform: translateY(var(--sb-lift-surface));
 }
 
 .session-hero {
@@ -187,7 +182,6 @@ const statusClass = computed(() => {
 .session-hero-orb {
   position: absolute;
   border-radius: 50%;
-  filter: blur(9px);
   opacity: 0.4;
   pointer-events: none;
 }

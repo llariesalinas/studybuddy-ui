@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Studybuddy Recommender Pipeline</title>
+<style>
+  :root {
+    --green: #00895a;
+    --green-light: #e6f4ee;
+    --ink: #1f2933;
+    --muted: #64748b;
+    --border: #e2e8f0;
+    --blue: #2563eb;
+    --blue-light: #eff6ff;
+    --amber: #d97706;
+    --amber-light: #fffbeb;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    background: #f7f9fb;
+    color: var(--ink);
+    margin: 0;
+    padding: 40px 24px 80px;
+    line-height: 1.55;
+  }
+  h1 { font-size: 1.6rem; margin-bottom: 4px; }
+  h2 { font-size: 1.15rem; margin: 0 0 12px; color: var(--ink); }
+  h3 { font-size: 1rem; margin: 0 0 8px; }
+  .subtitle { color: var(--muted); margin-bottom: 36px; }
+  .wrap { max-width: 900px; margin: 0 auto; }
+  .section-title {
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 48px 0 16px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 6px;
+  }
+  .stage {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px 24px;
+    margin-bottom: 18px;
+    position: relative;
+  }
+  .stage-label {
+    display: inline-block;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--green);
+    background: var(--green-light);
+    padding: 3px 10px;
+    border-radius: 999px;
+    margin-bottom: 10px;
+  }
+  .stage-label.blue { color: var(--blue); background: var(--blue-light); }
+  .stage-label.amber { color: var(--amber); background: var(--amber-light); }
+  .arrow {
+    text-align: center;
+    color: var(--muted);
+    font-size: 1.4rem;
+    margin: -6px 0 8px;
+  }
+  code {
+    background: #f1f5f9;
+    border-radius: 5px;
+    padding: 2px 6px;
+    font-size: 0.85em;
+  }
+  pre {
+    background: #0f172a;
+    color: #e2e8f0;
+    padding: 14px 16px;
+    border-radius: 10px;
+    overflow-x: auto;
+    font-size: 0.82rem;
+    margin: 12px 0 0;
+  }
+  .grid2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  .grid3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+  }
+  .mini {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    background: #fafcff;
+  }
+  .mini h3 { margin: 0 0 6px; font-size: 0.95rem; }
+  .mini p { margin: 0; color: var(--muted); font-size: 0.88rem; }
+  .weight-bar {
+    height: 10px;
+    border-radius: 6px;
+    background: var(--border);
+    overflow: hidden;
+    margin-top: 8px;
+  }
+  .weight-fill { height: 100%; background: var(--green); }
+  table { width: 100%; border-collapse: collapse; font-size: 0.88rem; margin-top: 8px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; }
+  .dead {
+    border: 1px dashed #cbd5e1;
+    background: #f8fafc;
+    opacity: 0.85;
+  }
+  .dead .stage-label { background: #f1f5f9; color: var(--muted); }
+  .tag-dead {
+    font-size: 0.7rem;
+    color: #b91c1c;
+    background: #fee2e2;
+    padding: 2px 8px;
+    border-radius: 999px;
+    margin-left: 8px;
+  }
+  .plan-marker {
+    border-left: 4px solid var(--green);
+    background: var(--green-light);
+  }
+  .plan-marker .stage-label { background: #fff; }
+  .callout {
+    border: 1px solid #fde68a;
+    background: #fffbeb;
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 0.88rem;
+    margin-top: 12px;
+    color: #92400e;
+  }
+  .callout strong { color: #78350f; }
+  .formula-box {
+    background: #0f172a;
+    color: #e2e8f0;
+    border-radius: 10px;
+    padding: 18px 20px;
+    font-family: "Fira Mono", "Consolas", monospace;
+    font-size: 0.85rem;
+    margin-top: 14px;
+    line-height: 1.8;
+  }
+  .formula-box .comment { color: #64748b; }
+  .formula-box .hl { color: #34d399; }
+  .step-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--green);
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 700;
+    margin-right: 8px;
+    flex-shrink: 0;
+  }
+  .step-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0;
+    margin-bottom: 10px;
+  }
+  .step-row p { margin: 0; font-size: 0.9rem; }
+  .divider { border: none; border-top: 1px solid var(--border); margin: 40px 0 32px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ============================================================
+       SECTION 1: HOW CF WORKS (new — added on top)
+  ============================================================ -->
+  <h1>Studybuddy Recommender — full explainer</h1>
+  <p class="subtitle">Covers the CF algorithm, how CBF and CF are blended, and the complete FindTutors pipeline. Source: <code>backend/studybuddy/recommender/</code></p>
+
+  <p class="section-title">Part 1 — Collaborative Filtering (CF.py)</p>
+
+  <div class="stage">
+    <span class="stage-label blue">What is CF?</span>
+    <h2>The core idea: "people like you also liked..."</h2>
+    <p>Collaborative Filtering does not look at tutor content at all (no subjects, no course match). Instead it asks: <em>"Which other students have similar rating patterns to this tutee, and which tutors did those students rate highly?"</em></p>
+    <p style="margin-top:8px;">If Student A and Student B have both rated the same tutors similarly in the past, they are considered "similar students." When Student A is looking for a new tutor, any tutor that Student B liked (but Student A hasn't used yet) becomes a strong CF signal.</p>
+  </div>
+  <div class="arrow">&#8595;</div>
+
+  <div class="stage">
+    <span class="stage-label blue">Step 1 of CF — Build the ratings matrix</span>
+    <h2>build_rating_matrix() — CF.py:9</h2>
+    <p>Loads every <code>Rating</code> row from the database and turns it into a nested dict:</p>
+    <pre>ratings = {
+  student_id_1: { tutor_id_A: 4.5, tutor_id_B: 3.0, ... },
+  student_id_2: { tutor_id_A: 5.0, tutor_id_C: 2.5, ... },
+  ...
+}</pre>
+    <p style="margin-top:10px;">This is built once per request and passed into the hybrid scorer so it isn't re-queried for every tutor.</p>
+  </div>
+  <div class="arrow">&#8595;</div>
+
+  <div class="stage">
+    <span class="stage-label blue">Step 2 of CF — Find similar students (Pearson similarity)</span>
+    <h2>sim() + top_k() — CF.py:31 / CF.py:64</h2>
+    <p>For the current tutee, find the 5 students (k=5) whose rating patterns are most similar, using <strong>Pearson correlation</strong>. Pearson is chosen over simpler cosine similarity because it accounts for rating bias — a student who always rates 5/5 and one who always rates 3/5 can still be "similar" if they agree on which tutors are relatively better.</p>
+
+    <div class="formula-box">
+<span class="comment"># Pearson similarity between student u and student v:</span>
+<span class="comment"># only computed over tutors both students have rated (common set)</span>
+
+sim(u, v) = <span class="hl">Σ (r_ui - r_u_avg)(r_vi - r_v_avg)</span>
+            <span class="hl">────────────────────────────────────────</span>
+            <span class="hl">√Σ(r_ui - r_u_avg)²  ·  √Σ(r_vi - r_v_avg)²</span>
+
+<span class="comment"># Result is between -1 (opposite taste) and +1 (identical taste)</span>
+<span class="comment"># Returns 0 if no common tutors rated (no basis for comparison)</span>
+    </div>
+
+    <p style="margin-top:12px;"><code>top_k()</code> runs this against every other student in the matrix and returns the top 5 by similarity score. These are the "neighbors."</p>
+  </div>
+  <div class="arrow">&#8595;</div>
+
+  <div class="stage">
+    <span class="stage-label blue">Step 3 of CF — Predict a rating for each candidate tutor</span>
+    <h2>compute_cf_score() — CF.py:88</h2>
+    <p>For each candidate tutor, predict what the current tutee would likely rate them, based on how similar neighbors rated that tutor — adjusted for each neighbor's personal rating baseline.</p>
+
+    <div class="formula-box">
+<span class="comment"># Weighted average of neighbor ratings, adjusted for baseline:</span>
+
+predicted_rating = student_avg + <span class="hl">Σ sim(u, neighbor) × (r_neighbor_tutor - neighbor_avg)</span>
+                                  <span class="hl">──────────────────────────────────────────────────────</span>
+                                  <span class="hl">Σ |sim(u, neighbor)|</span>
+
+<span class="comment"># student_avg = this tutee's average rating across all their past sessions</span>
+<span class="comment"># Returns None if no neighbor has rated this tutor (no CF signal)</span>
+    </div>
+
+    <p style="margin-top:12px;">A <code>None</code> result means there is no collaborative data for this tutor/student pair — the hybrid scorer treats this as <code>0</code>, falling back to purely CBF for that tutor.</p>
+  </div>
+
+  <div class="stage" style="border-color:#fde68a;background:#fffbeb;">
+    <span class="stage-label amber">Important — the cold start problem</span>
+    <h2>New students get 0% CF influence</h2>
+    <p>If a tutee has never completed a session, they have no entries in the ratings matrix (<code>student_id not in ratings</code>). <code>compute_cf_score</code> returns <code>None</code> immediately, which hybrid.py converts to <code>0</code>.</p>
+    <p style="margin-top:8px;">This means for a brand-new tutee the hybrid is effectively <strong>100% Content-Based Filtering</strong> — tutor recommendations are driven entirely by subject/course match. CF's weight grows naturally as the student completes sessions and ratings accumulate. No special handling is needed; it's automatic.</p>
+    <div class="formula-box">
+<span class="comment"># New student (0 sessions):</span>
+hybrid_score = 0.7 × cbf_score + 0.3 × (0 / 5)  <span class="hl">→ pure CBF</span>
+
+<span class="comment"># Returning student (has ratings + similar neighbors found):</span>
+hybrid_score = 0.7 × cbf_score + 0.3 × (cf_score / 5)  <span class="hl">→ blended</span>
+    </div>
+  </div>
+
+  <hr class="divider" />
+
+  <!-- ============================================================
+       SECTION 2: FULL PIPELINE (original content)
+  ============================================================ -->
+  <p class="section-title">Part 2 — Full recommendation pipeline (FindTutors flow)</p>
+
+  <div class="stage">
+    <span class="stage-label">Step 1 — Request</span>
+    <h2>recommend_tutors_view (views.py:3358)</h2>
+    <p>Tutee submits subject + preferred mode + budget + date/time from <code>FindTutors.vue</code>. The view loads <code>student_profile = request.user.userprofile</code> and calls <code>build_rating_matrix()</code> once to fetch all ratings.</p>
+  </div>
+  <div class="arrow">&#8595;</div>
+
+  <div class="stage">
+    <span class="stage-label">Step 2 — Hard filters (candidate queryset)</span>
+    <h2>get_recommendation_candidate_tutors (views.py:3252)</h2>
+    <p>Builds a Django queryset of <em>eligible</em> tutors before any scoring happens. Filters applied in order:</p>
+    <table>
+      <tr><th>Filter</th><th>Condition</th></tr>
+      <tr><td>Subject</td><td><code>tutorsubjects__subject__subject_code = subject</code></td></tr>
+      <tr><td>Mode</td><td><code>can_online</code> / <code>can_f2f</code></td></tr>
+      <tr><td>Budget</td><td><code>hourly_rate</code> between min/max</td></tr>
+      <tr><td>Availability / conflicts</td><td>excludes tutors with bookings or overrides for the requested date+slot</td></tr>
+    </table>
+    <p style="margin-top:10px;">This returns a <strong>candidate_qs</strong> — not yet scored, just "could this tutor even take the session."</p>
+  </div>
+  <div class="arrow">&#8595;</div>
+
+  <div class="stage plan-marker">
+    <span class="stage-label">+ New filter (this plan)</span>
+    <h2>Institution match — proposed addition</h2>
+    <p>Adds one more hard filter at this same stage: <code>profile__institution_id = student_profile.institution_id</code>, excluding tutors (or tutees) with no institution set. The same chokepoint feeds both <code>FindTutors</code> and the dashboard widget, so one change covers both surfaces.</p>
+  </div>
+  <div class="arrow">&#8595;</div>
+
+  <div class="stage">
+    <span class="stage-label">Step 3 — Scoring</span>
+    <h2>recommend_tutors_hybrid (hybrid.py:62)</h2>
+    <p>Every tutor surviving Step 2 is scored using the blended formula. Two signals run independently and are combined:</p>
+    <div class="grid2" style="margin-top:12px;">
+      <div class="mini">
+        <h3>CBF — Content-Based Filtering<br/><span style="font-weight:400;color:var(--muted);font-size:0.8em;">cbf.py: compute_cbf_score</span></h3>
+        <p>"Does this tutor teach what the student needs?" Weighted similarity across subject match, course, year level, and strand/level. Always produces a score — no cold-start problem.</p>
+        <div class="weight-bar"><div class="weight-fill" style="width:70%"></div></div>
+        <p style="margin-top:4px;">70% of final score</p>
+      </div>
+      <div class="mini">
+        <h3>CF — Collaborative Filtering<br/><span style="font-weight:400;color:var(--muted);font-size:0.8em;">CF.py: compute_cf_score</span></h3>
+        <p>"How have similar students rated this tutor?" Pearson-weighted prediction from k=5 nearest neighbors in the rating matrix. Returns 0 when student has no rating history (cold start).</p>
+        <div class="weight-bar"><div class="weight-fill" style="width:30%"></div></div>
+        <p style="margin-top:4px;">30% of final score (scaled ÷5)</p>
+      </div>
+    </div>
+    <pre>hybrid_score = 0.7 * cbf_score + 0.3 * (cf_score / 5)</pre>
+  </div>
+  <div class="arrow">&#8595;</div>
+
+  <div class="stage">
+    <span class="stage-label">Step 4 — Response</span>
+    <h2>Ranked list returned to FindTutors.vue</h2>
+    <p>Tutors sorted by <code>hybrid_score</code> descending, serialized, and rendered as tutor cards.</p>
+  </div>
+
+  <hr class="divider" />
+
+  <!-- ============================================================
+       SECTION 3: DEAD BRANCHES (updated — two functions now)
+  ============================================================ -->
+  <p class="section-title">Part 3 — Dead branches (superseded entry points)</p>
+  <p style="color:var(--muted);font-size:0.88rem;margin-bottom:16px;">Both files have standalone "recommend" entry points that were written before the hybrid scorer existed. The utility functions inside them (<code>compute_cbf_score</code>, <code>compute_cf_score</code>, <code>top_k</code>, <code>build_rating_matrix</code>) are all live and used by <code>hybrid.py</code> — only the top-level entry points below have zero callers.</p>
+
+  <div class="grid2">
+    <div class="stage dead">
+      <span class="stage-label">Superseded<span class="tag-dead">0 callers</span></span>
+      <h2>cbf.py — recommend_tutors() (line 106)</h2>
+      <p>Pure CBF-only recommender: loops over every tutor in the DB, scores with <code>compute_cbf_score</code>, returns ranked list. No CF blend, no budget/availability/booking pre-filtering. Was the original FindTutors backend before the hybrid existed.</p>
+      <p style="margin-top:8px;font-size:0.85rem;color:var(--muted);">Replaced by: <code>hybrid.py::recommend_tutors_hybrid</code></p>
+    </div>
+    <div class="stage dead">
+      <span class="stage-label">Superseded<span class="tag-dead">0 callers</span></span>
+      <h2>CF.py — recommend_tutors_cf() (line 123)</h2>
+      <p>Pure CF-only recommender: loops over every tutor in the DB, calls <code>compute_cf_score</code>, skips tutors the student already rated. No CBF blend, no pre-filtering of any kind. Was an early experiment in pure collaborative ranking.</p>
+      <p style="margin-top:8px;font-size:0.85rem;color:var(--muted);">Replaced by: <code>hybrid.py::recommend_tutors_hybrid</code></p>
+    </div>
+  </div>
+
+  <div class="callout" style="margin-top:4px;">
+    <strong>What this means for the institution filter plan:</strong> If we only patch the live pipeline (<code>get_recommendation_candidate_tutors</code> in views.py and the dashboard candidate queryset), the dead functions are harmless — nothing calls them so they can never expose cross-institution tutors. Removing them is a separate cleanup decision.
+  </div>
+
+</div>
+</body>
+</html>

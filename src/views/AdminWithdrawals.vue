@@ -10,7 +10,7 @@
         <select
           v-model="statusFilter"
           @change="fetchWithdrawals"
-          class="form-select form-select-sm rounded-pill"
+          class="form-select form-select-sm rounded-pill sb-field"
           style="width: 150px;"
         >
           <option value="">All Transactions</option>
@@ -452,7 +452,7 @@
 
               <textarea
                 v-model="failureReason"
-                class="form-control rounded-3"
+                class="form-control rounded-3 sb-field"
                 rows="2"
                 placeholder="Describe the error or audit finding..."
               ></textarea>

@@ -36,7 +36,7 @@
             <select
               id="support-category"
               v-model="form.category"
-              class="form-select support-select"
+              class="form-select support-select sb-field"
               required
             >
               <option value="" disabled>Select a category</option>
@@ -52,7 +52,7 @@
               id="support-subject"
               v-model.trim="form.subject"
               type="text"
-              class="form-control support-input"
+              class="form-control support-input sb-field"
               placeholder="Brief summary of the issue"
               maxlength="150"
               required
@@ -64,7 +64,7 @@
             <textarea
               id="support-description"
               v-model.trim="form.description"
-              class="form-control support-textarea"
+              class="form-control support-textarea sb-field"
               rows="4"
               placeholder="Please provide all relevant details here..."
               required
@@ -217,7 +217,7 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 20px;
-  animation: modal-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation: sb-scale-in var(--sb-t-normal) var(--sb-spring) both;
 }
 
 .support-modal-header {
@@ -255,7 +255,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s ease;
+  transition: transform var(--sb-t-normal) var(--sb-spring);
 }
 
 .support-modal-close:hover {
@@ -291,7 +291,7 @@ onUnmounted(() => {
   font-size: 14px;
   color: #0f172a;
   background-color: #f8fafc;
-  transition: all 0.15s ease;
+  transition: none;
 }
 
 .support-select:focus,
@@ -311,14 +311,4 @@ onUnmounted(() => {
   padding-top: 16px;
 }
 
-@keyframes modal-in {
-  from {
-    opacity: 0;
-    transform: translateY(20px) scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
 </style>

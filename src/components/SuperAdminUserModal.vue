@@ -27,19 +27,23 @@
           <span v-if="user?.is_domain_exempt" class="status-badge is-info">Domain exempt</span>
         </div>
 
-        <nav class="tab-row" aria-label="User detail tabs">
+        <nav class="tab-row" role="tablist" aria-label="User detail tabs">
           <button
             type="button"
-            class="tab-button"
+            class="tab-button sb-pill"
             :class="{ active: activeTab === 'profile' }"
+            role="tab"
+            :aria-selected="activeTab === 'profile'"
             @click="switchTab('profile')"
           >
             Profile
           </button>
           <button
             type="button"
-            class="tab-button"
+            class="tab-button sb-pill"
             :class="{ active: activeTab === 'actions' }"
+            role="tab"
+            :aria-selected="activeTab === 'actions'"
             @click="switchTab('actions')"
           >
             Actions

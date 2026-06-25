@@ -212,7 +212,7 @@
                 <input
                   type="text"
                   v-model="bookedSessionStore.bookedSessionLocation"
-                  class="form-control border-sb shadow-none py-2 rounded-3"
+                  class="form-control border-sb shadow-none py-2 rounded-3 sb-field"
                   placeholder="e.g. Library Room 3"
                   required
                 />
@@ -865,7 +865,7 @@ onMounted(async () => {
   display: grid;
   place-items: center;
   cursor: pointer;
-  transition: all 150ms ease;
+  transition: transform var(--sb-t-normal) var(--sb-spring);
 }
 
 .action-btn:hover {
@@ -1029,7 +1029,7 @@ onMounted(async () => {
   border-radius: 14px;
   background: #edf6f1;
   color: #0a7a51;
-  transition: background-color 150ms ease, transform 150ms ease, box-shadow 150ms ease;
+  transition: transform var(--sb-t-normal) var(--sb-spring);
 }
 
 .week-nav-btn:hover:not(:disabled) {
@@ -1170,7 +1170,7 @@ onMounted(async () => {
   font-weight: 600;
   text-align: left;
   cursor: pointer;
-  transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+  transition: transform var(--sb-t-normal) var(--sb-spring);
 }
 
 .slot-link:hover:not(:disabled) {
@@ -1313,7 +1313,7 @@ onMounted(async () => {
   color: #315447;
   font-weight: 600;
   text-align: left;
-  transition: background-color 150ms ease;
+  transition: none;
   cursor: pointer;
 }
 
@@ -1324,7 +1324,7 @@ onMounted(async () => {
 .subject-accordion-collapse {
   display: grid;
   grid-template-rows: 0fr;
-  transition: grid-template-rows 250ms ease-in-out;
+  transition: none;
 }
 
 .subject-accordion-collapse.is-expanded {

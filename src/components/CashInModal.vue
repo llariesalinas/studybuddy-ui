@@ -21,6 +21,7 @@
               <span>Amount (PHP)</span>
               <input
                 v-model.number="amount"
+                class="sb-field"
                 type="number"
                 min="0.01"
                 step="0.01"

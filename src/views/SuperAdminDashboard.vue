@@ -25,7 +25,7 @@
     </div>
 
     <section class="kpi-grid" aria-label="SuperAdmin overview">
-      <article v-for="card in kpiCards" :key="card.label" class="kpi-card">
+      <article v-for="card in kpiCards" :key="card.label" class="kpi-card sb-card-lift">
         <div class="kpi-icon" :class="card.tone">
           <i class="bi" :class="card.icon"></i>
         </div>

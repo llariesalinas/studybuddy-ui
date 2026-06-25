@@ -6,7 +6,7 @@
           <input
             type="date"
             v-model="selectedDate"
-            class="form-control"
+            class="form-control sb-field"
           />
         </div>
     </div>
@@ -146,7 +146,7 @@
               </p>
               <input
                 type="text"
-                class="form-control shadow-none"
+                class="form-control shadow-none sb-field"
                 v-model="tempLocation"
                 @keyup.enter="saveLocation"
                 @keyup.esc="closeLocationModal"
@@ -343,7 +343,7 @@ const filteredSessions = computed(() => {
 }
 
 .request-card {
-  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease, background-color 180ms ease;
+  transition: transform var(--sb-t-normal) var(--sb-spring);
 }
 
 .schedule-stack {

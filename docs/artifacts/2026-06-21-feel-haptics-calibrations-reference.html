@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>StudyBuddy — Pick the Feel</title>
+<style>
+  :root {
+    --sb-primary: #00895a;
+    --sb-primary-hover: #007049;
+    --ink: #0f172a;
+    --ink-soft: #475569;
+    --line: #e2e8f0;
+    --surface: #ffffff;
+    --bg: #f4f7f6;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    padding: 32px 24px 64px;
+    line-height: 1.5;
+  }
+  .head { max-width: 1120px; margin: 0 auto 28px; }
+  .head h1 { font-size: 24px; margin: 0 0 6px; letter-spacing: -0.02em; }
+  .head p { margin: 0; color: var(--ink-soft); font-size: 15px; }
+  .head .how {
+    margin-top: 14px; display: inline-flex; gap: 18px; flex-wrap: wrap;
+    font-size: 13px; color: var(--ink-soft);
+    background: #fff; border: 1px solid var(--line); border-radius: 999px;
+    padding: 8px 16px;
+  }
+  .head .how b { color: var(--ink); font-weight: 600; }
+
+  .grid {
+    max-width: 1120px; margin: 0 auto;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;
+  }
+  @media (max-width: 920px) { .grid { grid-template-columns: 1fr; } }
+
+  .col {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    padding: 20px 18px 18px;
+    display: flex; flex-direction: column; gap: 14px;
+  }
+  .col-head { display: flex; align-items: baseline; justify-content: space-between; }
+  .col-head h2 { font-size: 16px; margin: 0; letter-spacing: -0.01em; }
+  .tag { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-soft); }
+  .col-note { font-size: 12.5px; color: var(--ink-soft); margin: -4px 0 2px; min-height: 32px; }
+  .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: #94a3b8; margin-bottom: -6px; }
+
+  /* ---- per-calibration tokens ---- */
+  .cal--subtle {
+    --lift: -2px;  --press: 0.985; --dur: 130ms;
+    --spring: cubic-bezier(0.22, 1, 0.36, 1);
+    --sh-rest: 0 2px 8px rgba(15,23,42,0.05);
+    --sh-hover: 0 8px 20px rgba(15,23,42,0.09);
+    --sh-rest-brand: 0 4px 12px rgba(0,137,90,0.18);
+    --sh-hover-brand: 0 8px 18px rgba(0,137,90,0.22);
+    --halo: 0 0 0 3px rgba(0,137,90,0.10);
+  }
+  .cal--balanced {
+    --lift: -4px;  --press: 0.97;  --dur: 180ms;
+    --spring: cubic-bezier(0.16, 1, 0.3, 1);
+    --sh-rest: 0 6px 16px rgba(15,23,42,0.06);
+    --sh-hover: 0 16px 36px rgba(15,23,42,0.12);
+    --sh-rest-brand: 0 8px 18px rgba(0,137,90,0.20);
+    --sh-hover-brand: 0 14px 30px rgba(0,137,90,0.28);
+    --halo: 0 0 0 4px rgba(0,137,90,0.12);
+  }
+  .cal--lively {
+    --lift: -7px;  --press: 0.955; --dur: 230ms;
+    --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --sh-rest: 0 8px 20px rgba(15,23,42,0.07);
+    --sh-hover: 0 24px 52px rgba(15,23,42,0.16);
+    --sh-rest-brand: 0 10px 22px rgba(0,137,90,0.22);
+    --sh-hover-brand: 0 22px 44px rgba(0,137,90,0.34);
+    --halo: 0 0 0 5px rgba(0,137,90,0.16);
+  }
+
+  /* ---- demo surface: interactive card (teaching-card / mode-check) ---- */
+  .demo-card {
+    position: relative; z-index: 0;
+    background: #fff; border: 1px solid var(--line); border-radius: 14px;
+    padding: 14px; cursor: pointer;
+    box-shadow: var(--sh-rest);
+    transition: transform var(--dur) var(--spring), border-color var(--dur) var(--spring);
+    display: flex; gap: 12px; align-items: center;
+  }
+  .demo-card::after {
+    content: ""; position: absolute; inset: 0; border-radius: 14px;
+    box-shadow: var(--sh-hover); opacity: 0; z-index: -1;
+    transition: opacity var(--dur) var(--spring);
+    pointer-events: none;
+  }
+  .demo-card:hover { transform: translateY(var(--lift)); border-color: rgba(0,137,90,0.45); }
+  .demo-card:hover::after { opacity: 1; }
+  .demo-card:active { transform: scale(var(--press)); transition-duration: 70ms; }
+  .avatar {
+    width: 42px; height: 42px; border-radius: 50%; flex: none;
+    background: linear-gradient(135deg, #00b07a, #007049);
+    display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 15px;
+  }
+  .demo-card .who { font-weight: 600; font-size: 14px; }
+  .demo-card .who small { display: block; color: var(--ink-soft); font-weight: 400; font-size: 12px; }
+
+  /* ---- buttons ---- */
+  .btn-row { display: flex; gap: 10px; }
+  .btn {
+    position: relative; z-index: 0;
+    border: none; border-radius: 11px; padding: 11px 16px;
+    font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit;
+    transition: transform var(--dur) var(--spring);
+  }
+  .btn::after {
+    content: ""; position: absolute; inset: 0; border-radius: 11px;
+    opacity: 0; z-index: -1; transition: opacity var(--dur) var(--spring);
+    pointer-events: none;
+  }
+  .btn:hover { transform: translateY(var(--lift)); }
+  .btn:active { transform: scale(var(--press)); transition-duration: 70ms; }
+  .btn:focus-visible { outline: none; box-shadow: var(--halo); }
+
+  .btn-primary { background: var(--sb-primary); color: #fff; box-shadow: var(--sh-rest-brand); }
+  .btn-primary::after { box-shadow: var(--sh-hover-brand); }
+  .btn-primary:hover { background: var(--sb-primary-hover); }
+  .btn-primary:hover::after { opacity: 1; }
+
+  .btn-soft {
+    background: #eef5f2; color: var(--sb-primary); box-shadow: var(--sh-rest);
+  }
+  .btn-soft::after { box-shadow: var(--sh-hover); }
+  .btn-soft:hover::after { opacity: 1; }
+
+  /* ---- input with focus halo ---- */
+  .field label { display: block; font-size: 12px; color: var(--ink-soft); margin-bottom: 5px; }
+  .field input {
+    width: 100%; border: 1.5px solid var(--line); border-radius: 11px;
+    padding: 10px 12px; font-size: 14px; font-family: inherit; background: #fbfdfc;
+    transition: border-color var(--dur) var(--spring), box-shadow var(--dur) var(--spring);
+  }
+  .field input:focus {
+    outline: none; border-color: var(--sb-primary); box-shadow: var(--halo);
+    background: #fff;
+  }
+
+  /* ---- choose button ---- */
+  .choose {
+    margin-top: 4px;
+    border: 1.5px solid var(--sb-primary); background: #fff; color: var(--sb-primary);
+    border-radius: 12px; padding: 12px; font-size: 14px; font-weight: 700; cursor: pointer;
+    font-family: inherit; letter-spacing: 0.01em;
+    transition: transform var(--dur) var(--spring), background var(--dur) var(--spring), color var(--dur) var(--spring);
+  }
+  .choose:hover { transform: translateY(var(--lift)); background: var(--sb-primary); color: #fff; }
+  .choose:active { transform: scale(var(--press)); transition-duration: 70ms; }
+  .choose.is-picked { background: var(--sb-primary); color: #fff; }
+
+  .col.is-picked { border-color: var(--sb-primary); box-shadow: 0 0 0 2px rgba(0,137,90,0.18); }
+  .specs { font-size: 11px; color: #94a3b8; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+  <div class="head">
+    <h1>Which calibration is "the StudyBuddy feel"?</h1>
+    <p>The same profile elements — an interactive card, buttons, and an input — at three intensities. Everything uses transform + a faded shadow layer (no repaint, no blur), so it's perf-safe.</p>
+    <div class="how">
+      <span><b>Hover</b> the card &amp; buttons — watch the lift + shadow</span>
+      <span><b>Click &amp; hold</b> — feel the press</span>
+      <span><b>Tab</b> into a field — see the focus halo</span>
+    </div>
+  </div>
+
+  <div class="grid">
+    <!-- SUBTLE -->
+    <div class="col cal--subtle" id="col-subtle">
+      <div class="col-head"><h2>Subtle</h2><span class="tag">restrained</span></div>
+      <p class="col-note">Barely-there. Fast and quiet — motion you notice only subconsciously.</p>
+      <span class="label">Interactive card</span>
+      <div class="demo-card"><div class="avatar">AR</div><div class="who">Anna Reyes<small>Calculus • 4.9 ★</small></div></div>
+      <span class="label">Buttons</span>
+      <div class="btn-row"><button class="btn btn-primary">Save Changes</button><button class="btn btn-soft">Edit Bio</button></div>
+      <span class="label">Input</span>
+      <div class="field"><label>Full name</label><input value="Juan Dela Cruz" /></div>
+      <div class="specs">lift 2px · press 0.985 · 130ms · gentle</div>
+      <button class="choose" data-choice="subtle" onclick="pick(this,'col-subtle')">Choose Subtle</button>
+    </div>
+
+    <!-- BALANCED -->
+    <div class="col cal--balanced" id="col-balanced">
+      <div class="col-head"><h2>Balanced</h2><span class="tag">recommended</span></div>
+      <p class="col-note">Matches today's profile feel. Clear lift, a confident spring settle, present but not loud.</p>
+      <span class="label">Interactive card</span>
+      <div class="demo-card"><div class="avatar">AR</div><div class="who">Anna Reyes<small>Calculus • 4.9 ★</small></div></div>
+      <span class="label">Buttons</span>
+      <div class="btn-row"><button class="btn btn-primary">Save Changes</button><button class="btn btn-soft">Edit Bio</button></div>
+      <span class="label">Input</span>
+      <div class="field"><label>Full name</label><input value="Juan Dela Cruz" /></div>
+      <div class="specs">lift 4px · press 0.97 · 180ms · spring (0.16,1,0.3,1)</div>
+      <button class="choose" data-choice="balanced" onclick="pick(this,'col-balanced')">Choose Balanced</button>
+    </div>
+
+    <!-- LIVELY -->
+    <div class="col cal--lively" id="col-lively">
+      <div class="col-head"><h2>Lively</h2><span class="tag">expressive</span></div>
+      <p class="col-note">Bigger lift, a touch of bounce, tinted glow. Energetic and playful — leans into delight.</p>
+      <span class="label">Interactive card</span>
+      <div class="demo-card"><div class="avatar">AR</div><div class="who">Anna Reyes<small>Calculus • 4.9 ★</small></div></div>
+      <span class="label">Buttons</span>
+      <div class="btn-row"><button class="btn btn-primary">Save Changes</button><button class="btn btn-soft">Edit Bio</button></div>
+      <span class="label">Input</span>
+      <div class="field"><label>Full name</label><input value="Juan Dela Cruz" /></div>
+      <div class="specs">lift 7px · press 0.955 · 230ms · overshoot spring</div>
+      <button class="choose" data-choice="lively" onclick="pick(this,'col-lively')">Choose Lively</button>
+    </div>
+  </div>
+
+  <script>
+    function pick(btn, colId) {
+      document.querySelectorAll('.choose').forEach(b => b.classList.remove('is-picked'));
+      document.querySelectorAll('.col').forEach(c => c.classList.remove('is-picked'));
+      btn.classList.add('is-picked');
+      document.getElementById(colId).classList.add('is-picked');
+    }
+  </script>
+</body>
+</html>

@@ -1,11 +1,15 @@
 ---
 title: System background unification (landing-style, seamless)
 date: 2026-06-22
-status: Approved
+status: Done
 spec: this document
 ---
 
 # System Background Unification
+
+> **Implemented:** 2026-06-22. See the
+> [implementation plan](../plans/2026-06-22-system-background-unification.md) and
+> [completion summary](../session-summaries/2026-06-22-system-background-unification-summary.md).
 
 > **Visual reference (viewable HTML):**
 > [`docs/artifacts/2026-06-22-system-background-preview.html`](../artifacts/2026-06-22-system-background-preview.html)
