@@ -1519,6 +1519,7 @@ def dashboard_recommendations(request):
 #SearchTutors
 
 class SearchTutorsView(APIView):
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
         subject_code = request.query_params.get('subject')
@@ -1529,9 +1530,13 @@ class SearchTutorsView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        tutors = Tutor.objects.filter(
-            tutorsubjects__subject__subject_code=subject_code
-        ).select_related('profile').distinct()
+        student_profile = request.user.userprofile
+        tutors = filter_tutors_by_institution(
+            Tutor.objects.filter(
+                tutorsubjects__subject__subject_code=subject_code
+            ).select_related('profile').distinct(),
+            student_profile,
+        )
 
         serializer = TutorSearchSerializer(tutors, many=True)
         return Response(serializer.data)

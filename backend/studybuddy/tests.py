@@ -4225,3 +4225,12 @@ class InstitutionScopedMatchingTests(APITestCase):
         ids = {row["id"] for row in data}
         self.assertNotIn(self.tutor_b.profile.id, ids)
         self.assertNotIn(self.tutor_null.profile.id, ids)
+
+    def test_search_tutors_respects_institution(self):
+        self.client.force_authenticate(user=self.tutee.user)
+        resp = self.client.get("/api/search-tutors/", {"subject": "SCOPE101"})
+        self.assertEqual(resp.status_code, 200)
+        ids = {r["profile_id"] for r in resp.data}
+        self.assertIn(self.tutor_a.profile.id, ids)
+        self.assertNotIn(self.tutor_b.profile.id, ids)
+        self.assertNotIn(self.tutor_null.profile.id, ids)
