@@ -4234,3 +4234,7 @@ class InstitutionScopedMatchingTests(APITestCase):
         self.assertIn(self.tutor_a.profile.id, ids)
         self.assertNotIn(self.tutor_b.profile.id, ids)
         self.assertNotIn(self.tutor_null.profile.id, ids)
+
+    def test_search_tutors_requires_authentication(self):
+        resp = self.client.get("/api/search-tutors/", {"subject": "SCOPE101"})
+        self.assertEqual(resp.status_code, 401)
