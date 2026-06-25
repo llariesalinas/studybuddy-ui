@@ -4208,3 +4208,20 @@ class InstitutionScopedMatchingTests(APITestCase):
         self.assertEqual(resp.status_code, 200)
         ids = {r["id"] for r in resp.data}
         self.assertNotIn(self.tutor_null.profile.id, ids)
+
+    def test_dashboard_widget_respects_institution(self):
+        from studybuddy.recommender import dashboard
+        self._set_preferences(self.subject)
+        data = dashboard.get_dashboard_recommendations(self.tutee)
+        ids = {row["id"] for row in data}
+        self.assertNotIn(self.tutor_b.profile.id, ids)
+        self.assertNotIn(self.tutor_null.profile.id, ids)
+
+    def test_dashboard_fallback_respects_institution(self):
+        from studybuddy.recommender import dashboard
+        # tutee has no preferences set, so get_student_subject_codes returns []
+        # and the code falls through to _fallback
+        data = dashboard.get_dashboard_recommendations(self.tutee)
+        ids = {row["id"] for row in data}
+        self.assertNotIn(self.tutor_b.profile.id, ids)
+        self.assertNotIn(self.tutor_null.profile.id, ids)
