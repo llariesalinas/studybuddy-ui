@@ -46,6 +46,7 @@ from .recommender.hybrid import recommend_tutors_hybrid
 from .recommender.CF import build_rating_matrix
 
 from .recommender.cbf import recommend_tutors
+from .recommender.utils import filter_tutors_by_institution
 from .recommender.dashboard import (
     bump_dashboard_recs_cache_version,
     dashboard_recs_cache_key,
@@ -3251,6 +3252,7 @@ def get_recommendation_time_slots(start_time_string, end_time_string):
 
 def get_recommendation_candidate_tutors(
     subject,
+    student_profile,
     preferred_mode=None,
     min_budget=None,
     max_budget=None,
@@ -3258,8 +3260,11 @@ def get_recommendation_candidate_tutors(
     start_time=None,
     end_time=None,
 ):
-    base_candidates = Tutor.objects.filter(
-        tutorsubjects__subject__subject_code=subject
+    base_candidates = filter_tutors_by_institution(
+        Tutor.objects.filter(
+            tutorsubjects__subject__subject_code=subject
+        ),
+        student_profile,
     )
 
     if preferred_mode == "Online":
@@ -3376,6 +3381,7 @@ def recommend_tutors_view(request):
     ratings = build_rating_matrix()
     candidate_qs = get_recommendation_candidate_tutors(
         subject,
+        student_profile,
         preferred_mode=preferred_mode,
         min_budget=min_budget,
         max_budget=max_budget,

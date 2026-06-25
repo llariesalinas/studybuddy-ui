@@ -4158,3 +4158,53 @@ class InstitutionScopedMatchingTests(APITestCase):
         )
         qs = filter_tutors_by_institution(Tutor.objects.all(), no_inst_tutee)
         self.assertFalse(qs.exists())
+
+    def test_recommend_returns_same_institution_tutors(self):
+        self.client.force_authenticate(user=self.tutee.user)
+        resp = self.client.post(
+            "/api/recommend-tutors/",
+            {"subject": "SCOPE101"},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        ids = {r["id"] for r in resp.data}
+        self.assertIn(self.tutor_a.profile.id, ids)
+
+    def test_recommend_excludes_other_institution_tutor(self):
+        self.client.force_authenticate(user=self.tutee.user)
+        resp = self.client.post(
+            "/api/recommend-tutors/",
+            {"subject": "SCOPE101"},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        ids = {r["id"] for r in resp.data}
+        self.assertNotIn(self.tutor_b.profile.id, ids)
+
+    def test_recommend_tutee_no_institution_gets_empty_list(self):
+        no_inst_user = User.objects.create_user(
+            username="scope_no_inst2", email="noinst2@test.com", password="pass"
+        )
+        UserProfile.objects.create(
+            user=no_inst_user, fname="No", mname="", lname="Inst",
+            role="Tutee", institution=None,
+        )
+        self.client.force_authenticate(user=no_inst_user)
+        resp = self.client.post(
+            "/api/recommend-tutors/",
+            {"subject": "SCOPE101"},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data, [])
+
+    def test_recommend_null_institution_tutor_not_shown(self):
+        self.client.force_authenticate(user=self.tutee.user)
+        resp = self.client.post(
+            "/api/recommend-tutors/",
+            {"subject": "SCOPE101"},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        ids = {r["id"] for r in resp.data}
+        self.assertNotIn(self.tutor_null.profile.id, ids)
