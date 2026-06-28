@@ -238,9 +238,6 @@
 
                 <!-- Provider -->
                 <td class="small">
-                  <p class="mb-0 fw-semibold text-uppercase">
-                    {{ w?.rail || '-' }}
-                  </p>
                   <p class="mb-0 text-muted">
                     {{ w?.provider_status || 'pending' }}
                   </p>
@@ -412,11 +409,6 @@
 
               <p class="small text-muted mb-2 text-uppercase fw-bold">
                 Provider Details
-              </p>
-
-              <p class="mb-1">
-                <strong>Rail:</strong>
-                {{ activeWithdrawal?.rail || '-' }}
               </p>
 
               <p class="mb-1">

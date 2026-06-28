@@ -168,7 +168,14 @@
             :class="{ inactive: !account.is_active }"
           >
             <div class="destination-icon">
-              <i :class="account.destination_type === 'gcash' ? 'bi bi-phone' : 'bi bi-bank'"></i>
+              <img
+                v-if="institutionLogoUrl(account.receiving_institution_name)"
+                :src="institutionLogoUrl(account.receiving_institution_name)"
+                :alt="account.receiving_institution_name"
+                class="destination-logo"
+                @error="onLogoError(account.id)"
+              />
+              <i v-else :class="account.destination_type === 'gcash' ? 'bi bi-phone' : 'bi bi-bank'"></i>
             </div>
             <div class="destination-content">
               <div class="destination-title">
@@ -177,7 +184,7 @@
                   {{ account.is_active ? 'Active' : 'Inactive' }}
                 </span>
               </div>
-              <p>{{ formatDestinationType(account.destination_type) }} · {{ account.provider || 'rail' }}</p>
+              <p>{{ formatDestinationType(account.destination_type) }}</p>
               <code>{{ maskAccount(account.account_number) }}</code>
             </div>
             <button
@@ -230,8 +237,7 @@
               </div>
               <p>
                 {{ formatDestinationType(cashout.method) }} ·
-                {{ maskAccount(cashout.account_number) }} ·
-                {{ cashout.rail || 'rail pending' }}
+                {{ maskAccount(cashout.account_number) }}
               </p>
               <small v-if="cashout.provider_reference_number">
                 Ref: {{ cashout.provider_reference_number }}
@@ -278,28 +284,16 @@
           </div>
           <form @submit.prevent="saveAccount">
             <div class="modal-body">
-              <div class="form-grid">
-                <label>
-                  <span>Rail</span>
-                  <SbSelectModal
-                    v-model="accountForm.provider"
-                    :options="providerOptions"
-                    title="Rail"
-                    placeholder="Select rail"
-                    trigger-class="wallet-select-trigger"
-                  />
-                </label>
-                <label>
-                  <span>Type</span>
-                  <SbSelectModal
-                    v-model="accountForm.destination_type"
-                    :options="destinationTypeOptions"
-                    title="Destination Type"
-                    placeholder="Select type"
-                    trigger-class="wallet-select-trigger"
-                  />
-                </label>
-              </div>
+              <label>
+                <span>Type</span>
+                <SbSelectModal
+                  v-model="accountForm.destination_type"
+                  :options="destinationTypeOptions"
+                  title="Destination Type"
+                  placeholder="Select type"
+                  trigger-class="wallet-select-trigger"
+                />
+              </label>
 
               <label>
                 <span>Receiving Institution</span>
@@ -371,8 +365,13 @@
                   type="number"
                   step="0.01"
                   :min="walletStore.cashoutMinimum"
+                  :max="walletStore.cashoutMaximum"
                   required
                 />
+                <small class="field-hint">
+                  Minimum PHP {{ money(walletStore.cashoutMinimum) }} · Maximum PHP
+                  {{ money(walletStore.cashoutMaximum) }} per request
+                </small>
               </label>
 
               <div class="cashout-summary">
@@ -387,10 +386,6 @@
                 <div>
                   <span>Total deducted</span>
                   <strong>PHP {{ money(totalDeducted) }}</strong>
-                </div>
-                <div>
-                  <span>Rail</span>
-                  <strong>{{ cashoutRail }}</strong>
                 </div>
               </div>
 
@@ -420,6 +415,8 @@ import SbSelectModal from '@/components/SbSelectModal.vue'
 import CashInModal from '@/components/CashInModal.vue'
 import { useWalletStore } from '@/stores/wallet'
 import { useToastStore } from '@/stores/toast'
+import { getReceivingInstitutionLogoUrl } from '@/data/receivingInstitutionLogos'
+import { LOGO_DEV_TOKEN } from '@/config'
 
 const route = useRoute()
 const router = useRouter()
@@ -434,7 +431,6 @@ const isDev = import.meta.env.DEV
 const devAmount = ref(500)
 
 const accountForm = reactive({
-  provider: 'instapay',
   destination_type: 'gcash',
   receiving_institution_id: '',
   account_number: '',
@@ -446,10 +442,7 @@ const cashoutForm = reactive({
   payout_account_id: null,
 })
 
-const providerOptions = [
-  { label: 'InstaPay', value: 'instapay' },
-  { label: 'PESONet', value: 'pesonet' },
-]
+const failedLogoNames = ref(new Set())
 
 const destinationTypeOptions = [
   { label: 'GCash', value: 'gcash' },
@@ -462,7 +455,6 @@ const activePayoutAccounts = computed(() =>
 
 const cashoutAmount = computed(() => Number(cashoutForm.amount) || 0)
 const totalDeducted = computed(() => cashoutAmount.value + Number(walletStore.cashoutProviderFee || 0))
-const cashoutRail = computed(() => (cashoutAmount.value > 50000 ? 'pesonet' : 'instapay'))
 const selectedPayoutAccountId = computed(() =>
   cashoutForm.payout_account_id === null || cashoutForm.payout_account_id === ''
     ? null
@@ -491,11 +483,8 @@ const cashoutError = computed(() => {
   if (totalDeducted.value > Number(walletStore.balance || 0)) {
     return 'Balance must cover the amount plus provider fee.'
   }
-  if (
-    selectedCashoutAccount.value.provider &&
-    selectedCashoutAccount.value.provider !== cashoutRail.value
-  ) {
-    return `Use a ${cashoutRail.value} destination for this amount.`
+  if (cashoutAmount.value > Number(walletStore.cashoutMaximum)) {
+    return `Maximum cash-out per request is PHP ${money(walletStore.cashoutMaximum)}.`
   }
   return ''
 })
@@ -530,8 +519,19 @@ const receivingInstitutionOptions = computed(() =>
   walletStore.receivingInstitutions.map((institution) => ({
     label: institutionName(institution),
     value: institutionId(institution),
+    icon: getReceivingInstitutionLogoUrl({ name: institutionName(institution) }, LOGO_DEV_TOKEN),
   }))
 )
+
+const institutionLogoUrl = (receivingInstitutionName) => {
+  if (failedLogoNames.value.has(receivingInstitutionName)) return null
+  return getReceivingInstitutionLogoUrl({ name: receivingInstitutionName }, LOGO_DEV_TOKEN)
+}
+
+const onLogoError = (accountId) => {
+  const account = walletStore.payoutAccounts.find((item) => item.id === accountId)
+  if (account) failedLogoNames.value.add(account.receiving_institution_name)
+}
 
 const payoutAccountOptions = computed(() =>
   activePayoutAccounts.value.map((account) => ({
@@ -550,7 +550,6 @@ const maskAccount = (value = '') => {
 }
 
 const resetAccountForm = () => {
-  accountForm.provider = 'instapay'
   accountForm.destination_type = 'gcash'
   accountForm.receiving_institution_id = ''
   accountForm.account_number = ''
@@ -559,7 +558,7 @@ const resetAccountForm = () => {
 
 const openDestinationModal = async () => {
   showDestinationModal.value = true
-  await walletStore.fetchReceivingInstitutions(accountForm.provider)
+  await walletStore.fetchReceivingInstitutions()
 }
 
 const closeDestinationModal = () => {
@@ -691,7 +690,7 @@ const getWithdrawalStatusClass = (status) => {
 onMounted(async () => {
   await Promise.allSettled([
     refreshData(),
-    walletStore.fetchReceivingInstitutions(accountForm.provider),
+    walletStore.fetchReceivingInstitutions(),
   ])
 
   if (route.query.cashin === 'success' && route.query.id) {
@@ -711,16 +710,6 @@ onMounted(async () => {
     router.replace({ query: {} })
   }
 })
-
-watch(
-  () => accountForm.provider,
-  async (provider) => {
-    accountForm.receiving_institution_id = ''
-    if (showDestinationModal.value) {
-      await walletStore.fetchReceivingInstitutions(provider)
-    }
-  }
-)
 
 watch(showCashoutModal, async (isOpen) => {
   if (!isOpen) return
@@ -1229,8 +1218,16 @@ watch(showCashoutModal, async (isOpen) => {
 .destination-icon {
   width: 44px;
   height: 44px;
+  overflow: hidden;
   color: #fff;
   background: var(--wallet-primary);
+}
+
+.destination-logo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #fff;
 }
 
 .destination-title {
@@ -1512,12 +1509,6 @@ watch(showCashoutModal, async (isOpen) => {
   text-align: left;
 }
 
-.form-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-
 .modal-primary,
 .modal-secondary {
   min-height: 42px;
@@ -1562,6 +1553,14 @@ watch(showCashoutModal, async (isOpen) => {
   margin: 12px 0 0;
   color: #9a3e3e;
   font-size: 13px;
+}
+
+.field-hint {
+  color: var(--wallet-muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 .spin {
@@ -1631,8 +1630,7 @@ watch(showCashoutModal, async (isOpen) => {
     width: 100%;
   }
 
-  .metric-grid,
-  .form-grid {
+  .metric-grid {
     grid-template-columns: 1fr;
   }
 

@@ -1652,11 +1652,10 @@ class TutorCashOutTests(APITestCase):
         self.wallet.save(update_fields=["balance"])
         self.client.force_authenticate(user=self.tutor_user)
 
-    def create_account(self, provider="instapay", is_active=True):
+    def create_account(self, is_active=True):
         return TutorPayoutAccount.objects.create(
             tutor=self.tutor,
             destination_type="gcash",
-            provider=provider,
             receiving_institution_id="inst_gcash",
             receiving_institution_name="GCash",
             receiving_institution_code="GCASH",
@@ -1691,7 +1690,6 @@ class TutorCashOutTests(APITestCase):
     def test_create_list_and_deactivate_payout_destination(self):
         payload = {
             "destination_type": "gcash",
-            "provider": "instapay",
             "receiving_institution_id": "inst_gcash",
             "receiving_institution_name": "GCash",
             "receiving_institution_code": "GCASH",
@@ -1839,11 +1837,10 @@ class WalletCashOutEdgeCaseTests(APITestCase):
         self.wallet.save(update_fields=["balance"])
         self.client.force_authenticate(user=self.tutor_user)
 
-    def create_account(self, provider="instapay", is_active=True, tutor=None):
+    def create_account(self, is_active=True, tutor=None):
         return TutorPayoutAccount.objects.create(
             tutor=tutor or self.tutor,
             destination_type="gcash",
-            provider=provider,
             receiving_institution_id="inst_gcash",
             receiving_institution_name="GCash",
             receiving_institution_code="GCASH",
@@ -1852,20 +1849,70 @@ class WalletCashOutEdgeCaseTests(APITestCase):
             is_active=is_active,
         )
 
-    def test_cashout_rejects_rail_mismatch(self):
+    def provider_result(self, transaction_id="wt_test_edge"):
+        return {
+            "id": transaction_id,
+            "status": "pending",
+            "provider": "paymongo",
+            "reference_number": "PMO-EDGE",
+            "fee": Decimal("0.00"),
+            "net_amount": Decimal("0.00"),
+        }
+
+    @patch("studybuddy.views.create_wallet_transaction")
+    def test_cashout_same_destination_works_across_different_amounts(self, mock_create):
         self.wallet.balance = Decimal("100000.00")
         self.wallet.save(update_fields=["balance"])
-        account = self.create_account(provider="instapay")
+        account = self.create_account()
+        mock_create.return_value = self.provider_result()
+
+        first_response = self.client.post(
+            "/api/wallet/cash-outs/",
+            {"amount": "600.00", "payout_account_id": account.id},
+            format="json",
+        )
+        second_response = self.client.post(
+            "/api/wallet/cash-outs/",
+            {"amount": "50000.00", "payout_account_id": account.id},
+            format="json",
+        )
+
+        self.assertEqual(first_response.status_code, 201)
+        self.assertEqual(second_response.status_code, 201)
+        self.assertEqual(
+            WithdrawalRequest.objects.filter(tutor=self.tutor, payout_account=account).count(),
+            2,
+        )
+
+    @patch("studybuddy.views.create_wallet_transaction")
+    def test_cashout_allows_exact_cap_amount(self, mock_create):
+        self.wallet.balance = Decimal("100000.00")
+        self.wallet.save(update_fields=["balance"])
+        account = self.create_account()
+        mock_create.return_value = self.provider_result()
 
         response = self.client.post(
             "/api/wallet/cash-outs/",
-            {"amount": "60000.00", "payout_account_id": account.id},
+            {"amount": "50000.00", "payout_account_id": account.id},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+
+    def test_cashout_rejects_amount_above_cap(self):
+        self.wallet.balance = Decimal("100000.00")
+        self.wallet.save(update_fields=["balance"])
+        account = self.create_account()
+
+        response = self.client.post(
+            "/api/wallet/cash-outs/",
+            {"amount": "50000.01", "payout_account_id": account.id},
             format="json",
         )
 
         self.wallet.refresh_from_db()
         self.assertEqual(response.status_code, 400)
-        self.assertIn("pesonet", response.data["error"])
+        self.assertIn("Maximum cash-out", response.data["error"])
         self.assertEqual(self.wallet.balance, Decimal("100000.00"))
         self.assertFalse(WithdrawalRequest.objects.filter(tutor=self.tutor).exists())
 

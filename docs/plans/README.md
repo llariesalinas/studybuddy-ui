@@ -3,9 +3,12 @@
 Every finalized plan lives in this folder as its own dated file, created from [`_template.md`](_template.md).
 Status moves Draft → Approved → In Progress → Done. When a plan is complete, its summary is linked below.
 
+**Status & Progress Summary** (2026-06-28): Payout-destination rail removal + Receiving Institution logos plan implemented and marked Done. Institution-scoped matching plan marked Done; handoff artifact linked. All other active plans unchanged.
+
 | Date | Plan | Status | Summary |
 |------|------|--------|---------|
-| 2026-06-26 | [Institution-scoped tutor matching](2026-06-26-institution-scoped-matching.md) | Approved | [Spec](../specs/2026-06-26-institution-scoped-matching-design.md) |
+| 2026-06-28 | [Payout destination rail removal and Receiving Institution logos](2026-06-28-payout-destination-rail-removal-and-logos.md) | Done | [Summary](../session-summaries/2026-06-28-payout-destination-rail-removal-and-logos-summary.md) · [ADR-0001](../adr/0001-instapay-only-cashouts.md) · [ADR-0002](../adr/0002-logodev-for-institution-logos.md) |
+| 2026-06-26 | [Institution-scoped tutor matching](2026-06-26-institution-scoped-matching.md) | Done | [Spec](../specs/2026-06-26-institution-scoped-matching-design.md) · [Handoff](../artifacts/2026-06-26-institution-scoped-matching-handoff.html) |
 | 2026-06-22 | [Booking card glow-avatar redesign](2026-06-22-booking-card-glow-avatar-redesign.md) | Done | [Summary](../session-summaries/2026-06-22-booking-card-glow-avatar-redesign-summary.md) · [Spec](../specs/2026-06-22-booking-card-glow-avatar-redesign-design.md) |
 | 2026-06-21 | [Unified feel & haptics (Balanced calibration)](2026-06-21-feel-haptics-unification.md) | Done | [Summary](../session-summaries/2026-06-21-feel-haptics-unification-summary.md) · [Spec](../specs/2026-06-21-feel-haptics-unification-design.md) · [Reference](../artifacts/2026-06-21-feel-haptics-calibrations-reference.html) |
 | 2026-06-22 | [System background unification](2026-06-22-system-background-unification.md) | Done | [Summary](../session-summaries/2026-06-22-system-background-unification-summary.md) · [Spec](../specs/2026-06-22-system-background-unification-design.md) · [Preview](../artifacts/2026-06-22-system-background-preview.html) |
@@ -57,3 +60,13 @@ Entries marked Done&ast; predate the session-summary convention; their status is
 | 2026-05-25 | [Animation system expansion](2026-05-25-animation-system-expansion.md) | Done&ast; | Pending |
 | 2026-05-23 | [Sidebar notification count badge](2026-05-23-sidebar-notification-badge.md) | Done&ast; | Pending |
 | 2026-05-08 | [Auth pages redesign](2026-05-08-auth-pages-redesign.md) | Done&ast; | Pending |
+
+---
+
+## Changelog
+
+| Date | Change |
+|------|--------|
+| 2026-06-26 | Added handoff artifact link to institution-scoped matching row |
+| 2026-06-28 | Added payout-destination rail removal + Receiving Institution logos plan (Approved) |
+| 2026-06-28 | Marked payout-destination rail removal + Receiving Institution logos plan Done; linked summary |

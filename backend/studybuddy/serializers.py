@@ -50,7 +50,6 @@ class AdminWithdrawalSerializer(serializers.ModelSerializer):
             'provider_error_message',
             'provider_fee',
             'net_amount',
-            'rail',
             'callback_received_at',
             'requested_at',
             'processed_at'

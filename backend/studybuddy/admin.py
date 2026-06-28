@@ -53,14 +53,13 @@ class WithdrawalRequestAdmin(admin.ModelAdmin):
         'amount',
         'provider_fee',
         'method',
-        'rail',
         'provider_status',
         'provider_reference_number',
         'status',
         'requested_at',
         'processed_at'
     )
-    list_filter = ('status', 'method', 'rail', 'provider_status')
+    list_filter = ('status', 'method', 'provider_status')
     search_fields = (
         'tutor__profile__fname',
         'tutor__profile__lname',

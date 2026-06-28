@@ -7,6 +7,10 @@ from django.conf import settings
 
 PAYMONGO_API_BASE_URL = 'https://api.paymongo.com/v1'
 
+# Every Studybuddy cash-out moves through InstaPay (see ADR-0001) -- PESONet is no
+# longer a reachable code path.
+INSTAPAY_PROVIDER = 'instapay'
+
 
 class PayMongoCashOutError(Exception):
     def __init__(self, message, status_code=None, response_body=None):
@@ -67,10 +71,10 @@ def normalize_wallet_transaction(response_body):
     }
 
 
-def list_receiving_institutions(provider):
+def list_receiving_institutions():
     response = requests.get(
         f'{PAYMONGO_API_BASE_URL}/wallets/receiving_institutions',
-        params={'provider': provider},
+        params={'provider': INSTAPAY_PROVIDER},
         headers=get_money_movement_headers(),
     )
 
@@ -89,7 +93,7 @@ def list_receiving_institutions(provider):
     return response_body
 
 
-def create_wallet_transaction(wallet_id, payout_account, amount, rail, callback_url, withdrawal_id):
+def create_wallet_transaction(wallet_id, payout_account, amount, callback_url, withdrawal_id):
     if not wallet_id:
         raise PayMongoCashOutError('PayMongo wallet is not configured.')
 
@@ -98,7 +102,7 @@ def create_wallet_transaction(wallet_id, payout_account, amount, rail, callback_
         'currency': 'PHP',
         'description': f'StudyBuddy tutor cash-out #{withdrawal_id}',
         'purpose': 'Tutor cash-out',
-        'provider': rail,
+        'provider': INSTAPAY_PROVIDER,
         'receiver': {
             'bank_id': payout_account.receiving_institution_id,
             'bank_code': payout_account.receiving_institution_code,

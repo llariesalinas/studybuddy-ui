@@ -3858,12 +3858,17 @@ def wallet_status(request):
         "pending_amount": float(wallet.pending_amount),
         "currency": "PHP",
         "cashout_minimum": float(get_cashout_minimum()),
+        "cashout_maximum": float(get_cashout_maximum()),
         "cashout_provider_fee": float(get_cashout_provider_fee()),
     })
 
 
 def get_cashout_minimum():
     return decimal.Decimal(str(settings.CASHOUT_MIN_PHP)).quantize(decimal.Decimal('0.01'))
+
+
+def get_cashout_maximum():
+    return decimal.Decimal(str(settings.CASHOUT_MAX_PHP)).quantize(decimal.Decimal('0.01'))
 
 
 def get_cashout_provider_fee():
@@ -3899,15 +3904,10 @@ def get_cashout_callback_url(request):
     return base_url
 
 
-def get_required_cashout_rail(amount):
-    return 'pesonet' if amount > decimal.Decimal('50000.00') else 'instapay'
-
-
 def serialize_payout_account(account):
     return {
         "id": account.id,
         "destination_type": account.destination_type,
-        "provider": account.provider,
         "receiving_institution_id": account.receiving_institution_id,
         "receiving_institution_name": account.receiving_institution_name,
         "receiving_institution_code": account.receiving_institution_code,
@@ -3938,7 +3938,6 @@ def serialize_cash_out(withdrawal):
         "provider_error_message": withdrawal.provider_error_message,
         "provider_fee": float(withdrawal.provider_fee),
         "net_amount": float(withdrawal.net_amount),
-        "rail": withdrawal.rail,
         "callback_received_at": withdrawal.callback_received_at,
         "requested_at": withdrawal.requested_at,
         "processed_at": withdrawal.processed_at,
@@ -4141,12 +4140,8 @@ def request_withdrawal(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def receiving_institutions(request):
-    provider = request.query_params.get('provider', 'instapay').lower()
-    if provider not in ['instapay', 'pesonet']:
-        return Response({"error": "Provider must be instapay or pesonet."}, status=400)
-
     try:
-        provider_response = list_receiving_institutions(provider)
+        provider_response = list_receiving_institutions()
     except PayMongoCashOutError as exc:
         return Response({"error": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
 
@@ -4182,7 +4177,6 @@ def payout_destinations(request, account_id=None):
         account = TutorPayoutAccount.objects.create(
             tutor=tutor,
             destination_type=destination_type,
-            provider=data.get('provider', ''),
             receiving_institution_id=data.get('receiving_institution_id'),
             receiving_institution_name=data.get('receiving_institution_name'),
             receiving_institution_code=data.get('receiving_institution_code', ''),
@@ -4197,7 +4191,6 @@ def payout_destinations(request, account_id=None):
     account = get_object_or_404(TutorPayoutAccount, id=lookup_id, tutor=tutor)
     editable_fields = [
         'destination_type',
-        'provider',
         'receiving_institution_id',
         'receiving_institution_name',
         'receiving_institution_code',
@@ -4254,6 +4247,10 @@ def cash_outs(request):
     if amount < minimum_amount:
         return Response({"error": f"Minimum cash-out is PHP {minimum_amount}."}, status=400)
 
+    maximum_amount = get_cashout_maximum()
+    if amount > maximum_amount:
+        return Response({"error": f"Maximum cash-out per request is PHP {maximum_amount}."}, status=400)
+
     payout_account_id = request.data.get('payout_account_id')
     payout_account = get_object_or_404(
         TutorPayoutAccount,
@@ -4261,13 +4258,6 @@ def cash_outs(request):
         tutor=tutor,
         is_active=True
     )
-
-    rail = get_required_cashout_rail(amount)
-    if payout_account.provider and payout_account.provider != rail:
-        return Response(
-            {"error": f"This destination is saved for {payout_account.provider}. Use a {rail} destination."},
-            status=400
-        )
 
     with transaction.atomic():
         wallet, _ = Wallet.objects.select_for_update().get_or_create(tutor=tutor)
@@ -4288,7 +4278,6 @@ def cash_outs(request):
             provider='paymongo',
             provider_fee=provider_fee,
             net_amount=amount,
-            rail=rail,
             status='pending',
         )
 
@@ -4317,7 +4306,6 @@ def cash_outs(request):
             settings.PAYMONGO_WALLET_ID,
             payout_account,
             amount,
-            rail,
             get_cashout_callback_url(request),
             withdrawal.id,
         )

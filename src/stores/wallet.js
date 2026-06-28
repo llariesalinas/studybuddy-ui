@@ -8,6 +8,7 @@ export const useWalletStore = defineStore('wallet', () => {
   const balance = ref(0)
   const pendingAmount = ref(0)
   const cashoutMinimum = ref(500)
+  const cashoutMaximum = ref(50000)
   const cashoutProviderFee = ref(10)
   const transactions = ref([])
   const withdrawals = ref([])
@@ -46,6 +47,7 @@ export const useWalletStore = defineStore('wallet', () => {
       balance.value = data.balance
       pendingAmount.value = data.pending_amount
       cashoutMinimum.value = data.cashout_minimum ?? 500
+      cashoutMaximum.value = data.cashout_maximum ?? 50000
       cashoutProviderFee.value = data.cashout_provider_fee ?? 10
     } finally {
       loading.value = false
@@ -67,8 +69,8 @@ export const useWalletStore = defineStore('wallet', () => {
     payoutAccounts.value = data
   }
 
-  async function fetchReceivingInstitutions(provider = 'instapay') {
-    const data = await catalogStore.fetchReceivingInstitutions(provider)
+  async function fetchReceivingInstitutions() {
+    const data = await catalogStore.fetchReceivingInstitutions()
     receivingInstitutions.value = data
     return data
   }
@@ -119,7 +121,7 @@ export const useWalletStore = defineStore('wallet', () => {
     await api.post('dev/wallet/remove/', { amount })
   }
 
-  return { balance, pendingAmount, cashoutMinimum, cashoutProviderFee, transactions, withdrawals,
+  return { balance, pendingAmount, cashoutMinimum, cashoutMaximum, cashoutProviderFee, transactions, withdrawals,
            payoutAccounts, receivingInstitutions, loading,
            grossEarned, totalDeductions, netEarned,
            fetchWallet, fetchTransactions, fetchWithdrawals, fetchPayoutAccounts,

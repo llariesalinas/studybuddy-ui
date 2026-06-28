@@ -94,6 +94,13 @@
                 :aria-selected="isSelected(option.value) ? 'true' : 'false'"
                 @click="selectValue(option.value)"
               >
+                <img
+                  v-if="option.icon"
+                  :src="option.icon"
+                  alt=""
+                  class="sb-select-option-icon"
+                  @error="$event.target.style.display = 'none'"
+                />
                 <span class="sb-select-option-copy">
                   <span class="sb-select-option-label">{{ option.label }}</span>
                   <span v-if="option.description" class="sb-select-option-description">
@@ -562,8 +569,17 @@ function unlockBodyScroll() {
   outline: none;
 }
 
+.sb-select-option-icon {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  border-radius: 6px;
+  object-fit: contain;
+}
+
 .sb-select-option-copy {
   display: grid;
+  flex: 1;
   gap: 0.15rem;
   min-width: 0;
 }
