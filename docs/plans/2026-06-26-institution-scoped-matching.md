@@ -1,15 +1,16 @@
 ---
 title: Institution-Scoped Tutor Matching
 date: 2026-06-26
-status: Approved
+status: Done
 spec: ../specs/2026-06-26-institution-scoped-matching-design.md
 ---
 
 ## Status & Progress Summary
 
-**Status:** Approved — not yet started  
-**Tasks complete:** 0 / 4  
-**Next:** Task 1 — create `recommender/utils.py` helper and unit tests
+**Status:** Done — all tasks complete, final review approved  
+**Tasks complete:** 4 / 4  
+**Commits:** d54d1fb · 67ba7fe · 577637d · a70b6f3 · 19b7433  
+**Tests:** 10 / 10 pass (`InstitutionScopedMatchingTests`)
 
 # Institution-Scoped Tutor Matching Implementation Plan
 
@@ -552,3 +553,4 @@ git commit -m "feat: scope search-tutors endpoint by institution, add IsAuthenti
 ## Changelog
 
 - **2026-06-26** — Plan created from spec `2026-06-26-institution-scoped-matching-design.md`. Status set to Approved.
+- **2026-06-26** — All 4 tasks implemented and reviewed via subagent-driven development. Final whole-branch review approved. Added auth regression test (10th test) and removed `tests.py.full_backup` artifact in post-review fix. Status set to Done.
