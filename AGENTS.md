@@ -51,6 +51,24 @@ use `fix:` for bug fixes. Pull requests should include a summary, linked issue w
 screenshots for UI changes, migration notes for schema changes, and checks run (`npm run lint`,
 `npm run build`, `python manage.py test`).
 
+## Agent skills
+
+### Issue tracker
+
+Issues live as GitHub Issues on `llariesalinas/studybuddy-ui` (via the `gh` CLI); external PRs are
+not a triage surface. GitHub issues sit alongside the existing `docs/plans/` workflow rather than
+replacing it — see `docs/agents/issue-tracker.md` for how the two stay in sync.
+
+### Triage labels
+
+Canonical roles map 1:1 to label names (`needs-triage`, `needs-info`, `ready-for-agent`,
+`ready-for-human`, `wontfix`); only `wontfix` exists on the repo today. See
+`docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context layout: `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+
 ## Security & Configuration Tips
 
 Keep secrets in `.env` files and do not commit credentials. Centralize frontend API changes in
