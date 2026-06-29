@@ -122,6 +122,7 @@ urlpatterns = [
     path('wallet/payout-destinations/', views.payout_destinations),
     path('wallet/payout-destinations/<int:account_id>/', views.payout_destinations),
     path('wallet/receiving-institutions/', views.receiving_institutions),
+    path('wallet/cash-outs/recent/', views.recent_cash_outs),
     path('wallet/cash-outs/', views.cash_outs),
     path('wallet/paymongo/callback/', views.paymongo_cashout_callback),
     path('wallet/withdraw/', views.cash_outs),
