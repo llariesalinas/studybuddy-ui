@@ -6,6 +6,7 @@ import hashlib
 import hmac
 import secrets
 import requests
+from types import SimpleNamespace
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
@@ -3942,6 +3943,7 @@ def serialize_cash_out(withdrawal):
         "requested_at": withdrawal.requested_at,
         "processed_at": withdrawal.processed_at,
         "payout_account_id": withdrawal.payout_account_id,
+        "note": withdrawal.note,
     }
 
 
@@ -4251,12 +4253,49 @@ def cash_outs(request):
     if amount > maximum_amount:
         return Response({"error": f"Maximum cash-out per request is PHP {maximum_amount}."}, status=400)
 
-    payout_account_id = request.data.get('payout_account_id')
-    payout_account = get_object_or_404(
-        TutorPayoutAccount,
-        id=payout_account_id,
-        tutor=tutor,
-        is_active=True
+    destination_type = request.data.get('destination_type')
+    if destination_type not in ('gcash', 'bank'):
+        return Response({"error": "Select a valid destination type (gcash or bank)."}, status=400)
+
+    account_number = request.data.get('account_number')
+    if not account_number:
+        return Response({"error": "Enter the destination account number."}, status=400)
+
+    account_name = request.data.get('account_name')
+    if not account_name:
+        return Response({"error": "Enter the destination account name."}, status=400)
+
+    receiving_institution_id = request.data.get('receiving_institution_id')
+    receiving_institution_name = request.data.get('receiving_institution_name')
+    if not receiving_institution_id or not receiving_institution_name:
+        return Response({"error": "Select the receiving institution."}, status=400)
+
+    receiving_institution_code = request.data.get('receiving_institution_code', '')
+    bank_name = request.data.get('bank_name') or receiving_institution_name
+    note = request.data.get('note', '')
+
+    recent_withdrawals = list(
+        WithdrawalRequest.objects.filter(tutor=tutor).order_by('-requested_at')[:4]
+    )
+    has_history = len(recent_withdrawals) > 0
+    matches_recent_destination = any(
+        previous.method == destination_type
+        and previous.account_number == account_number
+        and previous.account_name == account_name
+        for previous in recent_withdrawals
+    )
+
+    if has_history and not matches_recent_destination and request.data.get('confirm_new_destination') is not True:
+        return Response({"error": "new_destination_confirmation_required"}, status=409)
+
+    destination = SimpleNamespace(
+        destination_type=destination_type,
+        receiving_institution_id=receiving_institution_id,
+        receiving_institution_name=receiving_institution_name,
+        receiving_institution_code=receiving_institution_code,
+        account_number=account_number,
+        account_name=account_name,
+        bank_name=bank_name,
     )
 
     with transaction.atomic():
@@ -4269,12 +4308,12 @@ def cash_outs(request):
 
         withdrawal = WithdrawalRequest.objects.create(
             tutor=tutor,
-            payout_account=payout_account,
             amount=amount,
-            method=payout_account.destination_type,
-            account_number=payout_account.account_number,
-            account_name=payout_account.account_name,
-            bank_name=payout_account.bank_name or payout_account.receiving_institution_name,
+            method=destination_type,
+            account_number=account_number,
+            account_name=account_name,
+            bank_name=bank_name,
+            note=note,
             provider='paymongo',
             provider_fee=provider_fee,
             net_amount=amount,
@@ -4304,7 +4343,7 @@ def cash_outs(request):
     try:
         provider_data = create_wallet_transaction(
             settings.PAYMONGO_WALLET_ID,
-            payout_account,
+            destination,
             amount,
             get_cashout_callback_url(request),
             withdrawal.id,

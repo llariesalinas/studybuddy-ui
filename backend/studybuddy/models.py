@@ -435,6 +435,7 @@ class WithdrawalRequest(models.Model):
     callback_received_at = models.DateTimeField(null=True, blank=True)
     requested_at = models.DateTimeField(auto_now_add=True)
     processed_at = models.DateTimeField(null=True, blank=True)
+    note = models.TextField(blank=True, default='')
 
 class WalletTopUp(models.Model):
     STATUS_CHOICES = [
