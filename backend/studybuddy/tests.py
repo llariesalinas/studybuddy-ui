@@ -38,7 +38,6 @@ from .models import (
     TutorSubjects,
     UserProfile,
     Transaction,
-    TutorPayoutAccount,
     Wallet,
     WalletTopUp,
     WithdrawalRequest,
@@ -1652,17 +1651,17 @@ class TutorCashOutTests(APITestCase):
         self.wallet.save(update_fields=["balance"])
         self.client.force_authenticate(user=self.tutor_user)
 
-    def create_account(self, is_active=True):
-        return TutorPayoutAccount.objects.create(
-            tutor=self.tutor,
-            destination_type="gcash",
-            receiving_institution_id="inst_gcash",
-            receiving_institution_name="GCash",
-            receiving_institution_code="GCASH",
-            account_number="09171234567",
-            account_name="Cash Tutor",
-            is_active=is_active,
-        )
+    def destination_fields(self, **overrides):
+        fields = {
+            "destination_type": "gcash",
+            "receiving_institution_id": "inst_gcash",
+            "receiving_institution_name": "GCash",
+            "receiving_institution_code": "GCASH",
+            "account_number": "09171234567",
+            "account_name": "Cash Tutor",
+        }
+        fields.update(overrides)
+        return fields
 
     def provider_result(self, status_value="pending", transaction_id="wt_test_123"):
         return {
@@ -1713,16 +1712,16 @@ class TutorCashOutTests(APITestCase):
         self.assertFalse(patch_response.data["is_active"])
 
     def test_cashout_rejects_invalid_amount_and_insufficient_balance(self):
-        account = self.create_account()
+        destination = self.destination_fields()
 
         small_response = self.client.post(
             "/api/wallet/cash-outs/",
-            {"amount": "499.99", "payout_account_id": account.id},
+            {"amount": "499.99", **destination},
             format="json",
         )
         insufficient_response = self.client.post(
             "/api/wallet/cash-outs/",
-            {"amount": "995.00", "payout_account_id": account.id},
+            {"amount": "995.00", **destination},
             format="json",
         )
 
@@ -1733,12 +1732,12 @@ class TutorCashOutTests(APITestCase):
 
     @patch("studybuddy.views.create_wallet_transaction")
     def test_cashout_deducts_amount_and_fee_and_stores_provider_data(self, mock_create):
-        account = self.create_account()
+        destination = self.destination_fields()
         mock_create.return_value = self.provider_result()
 
         response = self.client.post(
             "/api/wallet/cash-outs/",
-            {"amount": "500.00", "payout_account_id": account.id},
+            {"amount": "500.00", **destination},
             format="json",
         )
 
@@ -1768,12 +1767,12 @@ class TutorCashOutTests(APITestCase):
 
     @patch("studybuddy.views.create_wallet_transaction")
     def test_failed_callback_refunds_amount_and_fee_once(self, mock_create):
-        account = self.create_account()
+        destination = self.destination_fields()
         mock_create.return_value = self.provider_result()
 
         create_response = self.client.post(
             "/api/wallet/cash-outs/",
-            {"amount": "500.00", "payout_account_id": account.id},
+            {"amount": "500.00", **destination},
             format="json",
         )
         self.client.force_authenticate(user=None)
@@ -1803,6 +1802,139 @@ class TutorCashOutTests(APITestCase):
             ).count(),
             2,
         )
+
+    @patch("studybuddy.views.create_wallet_transaction")
+    def test_cashout_with_inline_destination_fields_succeeds(self, mock_create):
+        destination = self.destination_fields()
+        mock_create.return_value = self.provider_result()
+
+        response = self.client.post(
+            "/api/wallet/cash-outs/",
+            {"amount": "500.00", "note": "Rent money", **destination},
+            format="json",
+        )
+
+        self.wallet.refresh_from_db()
+        withdrawal = WithdrawalRequest.objects.get(id=response.data["id"])
+
+        self.assertIn(response.status_code, (200, 201))
+        self.assertEqual(self.wallet.balance, Decimal("490.00"))
+        self.assertEqual(withdrawal.method, destination["destination_type"])
+        self.assertEqual(withdrawal.account_number, destination["account_number"])
+        self.assertEqual(withdrawal.account_name, destination["account_name"])
+        self.assertEqual(withdrawal.note, "Rent money")
+
+    @patch("studybuddy.views.create_wallet_transaction")
+    def test_recent_cash_outs_returns_last_four_most_recent_first(self, mock_create):
+        mock_create.return_value = self.provider_result()
+        destination = self.destination_fields()
+        self.wallet.balance = Decimal("10000.00")
+        self.wallet.save(update_fields=["balance"])
+        statuses = ["pending", "processed", "rejected", "failed", "flagged", "processed"]
+
+        created_ids = []
+        for status_value in statuses:
+            response = self.client.post(
+                "/api/wallet/cash-outs/",
+                {"amount": "500.00", **destination},
+                format="json",
+            )
+            withdrawal = WithdrawalRequest.objects.get(id=response.data["id"])
+            withdrawal.status = status_value
+            withdrawal.save(update_fields=["status"])
+            created_ids.append(withdrawal.id)
+
+        response = self.client.get("/api/wallet/cash-outs/recent/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 4)
+        self.assertEqual(
+            [item["id"] for item in response.data],
+            list(reversed(created_ids[-4:])),
+        )
+
+    @patch("studybuddy.views.create_wallet_transaction")
+    def test_cashout_new_destination_requires_confirmation(self, mock_create):
+        mock_create.return_value = self.provider_result()
+        self.wallet.balance = Decimal("2000.00")
+        self.wallet.save(update_fields=["balance"])
+        known_destination = self.destination_fields()
+
+        self.client.post(
+            "/api/wallet/cash-outs/",
+            {"amount": "500.00", **known_destination},
+            format="json",
+        )
+
+        different_destination = self.destination_fields(
+            destination_type="bank",
+            receiving_institution_id="inst_bdo",
+            receiving_institution_name="BDO",
+            receiving_institution_code="BDO",
+            account_number="0011223344",
+            account_name="Cash Tutor",
+            bank_name="BDO",
+        )
+
+        rejected_response = self.client.post(
+            "/api/wallet/cash-outs/",
+            {"amount": "500.00", **different_destination},
+            format="json",
+        )
+
+        self.assertEqual(rejected_response.status_code, 409)
+        self.assertEqual(
+            rejected_response.data["error"], "new_destination_confirmation_required"
+        )
+        self.assertEqual(WithdrawalRequest.objects.filter(tutor=self.tutor).count(), 1)
+
+        confirmed_response = self.client.post(
+            "/api/wallet/cash-outs/",
+            {
+                "amount": "500.00",
+                "confirm_new_destination": True,
+                **different_destination,
+            },
+            format="json",
+        )
+
+        self.assertIn(confirmed_response.status_code, (200, 201))
+        self.assertEqual(WithdrawalRequest.objects.filter(tutor=self.tutor).count(), 2)
+
+    @patch("studybuddy.views.create_wallet_transaction")
+    def test_cashout_matching_recent_destination_skips_confirmation(self, mock_create):
+        mock_create.return_value = self.provider_result()
+        destination = self.destination_fields()
+
+        self.client.post(
+            "/api/wallet/cash-outs/",
+            {"amount": "500.00", **destination},
+            format="json",
+        )
+        self.wallet.balance = Decimal("1000.00")
+        self.wallet.save(update_fields=["balance"])
+
+        response = self.client.post(
+            "/api/wallet/cash-outs/",
+            {"amount": "500.00", **destination},
+            format="json",
+        )
+
+        self.assertIn(response.status_code, (200, 201))
+
+    @patch("studybuddy.views.create_wallet_transaction")
+    def test_cashout_first_time_destination_skips_confirmation_when_no_history(self, mock_create):
+        mock_create.return_value = self.provider_result()
+        destination = self.destination_fields()
+        self.assertFalse(WithdrawalRequest.objects.filter(tutor=self.tutor).exists())
+
+        response = self.client.post(
+            "/api/wallet/cash-outs/",
+            {"amount": "500.00", **destination},
+            format="json",
+        )
+
+        self.assertIn(response.status_code, (200, 201))
 
 
 @override_settings(
@@ -1837,17 +1969,17 @@ class WalletCashOutEdgeCaseTests(APITestCase):
         self.wallet.save(update_fields=["balance"])
         self.client.force_authenticate(user=self.tutor_user)
 
-    def create_account(self, is_active=True, tutor=None):
-        return TutorPayoutAccount.objects.create(
-            tutor=tutor or self.tutor,
-            destination_type="gcash",
-            receiving_institution_id="inst_gcash",
-            receiving_institution_name="GCash",
-            receiving_institution_code="GCASH",
-            account_number="09171234567",
-            account_name="Edge Tutor",
-            is_active=is_active,
-        )
+    def destination_fields(self, **overrides):
+        fields = {
+            "destination_type": "gcash",
+            "receiving_institution_id": "inst_gcash",
+            "receiving_institution_name": "GCash",
+            "receiving_institution_code": "GCASH",
+            "account_number": "09171234567",
+            "account_name": "Edge Tutor",
+        }
+        fields.update(overrides)
+        return fields
 
     def provider_result(self, transaction_id="wt_test_edge"):
         return {
@@ -1863,24 +1995,26 @@ class WalletCashOutEdgeCaseTests(APITestCase):
     def test_cashout_same_destination_works_across_different_amounts(self, mock_create):
         self.wallet.balance = Decimal("100000.00")
         self.wallet.save(update_fields=["balance"])
-        account = self.create_account()
+        destination = self.destination_fields()
         mock_create.return_value = self.provider_result()
 
         first_response = self.client.post(
             "/api/wallet/cash-outs/",
-            {"amount": "600.00", "payout_account_id": account.id},
+            {"amount": "600.00", **destination},
             format="json",
         )
         second_response = self.client.post(
             "/api/wallet/cash-outs/",
-            {"amount": "50000.00", "payout_account_id": account.id},
+            {"amount": "50000.00", **destination},
             format="json",
         )
 
         self.assertEqual(first_response.status_code, 201)
         self.assertEqual(second_response.status_code, 201)
         self.assertEqual(
-            WithdrawalRequest.objects.filter(tutor=self.tutor, payout_account=account).count(),
+            WithdrawalRequest.objects.filter(
+                tutor=self.tutor, account_number=destination["account_number"]
+            ).count(),
             2,
         )
 
@@ -1888,12 +2022,12 @@ class WalletCashOutEdgeCaseTests(APITestCase):
     def test_cashout_allows_exact_cap_amount(self, mock_create):
         self.wallet.balance = Decimal("100000.00")
         self.wallet.save(update_fields=["balance"])
-        account = self.create_account()
+        destination = self.destination_fields()
         mock_create.return_value = self.provider_result()
 
         response = self.client.post(
             "/api/wallet/cash-outs/",
-            {"amount": "50000.00", "payout_account_id": account.id},
+            {"amount": "50000.00", **destination},
             format="json",
         )
 
@@ -1902,11 +2036,11 @@ class WalletCashOutEdgeCaseTests(APITestCase):
     def test_cashout_rejects_amount_above_cap(self):
         self.wallet.balance = Decimal("100000.00")
         self.wallet.save(update_fields=["balance"])
-        account = self.create_account()
+        destination = self.destination_fields()
 
         response = self.client.post(
             "/api/wallet/cash-outs/",
-            {"amount": "50000.01", "payout_account_id": account.id},
+            {"amount": "50000.01", **destination},
             format="json",
         )
 
@@ -1916,60 +2050,79 @@ class WalletCashOutEdgeCaseTests(APITestCase):
         self.assertEqual(self.wallet.balance, Decimal("100000.00"))
         self.assertFalse(WithdrawalRequest.objects.filter(tutor=self.tutor).exists())
 
-    def test_cashout_404s_for_unknown_account(self):
-        response = self.client.post(
-            "/api/wallet/cash-outs/",
-            {"amount": "500.00", "payout_account_id": 999999},
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, 404)
-
-    def test_cashout_404s_for_inactive_account(self):
-        account = self.create_account(is_active=False)
+    def test_cashout_rejects_missing_destination_type(self):
+        destination = self.destination_fields()
+        destination.pop("destination_type")
 
         response = self.client.post(
             "/api/wallet/cash-outs/",
-            {"amount": "500.00", "payout_account_id": account.id},
+            {"amount": "500.00", **destination},
             format="json",
         )
 
-        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(WithdrawalRequest.objects.filter(tutor=self.tutor).exists())
 
-    def test_cashout_404s_for_another_tutors_account(self):
-        other_user = User.objects.create_user(
-            username="other-edge-tutor",
-            email="other-edge-tutor@example.com",
-            password="password",
-        )
-        other_profile = UserProfile.objects.create(
-            user=other_user, fname="Other", mname="", lname="Tutor", role="Tutor",
-        )
-        other_tutor = Tutor.objects.create(
-            profile=other_profile,
-            hourly_rate=Decimal("300.00"),
-            can_online=True,
-            can_f2f=True,
-            teaching_level="SHS",
-        )
-        other_account = self.create_account(tutor=other_tutor)
+    def test_cashout_rejects_invalid_destination_type(self):
+        destination = self.destination_fields(destination_type="paypal")
 
         response = self.client.post(
             "/api/wallet/cash-outs/",
-            {"amount": "500.00", "payout_account_id": other_account.id},
+            {"amount": "500.00", **destination},
             format="json",
         )
 
-        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(WithdrawalRequest.objects.filter(tutor=self.tutor).exists())
+
+    def test_cashout_rejects_missing_account_number(self):
+        destination = self.destination_fields()
+        destination.pop("account_number")
+
+        response = self.client.post(
+            "/api/wallet/cash-outs/",
+            {"amount": "500.00", **destination},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(WithdrawalRequest.objects.filter(tutor=self.tutor).exists())
+
+    def test_cashout_rejects_missing_account_name(self):
+        destination = self.destination_fields()
+        destination.pop("account_name")
+
+        response = self.client.post(
+            "/api/wallet/cash-outs/",
+            {"amount": "500.00", **destination},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(WithdrawalRequest.objects.filter(tutor=self.tutor).exists())
+
+    def test_cashout_rejects_missing_receiving_institution(self):
+        destination = self.destination_fields()
+        destination.pop("receiving_institution_id")
+        destination.pop("receiving_institution_name")
+
+        response = self.client.post(
+            "/api/wallet/cash-outs/",
+            {"amount": "500.00", **destination},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(WithdrawalRequest.objects.filter(tutor=self.tutor).exists())
 
     @patch("studybuddy.views.create_wallet_transaction")
     def test_cashout_synchronous_paymongo_failure_reverses_immediately(self, mock_create):
-        account = self.create_account()
+        destination = self.destination_fields()
         mock_create.side_effect = PayMongoCashOutError("Receiving account rejected the transfer.")
 
         response = self.client.post(
             "/api/wallet/cash-outs/",
-            {"amount": "500.00", "payout_account_id": account.id},
+            {"amount": "500.00", **destination},
             format="json",
         )
 
