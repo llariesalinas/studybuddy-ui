@@ -119,8 +119,6 @@ urlpatterns = [
     path('notifications/<int:notification_id>/read/', mark_notification_read),
     path('wallet/', views.wallet_status),
     path('wallet/transactions/', views.wallet_transactions),
-    path('wallet/payout-destinations/', views.payout_destinations),
-    path('wallet/payout-destinations/<int:account_id>/', views.payout_destinations),
     path('wallet/receiving-institutions/', views.receiving_institutions),
     path('wallet/cash-outs/recent/', views.recent_cash_outs),
     path('wallet/cash-outs/', views.cash_outs),

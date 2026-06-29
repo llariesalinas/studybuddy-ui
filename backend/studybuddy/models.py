@@ -372,30 +372,6 @@ class Transaction(models.Model):
     class Meta:
         ordering = ['-created_at']
 
-class TutorPayoutAccount(models.Model):
-    DESTINATION_TYPES = [
-        ('gcash', 'GCash'),
-        ('bank', 'Bank Transfer'),
-    ]
-
-    tutor = models.ForeignKey(Tutor, on_delete=models.CASCADE, related_name='payout_accounts')
-    destination_type = models.CharField(max_length=10, choices=DESTINATION_TYPES)
-    receiving_institution_id = models.CharField(max_length=100)
-    receiving_institution_name = models.CharField(max_length=150)
-    receiving_institution_code = models.CharField(max_length=50, blank=True)
-    account_number = models.CharField(max_length=50)
-    account_name = models.CharField(max_length=100)
-    bank_name = models.CharField(max_length=100, blank=True, null=True)
-    is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        ordering = ['-is_active', '-updated_at']
-
-    def __str__(self):
-        return f"{self.tutor.profile.fname} - {self.receiving_institution_name}"
-
 class WithdrawalRequest(models.Model):
     STATUS_CHOICES = [
         ('pending', 'Pending'),
@@ -410,13 +386,6 @@ class WithdrawalRequest(models.Model):
     ]
 
     tutor = models.ForeignKey(Tutor, on_delete=models.CASCADE)
-    payout_account = models.ForeignKey(
-        TutorPayoutAccount,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='cash_outs'
-    )
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     method = models.CharField(max_length=10, choices=METHOD_CHOICES)
     receiving_institution_id = models.CharField(max_length=100, blank=True, default='')

@@ -54,7 +54,7 @@ from .recommender.dashboard import (
     get_dashboard_recommendations,
 )
 from django.core.cache import cache
-from .models import Booking, Course, EmailOTPChallenge, Notification, PartnerInstitution, Payment, PaymentMethod, Preference, Rating, SessionCheckIn, Subjects, Tutor, TutorApplication, TutorAvailability, TutorAvailabilityOverride, TutorSubjects, Wallet, PlatformActivity, Transaction, TutorPayoutAccount
+from .models import Booking, Course, EmailOTPChallenge, Notification, PartnerInstitution, Payment, PaymentMethod, Preference, Rating, SessionCheckIn, Subjects, Tutor, TutorApplication, TutorAvailability, TutorAvailabilityOverride, TutorSubjects, Wallet, PlatformActivity, Transaction
 from .serializers import (
     NotificationSerializer,
     SubjectSerializer,
@@ -3905,22 +3905,6 @@ def get_cashout_callback_url(request):
     return base_url
 
 
-def serialize_payout_account(account):
-    return {
-        "id": account.id,
-        "destination_type": account.destination_type,
-        "receiving_institution_id": account.receiving_institution_id,
-        "receiving_institution_name": account.receiving_institution_name,
-        "receiving_institution_code": account.receiving_institution_code,
-        "account_number": account.account_number,
-        "account_name": account.account_name,
-        "bank_name": account.bank_name,
-        "is_active": account.is_active,
-        "created_at": account.created_at,
-        "updated_at": account.updated_at,
-    }
-
-
 def serialize_cash_out(withdrawal):
     return {
         "id": withdrawal.id,
@@ -3945,7 +3929,6 @@ def serialize_cash_out(withdrawal):
         "callback_received_at": withdrawal.callback_received_at,
         "requested_at": withdrawal.requested_at,
         "processed_at": withdrawal.processed_at,
-        "payout_account_id": withdrawal.payout_account_id,
         "note": withdrawal.note,
     }
 
@@ -4151,69 +4134,6 @@ def receiving_institutions(request):
         return Response({"error": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
 
     return Response(provider_response.get('data', provider_response))
-
-
-@api_view(['GET', 'POST', 'PATCH'])
-@permission_classes([IsAuthenticated])
-def payout_destinations(request, account_id=None):
-    tutor = get_request_tutor(request)
-    if tutor is None:
-        return Response({"error": "Not a tutor"}, status=403)
-
-    if request.method == 'GET':
-        accounts = TutorPayoutAccount.objects.filter(tutor=tutor).order_by('-is_active', '-updated_at')
-        return Response([serialize_payout_account(account) for account in accounts])
-
-    if request.method == 'POST':
-        data = request.data
-        destination_type = data.get('destination_type')
-        if destination_type not in ['gcash', 'bank']:
-            return Response({"error": "Destination type must be gcash or bank."}, status=400)
-
-        required_fields = [
-            'receiving_institution_id',
-            'receiving_institution_name',
-            'account_number',
-            'account_name',
-        ]
-        if any(not data.get(field) for field in required_fields):
-            return Response({"error": "Missing payout account details."}, status=400)
-
-        account = TutorPayoutAccount.objects.create(
-            tutor=tutor,
-            destination_type=destination_type,
-            receiving_institution_id=data.get('receiving_institution_id'),
-            receiving_institution_name=data.get('receiving_institution_name'),
-            receiving_institution_code=data.get('receiving_institution_code', ''),
-            account_number=data.get('account_number'),
-            account_name=data.get('account_name'),
-            bank_name=data.get('bank_name', ''),
-            is_active=bool(data.get('is_active', True)),
-        )
-        return Response(serialize_payout_account(account), status=status.HTTP_201_CREATED)
-
-    lookup_id = account_id or request.data.get('id')
-    account = get_object_or_404(TutorPayoutAccount, id=lookup_id, tutor=tutor)
-    editable_fields = [
-        'destination_type',
-        'receiving_institution_id',
-        'receiving_institution_name',
-        'receiving_institution_code',
-        'account_number',
-        'account_name',
-        'bank_name',
-        'is_active',
-    ]
-
-    for field in editable_fields:
-        if field in request.data:
-            setattr(account, field, request.data.get(field))
-
-    if account.destination_type not in ['gcash', 'bank']:
-        return Response({"error": "Destination type must be gcash or bank."}, status=400)
-
-    account.save()
-    return Response(serialize_payout_account(account))
 
 
 @api_view(['GET'])

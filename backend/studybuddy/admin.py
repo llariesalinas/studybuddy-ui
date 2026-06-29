@@ -19,7 +19,6 @@ from .models import (
     UserProfile,
     Wallet,
     Transaction,
-    TutorPayoutAccount,
     WithdrawalRequest,
 )
 
@@ -43,7 +42,6 @@ admin.site.register(AdminAccountRequest)
 
 admin.site.register(Wallet)
 admin.site.register(Transaction)
-admin.site.register(TutorPayoutAccount)
 
 
 @admin.register(WithdrawalRequest)

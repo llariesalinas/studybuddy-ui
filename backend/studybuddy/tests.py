@@ -1686,31 +1686,6 @@ class TutorCashOutTests(APITestCase):
             }
         }
 
-    def test_create_list_and_deactivate_payout_destination(self):
-        payload = {
-            "destination_type": "gcash",
-            "receiving_institution_id": "inst_gcash",
-            "receiving_institution_name": "GCash",
-            "receiving_institution_code": "GCASH",
-            "account_number": "09171234567",
-            "account_name": "Cash Tutor",
-        }
-
-        create_response = self.client.post("/api/wallet/payout-destinations/", payload, format="json")
-        list_response = self.client.get("/api/wallet/payout-destinations/")
-        account_id = create_response.data["id"]
-        patch_response = self.client.patch(
-            f"/api/wallet/payout-destinations/{account_id}/",
-            {"is_active": False},
-            format="json",
-        )
-
-        self.assertEqual(create_response.status_code, 201)
-        self.assertEqual(list_response.status_code, 200)
-        self.assertEqual(len(list_response.data), 1)
-        self.assertEqual(patch_response.status_code, 200)
-        self.assertFalse(patch_response.data["is_active"])
-
     def test_cashout_rejects_invalid_amount_and_insufficient_balance(self):
         destination = self.destination_fields()
 
@@ -2186,6 +2161,17 @@ class WalletCashOutEdgeCaseTests(APITestCase):
             WithdrawalRequest.objects.filter(tutor=self.tutor, receiving_institution_id="bpi").count(),
             1,
         )
+
+    def test_payout_destinations_endpoints_removed(self):
+        get_response = self.client.get("/api/wallet/payout-destinations/")
+        post_response = self.client.post(
+            "/api/wallet/payout-destinations/",
+            self.destination_fields(),
+            format="json",
+        )
+
+        self.assertEqual(get_response.status_code, 404)
+        self.assertEqual(post_response.status_code, 404)
 
 
 class WalletCashInTests(APITestCase):
