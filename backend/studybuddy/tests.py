@@ -2140,6 +2140,53 @@ class WalletCashOutEdgeCaseTests(APITestCase):
             2,
         )
 
+    @patch("studybuddy.views.create_wallet_transaction")
+    def test_cashout_new_destination_requires_confirmation(self, mock_create):
+        WithdrawalRequest.objects.create(
+            tutor=self.tutor,
+            amount=Decimal("500.00"),
+            method="bank",
+            receiving_institution_id="bdo",
+            receiving_institution_name="BDO",
+            account_number="123456",
+            account_name="Cash Tutor",
+            status="pending",
+        )
+        mock_create.return_value = self.provider_result()
+
+        destination = self.destination_fields(
+            destination_type="bank",
+            receiving_institution_id="bpi",
+            receiving_institution_name="BPI",
+            receiving_institution_code="BPI",
+            account_number="123456",
+            account_name="Cash Tutor",
+        )
+
+        unconfirmed_response = self.client.post(
+            "/api/wallet/cash-outs/",
+            {"amount": "500.00", **destination},
+            format="json",
+        )
+
+        self.assertEqual(unconfirmed_response.status_code, 409)
+        self.assertEqual(
+            WithdrawalRequest.objects.filter(tutor=self.tutor, receiving_institution_id="bpi").count(),
+            0,
+        )
+
+        confirmed_response = self.client.post(
+            "/api/wallet/cash-outs/",
+            {"amount": "500.00", "confirm_new_destination": True, **destination},
+            format="json",
+        )
+
+        self.assertEqual(confirmed_response.status_code, 201)
+        self.assertEqual(
+            WithdrawalRequest.objects.filter(tutor=self.tutor, receiving_institution_id="bpi").count(),
+            1,
+        )
+
 
 class WalletCashInTests(APITestCase):
     def setUp(self):
