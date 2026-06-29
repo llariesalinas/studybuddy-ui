@@ -241,6 +241,10 @@
                 <span>Account name</span>
                 <strong>{{ cashoutForm.account_name || '-' }}</strong>
               </div>
+              <div v-if="cashoutForm.destination_type === 'bank'" class="confirm-row">
+                <span>Bank name</span>
+                <strong>{{ cashoutForm.bank_name || '-' }}</strong>
+              </div>
               <div class="confirm-row">
                 <span>Amount you receive</span>
                 <strong>PHP {{ money(cashoutAmount) }}</strong>
@@ -323,7 +327,12 @@
 
               <label v-if="cashoutForm.destination_type === 'bank'">
                 <span>Bank Name</span>
-                <input v-model.trim="cashoutForm.bank_name" class="sb-field" />
+                <input
+                  v-model.trim="cashoutForm.bank_name"
+                  class="sb-field"
+                  required
+                  @input="bankNameAutoFilled = false"
+                />
               </label>
 
               <label>
@@ -415,6 +424,7 @@ const cashoutForm = reactive({
 })
 
 const showConfirmStep = ref(false)
+const bankNameAutoFilled = ref(false)
 
 const destinationTypeOptions = [
   { label: 'GCash', value: 'gcash' },
@@ -439,6 +449,9 @@ const cashoutError = computed(() => {
   if (!cashoutForm.receiving_institution_id) return 'Select a receiving institution.'
   if (!cashoutForm.account_number) return 'Enter the account number.'
   if (!cashoutForm.account_name) return 'Enter the account name.'
+  if (cashoutForm.destination_type === 'bank' && !cashoutForm.bank_name) {
+    return 'Enter the bank name.'
+  }
   if (cashoutAmount.value < Number(walletStore.cashoutMinimum)) {
     return `Minimum cash-out is PHP ${money(walletStore.cashoutMinimum)}.`
   }
@@ -502,6 +515,7 @@ const resetCashoutForm = () => {
   cashoutForm.account_name = ''
   cashoutForm.bank_name = ''
   cashoutForm.note = ''
+  bankNameAutoFilled.value = false
 }
 
 const closeCashoutModal = () => {
@@ -518,6 +532,7 @@ const applyRecentShortcut = (recent) => {
   cashoutForm.account_number = recent.account_number
   cashoutForm.account_name = recent.account_name
   cashoutForm.bank_name = recent.bank_name || ''
+  bankNameAutoFilled.value = false
 }
 
 const matchesRecentDestination = () =>
@@ -667,6 +682,20 @@ onMounted(async () => {
     router.replace({ query: {} })
   }
 })
+
+watch(
+  () => cashoutForm.receiving_institution_id,
+  (institutionId_) => {
+    if (cashoutForm.destination_type !== 'bank') return
+    if (cashoutForm.bank_name && !bankNameAutoFilled.value) return
+
+    const institution = walletStore.receivingInstitutions.find(
+      (item) => String(institutionId(item)) === String(institutionId_)
+    )
+    cashoutForm.bank_name = institution ? institutionName(institution) : ''
+    bankNameAutoFilled.value = true
+  }
+)
 
 watch(showCashoutModal, async (isOpen) => {
   if (!isOpen) return
