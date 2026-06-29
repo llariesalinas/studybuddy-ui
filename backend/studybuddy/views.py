@@ -4327,7 +4327,7 @@ def cash_outs(request):
 def recent_cash_outs(request):
     tutor = get_request_tutor(request)
     if tutor is None:
-        return Response({"error": "Not a tutor"}, status=404)
+        return Response({"error": "Not a tutor"}, status=403)
 
     withdrawals = WithdrawalRequest.objects.filter(tutor=tutor).order_by('-requested_at')[:4]
     return Response([serialize_cash_out(withdrawal) for withdrawal in withdrawals])
