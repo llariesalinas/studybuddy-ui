@@ -4194,7 +4194,9 @@ def cash_outs(request):
         return Response({"error": "Select the receiving institution."}, status=400)
 
     receiving_institution_code = request.data.get('receiving_institution_code', '')
-    bank_name = request.data.get('bank_name') or receiving_institution_name
+    bank_name = request.data.get('bank_name')
+    if destination_type == 'bank' and not bank_name:
+        return Response({"error": "Enter the destination bank name."}, status=400)
     note = request.data.get('note', '')
 
     recent_withdrawals = list(

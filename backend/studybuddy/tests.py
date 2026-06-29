@@ -2076,6 +2076,23 @@ class WalletCashOutEdgeCaseTests(APITestCase):
         self.assertEqual(response.status_code, 400)
         self.assertFalse(WithdrawalRequest.objects.filter(tutor=self.tutor).exists())
 
+    def test_cashout_rejects_missing_bank_name_for_bank_destination(self):
+        destination = self.destination_fields(
+            destination_type="bank",
+            receiving_institution_id="bdo",
+            receiving_institution_name="BDO",
+            receiving_institution_code="BDO",
+        )
+
+        response = self.client.post(
+            "/api/wallet/cash-outs/",
+            {"amount": "500.00", **destination},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(WithdrawalRequest.objects.filter(tutor=self.tutor).exists())
+
     def test_cashout_rejects_missing_receiving_institution(self):
         destination = self.destination_fields()
         destination.pop("receiving_institution_id")
@@ -2136,6 +2153,7 @@ class WalletCashOutEdgeCaseTests(APITestCase):
             receiving_institution_code="BPI",
             account_number="123456",
             account_name="Cash Tutor",
+            bank_name="BPI",
         )
 
         unconfirmed_response = self.client.post(

@@ -590,10 +590,10 @@ const handleCashout = async () => {
     cashoutForm.receiving_institution_code = institutionCode(institution)
   }
 
-  if (matchesRecentDestination()) {
-    await submitCashout(false)
-  } else {
+  if (walletStore.recentCashOuts.length && !matchesRecentDestination()) {
     showConfirmStep.value = true
+  } else {
+    await submitCashout(false)
   }
 }
 
@@ -684,8 +684,8 @@ onMounted(async () => {
 })
 
 watch(
-  () => cashoutForm.receiving_institution_id,
-  (institutionId_) => {
+  [() => cashoutForm.receiving_institution_id, () => cashoutForm.destination_type],
+  ([institutionId_]) => {
     if (cashoutForm.destination_type !== 'bank') return
     if (cashoutForm.bank_name && !bankNameAutoFilled.value) return
 
