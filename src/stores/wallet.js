@@ -12,7 +12,7 @@ export const useWalletStore = defineStore('wallet', () => {
   const cashoutProviderFee = ref(10)
   const transactions = ref([])
   const withdrawals = ref([])
-  const payoutAccounts = ref([])
+  const recentCashOuts = ref([])
   const receivingInstitutions = ref([])
   const loading = ref(false)
 
@@ -64,9 +64,9 @@ export const useWalletStore = defineStore('wallet', () => {
     withdrawals.value = data
   }
 
-  async function fetchPayoutAccounts() {
-    const { data } = await api.get('wallet/payout-destinations/')
-    payoutAccounts.value = data
+  async function fetchRecentCashOuts() {
+    const { data } = await api.get('wallet/cash-outs/recent/')
+    recentCashOuts.value = data
   }
 
   async function fetchReceivingInstitutions() {
@@ -75,30 +75,35 @@ export const useWalletStore = defineStore('wallet', () => {
     return data
   }
 
-  async function savePayoutAccount(payload) {
-    const request = payload.id
-      ? api.patch(`wallet/payout-destinations/${payload.id}/`, payload)
-      : api.post('wallet/payout-destinations/', payload)
-
-    await request
-    await fetchPayoutAccounts()
-  }
-
-  async function deactivatePayoutAccount(id) {
-    await api.patch(`wallet/payout-destinations/${id}/`, { is_active: false })
-    await fetchPayoutAccounts()
-  }
-
   async function requestWithdrawal(payload) {
-    try {
-      await api.post('wallet/cash-outs/', payload)
-      await fetchWallet()
-      await fetchTransactions()
-      await fetchWithdrawals()
-      return { success: true }
-    } catch (e) {
-      return { success: false, error: e.response?.data?.error || 'Cash-out failed. Please try again.' }
-    }
+    const {
+      amount,
+      destination_type,
+      receiving_institution_id,
+      receiving_institution_name,
+      receiving_institution_code,
+      account_number,
+      account_name,
+      bank_name,
+      note,
+      confirm_new_destination,
+    } = payload
+
+    await api.post('wallet/cash-outs/', {
+      amount,
+      destination_type,
+      receiving_institution_id,
+      receiving_institution_name,
+      receiving_institution_code,
+      account_number,
+      account_name,
+      bank_name,
+      note,
+      confirm_new_destination,
+    })
+    await fetchWallet()
+    await fetchTransactions()
+    await fetchWithdrawals()
   }
 
   async function initiateCashIn(amount) {
@@ -122,10 +127,10 @@ export const useWalletStore = defineStore('wallet', () => {
   }
 
   return { balance, pendingAmount, cashoutMinimum, cashoutMaximum, cashoutProviderFee, transactions, withdrawals,
-           payoutAccounts, receivingInstitutions, loading,
+           recentCashOuts, receivingInstitutions, loading,
            grossEarned, totalDeductions, netEarned,
-           fetchWallet, fetchTransactions, fetchWithdrawals, fetchPayoutAccounts,
-           fetchReceivingInstitutions, savePayoutAccount, deactivatePayoutAccount,
+           fetchWallet, fetchTransactions, fetchWithdrawals, fetchRecentCashOuts,
+           fetchReceivingInstitutions,
            requestWithdrawal, initiateCashIn, verifyCashIn, devAddFunds,
            devRemoveFunds }
 })
