@@ -1,7 +1,7 @@
 ---
 title: Cash-Out Recent Transactions (Remove Standalone Destinations)
 date: 2026-06-29
-status: Draft
+status: Done
 spec: ../specs/2026-06-29-cashout-recent-transactions.md
 ---
 
@@ -11,9 +11,12 @@ spec: ../specs/2026-06-29-cashout-recent-transactions.md
 
 ## Status & Progress Summary
 
-**Status:** Draft — not yet approved.
-**Tasks complete:** 0 / 8
-**Next:** Get this plan approved, then start with Task 1 (backend, additive).
+**Status:** Done — all 8 tasks implemented, reviewed, and verified.
+**Tasks complete:** 8 / 8
+**Next:** None. See
+[summary](../session-summaries/2026-06-29-cashout-recent-transactions-summary.md) for fixes found
+during review (institution-id missing from the match check, bank_name validation/auto-fill, three
+extra cleanups in Task 7) and manual-verification results.
 
 ## Goal
 
@@ -288,3 +291,4 @@ test data is fine and expected as part of this task.
 | Date | Change |
 |------|--------|
 | 2026-06-29 | Initial plan drafted from the spec, with code research from a direct Explore-agent pass (graphify graph was stale and skipped per user choice). 8 tasks: additive backend → frontend cutover → manual verification → destructive cleanup → close-out. |
+| 2026-06-29 | All 8 tasks implemented via subagent-driven-development and reviewed clean; status set to Done. See [summary](../session-summaries/2026-06-29-cashout-recent-transactions-summary.md). |
