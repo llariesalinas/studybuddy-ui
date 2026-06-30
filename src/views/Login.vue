@@ -95,6 +95,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import api from '@/services/api/api'
 import AuthShell from '@/components/AuthShell.vue'
+import { needsTutorApplicationAttention } from '@/services/tutorApplicationState'
 
 const router = useRouter()
 const route = useRoute()
@@ -133,10 +134,7 @@ const getErrorMessage = (error, fallback) => {
 const redirectForRole = (role) => {
   const normalizedRole = role?.toLowerCase()
 
-  if (
-    normalizedRole === 'tutor' &&
-    ['pending', 'rejected'].includes(authStore.user?.application_status)
-  ) {
+  if (normalizedRole === 'tutor' && needsTutorApplicationAttention(authStore.user)) {
     router.push('/application-status')
   } else if (normalizedRole === 'tutor') router.push('/tch-dashboard')
   else if (normalizedRole === 'tutee') router.push('/dashboard')

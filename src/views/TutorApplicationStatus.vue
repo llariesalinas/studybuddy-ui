@@ -3,7 +3,7 @@
     <template #icon>
       <i :class="statusIconClass"></i>
     </template>
-    <template #title>Application Status</template>
+    <template #title>{{ pageTitle }}</template>
     <template #subtitle>{{ statusSubtitle }}</template>
 
     <div v-if="loading" class="text-center py-5">
@@ -17,15 +17,14 @@
     </div>
 
     <div v-else-if="application" class="sb-status-container">
-      <!-- Status Badge -->
-      <div :class="['sb-status-badge', `sb-status-${application.application_status}`]">
+      <div :class="['sb-status-badge', `sb-status-${statusTone}`]">
         {{ statusLabel }}
       </div>
 
-      <!-- Main Status Logic -->
-      <div v-if="application.application_status === 'pending'" class="sb-status-content">
+      <div v-if="flow.kind === 'initial' && flow.status === 'pending'" class="sb-status-content">
         <p class="sb-status-text">
-          Your application was submitted on <strong>{{ formatDate(application.submitted_at) }}</strong> and is currently being reviewed.
+          Your tutor application was submitted on
+          <strong>{{ formatDate(submittedAt) }}</strong> and is currently being reviewed.
         </p>
         <div class="sb-info-card">
           <p class="small mb-0">
@@ -34,25 +33,57 @@
         </div>
       </div>
 
-      <div v-else-if="application.application_status === 'approved'" class="sb-status-content">
+      <div v-else-if="flow.kind === 'initial' && flow.status === 'approved'" class="sb-status-content">
         <p class="sb-status-text">
           Great news! Your application has been approved. You can now access your tutor dashboard.
         </p>
         <router-link to="/tch-dashboard" class="sb-btn-pill">Go to Dashboard</router-link>
       </div>
 
-      <div v-else-if="application.application_status === 'rejected'" class="sb-status-content">
-        <div class="sb-rejection-box">
-          <h6 class="sb-rejection-title">Reason for rejection:</h6>
-          <p class="sb-rejection-reason">"{{ application.rejection_reason || 'No specific reason provided.' }}"</p>
+      <div v-else-if="flow.kind === 'renewal' && flow.status === 'pending'" class="sb-status-content">
+        <p class="sb-status-text">
+          Your updated enrollment documents were submitted on
+          <strong>{{ formatDate(submittedAt) }}</strong> and are now under renewal review.
+        </p>
+        <div class="sb-info-card">
+          <p class="small mb-0">
+            No further upload is needed while the admin team reviews this renewal submission.
+          </p>
+        </div>
+      </div>
+
+      <div v-else-if="flow.kind === 'renewal' && flow.status === 'approved'" class="sb-status-content">
+        <p class="sb-status-text">
+          Your updated enrollment documents have been approved. You can continue using your tutor dashboard.
+        </p>
+        <router-link to="/tch-dashboard" class="sb-btn-pill">Go to Dashboard</router-link>
+      </div>
+
+      <div v-else class="sb-status-content">
+        <div v-if="flow.kind === 'renewal' && flow.status === 'due'" class="sb-info-card sb-action-card">
+          <h6 class="sb-card-title">Updated enrollment documents required</h6>
+          <p class="small mb-0">
+            To keep tutor access current, upload your latest School ID and proof of enrollment.
+          </p>
+          <p v-if="renewalDueAt" class="small text-muted mb-0 mt-2">
+            Renewal due by {{ formatDate(renewalDueAt) }}.
+          </p>
+        </div>
+
+        <div v-if="flow.status === 'rejected'" class="sb-rejection-box">
+          <h6 class="sb-rejection-title">
+            {{ flow.kind === 'renewal' ? 'Reason for renewal rejection:' : 'Reason for rejection:' }}
+          </h6>
+          <p class="sb-rejection-reason">
+            "{{ rejectionReason || 'No specific reason provided.' }}"
+          </p>
         </div>
 
         <p class="sb-status-text mb-4">
-          Don't worry, you can re-apply by updating and resubmitting your documents below.
+          {{ uploadPrompt }}
         </p>
 
-        <!-- Resubmission Form -->
-        <form @submit.prevent="handleResubmit" class="sb-resubmit-form">
+        <form v-if="flow.needsUpload" @submit.prevent="handleDocumentSubmit" class="sb-resubmit-form">
           <div v-if="resubmitError" class="sb-auth-alert mb-3">{{ resubmitError }}</div>
 
           <div class="sb-auth-field">
@@ -78,18 +109,18 @@
           </div>
 
           <div class="sb-auth-field">
-            <label class="sb-auth-label">Updated Motivation (Optional)</label>
+            <label class="sb-auth-label">{{ notesLabel }}</label>
             <textarea
               v-model="resubmitData.reasonToTutor"
               class="sb-auth-input"
-              placeholder="Tell us about your motivation..."
+              :placeholder="notesPlaceholder"
               rows="3"
             ></textarea>
           </div>
 
           <button type="submit" class="sb-btn-pill" :disabled="isResubmitting">
             <span v-if="isResubmitting" class="sb-spinner me-2"></span>
-            {{ isResubmitting ? 'Resubmitting...' : 'Resubmit Application' }}
+            {{ submitButtonLabel }}
           </button>
         </form>
       </div>
@@ -120,6 +151,12 @@ import { useRouter } from 'vue-router'
 import api from '@/services/api/api'
 import { useAuthStore } from '@/stores/auth'
 import AuthShell from '@/components/AuthShell.vue'
+import { MAX_DOCUMENT_UPLOAD_SIZE_BYTES } from '@/config'
+import {
+  getReviewRejectionReason,
+  getReviewSubmittedAt,
+  getTutorApplicationFlow,
+} from '@/services/tutorApplicationState'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -135,13 +172,26 @@ const resubmitData = reactive({
   reasonToTutor: ''
 })
 
+const flow = computed(() => getTutorApplicationFlow(application.value))
+const submittedAt = computed(() => getReviewSubmittedAt(application.value))
+const rejectionReason = computed(() => getReviewRejectionReason(application.value))
+const renewalDueAt = computed(() =>
+  application.value?.renewal_due_at ||
+  application.value?.document_renewal_due_at ||
+  application.value?.next_document_review_due_at ||
+  null
+)
+
 const fetchStatus = async () => {
   loading.value = true
   error.value = ''
   try {
     const response = await api.get('tutor-application/status/')
     application.value = response.data
-    resubmitData.reasonToTutor = application.value.reason_to_tutor || ''
+    resubmitData.reasonToTutor =
+      application.value.renewal_note ||
+      application.value.reason_to_tutor ||
+      ''
   } catch (err) {
     console.error('Failed to fetch status:', err)
     if (err.response?.status === 401) {
@@ -154,9 +204,17 @@ const fetchStatus = async () => {
   }
 }
 
+const pageTitle = computed(() =>
+  flow.value.kind === 'renewal' ? 'Document Renewal Status' : 'Application Status'
+)
+
 const statusIconClass = computed(() => {
   if (!application.value) return 'bi bi-info-circle'
-  switch (application.value.application_status) {
+  if (flow.value.kind === 'renewal' && flow.value.status === 'due') {
+    return 'bi bi-exclamation-circle-fill text-warning'
+  }
+
+  switch (flow.value.status) {
     case 'pending': return 'bi bi-hourglass-split'
     case 'approved': return 'bi bi-check-circle-fill text-success'
     case 'rejected': return 'bi bi-exclamation-triangle-fill text-danger'
@@ -166,7 +224,17 @@ const statusIconClass = computed(() => {
 
 const statusSubtitle = computed(() => {
   if (!application.value) return 'Checking your status...'
-  switch (application.value.application_status) {
+
+  if (flow.value.kind === 'renewal') {
+    switch (flow.value.status) {
+      case 'due': return 'Updated enrollment documents are required'
+      case 'pending': return 'Your renewal submission is being reviewed'
+      case 'rejected': return 'Action required on your renewal submission'
+      default: return 'Current status of your document renewal'
+    }
+  }
+
+  switch (flow.value.status) {
     case 'pending': return 'Your application is being reviewed'
     case 'approved': return 'Your application was successful!'
     case 'rejected': return 'Action required on your application'
@@ -176,12 +244,58 @@ const statusSubtitle = computed(() => {
 
 const statusLabel = computed(() => {
   if (!application.value) return ''
-  switch (application.value.application_status) {
+
+  if (flow.value.kind === 'renewal') {
+    switch (flow.value.status) {
+      case 'due': return 'Renewal Required'
+      case 'pending': return 'Renewal Pending Review'
+      case 'approved': return 'Renewal Approved'
+      case 'rejected': return 'Renewal Not Approved'
+      default: return 'Document Renewal'
+    }
+  }
+
+  switch (flow.value.status) {
     case 'pending': return 'Pending Review'
     case 'approved': return 'Approved'
     case 'rejected': return 'Not Approved'
-    default: return application.value.application_status
+    default: return flow.value.status
   }
+})
+
+const statusTone = computed(() => {
+  if (flow.value.status === 'due') return 'due'
+  return flow.value.status || 'pending'
+})
+
+const uploadPrompt = computed(() => {
+  if (flow.value.kind === 'renewal' && flow.value.status === 'due') {
+    return 'Upload the latest copies below so an institution admin can review your renewal.'
+  }
+
+  if (flow.value.kind === 'renewal') {
+    return 'Please resubmit corrected renewal documents below.'
+  }
+
+  return "Don't worry, you can re-apply by updating and resubmitting your documents below."
+})
+
+const notesLabel = computed(() =>
+  flow.value.kind === 'renewal' ? 'Note to Reviewer (Optional)' : 'Updated Motivation (Optional)'
+)
+
+const notesPlaceholder = computed(() =>
+  flow.value.kind === 'renewal'
+    ? 'Add any context about your updated enrollment documents...'
+    : 'Tell us about your motivation...'
+)
+
+const submitButtonLabel = computed(() => {
+  if (isResubmitting.value) {
+    return flow.value.kind === 'renewal' ? 'Submitting Renewal...' : 'Resubmitting...'
+  }
+
+  return flow.value.kind === 'renewal' ? 'Submit Renewal Documents' : 'Resubmit Application'
 })
 
 const formatDate = (dateStr) => {
@@ -195,11 +309,20 @@ const formatDate = (dateStr) => {
 
 const handleFileChange = (event, type) => {
   const file = event.target.files[0]
+  if (!file) return
+
+  if (file.size > MAX_DOCUMENT_UPLOAD_SIZE_BYTES) {
+    resubmitError.value = `"${file.name}" is too large. Each file must be under 5 MB.`
+    event.target.value = ''
+    return
+  }
+
+  resubmitError.value = ''
   if (type === 'schoolId') resubmitData.schoolId = file
   else if (type === 'enrollmentProof') resubmitData.enrollmentProof = file
 }
 
-const handleResubmit = async () => {
+const handleDocumentSubmit = async () => {
   resubmitError.value = ''
   if (!resubmitData.schoolId || !resubmitData.enrollmentProof) {
     resubmitError.value = 'Please upload both required documents.'
@@ -213,15 +336,24 @@ const handleResubmit = async () => {
     formData.append('enrollment_proof', resubmitData.enrollmentProof)
     formData.append('reason_to_tutor', resubmitData.reasonToTutor)
 
-    await api.post('tutor-application/resubmit/', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    })
+    if (flow.value.kind === 'renewal') {
+      formData.append('renewal_note', resubmitData.reasonToTutor)
+      await api.post('tutor-application/renewal/', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      })
+    } else {
+      await api.post('tutor-application/resubmit/', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      })
+    }
 
-    // Refresh status
     await fetchStatus()
   } catch (err) {
-    console.error('Resubmission failed:', err)
-    resubmitError.value = err.response?.data?.error || 'Resubmission failed. Please try again.'
+    console.error('Document submission failed:', err)
+    resubmitError.value =
+      err.response?.data?.error ||
+      err.response?.data?.detail ||
+      'Document submission failed. Please try again.'
   } finally {
     isResubmitting.value = false
   }
@@ -255,7 +387,8 @@ onMounted(() => {
   letter-spacing: 0.5px;
 }
 
-.sb-status-pending {
+.sb-status-pending,
+.sb-status-due {
   background: #fef3c7;
   color: #92400e;
 }
@@ -284,6 +417,17 @@ onMounted(() => {
   padding: 12px 16px;
   text-align: center;
   color: var(--sb-text-muted);
+}
+
+.sb-action-card {
+  text-align: left;
+}
+
+.sb-card-title {
+  color: var(--sb-text-main);
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 4px;
 }
 
 .sb-rejection-box {

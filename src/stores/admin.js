@@ -263,8 +263,11 @@ export const useAdminStore = defineStore(
     }
 
     let tutorApplicationsPromise = null
-    const fetchTutorApplications = async (status = null, force = false) => {
-      const params = status ? { status } : {}
+    const fetchTutorApplications = async (status = null, force = false, options = {}) => {
+      const params = {
+        ...(status ? { status } : {}),
+        ...(options.reviewType ? { review_type: options.reviewType } : {})
+      }
       if (tutorApplications.value.length && !status && !force) return
 
       if (tutorApplicationsPromise) {
@@ -291,12 +294,29 @@ export const useAdminStore = defineStore(
       return tutorApplicationsPromise
     }
 
-    const updateTutorApplicationStatus = async (id, applicationStatus, rejectionReason = '') => {
+    const updateTutorApplicationStatus = async (
+      id,
+      applicationStatus,
+      rejectionReason = '',
+      options = {}
+    ) => {
       try {
-        await api.patch(`/admin/tutor-applications/${id}/`, {
+        const payload = {
           application_status: applicationStatus,
           rejection_reason: rejectionReason
-        })
+        }
+
+        if (options.reviewType === 'renewal') {
+          payload.review_type = 'renewal'
+          payload.renewal_status = applicationStatus
+          payload.renewal_rejection_reason = rejectionReason
+        }
+
+        const endpoint = options.reviewType === 'renewal'
+          ? `/admin/tutor-document-renewals/${id}/`
+          : `/admin/tutor-applications/${id}/`
+
+        await api.patch(endpoint, payload)
         await fetchTutorApplications(null, true)
         await fetchStats(true)
       } catch (err) {

@@ -11,12 +11,12 @@ from datetime import timedelta
 from .models import (
     UserProfile, Tutor, Booking, WithdrawalRequest,
     PartnerInstitution, Wallet, Transaction, PlatformActivity,
-    TutorApplication, Payment
+    TutorApplication, TutorDocumentRenewalReview, Payment
 )
 from .serializers import (
     AdminWithdrawalSerializer, AdminUserSerializer,
     PartnerInstitutionSerializer, PlatformActivitySerializer,
-    TutorApplicationSerializer
+    TutorApplicationSerializer, TutorDocumentRenewalReviewSerializer
 )
 from .permissions import IsAdminUser, IsSuperAdminUser
 from .email_utils import send_application_approved_email, send_application_rejected_email
@@ -428,14 +428,42 @@ class AdminTutorApplicationListView(BaseAdminView):
 
     def get(self, request):
         status_filter = request.query_params.get('status')
-        queryset = self.get_queryset_for_user(request, TutorApplication.objects.select_related('profile__user', 'profile__institution').all(), user_path='profile')
-        queryset = queryset.order_by('-submitted_at')
+        application_queryset = self.get_queryset_for_user(
+            request,
+            TutorApplication.objects.select_related('profile__user', 'profile__institution').all(),
+            user_path='profile'
+        )
+        renewal_queryset = self.get_queryset_for_user(
+            request,
+            TutorDocumentRenewalReview.objects.select_related(
+                'profile__user',
+                'profile__institution',
+                'application',
+            ).all(),
+            user_path='profile'
+        )
 
         if status_filter:
-            queryset = queryset.filter(application_status=status_filter)
+            application_queryset = application_queryset.filter(application_status=status_filter)
+            renewal_queryset = renewal_queryset.filter(status=status_filter)
 
-        serializer = TutorApplicationSerializer(queryset, many=True, context={'request': request})
-        return Response(serializer.data)
+        application_data = TutorApplicationSerializer(
+            application_queryset,
+            many=True,
+            context={'request': request}
+        ).data
+        renewal_data = TutorDocumentRenewalReviewSerializer(
+            renewal_queryset,
+            many=True,
+            context={'request': request}
+        ).data
+        combined = sorted(
+            [*application_data, *renewal_data],
+            key=lambda item: item.get('submitted_at') or '',
+            reverse=True
+        )
+
+        return Response(combined)
 
 
 class AdminTutorApplicationDetailView(BaseAdminView):
@@ -481,3 +509,59 @@ class AdminTutorApplicationDetailView(BaseAdminView):
             logger.exception("Failed to send screening result email for application_id=%s", application.id)
 
         return Response({"message": f"Application {new_status} successfully."})
+
+
+class AdminTutorDocumentRenewalDetailView(BaseAdminView):
+    permission_classes = [permissions.IsAuthenticated, IsAdminUser]
+
+    def get(self, request, pk):
+        queryset = self.get_queryset_for_user(
+            request,
+            TutorDocumentRenewalReview.objects.select_related(
+                'application',
+                'profile__user',
+                'profile__institution',
+            ).all(),
+            user_path='profile'
+        )
+        renewal = get_object_or_404(queryset, pk=pk)
+        serializer = TutorDocumentRenewalReviewSerializer(renewal, context={'request': request})
+        return Response(serializer.data)
+
+    @transaction.atomic
+    def patch(self, request, pk):
+        queryset = self.get_queryset_for_user(
+            request,
+            TutorDocumentRenewalReview.objects.select_related('application', 'profile').all(),
+            user_path='profile'
+        )
+        renewal = get_object_or_404(queryset.select_for_update(), pk=pk)
+
+        new_status = request.data.get('application_status')
+        rejection_reason = request.data.get('rejection_reason', '')
+
+        if new_status not in ['approved', 'rejected']:
+            return Response({"error": "Invalid status. Must be 'approved' or 'rejected'."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if renewal.status != 'pending':
+            return Response({"error": "Only pending document renewals can be reviewed."}, status=status.HTTP_400_BAD_REQUEST)
+
+        renewal.status = new_status
+        renewal.rejection_reason = rejection_reason if new_status == 'rejected' else ''
+        renewal.reviewed_by = request.user.userprofile
+        renewal.reviewed_at = timezone.now()
+        renewal.save(update_fields=[
+            'status',
+            'rejection_reason',
+            'reviewed_by',
+            'reviewed_at',
+            'updated_at',
+        ])
+
+        PlatformActivity.objects.create(
+            activity_type='admin_action',
+            message=f"Admin {request.user.userprofile.fname} {new_status} document renewal for {renewal.profile.fname} {renewal.profile.lname}",
+            institution=request.user.userprofile.institution
+        )
+
+        return Response({"message": f"Document renewal {new_status} successfully."})

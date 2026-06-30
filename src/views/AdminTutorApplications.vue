@@ -9,6 +9,11 @@
           <option value="approved">Approved</option>
           <option value="rejected">Rejected</option>
         </select>
+        <select v-model="filters.reviewType" class="form-select form-select-sm rounded-pill" style="width: 150px;">
+          <option value="">All Types</option>
+          <option value="initial">First-time</option>
+          <option value="renewal">Renewal</option>
+        </select>
         <button @click="loadApplications" class="btn btn-sm btn-light rounded-circle" title="Refresh">
           <i class="bi bi-arrow-clockwise"></i>
         </button>
@@ -23,6 +28,7 @@
               <tr>
                 <th class="ps-4 py-3">Applicant</th>
                 <th class="py-3">Institution</th>
+                <th class="py-3">Type</th>
                 <th class="py-3">Status</th>
                 <th class="py-3">Submitted</th>
                 <th class="pe-4 py-3 text-end">Actions</th>
@@ -36,6 +42,7 @@
                 </td>
                 <td><span class="placeholder col-7 rounded"></span></td>
                 <td><span class="placeholder col-5 rounded-pill"></span></td>
+                <td><span class="placeholder col-5 rounded-pill"></span></td>
                 <td><span class="placeholder col-6 rounded small"></span></td>
                 <td class="pe-4 text-end"><span class="placeholder col-4 rounded"></span></td>
               </tr>
@@ -48,24 +55,30 @@
               <tr>
                 <th class="ps-4 py-3">Applicant</th>
                 <th class="py-3">Institution</th>
+                <th class="py-3">Type</th>
                 <th class="py-3">Status</th>
                 <th class="py-3">Submitted</th>
                 <th class="pe-4 py-3 text-end">Actions</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="app in adminStore.tutorApplications" :key="app.id">
+              <tr v-for="app in filteredApplications" :key="`${getApplicationReviewKind(app)}-${app.id}`">
                 <td class="ps-4">
                   <p class="mb-0 fw-bold">{{ app.applicant_name }}</p>
                   <p class="small text-muted mb-0">{{ app.email }}</p>
                 </td>
                 <td class="small">{{ app.institution_name }}</td>
                 <td>
-                  <span :class="['badge rounded-pill px-3', getStatusBadgeClass(app.application_status)]">
-                    {{ formatStatus(app.application_status) }}
+                  <span :class="['badge rounded-pill px-3', getReviewTypeBadgeClass(app)]">
+                    {{ getReviewTypeLabel(app) }}
                   </span>
                 </td>
-                <td class="small text-muted">{{ formatDate(app.submitted_at) }}</td>
+                <td>
+                  <span :class="['badge rounded-pill px-3', getStatusBadgeClass(getAppReviewStatus(app))]">
+                    {{ formatStatus(getAppReviewStatus(app)) }}
+                  </span>
+                </td>
+                <td class="small text-muted">{{ formatDate(getAppSubmittedAt(app)) }}</td>
                 <td class="pe-4 text-end">
                   <button @click="viewDetails(app)" class="btn btn-sm btn-light rounded-pill px-3 sb-btn">
                     Review
@@ -74,7 +87,7 @@
               </tr>
             </tbody>
           </table>
-          <div v-if="!adminStore.tutorApplications.length" class="text-center py-5">
+          <div v-if="!filteredApplications.length" class="text-center py-5">
             <i class="bi bi-inbox text-muted mb-3 d-block" style="font-size: 2rem;"></i>
             <p class="text-muted">No applications found matching your filter.</p>
           </div>
@@ -85,7 +98,7 @@
     <!-- Application Detail Offcanvas -->
     <div class="offcanvas offcanvas-end border-0 shadow" tabindex="-1" id="appDetailOffcanvas" style="width: 500px;">
       <div class="offcanvas-header bg-light border-bottom">
-        <h5 class="offcanvas-title fw-bold">Review Application</h5>
+        <h5 class="offcanvas-title fw-bold">Review {{ selectedReviewTypeLabel }}</h5>
         <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
       </div>
       <div v-if="selectedApp" class="offcanvas-body p-4">
@@ -95,13 +108,16 @@
             <h5 class="mb-1 fw-bold">{{ selectedApp.applicant_name }}</h5>
             <p class="mb-1 small"><i class="bi bi-envelope me-2"></i>{{ selectedApp.email }}</p>
             <p class="mb-0 small"><i class="bi bi-building me-2"></i>{{ selectedApp.institution_name }}</p>
+            <span :class="['badge rounded-pill mt-3 px-3', getReviewTypeBadgeClass(selectedApp)]">
+              {{ selectedReviewTypeLabel }}
+            </span>
           </div>
         </div>
 
-        <div v-if="selectedApp.reason_to_tutor" class="mb-4">
-          <label class="text-muted small text-uppercase fw-bold mb-1">Motivation</label>
+        <div v-if="selectedReviewNote" class="mb-4">
+          <label class="text-muted small text-uppercase fw-bold mb-1">{{ selectedReviewNoteLabel }}</label>
           <blockquote class="p-3 bg-light rounded-3 border-start border-primary border-4 small mb-0">
-            "{{ selectedApp.reason_to_tutor }}"
+            "{{ selectedReviewNote }}"
           </blockquote>
         </div>
 
@@ -111,22 +127,22 @@
             <div class="col-6">
               <div class="doc-card">
                 <div class="small fw-bold mb-2 text-center text-muted">School ID</div>
-                <a :href="selectedApp.school_id_url" target="_blank" class="doc-preview rounded-3 overflow-hidden d-block bg-white shadow-sm border">
-                  <img :src="selectedApp.school_id_url" class="img-fluid" alt="School ID" @error="handleImageError" />
+                <a :href="selectedSchoolIdUrl" target="_blank" class="doc-preview rounded-3 overflow-hidden d-block bg-white shadow-sm border">
+                  <img :src="selectedSchoolIdUrl" class="img-fluid" alt="School ID" @error="handleImageError" />
                   <div class="doc-overlay"><i class="bi bi-zoom-in me-1"></i> View Full</div>
                 </a>
               </div>
             </div>
             <div class="col-6">
               <div class="doc-card">
-                <div class="small fw-bold mb-2 text-center text-muted">Enrollment Proof</div>
-                <div v-if="isPdf(selectedApp.enrollment_proof_url)" class="doc-preview rounded-3 bg-white d-flex align-items-center justify-content-center flex-column text-danger shadow-sm border">
+                <div class="small fw-bold mb-2 text-center text-muted">Enrollment / RF Proof</div>
+                <div v-if="isPdf(selectedEnrollmentProofUrl)" class="doc-preview rounded-3 bg-white d-flex align-items-center justify-content-center flex-column text-danger shadow-sm border">
                    <i class="bi bi-file-earmark-pdf" style="font-size: 2.5rem;"></i>
                    <span class="small mt-1 fw-bold">PDF File</span>
-                   <a :href="selectedApp.enrollment_proof_url" target="_blank" class="doc-overlay text-white"><i class="bi bi-download me-1"></i> View PDF</a>
+                   <a :href="selectedEnrollmentProofUrl" target="_blank" class="doc-overlay text-white"><i class="bi bi-download me-1"></i> View PDF</a>
                 </div>
-                <a v-else :href="selectedApp.enrollment_proof_url" target="_blank" class="doc-preview rounded-3 overflow-hidden d-block bg-white shadow-sm border">
-                  <img :src="selectedApp.enrollment_proof_url" class="img-fluid" alt="Enrollment Proof" @error="handleImageError" />
+                <a v-else :href="selectedEnrollmentProofUrl" target="_blank" class="doc-preview rounded-3 overflow-hidden d-block bg-white shadow-sm border">
+                  <img :src="selectedEnrollmentProofUrl" class="img-fluid" alt="Enrollment Proof" @error="handleImageError" />
                   <div class="doc-overlay"><i class="bi bi-zoom-in me-1"></i> View Full</div>
                 </a>
               </div>
@@ -134,10 +150,10 @@
           </div>
         </div>
 
-        <div v-if="selectedApp.application_status === 'pending'" class="mt-5 pt-3 border-top">
+        <div v-if="isPendingReview(selectedApp)" class="mt-5 pt-3 border-top">
           <div v-if="rejectionMode">
             <label class="form-label fw-bold small">Reason for Rejection</label>
-            <textarea v-model="rejectionReason" class="form-control mb-3" rows="3" placeholder="Explain why the application is being rejected..."></textarea>
+            <textarea v-model="rejectionReason" class="form-control mb-3" rows="3" :placeholder="rejectionPlaceholder"></textarea>
             <div class="d-flex gap-2">
               <button @click="handleStatusUpdate('rejected')" class="btn btn-danger flex-grow-1 rounded-pill" :disabled="!rejectionReason || processing">
                 <span v-if="processing" class="spinner-border spinner-border-sm me-2"></span>
@@ -151,7 +167,7 @@
           <div v-else class="d-flex gap-2">
             <button @click="handleStatusUpdate('approved')" class="btn btn-success flex-grow-1 rounded-pill" :disabled="processing">
               <span v-if="processing" class="spinner-border spinner-border-sm me-2"></span>
-              {{ processing ? 'Processing...' : 'Approve Applicant' }}
+              {{ processing ? 'Processing...' : approveButtonLabel }}
             </button>
             <button @click="rejectionMode = true" class="btn btn-outline-danger flex-grow-1 rounded-pill" :disabled="processing">
               Reject
@@ -159,9 +175,15 @@
           </div>
         </div>
         <div v-else class="mt-5 pt-3 border-top">
-           <div :class="['p-3 rounded-3 text-center', selectedApp.application_status === 'approved' ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger']">
-             This application has already been <strong>{{ selectedApp.application_status }}</strong>.
-             <p v-if="selectedApp.reviewed_at" class="small mb-0 mt-1">Reviewed on {{ formatDate(selectedApp.reviewed_at) }}</p>
+           <div :class="['p-3 rounded-3 text-center', getAppReviewStatus(selectedApp) === 'approved' ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger']">
+             This {{ selectedReviewTypeLabel.toLowerCase() }} has already been
+             <strong>{{ getAppReviewStatus(selectedApp) }}</strong>.
+             <p v-if="getAppReviewedAt(selectedApp)" class="small mb-0 mt-1">
+               Reviewed on {{ formatDate(getAppReviewedAt(selectedApp)) }}
+             </p>
+             <p v-if="getAppReviewStatus(selectedApp) === 'rejected' && getAppRejectionReason(selectedApp)" class="small mb-0 mt-1">
+               Reason: {{ getAppRejectionReason(selectedApp) }}
+             </p>
            </div>
         </div>
       </div>
@@ -170,13 +192,21 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useAdminStore } from '@/stores/admin'
 import { Offcanvas } from 'bootstrap'
+import {
+  getApplicationReviewKind,
+  getReviewRejectionReason,
+  getReviewReviewedAt,
+  getReviewStatus,
+  getReviewSubmittedAt,
+} from '@/services/tutorApplicationState'
 
 const adminStore = useAdminStore()
 const filters = reactive({
-  status: 'pending'
+  status: 'pending',
+  reviewType: ''
 })
 
 const selectedApp = ref(null)
@@ -186,8 +216,78 @@ const processing = ref(false)
 let offcanvas = null
 
 const loadApplications = async () => {
-  await adminStore.fetchTutorApplications(filters.status, true)
+  await adminStore.fetchTutorApplications(filters.status, true, {
+    reviewType: filters.reviewType
+  })
 }
+
+const filteredApplications = computed(() => {
+  if (!filters.reviewType) return adminStore.tutorApplications
+
+  return adminStore.tutorApplications.filter(
+    (app) => getApplicationReviewKind(app) === filters.reviewType
+  )
+})
+
+const selectedReviewType = computed(() =>
+  selectedApp.value ? getApplicationReviewKind(selectedApp.value) : 'initial'
+)
+
+const selectedReviewTypeLabel = computed(() =>
+  selectedReviewType.value === 'renewal' ? 'Renewal Submission' : 'Application'
+)
+
+const approveButtonLabel = computed(() =>
+  selectedReviewType.value === 'renewal' ? 'Approve Renewal' : 'Approve Applicant'
+)
+
+const rejectionPlaceholder = computed(() =>
+  selectedReviewType.value === 'renewal'
+    ? 'Explain why the renewal documents are being rejected...'
+    : 'Explain why the application is being rejected...'
+)
+
+const readFirst = (source, keys) => {
+  for (const key of keys) {
+    if (source?.[key]) return source[key]
+  }
+
+  return null
+}
+
+const selectedSchoolIdUrl = computed(() => {
+  if (!selectedApp.value) return ''
+
+  return readFirst(selectedApp.value, [
+    'renewal_school_id_url',
+    'document_renewal_school_id_url',
+    'school_id_url'
+  ])
+})
+
+const selectedEnrollmentProofUrl = computed(() => {
+  if (!selectedApp.value) return ''
+
+  return readFirst(selectedApp.value, [
+    'renewal_enrollment_proof_url',
+    'document_renewal_enrollment_proof_url',
+    'enrollment_proof_url'
+  ])
+})
+
+const selectedReviewNote = computed(() => {
+  if (!selectedApp.value) return ''
+
+  return readFirst(selectedApp.value, [
+    'renewal_note',
+    'document_renewal_note',
+    'reason_to_tutor'
+  ])
+})
+
+const selectedReviewNoteLabel = computed(() =>
+  selectedReviewType.value === 'renewal' ? 'Renewal Note' : 'Motivation'
+)
 
 const viewDetails = (app) => {
   selectedApp.value = app
@@ -204,15 +304,38 @@ const handleStatusUpdate = async (status) => {
 
   processing.value = true
   try {
-    await adminStore.updateTutorApplicationStatus(selectedApp.value.id, status, rejectionReason.value)
+    await adminStore.updateTutorApplicationStatus(
+      selectedApp.value.id,
+      status,
+      rejectionReason.value,
+      { reviewType: selectedReviewType.value }
+    )
+    await loadApplications()
     offcanvas.hide()
-    // Notifications/Toast here? admin store should handle refresh
   } catch (err) {
     console.error('Status update failed:', err)
   } finally {
     processing.value = false
   }
 }
+
+const getAppReviewStatus = (app) => getReviewStatus(app)
+
+const getAppSubmittedAt = (app) => getReviewSubmittedAt(app)
+
+const getAppReviewedAt = (app) => getReviewReviewedAt(app)
+
+const getAppRejectionReason = (app) => getReviewRejectionReason(app)
+
+const isPendingReview = (app) => getAppReviewStatus(app) === 'pending'
+
+const getReviewTypeLabel = (app) =>
+  getApplicationReviewKind(app) === 'renewal' ? 'Renewal' : 'First-time'
+
+const getReviewTypeBadgeClass = (app) =>
+  getApplicationReviewKind(app) === 'renewal'
+    ? 'bg-info-subtle text-info-emphasis border border-info-subtle'
+    : 'bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle'
 
 const getStatusBadgeClass = (status) => {
   switch (status) {
@@ -246,7 +369,7 @@ const isPdf = (url) => {
   return url.toLowerCase().endsWith('.pdf') || url.includes('type=pdf')
 }
 
-watch(() => filters.status, () => {
+watch(() => [filters.status, filters.reviewType], () => {
   loadApplications()
 })
 

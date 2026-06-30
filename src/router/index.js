@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useProfileStore } from '@/stores/profile'
+import { needsTutorApplicationAttention } from '@/services/tutorApplicationState'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -283,12 +284,20 @@ router.beforeEach(async (to, from, next) => {
       }
     }
 
-    const applicationStatus = profileStore.applicationStatus || authStore.user?.application_status || null
-    const hasUnapprovedTutorApplication =
+    const tutorApplicationSnapshot = {
+      application_status: profileStore.applicationStatus || authStore.user?.application_status || null,
+      tutor_renewal_status: profileStore.loaded
+        ? profileStore.tutorRenewalStatus
+        : authStore.user?.tutor_renewal_status || null,
+      tutor_renewal_required: profileStore.loaded
+        ? profileStore.tutorRenewalRequired
+        : authStore.user?.tutor_renewal_required || false,
+    }
+    const hasTutorApplicationAttention =
       normalizedUserRole === 'tutor' &&
-      ['pending', 'rejected'].includes(applicationStatus)
+      needsTutorApplicationAttention(tutorApplicationSnapshot)
 
-    if (hasUnapprovedTutorApplication && to.name !== 'tutor-application-status') {
+    if (hasTutorApplicationAttention && to.name !== 'tutor-application-status') {
       return next('/application-status')
     }
 

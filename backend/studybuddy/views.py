@@ -58,7 +58,7 @@ from .recommender.dashboard import (
     get_dashboard_recommendations,
 )
 from django.core.cache import cache
-from .models import Booking, Course, EmailOTPChallenge, Notification, PartnerInstitution, Payment, PaymentMethod, Preference, Rating, Subjects, Tutor, TutorApplication, TutorAvailability, TutorAvailabilityOverride, TutorSubjects, Wallet, PlatformActivity, Transaction, TutorPayoutAccount
+from .models import Booking, Course, EmailOTPChallenge, Notification, PartnerInstitution, Payment, PaymentMethod, Preference, Rating, Subjects, Tutor, TutorApplication, TutorAvailability, TutorAvailabilityOverride, TutorDocumentRenewalReview, TutorSubjects, Wallet, PlatformActivity, Transaction, TutorPayoutAccount
 from .serializers import (
     NotificationSerializer,
     SubjectSerializer,
@@ -122,13 +122,7 @@ OTP_ERROR_MESSAGE = "Invalid or expired verification code."
 
 def build_login_response_payload(user, profile):
     refresh = RefreshToken.for_user(user)
-
-    application_status = None
-    if profile.role == 'Tutor':
-        try:
-            application_status = profile.tutor_application.application_status
-        except:
-            pass
+    tutor_document_context = get_tutor_document_review_context(profile)
 
     return {
         "access": str(refresh.access_token),
@@ -139,7 +133,45 @@ def build_login_response_payload(user, profile):
         "email": user.email,
         "fname": profile.fname,
         "lname": profile.lname,
+        **tutor_document_context,
+    }
+
+
+def get_tutor_document_review_context(profile):
+    application_status = None
+    document_renewal_status = None
+    document_renewal_due_at = None
+    document_renewal_rejection_reason = ''
+    can_submit_document_renewal = False
+
+    if profile.role == 'Tutor':
+        try:
+            application = profile.tutor_application
+            application_status = application.application_status
+            document_renewal_status = application.document_renewal_status()
+            due_at = application.document_renewal_due_at()
+            document_renewal_due_at = due_at.isoformat() if due_at else None
+            can_submit_document_renewal = application.can_submit_document_renewal()
+            latest_renewal = application.latest_document_renewal_review()
+            if latest_renewal and latest_renewal.status == 'rejected':
+                document_renewal_rejection_reason = latest_renewal.rejection_reason
+        except TutorApplication.DoesNotExist:
+            pass
+
+    document_renewal_required = document_renewal_status in ['due', 'pending', 'rejected']
+
+    return {
         "application_status": application_status,
+        "document_renewal_status": document_renewal_status,
+        "document_renewal_due_at": document_renewal_due_at,
+        "document_renewal_rejection_reason": document_renewal_rejection_reason,
+        "document_renewal_required": document_renewal_required,
+        "needs_document_renewal": document_renewal_required,
+        "tutor_renewal_status": document_renewal_status,
+        "tutor_renewal_required": document_renewal_required,
+        "tutor_renewal_due_at": document_renewal_due_at,
+        "tutor_renewal_rejection_reason": document_renewal_rejection_reason,
+        "can_submit_document_renewal": can_submit_document_renewal,
     }
 
 
@@ -798,17 +830,12 @@ def register_user(request):
 def profile_status(request):
 
     profile = request.user.userprofile
-    application_status = None
-    if profile.role == 'Tutor':
-        try:
-            application_status = profile.tutor_application.application_status
-        except:
-            pass
+    tutor_document_context = get_tutor_document_review_context(profile)
 
     return Response({
         "profile_completed": profile.profile_completed,
         "role": profile.role,
-        "application_status": application_status
+        **tutor_document_context
     })
 
 @api_view(['POST'])
@@ -4408,7 +4435,7 @@ def tutor_application_status(request):
 @transaction.atomic
 def tutor_application_resubmit(request):
     try:
-        application = TutorApplication.objects.get(profile=request.user.userprofile)
+        application = TutorApplication.objects.select_for_update().get(profile=request.user.userprofile)
     except TutorApplication.DoesNotExist:
         return Response({"error": "No application found to resubmit."}, status=status.HTTP_404_NOT_FOUND)
 
@@ -4420,6 +4447,15 @@ def tutor_application_resubmit(request):
         return Response(
             {"error": "Please provide both your School ID and Proof of Enrollment to resubmit."},
             status=status.HTTP_400_BAD_REQUEST
+        )
+
+    if application.application_status == 'approved':
+        return create_tutor_document_renewal_submission(
+            request,
+            application,
+            school_id,
+            enrollment_proof,
+            reason_to_tutor,
         )
 
     # Update application
@@ -4446,3 +4482,72 @@ def tutor_application_resubmit(request):
         logger.exception("Failed to send tutor application resubmission email for profile_id=%s", request.user.userprofile.id)
 
     return Response({"message": "Application resubmitted successfully. It is now back under review."})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@transaction.atomic
+def tutor_document_renewal_submit(request):
+    try:
+        application = TutorApplication.objects.select_for_update().get(profile=request.user.userprofile)
+    except TutorApplication.DoesNotExist:
+        return Response({"error": "No approved tutor application found."}, status=status.HTTP_404_NOT_FOUND)
+
+    school_id = request.FILES.get('school_id')
+    enrollment_proof = request.FILES.get('enrollment_proof')
+    reason_to_tutor = request.data.get('reason_to_tutor', '')
+
+    if not school_id or not enrollment_proof:
+        return Response(
+            {"error": "Please provide both your School ID and updated Enrollment/RF document."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    return create_tutor_document_renewal_submission(
+        request,
+        application,
+        school_id,
+        enrollment_proof,
+        reason_to_tutor,
+    )
+
+
+def create_tutor_document_renewal_submission(request, application, school_id, enrollment_proof, reason_to_tutor):
+    if application.application_status != 'approved':
+        return Response(
+            {"error": "Only approved tutors can submit recurring document renewals."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    renewal_status = application.document_renewal_status()
+    if renewal_status == 'pending':
+        return Response(
+            {"error": "Your updated documents are already pending review."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    if renewal_status == 'verified':
+        return Response(
+            {"error": "Your enrollment documents are still current."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    renewal = TutorDocumentRenewalReview.objects.create(
+        application=application,
+        profile=request.user.userprofile,
+        school_id=school_id,
+        enrollment_proof=enrollment_proof,
+        reason_to_tutor=reason_to_tutor,
+        status='pending',
+    )
+
+    PlatformActivity.objects.create(
+        activity_type='tutor_application',
+        message=f"Tutor document renewal submitted: {request.user.userprofile.fname} {request.user.userprofile.lname}",
+        institution=request.user.userprofile.institution
+    )
+
+    return Response({
+        "message": "Updated documents submitted successfully. They are now under review.",
+        "renewal_id": renewal.id,
+        **get_tutor_document_review_context(request.user.userprofile),
+    }, status=status.HTTP_201_CREATED)

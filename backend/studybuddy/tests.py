@@ -31,6 +31,8 @@ from .models import (
     TutorSubjects,
     UserProfile,
     Transaction,
+    TutorApplication,
+    TutorDocumentRenewalReview,
     TutorPayoutAccount,
     Wallet,
     WithdrawalRequest,
@@ -1685,6 +1687,211 @@ class TutorProfileTests(APITestCase):
         self.client.force_authenticate(user=self.tutor_user)
         response = self.client.post('/api/tutor/profile/avatar/', {}, format='multipart')
         self.assertEqual(response.status_code, 400)
+
+
+class TutorDocumentRenewalTests(APITestCase):
+    def setUp(self):
+        from datetime import timedelta
+        from django.utils import timezone
+
+        self.institution = PartnerInstitution.objects.create(
+            institution_name="CPU",
+            school_email_domain="cpu.edu",
+            is_active=True,
+        )
+        self.other_institution = PartnerInstitution.objects.create(
+            institution_name="Other University",
+            school_email_domain="other.edu",
+            is_active=True,
+        )
+        self.tutor_user = User.objects.create_user(
+            username="renewal-tutor@cpu.edu",
+            email="renewal-tutor@cpu.edu",
+            password="password",
+        )
+        self.tutor_profile = UserProfile.objects.create(
+            user=self.tutor_user,
+            fname="Renewal",
+            mname="",
+            lname="Tutor",
+            role="Tutor",
+            institution=self.institution,
+        )
+        Tutor.objects.create(profile=self.tutor_profile)
+        self.reviewed_at = timezone.now() - timedelta(days=91)
+        self.application = TutorApplication.objects.create(
+            profile=self.tutor_profile,
+            school_id=self.upload("initial-id.jpg", b"initial-id", "image/jpeg"),
+            enrollment_proof=self.upload("initial-rf.pdf", b"initial-rf", "application/pdf"),
+            application_status="approved",
+            reviewed_at=self.reviewed_at,
+        )
+        self.admin_user = User.objects.create_user(
+            username="admin@cpu.edu",
+            email="admin@cpu.edu",
+            password="password",
+        )
+        self.admin_profile = UserProfile.objects.create(
+            user=self.admin_user,
+            fname="Admin",
+            mname="",
+            lname="User",
+            role="Admin",
+            institution=self.institution,
+        )
+        self.other_admin_user = User.objects.create_user(
+            username="admin@other.edu",
+            email="admin@other.edu",
+            password="password",
+        )
+        UserProfile.objects.create(
+            user=self.other_admin_user,
+            fname="Other",
+            mname="",
+            lname="Admin",
+            role="Admin",
+            institution=self.other_institution,
+        )
+
+    def upload(self, name, content, content_type):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        return SimpleUploadedFile(name, content, content_type=content_type)
+
+    def renewal_payload(self):
+        return {
+            "school_id": self.upload("renewal-id.jpg", b"renewal-id", "image/jpeg"),
+            "enrollment_proof": self.upload("renewal-rf.pdf", b"renewal-rf", "application/pdf"),
+            "reason_to_tutor": "Still enrolled and available to tutor.",
+        }
+
+    def test_profile_status_exposes_due_document_renewal_state(self):
+        self.client.force_authenticate(user=self.tutor_user)
+
+        response = self.client.get("/api/profile/status/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["application_status"], "approved")
+        self.assertEqual(response.data["document_renewal_status"], "due")
+        self.assertTrue(response.data["can_submit_document_renewal"])
+        self.assertIsNotNone(response.data["document_renewal_due_at"])
+
+    def test_tutor_can_submit_due_document_renewal(self):
+        self.client.force_authenticate(user=self.tutor_user)
+
+        response = self.client.post(
+            "/api/tutor-application/renewal/",
+            self.renewal_payload(),
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        renewal = TutorDocumentRenewalReview.objects.get(application=self.application)
+        self.assertEqual(renewal.status, "pending")
+        self.assertEqual(response.data["document_renewal_status"], "pending")
+
+    def test_legacy_resubmit_endpoint_creates_document_renewal_for_approved_tutor(self):
+        self.client.force_authenticate(user=self.tutor_user)
+
+        response = self.client.post(
+            "/api/tutor-application/resubmit/",
+            self.renewal_payload(),
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.application.refresh_from_db()
+        self.assertEqual(self.application.application_status, "approved")
+        self.assertEqual(TutorDocumentRenewalReview.objects.filter(status="pending").count(), 1)
+
+    def test_tutor_cannot_submit_verified_document_renewal_before_due(self):
+        from django.utils import timezone
+
+        self.application.reviewed_at = timezone.now()
+        self.application.save(update_fields=["reviewed_at"])
+        self.client.force_authenticate(user=self.tutor_user)
+
+        response = self.client.post(
+            "/api/tutor-application/renewal/",
+            self.renewal_payload(),
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(TutorDocumentRenewalReview.objects.count(), 0)
+
+    def test_admin_can_approve_document_renewal_and_due_date_moves_forward(self):
+        renewal = TutorDocumentRenewalReview.objects.create(
+            application=self.application,
+            profile=self.tutor_profile,
+            school_id=self.upload("pending-id.jpg", b"pending-id", "image/jpeg"),
+            enrollment_proof=self.upload("pending-rf.pdf", b"pending-rf", "application/pdf"),
+            status="pending",
+        )
+        self.client.force_authenticate(user=self.admin_user)
+
+        response = self.client.patch(
+            f"/api/admin/tutor-document-renewals/{renewal.id}/",
+            {"application_status": "approved"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        renewal.refresh_from_db()
+        self.assertEqual(renewal.status, "approved")
+        self.assertEqual(self.application.document_renewal_status(), "verified")
+        self.assertGreater(self.application.document_renewal_due_at(), renewal.reviewed_at)
+
+    def test_admin_can_reject_document_renewal_and_tutor_can_resubmit(self):
+        renewal = TutorDocumentRenewalReview.objects.create(
+            application=self.application,
+            profile=self.tutor_profile,
+            school_id=self.upload("pending-id.jpg", b"pending-id", "image/jpeg"),
+            enrollment_proof=self.upload("pending-rf.pdf", b"pending-rf", "application/pdf"),
+            status="pending",
+        )
+        self.client.force_authenticate(user=self.admin_user)
+
+        reject_response = self.client.patch(
+            f"/api/admin/tutor-document-renewals/{renewal.id}/",
+            {
+                "application_status": "rejected",
+                "rejection_reason": "RF is not for the current term.",
+            },
+            format="json",
+        )
+
+        self.assertEqual(reject_response.status_code, 200)
+        renewal.refresh_from_db()
+        self.assertEqual(renewal.status, "rejected")
+        self.client.force_authenticate(user=self.tutor_user)
+        resubmit_response = self.client.post(
+            "/api/tutor-application/renewal/",
+            self.renewal_payload(),
+            format="multipart",
+        )
+        self.assertEqual(resubmit_response.status_code, 201)
+        self.assertEqual(TutorDocumentRenewalReview.objects.filter(status="pending").count(), 1)
+
+    def test_admin_cannot_review_other_institution_document_renewal(self):
+        renewal = TutorDocumentRenewalReview.objects.create(
+            application=self.application,
+            profile=self.tutor_profile,
+            school_id=self.upload("pending-id.jpg", b"pending-id", "image/jpeg"),
+            enrollment_proof=self.upload("pending-rf.pdf", b"pending-rf", "application/pdf"),
+            status="pending",
+        )
+        self.client.force_authenticate(user=self.other_admin_user)
+
+        response = self.client.patch(
+            f"/api/admin/tutor-document-renewals/{renewal.id}/",
+            {"application_status": "approved"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 404)
+        renewal.refresh_from_db()
+        self.assertEqual(renewal.status, "pending")
 
 
 @override_settings(

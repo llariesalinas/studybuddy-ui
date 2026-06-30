@@ -23,6 +23,7 @@ export function wsServerProtocol() {
 // Auth
 export const ACCESS_REFRESH_INTERVAL_MS = 4 * 60 * 1000   // 4 min
 export const IDLE_LOGOUT_MS             = 10 * 60 * 1000  // 10 min
+export const MAX_DOCUMENT_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024 // 5 MB; keep in sync with backend
 
 // Polling
 export const SESSION_POLL_INTERVAL_MS      = 60_000

@@ -1,10 +1,12 @@
 import uuid
+from datetime import timedelta
 
 from django.db import models
 from django.db.models import Q
 from django.contrib.auth.models import User
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.utils import timezone
 
 
 # Create your models here.
@@ -236,6 +238,8 @@ class Tutor(models.Model):
         return f"Tutor: {self.profile.fname} {self.profile.lname}"
 
 class TutorApplication(models.Model):
+    DOCUMENT_RENEWAL_INTERVAL_DAYS = 90
+
     STATUS_CHOICES = [
         ('pending', 'Pending Review'),
         ('approved', 'Approved'),
@@ -262,7 +266,8 @@ class TutorApplication(models.Model):
     application_status = models.CharField(
         max_length=20,
         choices=STATUS_CHOICES,
-        default='pending'
+        default='pending',
+        db_index=True,
     )
 
     # Admin Feedback
@@ -277,8 +282,95 @@ class TutorApplication(models.Model):
     submitted_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    def latest_approved_document_review_at(self):
+        latest_renewal = (
+            self.document_renewal_reviews
+            .filter(status='approved', reviewed_at__isnull=False)
+            .order_by('-reviewed_at', '-submitted_at')
+            .first()
+        )
+        if latest_renewal:
+            return latest_renewal.reviewed_at
+        return self.reviewed_at
+
+    def document_renewal_due_at(self):
+        if self.application_status != 'approved':
+            return None
+
+        approved_at = self.latest_approved_document_review_at()
+        if approved_at is None:
+            return None
+
+        return approved_at + timedelta(days=self.DOCUMENT_RENEWAL_INTERVAL_DAYS)
+
+    def latest_document_renewal_review(self):
+        return self.document_renewal_reviews.order_by('-submitted_at').first()
+
+    def document_renewal_status(self):
+        if self.application_status != 'approved':
+            return None
+
+        latest_renewal = self.latest_document_renewal_review()
+        if latest_renewal and latest_renewal.status in ['pending', 'rejected']:
+            return latest_renewal.status
+
+        due_at = self.document_renewal_due_at()
+        if due_at and due_at <= timezone.now():
+            return 'due'
+
+        return 'verified'
+
+    def can_submit_document_renewal(self):
+        return self.document_renewal_status() in ['due', 'rejected']
+
     def __str__(self):
         return f"Application: {self.profile.fname} {self.profile.lname} ({self.application_status})"
+
+
+class TutorDocumentRenewalReview(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Pending Review'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    ]
+
+    application = models.ForeignKey(
+        TutorApplication,
+        on_delete=models.CASCADE,
+        related_name='document_renewal_reviews'
+    )
+    profile = models.ForeignKey(
+        UserProfile,
+        on_delete=models.CASCADE,
+        related_name='document_renewal_reviews'
+    )
+    school_id = models.ImageField(upload_to='tutor_applications/renewal_school_ids/')
+    enrollment_proof = models.FileField(upload_to='tutor_applications/renewal_enrollment_proofs/')
+    reason_to_tutor = models.TextField(blank=True, default='')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    rejection_reason = models.TextField(blank=True, default='')
+    reviewed_by = models.ForeignKey(
+        UserProfile,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='reviewed_document_renewals'
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    submitted_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-submitted_at']
+        indexes = [
+            models.Index(fields=['profile', 'status'], name='studybuddy__profile_71f0af_idx'),
+            models.Index(fields=['application', 'status'], name='studybuddy__applica_1d5f57_idx'),
+            models.Index(fields=['status', 'submitted_at'], name='studybuddy__status_82fcda_idx'),
+        ]
+
+    def __str__(self):
+        return f"Document renewal: {self.profile.fname} {self.profile.lname} ({self.status})"
+
 
 class Wallet(models.Model):
     tutor = models.OneToOneField(Tutor, on_delete=models.CASCADE, related_name='wallet')

@@ -65,6 +65,7 @@
 <script setup>
 import { ref } from 'vue'
 import { useRegistrationInfoStore } from '@/stores/registrationinfo'
+import { MAX_DOCUMENT_UPLOAD_SIZE_BYTES } from '@/config'
 
 const props = defineProps({
   isOpen: Boolean,
@@ -77,13 +78,11 @@ const store = useRegistrationInfoStore()
 const localReason = ref(store.reasonToTutor)
 const localError = ref('')
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5 MB
-
 const handleFileChange = (event, type) => {
   const file = event.target.files[0]
   if (!file) return
 
-  if (file.size > MAX_FILE_SIZE) {
+  if (file.size > MAX_DOCUMENT_UPLOAD_SIZE_BYTES) {
     localError.value = `"${file.name}" is too large. Each file must be under 5 MB.`
     event.target.value = '' // reset the input
     return
