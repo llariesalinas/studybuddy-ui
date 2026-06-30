@@ -130,6 +130,7 @@ const menuItems = computed(() => {
       { to: '/superadmin/institutions', label: 'Institutions', icon: 'bi-building' },
       { to: '/superadmin/users', label: 'All Users', icon: 'bi-people' },
       { to: '/superadmin/reports', label: 'Reports', icon: 'bi-bar-chart-line' },
+      { to: '/superadmin/support', label: 'Support Desk', icon: 'bi-headset' },
     ]
   }
 

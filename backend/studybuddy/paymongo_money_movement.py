@@ -94,6 +94,19 @@ def list_receiving_institutions():
 
 
 def create_wallet_transaction(wallet_id, payout_account, amount, callback_url, withdrawal_id):
+    if getattr(settings, 'PAYMONGO_CASHOUT_MOCK', False):
+        return {
+            'id': f'mock_wtx_{withdrawal_id}',
+            'status': 'succeeded',
+            'provider': INSTAPAY_PROVIDER,
+            'reference_number': f'MOCK-{withdrawal_id}',
+            'provider_error_code': '',
+            'provider_error_message': '',
+            'fee': decimal.Decimal('0.00'),
+            'net_amount': parse_decimal(amount),
+            'raw': {'mock': True},
+        }
+
     if not wallet_id:
         raise PayMongoCashOutError('PayMongo wallet is not configured.')
 

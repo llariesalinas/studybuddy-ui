@@ -7,7 +7,8 @@ export const useWalletStore = defineStore('wallet', () => {
   const catalogStore = useCatalogStore()
   const balance = ref(0)
   const pendingAmount = ref(0)
-  const cashoutMinimum = ref(500)
+  const cashinMinimum = ref(50)
+  const cashoutMinimum = ref(50)
   const cashoutMaximum = ref(50000)
   const cashoutProviderFee = ref(10)
   const transactions = ref([])
@@ -46,7 +47,8 @@ export const useWalletStore = defineStore('wallet', () => {
       const { data } = await api.get('wallet/')
       balance.value = data.balance
       pendingAmount.value = data.pending_amount
-      cashoutMinimum.value = data.cashout_minimum ?? 500
+      cashinMinimum.value = data.cashin_minimum ?? 50
+      cashoutMinimum.value = data.cashout_minimum ?? 50
       cashoutMaximum.value = data.cashout_maximum ?? 50000
       cashoutProviderFee.value = data.cashout_provider_fee ?? 10
     } finally {
@@ -126,7 +128,7 @@ export const useWalletStore = defineStore('wallet', () => {
     await api.post('dev/wallet/remove/', { amount })
   }
 
-  return { balance, pendingAmount, cashoutMinimum, cashoutMaximum, cashoutProviderFee, transactions, withdrawals,
+  return { balance, pendingAmount, cashinMinimum, cashoutMinimum, cashoutMaximum, cashoutProviderFee, transactions, withdrawals,
            recentCashOuts, receivingInstitutions, loading,
            grossEarned, totalDeductions, netEarned,
            fetchWallet, fetchTransactions, fetchWithdrawals, fetchRecentCashOuts,

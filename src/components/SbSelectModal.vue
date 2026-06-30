@@ -8,6 +8,13 @@
     :aria-controls="dialogId"
     @click="openModal"
   >
+    <img
+      v-if="selectedOption?.icon"
+      :src="selectedOption.icon"
+      alt=""
+      class="sb-select-trigger-image"
+      @error="$event.target.style.display = 'none'"
+    />
     <span class="sb-select-trigger-text" :class="{ 'is-placeholder': !selectedOption }">
       {{ selectedOption?.label || placeholder }}
     </span>
@@ -279,7 +286,8 @@ function normalizeOptions(options) {
     .map(option => ({
       label: String(option.label ?? option.value),
       value: option.value,
-      description: option.description || ''
+      description: option.description || '',
+      icon: option.icon || ''
     }))
 }
 
@@ -402,6 +410,7 @@ function unlockBodyScroll() {
 }
 
 .sb-select-trigger-text {
+  flex: 1;
   min-width: 0;
   overflow: hidden;
   color: var(--sb-text-main);
@@ -416,6 +425,14 @@ function unlockBodyScroll() {
 .sb-select-trigger-icon {
   color: var(--sb-primary);
   flex: 0 0 auto;
+}
+
+.sb-select-trigger-image {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  border-radius: 6px;
+  object-fit: contain;
 }
 
 .sb-select-backdrop {

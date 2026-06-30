@@ -3858,10 +3858,15 @@ def wallet_status(request):
         "balance": float(wallet.balance),
         "pending_amount": float(wallet.pending_amount),
         "currency": "PHP",
+        "cashin_minimum": float(get_cashin_minimum()),
         "cashout_minimum": float(get_cashout_minimum()),
         "cashout_maximum": float(get_cashout_maximum()),
         "cashout_provider_fee": float(get_cashout_provider_fee()),
     })
+
+
+def get_cashin_minimum():
+    return decimal.Decimal(str(settings.CASHIN_MIN_PHP)).quantize(decimal.Decimal('0.01'))
 
 
 def get_cashout_minimum():
@@ -3931,6 +3936,12 @@ def serialize_cash_out(withdrawal):
         "processed_at": withdrawal.processed_at,
         "note": withdrawal.note,
     }
+
+
+def cashout_method_display(withdrawal):
+    if withdrawal.method == 'gcash':
+        return 'Digital Wallet'
+    return withdrawal.get_method_display()
 
 
 def serialize_cash_in(topup):
@@ -4098,8 +4109,9 @@ def request_withdrawal(request):
     if not amount or decimal.Decimal(str(amount)) > wallet.balance:
         return Response({"error": "Insufficient balance"}, status=400)
     
-    if decimal.Decimal(str(amount)) < 500:
-        return Response({"error": "Minimum withdrawal is ₱500"}, status=400)
+    minimum_amount = get_cashout_minimum()
+    if decimal.Decimal(str(amount)) < minimum_amount:
+        return Response({"error": f"Minimum withdrawal is PHP {minimum_amount}."}, status=400)
 
     with transaction.atomic():
         withdrawal = WithdrawalRequest.objects.create(
@@ -4119,7 +4131,7 @@ def request_withdrawal(request):
             wallet=wallet,
             transaction_type='withdrawal',
             amount=-decimal.Decimal(str(amount)),
-            description=f"Withdrawal request via {withdrawal.get_method_display()}",
+            description=f"Withdrawal request via {cashout_method_display(withdrawal)}",
             reference_id=f"WD-{withdrawal.id}"
         )
 
@@ -4256,7 +4268,7 @@ def cash_outs(request):
             wallet=wallet,
             transaction_type='withdrawal',
             amount=-amount,
-            description=f"Cash-out request via {withdrawal.get_method_display()}",
+            description=f"Cash-out request via {cashout_method_display(withdrawal)}",
             reference_id=f"WD-{withdrawal.id}"
         )
 
@@ -4633,6 +4645,10 @@ def initiate_cash_in(request):
     if amount is None:
         return Response({"error": "Enter a valid cash-in amount."}, status=400)
 
+    minimum_amount = get_cashin_minimum()
+    if amount < minimum_amount:
+        return Response({"error": f"Minimum cash-in is PHP {minimum_amount}."}, status=400)
+
     topup = WalletTopUp.objects.create(
         tutor=tutor, amount=amount, status='pending', provider='paymongo'
     )
@@ -4864,21 +4880,24 @@ def admin_claim_ticket(request, ticket_id):
         return Response(status=403)
 
     from .models import SupportTicket
-    queryset = SupportTicket.objects.all()
+    queryset = SupportTicket.objects.select_related('chatroom').all()
     if profile.role != 'SuperAdmin':
         queryset = queryset.filter(user__institution=profile.institution)
 
     ticket = get_object_or_404(queryset, id=ticket_id)
+    if ticket.status == 'Escalated' and profile.role != 'SuperAdmin':
+        return Response({"error": "Escalated tickets must be handled by a SuperAdmin."}, status=403)
 
     try:
         with transaction.atomic():
             ticket.assigned_agent = profile
-            ticket.status = 'In_Progress'
+            if ticket.status != 'Escalated':
+                ticket.status = 'In_Progress'
 
             ticket.chatroom.tutor = profile
 
-            ticket.save()
-            ticket.chatroom.save()
+            ticket.save(update_fields=['assigned_agent', 'status', 'updated_at'])
+            ticket.chatroom.save(update_fields=['tutor', 'updated_at'])
     except IntegrityError:
         return Response(
             {"error": "User already has an active support ticket claimed by you."},
@@ -4886,6 +4905,58 @@ def admin_claim_ticket(request, ticket_id):
         )
 
     return Response({"message": "Ticket claimed"})
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def admin_escalate_ticket(request, ticket_id):
+    profile = request.user.userprofile
+    if profile.role != 'Admin':
+        return Response(status=403)
+
+    reason = str(request.data.get('reason', '')).strip()
+    if not reason:
+        return Response({"error": "Escalation reason is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+    from .models import SupportTicket
+    ticket = get_object_or_404(
+        SupportTicket.objects.select_related('chatroom').filter(user__institution=profile.institution),
+        id=ticket_id,
+    )
+    if ticket.status == 'Resolved':
+        return Response({"error": "Resolved tickets cannot be escalated."}, status=status.HTTP_400_BAD_REQUEST)
+    if ticket.status == 'Escalated':
+        return Response({"error": "Ticket is already escalated."}, status=status.HTTP_400_BAD_REQUEST)
+
+    with transaction.atomic():
+        ticket.status = 'Escalated'
+        ticket.escalation_reason = reason
+        ticket.escalated_by = profile
+        ticket.escalated_at = timezone.now()
+        ticket.assigned_agent = None
+        ticket.save(update_fields=[
+            'status',
+            'escalation_reason',
+            'escalated_by',
+            'escalated_at',
+            'assigned_agent',
+            'updated_at',
+        ])
+
+        if ticket.chatroom:
+            ticket.chatroom.tutor = None
+            ticket.chatroom.save(update_fields=['tutor', 'updated_at'])
+
+            from studybuddy.chat.models import Message
+            Message.objects.create(
+                room=ticket.chatroom,
+                sender=None,
+                content="This support ticket has been escalated to SuperAdmin support.",
+            )
+
+    return Response({
+        "message": "Ticket escalated",
+        "status": "Escalated",
+    })
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -4919,10 +4990,12 @@ def admin_list_tickets(request):
         return Response(status=403)
 
     from .models import SupportTicket
-    tickets = SupportTicket.objects.select_related('user', 'assigned_agent').all().order_by('-created_at')
+    tickets = SupportTicket.objects.select_related('user', 'assigned_agent', 'escalated_by').all().order_by('-created_at')
     
-    if profile.role != 'SuperAdmin':
-        tickets = tickets.filter(user__institution=profile.institution)
+    if profile.role == 'SuperAdmin':
+        tickets = tickets.filter(Q(status='Escalated') | Q(escalated_at__isnull=False))
+    else:
+        tickets = tickets.filter(user__institution=profile.institution).exclude(status='Escalated')
 
     data = []
     for ticket in tickets:
@@ -4942,6 +5015,9 @@ def admin_list_tickets(request):
             "chatroom_id": ticket.chatroom_id,
             "assigned_agent": f"{ticket.assigned_agent.fname} {ticket.assigned_agent.lname}" if ticket.assigned_agent else None,
             "assigned_agent_id": ticket.assigned_agent_id,
+            "escalation_reason": ticket.escalation_reason,
+            "escalated_by": f"{ticket.escalated_by.fname} {ticket.escalated_by.lname}" if ticket.escalated_by else None,
+            "escalated_at": ticket.escalated_at,
             "created_at": ticket.created_at,
             "updated_at": ticket.updated_at,
         })
@@ -4960,6 +5036,9 @@ def admin_resolve_ticket(request, ticket_id):
         queryset = queryset.filter(user__institution=profile.institution)
 
     ticket = get_object_or_404(queryset, id=ticket_id)
+    if ticket.status == 'Escalated' and profile.role != 'SuperAdmin':
+        return Response({"error": "Escalated tickets must be resolved by a SuperAdmin."}, status=403)
+
     ticket.status = 'Resolved'
     ticket.save()
 

@@ -334,7 +334,18 @@ PAYMONGO_CASHOUT_CALLBACK_URL = os.getenv("PAYMONGO_CASHOUT_CALLBACK_URL", "")
 # Shared secret appended to the cashout callback URL and verified on the inbound
 # callback. When set, callbacks without a matching ?token= are rejected.
 PAYMONGO_CASHOUT_CALLBACK_SECRET = os.getenv("PAYMONGO_CASHOUT_CALLBACK_SECRET", "")
+# Dev-only: simulate a successful PayMongo wallet transaction instead of calling the
+# live Money Movement API. PayMongo test mode has no payouts product, so this is the
+# only way to exercise cash-out locally. Must never be enabled in production.
+PAYMONGO_CASHOUT_MOCK = os.getenv("PAYMONGO_CASHOUT_MOCK", "false").lower() in ("1", "true", "yes")
+if PAYMONGO_CASHOUT_MOCK and not DEBUG:
+    import logging
+    logging.getLogger(__name__).warning(
+        "PAYMONGO_CASHOUT_MOCK is enabled with DEBUG=false. Cash-outs will be "
+        "simulated as successful without moving real money."
+    )
 CASHOUT_PROVIDER_FEE_PHP = os.getenv("CASHOUT_PROVIDER_FEE_PHP", "10")
-CASHOUT_MIN_PHP = os.getenv("CASHOUT_MIN_PHP", "500")
+CASHIN_MIN_PHP = os.getenv("CASHIN_MIN_PHP", "50")
+CASHOUT_MIN_PHP = os.getenv("CASHOUT_MIN_PHP", "50")
 # InstaPay's real per-transaction cap (see ADR-0001) -- every cash-out uses InstaPay now.
 CASHOUT_MAX_PHP = os.getenv("CASHOUT_MAX_PHP", "50000")

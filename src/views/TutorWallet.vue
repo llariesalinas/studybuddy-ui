@@ -427,7 +427,7 @@ const showConfirmStep = ref(false)
 const bankNameAutoFilled = ref(false)
 
 const destinationTypeOptions = [
-  { label: 'GCash', value: 'gcash' },
+  { label: 'Digital Wallet', value: 'gcash' },
   { label: 'Bank', value: 'bank' },
 ]
 
@@ -497,7 +497,7 @@ const receivingInstitutionOptions = computed(() =>
   }))
 )
 
-const formatDestinationType = (type) => (type === 'gcash' ? 'GCash' : 'Bank Transfer')
+const formatDestinationType = (type) => (type === 'gcash' ? 'Digital Wallet' : 'Bank Transfer')
 
 const maskAccount = (value = '') => {
   const account = String(value)
@@ -556,6 +556,12 @@ const buildCashoutPayload = () => ({
   note: cashoutForm.note,
 })
 
+const cashoutSubmitErrorMessage = (error) =>
+  error.response?.data?.error ||
+  error.response?.data?.provider_error_message ||
+  error.response?.data?.failure_reason ||
+  'Unable to submit cash-out request.'
+
 const submitCashout = async (confirmNewDestination = false) => {
   isSubmitting.value = true
   try {
@@ -569,7 +575,7 @@ const submitCashout = async (confirmNewDestination = false) => {
     if (error.response?.status === 409 && error.response?.data?.error === 'new_destination_confirmation_required') {
       showConfirmStep.value = true
     } else {
-      toastStore.push(error.response?.data?.error || 'Unable to submit cash-out request.', 'error')
+      toastStore.push(cashoutSubmitErrorMessage(error), 'error')
     }
   } finally {
     isSubmitting.value = false

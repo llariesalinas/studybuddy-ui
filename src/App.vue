@@ -170,6 +170,11 @@
             <p class="sb-muted">Cross-institution analytics — filter by institution or view globally.</p>
           </div>
 
+          <div v-if="route.path === '/superadmin/support'">
+            <h2 class="fw-bold sb-text">SuperAdmin Support</h2>
+            <p class="sb-muted">Claim and resolve escalated support tickets from institution admins.</p>
+          </div>
+
           <div v-if="route.path === '/tch-requestedSessions'">
             <div class="d-flex align-items-center gap-2 flex-wrap">
               <h2 class="fw-bold sb-text mb-1">Requested Sessions</h2>

@@ -847,6 +847,7 @@ class SupportTicket(models.Model):
     STATUS_CHOICES = [
         ('Open', 'Open'),
         ('In_Progress', 'In Progress'),
+        ('Escalated', 'Escalated'),
         ('Resolved', 'Resolved'),
     ]
 
@@ -862,6 +863,9 @@ class SupportTicket(models.Model):
     chatroom = models.OneToOneField('ChatRoom', on_delete=models.SET_NULL, null=True, related_name='ticket')
 
     assigned_agent = models.ForeignKey(UserProfile, on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_tickets')
+    escalation_reason = models.TextField(blank=True, default='')
+    escalated_by = models.ForeignKey(UserProfile, on_delete=models.SET_NULL, null=True, blank=True, related_name='escalated_tickets')
+    escalated_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

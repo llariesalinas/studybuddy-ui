@@ -9,7 +9,7 @@
         <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
           <div class="d-flex gap-2 mb-4 filter-bar p-2 rounded-3 d-inline-flex">
             <button
-              v-for="status in ['Open', 'In_Progress', 'Resolved']"
+              v-for="status in statusTabs"
               :key="status"
               @click="filters.status = status"
               class="btn rounded-pill px-3 py-1 fw-semibold shadow-none sb-btn sb-pill filter-tab"
@@ -95,7 +95,7 @@
                     <i class="bi bi-eye"></i>
                   </button>
                   <button
-                    v-if="ticket.status === 'Open'"
+                    v-if="canClaim(ticket)"
                     type="button"
                     class="btn btn-sm bg-sb-primary text-white sb-btn rounded-pill px-3"
                     :disabled="claimingId === ticket.id"
@@ -105,12 +105,21 @@
                     Claim
                   </button>
                   <button
-                    v-else-if="ticket.status === 'In_Progress'"
+                    v-else-if="canChat(ticket)"
                     type="button"
                     class="btn btn-sm btn-outline-primary sb-btn rounded-pill px-3"
                     @click.stop="goToChat(ticket)"
                   >
                     Chat
+                  </button>
+                  <button
+                    v-if="canEscalate(ticket)"
+                    type="button"
+                    class="btn btn-sm btn-outline-warning sb-btn rounded-pill px-3 ms-2"
+                    :disabled="escalatingId === ticket.id"
+                    @click.stop="openEscalationModal(ticket)"
+                  >
+                    Escalate
                   </button>
                 </td>
               </tr>
@@ -192,6 +201,16 @@
             </div>
           </div>
 
+          <div v-if="selectedTicket.escalation_reason" class="mb-4">
+            <span class="small text-muted fw-bold d-block mb-1">ESCALATION REASON</span>
+            <div class="bg-warning-subtle text-dark p-3 rounded-4 small whitespace-pre-wrap">
+              {{ selectedTicket.escalation_reason }}
+            </div>
+            <p v-if="selectedTicket.escalated_by" class="small text-muted mt-2 mb-0">
+              Escalated by {{ selectedTicket.escalated_by }}
+            </p>
+          </div>
+
           <div v-if="selectedTicket.booking_id || selectedTicket.transaction_id" class="card border-sb rounded-4 p-3 mb-4">
             <h6 class="fw-bold mb-2 small text-muted"><i class="bi bi-link-45deg me-1"></i>CONTEXT LINKS</h6>
             <div v-if="selectedTicket.booking_id" class="mb-2">
@@ -210,7 +229,7 @@
 
           <div class="mt-auto pt-4 border-top">
             <button
-              v-if="selectedTicket.status === 'Open'"
+              v-if="canClaim(selectedTicket)"
               type="button"
               class="btn bg-sb-primary text-white w-100 mb-2 rounded-pill py-2 sb-btn"
               :disabled="claimingId === selectedTicket.id"
@@ -220,7 +239,7 @@
               Claim Ticket & Enter Chat
             </button>
             <button
-              v-if="selectedTicket.status === 'In_Progress'"
+              v-if="canChat(selectedTicket)"
               type="button"
               class="btn btn-primary w-100 mb-2 rounded-pill py-2 sb-btn"
               @click="goToChat(selectedTicket)"
@@ -228,7 +247,16 @@
               Open Ticket Chat
             </button>
             <button
-              v-if="selectedTicket.status !== 'Resolved'"
+              v-if="canEscalate(selectedTicket)"
+              type="button"
+              class="btn btn-outline-warning w-100 mb-2 rounded-pill py-2 sb-btn"
+              :disabled="escalatingId === selectedTicket.id"
+              @click="openEscalationModal(selectedTicket)"
+            >
+              Escalate to SuperAdmin
+            </button>
+            <button
+              v-if="canResolve(selectedTicket)"
               type="button"
               class="btn btn-outline-danger w-100 rounded-pill py-2 sb-btn"
               :disabled="resolvingId === selectedTicket.id"
@@ -246,26 +274,101 @@
         @click="selectedTicket = null"
       ></div>
     </Teleport>
+
+    <Teleport to="body">
+      <div
+        v-if="ticketToEscalate"
+        class="modal fade show d-block"
+        tabindex="-1"
+        role="dialog"
+        aria-modal="true"
+      >
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content border-0 shadow">
+            <div class="modal-header border-0 pb-0">
+              <h5 class="modal-title fw-bold sb-text">Escalate Ticket</h5>
+              <button
+                type="button"
+                class="btn-close shadow-none"
+                aria-label="Close"
+                @click="closeEscalationModal"
+              ></button>
+            </div>
+            <div class="modal-body">
+              <p class="small text-muted mb-3">
+                Ticket #{{ ticketToEscalate.id }} will move to the SuperAdmin support queue.
+              </p>
+              <label for="escalation-reason" class="form-label small fw-bold text-muted">
+                REASON
+              </label>
+              <textarea
+                id="escalation-reason"
+                v-model="escalationReason"
+                class="form-control sb-field shadow-none"
+                rows="4"
+                maxlength="500"
+                placeholder="What needs SuperAdmin access or decision-making?"
+              ></textarea>
+              <p v-if="escalationError" class="text-danger small mt-2 mb-0">
+                {{ escalationError }}
+              </p>
+            </div>
+            <div class="modal-footer border-0 pt-0">
+              <button
+                type="button"
+                class="btn btn-light rounded-pill px-4 sb-btn"
+                @click="closeEscalationModal"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                class="btn btn-warning rounded-pill px-4 sb-btn"
+                :disabled="escalatingId === ticketToEscalate.id"
+                @click="handleEscalate"
+              >
+                <span v-if="escalatingId === ticketToEscalate.id" class="spinner-border spinner-border-sm me-2"></span>
+                Escalate
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div
+        v-if="ticketToEscalate"
+        class="modal-backdrop fade show"
+        @click="closeEscalationModal"
+      ></div>
+    </Teleport>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import api from '@/services/api/api'
 import { useToastStore } from '@/stores/toast'
 
 const router = useRouter()
+const route = useRoute()
 const toastStore = useToastStore()
 
 const tickets = ref([])
 const loading = ref(true)
 const claimingId = ref(null)
 const resolvingId = ref(null)
+const escalatingId = ref(null)
 const selectedTicket = ref(null)
+const ticketToEscalate = ref(null)
+const escalationReason = ref('')
+const escalationError = ref('')
+const isSuperAdminDesk = computed(() => route.path.startsWith('/superadmin'))
+const statusTabs = computed(() => (
+  isSuperAdminDesk.value ? ['Escalated', 'Resolved'] : ['Open', 'In_Progress', 'Resolved']
+))
 
 const filters = reactive({
-  status: 'Open',
+  status: route.path.startsWith('/superadmin') ? 'Escalated' : 'Open',
   search: ''
 })
 
@@ -284,6 +387,12 @@ const fetchTickets = async () => {
 
 onMounted(() => {
   fetchTickets()
+})
+
+watch(isSuperAdminDesk, (superAdminDesk) => {
+  filters.status = superAdminDesk ? 'Escalated' : 'Open'
+  selectedTicket.value = null
+  ticketToEscalate.value = null
 })
 
 const getCount = (status) => tickets.value.filter((t) => t.status === status).length
@@ -306,6 +415,27 @@ const openDetail = (ticket) => {
   selectedTicket.value = ticket
 }
 
+const canClaim = (ticket) => {
+  if (isSuperAdminDesk.value) {
+    return ticket.status === 'Escalated' && !ticket.assigned_agent_id
+  }
+  return ticket.status === 'Open'
+}
+
+const canChat = (ticket) => {
+  return ticket.status === 'In_Progress' || (isSuperAdminDesk.value && ticket.status === 'Escalated' && ticket.assigned_agent_id)
+}
+
+const canEscalate = (ticket) => {
+  return !isSuperAdminDesk.value && ticket.status === 'In_Progress'
+}
+
+const canResolve = (ticket) => {
+  if (ticket.status === 'Resolved') return false
+  if (ticket.status === 'Escalated') return isSuperAdminDesk.value
+  return !isSuperAdminDesk.value
+}
+
 const handleClaim = async (ticket) => {
   claimingId.value = ticket.id
   try {
@@ -320,6 +450,43 @@ const handleClaim = async (ticket) => {
     toastStore.push(errorMessage, 'error')
   } finally {
     claimingId.value = null
+  }
+}
+
+const openEscalationModal = (ticket) => {
+  ticketToEscalate.value = ticket
+  escalationReason.value = ''
+  escalationError.value = ''
+}
+
+const closeEscalationModal = () => {
+  ticketToEscalate.value = null
+  escalationReason.value = ''
+  escalationError.value = ''
+}
+
+const handleEscalate = async () => {
+  const ticket = ticketToEscalate.value
+  const reason = escalationReason.value.trim()
+  if (!ticket) return
+  if (!reason) {
+    escalationError.value = 'Add a short reason before escalating.'
+    return
+  }
+
+  escalatingId.value = ticket.id
+  escalationError.value = ''
+  try {
+    await api.post(`admin/support/tickets/${ticket.id}/escalate/`, { reason })
+    toastStore.push('Ticket escalated to SuperAdmin support.')
+    selectedTicket.value = null
+    closeEscalationModal()
+    await fetchTickets()
+  } catch (error) {
+    console.error('Failed to escalate support ticket:', error)
+    escalationError.value = error.response?.data?.error || 'Unable to escalate ticket.'
+  } finally {
+    escalatingId.value = null
   }
 }
 
@@ -382,6 +549,7 @@ const getStatusBadgeClass = (status) => {
   switch (status) {
     case 'Open': return 'badge bg-warning text-dark px-3 rounded-pill';
     case 'In_Progress': return 'badge bg-primary text-white px-3 rounded-pill';
+    case 'Escalated': return 'badge bg-warning-subtle text-dark px-3 rounded-pill';
     default: return 'badge bg-success text-white px-3 rounded-pill';
   }
 }

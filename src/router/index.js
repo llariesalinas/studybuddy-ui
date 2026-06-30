@@ -203,6 +203,12 @@ const router = createRouter({
       component: () => import('@/views/SuperAdminReports.vue'),
       meta: { requiresAuth: true, role: 'SuperAdmin' }
     },
+    {
+      path: '/superadmin/support',
+      name: 'superadmin-support',
+      component: () => import('@/views/AdminSupport.vue'),
+      meta: { requiresAuth: true, role: 'SuperAdmin' }
+    },
 
     // ---------- SHARED ROUTES ----------
     {

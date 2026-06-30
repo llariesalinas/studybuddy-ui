@@ -1623,7 +1623,7 @@ class PaymentMethodTests(APITestCase):
     PAYMONGO_WALLET_ID="wallet_test",
     PAYMONGO_CASHOUT_CALLBACK_URL="https://api.test/api/wallet/paymongo/callback/",
     CASHOUT_PROVIDER_FEE_PHP="10",
-    CASHOUT_MIN_PHP="500",
+    CASHOUT_MIN_PHP="50",
 )
 class TutorCashOutTests(APITestCase):
     def setUp(self):
@@ -1691,7 +1691,7 @@ class TutorCashOutTests(APITestCase):
 
         small_response = self.client.post(
             "/api/wallet/cash-outs/",
-            {"amount": "499.99", **destination},
+            {"amount": "49.99", **destination},
             format="json",
         )
         insufficient_response = self.client.post(
@@ -1911,12 +1911,30 @@ class TutorCashOutTests(APITestCase):
 
         self.assertIn(response.status_code, (200, 201))
 
+    @override_settings(PAYMONGO_WALLET_ID="", PAYMONGO_CASHOUT_MOCK=True)
+    @patch("studybuddy.paymongo_money_movement.requests.post")
+    def test_cashout_mock_mode_succeeds_without_wallet_id_or_http_call(self, mock_post):
+        destination = self.destination_fields()
+
+        response = self.client.post(
+            "/api/wallet/cash-outs/",
+            {"amount": "500.00", **destination},
+            format="json",
+        )
+
+        withdrawal = WithdrawalRequest.objects.get(id=response.data["id"])
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(withdrawal.status, "processed")
+        self.assertEqual(withdrawal.provider_wallet_transaction_id, f"mock_wtx_{withdrawal.id}")
+        mock_post.assert_not_called()
+
 
 @override_settings(
     PAYMONGO_WALLET_ID="wallet_test",
     PAYMONGO_CASHOUT_CALLBACK_URL="https://api.test/api/wallet/paymongo/callback/",
     CASHOUT_PROVIDER_FEE_PHP="10",
-    CASHOUT_MIN_PHP="500",
+    CASHOUT_MIN_PHP="50",
 )
 class WalletCashOutEdgeCaseTests(APITestCase):
     def setUp(self):
@@ -2122,6 +2140,7 @@ class WalletCashOutEdgeCaseTests(APITestCase):
         withdrawal = WithdrawalRequest.objects.get(id=response.data["id"])
 
         self.assertEqual(response.status_code, 502)
+        self.assertEqual(response.data["provider_error_message"], "Receiving account rejected the transfer.")
         self.assertEqual(withdrawal.status, "failed")
         self.assertEqual(self.wallet.balance, Decimal("1000.00"))
         self.assertEqual(
@@ -2255,6 +2274,13 @@ class WalletCashInTests(APITestCase):
         response = self.client.post("/api/wallet/cash-in/", {"amount": "0"}, format="json")
 
         self.assertEqual(response.status_code, 400)
+        self.assertFalse(WalletTopUp.objects.filter(tutor=self.tutor).exists())
+
+    def test_initiate_cash_in_rejects_amount_below_minimum(self):
+        response = self.client.post("/api/wallet/cash-in/", {"amount": "49.99"}, format="json")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Minimum cash-in", response.data["error"])
         self.assertFalse(WalletTopUp.objects.filter(tutor=self.tutor).exists())
 
     @patch("studybuddy.views.requests.post")
@@ -2493,6 +2519,7 @@ class WalletStatusAndTransactionsTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["balance"], 750.00)
         self.assertEqual(response.data["pending_amount"], 50.00)
+        self.assertIn("cashin_minimum", response.data)
         self.assertIn("cashout_minimum", response.data)
         self.assertIn("cashout_provider_fee", response.data)
 
@@ -4054,17 +4081,17 @@ class TutorCashInTests(APITestCase):
     def test_initiate_creates_topup_and_returns_checkout_url(self, mock_post):
         mock_post.return_value = self.checkout_ok()
         response = self.client.post(
-            "/api/wallet/cash-in/", {"amount": "100.00"}, format="json"
+            "/api/wallet/cash-in/", {"amount": "50.00"}, format="json"
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["checkout_url"], "https://pm.test/checkout/cs_test_123")
         topup = WalletTopUp.objects.get(id=response.data["id"])
         self.assertEqual(topup.status, "pending")
-        self.assertEqual(topup.amount, Decimal("100.00"))
+        self.assertEqual(topup.amount, Decimal("50.00"))
         self.assertEqual(topup.provider_reference, "cs_test_123")
         sent = mock_post.call_args.kwargs["json"]
         self.assertEqual(
-            sent["data"]["attributes"]["line_items"][0]["amount"], 10000
+            sent["data"]["attributes"]["line_items"][0]["amount"], 5000
         )
 
     @patch("studybuddy.views.requests.get")
@@ -4306,6 +4333,172 @@ class AdminDashboardMetricsTests(APITestCase):
         types = {item["type"] for item in data["items"]}
         self.assertIn("withdrawal", types)
         self.assertIn("support", types)
+
+
+class SupportTicketEscalationTests(APITestCase):
+    def setUp(self):
+        self.institution = PartnerInstitution.objects.create(
+            institution_name="Central Philippine University",
+            school_email_domain="cpu.edu.ph",
+            is_active=True,
+        )
+        self.other_institution = PartnerInstitution.objects.create(
+            institution_name="Other University",
+            school_email_domain="other.edu.ph",
+            is_active=True,
+        )
+        self.admin_user = User.objects.create_user(
+            username="support_admin",
+            email="admin@cpu.edu.ph",
+            password="password",
+        )
+        self.admin_profile = UserProfile.objects.create(
+            user=self.admin_user,
+            fname="Ada",
+            mname="",
+            lname="Admin",
+            role="Admin",
+            institution=self.institution,
+        )
+        self.super_user = User.objects.create_user(
+            username="super_support",
+            email="super@studybuddy.test",
+            password="password",
+        )
+        self.super_profile = UserProfile.objects.create(
+            user=self.super_user,
+            fname="Sam",
+            mname="",
+            lname="Super",
+            role="SuperAdmin",
+            profile_completed=True,
+            is_domain_exempt=True,
+        )
+        self.tutee_user = User.objects.create_user(
+            username="support_tutee",
+            email="tutee@cpu.edu.ph",
+            password="password",
+        )
+        self.tutee_profile = UserProfile.objects.create(
+            user=self.tutee_user,
+            fname="Tina",
+            mname="",
+            lname="Tutee",
+            role="Tutee",
+            institution=self.institution,
+        )
+        self.room = ChatRoom.objects.create(
+            tutee=self.tutee_profile,
+            tutor=self.admin_profile,
+            room_type="support",
+        )
+        self.ticket = SupportTicket.objects.create(
+            user=self.tutee_profile,
+            category="Technical",
+            subject="Cannot join session",
+            description="The call page will not load.",
+            status="In_Progress",
+            assigned_agent=self.admin_profile,
+            chatroom=self.room,
+        )
+
+    def test_admin_escalates_ticket_to_superadmin_queue(self):
+        self.client.force_authenticate(user=self.admin_user)
+
+        response = self.client.post(
+            f"/api/admin/support/tickets/{self.ticket.id}/escalate/",
+            {"reason": "Payment records need platform access."},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.ticket.refresh_from_db()
+        self.room.refresh_from_db()
+        self.assertEqual(self.ticket.status, "Escalated")
+        self.assertEqual(self.ticket.escalation_reason, "Payment records need platform access.")
+        self.assertEqual(self.ticket.escalated_by, self.admin_profile)
+        self.assertIsNotNone(self.ticket.escalated_at)
+        self.assertIsNone(self.ticket.assigned_agent)
+        self.assertIsNone(self.room.tutor)
+        self.assertTrue(
+            Message.objects.filter(
+                room=self.room,
+                sender=None,
+                content="This support ticket has been escalated to SuperAdmin support.",
+            ).exists()
+        )
+
+        admin_list = self.client.get("/api/admin/support/tickets/")
+        self.assertNotIn(self.ticket.id, [ticket["id"] for ticket in admin_list.data])
+
+        self.client.force_authenticate(user=self.super_user)
+        super_list = self.client.get("/api/admin/support/tickets/")
+        escalated_ticket = next(ticket for ticket in super_list.data if ticket["id"] == self.ticket.id)
+        self.assertEqual(escalated_ticket["status"], "Escalated")
+        self.assertEqual(escalated_ticket["escalation_reason"], "Payment records need platform access.")
+
+    def test_escalation_requires_reason_and_institution_scope(self):
+        self.client.force_authenticate(user=self.admin_user)
+
+        missing_reason = self.client.post(
+            f"/api/admin/support/tickets/{self.ticket.id}/escalate/",
+            {"reason": "   "},
+            format="json",
+        )
+
+        self.assertEqual(missing_reason.status_code, 400)
+        self.ticket.refresh_from_db()
+        self.assertEqual(self.ticket.status, "In_Progress")
+
+        other_admin_user = User.objects.create_user(
+            username="other_admin",
+            email="admin@other.edu.ph",
+            password="password",
+        )
+        UserProfile.objects.create(
+            user=other_admin_user,
+            fname="Omar",
+            mname="",
+            lname="Admin",
+            role="Admin",
+            institution=self.other_institution,
+        )
+        self.client.force_authenticate(user=other_admin_user)
+
+        cross_institution = self.client.post(
+            f"/api/admin/support/tickets/{self.ticket.id}/escalate/",
+            {"reason": "Needs platform review."},
+            format="json",
+        )
+
+        self.assertEqual(cross_institution.status_code, 404)
+        self.ticket.refresh_from_db()
+        self.assertEqual(self.ticket.status, "In_Progress")
+
+    def test_superadmin_claims_and_resolves_escalated_ticket(self):
+        self.client.force_authenticate(user=self.admin_user)
+        self.client.post(
+            f"/api/admin/support/tickets/{self.ticket.id}/escalate/",
+            {"reason": "Needs platform review."},
+            format="json",
+        )
+
+        admin_resolve = self.client.post(f"/api/admin/support/tickets/{self.ticket.id}/resolve/")
+        self.assertEqual(admin_resolve.status_code, 403)
+
+        self.client.force_authenticate(user=self.super_user)
+        claim = self.client.post(f"/api/admin/support/tickets/{self.ticket.id}/claim/")
+        self.assertEqual(claim.status_code, 200)
+        self.ticket.refresh_from_db()
+        self.room.refresh_from_db()
+        self.assertEqual(self.ticket.status, "Escalated")
+        self.assertEqual(self.ticket.assigned_agent, self.super_profile)
+        self.assertEqual(self.room.tutor, self.super_profile)
+
+        resolve = self.client.post(f"/api/admin/support/tickets/{self.ticket.id}/resolve/")
+        self.assertEqual(resolve.status_code, 200)
+        self.ticket.refresh_from_db()
+        self.assertEqual(self.ticket.status, "Resolved")
 
 
 class InstitutionScopedMatchingTests(APITestCase):

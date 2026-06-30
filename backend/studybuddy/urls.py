@@ -60,6 +60,7 @@ urlpatterns = [
     path('admin/admin-account-requests/<int:pk>/', AdminAccountRequestView.as_view()),
     path('admin/support/tickets/', views.admin_list_tickets),
     path('admin/support/tickets/<int:ticket_id>/claim/', views.admin_claim_ticket),
+    path('admin/support/tickets/<int:ticket_id>/escalate/', views.admin_escalate_ticket),
     path('admin/support/tickets/<int:ticket_id>/resolve/', views.admin_resolve_ticket),
 
     path('support/tickets/create/', views.create_support_ticket),

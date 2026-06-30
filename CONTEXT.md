@@ -5,6 +5,26 @@ project's glossary — domain terms only, no implementation detail.
 
 ## Language
 
+### Support
+
+**Support Ticket**:
+A user-reported issue that Studybuddy support staff can claim, discuss in a support chat, and
+resolve. A Support Ticket moves through a lifecycle: Open -> In Progress -> Escalated -> Resolved.
+_Avoid_: Issue (too vague), support chat (the chat is only the conversation attached to the
+ticket)
+
+**Escalated Support Ticket**:
+A Support Ticket that an institution admin cannot resolve and has raised to SuperAdmin attention.
+It remains the same ticket, but its lifecycle state changes to Escalated and responsibility moves
+from the institution admin to SuperAdmin. Escalated Support Tickets leave the institution admin's
+active queue and appear in the SuperAdmin support queue. Escalation requires a short reason that
+explains why SuperAdmin intervention is needed. Once escalated, only SuperAdmins can resolve the
+ticket. Escalation clears the institution admin as the active owner; a SuperAdmin can then claim
+the ticket as the new owner. The reporter sees a calm system message in the support chat when the
+ticket is escalated. SuperAdmins claim Escalated Support Tickets from the SuperAdmin support
+queue rather than receiving auto-assigned tickets.
+_Avoid_: Forwarded ticket, transferred ticket
+
 ### Payouts & cash-out
 
 **Payout Destination**:

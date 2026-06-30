@@ -23,12 +23,13 @@
                 v-model.number="amount"
                 class="sb-field"
                 type="number"
-                min="0.01"
+                :min="walletStore.cashinMinimum"
                 step="0.01"
                 required
                 :disabled="submitting"
               />
             </label>
+            <p class="cashin-limit">Minimum PHP {{ money(walletStore.cashinMinimum) }}</p>
             <p v-if="error" class="form-error">{{ error }}</p>
           </div>
           <div class="modal-footer border-0">
@@ -59,15 +60,21 @@ defineEmits(['close'])
 const walletStore = useWalletStore()
 const toastStore = useToastStore()
 
-const amount = ref(null)
+const amount = ref(walletStore.cashinMinimum)
 const submitting = ref(false)
 const error = ref('')
 
-const canSubmit = computed(() => Number(amount.value) > 0)
+const money = (value) =>
+  Number(value || 0).toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+
+const canSubmit = computed(() => Number(amount.value) >= Number(walletStore.cashinMinimum))
 
 const submit = async () => {
   if (!canSubmit.value) {
-    error.value = 'Enter a valid amount.'
+    error.value = `Minimum cash-in is PHP ${money(walletStore.cashinMinimum)}.`
     return
   }
   submitting.value = true
@@ -143,6 +150,12 @@ const submit = async () => {
   font-weight: 600;
   text-transform: none;
   letter-spacing: 0;
+}
+
+.cashin-limit {
+  margin: 8px 0 0;
+  color: var(--sb-muted, #475569);
+  font-size: 12px;
 }
 
 .modal-primary,

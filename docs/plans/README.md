@@ -3,10 +3,12 @@
 Every finalized plan lives in this folder as its own dated file, created from [`_template.md`](_template.md).
 Status moves Draft → Approved → In Progress → Done. When a plan is complete, its summary is linked below.
 
-**Status & Progress Summary** (2026-06-29): Cash-out recent transactions plan implemented and marked Done. All other plans unchanged from 2026-06-28.
+**Status & Progress Summary** (2026-07-01): Local cash-out dev stub (`PAYMONGO_CASHOUT_MOCK`) implemented and marked Done. Support ticket escalation and cash-out recent transactions remain Done.
 
 | Date | Plan | Status | Summary |
 |------|------|--------|---------|
+| 2026-07-01 | [Local cash-out dev stub (PayMongo Money Movement)](2026-07-01-local-cashout-dev-stub.md) | Done | [Summary](../session-summaries/2026-07-01-local-cashout-dev-stub-summary.md) |
+| 2026-06-30 | [Support ticket escalation](2026-06-30-support-ticket-escalation.md) | Done | [Summary](../session-summaries/2026-06-30-support-ticket-escalation-summary.md) · [Issue #95](https://github.com/llariesalinas/studybuddy-ui/issues/95) |
 | 2026-06-29 | [Cash-out recent transactions (remove standalone destinations)](2026-06-29-cashout-recent-transactions.md) | Done | [Summary](../session-summaries/2026-06-29-cashout-recent-transactions-summary.md) · [Spec](../specs/2026-06-29-cashout-recent-transactions.md) |
 | 2026-06-28 | [Payout destination rail removal and Receiving Institution logos](2026-06-28-payout-destination-rail-removal-and-logos.md) | Done | [Summary](../session-summaries/2026-06-28-payout-destination-rail-removal-and-logos-summary.md) · [ADR-0001](../adr/0001-instapay-only-cashouts.md) · [ADR-0002](../adr/0002-logodev-for-institution-logos.md) |
 | 2026-06-26 | [Institution-scoped tutor matching](2026-06-26-institution-scoped-matching.md) | Done | [Spec](../specs/2026-06-26-institution-scoped-matching-design.md) · [Handoff](../artifacts/2026-06-26-institution-scoped-matching-handoff.html) |
@@ -73,3 +75,7 @@ Entries marked Done&ast; predate the session-summary convention; their status is
 | 2026-06-28 | Marked payout-destination rail removal + Receiving Institution logos plan Done; linked summary |
 | 2026-06-29 | Added cash-out recent transactions plan (Draft) |
 | 2026-06-29 | Marked cash-out recent transactions plan Done; linked summary |
+| 2026-06-30 | Added support ticket escalation PRD (Approved) |
+| 2026-06-30 | Marked support ticket escalation Done; linked summary |
+| 2026-07-01 | Added local cash-out dev stub plan (Approved) |
+| 2026-07-01 | Marked local cash-out dev stub Done; linked summary |
