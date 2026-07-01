@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>StudyBuddy — Plans Dashboard</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --card: #161b22;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --border: #30363d;
+    --in-progress: #388bfd;
+    --blocked: #f85149;
+    --approved: #d29922;
+    --draft: #6e7681;
+    --done: #2ea043;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    margin: 0;
+    padding: 2rem;
+    line-height: 1.5;
+  }
+  h1 { font-size: 1.5rem; margin-bottom: 0.25rem; }
+  .subtitle { color: var(--muted); margin-bottom: 1.5rem; font-size: 0.9rem; }
+  .badge-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 2rem;
+  }
+  .badge-count {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.4rem 0.9rem;
+    font-size: 0.9rem;
+  }
+  .dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 0.4rem;
+  }
+  .group {
+    margin-bottom: 1.5rem;
+  }
+  .group > summary, .group-title {
+    font-size: 1.05rem;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 0.75rem;
+    list-style: none;
+  }
+  .group > summary::-webkit-details-marker { display: none; }
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 0.75rem;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+  }
+  .card a.title {
+    color: var(--text);
+    font-weight: 600;
+    text-decoration: none;
+    font-size: 0.95rem;
+  }
+  .card a.title:hover { text-decoration: underline; }
+  .card .date { color: var(--muted); font-size: 0.8rem; margin: 0.25rem 0 0.5rem; }
+  .card .summary { color: var(--muted); font-size: 0.85rem; }
+  .status-badge {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 0.15rem 0.5rem;
+    border-radius: 10px;
+    margin-bottom: 0.4rem;
+  }
+  .status-In-Progress { background: rgba(56,139,253,0.15); color: var(--in-progress); }
+  .status-Blocked { background: rgba(248,81,73,0.15); color: var(--blocked); }
+  .status-Approved { background: rgba(210,153,34,0.15); color: var(--approved); }
+  .status-Draft { background: rgba(110,118,129,0.15); color: var(--draft); }
+  .status-Done { background: rgba(46,160,67,0.15); color: var(--done); }
+</style>
+</head>
+<body>
+
+<h1>StudyBuddy — Plans Dashboard</h1>
+<div class="subtitle">Generated from docs/plans/ on branch fix/tutor-application-bugfixes — 2026-07-01</div>
+
+<div class="badge-row">
+  <span class="badge-count"><span class="dot" style="background:var(--in-progress)"></span>2 In Progress</span>
+  <span class="badge-count"><span class="dot" style="background:var(--blocked)"></span>0 Blocked</span>
+  <span class="badge-count"><span class="dot" style="background:var(--approved)"></span>2 Approved</span>
+  <span class="badge-count"><span class="dot" style="background:var(--draft)"></span>0 Draft</span>
+  <span class="badge-count"><span class="dot" style="background:var(--done)"></span>7 Done</span>
+</div>
+
+<div class="group">
+  <div class="group-title">In Progress</div>
+  <div class="cards">
+    <div class="card">
+      <span class="status-badge status-In-Progress">In Progress</span><br/>
+      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-07-01-tutor-application-bugfixes.md">Tutor application bugfixes</a>
+      <div class="date">2026-07-01</div>
+      <div class="summary">4 of 5 fixes implemented (resubmit gate, backend upload-size centralization, resubmit size check, login exception narrowing); 1 was already done by an intervening commit. Test coverage handed off separately.</div>
+    </div>
+    <div class="card">
+      <span class="status-badge status-In-Progress">In Progress</span><br/>
+      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-06-07-dashboard-load-performance.md">Dashboard load performance (backend)</a>
+      <div class="date">2026-06-07</div>
+      <div class="summary">Cut tutee-dashboard load time by removing duplicated/dead backend work and indexing the hot booking queries, without changing what any page renders.</div>
+    </div>
+  </div>
+</div>
+
+<div class="group">
+  <div class="group-title">Approved</div>
+  <div class="cards">
+    <div class="card">
+      <span class="status-badge status-Approved">Approved</span><br/>
+      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-07-01-tutor-application-bugfix-tests.md">Tutor application bugfix tests</a>
+      <div class="date">2026-07-01</div>
+      <div class="summary">Test plan handed off to Codex: regression coverage for the resubmit gate, oversized-file rejection, and the login_view exception-narrowing fix.</div>
+    </div>
+    <div class="card">
+      <span class="status-badge status-Approved">Approved</span><br/>
+      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-06-06-frontend-chat-caching.md">Frontend and chat caching</a>
+      <div class="date">2026-06-06</div>
+      <div class="summary">Improve load speed for stable reference data and slow messaging views while keeping freshness-sensitive chat behavior accurate.</div>
+    </div>
+  </div>
+</div>
+
+<details class="group" open>
+  <summary>Draft</summary>
+  <div class="cards">
+  </div>
+</details>
+
+<details class="group" open>
+  <summary>Blocked</summary>
+  <div class="cards">
+  </div>
+</details>
+
+<details class="group">
+  <summary>Done (7)</summary>
+  <div class="cards">
+    <div class="card">
+      <span class="status-badge status-Done">Done</span><br/>
+      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-07-01-tutor-document-renewal-review.md">Tutor document renewal review</a>
+      <div class="date">2026-07-01</div>
+      <div class="summary">Retro-documented: approved tutors' enrollment documents now re-verify every 90 days via a separate TutorDocumentRenewalReview flow, with its own admin queue.</div>
+    </div>
+    <div class="card">
+      <span class="status-badge status-Done">Done</span><br/>
+      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-06-07-aurora-performance-fix.md">Aurora performance fix — static gradient</a>
+      <div class="date">2026-06-07</div>
+      <div class="summary">Fixed tutee dashboard sluggishness (~30fps) without changing the visual design — kept the aurora gradient, glassmorphism cards, and dark/light toggle.</div>
+    </div>
+    <div class="card">
+      <span class="status-badge status-Done">Done</span><br/>
+      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-06-07-chat-partner-context-display.md">Chat partner context display</a>
+      <div class="date">2026-06-07</div>
+      <div class="summary">Chat context panels now show the actual other participant, especially from the tutor side, while support chats stay labeled Customer Support.</div>
+    </div>
+    <div class="card">
+      <span class="status-badge status-Done">Done</span><br/>
+      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-06-07-dashboard-card-stability.md">Dashboard card stability</a>
+      <div class="date">2026-06-07</div>
+      <div class="summary">Tutee dashboard's weekly session cards and recommended tutor cards now keep a stable visual height even with long subjects/metadata.</div>
+    </div>
+    <div class="card">
+      <span class="status-badge status-Done">Done</span><br/>
+      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-06-07-dashboard-top5-redis-cache.md">Dashboard top 5 Redis cache</a>
+      <div class="date">2026-06-07</div>
+      <div class="summary">Backend now enforces the tutee dashboard recommendation widget as exactly the top 5 hybrid-algorithm tutors, Redis-cached in deployment.</div>
+    </div>
+    <div class="card">
+      <span class="status-badge status-Done">Done</span><br/>
+      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-06-07-notifications-timeout-fix.md">Notifications timeout fix</a>
+      <div class="date">2026-06-07</div>
+      <div class="summary">Eliminated the 30s Axios timeout on GET /notifications/ caused by concurrent request pile-up plus a slow unindexed query.</div>
+    </div>
+    <div class="card">
+      <span class="status-badge status-Done">Done</span><br/>
+      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-06-07-support-chat-naming.md">Support chat naming</a>
+      <div class="date">2026-06-07</div>
+      <div class="summary">Support-ticket chat rooms now display as Customer Support instead of the reporter's own name, preserving normal tutor/tutee partner names.</div>
+    </div>
+  </div>
+</details>
+
+</body>
+</html>
