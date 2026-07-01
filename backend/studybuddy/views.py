@@ -775,8 +775,8 @@ def register_user(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        MAX_UPLOAD_SIZE = 5 * 1024 * 1024  # 5 MB
-        if school_id.size > MAX_UPLOAD_SIZE or enrollment_proof.size > MAX_UPLOAD_SIZE:
+        if (school_id.size > settings.MAX_DOCUMENT_UPLOAD_SIZE
+                or enrollment_proof.size > settings.MAX_DOCUMENT_UPLOAD_SIZE):
             return Response(
                 {"error": "Each uploaded file must be under 5 MB. Please compress your images and try again."},
                 status=status.HTTP_400_BAD_REQUEST
@@ -883,8 +883,8 @@ def login_view(request):
                     {"error": "Your application is still being processed. We will email you once it is approved."},
                     status=status.HTTP_403_FORBIDDEN
                 )
-        except Exception:
-            logger.exception("Error checking tutor application status for profile_id=%s", profile.id)
+        except TutorApplication.DoesNotExist:
+            pass
 
     if not profile.is_domain_exempt and profile.role not in ['Admin', 'SuperAdmin']:
         email_domain = normalize_email_domain(email)
@@ -3123,7 +3123,7 @@ def upload_tutee_avatar(request):
     if not avatar.content_type.startswith('image/'):
         return Response({'error': 'File must be an image'}, status=400)
 
-    if avatar.size > 5 * 1024 * 1024:
+    if avatar.size > settings.MAX_DOCUMENT_UPLOAD_SIZE:
         return Response({'error': 'Image must be under 5MB'}, status=400)
 
     profile = request.user.userprofile
@@ -3147,7 +3147,7 @@ def upload_tutor_avatar(request):
     if not avatar.content_type.startswith('image/'):
         return Response({'error': 'File must be an image'}, status=400)
 
-    if avatar.size > 5 * 1024 * 1024:
+    if avatar.size > settings.MAX_DOCUMENT_UPLOAD_SIZE:
         return Response({'error': 'Image must be under 5MB'}, status=400)
 
     profile = request.user.userprofile
@@ -4449,6 +4449,13 @@ def tutor_application_resubmit(request):
             status=status.HTTP_400_BAD_REQUEST
         )
 
+    if (school_id.size > settings.MAX_DOCUMENT_UPLOAD_SIZE
+            or enrollment_proof.size > settings.MAX_DOCUMENT_UPLOAD_SIZE):
+        return Response(
+            {"error": "Each uploaded file must be under 5 MB. Please compress your images and try again."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
     if application.application_status == 'approved':
         return create_tutor_document_renewal_submission(
             request,
@@ -4456,6 +4463,12 @@ def tutor_application_resubmit(request):
             school_id,
             enrollment_proof,
             reason_to_tutor,
+        )
+
+    if application.application_status != 'rejected':
+        return Response(
+            {"error": "Your application is still being processed. It cannot be resubmitted right now."},
+            status=status.HTTP_400_BAD_REQUEST
         )
 
     # Update application

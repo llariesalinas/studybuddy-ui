@@ -246,6 +246,10 @@ else:
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024   # 10 MB hard ceiling on non-file POST data
 FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024    # 5 MB — files above this go to temp disk
 
+# Per-file size cap applied to tutor application documents and avatar uploads.
+# Mirrored in the frontend as MAX_DOCUMENT_UPLOAD_SIZE_BYTES (src/config.js) — keep in sync.
+MAX_DOCUMENT_UPLOAD_SIZE = 5 * 1024 * 1024  # 5 MB
+
 PASSWORD_RESET_TIMEOUT = 3600
 LOGIN_OTP_TTL_SECONDS = 600
 LOGIN_OTP_MAX_ATTEMPTS = 5
