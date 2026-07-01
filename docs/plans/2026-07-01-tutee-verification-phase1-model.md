@@ -1,7 +1,7 @@
 ---
 title: Tutee enrollment verification — Phase 1 (model & backend foundation)
 date: 2026-07-01
-status: Approved
+status: Done
 spec: 2026-07-01-tutee-verification-overview.md
 ---
 
@@ -13,10 +13,24 @@ spec: 2026-07-01-tutee-verification-overview.md
 <!-- LIVING SUMMARY: keep this section and the Changelog current on every edit -->
 ## Status & Progress Summary
 
-**Status: Approved — not yet implemented.**
+**Status: Done — steps 1-9 complete and verified; step 10 (serializers) cut, moved to Phase 3.**
 
-No steps done yet. This phase touches only models, migrations, and a new unwired helper function — no
-endpoint's user-facing behavior changes in this phase (that starts in Phase 2).
+- [x] Abstract `ApplicationVerificationBase` / `DocumentRenewalReviewBase`, `TutorApplication`/
+      `TutorDocumentRenewalReview` refactored onto them, `TuteeApplication`/`TuteeDocumentRenewalReview`
+      added (steps 1-5).
+- [x] Regression tests (baseline `TutorDocumentRenewalTests`, 7/7 green) + new
+      `ApplicationVerificationSharedBaseTests` (4/4 green) proving identical behavior for both roles
+      (steps 6-7).
+- [x] Migration generated and verified schema-neutral: `TutorApplication` gets only the 2 additive
+      reminder fields, `TutorDocumentRenewalReview` untouched, 2 new tables created (step 8).
+- [x] Generalized `get_document_review_context(application)` helper added, unit-tested, not wired into
+      any view (step 9).
+- [ ] ~~Step 10 — `TuteeApplicationSerializer`/`TuteeDocumentRenewalReviewSerializer`~~ — **cut**, see
+      Changelog. Moved to Phase 3, where they'll be written alongside the admin views/tests that use
+      them instead of sitting unreferenced.
+
+This phase touches only models, migrations, and a new unwired helper function — no endpoint's
+user-facing behavior changes in this phase (that starts in Phase 2).
 
 ## Goal
 
@@ -94,9 +108,7 @@ this phase.
    parameterized so it can be called for either a `tutor_application` or `tutee_application`. Do **not**
    call it from `build_login_response_payload` for tutees yet; add a unit test that calls it directly with
    a `TuteeApplication` fixture and asserts the same keys/values shape as the tutor path.
-10. **Serializers**: add `TuteeApplicationSerializer` / `TuteeDocumentRenewalReviewSerializer` mirroring the
-    tutor ones field-for-field (needed by Phase 3's admin queue, but adding them now while the models are
-    fresh in context is lower-risk than retrofitting later). Not wired into any view in this phase.
+10. ~~**Serializers**~~ — **cut from this phase**, see Changelog. Moved to Phase 3.
 
 ## Risks
 
@@ -130,3 +142,41 @@ this phase.
 
 - 2026-07-01: Phase 1 plan written in full detail from the locked design (handoff doc §3/§4). Status set to
   Approved. Not yet implemented.
+- 2026-07-01: Implemented steps 1-9. Two refinements discovered during implementation:
+  - **FK/upload-path boundary is wider than originally sketched.** `profile`, `reviewed_by`, `school_id`,
+    `enrollment_proof` had to move out of both abstract bases and onto each concrete subclass instead of
+    just `profile`/`application` as originally written. Reason: Django's `%(class)s` related-name
+    interpolation only applies to `related_name`/`related_query_name`, not to plain FK `related_name`
+    strings needing full customization or to `upload_to` paths — `reviewed_by`/`profile` FKs on the review
+    base both target `UserProfile`, so an identical inherited `related_name` would collide between the
+    Tutor and Tutee subclasses; `school_id`/`upload_to` needs a role-specific storage folder. The abstract
+    bases still carry all the actual shared logic and status/renewal fields — this is a mechanical
+    Django-inheritance detail, not a design change.
+  - **Step 10 (serializers) cut.** Adding `TuteeApplicationSerializer`/`TuteeDocumentRenewalReviewSerializer`
+    with no view or test wired to them was flagged as premature against this repo's "no half-finished
+    implementations" convention. Moved to Phase 3, written alongside the admin views/tests that use them.
+  - Verified: baseline `TutorDocumentRenewalTests` (7/7) unchanged; new
+    `ApplicationVerificationSharedBaseTests` (4/4) proves identical renewal-cadence behavior for
+    `TutorApplication` and `TuteeApplication`; migration inspected by hand — `TutorApplication` gets only
+    the 2 additive reminder fields, `TutorDocumentRenewalReview` untouched, 2 new tables created;
+    `makemigrations --check --dry-run` clean after applying.
+- 2026-07-01: Ran the full backend suite (`python manage.py test`, 103 tests): 3 failures + 8 errors, all in
+  `ChatFeatureTests`, `EmailAuthTests`, and `RecommendTutorsViewTests` — none touch
+  `TutorApplication`/`TuteeApplication`/`ApplicationVerificationBase` or any file this phase changed.
+  Confirmed pre-existing by stashing this phase's code changes (`git stash push -u`) and re-running the
+  same failing tests against clean `HEAD`: identical failures/errors reproduce verbatim. Restored the
+  stash. Status set to Done.
+- 2026-07-01: Ran `/code-review` (8 finder angles + verify) on the Phase 1 diff. Most candidates were false
+  positives (claimed `related_name` collisions that are actually fine since they target different models —
+  refuted directly by the passing test suite exercising exactly those code paths; a claimed `None` deref in
+  `get_document_review_context` that doesn't exist, the code already guards with `if latest_renewal and
+  ...`; "hardcoded values" flags on string literals that are pre-existing `STATUS_CHOICES` values copied
+  verbatim from the original code). Two findings were real and fixed:
+  - `get_document_review_context()` and `get_tutor_document_review_context()` duplicated the same dict-
+    building logic. Collapsed to one implementation: `get_tutor_document_review_context` now does the
+    profile→application lookup and delegates to `get_document_review_context`; a shared
+    `EMPTY_DOCUMENT_REVIEW_CONTEXT` constant covers the no-application case.
+  - `reminder_7day_sent_at`/`reminder_1day_sent_at` had no `db_index`, and Phase 4 will filter on them for
+    reminder dedup. Added `db_index=True` to both while the columns are new and empty, avoiding a later
+    index-add migration under load. Migration regenerated; `makemigrations --check --dry-run` still clean;
+    all 11 tests still pass.

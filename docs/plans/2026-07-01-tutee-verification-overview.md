@@ -1,7 +1,7 @@
 ---
 title: Tutee enrollment verification — overview
 date: 2026-07-01
-status: Approved
+status: In Progress
 spec: ../session-summaries/2026-07-01-tutee-verification-handoff.md
 ---
 
@@ -15,9 +15,9 @@ spec: ../session-summaries/2026-07-01-tutee-verification-handoff.md
 <!-- LIVING SUMMARY: keep this section and the Changelog current on every edit -->
 ## Status & Progress Summary
 
-**Status: Approved — design locked, phase files written. Phase 1 is next.**
+**Status: In Progress — Phase 1 Done. Awaiting explicit go-ahead before starting Phase 2.**
 
-- [ ] Phase 1 — Model & backend foundation ([plan](2026-07-01-tutee-verification-phase1-model.md))
+- [x] Phase 1 — Model & backend foundation ([plan](2026-07-01-tutee-verification-phase1-model.md))
 - [ ] Phase 2 — Booking gate & forward-only enforcement ([plan](2026-07-01-tutee-verification-phase2-gate.md))
 - [ ] Phase 3 — UI surfaces ([plan](2026-07-01-tutee-verification-phase3-ui.md))
 - [ ] Phase 4 — Email & dev tools ([plan](2026-07-01-tutee-verification-phase4-email-devtools.md))
@@ -80,3 +80,6 @@ flow, apply rules symmetrically. Concretely:
 
 - 2026-07-01: Overview and all 4 phase plan files written from the locked design in the handoff doc.
   Status set to Approved (design already signed off via grilling; nothing left to decide at this level).
+- 2026-07-01: Phase 1 implemented and verified (abstract base models, `TuteeApplication`/
+  `TuteeDocumentRenewalReview`, schema-neutral migration, generalized helper, full backend suite run with
+  only pre-existing/unrelated failures). Status moved to In Progress; Phase 2 awaits explicit go-ahead.

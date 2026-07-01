@@ -33,6 +33,8 @@ from .models import (
     Transaction,
     TutorApplication,
     TutorDocumentRenewalReview,
+    TuteeApplication,
+    TuteeDocumentRenewalReview,
     TutorPayoutAccount,
     Wallet,
     WithdrawalRequest,
@@ -1892,6 +1894,146 @@ class TutorDocumentRenewalTests(APITestCase):
         self.assertEqual(response.status_code, 404)
         renewal.refresh_from_db()
         self.assertEqual(renewal.status, "pending")
+
+
+class ApplicationVerificationSharedBaseTests(APITestCase):
+    """Proves TutorApplication and TuteeApplication share identical renewal-cadence
+    behavior via their common abstract base (Phase 1 of tutee enrollment verification,
+    see docs/plans/2026-07-01-tutee-verification-phase1-model.md)."""
+
+    def setUp(self):
+        self.institution = PartnerInstitution.objects.create(
+            institution_name="CPU",
+            school_email_domain="cpu.edu",
+            is_active=True,
+        )
+        self.tutor_user = User.objects.create_user(
+            username="shared-base-tutor@cpu.edu",
+            email="shared-base-tutor@cpu.edu",
+            password="password",
+        )
+        self.tutor_profile = UserProfile.objects.create(
+            user=self.tutor_user,
+            fname="Shared",
+            mname="",
+            lname="Tutor",
+            role="Tutor",
+            institution=self.institution,
+        )
+        self.tutee_user = User.objects.create_user(
+            username="shared-base-tutee@cpu.edu",
+            email="shared-base-tutee@cpu.edu",
+            password="password",
+        )
+        self.tutee_profile = UserProfile.objects.create(
+            user=self.tutee_user,
+            fname="Shared",
+            mname="",
+            lname="Tutee",
+            role="Tutee",
+            institution=self.institution,
+        )
+
+    def upload(self, name, content, content_type):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        return SimpleUploadedFile(name, content, content_type=content_type)
+
+    def make_application(self, model, profile, reviewed_at):
+        return model.objects.create(
+            profile=profile,
+            school_id=self.upload("id.jpg", b"id", "image/jpeg"),
+            enrollment_proof=self.upload("rf.pdf", b"rf", "application/pdf"),
+            application_status="approved",
+            reviewed_at=reviewed_at,
+        )
+
+    def assert_shared_renewal_behavior(self, model, review_model, profile):
+        from datetime import timedelta
+        from django.utils import timezone
+
+        due_reviewed_at = timezone.now() - timedelta(days=91)
+        application = self.make_application(model, profile, due_reviewed_at)
+
+        # Verified just after approval, due once DOCUMENT_RENEWAL_INTERVAL_DAYS has elapsed.
+        self.assertEqual(
+            application.document_renewal_due_at(),
+            due_reviewed_at + timedelta(days=model.DOCUMENT_RENEWAL_INTERVAL_DAYS),
+        )
+        self.assertEqual(application.document_renewal_status(), "due")
+        self.assertTrue(application.can_submit_document_renewal())
+
+        # A pending renewal review takes precedence over "due".
+        pending_renewal = review_model.objects.create(
+            application=application,
+            profile=profile,
+            school_id=self.upload("renewal-id.jpg", b"renewal-id", "image/jpeg"),
+            enrollment_proof=self.upload("renewal-rf.pdf", b"renewal-rf", "application/pdf"),
+            status="pending",
+        )
+        self.assertEqual(application.latest_document_renewal_review(), pending_renewal)
+        self.assertEqual(application.document_renewal_status(), "pending")
+        self.assertFalse(application.can_submit_document_renewal())
+
+        # Approving the renewal moves the renewal clock forward and re-verifies.
+        pending_renewal.status = "approved"
+        pending_renewal.reviewed_at = timezone.now()
+        pending_renewal.save(update_fields=["status", "reviewed_at"])
+        self.assertEqual(application.latest_approved_document_review_at(), pending_renewal.reviewed_at)
+        self.assertEqual(application.document_renewal_status(), "verified")
+        self.assertGreater(application.document_renewal_due_at(), due_reviewed_at)
+
+        # A rejected renewal makes the application resubmittable, not "verified".
+        pending_renewal.status = "rejected"
+        pending_renewal.reviewed_at = timezone.now()
+        pending_renewal.save(update_fields=["status", "reviewed_at"])
+        self.assertEqual(application.document_renewal_status(), "rejected")
+        self.assertTrue(application.can_submit_document_renewal())
+
+    def test_tutor_application_shared_renewal_behavior(self):
+        self.assert_shared_renewal_behavior(
+            TutorApplication, TutorDocumentRenewalReview, self.tutor_profile
+        )
+
+    def test_tutee_application_shared_renewal_behavior(self):
+        self.assert_shared_renewal_behavior(
+            TuteeApplication, TuteeDocumentRenewalReview, self.tutee_profile
+        )
+
+    def test_reminder_dedup_fields_default_null_for_both_roles(self):
+        tutor_application = self.make_application(
+            TutorApplication, self.tutor_profile, timezone_now_minus_days(1)
+        )
+        tutee_application = self.make_application(
+            TuteeApplication, self.tutee_profile, timezone_now_minus_days(1)
+        )
+
+        for application in (tutor_application, tutee_application):
+            self.assertIsNone(application.reminder_7day_sent_at)
+            self.assertIsNone(application.reminder_1day_sent_at)
+
+    def test_generalized_document_review_context_matches_tutor_shape(self):
+        from .views import get_document_review_context, get_tutor_document_review_context
+
+        due_reviewed_at = timezone_now_minus_days(91)
+        tutor_application = self.make_application(TutorApplication, self.tutor_profile, due_reviewed_at)
+        tutee_application = self.make_application(TuteeApplication, self.tutee_profile, due_reviewed_at)
+
+        tutor_context = get_tutor_document_review_context(self.tutor_profile)
+        generalized_tutor_context = get_document_review_context(tutor_application)
+        generalized_tutee_context = get_document_review_context(tutee_application)
+
+        self.assertEqual(tutor_context, generalized_tutor_context)
+        self.assertEqual(set(generalized_tutor_context.keys()), set(generalized_tutee_context.keys()))
+        self.assertEqual(generalized_tutee_context["document_renewal_status"], "due")
+        self.assertTrue(generalized_tutee_context["can_submit_document_renewal"])
+
+
+def timezone_now_minus_days(days):
+    from datetime import timedelta
+    from django.utils import timezone
+
+    return timezone.now() - timedelta(days=days)
 
 
 @override_settings(

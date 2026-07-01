@@ -27,9 +27,11 @@ view across both roles.
 - Add a verification/renewal card to **both** `TuteeProfile.vue` and `TutorProfile.vue`: "Renewed ✓" +
   countdown to next renewal. Use `.sb-card` / `.sb-badge` local patterns + `--sb-*` CSS custom properties
   per `.claude/skills/shadcn-components.md` and `App.vue` — no hardcoded colors.
-- Generalize the admin queue (`AdminTutorApplications.vue`) with a tutor/tutee role tab, wired to the new
-  `TuteeApplicationSerializer` / `TuteeDocumentRenewalReviewSerializer` from Phase 1 and new admin
-  list/detail views mirroring `AdminTutorApplicationListView` / `AdminTutorApplicationDetailView`.
+- Generalize the admin queue (`AdminTutorApplications.vue`) with a tutor/tutee role tab. This phase writes
+  `TuteeApplicationSerializer` / `TuteeDocumentRenewalReviewSerializer` (mirroring the tutor ones
+  field-for-field against the `TuteeApplication`/`TuteeDocumentRenewalReview` models from Phase 1 —
+  deliberately deferred here so they land alongside the views/tests that use them, not unreferenced) and
+  new admin list/detail views mirroring `AdminTutorApplicationListView` / `AdminTutorApplicationDetailView`.
 - Admin renewal-status visibility (read-only for regular admins): renewal status column + filter
   (`verified`/`due`/`pending`/`rejected`/`lapsed`) across ALL users of both roles with due date — not just
   rows with a pending submission. Regular admins act only through the existing review-a-submission flow;
@@ -50,3 +52,5 @@ view across both roles.
 ## Changelog
 
 - 2026-07-01: Outline written alongside the overview and Phase 1 detail plan. Not started.
+- 2026-07-01: Phase 1 cut its step 10 (Tutee serializers) as premature/unwired; this phase now explicitly
+  owns writing `TuteeApplicationSerializer` / `TuteeDocumentRenewalReviewSerializer` itself.

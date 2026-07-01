@@ -237,7 +237,13 @@ class Tutor(models.Model):
     def __str__(self):
         return f"Tutor: {self.profile.fname} {self.profile.lname}"
 
-class TutorApplication(models.Model):
+class ApplicationVerificationBase(models.Model):
+    """Shared document-verification + renewal-cadence fields/logic for TutorApplication and
+    TuteeApplication (see docs/plans/2026-07-01-tutee-verification-phase1-model.md). Each concrete
+    subclass defines its own `profile`/`reviewed_by` FKs and `school_id`/`enrollment_proof` upload
+    paths, since those need role-specific `related_name`/`upload_to` values that Django's abstract-base
+    `%(class)s` interpolation doesn't cover for plain FileFields."""
+
     DOCUMENT_RENEWAL_INTERVAL_DAYS = 90
 
     STATUS_CHOICES = [
@@ -246,17 +252,8 @@ class TutorApplication(models.Model):
         ('rejected', 'Rejected'),
     ]
 
-    profile = models.OneToOneField(
-        UserProfile,
-        on_delete=models.CASCADE,
-        related_name='tutor_application'
-    )
-
-    # Required Documents Only
-    school_id = models.ImageField(upload_to='tutor_applications/school_ids/')
-    enrollment_proof = models.FileField(upload_to='tutor_applications/enrollment_proofs/')
-
-    # Optional Motivation
+    # Optional Motivation. Kept as `reason_to_tutor` for both roles rather than renamed generically —
+    # see Phase 1 plan's "naming decision" note.
     reason_to_tutor = models.TextField(
         blank=True,
         help_text="Why do you want to become a tutor?"
@@ -272,15 +269,19 @@ class TutorApplication(models.Model):
 
     # Admin Feedback
     rejection_reason = models.TextField(blank=True, default='')
-    reviewed_by = models.ForeignKey(
-        UserProfile, on_delete=models.SET_NULL,
-        null=True, blank=True,
-        related_name='reviewed_applications'
-    )
     reviewed_at = models.DateTimeField(null=True, blank=True)
 
     submitted_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    # Opportunistic renewal-reminder dedup (Phase 4 consumes these; unused until then). Indexed now,
+    # while the columns are new and empty, so Phase 4's dedup filter doesn't force a table-scan or a
+    # later index-add migration under load.
+    reminder_7day_sent_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    reminder_1day_sent_at = models.DateTimeField(null=True, blank=True, db_index=True)
+
+    class Meta:
+        abstract = True
 
     def latest_approved_document_review_at(self):
         latest_renewal = (
@@ -323,17 +324,50 @@ class TutorApplication(models.Model):
     def can_submit_document_renewal(self):
         return self.document_renewal_status() in ['due', 'rejected']
 
-    def __str__(self):
-        return f"Application: {self.profile.fname} {self.profile.lname} ({self.application_status})"
 
+class DocumentRenewalReviewBase(models.Model):
+    """Shared fields for a single renewal-document submission review. Each concrete subclass defines
+    its own `application` FK (target model differs per role) and `profile`/`reviewed_by` FKs (need
+    distinct `related_name`s since both point at UserProfile), plus its own upload paths and Meta."""
 
-class TutorDocumentRenewalReview(models.Model):
     STATUS_CHOICES = [
         ('pending', 'Pending Review'),
         ('approved', 'Approved'),
         ('rejected', 'Rejected'),
     ]
 
+    reason_to_tutor = models.TextField(blank=True, default='')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    rejection_reason = models.TextField(blank=True, default='')
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    submitted_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        abstract = True
+
+
+class TutorApplication(ApplicationVerificationBase):
+    profile = models.OneToOneField(
+        UserProfile,
+        on_delete=models.CASCADE,
+        related_name='tutor_application'
+    )
+
+    school_id = models.ImageField(upload_to='tutor_applications/school_ids/')
+    enrollment_proof = models.FileField(upload_to='tutor_applications/enrollment_proofs/')
+
+    reviewed_by = models.ForeignKey(
+        UserProfile, on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='reviewed_applications'
+    )
+
+    def __str__(self):
+        return f"Application: {self.profile.fname} {self.profile.lname} ({self.application_status})"
+
+
+class TutorDocumentRenewalReview(DocumentRenewalReviewBase):
     application = models.ForeignKey(
         TutorApplication,
         on_delete=models.CASCADE,
@@ -346,9 +380,6 @@ class TutorDocumentRenewalReview(models.Model):
     )
     school_id = models.ImageField(upload_to='tutor_applications/renewal_school_ids/')
     enrollment_proof = models.FileField(upload_to='tutor_applications/renewal_enrollment_proofs/')
-    reason_to_tutor = models.TextField(blank=True, default='')
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
-    rejection_reason = models.TextField(blank=True, default='')
     reviewed_by = models.ForeignKey(
         UserProfile,
         on_delete=models.SET_NULL,
@@ -356,9 +387,6 @@ class TutorDocumentRenewalReview(models.Model):
         blank=True,
         related_name='reviewed_document_renewals'
     )
-    reviewed_at = models.DateTimeField(null=True, blank=True)
-    submitted_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ['-submitted_at']
@@ -366,6 +394,59 @@ class TutorDocumentRenewalReview(models.Model):
             models.Index(fields=['profile', 'status'], name='studybuddy__profile_71f0af_idx'),
             models.Index(fields=['application', 'status'], name='studybuddy__applica_1d5f57_idx'),
             models.Index(fields=['status', 'submitted_at'], name='studybuddy__status_82fcda_idx'),
+        ]
+
+    def __str__(self):
+        return f"Document renewal: {self.profile.fname} {self.profile.lname} ({self.status})"
+
+
+class TuteeApplication(ApplicationVerificationBase):
+    profile = models.OneToOneField(
+        UserProfile,
+        on_delete=models.CASCADE,
+        related_name='tutee_application'
+    )
+
+    school_id = models.ImageField(upload_to='tutee_applications/school_ids/')
+    enrollment_proof = models.FileField(upload_to='tutee_applications/enrollment_proofs/')
+
+    reviewed_by = models.ForeignKey(
+        UserProfile, on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='reviewed_tutee_applications'
+    )
+
+    def __str__(self):
+        return f"Application: {self.profile.fname} {self.profile.lname} ({self.application_status})"
+
+
+class TuteeDocumentRenewalReview(DocumentRenewalReviewBase):
+    application = models.ForeignKey(
+        TuteeApplication,
+        on_delete=models.CASCADE,
+        related_name='document_renewal_reviews'
+    )
+    profile = models.ForeignKey(
+        UserProfile,
+        on_delete=models.CASCADE,
+        related_name='tutee_document_renewal_reviews'
+    )
+    school_id = models.ImageField(upload_to='tutee_applications/renewal_school_ids/')
+    enrollment_proof = models.FileField(upload_to='tutee_applications/renewal_enrollment_proofs/')
+    reviewed_by = models.ForeignKey(
+        UserProfile,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='reviewed_tutee_document_renewals'
+    )
+
+    class Meta:
+        ordering = ['-submitted_at']
+        indexes = [
+            models.Index(fields=['profile', 'status'], name='studybuddy__tutee_pr_stat_idx'),
+            models.Index(fields=['application', 'status'], name='studybuddy__tutee_ap_stat_idx'),
+            models.Index(fields=['status', 'submitted_at'], name='studybuddy__tutee_st_sub_idx'),
         ]
 
     def __str__(self):

@@ -137,31 +137,40 @@ def build_login_response_payload(user, profile):
     }
 
 
-def get_tutor_document_review_context(profile):
-    application_status = None
-    document_renewal_status = None
-    document_renewal_due_at = None
-    document_renewal_rejection_reason = ''
-    can_submit_document_renewal = False
+EMPTY_DOCUMENT_REVIEW_CONTEXT = {
+    "application_status": None,
+    "document_renewal_status": None,
+    "document_renewal_due_at": None,
+    "document_renewal_rejection_reason": '',
+    "document_renewal_required": False,
+    "needs_document_renewal": False,
+    "tutor_renewal_status": None,
+    "tutor_renewal_required": False,
+    "tutor_renewal_due_at": None,
+    "tutor_renewal_rejection_reason": '',
+    "can_submit_document_renewal": False,
+}
 
-    if profile.role == 'Tutor':
-        try:
-            application = profile.tutor_application
-            application_status = application.application_status
-            document_renewal_status = application.document_renewal_status()
-            due_at = application.document_renewal_due_at()
-            document_renewal_due_at = due_at.isoformat() if due_at else None
-            can_submit_document_renewal = application.can_submit_document_renewal()
-            latest_renewal = application.latest_document_renewal_review()
-            if latest_renewal and latest_renewal.status == 'rejected':
-                document_renewal_rejection_reason = latest_renewal.rejection_reason
-        except TutorApplication.DoesNotExist:
-            pass
+
+def get_document_review_context(application):
+    """Builds the document-verification/renewal-status dict shared by the login payload and
+    profile-status endpoint, from a TutorApplication or TuteeApplication instance. Role-generic;
+    not yet called for tutees (Phase 1 of tutee enrollment verification adds no user-facing
+    behavior change) — see docs/plans/2026-07-01-tutee-verification-phase1-model.md."""
+    document_renewal_status = application.document_renewal_status()
+    due_at = application.document_renewal_due_at()
+    document_renewal_due_at = due_at.isoformat() if due_at else None
+    can_submit_document_renewal = application.can_submit_document_renewal()
+
+    document_renewal_rejection_reason = ''
+    latest_renewal = application.latest_document_renewal_review()
+    if latest_renewal and latest_renewal.status == 'rejected':
+        document_renewal_rejection_reason = latest_renewal.rejection_reason
 
     document_renewal_required = document_renewal_status in ['due', 'pending', 'rejected']
 
     return {
-        "application_status": application_status,
+        "application_status": application.application_status,
         "document_renewal_status": document_renewal_status,
         "document_renewal_due_at": document_renewal_due_at,
         "document_renewal_rejection_reason": document_renewal_rejection_reason,
@@ -173,6 +182,18 @@ def get_tutor_document_review_context(profile):
         "tutor_renewal_rejection_reason": document_renewal_rejection_reason,
         "can_submit_document_renewal": can_submit_document_renewal,
     }
+
+
+def get_tutor_document_review_context(profile):
+    if profile.role != 'Tutor':
+        return dict(EMPTY_DOCUMENT_REVIEW_CONTEXT)
+
+    try:
+        application = profile.tutor_application
+    except TutorApplication.DoesNotExist:
+        return dict(EMPTY_DOCUMENT_REVIEW_CONTEXT)
+
+    return get_document_review_context(application)
 
 
 def generate_otp_code():

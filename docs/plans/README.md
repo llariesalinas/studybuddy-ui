@@ -5,8 +5,8 @@ Status moves Draft → Approved → In Progress → Done. When a plan is complet
 
 | Date | Plan | Status | Summary |
 |------|------|--------|---------|
-| 2026-07-01 | [Tutee verification — overview](2026-07-01-tutee-verification-overview.md) | Approved | Pending |
-| 2026-07-01 | [Tutee verification — Phase 1 (model)](2026-07-01-tutee-verification-phase1-model.md) | Approved | Pending |
+| 2026-07-01 | [Tutee verification — overview](2026-07-01-tutee-verification-overview.md) | In Progress | Pending |
+| 2026-07-01 | [Tutee verification — Phase 1 (model)](2026-07-01-tutee-verification-phase1-model.md) | Done | Pending |
 | 2026-07-01 | [Tutee verification — Phase 2 (gate)](2026-07-01-tutee-verification-phase2-gate.md) | Draft | Pending |
 | 2026-07-01 | [Tutee verification — Phase 3 (UI)](2026-07-01-tutee-verification-phase3-ui.md) | Draft | Pending |
 | 2026-07-01 | [Tutee verification — Phase 4 (email & dev tools)](2026-07-01-tutee-verification-phase4-email-devtools.md) | Draft | Pending |
