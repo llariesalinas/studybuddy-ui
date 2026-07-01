@@ -100,14 +100,14 @@
 <body>
 
 <h1>StudyBuddy — Plans Dashboard</h1>
-<div class="subtitle">Generated from docs/plans/ on branch feat/tutee-enrollment-verification — 2026-07-01</div>
+<div class="subtitle">Generated from docs/plans/ on branch feat/tutee-enrollment-verification — 2026-07-02</div>
 
 <div class="badge-row">
   <span class="badge-count"><span class="dot" style="background:var(--in-progress)"></span>1 In Progress</span>
   <span class="badge-count"><span class="dot" style="background:var(--blocked)"></span>0 Blocked</span>
   <span class="badge-count"><span class="dot" style="background:var(--approved)"></span>2 Approved</span>
-  <span class="badge-count"><span class="dot" style="background:var(--draft)"></span>3 Draft</span>
-  <span class="badge-count"><span class="dot" style="background:var(--done)"></span>10 Done</span>
+  <span class="badge-count"><span class="dot" style="background:var(--draft)"></span>2 Draft</span>
+  <span class="badge-count"><span class="dot" style="background:var(--done)"></span>11 Done</span>
 </div>
 
 <div class="group">
@@ -117,7 +117,7 @@
       <span class="status-badge status-In-Progress">In Progress</span><br/>
       <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-07-01-tutee-verification-overview.md">Tutee verification — overview</a>
       <div class="date">2026-07-01</div>
-      <div class="summary">Design locked, 4-phase map. Phase 1 Done; Phases 2-4 await explicit go-ahead per the one-phase-at-a-time convention. Document-based tutee verification mirroring tutors via a shared abstract base model, forward-only booking gate, 90-day renewal, generalized admin queue, opportunistic reminders, dev-only SuperAdmin tools.</div>
+      <div class="summary">Design locked, 4-phase map. Phases 1-2 Done; Phases 3-4 await explicit go-ahead per the one-phase-at-a-time convention. Document-based tutee verification mirroring tutors via a shared abstract base model, forward-only booking gate, 90-day renewal, generalized admin queue, opportunistic reminders, dev-only SuperAdmin tools.</div>
     </div>
   </div>
 </div>
@@ -145,12 +145,6 @@
   <div class="cards">
     <div class="card">
       <span class="status-badge status-Draft">Draft</span><br/>
-      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-07-01-tutee-verification-phase2-gate.md">Tutee verification — Phase 2 (gate)</a>
-      <div class="date">2026-07-01</div>
-      <div class="summary">Outline. Loosens tutor lockout to forward-only, mirrors it for tutees, server-side booking-time gate, 30-day grace period for existing tutees. Depends on Phase 1.</div>
-    </div>
-    <div class="card">
-      <span class="status-badge status-Draft">Draft</span><br/>
       <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-07-01-tutee-verification-phase3-ui.md">Tutee verification — Phase 3 (UI)</a>
       <div class="date">2026-07-01</div>
       <div class="summary">Outline. Generalized application-status page, renewal card on both profiles, generalized admin queue with role tab + read-only status column/filter. Depends on Phase 2.</div>
@@ -171,8 +165,14 @@
 </details>
 
 <details class="group">
-  <summary>Done (10)</summary>
+  <summary>Done (11)</summary>
   <div class="cards">
+    <div class="card">
+      <span class="status-badge status-Done">Done</span><br/>
+      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-07-01-tutee-verification-phase2-gate.md">Tutee verification — Phase 2 (gate)</a>
+      <div class="date">2026-07-01</div>
+      <div class="summary">Server-side can_create_new_booking gate wired into booking-creation and accept-request endpoints; tutor router lockout narrowed to forward-only; env-driven grace-period cutover. Tutee-side route guard deferred to Phase 3. Browser-verified.</div>
+    </div>
     <div class="card">
       <span class="status-badge status-Done">Done</span><br/>
       <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-07-01-tutee-verification-phase1-model.md">Tutee verification — Phase 1 (model)</a>

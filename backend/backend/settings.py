@@ -250,6 +250,13 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024    # 5 MB — files above this go 
 # Mirrored in the frontend as MAX_DOCUMENT_UPLOAD_SIZE_BYTES (src/config.js) — keep in sync.
 MAX_DOCUMENT_UPLOAD_SIZE = 5 * 1024 * 1024  # 5 MB
 
+# Tutee enrollment verification booking gate (docs/plans/2026-07-01-tutee-verification-phase2-gate.md).
+# Existing tutees get a one-time, global 30-day grace period before new-booking creation is gated on
+# their document verification status. Unset by default — a fresh clone/CI run must never start gating
+# tutees just because wall-clock time passed some hardcoded date. Set the env var once, to (actual
+# rollout date + 30 days), at deploy time.
+TUTEE_VERIFICATION_ENFORCEMENT_START_DATE = os.getenv('TUTEE_VERIFICATION_ENFORCEMENT_START_DATE')
+
 PASSWORD_RESET_TIMEOUT = 3600
 LOGIN_OTP_TTL_SECONDS = 600
 LOGIN_OTP_MAX_ATTEMPTS = 5

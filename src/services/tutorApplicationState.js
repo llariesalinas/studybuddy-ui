@@ -203,3 +203,13 @@ export const needsTutorApplicationAttention = (application) => {
     (flow.kind === 'renewal' && ['due', 'pending', 'rejected'].includes(flow.status))
   )
 }
+
+// Narrower than needsTutorApplicationAttention: true only for a never-approved (initial) tutor.
+// Used by the router's global lockout — a renewal-due/pending/rejected tutor is forward-only
+// (blocked only from booking/accept surfaces, not the whole app) per
+// docs/plans/2026-07-01-tutee-verification-phase2-gate.md.
+export const needsTutorApplicationLockout = (application) => {
+  const flow = getTutorApplicationFlow(application)
+
+  return flow.kind === 'initial' && ['pending', 'rejected'].includes(flow.status)
+}

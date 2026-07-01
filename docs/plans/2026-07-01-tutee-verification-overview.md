@@ -15,10 +15,10 @@ spec: ../session-summaries/2026-07-01-tutee-verification-handoff.md
 <!-- LIVING SUMMARY: keep this section and the Changelog current on every edit -->
 ## Status & Progress Summary
 
-**Status: In Progress — Phase 1 Done. Awaiting explicit go-ahead before starting Phase 2.**
+**Status: In Progress — Phases 1-2 Done. Awaiting explicit go-ahead before starting Phase 3.**
 
 - [x] Phase 1 — Model & backend foundation ([plan](2026-07-01-tutee-verification-phase1-model.md))
-- [ ] Phase 2 — Booking gate & forward-only enforcement ([plan](2026-07-01-tutee-verification-phase2-gate.md))
+- [x] Phase 2 — Booking gate & forward-only enforcement ([plan](2026-07-01-tutee-verification-phase2-gate.md))
 - [ ] Phase 3 — UI surfaces ([plan](2026-07-01-tutee-verification-phase3-ui.md))
 - [ ] Phase 4 — Email & dev tools ([plan](2026-07-01-tutee-verification-phase4-email-devtools.md))
 
@@ -83,3 +83,8 @@ flow, apply rules symmetrically. Concretely:
 - 2026-07-01: Phase 1 implemented and verified (abstract base models, `TuteeApplication`/
   `TuteeDocumentRenewalReview`, schema-neutral migration, generalized helper, full backend suite run with
   only pre-existing/unrelated failures). Status moved to In Progress; Phase 2 awaits explicit go-ahead.
+- 2026-07-02: Phase 2 implemented and verified (server-side `can_create_new_booking` gate wired into both
+  booking-creation and accept-request endpoints, tutor router lockout narrowed to forward-only, grace-period
+  cutover as an env-driven settings constant). Tutee-side route guard deliberately deferred to Phase 3 (see
+  Phase 2's own changelog for why). Browser-verified the loosening end to end. Phase 3 awaits explicit
+  go-ahead.

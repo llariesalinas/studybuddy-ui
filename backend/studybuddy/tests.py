@@ -2036,6 +2036,186 @@ def timezone_now_minus_days(days):
     return timezone.now() - timedelta(days=days)
 
 
+class BookingVerificationGateTests(APITestCase):
+    """Phase 2 of tutee enrollment verification: can_create_new_booking gates new booking creation
+    (tutee) and accepting a pending booking request (tutor). See
+    docs/plans/2026-07-01-tutee-verification-phase2-gate.md."""
+
+    ENFORCED = {'TUTEE_VERIFICATION_ENFORCEMENT_START_DATE': '2020-01-01'}
+    NOT_YET_ENFORCED = {'TUTEE_VERIFICATION_ENFORCEMENT_START_DATE': None}
+    MALFORMED = {'TUTEE_VERIFICATION_ENFORCEMENT_START_DATE': 'not-a-date'}
+
+    def setUp(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        from .views import WEEKDAY_MAP
+
+        self.institution = PartnerInstitution.objects.create(
+            institution_name="CPU",
+            school_email_domain="cpu.edu",
+            is_active=True,
+        )
+        self.tutee_user = User.objects.create_user(
+            username="gate-tutee@cpu.edu",
+            email="gate-tutee@cpu.edu",
+            password="password",
+        )
+        self.tutee_profile = UserProfile.objects.create(
+            user=self.tutee_user,
+            fname="Gate",
+            mname="",
+            lname="Tutee",
+            role="Tutee",
+            institution=self.institution,
+        )
+        self.tutor_user = User.objects.create_user(
+            username="gate-tutor@cpu.edu",
+            email="gate-tutor@cpu.edu",
+            password="password",
+        )
+        self.tutor_profile = UserProfile.objects.create(
+            user=self.tutor_user,
+            fname="Gate",
+            mname="",
+            lname="Tutor",
+            role="Tutor",
+            institution=self.institution,
+        )
+        self.tutor = Tutor.objects.create(
+            profile=self.tutor_profile,
+            hourly_rate=Decimal("280.00"),
+            can_online=True,
+            can_f2f=True,
+            teaching_level="SHS",
+        )
+        self.future_date = timezone.now().date() + timedelta(days=30)
+        self.availability = TutorAvailability.objects.create(
+            tutor=self.tutor,
+            day=WEEKDAY_MAP[self.future_date.weekday()],
+            time_slot=time(14, 0),
+            is_active=True,
+        )
+
+    def upload(self, name, content, content_type):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        return SimpleUploadedFile(name, content, content_type=content_type)
+
+    def make_verified_application(self, model, profile):
+        return model.objects.create(
+            profile=profile,
+            school_id=self.upload("id.jpg", b"id", "image/jpeg"),
+            enrollment_proof=self.upload("rf.pdf", b"rf", "application/pdf"),
+            application_status="approved",
+            reviewed_at=timezone_now_minus_days(1),
+        )
+
+    def make_due_application(self, model, profile):
+        return model.objects.create(
+            profile=profile,
+            school_id=self.upload("id.jpg", b"id", "image/jpeg"),
+            enrollment_proof=self.upload("rf.pdf", b"rf", "application/pdf"),
+            application_status="approved",
+            reviewed_at=timezone_now_minus_days(91),
+        )
+
+    def post_confirm_booking(self):
+        self.client.force_authenticate(user=self.tutee_user)
+        return self.client.post(
+            "/api/bookings/confirm/",
+            {
+                "tutor_id": self.tutor_profile.id,
+                "slots": [{
+                    "availability_id": self.availability.id,
+                    "session_date": self.future_date.isoformat(),
+                    "session_mode": "Online",
+                }],
+            },
+            format="json",
+        )
+
+    @override_settings(**ENFORCED)
+    def test_tutee_without_application_blocked_once_enforced(self):
+        response = self.post_confirm_booking()
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.data.get("code"), "verification_required")
+
+    @override_settings(**NOT_YET_ENFORCED)
+    def test_tutee_without_application_allowed_during_grace_period(self):
+        response = self.post_confirm_booking()
+
+        self.assertEqual(response.status_code, 200)
+
+    @override_settings(**MALFORMED)
+    def test_malformed_enforcement_date_fails_safe_as_not_enforced(self):
+        response = self.post_confirm_booking()
+
+        self.assertEqual(response.status_code, 200)
+
+    @override_settings(**ENFORCED)
+    def test_tutee_with_verified_application_can_book(self):
+        self.make_verified_application(TuteeApplication, self.tutee_profile)
+
+        response = self.post_confirm_booking()
+
+        self.assertEqual(response.status_code, 200)
+
+    @override_settings(**ENFORCED)
+    def test_tutee_with_due_renewal_blocked(self):
+        self.make_due_application(TuteeApplication, self.tutee_profile)
+
+        response = self.post_confirm_booking()
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.data.get("code"), "verification_required")
+
+    def create_pending_booking(self):
+        return Booking.objects.create(
+            student=self.tutee_profile,
+            tutor=self.tutor,
+            availability=self.availability,
+            session_date=self.future_date,
+            session_mode="Online",
+            booking_request_id=uuid4(),
+            status="Pending",
+        )
+
+    def test_tutor_without_application_blocked_from_approving(self):
+        booking = self.create_pending_booking()
+        self.client.force_authenticate(user=self.tutor_user)
+
+        response = self.client.post(f"/api/bookings/{booking.id}/approve/")
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.data.get("code"), "verification_required")
+        booking.refresh_from_db()
+        self.assertEqual(booking.status, "Pending")
+
+    def test_tutor_with_verified_application_can_approve_booking(self):
+        self.make_verified_application(TutorApplication, self.tutor_profile)
+        booking = self.create_pending_booking()
+        self.client.force_authenticate(user=self.tutor_user)
+
+        response = self.client.post(f"/api/bookings/{booking.id}/approve/")
+
+        self.assertEqual(response.status_code, 200)
+        booking.refresh_from_db()
+        self.assertEqual(booking.status, "Confirmed")
+
+    def test_tutor_with_due_renewal_blocked_from_approving(self):
+        self.make_due_application(TutorApplication, self.tutor_profile)
+        booking = self.create_pending_booking()
+        self.client.force_authenticate(user=self.tutor_user)
+
+        response = self.client.post(f"/api/bookings/{booking.id}/approve/")
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.data.get("code"), "verification_required")
+        booking.refresh_from_db()
+        self.assertEqual(booking.status, "Pending")
+
+
 @override_settings(
     EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
     FRONTEND_URL="https://studybuddy.example",

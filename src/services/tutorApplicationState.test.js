@@ -4,6 +4,7 @@ import {
   getReviewStatus,
   getTutorApplicationFlow,
   needsTutorApplicationAttention,
+  needsTutorApplicationLockout,
 } from './tutorApplicationState'
 
 describe('tutor application state helpers', () => {
@@ -74,5 +75,44 @@ describe('tutor application state helpers', () => {
       needsUpload: false,
     })
     expect(needsTutorApplicationAttention(application)).toBe(false)
+  })
+
+  it('locks out a never-approved (pending) tutor globally', () => {
+    const application = { application_status: 'pending' }
+
+    expect(needsTutorApplicationLockout(application)).toBe(true)
+  })
+
+  it('locks out a never-approved (rejected) tutor globally', () => {
+    const application = { application_status: 'rejected' }
+
+    expect(needsTutorApplicationLockout(application)).toBe(true)
+  })
+
+  it('does not globally lock out a renewal-due approved tutor (forward-only)', () => {
+    const application = {
+      application_status: 'approved',
+      renewal_required: true,
+    }
+
+    expect(needsTutorApplicationAttention(application)).toBe(true)
+    expect(needsTutorApplicationLockout(application)).toBe(false)
+  })
+
+  it('does not globally lock out a renewal-pending or renewal-rejected approved tutor', () => {
+    expect(needsTutorApplicationLockout({
+      application_status: 'approved',
+      renewal_status: 'pending',
+    })).toBe(false)
+    expect(needsTutorApplicationLockout({
+      application_status: 'approved',
+      renewal_status: 'rejected',
+    })).toBe(false)
+  })
+
+  it('does not lock out a fully verified, approved tutor', () => {
+    const application = { application_status: 'approved' }
+
+    expect(needsTutorApplicationLockout(application)).toBe(false)
   })
 })

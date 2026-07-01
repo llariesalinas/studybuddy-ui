@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useProfileStore } from '@/stores/profile'
-import { needsTutorApplicationAttention } from '@/services/tutorApplicationState'
+import { needsTutorApplicationLockout } from '@/services/tutorApplicationState'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -293,11 +293,14 @@ router.beforeEach(async (to, from, next) => {
         ? profileStore.tutorRenewalRequired
         : authStore.user?.tutor_renewal_required || false,
     }
-    const hasTutorApplicationAttention =
+    // Global lockout applies only to never-approved tutors. A renewal-due/pending/rejected tutor
+    // is forward-only (blocked only at booking/accept surfaces, enforced server-side) — see
+    // docs/plans/2026-07-01-tutee-verification-phase2-gate.md.
+    const hasTutorApplicationLockout =
       normalizedUserRole === 'tutor' &&
-      needsTutorApplicationAttention(tutorApplicationSnapshot)
+      needsTutorApplicationLockout(tutorApplicationSnapshot)
 
-    if (hasTutorApplicationAttention && to.name !== 'tutor-application-status') {
+    if (hasTutorApplicationLockout && to.name !== 'tutor-application-status') {
       return next('/application-status')
     }
 

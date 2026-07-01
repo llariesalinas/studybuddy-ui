@@ -196,6 +196,52 @@ def get_tutor_document_review_context(profile):
     return get_document_review_context(application)
 
 
+def tutee_verification_enforced():
+    """True once the global grace-period cutover for tutee enrollment verification has passed.
+    A single global date, not per-account, and unset (never enforced) by default — see
+    docs/plans/2026-07-01-tutee-verification-phase2-gate.md."""
+    cutover_str = settings.TUTEE_VERIFICATION_ENFORCEMENT_START_DATE
+    if not cutover_str:
+        return False
+
+    try:
+        cutover = date.fromisoformat(cutover_str)
+    except ValueError:
+        logger.error(
+            "TUTEE_VERIFICATION_ENFORCEMENT_START_DATE is not a valid ISO date: %r. "
+            "Treating tutee verification as not yet enforced.",
+            cutover_str,
+        )
+        return False
+
+    return timezone.now().date() >= cutover
+
+
+def get_verification_application(profile):
+    if profile.role == 'Tutor':
+        return getattr(profile, 'tutor_application', None)
+    if profile.role == 'Tutee':
+        return getattr(profile, 'tutee_application', None)
+    return None
+
+
+def can_create_new_booking(profile):
+    """Source-of-truth check for the forward-only booking gate: can this profile take on NEW work
+    (a tutee creating a booking, a tutor accepting a pending booking request)? Existing bookings,
+    wallet, and dashboard access are never affected by this check."""
+    if profile.role == 'Tutee' and not tutee_verification_enforced():
+        return True
+
+    application = get_verification_application(profile)
+    if application is None:
+        return False
+
+    return (
+        application.application_status == 'approved'
+        and application.document_renewal_status() == 'verified'
+    )
+
+
 def generate_otp_code():
     return f"{secrets.randbelow(1000000):06d}"
 
@@ -1818,6 +1864,15 @@ def confirm_payment_and_book(request):
 
     user_profile = get_object_or_404(UserProfile, user=request.user)
 
+    if user_profile.role == 'Tutee' and not can_create_new_booking(user_profile):
+        return Response(
+            {
+                "error": "Please verify your enrollment before booking a new session.",
+                "code": "verification_required",
+            },
+            status=403,
+        )
+
     tutor_id = request.data.get("tutor_id")
     slots = request.data.get("slots")
     method_id = request.data.get("payment_method")
@@ -2231,6 +2286,15 @@ def approve_booking(request, booking_id):
     # Ensure tutor owns booking
     if request.user.userprofile != booking.tutor.profile:
         return Response({"error": "Unauthorized"}, status=403)
+
+    if not can_create_new_booking(request.user.userprofile):
+        return Response(
+            {
+                "error": "Please complete your enrollment verification before accepting new bookings.",
+                "code": "verification_required",
+            },
+            status=403,
+        )
 
     wallet, _ = Wallet.objects.get_or_create(tutor=booking.tutor)
     if wallet.balance < 0:
