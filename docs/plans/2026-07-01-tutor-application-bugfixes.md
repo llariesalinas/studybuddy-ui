@@ -1,7 +1,7 @@
 ---
 title: tutor-application-bugfixes
 date: 2026-07-01
-status: In Progress
+status: Done
 spec:
 ---
 
@@ -14,7 +14,7 @@ spec:
 <!-- LIVING SUMMARY: keep this section and the Changelog current on every edit -->
 ## Status & Progress Summary
 
-**Status: In Progress — 1 of 5 done, 4 revised and in flight.**
+**Status: Done — All 5 fixes implemented.**
 
 An unplanned commit, `66c1441` ("Add tutor document renewal review flow"), landed on this branch between
 sessions and shipped a large chunk of the deferred tutee/tutor renewal feature (see
@@ -23,15 +23,15 @@ retro-documented). It incidentally touched two of these bugs, so steps 1 and 3 b
 original form to match current code instead of being implemented as originally written.
 
 - [x] Step 2 — model/migration drift (`db_index=True` already present — done by the renewal commit)
-- [ ] Step 1 — resubmission gate (**revised**: renewal commit already redirects `approved` apps to the new
+- [x] Step 1 — resubmission gate (**revised**: renewal commit already redirects `approved` apps to the new
       renewal flow instead of reverting them to pending, which fixed the worst case. Remaining gap: `pending`
       apps can still freely resubmit via the same fallthrough. Add an explicit `rejected`-only gate.)
-- [ ] Step 3 — centralize `MAX_UPLOAD_SIZE` (**revised**: frontend half already done by the renewal commit —
+- [x] Step 3 — centralize `MAX_UPLOAD_SIZE` (**revised**: frontend half already done by the renewal commit —
       `MAX_DOCUMENT_UPLOAD_SIZE_BYTES` in `src/config.js`, used by `TutorScreeningModal.vue` and
       `TutorApplicationStatus.vue`. Backend half remains: no `settings.py` constant, and `register_user` /
       `upload_tutee_avatar` still have separate inline literals.)
-- [ ] Step 4 — resubmit size check (unchanged from original plan)
-- [ ] Step 5 — `login_view` exception narrowing (unchanged from original plan; still fail-open at
+- [x] Step 4 — resubmit size check (unchanged from original plan)
+- [x] Step 5 — `login_view` exception narrowing (unchanged from original plan; still fail-open at
       `views.py:886-887`)
 
 No other deviations. No open questions blocking implementation.
@@ -118,3 +118,4 @@ rarely; a documented mirrored constant is simpler and sufficient at this scale.
   [`docs/plans/2026-07-01-tutor-document-renewal-review.md`](2026-07-01-tutor-document-renewal-review.md) and
   revised steps 1 and 3 above to match current code. User confirmed this approach. Status moved to In Progress;
   implementing the 4 remaining gaps (steps 1, 3-backend, 4, 5) now.
+- 2026-07-01: Implemented steps 1, 3 (backend), 4, and 5 in commit `57480ad`. Status moved to Done.

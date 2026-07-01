@@ -1,7 +1,7 @@
 ---
 title: Dashboard load performance (backend)
 date: 2026-06-07
-status: In Progress     # Phase 1 verified end-to-end; Phase 2 (pagination) ruled out by re-measure; redis e2e still pending (no local server)
+status: Done     # Phase 1 verified end-to-end; Phase 2 (pagination) ruled out by re-measure; redis e2e still pending (no local server)
 spec:
 ---
 
