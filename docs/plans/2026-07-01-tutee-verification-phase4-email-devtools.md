@@ -8,12 +8,15 @@ spec: 2026-07-01-tutee-verification-overview.md
 # Phase 4 — Email & dev tools
 
 > Part of [Tutee enrollment verification — overview](2026-07-01-tutee-verification-overview.md). Outline
-> only — flesh out once Phase 3 lands.
+> only — flesh out once Phase 3 lands. Phase 3 is Done; see the session handoff at
+> [`docs/session-summaries/2026-07-02-tutee-verification-phase4-handoff.md`](../session-summaries/2026-07-02-tutee-verification-phase4-handoff.md)
+> for full context (gotchas, environment state, what's already done) before starting this phase.
 
 <!-- LIVING SUMMARY: keep this section and the Changelog current on every edit -->
 ## Status & Progress Summary
 
-**Status: Draft — outline only, not started.** Depends on Phase 3.
+**Status: Draft — outline only, not started.** Phase 3 is Done (unblocked); this phase hasn't been fleshed
+out into full detail yet — that's the next action, see the handoff doc linked above.
 
 ## Goal
 
@@ -52,3 +55,7 @@ demo lapse/reminders without waiting out the real 90-day/30-day windows.
 ## Changelog
 
 - 2026-07-01: Outline written alongside the overview and Phase 1 detail plan. Not started.
+- 2026-07-02: Phase 3 shipped and committed (`cbc67e8`), unblocking this phase. Session ended before
+  fleshing this phase out — linked a handoff doc
+  (`docs/session-summaries/2026-07-02-tutee-verification-phase4-handoff.md`) capturing environment gotchas
+  and full context for whoever picks this up next. Still Draft/outline; not started.
