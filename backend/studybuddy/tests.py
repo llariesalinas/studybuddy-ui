@@ -5566,6 +5566,13 @@ class VerificationDevToolsTests(APITestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertTrue(resp.data["tutee_verification_enforced"])
         self.assertTrue(resp.data["enforcement_override"])
+        self.assertTrue(
+            PlatformActivity.objects.filter(
+                activity_type="admin_action",
+                message__contains="set tutee verification enforcement override to 'on'",
+                institution=self.institution,
+            ).exists()
+        )
 
     @override_settings(VERIFICATION_DEV_TOOLS_ENABLED=False)
     def test_endpoints_403_when_flag_disabled(self):

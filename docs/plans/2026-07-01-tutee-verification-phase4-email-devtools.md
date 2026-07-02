@@ -128,11 +128,11 @@ and the login response (`views.py:137`), which together satisfy "opportunistic, 
      `role_label = profile.role.lower()` and the profile's real application object (via
      `get_verification_application(profile)`, already defined at `views.py:238-243` — reuse it, don't
      reimplement); 404 if the profile has no application yet (nothing to email about).
-  5. `force_expire`: backdate the renewal clock so `document_renewal_status()` returns `'due'` on the next
-     read — set `reviewed_at` 91 days in the past on the latest approved `DocumentRenewalReview` if one
-     exists, else on the application's own `reviewed_at` (mirrors `latest_approved_document_review_at()`'s
-     own fallback logic at `models.py:286-295`), and clear both `reminder_*_sent_at` fields so a demo can
-     immediately re-trigger reminders too. Wrap in `@transaction.atomic` like the other admin patch views.
+  5. `force_expire`: import and reuse the shared state helper from
+     `backend/studybuddy/_verification_dev.py` created by
+     [Verification dev tools](2026-07-02-verification-dev-tools.md). The helper owns the renewal-clock
+     backdating / exact-state behavior so SuperAdmin tools and the self-service profile panel do not
+     drift. Wrap the admin action in `@transaction.atomic` like the other admin patch views.
   6. Log a `PlatformActivity` row (`activity_type='admin_action'`) for every dev-tool action, same as every
      other admin mutation in this file — dev tools shouldn't be invisible in the audit trail.
 - `urls.py` — add `path('admin/users/<int:pk>/verification-dev-tools/',

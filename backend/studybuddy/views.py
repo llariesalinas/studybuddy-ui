@@ -343,6 +343,13 @@ def dev_verification_set_enforcement(request):
     else:
         return Response({"error": "mode must be one of: on, off, clear."}, status=400)
 
+    profile = request.user.userprofile
+    PlatformActivity.objects.create(
+        activity_type='admin_action',
+        message=f"[DEV] {profile.fname} {profile.lname} set tutee verification enforcement override to '{mode}'",
+        institution=profile.institution,
+    )
+
     return Response(_verification_dev_readout(request.user.userprofile))
 
 
