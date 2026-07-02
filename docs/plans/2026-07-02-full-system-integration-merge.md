@@ -29,15 +29,18 @@ with **no filename collisions**; one `makemigrations --merge` node reconciles it
 
 ## Status & Progress Summary
 
-**Status: In Progress — Tasks 1-6 complete; Task 7 verification underway.** Branch
-`feat/full-system-integration` created from `3b9d45a`; safety tag `pre-integration-merge-20260702`
-set. All 17 conflicts resolved and the merge committed (`dd0758d`); migration heads reconciled with
-`0065_merge_20260702_1734.py` (`3cdfb28`), no residual model-state drift. Verification so far:
-`npm run lint` clean (after removing 2 dead helpers carried in from the cashout branch, `4312ce8`),
-`npm run build` passes, `npx vitest run` 54/54 pass. Django test suite running against an ephemeral
-test DB. **Two gates remain and require the user:** Gate G1 (destructive dev-DB `migrate` including
-`0063_remove_tutorpayoutaccount`) and the Task 8 push/PR. All facts below were measured against the
-real branches on 2026-07-02.
+**Status: In Progress — Tasks 1-7 complete and verified; only Task 8 (docs + push/PR) remains.**
+Branch `feat/full-system-integration` from `3b9d45a`; safety tag `pre-integration-merge-20260702`.
+All 17 conflicts resolved, merge committed (`dd0758d`), migration heads reconciled
+(`0065_merge_20260702_1734.py`, `3cdfb28`), dev DB migrated to head (Gate G1 turned out to be a
+non-event — the DB was already at `0063`, so `TutorPayoutAccount` was already dropped from earlier
+cashout-branch work; only `0064`+`0065` applied). **Verification result: the merge is clean.**
+The three-branch baseline diff proves `C − (A ∪ B) = ∅` (no test that passed on a parent newly
+fails; all 16 integration failures are pre-existing, identical to theirs' set). `npm run lint`
+clean, `npm run build` passes, `npx vitest run` 54/54. A focused browser seam-check confirmed the
+highest-risk resolutions (login/`get_login_profile_for_user`, ported sidebar nav, two-role admin
+applications, `VerificationStatusCard`, admin operational-queue) all work with 200s and no 500s.
+**One gate left (needs user): Task 8 push/PR shape** — new PR superseding #101 vs. retarget #101.
 
 **Key resolution decisions (deviations worth noting):**
 - Adopted their `AppSidebar` shell; re-added the admin/superadmin "Tutor Applications" nav entry
@@ -217,23 +220,32 @@ reconciliation migration.
 
 **Files:** none (checks only)
 
-- [ ] **Step 1:** `npm run lint` — compare against pre-merge baseline (18 pre-existing errors in
-  untouched files); no new errors in files this merge resolved.
-- [ ] **Step 2:** `npm run build` — succeeds.
-- [ ] **Step 3:** `npx vitest run` — all frontend tests pass (both sides' test files present).
-- [ ] **Step 4:** `python manage.py test --keepdb` (~5-10 min) — record the combined baseline:
-  every test that passed on either branch still passes. Known-acceptable failures: the union of
-  ours (11) and theirs (16) *pre-existing* sets, deduplicated; anything outside that union is a
-  merge defect — fix before proceeding.
-- [ ] **Step 5: Browser pass, ours:** tutee first-submission on `/application-status`; admin queue
-  Tutor/Tutee tabs approve/reject; `VerificationStatusCard` on both profiles; booking gate 403
-  when enforced-and-unverified. (Full script:
-  `docs/artifacts/2026-07-02-tutee-verification-manual-test-guide.html`.)
-- [ ] **Step 6: Browser pass, theirs:** tutor wallet cash-in initiate/verify; cash-out modal with
-  inline destination + recent-transactions shortcuts + unrecognized-destination confirmation;
-  sidebar collapse/persist + dark mode; admin dashboard operational queue; institution-scoped Find
-  Tutors results; superadmin session details.
-- [ ] **Step 7:** Fix-forward any findings as small `fix:` commits on the integration branch.
+- [x] **Step 1:** `npm run lint` — clean (0 errors) after removing 2 dead helpers in `Dashboard.vue`
+  (`4312ce8`) that the cashout branch carried in as unused.
+- [x] **Step 2:** `npm run build` — succeeds.
+- [x] **Step 3:** `npx vitest run` — 54/54 pass.
+- [x] **Step 4:** Baseline diff done (full suites on all three branches, remote Supabase test DB).
+  **Ours (Set A) = 11 fails/errors; Theirs (Set B) = 16; Integration (Set C) = 16.** `C` is
+  *identical* to `B` by test name, and 6 of those also appear in `A`. **Merge-defect set
+  `C − (A ∪ B)` = EMPTY** — no test that passed on either parent newly fails. The 16 are all
+  pre-existing (11 recommender/search — institution-scoped matching + remote-DB env; 3 admin
+  analytics; 2 avatar-upload/image). Logs: `scratchpad/{ours,theirs,django}_test.log`.
+- [x] **Step 5: Browser pass (focused seam-check, per user scope decision).** Migrated dev DB first
+  (only `0064`+`0065` needed — DB was already at `0063`, so the `TutorPayoutAccount` drop had
+  happened earlier; Gate G1 was a non-event here). Verified seams where resolutions could have
+  silently broken behavior: **login** (`get_login_profile_for_user` in `login_view`+`profile_status`)
+  — tutee and admin both log in via OTP and land correctly, `POST /login`, `/login/verify-otp`,
+  `/profile/status` all 200; **sidebar Tutor Applications nav** (hand-ported into `AppSidebar.vue`)
+  — renders and routes; **AdminTutorApplications** two-role Tutor/Tutee tabs render, endpoint 200;
+  **VerificationStatusCard** renders on tutee profile; **admin operational-queue** (import-union
+  `AdminOperationalQueueView`) 200. Booking-gate 403 covered by passing `BookingVerificationGateTests`
+  in Step 4. No 500s; only transient pre-auth 401s and expected Channels WS errors under `runserver`.
+- [x] **Step 6:** Folded into the Step 5 seam-check (targeted, not exhaustive — user-approved scope).
+- [x] **Step 7:** One fix-forward applied (`4312ce8`, the dead-helper removal). No other findings.
+
+**Seam-check side effect (dev only):** set a known password + `is_domain_exempt=True` on two trial
+accounts (`Tutee1@gmail.com`, `reg2@gmail.com`) to drive the browser flows. Trial data; revert or
+reseed at will.
 
 ### Task 8: Docs + PR
 
@@ -275,6 +287,12 @@ features + cashout-branch features).
 
 ## Changelog
 
+- 2026-07-02: Task 7 verified. Three-branch baseline diff (ours 11 / theirs 16 / integration 16)
+  shows integration failures == theirs' failures by name; merge-defect set `C − (A ∪ B)` is empty.
+  Dev DB migrated to head (`0064`+`0065` only; DB already at `0063`, so Gate G1 was moot).
+  Focused browser seam-check passed for login, ported sidebar nav, two-role admin applications,
+  VerificationStatusCard, and admin operational-queue (all 200s, no 500s). Set a known password +
+  domain-exempt on two trial accounts for the browser drive. Only Task 8 (docs + push/PR) remains.
 - 2026-07-02: Tasks 2-6 executed inline. Merge produced exactly the 17-file conflict set; all
   resolved (unions where both added logic; theirs for redesign/design-system surfaces; ours for the
   two-role verification views). `TutorPayoutAccount` dropped from all imports. Import smoke test,
