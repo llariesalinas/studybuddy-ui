@@ -1,7 +1,7 @@
 ---
 title: Full-system integration merge (tutee verification + cashout-branch features)
 date: 2026-07-02
-status: In Progress
+status: Done
 spec: 2026-07-01-tutee-verification-overview.md
 ---
 
@@ -29,7 +29,9 @@ with **no filename collisions**; one `makemigrations --merge` node reconciles it
 
 ## Status & Progress Summary
 
-**Status: In Progress — Tasks 1-7 complete and verified; only Task 8 (docs + push/PR) remains.**
+**Status: Done — branch complete and verified; push/PR deferred to user.**
+Docs finished (this file + session summary + `index.html`). The only open item is the deliberate
+Task 8 Step 4 push/PR, which the user chose to hold ("finish docs, don't push yet").
 Branch `feat/full-system-integration` from `3b9d45a`; safety tag `pre-integration-merge-20260702`.
 All 17 conflicts resolved, merge committed (`dd0758d`), migration heads reconciled
 (`0065_merge_20260702_1734.py`, `3cdfb28`), dev DB migrated to head (Gate G1 turned out to be a
@@ -251,15 +253,13 @@ reseed at will.
 
 **Files:** `docs/plans/index.html`, this plan file, session summary; PR.
 
-- [ ] **Step 1:** Set this plan's status to Done; write
-  `docs/session-summaries/2026-07-02-full-system-integration-merge-summary.md` (shipped vs
-  planned, deviations, checks run + results).
-- [ ] **Step 2:** Regenerate `docs/plans/index.html` from scratch per dashboard spec.
-- [ ] **Step 3:** `git commit` the docs.
-- [ ] **Step 4 (user confirmation required):** push `feat/full-system-integration` and either
-  (a) open a new PR "feat: full system integration" superseding #101, or (b) retarget #101 —
-  user's choice. PR body: feature inventory from both lines, migration notes (incl. destructive
-  `0063` and Gate G1 outcome), checks run with results.
+- [x] **Step 1:** Status set to Done; wrote
+  `docs/session-summaries/2026-07-02-full-system-integration-merge-summary.md`.
+- [x] **Step 2:** Regenerated `docs/plans/index.html` from the merged README plan set.
+- [x] **Step 3:** `git commit` the docs.
+- [ ] **Step 4 (DEFERRED — user chose "finish docs, don't push yet"):** push
+  `feat/full-system-integration` and either (a) new PR superseding #101 or (b) retarget #101.
+  Nothing pushed; branch is complete and verified locally, awaiting the user's push decision.
 
 ## Risks
 
@@ -287,6 +287,10 @@ features + cashout-branch features).
 
 ## Changelog
 
+- 2026-07-02: Task 8 docs finished; status → Done. Wrote session summary, regenerated
+  `index.html` from the merged README plan set, updated the README row to Done. Push/PR (Step 4)
+  deliberately deferred per user ("finish docs, don't push yet"). Branch is complete and verified;
+  nothing pushed.
 - 2026-07-02: Task 7 verified. Three-branch baseline diff (ours 11 / theirs 16 / integration 16)
   shows integration failures == theirs' failures by name; merge-defect set `C − (A ∪ B)` is empty.
   Dev DB migrated to head (`0064`+`0065` only; DB already at `0063`, so Gate G1 was moot).
