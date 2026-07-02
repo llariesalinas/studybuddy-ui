@@ -556,6 +556,7 @@ class PlatformActivity(models.Model):
         ('withdrawal_failed', 'Withdrawal Failure'),
         ('admin_action', 'Admin Action'),
         ('tutor_application', 'Tutor Application'),
+        ('tutee_application', 'Tutee Application'),
     ]
 
     activity_type = models.CharField(max_length=30, choices=ACTIVITY_TYPES)

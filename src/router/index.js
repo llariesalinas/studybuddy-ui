@@ -1,7 +1,9 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useProfileStore } from '@/stores/profile'
-import { needsTutorApplicationLockout } from '@/services/tutorApplicationState'
+import { needsTutorApplicationLockout, needsTuteeVerificationBlock } from '@/services/tutorApplicationState'
+
+const TUTEE_BOOKING_FLOW_ROUTE_NAMES = ['book', 'tutors', 'tutor-details']
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -112,7 +114,7 @@ const router = createRouter({
       path: '/application-status',
       name: 'tutor-application-status',
       component: () => import('@/views/TutorApplicationStatus.vue'),
-      meta: { requiresAuth: true, role: 'Tutor' }
+      meta: { requiresAuth: true, role: ['Tutor', 'Tutee'] }
     },
     {
       path: '/tch-dashboard',
@@ -301,6 +303,23 @@ router.beforeEach(async (to, from, next) => {
       needsTutorApplicationLockout(tutorApplicationSnapshot)
 
     if (hasTutorApplicationLockout && to.name !== 'tutor-application-status') {
+      return next('/application-status')
+    }
+
+    // Tutee booking-flow gate: forward-only, only blocks the booking-creation routes, and only once
+    // the server-side grace period has actually ended — see
+    // docs/plans/2026-07-01-tutee-verification-phase3-ui.md.
+    const tuteeApplicationSnapshot = {
+      application_status: profileStore.applicationStatus || null,
+      document_renewal_status: profileStore.renewalStatus || null,
+      tutee_verification_enforced: profileStore.tuteeVerificationEnforced,
+    }
+    const hasTuteeVerificationBlock =
+      normalizedUserRole === 'tutee' &&
+      TUTEE_BOOKING_FLOW_ROUTE_NAMES.includes(to.name) &&
+      needsTuteeVerificationBlock(tuteeApplicationSnapshot)
+
+    if (hasTuteeVerificationBlock) {
       return next('/application-status')
     }
 

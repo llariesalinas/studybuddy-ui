@@ -35,6 +35,7 @@ from .models import (
     TutorDocumentRenewalReview,
     TuteeApplication,
     TuteeDocumentRenewalReview,
+    PlatformActivity,
     TutorPayoutAccount,
     Wallet,
     WithdrawalRequest,
@@ -2214,6 +2215,264 @@ class BookingVerificationGateTests(APITestCase):
         self.assertEqual(response.data.get("code"), "verification_required")
         booking.refresh_from_db()
         self.assertEqual(booking.status, "Pending")
+
+
+class TuteeVerificationPhase3Tests(APITestCase):
+    """Phase 3 of tutee enrollment verification: the mirrored tutee-facing endpoints, admin views, and
+    the profile_status role dispatcher. See docs/plans/2026-07-01-tutee-verification-phase3-ui.md."""
+
+    def setUp(self):
+        self.institution = PartnerInstitution.objects.create(
+            institution_name="CPU",
+            school_email_domain="cpu.edu",
+            is_active=True,
+        )
+        self.other_institution = PartnerInstitution.objects.create(
+            institution_name="Other University",
+            school_email_domain="other.edu",
+            is_active=True,
+        )
+        self.tutee_user = User.objects.create_user(
+            username="phase3-tutee@cpu.edu",
+            email="phase3-tutee@cpu.edu",
+            password="password",
+        )
+        self.tutee_profile = UserProfile.objects.create(
+            user=self.tutee_user,
+            fname="Phase3",
+            mname="",
+            lname="Tutee",
+            role="Tutee",
+            institution=self.institution,
+        )
+        self.admin_user = User.objects.create_user(
+            username="phase3-admin@cpu.edu",
+            email="phase3-admin@cpu.edu",
+            password="password",
+        )
+        self.admin_profile = UserProfile.objects.create(
+            user=self.admin_user,
+            fname="Phase3",
+            mname="",
+            lname="Admin",
+            role="Admin",
+            institution=self.institution,
+        )
+        self.other_admin_user = User.objects.create_user(
+            username="phase3-admin@other.edu",
+            email="phase3-admin@other.edu",
+            password="password",
+        )
+        UserProfile.objects.create(
+            user=self.other_admin_user,
+            fname="Other",
+            mname="",
+            lname="Admin",
+            role="Admin",
+            institution=self.other_institution,
+        )
+
+    def upload(self, name, content, content_type):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        return SimpleUploadedFile(name, content, content_type=content_type)
+
+    def test_tutee_application_status_returns_404_when_none_exists(self):
+        self.client.force_authenticate(user=self.tutee_user)
+
+        response = self.client.get("/api/tutee-application/status/")
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_tutee_application_resubmit_creates_initial_application_when_none_exists(self):
+        self.client.force_authenticate(user=self.tutee_user)
+
+        response = self.client.post(
+            "/api/tutee-application/resubmit/",
+            {
+                "school_id": self.upload("id.jpg", b"id", "image/jpeg"),
+                "enrollment_proof": self.upload("rf.pdf", b"rf", "application/pdf"),
+                "reason_to_tutor": "First time submitting",
+            },
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        application = TuteeApplication.objects.get(profile=self.tutee_profile)
+        self.assertEqual(application.application_status, "pending")
+        self.assertEqual(
+            PlatformActivity.objects.filter(activity_type="tutee_application").count(), 1
+        )
+
+    def test_tutee_application_resubmit_rejected_goes_back_to_pending(self):
+        application = TuteeApplication.objects.create(
+            profile=self.tutee_profile,
+            school_id=self.upload("id.jpg", b"id", "image/jpeg"),
+            enrollment_proof=self.upload("rf.pdf", b"rf", "application/pdf"),
+            application_status="rejected",
+            rejection_reason="Blurry photo",
+        )
+        self.client.force_authenticate(user=self.tutee_user)
+
+        response = self.client.post(
+            "/api/tutee-application/resubmit/",
+            {
+                "school_id": self.upload("new-id.jpg", b"new-id", "image/jpeg"),
+                "enrollment_proof": self.upload("new-rf.pdf", b"new-rf", "application/pdf"),
+                "reason_to_tutor": "Resubmitting",
+            },
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        application.refresh_from_db()
+        self.assertEqual(application.application_status, "pending")
+        self.assertEqual(
+            PlatformActivity.objects.filter(activity_type="tutee_application").count(), 1
+        )
+
+    def test_tutee_document_renewal_submit_when_due(self):
+        application = TuteeApplication.objects.create(
+            profile=self.tutee_profile,
+            school_id=self.upload("id.jpg", b"id", "image/jpeg"),
+            enrollment_proof=self.upload("rf.pdf", b"rf", "application/pdf"),
+            application_status="approved",
+            reviewed_at=timezone_now_minus_days(91),
+        )
+        self.client.force_authenticate(user=self.tutee_user)
+
+        response = self.client.post(
+            "/api/tutee-application/renewal/",
+            {
+                "school_id": self.upload("new-id.jpg", b"new-id", "image/jpeg"),
+                "enrollment_proof": self.upload("new-rf.pdf", b"new-rf", "application/pdf"),
+                "reason_to_tutor": "Still enrolled",
+            },
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["document_renewal_status"], "pending")
+        renewal = TuteeDocumentRenewalReview.objects.get(application=application)
+        self.assertEqual(renewal.status, "pending")
+
+    def test_admin_tutee_application_list_combines_applications_and_renewals(self):
+        TuteeApplication.objects.create(
+            profile=self.tutee_profile,
+            school_id=self.upload("id.jpg", b"id", "image/jpeg"),
+            enrollment_proof=self.upload("rf.pdf", b"rf", "application/pdf"),
+            application_status="pending",
+        )
+        self.client.force_authenticate(user=self.admin_user)
+
+        response = self.client.get("/api/admin/tutee-applications/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]["applicant_name"], "Phase3 Tutee")
+
+    def test_admin_can_approve_initial_tutee_application(self):
+        application = TuteeApplication.objects.create(
+            profile=self.tutee_profile,
+            school_id=self.upload("id.jpg", b"id", "image/jpeg"),
+            enrollment_proof=self.upload("rf.pdf", b"rf", "application/pdf"),
+            application_status="pending",
+        )
+        self.client.force_authenticate(user=self.admin_user)
+
+        response = self.client.patch(
+            f"/api/admin/tutee-applications/{application.id}/",
+            {"application_status": "approved"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        application.refresh_from_db()
+        self.assertEqual(application.application_status, "approved")
+
+    def test_admin_can_approve_tutee_document_renewal_and_resets_dedup_fields(self):
+        application = TuteeApplication.objects.create(
+            profile=self.tutee_profile,
+            school_id=self.upload("id.jpg", b"id", "image/jpeg"),
+            enrollment_proof=self.upload("rf.pdf", b"rf", "application/pdf"),
+            application_status="approved",
+            reviewed_at=timezone_now_minus_days(91),
+            reminder_7day_sent_at=timezone_now_minus_days(3),
+            reminder_1day_sent_at=timezone_now_minus_days(1),
+        )
+        renewal = TuteeDocumentRenewalReview.objects.create(
+            application=application,
+            profile=self.tutee_profile,
+            school_id=self.upload("pending-id.jpg", b"pending-id", "image/jpeg"),
+            enrollment_proof=self.upload("pending-rf.pdf", b"pending-rf", "application/pdf"),
+            status="pending",
+        )
+        self.client.force_authenticate(user=self.admin_user)
+
+        response = self.client.patch(
+            f"/api/admin/tutee-document-renewals/{renewal.id}/",
+            {"application_status": "approved"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        application.refresh_from_db()
+        self.assertEqual(application.document_renewal_status(), "verified")
+        self.assertIsNone(application.reminder_7day_sent_at)
+        self.assertIsNone(application.reminder_1day_sent_at)
+
+    def test_admin_cannot_review_other_institution_tutee_document_renewal(self):
+        application = TuteeApplication.objects.create(
+            profile=self.tutee_profile,
+            school_id=self.upload("id.jpg", b"id", "image/jpeg"),
+            enrollment_proof=self.upload("rf.pdf", b"rf", "application/pdf"),
+            application_status="approved",
+            reviewed_at=timezone_now_minus_days(91),
+        )
+        renewal = TuteeDocumentRenewalReview.objects.create(
+            application=application,
+            profile=self.tutee_profile,
+            school_id=self.upload("pending-id.jpg", b"pending-id", "image/jpeg"),
+            enrollment_proof=self.upload("pending-rf.pdf", b"pending-rf", "application/pdf"),
+            status="pending",
+        )
+        self.client.force_authenticate(user=self.other_admin_user)
+
+        response = self.client.patch(
+            f"/api/admin/tutee-document-renewals/{renewal.id}/",
+            {"application_status": "approved"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 404)
+        renewal.refresh_from_db()
+        self.assertEqual(renewal.status, "pending")
+
+    @override_settings(TUTEE_VERIFICATION_ENFORCEMENT_START_DATE='2020-01-01')
+    def test_profile_status_dispatches_to_tutee_context_and_exposes_enforcement_flag(self):
+        TuteeApplication.objects.create(
+            profile=self.tutee_profile,
+            school_id=self.upload("id.jpg", b"id", "image/jpeg"),
+            enrollment_proof=self.upload("rf.pdf", b"rf", "application/pdf"),
+            application_status="approved",
+            reviewed_at=timezone_now_minus_days(91),
+        )
+        self.client.force_authenticate(user=self.tutee_user)
+
+        response = self.client.get("/api/profile/status/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["document_renewal_status"], "due")
+        self.assertTrue(response.data["tutee_verification_enforced"])
+
+    def test_profile_status_for_tutee_with_no_application_returns_empty_context(self):
+        self.client.force_authenticate(user=self.tutee_user)
+
+        response = self.client.get("/api/profile/status/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.data["document_renewal_status"])
+        self.assertFalse(response.data["document_renewal_required"])
 
 
 @override_settings(

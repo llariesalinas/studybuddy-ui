@@ -5,6 +5,7 @@ import {
   getTutorApplicationFlow,
   needsTutorApplicationAttention,
   needsTutorApplicationLockout,
+  needsTuteeVerificationBlock,
 } from './tutorApplicationState'
 
 describe('tutor application state helpers', () => {
@@ -114,5 +115,39 @@ describe('tutor application state helpers', () => {
     const application = { application_status: 'approved' }
 
     expect(needsTutorApplicationLockout(application)).toBe(false)
+  })
+})
+
+describe('needsTuteeVerificationBlock', () => {
+  it('never blocks during the grace period, regardless of application state', () => {
+    expect(needsTuteeVerificationBlock({
+      tutee_verification_enforced: false,
+      application_status: null,
+      document_renewal_status: null,
+    })).toBe(false)
+  })
+
+  it('blocks a tutee with no application once enforcement is active', () => {
+    expect(needsTuteeVerificationBlock({
+      tutee_verification_enforced: true,
+      application_status: null,
+      document_renewal_status: null,
+    })).toBe(true)
+  })
+
+  it('blocks a tutee whose renewal is due once enforcement is active', () => {
+    expect(needsTuteeVerificationBlock({
+      tutee_verification_enforced: true,
+      application_status: 'approved',
+      document_renewal_status: 'due',
+    })).toBe(true)
+  })
+
+  it('does not block a fully verified tutee once enforcement is active', () => {
+    expect(needsTuteeVerificationBlock({
+      tutee_verification_enforced: true,
+      application_status: 'approved',
+      document_renewal_status: 'verified',
+    })).toBe(false)
   })
 })

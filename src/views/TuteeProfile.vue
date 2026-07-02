@@ -61,6 +61,8 @@
         </div>
       </header>
 
+      <VerificationStatusCard />
+
       <main class="profile-grid">
         <div class="profile-col">
           <section class="glass-segment">
@@ -444,9 +446,12 @@ import { useSubjectCatalog } from '@/composables/useSubjectCatalog'
 import api from '@/services/api/api'
 import { useCatalogStore } from '@/stores/catalog'
 import { useToastStore } from '@/stores/toast'
+import { useProfileStore } from '@/stores/profile'
+import VerificationStatusCard from '@/components/VerificationStatusCard.vue'
 
 const catalogStore = useCatalogStore()
 const toastStore = useToastStore()
+const profileStore = useProfileStore()
 
 const profile = ref({
   fname: '',
@@ -930,6 +935,7 @@ onMounted(() => {
   loadProfile()
   loadCourses()
   loadSubjects()
+  if (!profileStore.loaded) profileStore.checkProfileStatus()
 })
 </script>
 

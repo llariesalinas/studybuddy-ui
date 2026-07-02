@@ -30,7 +30,9 @@ from .admin_views import (
     AdminStatsView, AdminWithdrawalListView, AdminWithdrawalDetailView,
     AdminUserListView, AdminInstitutionView, AdminAnalyticsView,
     AdminTutorApplicationListView, AdminTutorApplicationDetailView,
-    AdminTutorDocumentRenewalDetailView, SuperAdminInstitutionPerformanceView
+    AdminTutorDocumentRenewalDetailView, SuperAdminInstitutionPerformanceView,
+    AdminTuteeApplicationListView, AdminTuteeApplicationDetailView,
+    AdminTuteeDocumentRenewalDetailView
 )
 from . import views
 
@@ -44,6 +46,9 @@ urlpatterns = [
     path('admin/tutor-applications/', AdminTutorApplicationListView.as_view()),
     path('admin/tutor-applications/<int:pk>/', AdminTutorApplicationDetailView.as_view()),
     path('admin/tutor-document-renewals/<int:pk>/', AdminTutorDocumentRenewalDetailView.as_view()),
+    path('admin/tutee-applications/', AdminTuteeApplicationListView.as_view()),
+    path('admin/tutee-applications/<int:pk>/', AdminTuteeApplicationDetailView.as_view()),
+    path('admin/tutee-document-renewals/<int:pk>/', AdminTuteeDocumentRenewalDetailView.as_view()),
     path('admin/users/', AdminUserListView.as_view()),
     path('admin/users/<int:pk>/', AdminUserListView.as_view()),
     path('admin/institutions/', AdminInstitutionView.as_view()),
@@ -68,6 +73,9 @@ urlpatterns = [
     path('tutor-application/status/', views.tutor_application_status),
     path('tutor-application/resubmit/', views.tutor_application_resubmit),
     path('tutor-application/renewal/', views.tutor_document_renewal_submit),
+    path('tutee-application/status/', views.tutee_application_status),
+    path('tutee-application/resubmit/', views.tutee_application_resubmit),
+    path('tutee-application/renewal/', views.tutee_document_renewal_submit),
     path('preferences/', views.save_preferences),
     path('partner-institutions/', views.partner_institutions_list),
     path('dashboard/', student_dashboard),

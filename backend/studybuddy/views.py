@@ -58,7 +58,7 @@ from .recommender.dashboard import (
     get_dashboard_recommendations,
 )
 from django.core.cache import cache
-from .models import Booking, Course, EmailOTPChallenge, Notification, PartnerInstitution, Payment, PaymentMethod, Preference, Rating, Subjects, Tutor, TutorApplication, TutorAvailability, TutorAvailabilityOverride, TutorDocumentRenewalReview, TutorSubjects, Wallet, PlatformActivity, Transaction, TutorPayoutAccount
+from .models import Booking, Course, EmailOTPChallenge, Notification, PartnerInstitution, Payment, PaymentMethod, Preference, Rating, Subjects, Tutor, TutorApplication, TutorAvailability, TutorAvailabilityOverride, TutorDocumentRenewalReview, TutorSubjects, Wallet, PlatformActivity, Transaction, TutorPayoutAccount, TuteeApplication, TuteeDocumentRenewalReview
 from .serializers import (
     NotificationSerializer,
     SubjectSerializer,
@@ -68,6 +68,7 @@ from .serializers import (
     TutorProfileSerializer,
     TutorProfileUpdateSerializer,
     TutorSearchSerializer,
+    TuteeApplicationSerializer,
 )
 from .email_utils import send_application_received_email
 from .chat.services import create_booking_event
@@ -194,6 +195,23 @@ def get_tutor_document_review_context(profile):
         return dict(EMPTY_DOCUMENT_REVIEW_CONTEXT)
 
     return get_document_review_context(application)
+
+
+def get_role_document_review_context(profile):
+    """Role-generic dispatcher used by profile_status: identical output to
+    get_tutor_document_review_context for tutors (zero behavior change there), and the equivalent for
+    tutees via Phase 1's get_document_review_context — see
+    docs/plans/2026-07-01-tutee-verification-phase3-ui.md."""
+    if profile.role == 'Tutor':
+        return get_tutor_document_review_context(profile)
+
+    if profile.role == 'Tutee':
+        application = getattr(profile, 'tutee_application', None)
+        if application is None:
+            return dict(EMPTY_DOCUMENT_REVIEW_CONTEXT)
+        return get_document_review_context(application)
+
+    return dict(EMPTY_DOCUMENT_REVIEW_CONTEXT)
 
 
 def tutee_verification_enforced():
@@ -897,12 +915,13 @@ def register_user(request):
 def profile_status(request):
 
     profile = request.user.userprofile
-    tutor_document_context = get_tutor_document_review_context(profile)
+    document_context = get_role_document_review_context(profile)
 
     return Response({
         "profile_completed": profile.profile_completed,
         "role": profile.role,
-        **tutor_document_context
+        "tutee_verification_enforced": tutee_verification_enforced(),
+        **document_context
     })
 
 @api_view(['POST'])
@@ -4648,4 +4667,162 @@ def create_tutor_document_renewal_submission(request, application, school_id, en
         "message": "Updated documents submitted successfully. They are now under review.",
         "renewal_id": renewal.id,
         **get_tutor_document_review_context(request.user.userprofile),
+    }, status=status.HTTP_201_CREATED)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def tutee_application_status(request):
+    try:
+        application = TuteeApplication.objects.get(profile=request.user.userprofile)
+        serializer = TuteeApplicationSerializer(application, context={'request': request})
+        return Response(serializer.data)
+    except TuteeApplication.DoesNotExist:
+        return Response({"error": "No application found for this user."}, status=status.HTTP_404_NOT_FOUND)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@transaction.atomic
+def tutee_application_resubmit(request):
+    school_id = request.FILES.get('school_id')
+    enrollment_proof = request.FILES.get('enrollment_proof')
+    reason_to_tutor = request.data.get('reason_to_tutor', '')
+
+    if not school_id or not enrollment_proof:
+        return Response(
+            {"error": "Please provide both your School ID and Proof of Enrollment to resubmit."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    if (school_id.size > settings.MAX_DOCUMENT_UPLOAD_SIZE
+            or enrollment_proof.size > settings.MAX_DOCUMENT_UPLOAD_SIZE):
+        return Response(
+            {"error": "Each uploaded file must be under 5 MB. Please compress your images and try again."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Unlike tutors (who submit documents at registration), tutees register free and submit
+    # verification documents later — so this is also the first-time submission endpoint, not just
+    # resubmission. See docs/plans/2026-07-01-tutee-verification-phase3-ui.md.
+    application, created = TuteeApplication.objects.select_for_update().get_or_create(
+        profile=request.user.userprofile,
+        defaults={
+            'school_id': school_id,
+            'enrollment_proof': enrollment_proof,
+            'reason_to_tutor': reason_to_tutor,
+            'application_status': 'pending',
+        }
+    )
+
+    if created:
+        PlatformActivity.objects.create(
+            activity_type='tutee_application',
+            message=f"Tutee application submitted: {request.user.userprofile.fname} {request.user.userprofile.lname}",
+            institution=request.user.userprofile.institution
+        )
+        return Response({"message": "Application submitted successfully. It is now under review."})
+
+    if application.application_status == 'approved':
+        return create_tutee_document_renewal_submission(
+            request,
+            application,
+            school_id,
+            enrollment_proof,
+            reason_to_tutor,
+        )
+
+    if application.application_status != 'rejected':
+        return Response(
+            {"error": "Your application is still being processed. It cannot be resubmitted right now."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    application.school_id = school_id
+    application.enrollment_proof = enrollment_proof
+    application.reason_to_tutor = reason_to_tutor
+    application.application_status = 'pending'
+    application.rejection_reason = ''
+    application.reviewed_at = None
+    application.reviewed_by = None
+    application.save()
+
+    PlatformActivity.objects.create(
+        activity_type='tutee_application',
+        message=f"Tutee application resubmitted: {request.user.userprofile.fname} {request.user.userprofile.lname}",
+        institution=request.user.userprofile.institution
+    )
+
+    # Email notification deliberately not sent yet — see AdminTuteeApplicationDetailView.patch for why
+    # (send_application_*_email is tutor-worded; Phase 4 generalizes it for both roles).
+
+    return Response({"message": "Application resubmitted successfully. It is now back under review."})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@transaction.atomic
+def tutee_document_renewal_submit(request):
+    try:
+        application = TuteeApplication.objects.select_for_update().get(profile=request.user.userprofile)
+    except TuteeApplication.DoesNotExist:
+        return Response({"error": "No approved tutee application found."}, status=status.HTTP_404_NOT_FOUND)
+
+    school_id = request.FILES.get('school_id')
+    enrollment_proof = request.FILES.get('enrollment_proof')
+    reason_to_tutor = request.data.get('reason_to_tutor', '')
+
+    if not school_id or not enrollment_proof:
+        return Response(
+            {"error": "Please provide both your School ID and updated Enrollment/RF document."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    return create_tutee_document_renewal_submission(
+        request,
+        application,
+        school_id,
+        enrollment_proof,
+        reason_to_tutor,
+    )
+
+
+def create_tutee_document_renewal_submission(request, application, school_id, enrollment_proof, reason_to_tutor):
+    if application.application_status != 'approved':
+        return Response(
+            {"error": "Only approved tutees can submit recurring document renewals."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    renewal_status = application.document_renewal_status()
+    if renewal_status == 'pending':
+        return Response(
+            {"error": "Your updated documents are already pending review."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    if renewal_status == 'verified':
+        return Response(
+            {"error": "Your enrollment documents are still current."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    renewal = TuteeDocumentRenewalReview.objects.create(
+        application=application,
+        profile=request.user.userprofile,
+        school_id=school_id,
+        enrollment_proof=enrollment_proof,
+        reason_to_tutor=reason_to_tutor,
+        status='pending',
+    )
+
+    PlatformActivity.objects.create(
+        activity_type='tutee_application',
+        message=f"Tutee document renewal submitted: {request.user.userprofile.fname} {request.user.userprofile.lname}",
+        institution=request.user.userprofile.institution
+    )
+
+    return Response({
+        "message": "Updated documents submitted successfully. They are now under review.",
+        "renewal_id": renewal.id,
+        **get_document_review_context(application),
     }, status=status.HTTP_201_CREATED)

@@ -15,11 +15,11 @@ spec: ../session-summaries/2026-07-01-tutee-verification-handoff.md
 <!-- LIVING SUMMARY: keep this section and the Changelog current on every edit -->
 ## Status & Progress Summary
 
-**Status: In Progress — Phases 1-2 Done. Awaiting explicit go-ahead before starting Phase 3.**
+**Status: In Progress — Phases 1-3 Done. User has pre-approved starting Phase 4 next.**
 
 - [x] Phase 1 — Model & backend foundation ([plan](2026-07-01-tutee-verification-phase1-model.md))
 - [x] Phase 2 — Booking gate & forward-only enforcement ([plan](2026-07-01-tutee-verification-phase2-gate.md))
-- [ ] Phase 3 — UI surfaces ([plan](2026-07-01-tutee-verification-phase3-ui.md))
+- [x] Phase 3 — UI surfaces ([plan](2026-07-01-tutee-verification-phase3-ui.md))
 - [ ] Phase 4 — Email & dev tools ([plan](2026-07-01-tutee-verification-phase4-email-devtools.md))
 
 Execute one phase at a time; do not start the next phase without explicit go-ahead, per this project's
@@ -88,3 +88,9 @@ flow, apply rules symmetrically. Concretely:
   cutover as an env-driven settings constant). Tutee-side route guard deliberately deferred to Phase 3 (see
   Phase 2's own changelog for why). Browser-verified the loosening end to end. Phase 3 awaits explicit
   go-ahead.
+- 2026-07-02: Phase 3 implemented, tested, and browser-verified end to end (generalized `/application-status`
+  for both roles, renewal cards on both profile views via a new shared `VerificationStatusCard.vue`, tutee
+  admin review queue with a role tab, the tutee-side route guard gap Phase 2 deferred is now closed). Found
+  and fixed a real gap during verification: tutees have no application at signup (unlike tutors), so the
+  status page needed a genuine initial-submission path, not just resubmission — `tutee_application_resubmit`
+  now creates on first submit. User pre-approved proceeding directly to Phase 4 next.

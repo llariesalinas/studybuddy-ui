@@ -213,3 +213,17 @@ export const needsTutorApplicationLockout = (application) => {
 
   return flow.kind === 'initial' && ['pending', 'rejected'].includes(flow.status)
 }
+
+// Tutee-side booking-flow gate (closes the gap Phase 2 deliberately deferred to Phase 3, once
+// /application-status was generalized for both roles). Mirrors the server's can_create_new_booking
+// source of truth: gated only while tutee_verification_enforced is true, so a tutee with no
+// application yet is never wrongly blocked during the grace period — see
+// docs/plans/2026-07-01-tutee-verification-phase3-ui.md.
+export const needsTuteeVerificationBlock = (snapshot) => {
+  if (!snapshot?.tutee_verification_enforced) return false
+
+  return !(
+    snapshot?.application_status === 'approved' &&
+    snapshot?.document_renewal_status === 'verified'
+  )
+}

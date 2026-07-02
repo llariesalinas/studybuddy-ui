@@ -11,12 +11,14 @@ from datetime import timedelta
 from .models import (
     UserProfile, Tutor, Booking, WithdrawalRequest,
     PartnerInstitution, Wallet, Transaction, PlatformActivity,
-    TutorApplication, TutorDocumentRenewalReview, Payment
+    TutorApplication, TutorDocumentRenewalReview,
+    TuteeApplication, TuteeDocumentRenewalReview, Payment
 )
 from .serializers import (
     AdminWithdrawalSerializer, AdminUserSerializer,
     PartnerInstitutionSerializer, PlatformActivitySerializer,
-    TutorApplicationSerializer, TutorDocumentRenewalReviewSerializer
+    TutorApplicationSerializer, TutorDocumentRenewalReviewSerializer,
+    TuteeApplicationSerializer, TuteeDocumentRenewalReviewSerializer
 )
 from .permissions import IsAdminUser, IsSuperAdminUser
 from .email_utils import send_application_approved_email, send_application_rejected_email
@@ -557,6 +559,155 @@ class AdminTutorDocumentRenewalDetailView(BaseAdminView):
             'reviewed_at',
             'updated_at',
         ])
+
+        if new_status == 'approved':
+            # The renewal clock just reset; any reminder already sent for the previous cycle is stale.
+            renewal.application.reminder_7day_sent_at = None
+            renewal.application.reminder_1day_sent_at = None
+            renewal.application.save(update_fields=['reminder_7day_sent_at', 'reminder_1day_sent_at'])
+
+        PlatformActivity.objects.create(
+            activity_type='admin_action',
+            message=f"Admin {request.user.userprofile.fname} {new_status} document renewal for {renewal.profile.fname} {renewal.profile.lname}",
+            institution=request.user.userprofile.institution
+        )
+
+        return Response({"message": f"Document renewal {new_status} successfully."})
+
+
+class AdminTuteeApplicationListView(BaseAdminView):
+    permission_classes = [permissions.IsAuthenticated, IsAdminUser]
+
+    def get(self, request):
+        status_filter = request.query_params.get('status')
+        application_queryset = self.get_queryset_for_user(
+            request,
+            TuteeApplication.objects.select_related('profile__user', 'profile__institution').all(),
+            user_path='profile'
+        )
+        renewal_queryset = self.get_queryset_for_user(
+            request,
+            TuteeDocumentRenewalReview.objects.select_related(
+                'profile__user',
+                'profile__institution',
+                'application',
+            ).all(),
+            user_path='profile'
+        )
+
+        if status_filter:
+            application_queryset = application_queryset.filter(application_status=status_filter)
+            renewal_queryset = renewal_queryset.filter(status=status_filter)
+
+        application_data = TuteeApplicationSerializer(
+            application_queryset,
+            many=True,
+            context={'request': request}
+        ).data
+        renewal_data = TuteeDocumentRenewalReviewSerializer(
+            renewal_queryset,
+            many=True,
+            context={'request': request}
+        ).data
+        combined = sorted(
+            [*application_data, *renewal_data],
+            key=lambda item: item.get('submitted_at') or '',
+            reverse=True
+        )
+
+        return Response(combined)
+
+
+class AdminTuteeApplicationDetailView(BaseAdminView):
+    permission_classes = [permissions.IsAuthenticated, IsAdminUser]
+
+    def get(self, request, pk):
+        queryset = self.get_queryset_for_user(request, TuteeApplication.objects.all(), user_path='profile')
+        application = get_object_or_404(queryset, pk=pk)
+        serializer = TuteeApplicationSerializer(application, context={'request': request})
+        return Response(serializer.data)
+
+    @transaction.atomic
+    def patch(self, request, pk):
+        queryset = self.get_queryset_for_user(request, TuteeApplication.objects.all(), user_path='profile')
+        application = get_object_or_404(queryset.select_for_update(), pk=pk)
+
+        new_status = request.data.get('application_status')
+        rejection_reason = request.data.get('rejection_reason', '')
+
+        if new_status not in ['approved', 'rejected']:
+            return Response({"error": "Invalid status. Must be 'approved' or 'rejected'."}, status=status.HTTP_400_BAD_REQUEST)
+
+        application.application_status = new_status
+        application.rejection_reason = rejection_reason if new_status == 'rejected' else ''
+        application.reviewed_by = request.user.userprofile
+        application.reviewed_at = timezone.now()
+        application.save()
+
+        # Log activity
+        PlatformActivity.objects.create(
+            activity_type='admin_action',
+            message=f"Admin {request.user.userprofile.fname} {new_status} tutee application for {application.profile.fname} {application.profile.lname}",
+            institution=request.user.userprofile.institution
+        )
+
+        # Email notification deliberately not sent yet — send_application_*_email is tutor-worded and
+        # Phase 4 owns generalizing it to take role/label (docs/plans/2026-07-01-tutee-verification-phase4-email-devtools.md).
+
+        return Response({"message": f"Application {new_status} successfully."})
+
+
+class AdminTuteeDocumentRenewalDetailView(BaseAdminView):
+    permission_classes = [permissions.IsAuthenticated, IsAdminUser]
+
+    def get(self, request, pk):
+        queryset = self.get_queryset_for_user(
+            request,
+            TuteeDocumentRenewalReview.objects.select_related(
+                'application',
+                'profile__user',
+                'profile__institution',
+            ).all(),
+            user_path='profile'
+        )
+        renewal = get_object_or_404(queryset, pk=pk)
+        serializer = TuteeDocumentRenewalReviewSerializer(renewal, context={'request': request})
+        return Response(serializer.data)
+
+    @transaction.atomic
+    def patch(self, request, pk):
+        queryset = self.get_queryset_for_user(
+            request,
+            TuteeDocumentRenewalReview.objects.select_related('application', 'profile').all(),
+            user_path='profile'
+        )
+        renewal = get_object_or_404(queryset.select_for_update(), pk=pk)
+
+        new_status = request.data.get('application_status')
+        rejection_reason = request.data.get('rejection_reason', '')
+
+        if new_status not in ['approved', 'rejected']:
+            return Response({"error": "Invalid status. Must be 'approved' or 'rejected'."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if renewal.status != 'pending':
+            return Response({"error": "Only pending document renewals can be reviewed."}, status=status.HTTP_400_BAD_REQUEST)
+
+        renewal.status = new_status
+        renewal.rejection_reason = rejection_reason if new_status == 'rejected' else ''
+        renewal.reviewed_by = request.user.userprofile
+        renewal.reviewed_at = timezone.now()
+        renewal.save(update_fields=[
+            'status',
+            'rejection_reason',
+            'reviewed_by',
+            'reviewed_at',
+            'updated_at',
+        ])
+
+        if new_status == 'approved':
+            renewal.application.reminder_7day_sent_at = None
+            renewal.application.reminder_1day_sent_at = None
+            renewal.application.save(update_fields=['reminder_7day_sent_at', 'reminder_1day_sent_at'])
 
         PlatformActivity.objects.create(
             activity_type='admin_action',

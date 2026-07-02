@@ -37,7 +37,10 @@
                 <i class="bi bi-mortarboard-fill"></i>
                 Tutor
               </span>
-              <span class="verified-badge">
+              <span
+                v-if="profileStore.applicationStatus === 'approved' && profileStore.renewalStatus === 'verified'"
+                class="verified-badge"
+              >
                 <i class="bi bi-patch-check-fill"></i>
                 Verified
               </span>
@@ -56,6 +59,8 @@
           </button>
         </div>
       </header>
+
+      <VerificationStatusCard />
 
       <main class="profile-grid">
         <div class="profile-col">
@@ -550,10 +555,13 @@ import { useRouter } from 'vue-router'
 import api from '@/services/api/api'
 import { useCatalogStore } from '@/stores/catalog'
 import { useToastStore } from '@/stores/toast'
+import { useProfileStore } from '@/stores/profile'
+import VerificationStatusCard from '@/components/VerificationStatusCard.vue'
 
 const router = useRouter()
 const catalogStore = useCatalogStore()
 const toastStore = useToastStore()
+const profileStore = useProfileStore()
 
 const minHourlyRate = 50
 const hourlyRateStep = 10
@@ -1131,6 +1139,7 @@ onMounted(() => {
   loadProfile()
   loadSubjects()
   loadCourses()
+  if (!profileStore.loaded) profileStore.checkProfileStatus()
 })
 </script>
 

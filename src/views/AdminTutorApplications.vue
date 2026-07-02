@@ -1,8 +1,26 @@
 <template>
   <div class="admin-applications p-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
-      <h3 class="mb-0">Tutor Applications</h3>
+      <h3 class="mb-0">{{ pageTitle }}</h3>
       <div class="d-flex gap-2">
+        <div class="btn-group" role="group" aria-label="Applicant role">
+          <button
+            type="button"
+            class="btn btn-sm rounded-pill px-3 me-1"
+            :class="filters.role === 'tutor' ? 'btn-dark' : 'btn-light'"
+            @click="filters.role = 'tutor'"
+          >
+            Tutors
+          </button>
+          <button
+            type="button"
+            class="btn btn-sm rounded-pill px-3"
+            :class="filters.role === 'tutee' ? 'btn-dark' : 'btn-light'"
+            @click="filters.role = 'tutee'"
+          >
+            Tutees
+          </button>
+        </div>
         <select v-model="filters.status" class="form-select form-select-sm rounded-pill" style="width: 150px;">
           <option value="">All Statuses</option>
           <option value="pending">Pending</option>
@@ -205,6 +223,7 @@ import {
 
 const adminStore = useAdminStore()
 const filters = reactive({
+  role: 'tutor',
   status: 'pending',
   reviewType: ''
 })
@@ -215,16 +234,26 @@ const rejectionReason = ref('')
 const processing = ref(false)
 let offcanvas = null
 
+const pageTitle = computed(() => (filters.role === 'tutee' ? 'Tutee Applications' : 'Tutor Applications'))
+
+const applicationsForRole = computed(() =>
+  filters.role === 'tutee' ? adminStore.tuteeApplications : adminStore.tutorApplications
+)
+
 const loadApplications = async () => {
-  await adminStore.fetchTutorApplications(filters.status, true, {
+  const fetchApplications = filters.role === 'tutee'
+    ? adminStore.fetchTuteeApplications
+    : adminStore.fetchTutorApplications
+
+  await fetchApplications(filters.status, true, {
     reviewType: filters.reviewType
   })
 }
 
 const filteredApplications = computed(() => {
-  if (!filters.reviewType) return adminStore.tutorApplications
+  if (!filters.reviewType) return applicationsForRole.value
 
-  return adminStore.tutorApplications.filter(
+  return applicationsForRole.value.filter(
     (app) => getApplicationReviewKind(app) === filters.reviewType
   )
 })
@@ -302,9 +331,13 @@ const viewDetails = (app) => {
 const handleStatusUpdate = async (status) => {
   if (!selectedApp.value) return
 
+  const updateStatus = filters.role === 'tutee'
+    ? adminStore.updateTuteeApplicationStatus
+    : adminStore.updateTutorApplicationStatus
+
   processing.value = true
   try {
-    await adminStore.updateTutorApplicationStatus(
+    await updateStatus(
       selectedApp.value.id,
       status,
       rejectionReason.value,
@@ -369,7 +402,7 @@ const isPdf = (url) => {
   return url.toLowerCase().endsWith('.pdf') || url.includes('type=pdf')
 }
 
-watch(() => [filters.status, filters.reviewType], () => {
+watch(() => [filters.role, filters.status, filters.reviewType], () => {
   loadApplications()
 })
 

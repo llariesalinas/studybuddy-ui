@@ -23,7 +23,7 @@
 
       <div v-if="flow.kind === 'initial' && flow.status === 'pending'" class="sb-status-content">
         <p class="sb-status-text">
-          Your tutor application was submitted on
+          Your application was submitted on
           <strong>{{ formatDate(submittedAt) }}</strong> and is currently being reviewed.
         </p>
         <div class="sb-info-card">
@@ -35,9 +35,9 @@
 
       <div v-else-if="flow.kind === 'initial' && flow.status === 'approved'" class="sb-status-content">
         <p class="sb-status-text">
-          Great news! Your application has been approved. You can now access your tutor dashboard.
+          Great news! Your application has been approved. You can now access your dashboard.
         </p>
-        <router-link to="/tch-dashboard" class="sb-btn-pill">Go to Dashboard</router-link>
+        <router-link :to="dashboardRoute" class="sb-btn-pill">Go to Dashboard</router-link>
       </div>
 
       <div v-else-if="flow.kind === 'renewal' && flow.status === 'pending'" class="sb-status-content">
@@ -54,16 +54,16 @@
 
       <div v-else-if="flow.kind === 'renewal' && flow.status === 'approved'" class="sb-status-content">
         <p class="sb-status-text">
-          Your updated enrollment documents have been approved. You can continue using your tutor dashboard.
+          Your updated enrollment documents have been approved. You can continue using your dashboard.
         </p>
-        <router-link to="/tch-dashboard" class="sb-btn-pill">Go to Dashboard</router-link>
+        <router-link :to="dashboardRoute" class="sb-btn-pill">Go to Dashboard</router-link>
       </div>
 
       <div v-else class="sb-status-content">
         <div v-if="flow.kind === 'renewal' && flow.status === 'due'" class="sb-info-card sb-action-card">
           <h6 class="sb-card-title">Updated enrollment documents required</h6>
           <p class="small mb-0">
-            To keep tutor access current, upload your latest School ID and proof of enrollment.
+            To keep your access current, upload your latest School ID and proof of enrollment.
           </p>
           <p v-if="renewalDueAt" class="small text-muted mb-0 mt-2">
             Renewal due by {{ formatDate(renewalDueAt) }}.
@@ -138,6 +138,53 @@
       </div>
     </div>
 
+    <div v-else-if="showInitialTuteeSubmission" class="sb-status-container">
+      <p class="sb-status-text mb-4">
+        Submit your School ID and proof of enrollment to get verified before booking your first session.
+      </p>
+
+      <form @submit.prevent="handleDocumentSubmit" class="sb-resubmit-form">
+        <div v-if="resubmitError" class="sb-auth-alert mb-3">{{ resubmitError }}</div>
+
+        <div class="sb-auth-field">
+          <label class="sb-auth-label">School ID (Image)</label>
+          <input
+            type="file"
+            @change="handleFileChange($event, 'schoolId')"
+            class="sb-auth-input"
+            accept="image/*"
+            required
+          />
+        </div>
+
+        <div class="sb-auth-field">
+          <label class="sb-auth-label">Proof of Enrollment (Image or PDF)</label>
+          <input
+            type="file"
+            @change="handleFileChange($event, 'enrollmentProof')"
+            class="sb-auth-input"
+            accept="image/*,application/pdf"
+            required
+          />
+        </div>
+
+        <div class="sb-auth-field">
+          <label class="sb-auth-label">Motivation (Optional)</label>
+          <textarea
+            v-model="resubmitData.reasonToTutor"
+            class="sb-auth-input"
+            placeholder="Tell us about your motivation..."
+            rows="3"
+          ></textarea>
+        </div>
+
+        <button type="submit" class="sb-btn-pill" :disabled="isResubmitting">
+          <span v-if="isResubmitting" class="sb-spinner me-2"></span>
+          {{ isResubmitting ? 'Submitting...' : 'Submit Documents' }}
+        </button>
+      </form>
+    </div>
+
     <div v-else class="text-center py-5">
       <p class="text-muted">No application found. Please register first.</p>
       <router-link to="/register" class="sb-auth-link">Go to Registration</router-link>
@@ -160,9 +207,14 @@ import {
 
 const router = useRouter()
 const authStore = useAuthStore()
+const isTutee = computed(() => authStore.userRole === 'tutee')
+const dashboardRoute = computed(() => (isTutee.value ? '/dashboard' : '/tch-dashboard'))
 const loading = ref(true)
 const error = ref('')
 const application = ref(null)
+const showInitialTuteeSubmission = computed(
+  () => isTutee.value && !loading.value && !error.value && !application.value
+)
 
 const isResubmitting = ref(false)
 const resubmitError = ref('')
@@ -186,7 +238,8 @@ const fetchStatus = async () => {
   loading.value = true
   error.value = ''
   try {
-    const response = await api.get('tutor-application/status/')
+    const endpoint = isTutee.value ? 'tutee-application/status/' : 'tutor-application/status/'
+    const response = await api.get(endpoint)
     application.value = response.data
     resubmitData.reasonToTutor =
       application.value.renewal_note ||
@@ -196,6 +249,10 @@ const fetchStatus = async () => {
     console.error('Failed to fetch status:', err)
     if (err.response?.status === 401) {
       error.value = 'Please log in to check your application status.'
+    } else if (err.response?.status === 404 && isTutee.value) {
+      // Tutees register free and submit verification documents later (unlike tutors, who submit at
+      // registration) — a 404 here just means they haven't submitted yet, not an error.
+      application.value = null
     } else {
       error.value = 'Could not load application status. Please try again later.'
     }
@@ -204,9 +261,10 @@ const fetchStatus = async () => {
   }
 }
 
-const pageTitle = computed(() =>
-  flow.value.kind === 'renewal' ? 'Document Renewal Status' : 'Application Status'
-)
+const pageTitle = computed(() => {
+  if (showInitialTuteeSubmission.value) return 'Enrollment Verification'
+  return flow.value.kind === 'renewal' ? 'Document Renewal Status' : 'Application Status'
+})
 
 const statusIconClass = computed(() => {
   if (!application.value) return 'bi bi-info-circle'
@@ -223,6 +281,7 @@ const statusIconClass = computed(() => {
 })
 
 const statusSubtitle = computed(() => {
+  if (showInitialTuteeSubmission.value) return 'Verification required to book your first session'
   if (!application.value) return 'Checking your status...'
 
   if (flow.value.kind === 'renewal') {
@@ -336,13 +395,15 @@ const handleDocumentSubmit = async () => {
     formData.append('enrollment_proof', resubmitData.enrollmentProof)
     formData.append('reason_to_tutor', resubmitData.reasonToTutor)
 
+    const prefix = isTutee.value ? 'tutee-application' : 'tutor-application'
+
     if (flow.value.kind === 'renewal') {
       formData.append('renewal_note', resubmitData.reasonToTutor)
-      await api.post('tutor-application/renewal/', formData, {
+      await api.post(`${prefix}/renewal/`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       })
     } else {
-      await api.post('tutor-application/resubmit/', formData, {
+      await api.post(`${prefix}/resubmit/`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       })
     }
