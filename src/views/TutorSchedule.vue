@@ -83,14 +83,26 @@
                   v-for="slot in groupedSlots[day.code]"
                   :key="slot.availability_id"
                   type="button"
-                  class="slot-pill sb-btn"
+                  class="slot-pill sb-btn sb-pill"
                   :class="{
                     selected: isSlotSelected(slot.availability_id),
                     blocked: isSlotBlocked(day.date, slot.availability_id)
                   }"
+                  :aria-pressed="isSlotSelected(slot.availability_id)"
                   @click="toggleSlotSelection(slot.availability_id)"
                 >
-                  <span class="slot-pill-text">{{ slot.time_slot }} - {{ addThirtyMinutes(slot.time_slot) }}</span>
+                  <span
+                    class="slot-period-rail"
+                    :class="getSlotPeriodClass(slot.time_slot)"
+                  >
+                    {{ getSlotPeriodLabel(slot.time_slot) }}
+                  </span>
+                  <span class="slot-pill-content">
+                    <span class="slot-pill-text">{{ formatSlotRange(slot.time_slot) }}</span>
+                    <span class="slot-pill-subtitle">
+                      {{ getSlotPeriodDescription(slot.time_slot) }}
+                    </span>
+                  </span>
                   <span v-if="isSlotBlocked(day.date, slot.availability_id)" class="slot-pill-status">
                     Blocked
                   </span>
@@ -186,16 +198,18 @@
             <div class="time-period-toggle">
               <button
                 type="button"
-                class="time-period-btn sb-btn"
+                class="time-period-btn sb-btn sb-pill"
                 :class="{ active: startPeriod === 'AM' }"
+                :aria-pressed="startPeriod === 'AM'"
                 @click="startPeriod = 'AM'"
               >
                 AM
               </button>
               <button
                 type="button"
-                class="time-period-btn sb-btn"
+                class="time-period-btn sb-btn sb-pill"
                 :class="{ active: startPeriod === 'PM' }"
+                :aria-pressed="startPeriod === 'PM'"
                 @click="startPeriod = 'PM'"
               >
                 PM
@@ -207,8 +221,9 @@
                 v-for="time in visibleStartTimes"
                 :key="`start-${time}`"
                 type="button"
-                class="time-grid-btn sb-btn"
+                class="time-grid-btn sb-btn sb-pill"
                 :class="{ active: newSlot.start_time === time }"
+                :aria-pressed="newSlot.start_time === time"
                 @click="selectStartTime(time)"
               >
                 {{ formatDisplayTime(time) }}
@@ -237,16 +252,18 @@
             <div class="time-period-toggle">
               <button
                 type="button"
-                class="time-period-btn sb-btn"
+                class="time-period-btn sb-btn sb-pill"
                 :class="{ active: endPeriod === 'AM' }"
+                :aria-pressed="endPeriod === 'AM'"
                 @click="endPeriod = 'AM'"
               >
                 AM
               </button>
               <button
                 type="button"
-                class="time-period-btn sb-btn"
+                class="time-period-btn sb-btn sb-pill"
                 :class="{ active: endPeriod === 'PM' }"
+                :aria-pressed="endPeriod === 'PM'"
                 @click="endPeriod = 'PM'"
               >
                 PM
@@ -258,8 +275,9 @@
                 v-for="time in visibleEndTimes"
                 :key="`end-${time}`"
                 type="button"
-                class="time-grid-btn sb-btn"
+                class="time-grid-btn sb-btn sb-pill"
                 :class="{ active: newSlot.end_time === time }"
+                :aria-pressed="newSlot.end_time === time"
                 @click="selectEndTime(time)"
               >
                 {{ formatDisplayTime(time) }}
@@ -474,6 +492,50 @@ function formatDisplayTime(timeString) {
   const suffix = hours >= 12 ? 'PM' : 'AM'
   const hour12 = hours % 12 || 12
   return `${hour12}:${String(minutes).padStart(2, '0')} ${suffix}`
+}
+
+function formatDisplayTimeWithoutPeriod(timeString) {
+  const [hours, minutes] = timeString.split(':').map(Number)
+  const hour12 = hours % 12 || 12
+  return `${hour12}:${String(minutes).padStart(2, '0')}`
+}
+
+function getTimePeriod(timeString) {
+  const [hours] = timeString.split(':').map(Number)
+  return hours >= 12 ? 'PM' : 'AM'
+}
+
+function formatSlotRange(timeString) {
+  const endTime = addThirtyMinutes(timeString)
+  const startPeriod = getTimePeriod(timeString)
+  const endPeriod = getTimePeriod(endTime)
+
+  if (startPeriod !== endPeriod) {
+    return `${formatDisplayTime(timeString)} - ${formatDisplayTime(endTime)}`
+  }
+
+  return `${formatDisplayTimeWithoutPeriod(timeString)} - ${formatDisplayTimeWithoutPeriod(endTime)}`
+}
+
+function getSlotPeriodLabel(timeString) {
+  return getTimePeriod(timeString)
+}
+
+function getSlotPeriodClass(timeString) {
+  const periodLabel = getSlotPeriodLabel(timeString)
+
+  return periodLabel === 'PM' ? 'slot-period-pm' : 'slot-period-am'
+}
+
+function getSlotPeriodDescription(timeString) {
+  const startPeriod = getTimePeriod(timeString)
+  const endPeriod = getTimePeriod(addThirtyMinutes(timeString))
+
+  if (startPeriod !== endPeriod) {
+    return startPeriod === 'AM' ? 'noon transition' : 'day transition'
+  }
+
+  return `${startPeriod} slot`
 }
 
 function formatDayDate(dateString) {
@@ -807,7 +869,7 @@ function addThirtyMinutes(timeString) {
   border-radius: 14px;
   background: #edf6f1;
   color: #0a7a51;
-  transition: background-color 150ms ease, transform 150ms ease, box-shadow 150ms ease;
+  transition: transform var(--sb-t-normal) var(--sb-spring);
 }
 
 .week-nav-btn:hover:not(:disabled) {
@@ -979,13 +1041,13 @@ function addThirtyMinutes(timeString) {
 }
 
 .slot-pill {
-  display: inline-flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  align-items: stretch;
   width: 100%;
   min-height: 48px;
-  padding: 12px 16px;
+  padding: 0;
+  overflow: hidden;
   border: 1px solid transparent;
   border-radius: 999px;
   background: #e1f5ee;
@@ -993,7 +1055,7 @@ function addThirtyMinutes(timeString) {
   font-weight: 700;
   font-size: 1rem;
   text-align: left;
-  transition: transform 150ms ease, box-shadow 150ms ease, background-color 150ms ease, border-color 150ms ease;
+  transition: transform var(--sb-t-normal) var(--sb-spring);
 }
 
 .slot-pill:hover:not(:disabled) {
@@ -1011,6 +1073,7 @@ function addThirtyMinutes(timeString) {
 }
 
 .slot-pill.blocked {
+  --sb-pill-outline-color: #b42318;
   background: #fff2f0;
   border-color: #f3b7b0;
   color: #b42318;
@@ -1028,9 +1091,45 @@ function addThirtyMinutes(timeString) {
   cursor: default;
 }
 
+.slot-period-rail {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  border-right: 1px solid #b8dece;
+  background: #ffffff;
+  color: #0a7a51;
+  font-size: 0.72rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.slot-period-pm {
+  border-right-color: #113a31;
+  background: #113a31;
+  color: #ffffff;
+}
+
+.slot-pill-content {
+  min-width: 0;
+  display: grid;
+  align-content: center;
+  gap: 2px;
+  padding: 8px 12px;
+}
+
 .slot-pill-text {
   min-width: 0;
-  line-height: 1.25;
+  color: #063a30;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.slot-pill-subtitle {
+  color: #5f776e;
+  font-size: 0.73rem;
+  font-weight: 650;
+  line-height: 1.15;
 }
 
 .slot-pill-check {
@@ -1039,6 +1138,8 @@ function addThirtyMinutes(timeString) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  align-self: center;
+  margin-right: 12px;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.18);
   color: #ffffff;
@@ -1046,11 +1147,38 @@ function addThirtyMinutes(timeString) {
 }
 
 .slot-pill-status {
+  align-self: center;
+  margin-right: 12px;
   flex-shrink: 0;
   font-size: 0.75rem;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.02em;
+}
+
+.slot-pill.selected .slot-period-rail,
+.slot-pill.blocked.selected .slot-period-rail {
+  border-right-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+}
+
+.slot-pill.selected .slot-pill-text,
+.slot-pill.selected .slot-pill-subtitle,
+.slot-pill.blocked.selected .slot-pill-text,
+.slot-pill.blocked.selected .slot-pill-subtitle {
+  color: #ffffff;
+}
+
+.slot-pill.blocked .slot-period-rail {
+  border-right-color: #f3b7b0;
+  background: #ffffff;
+  color: #b42318;
+}
+
+.slot-pill.blocked .slot-pill-text,
+.slot-pill.blocked .slot-pill-subtitle {
+  color: #b42318;
 }
 
 .empty-day-zone {
@@ -1131,7 +1259,7 @@ function addThirtyMinutes(timeString) {
   color: #163127;
   font-size: 0.92rem;
   padding: 0;
-  transition: color 150ms ease, transform 150ms ease;
+  transition: transform var(--sb-t-normal) var(--sb-spring);
 }
 
 .time-picker-close:hover {
@@ -1173,7 +1301,7 @@ function addThirtyMinutes(timeString) {
   color: #315447;
   font-weight: 700;
   padding: 8px 0;
-  transition: background-color 150ms ease, color 150ms ease, transform 150ms ease, box-shadow 150ms ease;
+  transition: transform var(--sb-t-normal) var(--sb-spring);
 }
 
 .time-period-btn:hover:not(.active) {
@@ -1202,7 +1330,7 @@ function addThirtyMinutes(timeString) {
   padding: 10px 12px;
   font-weight: 600;
   text-align: center;
-  transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease, transform 150ms ease, box-shadow 150ms ease;
+  transition: transform var(--sb-t-normal) var(--sb-spring);
 }
 
 .time-grid-btn:hover:not(.active) {
@@ -1220,7 +1348,7 @@ function addThirtyMinutes(timeString) {
 }
 
 .modal-box :deep(select.form-control) {
-  transition: border-color 150ms ease, box-shadow 150ms ease, background-color 150ms ease;
+  transition: none;
 }
 
 .modal-box :deep(select.form-control:hover) {
@@ -1231,7 +1359,7 @@ function addThirtyMinutes(timeString) {
 
 .modal-box :deep(.btn-secondary),
 .modal-box :deep(.btn-success) {
-  transition: transform 150ms ease, box-shadow 150ms ease, filter 150ms ease;
+  transition: transform var(--sb-t-normal) var(--sb-spring);
 }
 
 .modal-box :deep(.btn-secondary:hover),
@@ -1253,7 +1381,7 @@ function addThirtyMinutes(timeString) {
   background: #e1f5ee;
   color: #085041;
   text-align: left;
-  transition: transform 150ms ease, box-shadow 150ms ease, background-color 150ms ease, border-color 150ms ease;
+  transition: transform var(--sb-t-normal) var(--sb-spring);
 }
 
 .selected-time-card:hover {

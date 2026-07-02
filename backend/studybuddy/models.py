@@ -1,10 +1,12 @@
 import uuid
+from datetime import timedelta
 
 from django.db import models
 from django.db.models import Q
 from django.contrib.auth.models import User
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.utils import timezone
 
 
 # Create your models here.
@@ -99,6 +101,68 @@ class UserProfile(models.Model):
 
     def __str__(self):
         return f"{self.fname} {self.lname}"
+
+
+class InstitutionRequest(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    ]
+
+    institution_name = models.CharField(max_length=200)
+    school_email_domain = models.CharField(max_length=100)
+    contact_person = models.CharField(max_length=200)
+    contact_email = models.EmailField()
+    note = models.TextField(blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    reviewed_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='institution_requests_reviewed'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f"{self.institution_name} ({self.status})"
+
+
+class AdminAccountRequest(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    ]
+
+    requesting_admin = models.ForeignKey(
+        UserProfile,
+        on_delete=models.CASCADE,
+        related_name='admin_requests_sent'
+    )
+    institution = models.ForeignKey(PartnerInstitution, on_delete=models.CASCADE)
+    target_user = models.ForeignKey(
+        UserProfile,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='admin_requests_received'
+    )
+    note = models.TextField(blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    created_at = models.DateTimeField(auto_now_add=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f"Admin request for {self.institution.institution_name} ({self.status})"
 
 
 class EmailOTPChallenge(models.Model):
@@ -235,24 +299,23 @@ class Tutor(models.Model):
     def __str__(self):
         return f"Tutor: {self.profile.fname} {self.profile.lname}"
 
-class TutorApplication(models.Model):
+class ApplicationVerificationBase(models.Model):
+    """Shared document-verification + renewal-cadence fields/logic for TutorApplication and
+    TuteeApplication (see docs/plans/2026-07-01-tutee-verification-phase1-model.md). Each concrete
+    subclass defines its own `profile`/`reviewed_by` FKs and `school_id`/`enrollment_proof` upload
+    paths, since those need role-specific `related_name`/`upload_to` values that Django's abstract-base
+    `%(class)s` interpolation doesn't cover for plain FileFields."""
+
+    DOCUMENT_RENEWAL_INTERVAL_DAYS = 90
+
     STATUS_CHOICES = [
         ('pending', 'Pending Review'),
         ('approved', 'Approved'),
         ('rejected', 'Rejected'),
     ]
 
-    profile = models.OneToOneField(
-        UserProfile,
-        on_delete=models.CASCADE,
-        related_name='tutor_application'
-    )
-
-    # Required Documents Only
-    school_id = models.ImageField(upload_to='tutor_applications/school_ids/')
-    enrollment_proof = models.FileField(upload_to='tutor_applications/enrollment_proofs/')
-
-    # Optional Motivation
+    # Optional Motivation. Kept as `reason_to_tutor` for both roles rather than renamed generically —
+    # see Phase 1 plan's "naming decision" note.
     reason_to_tutor = models.TextField(
         blank=True,
         help_text="Why do you want to become a tutor?"
@@ -262,23 +325,195 @@ class TutorApplication(models.Model):
     application_status = models.CharField(
         max_length=20,
         choices=STATUS_CHOICES,
-        default='pending'
+        default='pending',
+        db_index=True,
     )
 
     # Admin Feedback
     rejection_reason = models.TextField(blank=True, default='')
-    reviewed_by = models.ForeignKey(
-        UserProfile, on_delete=models.SET_NULL,
-        null=True, blank=True,
-        related_name='reviewed_applications'
-    )
     reviewed_at = models.DateTimeField(null=True, blank=True)
 
     submitted_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    # Opportunistic renewal-reminder dedup (Phase 4 consumes these; unused until then). Indexed now,
+    # while the columns are new and empty, so Phase 4's dedup filter doesn't force a table-scan or a
+    # later index-add migration under load.
+    reminder_7day_sent_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    reminder_1day_sent_at = models.DateTimeField(null=True, blank=True, db_index=True)
+
+    class Meta:
+        abstract = True
+
+    def latest_approved_document_review_at(self):
+        latest_renewal = (
+            self.document_renewal_reviews
+            .filter(status='approved', reviewed_at__isnull=False)
+            .order_by('-reviewed_at', '-submitted_at')
+            .first()
+        )
+        if latest_renewal:
+            return latest_renewal.reviewed_at
+        return self.reviewed_at
+
+    def document_renewal_due_at(self):
+        if self.application_status != 'approved':
+            return None
+
+        approved_at = self.latest_approved_document_review_at()
+        if approved_at is None:
+            return None
+
+        return approved_at + timedelta(days=self.DOCUMENT_RENEWAL_INTERVAL_DAYS)
+
+    def latest_document_renewal_review(self):
+        return self.document_renewal_reviews.order_by('-submitted_at').first()
+
+    def document_renewal_status(self):
+        if self.application_status != 'approved':
+            return None
+
+        latest_renewal = self.latest_document_renewal_review()
+        if latest_renewal and latest_renewal.status in ['pending', 'rejected']:
+            return latest_renewal.status
+
+        due_at = self.document_renewal_due_at()
+        if due_at and due_at <= timezone.now():
+            return 'due'
+
+        return 'verified'
+
+    def can_submit_document_renewal(self):
+        return self.document_renewal_status() in ['due', 'rejected']
+
+
+class DocumentRenewalReviewBase(models.Model):
+    """Shared fields for a single renewal-document submission review. Each concrete subclass defines
+    its own `application` FK (target model differs per role) and `profile`/`reviewed_by` FKs (need
+    distinct `related_name`s since both point at UserProfile), plus its own upload paths and Meta."""
+
+    STATUS_CHOICES = [
+        ('pending', 'Pending Review'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    ]
+
+    reason_to_tutor = models.TextField(blank=True, default='')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    rejection_reason = models.TextField(blank=True, default='')
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    submitted_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        abstract = True
+
+
+class TutorApplication(ApplicationVerificationBase):
+    profile = models.OneToOneField(
+        UserProfile,
+        on_delete=models.CASCADE,
+        related_name='tutor_application'
+    )
+
+    school_id = models.ImageField(upload_to='tutor_applications/school_ids/')
+    enrollment_proof = models.FileField(upload_to='tutor_applications/enrollment_proofs/')
+
+    reviewed_by = models.ForeignKey(
+        UserProfile, on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='reviewed_applications'
+    )
+
     def __str__(self):
         return f"Application: {self.profile.fname} {self.profile.lname} ({self.application_status})"
+
+
+class TutorDocumentRenewalReview(DocumentRenewalReviewBase):
+    application = models.ForeignKey(
+        TutorApplication,
+        on_delete=models.CASCADE,
+        related_name='document_renewal_reviews'
+    )
+    profile = models.ForeignKey(
+        UserProfile,
+        on_delete=models.CASCADE,
+        related_name='document_renewal_reviews'
+    )
+    school_id = models.ImageField(upload_to='tutor_applications/renewal_school_ids/')
+    enrollment_proof = models.FileField(upload_to='tutor_applications/renewal_enrollment_proofs/')
+    reviewed_by = models.ForeignKey(
+        UserProfile,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='reviewed_document_renewals'
+    )
+
+    class Meta:
+        ordering = ['-submitted_at']
+        indexes = [
+            models.Index(fields=['profile', 'status'], name='studybuddy__profile_71f0af_idx'),
+            models.Index(fields=['application', 'status'], name='studybuddy__applica_1d5f57_idx'),
+            models.Index(fields=['status', 'submitted_at'], name='studybuddy__status_82fcda_idx'),
+        ]
+
+    def __str__(self):
+        return f"Document renewal: {self.profile.fname} {self.profile.lname} ({self.status})"
+
+
+class TuteeApplication(ApplicationVerificationBase):
+    profile = models.OneToOneField(
+        UserProfile,
+        on_delete=models.CASCADE,
+        related_name='tutee_application'
+    )
+
+    school_id = models.ImageField(upload_to='tutee_applications/school_ids/')
+    enrollment_proof = models.FileField(upload_to='tutee_applications/enrollment_proofs/')
+
+    reviewed_by = models.ForeignKey(
+        UserProfile, on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='reviewed_tutee_applications'
+    )
+
+    def __str__(self):
+        return f"Application: {self.profile.fname} {self.profile.lname} ({self.application_status})"
+
+
+class TuteeDocumentRenewalReview(DocumentRenewalReviewBase):
+    application = models.ForeignKey(
+        TuteeApplication,
+        on_delete=models.CASCADE,
+        related_name='document_renewal_reviews'
+    )
+    profile = models.ForeignKey(
+        UserProfile,
+        on_delete=models.CASCADE,
+        related_name='tutee_document_renewal_reviews'
+    )
+    school_id = models.ImageField(upload_to='tutee_applications/renewal_school_ids/')
+    enrollment_proof = models.FileField(upload_to='tutee_applications/renewal_enrollment_proofs/')
+    reviewed_by = models.ForeignKey(
+        UserProfile,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='reviewed_tutee_document_renewals'
+    )
+
+    class Meta:
+        ordering = ['-submitted_at']
+        indexes = [
+            models.Index(fields=['profile', 'status'], name='studybuddy__tutee_pr_stat_idx'),
+            models.Index(fields=['application', 'status'], name='studybuddy__tutee_ap_stat_idx'),
+            models.Index(fields=['status', 'submitted_at'], name='studybuddy__tutee_st_sub_idx'),
+        ]
+
+    def __str__(self):
+        return f"Document renewal: {self.profile.fname} {self.profile.lname} ({self.status})"
+
 
 class Wallet(models.Model):
     tutor = models.OneToOneField(Tutor, on_delete=models.CASCADE, related_name='wallet')
@@ -297,6 +532,7 @@ class Transaction(models.Model):
         ('cashout_fee', 'Cash-Out Provider Fee'),
         ('cashout_fee_reversal', 'Cash-Out Provider Fee Reversal'),
         ('commission_deduction', 'Commission Deduction'),
+        ('cash_in', 'Wallet Top-Up'),
     ]
 
     wallet = models.ForeignKey(Wallet, on_delete=models.CASCADE, related_name='transactions')
@@ -308,31 +544,6 @@ class Transaction(models.Model):
 
     class Meta:
         ordering = ['-created_at']
-
-class TutorPayoutAccount(models.Model):
-    DESTINATION_TYPES = [
-        ('gcash', 'GCash'),
-        ('bank', 'Bank Transfer'),
-    ]
-
-    tutor = models.ForeignKey(Tutor, on_delete=models.CASCADE, related_name='payout_accounts')
-    destination_type = models.CharField(max_length=10, choices=DESTINATION_TYPES)
-    receiving_institution_id = models.CharField(max_length=100)
-    receiving_institution_name = models.CharField(max_length=150)
-    receiving_institution_code = models.CharField(max_length=50, blank=True)
-    provider = models.CharField(max_length=20, blank=True, default='')
-    account_number = models.CharField(max_length=50)
-    account_name = models.CharField(max_length=100)
-    bank_name = models.CharField(max_length=100, blank=True, null=True)
-    is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        ordering = ['-is_active', '-updated_at']
-
-    def __str__(self):
-        return f"{self.tutor.profile.fname} - {self.receiving_institution_name}"
 
 class WithdrawalRequest(models.Model):
     STATUS_CHOICES = [
@@ -348,15 +559,11 @@ class WithdrawalRequest(models.Model):
     ]
 
     tutor = models.ForeignKey(Tutor, on_delete=models.CASCADE)
-    payout_account = models.ForeignKey(
-        TutorPayoutAccount,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='cash_outs'
-    )
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     method = models.CharField(max_length=10, choices=METHOD_CHOICES)
+    receiving_institution_id = models.CharField(max_length=100, blank=True, default='')
+    receiving_institution_name = models.CharField(max_length=150, blank=True, default='')
+    receiving_institution_code = models.CharField(max_length=50, blank=True, default='')
     account_number = models.CharField(max_length=50)
     account_name = models.CharField(max_length=100)
     bank_name = models.CharField(max_length=100, blank=True, null=True)
@@ -370,10 +577,31 @@ class WithdrawalRequest(models.Model):
     provider_error_message = models.TextField(blank=True, default='')
     provider_fee = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     net_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    rail = models.CharField(max_length=20, blank=True, default='')
     callback_received_at = models.DateTimeField(null=True, blank=True)
     requested_at = models.DateTimeField(auto_now_add=True)
     processed_at = models.DateTimeField(null=True, blank=True)
+    note = models.TextField(blank=True, default='')
+
+class WalletTopUp(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('paid', 'Paid'),
+        ('failed', 'Failed'),
+    ]
+
+    tutor = models.ForeignKey(Tutor, on_delete=models.CASCADE, related_name='top_ups')
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    provider = models.CharField(max_length=20, default='paymongo')
+    provider_reference = models.CharField(max_length=100, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    paid_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"TopUp {self.id} - {self.tutor.profile.fname} (₱{self.amount}, {self.status})"
 
 class PlatformActivity(models.Model):
     ACTIVITY_TYPES = [
@@ -383,6 +611,7 @@ class PlatformActivity(models.Model):
         ('withdrawal_failed', 'Withdrawal Failure'),
         ('admin_action', 'Admin Action'),
         ('tutor_application', 'Tutor Application'),
+        ('tutee_application', 'Tutee Application'),
     ]
 
     activity_type = models.CharField(max_length=30, choices=ACTIVITY_TYPES)
@@ -563,6 +792,8 @@ class Booking(models.Model):
     )
     tutee_confirmed = models.BooleanField(default=False)
     tutor_confirmed = models.BooleanField(default=False)
+    dashboard_hidden_by_student_at = models.DateTimeField(null=True, blank=True)
+    dashboard_hidden_by_tutor_at = models.DateTimeField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -586,6 +817,51 @@ class Booking(models.Model):
                 name='unique_active_booking_per_slot_date',
             ),
         ]
+
+
+class SessionCheckIn(models.Model):
+    EVENT_VENUE_CONFIRM = 'venue_confirm'
+    EVENT_MIDPOINT_CHECKIN = 'midpoint_checkin'
+    EVENT_TYPE_CHOICES = [
+        (EVENT_VENUE_CONFIRM, 'Venue confirmation'),
+        (EVENT_MIDPOINT_CHECKIN, 'Mid-session check-in'),
+    ]
+
+    RESPONSE_VENUE_YES = 'yes'
+    RESPONSE_VENUE_NO = 'no'
+    RESPONSE_MIDPOINT_GOOD = 'good'
+    RESPONSE_MIDPOINT_ISSUES = 'issues'
+    RESPONSE_CHOICES = [
+        (RESPONSE_VENUE_YES, 'Yes'),
+        (RESPONSE_VENUE_NO, 'No'),
+        (RESPONSE_MIDPOINT_GOOD, 'Good'),
+        (RESPONSE_MIDPOINT_ISSUES, 'Having issues'),
+    ]
+
+    booking = models.ForeignKey(
+        Booking,
+        on_delete=models.CASCADE,
+        related_name='check_ins'
+    )
+    event_type = models.CharField(max_length=30, choices=EVENT_TYPE_CHOICES)
+    response = models.CharField(max_length=30, choices=RESPONSE_CHOICES)
+    responded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-responded_at']
+        indexes = [
+            models.Index(fields=['booking', 'event_type']),
+            models.Index(fields=['event_type', 'responded_at']),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['booking', 'event_type'],
+                name='unique_session_check_in_per_booking_event',
+            ),
+        ]
+
+    def __str__(self):
+        return f"Booking {self.booking_id} {self.event_type}: {self.response}"
 
 class PaymentMethod(models.Model):
 
@@ -745,6 +1021,7 @@ class SupportTicket(models.Model):
     STATUS_CHOICES = [
         ('Open', 'Open'),
         ('In_Progress', 'In Progress'),
+        ('Escalated', 'Escalated'),
         ('Resolved', 'Resolved'),
     ]
 
@@ -760,6 +1037,9 @@ class SupportTicket(models.Model):
     chatroom = models.OneToOneField('ChatRoom', on_delete=models.SET_NULL, null=True, related_name='ticket')
 
     assigned_agent = models.ForeignKey(UserProfile, on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_tickets')
+    escalation_reason = models.TextField(blank=True, default='')
+    escalated_by = models.ForeignKey(UserProfile, on_delete=models.SET_NULL, null=True, blank=True, related_name='escalated_tickets')
+    escalated_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

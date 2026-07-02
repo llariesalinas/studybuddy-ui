@@ -2,8 +2,8 @@
 
 **Date completed:** 2026-06-02
 **Branch:** feature-darkmode-toggle
-**Plan:** `docs/superpowers/plans/2026-06-02-session-cancellation.md`
-**Spec:** `docs/superpowers/specs/2026-06-02-session-cancellation-design.md`
+**Plan:** `docs/plans/2026-06-02-session-cancellation.md`
+**Spec:** `docs/specs/2026-06-02-session-cancellation-design.md`
 
 ## Summary
 

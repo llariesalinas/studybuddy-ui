@@ -5,7 +5,7 @@
 **Goal:** Both tutee and tutor can cancel Pending or Confirmed-upcoming sessions,
 with a required reason and a "not today or tomorrow" cutoff; no payment is touched.
 **Stack:** Vue 3, Pinia, Django REST, Bootstrap 5
-**Spec:** `docs/superpowers/specs/2026-06-02-session-cancellation-design.md`
+**Spec:** `docs/specs/2026-06-02-session-cancellation-design.md`
 
 > Execute in order. Tasks 1-3 (backend) must land before Tasks 4-7 (frontend),
 > since the frontend depends on the extended endpoint and stored fields.
@@ -478,7 +478,7 @@ with a required reason and a "not today or tomorrow" cutoff; no payment is touch
 # Phase B Completion Report — Session Cancellation (Both Roles)
 **Date completed:** <YYYY-MM-DD>
 **Branch:** <branch>
-**Plan:** docs/superpowers/plans/2026-06-02-session-cancellation.md
+**Plan:** docs/plans/2026-06-02-session-cancellation.md
 
 ## Summary
 <what shipped: both roles can cancel pending/upcoming with reason + cutoff>

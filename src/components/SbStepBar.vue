@@ -5,7 +5,7 @@
       <span class="sb-step-label sb-step-label--right">{{ Math.round((current / total) * 100) }}%</span>
     </div>
     <div class="sb-step-track">
-      <div class="sb-step-fill" :style="{ width: `${(current / total) * 100}%` }"></div>
+      <div class="sb-step-fill" :style="{ transform: `scaleX(${current / total})` }"></div>
     </div>
   </div>
 </template>
@@ -40,9 +40,11 @@ defineProps({
 }
 
 .sb-step-fill {
+  width: 100%;
   height: 100%;
   background: var(--sb-primary);
   border-radius: 999px;
-  transition: width 700ms var(--sb-spring);
+  transform-origin: left center;
+  transition: transform var(--sb-t-normal) var(--sb-spring);
 }
 </style>

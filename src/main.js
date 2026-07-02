@@ -4,6 +4,7 @@ import router from './router'
 import { createPinia } from 'pinia'
 import { useAuthStore } from '@/stores/auth' // 1. Import the store
 import { useThemeStore } from '@/stores/theme'
+import { useSidebarStore } from '@/stores/sidebar'
 import piniaPluginPersistedstate from 'pinia-plugin-persistedstate'
 
 // 1. Import Bootstrap CSS
@@ -32,5 +33,8 @@ authStore.initializeAuth()
 
 const themeStore = useThemeStore()
 themeStore.initTheme()
+
+const sidebarStore = useSidebarStore()
+sidebarStore.initSidebar()
 
 app.mount('#app')

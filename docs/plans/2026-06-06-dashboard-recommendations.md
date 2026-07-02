@@ -13,7 +13,7 @@
 ## Status & Progress Summary
 
 **Status:** Done — implemented via subagent-driven development, all 6 code tasks committed; verification green for this feature.
-**Spec:** `docs/superpowers/specs/2026-06-06-dashboard-recommendations-design.md`
+**Spec:** `docs/specs/2026-06-06-dashboard-recommendations-design.md`
 **Summary:** `docs/session-summaries/2026-06-06-dashboard-recommendations-summary.md`
 **Tasks:** 7 (sequential, TDD; no parallel agents per author)
 
@@ -854,5 +854,5 @@ With Redis running and `REDIS_URL` set, start the backend and frontend, log in a
 
 ## Changelog
 
-- **2026-06-06** — Plan created from spec `docs/superpowers/specs/2026-06-06-dashboard-recommendations-design.md`. 7 tasks (TDD, sequential). Verified URL paths against `urls.py` and corrected the preference-save test path from `/api/save-preferences/` to `/api/preferences/`. Status: Approved, ready for execution.
+- **2026-06-06** — Plan created from spec `docs/specs/2026-06-06-dashboard-recommendations-design.md`. 7 tasks (TDD, sequential). Verified URL paths against `urls.py` and corrected the preference-save test path from `/api/save-preferences/` to `/api/preferences/`. Status: Approved, ready for execution.
 - **2026-06-06** — Executed via subagent-driven development. Tasks 1–6 implemented and committed (`4216032`, `82b7ef6`, `20f2905`, `367bfa8`, `604ea6e`, `63be320`); each task's TDD tests pass. Task 7 verification: `manage.py check` PASS, `npm run build` PASS, full backend suite 76/78 (the 2 failures are pre-existing `EmailAuthTests` password-reset cases from the separate email async refactor, not this feature). Prereq cleanup before execution: committed existing email/chat work as `feat(email)`/`feat(chat)`; installed `anymail`/`django-q2`/`django-picklefield` so the backend boots. Status → Done. Summary written to `docs/session-summaries/2026-06-06-dashboard-recommendations-summary.md`.

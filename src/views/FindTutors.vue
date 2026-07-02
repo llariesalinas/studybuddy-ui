@@ -38,7 +38,7 @@
           <input
             type="text"
             v-model="locationModel"
-            class="form-control border-sb shadow-none py-2 rounded-3"
+            class="form-control border-sb shadow-none py-2 rounded-3 sb-field"
             placeholder="e.g. Library"
           />
         </div>
@@ -624,10 +624,7 @@ onBeforeRouteUpdate(async (to, from, next) => {
   gap: 0.75rem;
   padding: 0.5rem 0.85rem;
   text-align: left;
-  transition:
-    border-color 180ms ease,
-    box-shadow 180ms ease,
-    transform 180ms ease;
+  transition: transform var(--sb-t-normal) var(--sb-spring);
 }
 
 .budget-toggle-btn:hover {

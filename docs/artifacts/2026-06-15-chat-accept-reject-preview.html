@@ -1,0 +1,565 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Chat Accept Reject Preview</title>
+    <style>
+      :root {
+        --sb-primary: #00895a;
+        --sb-primary-hover: #00704a;
+        --sb-dark: #0a1916;
+        --sb-canvas: #ffffff;
+        --sb-parchment: #f5f5f7;
+        --sb-ink: #1d1d1f;
+        --sb-muted: #6e6e73;
+        --sb-green-tint: #edf7f3;
+        --sb-green-border: #b8dece;
+        --sb-danger-bs: #dc3545;
+        --sb-warning-bg: #ffc107;
+        --sb-warning-text: #997404;
+        --sb-text-main: #163127;
+        --sb-text-muted: #6b7280;
+        --sb-text-secondary: #475569;
+        --sb-text-dark: #0f172a;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--sb-parchment);
+        color: var(--sb-ink);
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      .page {
+        width: min(1180px, calc(100% - 40px));
+        margin: 0 auto;
+        padding: 34px 0 48px;
+      }
+
+      .preview-header {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 24px;
+        margin-bottom: 24px;
+      }
+
+      .kicker {
+        margin: 0 0 8px;
+        color: var(--sb-primary);
+        font-size: 11px;
+        font-weight: 800;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 0;
+        color: #10251f;
+        font-size: 34px;
+        line-height: 1.12;
+      }
+
+      .summary {
+        max-width: 720px;
+        margin: 8px 0 0;
+        color: var(--sb-muted);
+        font-size: 15px;
+        line-height: 1.55;
+      }
+
+      .status-card {
+        min-width: 250px;
+        padding: 13px 16px;
+        border: 1px solid var(--sb-green-border);
+        border-radius: 16px;
+        background: var(--sb-green-tint);
+        color: #12483b;
+        font-size: 13px;
+        line-height: 1.45;
+      }
+
+      .preview-grid {
+        display: grid;
+        gap: 22px;
+      }
+
+      .scenario {
+        border: 1px solid #e8e8e8;
+        border-radius: 18px;
+        background: #ffffff;
+        box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+        overflow: hidden;
+      }
+
+      .scenario-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 18px 22px;
+        border-bottom: 1px solid #eef1ef;
+      }
+
+      .scenario-title {
+        margin: 0 0 3px;
+        color: #10251f;
+        font-size: 18px;
+        font-weight: 800;
+      }
+
+      .scenario-copy {
+        margin: 0;
+        color: var(--sb-muted);
+        font-size: 13px;
+      }
+
+      .role-pill {
+        display: inline-flex;
+        align-items: center;
+        min-height: 28px;
+        padding: 5px 11px;
+        border-radius: 999px;
+        background: var(--sb-dark);
+        color: #ffffff;
+        font-size: 11px;
+        font-weight: 800;
+      }
+
+      .chat-shell {
+        padding: 18px 22px 22px;
+        background: #f8faf9;
+      }
+
+      .chat-window {
+        display: grid;
+        gap: 14px;
+        min-height: 220px;
+        padding: 16px;
+        border: 1px solid #edf0ef;
+        border-radius: 20px;
+        background: linear-gradient(135deg, #ffffff, #f8fbfa);
+      }
+
+      .chat-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid #eef1ef;
+      }
+
+      .avatar {
+        display: grid;
+        place-items: center;
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        background: var(--sb-primary);
+        color: #ffffff;
+        font-size: 13px;
+        font-weight: 800;
+      }
+
+      .chat-name {
+        color: var(--sb-text-main);
+        font-size: 14px;
+        font-weight: 800;
+      }
+
+      .chat-meta {
+        color: var(--sb-text-muted);
+        font-size: 12px;
+      }
+
+      .chat-banner {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 12px 14px;
+        border: 1px solid rgba(0, 137, 90, 0.14);
+        border-radius: 18px;
+        background:
+          linear-gradient(135deg, rgba(255, 252, 237, 0.96), rgba(244, 252, 248, 0.96));
+        box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+      }
+
+      .chat-banner__body {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex: 1 1 auto;
+        min-width: 0;
+      }
+
+      .chat-banner__icon {
+        width: 36px;
+        height: 36px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid rgba(153, 116, 4, 0.18);
+        border-radius: 50%;
+        background: rgba(255, 193, 7, 0.16);
+        color: var(--sb-warning-text);
+        font-size: 16px;
+        flex-shrink: 0;
+      }
+
+      .chat-banner__text {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+      }
+
+      .chat-banner__eyebrow {
+        color: var(--sb-primary);
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        line-height: 1.1;
+        text-transform: uppercase;
+      }
+
+      .chat-banner__label {
+        color: var(--sb-text-main);
+        font-size: 14px;
+        font-weight: 850;
+      }
+
+      .chat-banner__sub {
+        color: var(--sb-text-muted);
+        font-size: 12px;
+        margin-top: 1px;
+      }
+
+      .chat-banner__badge {
+        flex-shrink: 0;
+        padding: 3px 10px;
+        border-radius: 20px;
+        background: var(--sb-warning-bg);
+        color: var(--sb-text-dark);
+        font-size: 11px;
+        font-weight: 700;
+      }
+
+      .chat-banner__action {
+        display: grid;
+        gap: 10px;
+        flex: 0 0 auto;
+        min-width: min(360px, 44%);
+      }
+
+      .chat-banner__location-display,
+      .chat-banner__action-row {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+
+      .chat-banner__location-display {
+        justify-content: space-between;
+      }
+
+      .chat-banner__action--online {
+        min-width: 260px;
+        padding: 9px 10px;
+        border: 1px solid rgba(0, 137, 90, 0.1);
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.72);
+      }
+
+      .chat-banner__decision-card {
+        display: grid;
+        gap: 6px;
+        padding: 9px 10px;
+        border: 1px solid rgba(0, 137, 90, 0.1);
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.72);
+      }
+
+      .chat-banner__field-label {
+        color: var(--sb-text-muted);
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        line-height: 1;
+        text-transform: uppercase;
+      }
+
+      .chat-banner__loc-chip {
+        max-width: 260px;
+        overflow: hidden;
+        padding: 7px 11px;
+        border: 1px solid rgba(0, 137, 90, 0.18);
+        border-radius: 999px;
+        background: rgba(237, 247, 243, 0.9);
+        color: var(--sb-text-main);
+        font-size: 13px;
+        font-weight: 750;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .chat-banner__btn {
+        min-height: 34px;
+        border: 0;
+        border-radius: 999px;
+        background: transparent;
+        color: var(--sb-text-secondary);
+        cursor: default;
+        font-size: 13px;
+        font-weight: 700;
+        padding: 7px 16px;
+      }
+
+      .chat-banner__btn--primary {
+        background: var(--sb-primary);
+        color: #ffffff;
+        box-shadow: 0 8px 16px rgba(0, 137, 90, 0.18);
+      }
+
+      .chat-banner__btn--ghost {
+        background: rgba(0, 137, 90, 0.08);
+        color: var(--sb-primary);
+      }
+
+      .chat-banner__btn--danger-text {
+        border: 1px solid rgba(220, 53, 69, 0.16);
+        background: rgba(220, 53, 69, 0.06);
+        color: var(--sb-danger-bs);
+      }
+
+      .message-row {
+        display: flex;
+      }
+
+      .message-row.me {
+        justify-content: flex-end;
+      }
+
+      .bubble {
+        max-width: 70%;
+        padding: 10px 14px;
+        border-radius: 16px;
+        font-size: 13px;
+        line-height: 1.4;
+      }
+
+      .bubble.them {
+        border: 1px solid #eef1ef;
+        border-bottom-left-radius: 5px;
+        background: #ffffff;
+      }
+
+      .bubble.me {
+        border-bottom-right-radius: 5px;
+        background: #7af2b6;
+        color: #10251f;
+      }
+
+      @media (max-width: 780px) {
+        .preview-header,
+        .scenario-header,
+        .chat-banner,
+        .chat-banner__location-display,
+        .chat-banner__action-row {
+          align-items: stretch;
+          flex-direction: column;
+        }
+
+        .status-card {
+          min-width: 0;
+        }
+
+        .chat-banner__action {
+          width: 100%;
+          min-width: 0;
+        }
+
+        .chat-banner__loc-chip {
+          max-width: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <header class="preview-header">
+        <div>
+          <p class="kicker">Chat request actions</p>
+          <h1>Accept and reject directly in chat</h1>
+          <p class="summary">
+            This preview mirrors the implemented `ChatBanner.vue` behavior: tutors can act on pending
+            booking requests from the conversation, while tutees only see waiting or suggest-change UI.
+          </p>
+        </div>
+        <aside class="status-card">
+          <strong>Implemented behavior:</strong> one-click reject, disabled loading states, and F2F
+          location confirmation before accept.
+        </aside>
+      </header>
+
+      <section class="preview-grid">
+        <article class="scenario">
+          <div class="scenario-header">
+            <div>
+              <h2 class="scenario-title">F2F pending request</h2>
+              <p class="scenario-copy">Tutor can edit the meeting location, then confirm and accept or reject.</p>
+            </div>
+            <span class="role-pill">Tutor view</span>
+          </div>
+          <div class="chat-shell">
+            <div class="chat-window">
+              <div class="chat-header">
+                <div class="avatar">AR</div>
+                <div>
+                  <div class="chat-name">Ari Reyes</div>
+                  <div class="chat-meta">BS Information Technology (CPU-CCS)</div>
+                </div>
+              </div>
+
+              <div class="chat-banner">
+                <div class="chat-banner__body">
+                  <span class="chat-banner__icon">i</span>
+                  <div class="chat-banner__text">
+                    <span class="chat-banner__eyebrow">Booking request</span>
+                    <span class="chat-banner__label">Confirm this session</span>
+                    <span class="chat-banner__sub">Set or confirm the meeting location.</span>
+                  </div>
+                  <span class="chat-banner__badge">Pending</span>
+                </div>
+                <div class="chat-banner__action">
+                  <div class="chat-banner__decision-card">
+                    <span class="chat-banner__field-label">Meeting place</span>
+                    <div class="chat-banner__location-display">
+                      <span class="chat-banner__loc-chip">Library 23</span>
+                      <button class="chat-banner__btn chat-banner__btn--ghost" type="button">Edit</button>
+                    </div>
+                  </div>
+                  <div class="chat-banner__action-row">
+                    <button class="chat-banner__btn chat-banner__btn--primary" type="button">
+                      Confirm &amp; Accept
+                    </button>
+                    <button class="chat-banner__btn chat-banner__btn--danger-text" type="button">
+                      Reject
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="message-row">
+                <div class="bubble them">Hi, I sent the request for tomorrow afternoon.</div>
+              </div>
+              <div class="message-row me">
+                <div class="bubble me">Works for me. I'll confirm the location here.</div>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="scenario">
+          <div class="scenario-header">
+            <div>
+              <h2 class="scenario-title">Online pending request</h2>
+              <p class="scenario-copy">No location step. Tutor can accept or reject the request from the banner.</p>
+            </div>
+            <span class="role-pill">Tutor view</span>
+          </div>
+          <div class="chat-shell">
+            <div class="chat-window">
+              <div class="chat-header">
+                <div class="avatar">JM</div>
+                <div>
+                  <div class="chat-name">Jules Martin</div>
+                  <div class="chat-meta">Online session request</div>
+                </div>
+              </div>
+
+              <div class="chat-banner">
+                <div class="chat-banner__body">
+                  <span class="chat-banner__icon">i</span>
+                  <div class="chat-banner__text">
+                    <span class="chat-banner__eyebrow">Booking request</span>
+                    <span class="chat-banner__label">Session request pending</span>
+                    <span class="chat-banner__sub">Ready for your response.</span>
+                  </div>
+                  <span class="chat-banner__badge">Pending</span>
+                </div>
+                <div class="chat-banner__action chat-banner__action--online">
+                  <span class="chat-banner__field-label">Respond to request</span>
+                  <div class="chat-banner__action-row">
+                    <button class="chat-banner__btn chat-banner__btn--primary" type="button">
+                      Accept
+                    </button>
+                    <button class="chat-banner__btn chat-banner__btn--danger-text" type="button">
+                      Reject
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="message-row">
+                <div class="bubble them">Can we do this online at 9?</div>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="scenario">
+          <div class="scenario-header">
+            <div>
+              <h2 class="scenario-title">Tutee pending request</h2>
+              <p class="scenario-copy">Tutees do not get accept/reject actions. F2F still allows suggesting a location change.</p>
+            </div>
+            <span class="role-pill">Tutee view</span>
+          </div>
+          <div class="chat-shell">
+            <div class="chat-window">
+              <div class="chat-header">
+                <div class="avatar">MK</div>
+                <div>
+                  <div class="chat-name">Mina Ko</div>
+                  <div class="chat-meta">Waiting for tutor confirmation</div>
+                </div>
+              </div>
+
+              <div class="chat-banner">
+                <div class="chat-banner__body">
+                  <span class="chat-banner__icon">i</span>
+                  <div class="chat-banner__text">
+                    <span class="chat-banner__eyebrow">Booking request</span>
+                    <span class="chat-banner__label">Session pending</span>
+                    <span class="chat-banner__sub">Suggest or confirm the meeting location.</span>
+                  </div>
+                  <span class="chat-banner__badge">Pending</span>
+                </div>
+                <div class="chat-banner__action">
+                  <div class="chat-banner__decision-card">
+                    <span class="chat-banner__field-label">Suggested place</span>
+                    <div class="chat-banner__location-display">
+                      <span class="chat-banner__loc-chip">Library 23</span>
+                      <button class="chat-banner__btn chat-banner__btn--ghost" type="button">
+                        Suggest change
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="message-row me">
+                <div class="bubble me">Are you available around this time instead?</div>
+              </div>
+            </div>
+          </div>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>

@@ -80,6 +80,6 @@ const verify = (id) => {
 }
 
 .pop-enter-active {
-  animation: sb-pop 350ms var(--sb-spring-fast) both;
+  animation: sb-pop var(--sb-t-normal) var(--sb-spring) both;
 }
 </style>

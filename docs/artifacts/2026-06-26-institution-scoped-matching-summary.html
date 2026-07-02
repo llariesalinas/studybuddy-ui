@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Institution-Scoped Tutor Matching — Implementation Summary</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f6f8fa;
+      color: #1a1a2e;
+      line-height: 1.6;
+      padding: 2rem 1rem;
+    }
+
+    .page {
+      max-width: 860px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    .hero {
+      background: linear-gradient(135deg, #00895a 0%, #006644 100%);
+      border-radius: 16px;
+      padding: 2.5rem 2rem;
+      color: #fff;
+      margin-bottom: 2rem;
+    }
+    .hero-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      opacity: 0.75;
+      margin-bottom: 0.5rem;
+    }
+    .hero h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+    .hero p {
+      opacity: 0.9;
+      font-size: 0.95rem;
+      max-width: 560px;
+    }
+    .hero-meta {
+      display: flex;
+      gap: 1.5rem;
+      margin-top: 1.25rem;
+      flex-wrap: wrap;
+    }
+    .hero-meta span {
+      font-size: 0.8rem;
+      opacity: 0.8;
+    }
+    .hero-meta strong {
+      opacity: 1;
+    }
+
+    /* Cards */
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      border: 1px solid #e4e8ef;
+      padding: 1.5rem;
+      margin-bottom: 1.25rem;
+    }
+    .card h2 {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #1a1a2e;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .card h2 .icon {
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      flex-shrink: 0;
+    }
+    .icon-green  { background: #d1fae5; color: #065f46; }
+    .icon-blue   { background: #dbeafe; color: #1e40af; }
+    .icon-amber  { background: #fef3c7; color: #92400e; }
+    .icon-slate  { background: #f1f5f9; color: #475569; }
+
+    /* Goal block */
+    .goal-block {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      font-size: 0.9rem;
+      color: #166534;
+      margin-bottom: 1.25rem;
+    }
+    .goal-block strong { display: block; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.25rem; color: #15803d; }
+
+    /* Tasks */
+    .task-list { display: flex; flex-direction: column; gap: 0.75rem; }
+    .task {
+      display: grid;
+      grid-template-columns: 2rem 1fr auto;
+      align-items: start;
+      gap: 0.75rem;
+      padding: 0.9rem 1rem;
+      border-radius: 8px;
+      border: 1px solid #e4e8ef;
+      background: #fafbfc;
+    }
+    .task.done { border-color: #bbf7d0; background: #f0fdf4; }
+    .task.inprogress { border-color: #fed7aa; background: #fff7ed; }
+
+    .task-num {
+      width: 2rem;
+      height: 2rem;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8rem;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .done .task-num   { background: #00895a; color: #fff; }
+    .inprogress .task-num { background: #f97316; color: #fff; }
+
+    .task-body h3 { font-size: 0.9rem; font-weight: 600; margin-bottom: 0.2rem; }
+    .task-body p  { font-size: 0.8rem; color: #64748b; }
+
+    .badge {
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 0.2rem 0.55rem;
+      border-radius: 999px;
+      white-space: nowrap;
+      align-self: start;
+      margin-top: 0.1rem;
+    }
+    .badge-done       { background: #d1fae5; color: #065f46; }
+    .badge-inprogress { background: #fed7aa; color: #9a3412; }
+
+    /* Files changed */
+    .file-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    .file-table th {
+      text-align: left;
+      padding: 0.5rem 0.75rem;
+      background: #f1f5f9;
+      color: #475569;
+      font-weight: 600;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .file-table td { padding: 0.55rem 0.75rem; border-top: 1px solid #f1f5f9; }
+    .file-table tr:hover td { background: #f8fafc; }
+    code {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 0.8rem;
+      background: #f1f5f9;
+      padding: 0.1rem 0.35rem;
+      border-radius: 4px;
+      color: #0f172a;
+    }
+    .action-create { color: #059669; font-weight: 600; }
+    .action-modify { color: #2563eb; font-weight: 600; }
+
+    /* Tests */
+    .test-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+    @media (max-width: 560px) { .test-grid { grid-template-columns: 1fr; } }
+    .test-item {
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      font-size: 0.8rem;
+    }
+    .test-item .test-name { font-weight: 600; color: #166534; margin-bottom: 0.2rem; }
+    .test-item .test-desc { color: #374151; }
+    .test-item .check { color: #00895a; margin-right: 0.25rem; }
+
+    /* Code block */
+    .code-block {
+      background: #0f172a;
+      color: #e2e8f0;
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 0.78rem;
+      line-height: 1.7;
+      overflow-x: auto;
+    }
+    .code-block .kw  { color: #7dd3fc; }
+    .code-block .fn  { color: #86efac; }
+    .code-block .cm  { color: #64748b; font-style: italic; }
+    .code-block .st  { color: #fca5a5; }
+
+    /* Null table */
+    .null-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    .null-table th { background: #f1f5f9; padding: 0.5rem 0.75rem; text-align: left; color: #475569; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; }
+    .null-table td { padding: 0.6rem 0.75rem; border-top: 1px solid #f1f5f9; }
+    .null-table .outcome { color: #059669; font-weight: 500; }
+
+    /* Commits */
+    .commit-list { display: flex; flex-direction: column; gap: 0.5rem; }
+    .commit {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 0.75rem;
+      align-items: center;
+      padding: 0.65rem 0.9rem;
+      border-radius: 8px;
+      background: #fafbfc;
+      border: 1px solid #e4e8ef;
+      font-size: 0.82rem;
+    }
+    .commit-sha {
+      font-family: monospace;
+      font-size: 0.75rem;
+      background: #e2e8f0;
+      padding: 0.15rem 0.45rem;
+      border-radius: 4px;
+      color: #475569;
+      white-space: nowrap;
+    }
+
+    /* Section spacing */
+    .section-label {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #94a3b8;
+      margin-bottom: 0.75rem;
+      margin-top: 0.25rem;
+    }
+
+    /* Footer */
+    .footer {
+      text-align: center;
+      font-size: 0.75rem;
+      color: #94a3b8;
+      padding-top: 1.5rem;
+      margin-top: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Hero -->
+  <div class="hero">
+    <div class="hero-label">Implementation Summary</div>
+    <h1>Institution-Scoped Tutor Matching</h1>
+    <p>Tutees are now hard-filtered to see only tutors from their own institution across all recommendation and search surfaces. Cross-institution leakage is impossible.</p>
+    <div class="hero-meta">
+      <span><strong>Date:</strong> 2026-06-26</span>
+      <span><strong>Branch:</strong> feature-sidebar-redesign</span>
+      <span><strong>Stack:</strong> Django 6.0 · Django REST Framework · PostgreSQL</span>
+      <span><strong>Tests added:</strong> 9</span>
+    </div>
+  </div>
+
+  <!-- Goal -->
+  <div class="goal-block">
+    <strong>Goal</strong>
+    A CPU tutee (<code>cpu.edu.ph</code>) must never see tutors from a different institution, and vice versa. The filter is a hard exclusion — no cross-institution leakage, no soft preference fallback.
+  </div>
+
+  <!-- Tasks -->
+  <div class="card">
+    <h2><span class="icon icon-green">✓</span> Tasks</h2>
+    <div class="task-list">
+
+      <div class="task done">
+        <div class="task-num">1</div>
+        <div class="task-body">
+          <h3>Core helper — <code>recommender/utils.py</code></h3>
+          <p>Created <code>filter_tutors_by_institution(queryset, student_profile)</code>. Returns <code>.none()</code> when institution is unset; filters by <code>profile__institution_id</code> otherwise. Added <code>InstitutionScopedMatchingTests</code> class with full setUp and 2 unit tests.</p>
+        </div>
+        <span class="badge badge-done">Done</span>
+      </div>
+
+      <div class="task done">
+        <div class="task-num">2</div>
+        <div class="task-body">
+          <h3>FindTutors filter — <code>POST /api/recommend-tutors/</code></h3>
+          <p>Added <code>student_profile</code> as second parameter to <code>get_recommendation_candidate_tutors</code>. Institution filter is the first operation on <code>base_candidates</code>, before mode/budget/date filters. Updated call site in <code>recommend_tutors_view</code>. 4 integration tests.</p>
+        </div>
+        <span class="badge badge-done">Done</span>
+      </div>
+
+      <div class="task done">
+        <div class="task-num">3</div>
+        <div class="task-body">
+          <h3>Dashboard filter — <code>GET /api/recommendations/</code></h3>
+          <p>Updated <code>_fallback(tutee, limit)</code> to wrap its queryset with the institution filter. Wrapped <code>candidate_qs</code> in the main scoring path. Both the subject-matched path and the zero-preferences fallback path are now institution-scoped. 2 tests.</p>
+        </div>
+        <span class="badge badge-done">Done</span>
+      </div>
+
+      <div class="task done">
+        <div class="task-num">4</div>
+        <div class="task-body">
+          <h3>Search filter — <code>GET /api/search-tutors/</code></h3>
+          <p>Added <code>permission_classes = [IsAuthenticated]</code> and <code>filter_tutors_by_institution</code> to <code>SearchTutorsView</code>. 2 tests (institution filter + unauthenticated 401 regression). Full suite: 10/10 institution tests pass.</p>
+        </div>
+        <span class="badge badge-done">Done</span>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Core helper -->
+  <div class="card">
+    <h2><span class="icon icon-blue">{ }</span> Core Helper</h2>
+    <p class="section-label">backend/studybuddy/recommender/utils.py</p>
+    <div class="code-block"><span class="kw">def</span> <span class="fn">filter_tutors_by_institution</span>(queryset, student_profile):
+    institution_id = student_profile.institution_id
+    <span class="kw">if</span> institution_id <span class="kw">is</span> <span class="kw">None</span>:
+        <span class="kw">return</span> queryset.none()   <span class="cm"># tutee has no institution → empty, not error</span>
+    <span class="kw">return</span> queryset.filter(profile__institution_id=institution_id)
+    <span class="cm"># NULL-institution tutors auto-excluded: SQL NULL = value is never true</span></div>
+  </div>
+
+  <!-- Files changed -->
+  <div class="card">
+    <h2><span class="icon icon-slate">≡</span> Files Changed</h2>
+    <table class="file-table">
+      <thead>
+        <tr><th>File</th><th>Action</th><th>What changed</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>backend/studybuddy/recommender/utils.py</code></td>
+          <td><span class="action-create">Created</span></td>
+          <td><code>filter_tutors_by_institution</code> helper</td>
+        </tr>
+        <tr>
+          <td><code>backend/studybuddy/views.py</code></td>
+          <td><span class="action-modify">Modified</span></td>
+          <td>Import helper · <code>get_recommendation_candidate_tutors</code> signature · <code>recommend_tutors_view</code> call site · <code>SearchTutorsView</code> auth + filter</td>
+        </tr>
+        <tr>
+          <td><code>backend/studybuddy/recommender/dashboard.py</code></td>
+          <td><span class="action-modify">Modified</span></td>
+          <td>Import helper · <code>_fallback(tutee, limit)</code> · <code>candidate_qs</code> filter</td>
+        </tr>
+        <tr>
+          <td><code>backend/studybuddy/tests.py</code></td>
+          <td><span class="action-modify">Modified</span></td>
+          <td>New class <code>InstitutionScopedMatchingTests</code> — setUp + 9 test methods</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Tests -->
+  <div class="card">
+    <h2><span class="icon icon-green">✓</span> Test Coverage — <code>InstitutionScopedMatchingTests</code></h2>
+    <div class="test-grid">
+      <div class="test-item">
+        <div class="test-name"><span class="check">✓</span>Helper — institution filter</div>
+        <div class="test-desc"><code>filter_tutors_by_institution</code> returns only same-institution tutors; excludes inst_b and null-institution tutors.</div>
+      </div>
+      <div class="test-item">
+        <div class="test-name"><span class="check">✓</span>Helper — no institution</div>
+        <div class="test-desc">Returns empty queryset (not an error) when tutee has <code>institution = None</code>.</div>
+      </div>
+      <div class="test-item">
+        <div class="test-name"><span class="check">✓</span>FindTutors — same institution</div>
+        <div class="test-desc"><code>POST /api/recommend-tutors/</code> includes tutor_a (same institution as tutee).</div>
+      </div>
+      <div class="test-item">
+        <div class="test-name"><span class="check">✓</span>FindTutors — excludes other institution</div>
+        <div class="test-desc">tutor_b (inst_b) never appears in <code>POST /recommend-tutors/</code> results.</div>
+      </div>
+      <div class="test-item">
+        <div class="test-name"><span class="check">✓</span>FindTutors — tutee no institution</div>
+        <div class="test-desc">Tutee with <code>institution = None</code> gets an empty list, not an error.</div>
+      </div>
+      <div class="test-item">
+        <div class="test-name"><span class="check">✓</span>FindTutors — null tutor excluded</div>
+        <div class="test-desc">Null-institution tutor never surfaces for any tutee.</div>
+      </div>
+      <div class="test-item">
+        <div class="test-name"><span class="check">✓</span>Dashboard widget — institution scoped</div>
+        <div class="test-desc">Main scoring path (tutee has preferences) excludes inst_b and null tutors from widget cards.</div>
+      </div>
+      <div class="test-item">
+        <div class="test-name"><span class="check">✓</span>Dashboard fallback — institution scoped</div>
+        <div class="test-desc">Zero-preference fallback path also excludes cross-institution tutors.</div>
+      </div>
+      <div class="test-item">
+        <div class="test-name"><span class="check">✓</span>Search — institution scoped</div>
+        <div class="test-desc"><code>GET /api/search-tutors/</code> returns only same-institution tutors; excludes inst_b and null-institution tutors.</div>
+      </div>
+      <div class="test-item">
+        <div class="test-name"><span class="check">✓</span>Search — requires authentication</div>
+        <div class="test-desc">Unauthenticated GET to <code>/api/search-tutors/</code> returns 401. Guards against accidental <code>IsAuthenticated</code> removal.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Null handling -->
+  <div class="card">
+    <h2><span class="icon icon-amber">!</span> Null Institution Handling</h2>
+    <table class="null-table">
+      <thead>
+        <tr><th>State</th><th>Outcome</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Tutee has <code>institution = None</code></td>
+          <td class="outcome"><code>filter_tutors_by_institution</code> returns <code>.none()</code> — tutee gets an empty list, not an error. Admin must assign institution before matching works.</td>
+        </tr>
+        <tr>
+          <td>Tutor has <code>profile__institution = None</code></td>
+          <td class="outcome">Auto-excluded by SQL semantics: <code>NULL = value</code> is never true. Invisible to all tutees until an admin assigns their institution.</td>
+        </tr>
+      </tbody>
+    </table>
+    <p style="margin-top:1rem; font-size:0.82rem; color:#64748b;">
+      <strong>Pre-deploy check:</strong> run
+      <code>UserProfile.objects.filter(role__in=['Tutee','Tutor'], institution=None).count()</code>
+      — if non-zero, coordinate with institution admin to backfill before enabling, or affected users immediately get empty results.
+    </p>
+  </div>
+
+  <!-- Commits -->
+  <div class="card">
+    <h2><span class="icon icon-slate">↗</span> Commits</h2>
+    <div class="commit-list">
+      <div class="commit">
+        <span class="commit-sha">d54d1fb</span>
+        <span>feat: add filter_tutors_by_institution helper with unit tests</span>
+      </div>
+      <div class="commit">
+        <span class="commit-sha">67ba7fe</span>
+        <span>feat: scope recommend-tutors endpoint by institution</span>
+      </div>
+      <div class="commit">
+        <span class="commit-sha">577637d</span>
+        <span>feat: scope dashboard recommendations by institution</span>
+      </div>
+      <div class="commit">
+        <span class="commit-sha">a70b6f3</span>
+        <span>feat: enforce institution scoping on tutor search endpoint</span>
+      </div>
+      <div class="commit">
+        <span class="commit-sha">19b7433</span>
+        <span>test: add auth regression test for search-tutors; remove backup artifact</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    Institution-Scoped Tutor Matching · Studybuddy · 2026-06-26 · 10 tests · Final review: Approved
+  </div>
+
+</div>
+</body>
+</html>

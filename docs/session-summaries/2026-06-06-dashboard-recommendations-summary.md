@@ -1,8 +1,8 @@
 # Dashboard Recommendations — Session Summary
 
 **Date:** 2026-06-06
-**Plan:** `docs/superpowers/plans/2026-06-06-dashboard-recommendations.md`
-**Spec:** `docs/superpowers/specs/2026-06-06-dashboard-recommendations-design.md`
+**Plan:** `docs/plans/2026-06-06-dashboard-recommendations.md`
+**Spec:** `docs/specs/2026-06-06-dashboard-recommendations-design.md`
 **Status:** Complete. Recommendation feature fully green; full suite has 2 pre-existing email-test failures unrelated to this work (see Checks).
 
 ---

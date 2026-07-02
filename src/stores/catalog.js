@@ -13,7 +13,7 @@ export const useCatalogStore = defineStore('catalog', () => {
   const courses = ref([])
   const institutions = ref([])
   const paymentMethods = ref([])
-  const receivingInstitutionsByProvider = ref({})
+  const receivingInstitutions = ref([])
 
   async function fetchSubjects(options = {}) {
     const { data } = await cachedGet('subjects/', {
@@ -55,20 +55,15 @@ export const useCatalogStore = defineStore('catalog', () => {
     return paymentMethods.value
   }
 
-  async function fetchReceivingInstitutions(provider = 'instapay', options = {}) {
-    const normalizedProvider = String(provider || 'instapay').toLowerCase()
+  async function fetchReceivingInstitutions(options = {}) {
     const { data } = await cachedGet('wallet/receiving-institutions/', {
-      params: { provider: normalizedProvider },
       ttlMs: RECEIVING_INSTITUTIONS_CACHE_TTL_MS,
       scope: 'catalog',
-      cacheKey: `wallet/receiving-institutions/${normalizedProvider}`,
+      cacheKey: 'wallet/receiving-institutions',
       ...options,
     })
-    receivingInstitutionsByProvider.value = {
-      ...receivingInstitutionsByProvider.value,
-      [normalizedProvider]: Array.isArray(data) ? data : [],
-    }
-    return receivingInstitutionsByProvider.value[normalizedProvider]
+    receivingInstitutions.value = Array.isArray(data) ? data : []
+    return receivingInstitutions.value
   }
 
   return {
@@ -76,7 +71,7 @@ export const useCatalogStore = defineStore('catalog', () => {
     courses,
     institutions,
     paymentMethods,
-    receivingInstitutionsByProvider,
+    receivingInstitutions,
     fetchSubjects,
     fetchCourses,
     fetchPartnerInstitutions,

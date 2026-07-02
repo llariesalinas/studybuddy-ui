@@ -1,0 +1,769 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Direction M — Studio Motion</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --sb-primary: #00895A;
+    --sb-bg: #F8F9FA;
+    --sb-card-bg: #ffffff;
+    --sb-card-border: #EAEAEA;
+    --sb-text-main: #163127;
+    --sb-text-muted: #6B7280;
+    --sb-dark: #0A1916;
+    --pop-yellow: #FFC94D;
+    --pop-orange: #FF8A5C;
+    --sb-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { background: var(--sb-bg); }
+  body { font-family: 'Inter', system-ui, sans-serif; color: var(--sb-text-main); overflow-x: hidden; }
+
+  /* aurora background — long soft diagonal ribbons, slowly swaying */
+  .bgwash {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden;
+    background: linear-gradient(180deg, #F1FAF6 0%, var(--sb-bg) 40%, #FDF9F1 100%);
+  }
+  .bgwash i { position: absolute; display: block; will-change: transform; }
+  .bgwash .b1 {
+    left: -25vw; top: -14vh; width: 150vw; height: 58vh;
+    background:
+      radial-gradient(42% 58% at 28% 52%, rgba(0,137,90,.18), transparent 70%),
+      radial-gradient(36% 52% at 55% 44%, rgba(43,182,138,.15), transparent 70%),
+      radial-gradient(30% 50% at 78% 56%, rgba(255,201,77,.13), transparent 70%);
+    animation: sway1 36s ease-in-out infinite alternate;
+  }
+  .bgwash .b2 {
+    right: -30vw; top: 20vh; width: 135vw; height: 50vh;
+    background:
+      radial-gradient(40% 55% at 35% 50%, rgba(142,124,244,.11), transparent 70%),
+      radial-gradient(34% 52% at 62% 46%, rgba(255,143,163,.13), transparent 70%);
+    animation: sway2 44s ease-in-out infinite alternate;
+  }
+  .bgwash .b3 {
+    left: -22vw; bottom: -18vh; width: 145vw; height: 52vh;
+    background:
+      radial-gradient(40% 55% at 30% 50%, rgba(255,138,92,.11), transparent 70%),
+      radial-gradient(38% 55% at 64% 46%, rgba(0,137,90,.14), transparent 70%);
+    animation: sway3 40s ease-in-out infinite alternate;
+  }
+  @keyframes sway1 {
+    from { transform: rotate(-14deg); }
+    to { transform: rotate(-9deg) translate(6vw, 5vh) scaleY(1.18); }
+  }
+  @keyframes sway2 {
+    from { transform: rotate(10deg); }
+    to { transform: rotate(14deg) translate(-7vw, -4vh) scaleY(1.14); }
+  }
+  @keyframes sway3 {
+    from { transform: rotate(-6deg); }
+    to { transform: rotate(-2deg) translate(5vw, -3vh) scaleY(1.2); }
+  }
+  body.smooth { overflow: hidden; height: 100vh; } /* replaced by virtual scroll */
+  #scrollspace { position: absolute; top: 0; left: 0; width: 1px; }
+  #smooth { position: fixed; top: 0; left: 0; width: 100%; will-change: transform; }
+  body:not(.smooth) #smooth { position: static; }
+
+  /* custom cursor */
+  #cursor {
+    position: fixed; z-index: 200; width: 14px; height: 14px; border-radius: 50%;
+    background: var(--sb-primary); pointer-events: none; top: 0; left: 0;
+    transform: translate(-50%, -50%); transition: width .25s, height .25s, opacity .25s, background .25s;
+    mix-blend-mode: multiply; opacity: .85;
+  }
+  #cursor.big { width: 56px; height: 56px; background: var(--pop-yellow); opacity: .9; }
+  @media (hover: none) { #cursor { display: none; } }
+
+  nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100; display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 40px; mix-blend-mode: normal;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 900; font-size: 19px; }
+  .brand .mark { width: 34px; height: 34px; background: var(--sb-primary); color: #fff; border-radius: 10px; display: grid; place-items: center; font-size: 18px; }
+  .navlinks { display: flex; gap: 12px; align-items: center; }
+  .btn { font: 600 14.5px 'Inter'; text-decoration: none; padding: 10px 26px; border-radius: 999px; display: inline-block; position: relative; overflow: hidden; }
+  .btn.primary { background: var(--sb-primary); color: #fff; }
+  .btn.outline { border: 1.5px solid rgba(22,49,39,.2); color: var(--sb-text-main); background: rgba(255,255,255,.7); backdrop-filter: blur(6px); }
+  .btn .fill { position: absolute; inset: 0; background: var(--sb-dark); border-radius: inherit; transform: translateY(101%); transition: transform .35s var(--sb-spring); z-index: 0; }
+  .btn span.lbl { position: relative; z-index: 1; }
+  .btn:hover .fill { transform: translateY(0); }
+  .btn.primary:hover { color: #fff; }
+  .back { position: fixed; bottom: 18px; left: 18px; z-index: 160; font-size: 13px; background: #fff; border: 1px solid var(--sb-card-border); padding: 8px 18px; }
+
+  section { position: relative; padding: 0 40px; }
+  .inner { max-width: 1240px; margin: 0 auto; }
+
+  /* HERO — oversized display type, line reveals */
+  .hero { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; padding-top: 80px; }
+  .kick { font-size: 13px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: var(--sb-primary); margin-bottom: 26px; }
+  h1 { font-size: clamp(54px, 8.6vw, 132px); font-weight: 900; letter-spacing: -0.045em; line-height: .96; text-wrap: balance; }
+  h1 .row { display: block; overflow: hidden; }
+  h1 .row > span { display: inline-block; transform: translateY(112%); transition: transform 1s var(--sb-spring); }
+  h1.in .row > span { transform: none; }
+  h1 .row:nth-child(2) > span { transition-delay: .08s; }
+  h1 .row:nth-child(3) > span { transition-delay: .16s; }
+  h1 em { font-style: normal; color: var(--sb-primary); }
+  .hero .sub { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 40px; gap: 40px; flex-wrap: wrap; }
+  .hero .sub p { max-width: 430px; font-size: 17px; line-height: 1.65; color: var(--sb-text-muted); }
+  .scroll-cue { font-size: 12px; letter-spacing: 2.5px; text-transform: uppercase; color: var(--sb-text-muted); display: flex; align-items: center; gap: 10px; }
+  .scroll-cue .bar { width: 1.5px; height: 44px; background: rgba(22,49,39,.25); position: relative; overflow: hidden; }
+  .scroll-cue .bar::after { content: ""; position: absolute; left: 0; right: 0; height: 50%; background: var(--sb-primary); animation: cue 1.6s ease-in-out infinite; }
+  @keyframes cue { 0% { top: -50% } 100% { top: 100% } }
+
+  /* MARQUEE — two identical halves, each with self-contained spacing, so -50% loops seamlessly */
+  .marquee { border-top: 1px solid var(--sb-card-border); border-bottom: 1px solid var(--sb-card-border); padding: 22px 0; overflow: hidden; background: #fff; position: relative; z-index: 1; }
+  .marquee .track { display: flex; width: max-content; animation: mq 26s linear infinite; }
+  .marquee .track > span { font-size: clamp(20px, 2.4vw, 30px); font-weight: 800; letter-spacing: -0.5px; white-space: nowrap; display: flex; align-items: center; gap: 56px; padding-right: 56px; }
+  .marquee .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .marquee .dot.y { background: var(--pop-yellow); }
+  .marquee .dot.p { background: #FF8FA3; }
+  .marquee .dot.o { background: var(--pop-orange); }
+  .marquee .dot.g { background: var(--sb-primary); }
+  .marquee em { font-style: normal; color: var(--sb-primary); }
+  @keyframes mq { to { transform: translateX(-50%); } }
+
+  /* PANELS — full-width reactive cards with parallax illustration */
+  .panels { padding-top: 110px; padding-bottom: 40px; }
+  .panel {
+    display: grid; grid-template-columns: 90px 1fr 1fr; gap: 40px; align-items: center;
+    border-top: 1px solid var(--sb-card-border); padding: 64px 0;
+  }
+  .panel .idx { font-size: 15px; font-weight: 800; color: var(--sb-text-muted); }
+  .panel .idx b { color: var(--sb-primary); }
+  .panel h2 { font-size: clamp(30px, 3.8vw, 52px); font-weight: 900; letter-spacing: -0.03em; line-height: 1.02; margin-bottom: 16px; }
+  .panel h2 .row { display: block; overflow: hidden; }
+  .panel h2 .row > span { display: inline-block; transform: translateY(112%); transition: transform .85s var(--sb-spring); }
+  .panel.in h2 .row > span { transform: none; }
+  .panel p { font-size: 15.5px; line-height: 1.65; color: var(--sb-text-muted); max-width: 430px; }
+  .panel .viz {
+    background: var(--sb-card-bg); border: 1px solid var(--sb-card-border); border-radius: 26px; overflow: hidden;
+    box-shadow: 0 24px 60px rgba(10,25,22,.07);
+    clip-path: inset(12% 6% 12% 6% round 26px);
+    transition: clip-path .9s var(--sb-spring), box-shadow .4s ease;
+    will-change: transform;
+  }
+  .panel.in .viz { clip-path: inset(0 0 0 0 round 26px); }
+  /* each card throws a differently-colored, deeper shadow on hover */
+  .panel:nth-of-type(1) .viz:hover { box-shadow: 0 34px 80px rgba(0,137,90,.22), 0 10px 28px rgba(10,25,22,.10); }
+  .panel:nth-of-type(2) .viz:hover { box-shadow: 0 34px 80px rgba(255,176,46,.30), 0 10px 28px rgba(10,25,22,.10); }
+  .panel:nth-of-type(3) .viz:hover { box-shadow: 0 34px 80px rgba(255,120,70,.28), 0 10px 28px rgba(10,25,22,.10); }
+  .panel .viz .ill { padding: 30px; will-change: transform; }
+  .panel .viz svg { width: 100%; height: auto; display: block; }
+  .char { transform-box: fill-box; transform-origin: center; will-change: transform; }
+
+  /* STATS BAND (numbers count) — its own full-width moment */
+  .countband { background: rgba(0,137,90,.045); border-top: 1px solid var(--sb-card-border); border-bottom: 1px solid var(--sb-card-border); }
+  .countstrip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 48px; padding: 130px 0; }
+  .count { border-left: 3px solid var(--sb-primary); padding-left: 30px; }
+  .count .n { font-size: clamp(54px, 7vw, 96px); font-weight: 900; letter-spacing: -0.04em; line-height: 1; }
+  .count .l { color: var(--sb-text-muted); font-size: 15px; margin-top: 14px; max-width: 220px; line-height: 1.5; }
+
+  /* SECTION HEADS (tools + faq) — masked line reveals like the hero */
+  .tools { padding-top: 40px; }
+  .faqsec { padding-top: 170px; padding-bottom: 150px; }
+  .kick2 { font-size: 13px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: var(--sb-primary); margin-bottom: 18px; display: block; }
+  .tools .head, .faq .head { max-width: 780px; margin-bottom: 84px; }
+  .tools h2, .faq h2 { font-size: clamp(34px, 4.6vw, 64px); font-weight: 900; letter-spacing: -0.035em; line-height: 1; }
+  .tools h2 .row, .faq h2 .row { display: block; overflow: hidden; }
+  .tools h2 .row > span, .faq h2 .row > span { display: inline-block; transform: translateY(112%); transition: transform .9s var(--sb-spring); }
+  .tools.in h2 .row > span, .faq.in h2 .row > span { transform: none; }
+  .tools h2 .row:nth-child(2) > span, .faq h2 .row:nth-child(2) > span { transition-delay: .08s; }
+  .tools .head p, .faq .head p { color: var(--sb-text-muted); font-size: 16.5px; margin-top: 16px; max-width: 540px; line-height: 1.65; }
+
+  /* TOOLS — pinned horizontal rail: page anchors, white slabs ride sideways.
+     Perf: shares the page's single rAF loop, transform-only, travel cached on resize. */
+  .toolstage { height: 300vh; }
+  .toolpin { height: 100vh; display: flex; flex-direction: column; justify-content: center; overflow: hidden; will-change: transform; }
+  .tooltrack { display: flex; gap: 28px; will-change: transform; } /* section supplies the 40px gutters */
+  .tslab {
+    flex: 0 0 60vw; min-height: 30vh; position: relative; overflow: hidden;
+    background: var(--sb-card-bg); border: 1px solid var(--sb-card-border); border-radius: 30px;
+    padding: 46px 48px; display: flex; align-items: center; gap: 40px;
+    box-shadow: 0 24px 60px rgba(10,25,22,.06);
+    transition: box-shadow .35s ease;
+  }
+  .tslab .num {
+    flex: none; pointer-events: none; user-select: none;
+    font-family: Georgia, 'Times New Roman', serif; font-style: italic; font-weight: 700;
+    font-size: clamp(90px, 8.5vw, 140px); line-height: .8; opacity: .2;
+    transform: translateY(6px);
+  }
+  .tslab:nth-child(1) .num { color: var(--sb-primary); }
+  .tslab:nth-child(2) .num { color: #DCA21B; }
+  .tslab:nth-child(3) .num { color: #E0683A; }
+  .tslab:nth-child(4) .num { color: #E26D86; }
+  .tslab:nth-child(1):hover { box-shadow: 0 30px 70px rgba(0,137,90,.20); }
+  .tslab:nth-child(2):hover { box-shadow: 0 30px 70px rgba(255,176,46,.26); }
+  .tslab:nth-child(3):hover { box-shadow: 0 30px 70px rgba(255,120,70,.24); }
+  .tslab:nth-child(4):hover { box-shadow: 0 30px 70px rgba(255,143,163,.26); }
+  .tslab .ttext { flex: 1 1 auto; min-width: 0; }
+  .tslab h3 { font-size: clamp(34px, 3.4vw, 58px); font-weight: 900; letter-spacing: -0.035em; line-height: 1.02; margin-bottom: 16px; }
+  .tslab p { font-size: clamp(17px, 1.5vw, 21px); line-height: 1.6; color: var(--sb-text-muted); max-width: 560px; }
+  .tslab .tviz { flex: none; width: clamp(120px, 11.5vw, 180px); }
+  .tslab .tviz svg { width: 100%; height: auto; display: block; overflow: visible; }
+  .nopin .toolstage { height: auto; }
+  .nopin .toolpin { height: auto; padding: 110px 0 100px; transform: none !important; }
+  .nopin .tooltrack { transform: none !important; flex-wrap: wrap; }
+  .nopin .tslab { flex-basis: 100%; min-height: 0; padding: 44px 36px 40px; }
+
+  /* FAQ ACCORDION */
+  .faq { max-width: 880px; margin: 0 auto; }
+  .faqitem { border-top: 1px solid var(--sb-card-border); opacity: 0; transform: translateY(26px); transition: opacity .6s ease, transform .6s var(--sb-spring); }
+  .faqitem.in { opacity: 1; transform: none; }
+  .faqitem:nth-of-type(2) { transition-delay: .07s; }
+  .faqitem:nth-of-type(3) { transition-delay: .14s; }
+  .faqitem:nth-of-type(4) { transition-delay: .21s; }
+  .faqitem:last-of-type { border-bottom: 1px solid var(--sb-card-border); }
+  .faqq { width: 100%; background: none; border: 0; font: inherit; text-align: left; display: flex; align-items: center; gap: 22px; padding: 38px 4px; cursor: pointer; color: var(--sb-text-main); }
+  .faqq .no { font-size: 13px; font-weight: 800; color: var(--sb-primary); width: 34px; flex: none; }
+  .faqq .q { font-size: clamp(17px, 2vw, 22px); font-weight: 800; letter-spacing: -0.3px; flex: 1; transition: transform .35s var(--sb-spring), color .25s; }
+  .faqq:hover .q { transform: translateX(10px); color: var(--sb-primary); }
+  .faqq .plusw { width: 36px; height: 36px; border-radius: 50%; border: 1.5px solid var(--sb-card-border); display: grid; place-items: center; flex: none; color: var(--sb-text-main); transition: transform .45s var(--sb-spring), background .25s, border-color .25s, color .25s; }
+  .faqitem.open .plusw { transform: rotate(135deg); background: var(--sb-primary); border-color: var(--sb-primary); color: #fff; }
+  .faqa { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .5s var(--sb-spring); }
+  .faqitem.open .faqa { grid-template-rows: 1fr; }
+  .faqa > div { overflow: hidden; }
+  .faqa p { padding: 0 4px 38px 56px; color: var(--sb-text-muted); font-size: 15.5px; line-height: 1.65; max-width: 660px; }
+
+  /* CTA — dark, magnetic button, hover fill */
+  .ctawrap { padding: 40px 40px 120px; }
+  .ctapanel {
+    background: var(--sb-dark); color: #fff; border-radius: 32px; padding: 110px 48px; text-align: center;
+    position: relative; overflow: hidden;
+  }
+  .ctapanel::before { content: ""; position: absolute; inset: 0; background: radial-gradient(520px 360px at 78% 8%, rgba(0,137,90,.4), transparent 70%); }
+  .ctapanel h2 { position: relative; font-size: clamp(38px, 5.6vw, 84px); font-weight: 900; letter-spacing: -0.04em; line-height: .98; }
+  .ctapanel h2 em { font-style: normal; color: var(--pop-yellow); }
+  .ctapanel p { position: relative; color: rgba(255,255,255,.62); margin: 22px 0 38px; font-size: 16px; }
+  .magnet { position: relative; display: inline-block; will-change: transform; }
+  .magnet .btn { font-size: 16px; padding: 16px 44px; }
+
+  footer { padding: 26px 40px 90px; text-align: center; color: var(--sb-text-muted); font-size: 13.5px; }
+
+  .reveal { opacity: 0; transform: translateY(34px); transition: opacity .8s ease, transform .8s var(--sb-spring); }
+  .reveal.in { opacity: 1; transform: none; }
+
+  @media (max-width: 900px) {
+    .panel { grid-template-columns: 1fr; gap: 22px; }
+    .countstrip { grid-template-columns: 1fr; gap: 40px; padding: 90px 0; }
+    .faqsec { padding-top: 110px; padding-bottom: 100px; }
+    .toolstage { height: auto; }
+    .toolpin { height: auto; padding: 110px 0 100px; transform: none !important; }
+    .tooltrack { transform: none !important; flex-direction: column; padding: 0; }
+    .tslab { flex-basis: auto; min-height: 0; padding: 36px 30px; flex-direction: column; align-items: flex-start; gap: 8px; }
+    .tslab .num { font-size: 90px; transform: none; }
+  }
+  @media (max-width: 600px) {
+    .faqa p { padding-left: 4px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    h1 .row > span, .panel h2 .row > span, .tools h2 .row > span, .faq h2 .row > span { transform: none; transition: none; }
+    .panel .viz { clip-path: none; }
+    .reveal, .faqitem { opacity: 1; transform: none; transition: none; }
+    .tooltrack, .toolpin { transform: none !important; }
+    .tooltrack { flex-wrap: wrap; }
+    .tslab { flex-basis: 100%; }
+    .toolstage { height: auto; }
+    .toolpin { height: auto; padding: 110px 0; }
+    .faqa { transition: none; }
+    .marquee .track { animation: none; }
+    .bgwash i { animation: none; }
+    #cursor { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="bgwash"><i class="b1"></i><i class="b2"></i><i class="b3"></i></div>
+<div id="cursor"></div>
+<div id="scrollspace"></div>
+
+<nav>
+  <div class="brand"><span class="mark">S</span> Studybuddy</div>
+  <div class="navlinks">
+    <a class="btn outline hoverable" href="#"><span class="lbl">Log in</span></a>
+    <a class="btn primary hoverable" href="#"><span class="fill"></span><span class="lbl">Get started</span></a>
+  </div>
+</nav>
+
+<div id="smooth">
+  <!-- HERO -->
+  <section class="hero">
+    <div class="inner">
+      <div class="kick reveal in">Peer tutoring — by students, for students</div>
+      <h1 id="heroTitle">
+        <span class="row"><span>Learn it from</span></span>
+        <span class="row"><span>someone who</span></span>
+        <span class="row"><span><em>just aced it.</em></span></span>
+      </h1>
+      <div class="sub">
+        <p class="reveal">Studybuddy matches you with students on your campus who took the class, passed the exam, and can actually explain it. Book a session, study together, get it.</p>
+        <div class="scroll-cue">Scroll <span class="bar"></span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MARQUEE -->
+  <div class="marquee">
+    <div class="track">
+      <span>Get matched <span class="dot y"></span> Study together <span class="dot p"></span> <em>Actually get it</em> <span class="dot o"></span> Tutors earn <span class="dot g"></span> Your campus, your buddies <span class="dot y"></span></span>
+      <span>Get matched <span class="dot y"></span> Study together <span class="dot p"></span> <em>Actually get it</em> <span class="dot o"></span> Tutors earn <span class="dot g"></span> Your campus, your buddies <span class="dot y"></span></span>
+    </div>
+  </div>
+
+  <!-- PANELS -->
+  <section class="panels">
+    <div class="inner">
+
+      <div class="panel">
+        <div class="idx"><b>01</b> / 03</div>
+        <div>
+          <h2><span class="row"><span>Share what</span></span><span class="row"><span>you need.</span></span></h2>
+          <p>Choose a subject, topic, and goal so Studybuddy can surface the right peers.</p>
+        </div>
+        <div class="viz hoverable">
+          <div class="ill" data-depth="0.06">
+            <svg viewBox="0 0 440 240" fill="none">
+              <text x="24" y="48" font-family="Inter" font-size="17" font-weight="800" fill="#163127">What do you need help with?</text>
+              <rect x="24" y="70" width="118" height="40" rx="20" fill="#00895A"/>
+              <text x="46" y="95" font-family="Inter" font-size="14" font-weight="600" fill="#fff">Calculus 2</text>
+              <rect x="154" y="70" width="100" height="40" rx="20" fill="#fff" stroke="#EAEAEA" stroke-width="2"/>
+              <text x="174" y="95" font-family="Inter" font-size="14" fill="#6B7280">Physics</text>
+              <rect x="266" y="70" width="110" height="40" rx="20" fill="#fff" stroke="#EAEAEA" stroke-width="2"/>
+              <text x="284" y="95" font-family="Inter" font-size="14" fill="#6B7280">Chemistry</text>
+              <rect x="24" y="126" width="196" height="40" rx="20" fill="#fff" stroke="#EAEAEA" stroke-width="2"/>
+              <text x="42" y="151" font-family="Inter" font-size="14" fill="#6B7280">Thu, 7:00 PM onwards</text>
+              <path d="M330 168 q 26 14 52 -6" stroke="#FFC94D" stroke-width="3.5" stroke-linecap="round"/>
+              <path d="M372 160 l 11 1 l -4 10" stroke="#FFC94D" stroke-width="3.5" stroke-linecap="round"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="idx"><b>02</b> / 03</div>
+        <div>
+          <h2><span class="row"><span>Match</span></span><span class="row"><span>and book.</span></span></h2>
+          <p>Compare tutor fit, availability, and ratings, then reserve a time that works.</p>
+        </div>
+        <div class="viz hoverable">
+          <div class="ill" data-depth="0.09">
+            <svg viewBox="0 0 440 240" fill="none">
+              <g class="char" data-amp="2.5">
+                <circle cx="120" cy="106" r="32" fill="#fff" stroke="#163127" stroke-width="2.8"/>
+                <path d="M90 99 q 2 -27 30 -27 q 26 0 30 21 M103 76 q 6 -7 12 -8" stroke="#163127" stroke-width="2.4" stroke-linecap="round"/>
+                <path d="M110 102 q 3 4 8 0 M131 102 q 3 4 8 0 M113 118 q 7 5 14 0" stroke="#163127" stroke-width="2.4" stroke-linecap="round"/>
+                <path d="M103 110 l 7 1 M144 111 l -7 -1" stroke="#FF8FA3" stroke-width="2.2" stroke-linecap="round" opacity=".75"/>
+              </g>
+              <g class="char" data-amp="3">
+                <circle cx="320" cy="106" r="32" fill="#fff" stroke="#163127" stroke-width="2.8"/>
+                <path d="M290 99 q 4 -26 30 -26 q 25 0 30 20" stroke="#163127" stroke-width="2.4" stroke-linecap="round"/>
+                <circle cx="348" cy="80" r="6" fill="#163127"/>
+                <path d="M310 102 q 3 4 8 0 M331 102 q 3 4 8 0" stroke="#163127" stroke-width="2.4" stroke-linecap="round"/>
+                <circle cx="313.5" cy="103" r="8" fill="none" stroke="#163127" stroke-width="2"/>
+                <circle cx="334.5" cy="103" r="8" fill="none" stroke="#163127" stroke-width="2"/>
+                <path d="M321 103 h 6 M314 121 q 6 4 12 0" stroke="#163127" stroke-width="2.2" stroke-linecap="round"/>
+              </g>
+              <path d="M158 98 q 62 -44 124 0" stroke="#00895A" stroke-width="3" stroke-linecap="round" stroke-dasharray="7 8"/>
+              <g class="char" data-amp="6">
+                <circle cx="220" cy="64" r="14" fill="#FFC94D"/>
+                <path d="M214 64 l 5 5 l 8 -9" stroke="#163127" stroke-width="2.6" stroke-linecap="round"/>
+              </g>
+              <rect x="150" y="176" width="140" height="34" rx="17" fill="#F4FAF7" stroke="#D8EAE2" stroke-width="2"/>
+              <text x="176" y="198" font-family="Inter" font-size="14" font-weight="800" fill="#00895A">98% match</text>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="idx"><b>03</b> / 03</div>
+        <div>
+          <h2><span class="row"><span>Learn</span></span><span class="row"><span>and track.</span></span></h2>
+          <p>Wrap each session with history, compensation, and progress details in place.</p>
+        </div>
+        <div class="viz hoverable">
+          <div class="ill" data-depth="0.07">
+            <svg viewBox="0 0 440 240" fill="none">
+              <path d="M60 196 h 320" stroke="#163127" stroke-width="2.8" stroke-linecap="round"/>
+              <g class="char" data-amp="2.5">
+                <circle cx="170" cy="120" r="28" fill="#fff" stroke="#163127" stroke-width="2.6"/>
+                <path d="M144 114 q 2 -23 26 -23 q 22 0 26 17" stroke="#163127" stroke-width="2.2" stroke-linecap="round"/>
+                <path d="M161 117 q 3 4 6 0 M180 117 q 3 4 6 0 M163 130 q 6 5 13 0" stroke="#163127" stroke-width="2.2" stroke-linecap="round"/>
+                <path d="M170 148 v 46" stroke="#163127" stroke-width="2.6" stroke-linecap="round"/>
+              </g>
+              <g class="char" data-amp="3">
+                <circle cx="276" cy="120" r="28" fill="#fff" stroke="#163127" stroke-width="2.6"/>
+                <path d="M250 114 q 2 -23 26 -23 q 22 0 26 17" stroke="#163127" stroke-width="2.2" stroke-linecap="round"/>
+                <circle cx="298" cy="96" r="5" fill="#163127"/>
+                <path d="M267 117 q 3 4 6 0 M286 117 q 3 4 6 0 M269 131 q 6 5 13 0" stroke="#163127" stroke-width="2.2" stroke-linecap="round"/>
+                <path d="M276 148 v 46" stroke="#163127" stroke-width="2.6" stroke-linecap="round"/>
+              </g>
+              <rect x="200" y="160" width="48" height="30" rx="5" fill="#FFF7E2" stroke="#163127" stroke-width="2" transform="rotate(-3 224 175)"/>
+              <g class="char" data-amp="5">
+                <circle cx="170" cy="58" r="13" fill="#FFC94D"/>
+                <path d="M164 76 h 12" stroke="#163127" stroke-width="2.4" stroke-linecap="round"/>
+                <path d="M150 42 l -7 -5 M190 42 l 7 -5 M170 38 v -9" stroke="#FF8A5C" stroke-width="2.6" stroke-linecap="round"/>
+              </g>
+              <g class="char" data-amp="4">
+                <text x="316" y="70" font-family="Inter" font-size="16" font-weight="800" fill="#00895A">Got it!</text>
+              </g>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- PLATFORM TOOLS — page anchors while the white rail rides sideways -->
+  <section class="tools">
+    <div class="toolstage" id="toolstage">
+      <div class="toolpin" id="toolpin">
+        <div class="inner" style="width: 100%;">
+          <div class="head">
+            <span class="kick2">Platform tools</span>
+            <h2><span class="row"><span>Everything the</span></span><span class="row"><span>tutoring loop needs.</span></span></h2>
+            <p>Built for peer learning programs that need matching, scheduling, reporting, and fair tutor visibility.</p>
+          </div>
+        </div>
+        <div class="tooltrack" id="tooltrack">
+          <div class="tslab hoverable">
+            <span class="num" aria-hidden="true">01</span>
+            <div class="ttext">
+              <h3>Smart tutor matching</h3>
+              <p>Rank peer tutors by subject fit, ratings, availability, and workload balance.</p>
+            </div>
+            <div class="tviz" aria-hidden="true">
+              <svg viewBox="0 0 200 170" fill="none">
+                <g class="char" data-amp="3">
+                  <circle cx="86" cy="76" r="46" fill="#EAF6F0" stroke="#0A1916" stroke-width="2.5"/>
+                  <path d="M120 110 l 34 34" stroke="#0A1916" stroke-width="3" stroke-linecap="round"/>
+                  <path d="M86 56 l 6.2 13.2 14.6 1.9 -10.7 10 2.8 14.4 -12.9 -7.1 -12.9 7.1 2.8 -14.4 -10.7 -10 14.6 -1.9 z"
+                        fill="#FFC94D" stroke="#0A1916" stroke-width="2.2" stroke-linejoin="round"/>
+                </g>
+                <g class="char" data-amp="5">
+                  <path d="M160 36 q 6 -10 14 -2" stroke="#00895A" stroke-width="2.5" stroke-linecap="round"/>
+                  <path d="M156 50 q 8 -4 12 2" stroke="#00895A" stroke-width="2.5" stroke-linecap="round"/>
+                </g>
+                <g class="char" data-amp="4">
+                  <path d="M22 28 l 3 8 8 1.5 -6 5.6 1.6 8.2 -6.6 -4.4 -6.6 4.4 1.6 -8.2 -6 -5.6 8 -1.5 z"
+                        fill="#FF8FA3" stroke="#0A1916" stroke-width="2" stroke-linejoin="round" opacity=".85"/>
+                </g>
+              </svg>
+            </div>
+          </div>
+          <div class="tslab hoverable">
+            <span class="num" aria-hidden="true">02</span>
+            <div class="ttext">
+              <h3>Flexible scheduling</h3>
+              <p>Book around real tutor availability and keep upcoming sessions easy to scan.</p>
+            </div>
+            <div class="tviz" aria-hidden="true">
+              <svg viewBox="0 0 200 170" fill="none">
+                <g class="char" data-amp="2.5">
+                  <rect x="30" y="34" width="124" height="108" rx="14" fill="#fff" stroke="#0A1916" stroke-width="2.5"/>
+                  <path d="M30 64 h 124" stroke="#0A1916" stroke-width="2.5"/>
+                  <path d="M58 24 v 18 M126 24 v 18" stroke="#0A1916" stroke-width="3" stroke-linecap="round"/>
+                  <circle cx="58" cy="88" r="4" fill="#D7DDD9"/><circle cx="92" cy="88" r="4" fill="#D7DDD9"/><circle cx="126" cy="88" r="4" fill="#D7DDD9"/>
+                  <circle cx="58" cy="116" r="4" fill="#D7DDD9"/><circle cx="126" cy="116" r="4" fill="#D7DDD9"/>
+                  <circle cx="92" cy="116" r="13" fill="rgba(0,137,90,.12)" stroke="#00895A" stroke-width="2.5"/>
+                  <path d="M86.5 116 l 4 4.5 7 -9" stroke="#00895A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                </g>
+                <g class="char" data-amp="4.5">
+                  <circle cx="166" cy="52" r="20" fill="#FFF6E3" stroke="#0A1916" stroke-width="2.5"/>
+                  <path d="M166 42 v 10 l 7 5" stroke="#0A1916" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+                </g>
+              </svg>
+            </div>
+          </div>
+          <div class="tslab hoverable">
+            <span class="num" aria-hidden="true">03</span>
+            <div class="ttext">
+              <h3>Reports and earnings</h3>
+              <p>Track completed sessions, tutor compensation, and program-level performance.</p>
+            </div>
+            <div class="tviz" aria-hidden="true">
+              <svg viewBox="0 0 200 170" fill="none">
+                <g class="char" data-amp="2.5">
+                  <path d="M34 142 q 66 4 132 0" stroke="#0A1916" stroke-width="2.5" stroke-linecap="round"/>
+                  <rect x="48" y="100" width="26" height="40" rx="7" fill="#FFE0E7" stroke="#0A1916" stroke-width="2.5"/>
+                  <rect x="88" y="76" width="26" height="64" rx="7" fill="#FFF0CC" stroke="#0A1916" stroke-width="2.5"/>
+                  <rect x="128" y="50" width="26" height="90" rx="7" fill="#DDF2E9" stroke="#0A1916" stroke-width="2.5"/>
+                </g>
+                <g class="char" data-amp="4">
+                  <path d="M44 64 q 48 -34 96 -22" stroke="#00895A" stroke-width="2.5" stroke-dasharray="2 8" stroke-linecap="round" fill="none"/>
+                  <path d="M132 36 l 12 4 -6 11 z" fill="#00895A"/>
+                </g>
+                <g class="char" data-amp="5">
+                  <circle cx="170" cy="92" r="16" fill="#FFC94D" stroke="#0A1916" stroke-width="2.5"/>
+                  <path d="M170 84 v 16 M164 88 h 9 q 4 0 4 4 t -4 4 h -9" stroke="#0A1916" stroke-width="2" stroke-linecap="round" fill="none"/>
+                </g>
+              </svg>
+            </div>
+          </div>
+          <div class="tslab hoverable">
+            <span class="num" aria-hidden="true">04</span>
+            <div class="ttext">
+              <h3>Balanced workloads</h3>
+              <p>Protect session quality by keeping tutor demand visible before calendars fill up.</p>
+            </div>
+            <div class="tviz" aria-hidden="true">
+              <svg viewBox="0 0 200 170" fill="none">
+                <g class="char" data-amp="2.5">
+                  <path d="M100 50 v 64" stroke="#0A1916" stroke-width="2.5" stroke-linecap="round"/>
+                  <path d="M76 130 q 24 -8 48 0 l -6 12 q -18 -6 -36 0 z" fill="#EAF6F0" stroke="#0A1916" stroke-width="2.5" stroke-linejoin="round"/>
+                  <path d="M40 56 q 60 -12 120 0" stroke="#0A1916" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+                  <circle cx="100" cy="48" r="6" fill="#FFC94D" stroke="#0A1916" stroke-width="2.2"/>
+                </g>
+                <g class="char" data-amp="4">
+                  <path d="M40 56 l -10 26 q 10 8 20 0 z" fill="rgba(0,137,90,.15)" stroke="#0A1916" stroke-width="2.2" stroke-linejoin="round"/>
+                  <circle cx="40" cy="94" r="11" fill="#00895A" stroke="#0A1916" stroke-width="2.2"/>
+                </g>
+                <g class="char" data-amp="4.5">
+                  <path d="M160 56 l -10 26 q 10 8 20 0 z" fill="rgba(255,143,163,.18)" stroke="#0A1916" stroke-width="2.2" stroke-linejoin="round"/>
+                  <circle cx="160" cy="94" r="11" fill="#FF8FA3" stroke="#0A1916" stroke-width="2.2"/>
+                </g>
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- COUNT STRIP -->
+  <section class="countband">
+    <div class="inner countstrip">
+      <div class="count reveal"><div class="n"><span data-count="20">0</span>s</div><div class="l">to tell us what's hurting</div></div>
+      <div class="count reveal"><div class="n"><span data-count="98">0</span>%</div><div class="l">match scores, out in the open</div></div>
+      <div class="count reveal"><div class="n"><span data-count="1">0</span> min</div><div class="l">to join with your student email</div></div>
+    </div>
+  </section>
+
+  <!-- COMMON QUESTIONS -->
+  <section class="faqsec">
+    <div class="inner faq">
+      <div class="head">
+        <span class="kick2">Common questions</span>
+        <h2><span class="row"><span>Asked a lot,</span></span><span class="row"><span>answered straight.</span></span></h2>
+      </div>
+      <div class="faqitem">
+        <button class="faqq hoverable" type="button">
+          <span class="no">01</span>
+          <span class="q">Who can become a tutor?</span>
+          <span class="plusw"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+        </button>
+        <div class="faqa"><div><p>Any student who's strong in a subject. Set your subjects, rate, and availability — you earn per completed session while keeping your own schedule.</p></div></div>
+      </div>
+      <div class="faqitem">
+        <button class="faqq hoverable" type="button">
+          <span class="no">02</span>
+          <span class="q">How much does it cost?</span>
+          <span class="plusw"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+        </button>
+        <div class="faqa"><div><p>Joining is free. You only pay per booked session at the tutor's listed rate, and payments are handled online inside the platform.</p></div></div>
+      </div>
+      <div class="faqitem">
+        <button class="faqq hoverable" type="button">
+          <span class="no">03</span>
+          <span class="q">Can I use it on my campus?</span>
+          <span class="plusw"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+        </button>
+        <div class="faqa"><div><p>Studybuddy is open to any campus. Sign up with your student email and you'll be matched with peers from your own school.</p></div></div>
+      </div>
+      <div class="faqitem">
+        <button class="faqq hoverable" type="button">
+          <span class="no">04</span>
+          <span class="q">What happens if a session falls through?</span>
+          <span class="plusw"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+        </button>
+        <div class="faqa"><div><p>You can reschedule or cancel ahead of time, and session history keeps everything on record. If something goes wrong, support is one tap away.</p></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <div class="ctawrap">
+    <div class="ctapanel">
+      <h2>Your study buddy is<br><em>already on campus.</em></h2>
+      <p>Free with your student email — whether you need the help or you are the help.</p>
+      <span class="magnet"><a class="btn primary hoverable" href="#"><span class="fill"></span><span class="lbl">Get started</span></a></span>
+    </div>
+  </div>
+
+  <footer>Studybuddy — built by students, for students. Bring it to your campus.</footer>
+</div>
+
+<a class="btn back hoverable" href="index.html"><span class="lbl">&larr; All options</span></a>
+
+<script>
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches
+  const fine = matchMedia('(pointer: fine)').matches
+
+  /* ---------- lerp smooth scroll ---------- */
+  const smooth = document.getElementById('smooth')
+  const space = document.getElementById('scrollspace')
+  let target = 0, current = 0, running = false
+
+  function setSpace() { space.style.height = smooth.scrollHeight + 'px' }
+
+  if (!reduced && fine) {
+    document.body.classList.remove('smooth') // keep native scrollbar; we translate content
+    setSpace()
+    new ResizeObserver(setSpace).observe(smooth)
+    smooth.style.position = 'fixed'
+    addEventListener('scroll', () => { target = window.scrollY }, { passive: true })
+    const raf = () => {
+      current += (target - current) * 0.085
+      if (Math.abs(target - current) < 0.05) current = target
+      smooth.style.transform = `translate3d(0, ${-current}px, 0)`
+      parallax()
+      charWiggle(current)
+      toolPin()
+      requestAnimationFrame(raf)
+    }
+    requestAnimationFrame(raf)
+  } else {
+    smooth.style.position = 'static'
+    space.remove()
+    document.body.classList.add('nopin') // native scroll: tools section flows normally
+  }
+
+  /* ---------- custom cursor ---------- */
+  const cur = document.getElementById('cursor')
+  let mx = -100, my = -100, cx = -100, cy = -100
+  if (fine && !reduced) {
+    addEventListener('mousemove', (e) => { mx = e.clientX; my = e.clientY })
+    const curRaf = () => {
+      cx += (mx - cx) * 0.2; cy += (my - cy) * 0.2
+      cur.style.transform = `translate(${cx}px, ${cy}px) translate(-50%, -50%)`
+      requestAnimationFrame(curRaf)
+    }
+    requestAnimationFrame(curRaf)
+    document.querySelectorAll('.hoverable, a').forEach((el) => {
+      el.addEventListener('mouseenter', () => cur.classList.add('big'))
+      el.addEventListener('mouseleave', () => cur.classList.remove('big'))
+    })
+  } else { cur.remove() }
+
+  /* ---------- parallax illustrations ---------- */
+  const depths = [...document.querySelectorAll('[data-depth]')]
+  function parallax() {
+    const vh = innerHeight
+    depths.forEach((el) => {
+      const r = el.getBoundingClientRect()
+      const c = r.top + r.height / 2 - vh / 2
+      el.style.transform = `translateY(${-c * parseFloat(el.dataset.depth)}px)`
+    })
+  }
+  if (reduced) { /* noop */ } else if (!fine) {
+    addEventListener('scroll', () => requestAnimationFrame(() => { parallax(); charWiggle(window.scrollY) }), { passive: true })
+  }
+
+  /* ---------- characters react to scroll ---------- */
+  const chars = [...document.querySelectorAll('.char')]
+  function charWiggle(s) {
+    chars.forEach((c, i) => {
+      const amp = parseFloat(c.dataset.amp || 3)
+      const ph = i * 1.7
+      c.style.transform = `rotate(${Math.sin(s / 55 + ph) * amp}deg) translateY(${Math.cos(s / 48 + ph) * amp * 0.7}px)`
+    })
+  }
+
+  /* ---------- pinned tools rail: page anchors, white slabs ride sideways ----------
+     Perf notes: runs inside the page's single rAF loop (no extra loop), writes one
+     transform per frame, and only measures the track on init/resize — never per frame. */
+  const toolstage = document.getElementById('toolstage')
+  const toolpin = document.getElementById('toolpin')
+  const tooltrack = document.getElementById('tooltrack')
+  const toolsSec = document.querySelector('.tools')
+  let railTravel = 0
+  function measureRail() {
+    // distance the track must travel so the last slab ends flush with the gutter
+    railTravel = Math.max(0, tooltrack.scrollWidth - (innerWidth - 80))
+  }
+  measureRail()
+  addEventListener('resize', measureRail)
+  function toolPin() {
+    const r = toolstage.getBoundingClientRect()
+    const span = r.height - innerHeight
+    if (span <= 0) return // stacked layout (narrow viewport): no pin
+    const y = Math.max(0, Math.min(span, -r.top))
+    toolpin.style.transform = `translate3d(0, ${y}px, 0)`
+    const p = y / span
+    if (p > 0.01) toolsSec.classList.add('in') // head line-masks reveal as the pin engages
+    // brief hold at the start (5%) and end (10%) so the rail settles before release
+    const rp = Math.max(0, Math.min(1, (p - 0.05) / 0.85))
+    tooltrack.style.transform = `translate3d(${(-rp * railTravel).toFixed(1)}px, 0, 0)`
+  }
+
+  /* ---------- per-card cursor tilt, each with its own personality ---------- */
+  const tiltCfg = [
+    { max: 7, dir: 1, z: 0 },     // calm, follows the cursor
+    { max: 12, dir: -1, z: 1.4 }, // eager, leans against the cursor with a twist
+    { max: 9, dir: 1, z: -1.8 },  // relaxed counter-twist
+  ]
+  if (fine && !reduced) {
+    document.querySelectorAll('.panel .viz').forEach((card, i) => {
+      const cfg = tiltCfg[i % tiltCfg.length]
+      card.addEventListener('mousemove', (e) => {
+        const r = card.getBoundingClientRect()
+        const px = (e.clientX - r.left) / r.width - 0.5
+        const py = (e.clientY - r.top) / r.height - 0.5
+        card.style.transition = 'clip-path .9s var(--sb-spring), box-shadow .4s ease, transform .1s linear'
+        card.style.transform =
+          `perspective(900px) rotateX(${(-py * cfg.max * cfg.dir).toFixed(2)}deg)` +
+          ` rotateY(${(px * cfg.max * cfg.dir).toFixed(2)}deg) rotate(${cfg.z}deg) scale(1.025)`
+      })
+      card.addEventListener('mouseleave', () => {
+        card.style.transition = 'clip-path .9s var(--sb-spring), box-shadow .4s ease, transform .6s cubic-bezier(.16,1,.3,1)'
+        card.style.transform = 'none'
+      })
+    })
+  }
+
+  /* ---------- reveals + counters ---------- */
+  const io = new IntersectionObserver((entries) => entries.forEach((e) => {
+    if (!e.isIntersecting) return
+    e.target.classList.add('in')
+    e.target.querySelectorAll('[data-count]').forEach(runCount)
+  }), { threshold: 0.25 })
+  document.querySelectorAll('.reveal, .panel, #heroTitle, .count, .tools, .faq, .faqitem').forEach((el) => io.observe(el))
+
+  /* ---------- FAQ accordion ---------- */
+  document.querySelectorAll('.faqitem').forEach((item) => {
+    item.querySelector('.faqq').addEventListener('click', () => item.classList.toggle('open'))
+  })
+  setTimeout(() => document.getElementById('heroTitle').classList.add('in'), 80)
+
+  function runCount(el) {
+    if (el.dataset.done) return
+    el.dataset.done = '1'
+    const end = parseInt(el.dataset.count, 10)
+    const t0 = performance.now()
+    const tick = (t) => {
+      const p = Math.min(1, (t - t0) / 1100)
+      el.textContent = Math.round(end * (1 - Math.pow(1 - p, 3)))
+      if (p < 1) requestAnimationFrame(tick)
+    }
+    requestAnimationFrame(tick)
+  }
+
+  /* ---------- magnetic CTA ---------- */
+  const mag = document.querySelector('.magnet')
+  if (mag && fine && !reduced) {
+    const strength = 0.35
+    mag.addEventListener('mousemove', (e) => {
+      const r = mag.getBoundingClientRect()
+      const dx = e.clientX - (r.left + r.width / 2)
+      const dy = e.clientY - (r.top + r.height / 2)
+      mag.style.transform = `translate(${dx * strength}px, ${dy * strength}px)`
+    })
+    mag.addEventListener('mouseleave', () => { mag.style.transform = 'translate(0,0)'; mag.style.transition = 'transform .5s cubic-bezier(.16,1,.3,1)'; setTimeout(() => mag.style.transition = '', 500) })
+  }
+</script>
+</body>
+</html>

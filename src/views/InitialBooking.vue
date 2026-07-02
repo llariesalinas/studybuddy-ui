@@ -29,7 +29,7 @@
                   v-for="mode in modes"
                   :key="mode.value"
                   type="button"
-                  class="mode-button sb-btn"
+                  class="mode-button sb-btn sb-pill"
                   :class="{ 'mode-button-active': store.selectedMode === mode.value }"
                   role="radio"
                   :aria-checked="store.selectedMode === mode.value ? 'true' : 'false'"
@@ -49,7 +49,7 @@
             <input
               type="text"
               v-model="store.selectedLocation"
-              class="form-control border-sb shadow-none"
+              class="form-control border-sb shadow-none sb-field"
               placeholder="e.g. Library Room 3, Cafeteria..."
               required
             />
@@ -368,8 +368,7 @@ const findTutor = async () => {
   font-size: 14px;
   font-weight: 700;
   line-height: 1.2;
-  transition: border-color 0.16s ease, box-shadow 0.16s ease, background-color 0.16s ease,
-    transform 0.16s ease;
+  transition: transform var(--sb-t-normal) var(--sb-spring);
 }
 
 .mode-button:hover,

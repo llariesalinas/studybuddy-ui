@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>StudyBuddy Plans Dashboard</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --card: #161b22;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --border: #30363d;
+    --in-progress: #388bfd;
+    --blocked: #f85149;
+    --approved: #d29922;
+    --draft: #6e7681;
+    --done: #2ea043;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    margin: 0;
+    padding: 32px 24px 64px;
+  }
+  h1 { font-size: 22px; margin: 0 0 16px; }
+  .badges { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 32px; font-size: 13px; }
+  .badge { padding: 4px 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--card); }
+  .badge b { font-weight: 600; }
+  .badge.in-progress b { color: var(--in-progress); }
+  .badge.blocked b { color: var(--blocked); }
+  .badge.approved b { color: var(--approved); }
+  .badge.draft b { color: var(--draft); }
+  .badge.done b { color: var(--done); }
+  .group { margin-bottom: 28px; }
+  .group > summary { cursor: pointer; list-style: none; }
+  .group > summary::-webkit-details-marker { display: none; }
+  .group h2 { font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin: 0 0 12px; font-weight: 600; display: inline-block; }
+  .cards { display: flex; flex-direction: column; gap: 8px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; }
+  .card-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .card-title a { color: var(--text); text-decoration: none; font-weight: 600; }
+  .card-title a:hover { text-decoration: underline; }
+  .card-meta { color: var(--muted); font-size: 12px; margin-top: 4px; }
+  .summary { color: var(--muted); font-size: 13px; margin: 8px 0 0; }
+  .status { font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); white-space: nowrap; }
+  .status.in-progress { color: var(--in-progress); }
+  .status.blocked { color: var(--blocked); }
+  .status.approved { color: var(--approved); }
+  .status.draft { color: var(--draft); }
+  .status.done { color: var(--done); }
+</style>
+</head>
+<body>
+  <h1>StudyBuddy Plans Dashboard</h1>
+  <div class="badges">
+    <span class="badge in-progress"><b>3</b> In Progress</span>
+    <span class="badge approved"><b>6</b> Approved</span>
+    <span class="badge draft"><b>2</b> Draft</span>
+    <span class="badge done"><b>47</b> Done</span>
+  </div>
+  <div class="group">
+    <h2>In Progress (3)</h2>
+    <div class="cards">
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-07-01-tutee-verification-overview.md">Tutee verification — overview</a></span><span class="status in-progress">In Progress</span></div>
+        <div class="card-meta">2026-07-01</div>
+        
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-06-14-antigravity-edgecase-scan.md">Antigravity Edge-Case Scan</a></span><span class="status in-progress">In Progress</span></div>
+        <div class="card-meta">2026-06-14</div>
+        <p class="summary">Summary</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-06-14-ongoing-booking-live-status.md">Ongoing-booking live status surface</a></span><span class="status in-progress">In Progress</span></div>
+        <div class="card-meta">2026-06-14</div>
+        <p class="summary">Spec</p>
+      </div>
+    </div>
+  </div>
+  <div class="group">
+    <h2>Approved (6)</h2>
+    <div class="cards">
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-07-02-verification-dev-tools.md">Verification dev tools (self-service profile panel)</a></span><span class="status approved">Approved</span></div>
+        <div class="card-meta">2026-07-02</div>
+        
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-07-01-tutor-application-bugfix-tests.md">Tutor application bugfix tests</a></span><span class="status approved">Approved</span></div>
+        <div class="card-meta">2026-07-01</div>
+        
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-06-17-superadmin-redesign.md">Super Admin Redesign</a></span><span class="status approved">Approved</span></div>
+        <div class="card-meta">2026-06-17</div>
+        <p class="summary">Spec Artifact</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-06-15-chat-banner-card-redesign.md">Chat banner &amp; booking card compact-timeline redesign</a></span><span class="status approved">Approved</span></div>
+        <div class="card-meta">2026-06-15</div>
+        
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-06-08-superadmin-institution-hierarchy.md">SuperAdmin role + per-institution admin scoping</a></span><span class="status approved">Approved</span></div>
+        <div class="card-meta">2026-06-08</div>
+        
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-06-06-frontend-chat-caching.md">Frontend and chat caching</a></span><span class="status approved">Approved</span></div>
+        <div class="card-meta">2026-06-06</div>
+        
+      </div>
+    </div>
+  </div>
+  <div class="group">
+    <h2>Draft (2)</h2>
+    <div class="cards">
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-07-01-tutee-verification-phase4-email-devtools.md">Tutee verification — Phase 4 (email &amp; dev tools)</a></span><span class="status draft">Draft</span></div>
+        <div class="card-meta">2026-07-01</div>
+        
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-06-11-paymongo-proof-of-payment-validation.md">PayMongo proof-of-payment validation</a></span><span class="status draft">Draft</span></div>
+        <div class="card-meta">2026-06-11</div>
+        
+      </div>
+    </div>
+  </div>
+  <details class="group">
+    <summary><h2>Done (47)</h2></summary>
+    <div class="cards">
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-07-02-full-system-integration-merge.md">Full-system integration merge</a></span><span class="status done">Done</span></div>
+        <div class="card-meta">2026-07-02</div>
+        <p class="summary">Summary</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-07-01-tutee-verification-phase1-model.md">Tutee verification — Phase 1 (model)</a></span><span class="status done">Done</span></div>
+        <div class="card-meta">2026-07-01</div>
+        
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-07-01-tutee-verification-phase2-gate.md">Tutee verification — Phase 2 (gate)</a></span><span class="status done">Done</span></div>
+        <div class="card-meta">2026-07-01</div>
+        
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-07-01-tutee-verification-phase3-ui.md">Tutee verification — Phase 3 (UI)</a></span><span class="status done">Done</span></div>
+        <div class="card-meta">2026-07-01</div>
+        
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-07-01-tutor-application-bugfixes.md">Tutor application bugfixes</a></span><span class="status done">Done</span></div>
+        <div class="card-meta">2026-07-01</div>
+        <p class="summary">Summary</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-07-01-tutor-document-renewal-review.md">Tutor document renewal review</a></span><span class="status done">Done</span></div>
+        <div class="card-meta">2026-07-01</div>
+        <p class="summary">Summary</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-07-01-local-cashout-dev-stub.md">Local cash-out dev stub (PayMongo Money Movement)</a></span><span class="status done">Done</span></div>
+        <div class="card-meta">2026-07-01</div>
+        <p class="summary">Summary</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-06-30-support-ticket-escalation.md">Support ticket escalation</a></span><span class="status done">Done</span></div>
+        <div class="card-meta">2026-06-30</div>
+        <p class="summary">Summary Issue #95</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-06-29-cashout-recent-transactions.md">Cash-out recent transactions (remove standalone destinations)</a></span><span class="status done">Done</span></div>
+        <div class="card-meta">2026-06-29</div>
+        <p class="summary">Summary Spec</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-06-28-payout-destination-rail-removal-and-logos.md">Payout destination rail removal and Receiving Institution logos</a></span><span class="status done">Done</span></div>
+        <div class="card-meta">2026-06-28</div>
+        <p class="summary">Summary ADR-0001 ADR-0002</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-06-26-institution-scoped-matching.md">Institution-scoped tutor matching</a></span><span class="status done">Done</span></div>
+        <div class="card-meta">2026-06-26</div>
+        <p class="summary">Spec Handoff</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-06-22-booking-card-glow-avatar-redesign.md">Booking card glow-avatar redesign</a></span><span class="status done">Done</span></div>
+        <div class="card-meta">2026-06-22</div>
+        <p class="summary">Summary Spec</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-06-22-system-background-unification.md">System background unification</a></span><span class="status done">Done</span></div>
+        <div class="card-meta">2026-06-22</div>
+        <p class="summary">Summary Spec Preview</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-06-21-feel-haptics-unification.md">Unified feel &amp; haptics (Balanced calibration)</a></span><span class="status done">Done</span></div>
+        <div class="card-meta">2026-06-21</div>
+        <p class="summary">Summary Spec Reference</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-06-21-admin-dashboard-redesign.md">Institutional Admin dashboard redesign (Phase 1)</a></span><span class="status done">Done</span></div>
+        <div class="card-meta">2026-06-21</div>
+        <p class="summary">Summary Spec Preview</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-06-21-tutor-profile-realtime-image-compression.md">Tutor profile real-time reflection + avatar compression</a></span><span class="status done">Done</span></div>
+        <div class="card-meta">2026-06-21</div>
+        <p class="summary">Summary Spec</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-06-15-session-details-alive-redesign.md">Session Details "alive" redesign (tutee + tutor)</a></span><span class="status done">Done</span></div>
+        <div class="card-meta">2026-06-15</div>
+        <p class="summary">Summary Reference</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-06-15-tutor-details-slot-clarity.md">Tutor details slot range clarity</a></span><span class="status done">Implemented (pending preview)</span></div>
+        <div class="card-meta">2026-06-15</div>
+        
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-06-15-schedule-am-pm-rail.md">Tutor schedule AM/PM period rail</a></span><span class="status done">Done</span></div>
+        <div class="card-meta">2026-06-15</div>
+        <p class="summary">Summary</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-06-14-tutor-wallet-cash-in.md">Tutor wallet cash-in (top-up)</a></span><span class="status done">Done</span></div>
+        <div class="card-meta">2026-06-14</div>
+        <p class="summary">Summary</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-06-14-chat-accept-reject.md">Chat accept/reject pending sessions</a></span><span class="status done">Done</span></div>
+        <div class="card-meta">2026-06-14</div>
+        <p class="summary">Summary</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-06-11-landing-page-redesign.md">Landing page redesign — Studio Motion</a></span><span class="status done">Done</span></div>
+        <div class="card-meta">2026-06-11</div>
+        <p class="summary">Summary</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-06-08-online-only-payments.md">Online-only payments + proof of payment</a></span><span class="status done">Done</span></div>
+        <div class="card-meta">2026-06-08</div>
+        <p class="summary">Summary</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-06-08-venue-session-checkin-modals.md">Venue confirmation + mid-session check-in modals</a></span><span class="status done">Done</span></div>
+        <div class="card-meta">2026-06-08</div>
+        <p class="summary">Implemented session check-in tracking + tutee/tutor UI</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-06-07-dashboard-load-performance.md">Dashboard load performance (backend)</a></span><span class="status done">Done</span></div>
+        <div class="card-meta">2026-06-07</div>
+        <p class="summary">Summary</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-06-07-chat-partner-context-display.md">Chat partner context display</a></span><span class="status done">Done</span></div>
+        <div class="card-meta">2026-06-07</div>
+        <p class="summary">Summary</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-06-07-support-chat-naming.md">Support chat naming</a></span><span class="status done">Done</span></div>
+        <div class="card-meta">2026-06-07</div>
+        <p class="summary">Summary</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-06-07-dashboard-card-stability.md">Dashboard card stability</a></span><span class="status done">Done</span></div>
+        <div class="card-meta">2026-06-07</div>
+        <p class="summary">Summary</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-06-07-notifications-timeout-fix.md">Notifications timeout fix</a></span><span class="status done">Done</span></div>
+        <div class="card-meta">2026-06-07</div>
+        <p class="summary">Summary</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-06-07-dashboard-top5-redis-cache.md">Dashboard top 5 Redis cache</a></span><span class="status done">Done</span></div>
+        <div class="card-meta">2026-06-07</div>
+        <p class="summary">Summary</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title">Global aurora/blur performance cleanup</span><span class="status done">Done</span></div>
+        <div class="card-meta">2026-06-07</div>
+        <p class="summary">Summary</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-06-07-aurora-performance-fix.md">Aurora performance fix — static gradient</a></span><span class="status done">Done</span></div>
+        <div class="card-meta">2026-06-07</div>
+        <p class="summary">Summary</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-06-07-aurora-hue-restoration.md">Aurora hue restoration (performant)</a></span><span class="status done">Done</span></div>
+        <div class="card-meta">2026-06-07</div>
+        <p class="summary">Summary</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-06-06-resend-email-integration.md">Resend email integration</a></span><span class="status done">Done</span></div>
+        <div class="card-meta">2026-06-06</div>
+        <p class="summary">Summary</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-06-06-email-async-hardening.md">Email system hardening (async queue + resilience)</a></span><span class="status done">Done</span></div>
+        <div class="card-meta">2026-06-06</div>
+        <p class="summary">Summary</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-06-06-dashboard-recommendations.md">Dashboard recommendations</a></span><span class="status done">Done</span></div>
+        <div class="card-meta">2026-06-06</div>
+        <p class="summary">Summary</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-06-03-replace-selects-with-sbselectmodal.md">Replace native selects with SbSelectModal</a></span><span class="status done">Done</span></div>
+        <div class="card-meta">2026-06-03</div>
+        <p class="summary">Summary</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-06-02-session-cancellation.md">Phase B — Session cancellation (both roles)</a></span><span class="status done">Done</span></div>
+        <div class="card-meta">2026-06-02</div>
+        <p class="summary">Summary</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-06-02-booking-tutor-load-fix.md">Phase A — Booking "tutors won't load" fix</a></span><span class="status done">Done</span></div>
+        <div class="card-meta">2026-06-02</div>
+        <p class="summary">Summary</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-05-26-system-wide-darkmode-toggle.md">System-wide dark mode toggle</a></span><span class="status done">Done</span></div>
+        <div class="card-meta">2026-05-26</div>
+        
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-05-25-tutor-profile-redesign.md">Tutor profile redesign</a></span><span class="status done">Done</span></div>
+        <div class="card-meta">2026-05-25</div>
+        
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-05-25-tutee-profile-redesign.md">Tutee profile redesign</a></span><span class="status done">Done</span></div>
+        <div class="card-meta">2026-05-25</div>
+        
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-05-25-tutee-profile-avatar-url.md">Tutee profile avatar URL (backend)</a></span><span class="status done">Done</span></div>
+        <div class="card-meta">2026-05-25</div>
+        
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-05-25-haptics-rollout.md">Feel &amp; haptics rollout</a></span><span class="status done">Done</span></div>
+        <div class="card-meta">2026-05-25</div>
+        
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-05-25-animation-system-expansion.md">Animation system expansion</a></span><span class="status done">Done</span></div>
+        <div class="card-meta">2026-05-25</div>
+        
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-05-23-sidebar-notification-badge.md">Sidebar notification count badge</a></span><span class="status done">Done</span></div>
+        <div class="card-meta">2026-05-23</div>
+        
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title"><a href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-05-08-auth-pages-redesign.md">Auth pages redesign</a></span><span class="status done">Done</span></div>
+        <div class="card-meta">2026-05-08</div>
+        
+      </div>
+    </div>
+  </details>
+</body>
+</html>

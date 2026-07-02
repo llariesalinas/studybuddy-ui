@@ -769,6 +769,18 @@ export const useChatStore = defineStore('chat', () => {
     return response.data
   }
 
+  async function acceptBooking(bookingId) {
+    const response = await api.post(`bookings/${bookingId}/approve/`)
+    await fetchRooms({ force: true })
+    return response.data
+  }
+
+  async function rejectBooking(bookingId) {
+    const response = await api.post(`bookings/${bookingId}/reject/`)
+    await fetchRooms({ force: true })
+    return response.data
+  }
+
   function getRoomPartnerName(room) {
     if (room?.room_type === 'support') {
       return 'Customer Support'
@@ -838,6 +850,8 @@ export const useChatStore = defineStore('chat', () => {
     retryMessage,
     sendTyping,
     updatePendingLocation,
+    acceptBooking,
+    rejectBooking,
     getRoomPartnerName,
     disconnectRoom,
     disconnectAll,

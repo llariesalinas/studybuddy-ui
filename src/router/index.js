@@ -1,6 +1,9 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useProfileStore } from '@/stores/profile'
+import { needsTutorApplicationLockout, needsTuteeVerificationBlock } from '@/services/tutorApplicationState'
+
+const TUTEE_BOOKING_FLOW_ROUTE_NAMES = ['book', 'tutors', 'tutor-details']
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -111,7 +114,7 @@ const router = createRouter({
       path: '/application-status',
       name: 'tutor-application-status',
       component: () => import('@/views/TutorApplicationStatus.vue'),
-      meta: { requiresAuth: true, role: 'Tutor' }
+      meta: { requiresAuth: true, role: ['Tutor', 'Tutee'] }
     },
     {
       path: '/tch-dashboard',
@@ -220,6 +223,12 @@ const router = createRouter({
       component: () => import('@/views/SuperAdminReports.vue'),
       meta: { requiresAuth: true, role: 'SuperAdmin' }
     },
+    {
+      path: '/superadmin/support',
+      name: 'superadmin-support',
+      component: () => import('@/views/AdminSupport.vue'),
+      meta: { requiresAuth: true, role: 'SuperAdmin' }
+    },
 
     // ---------- SHARED ROUTES ----------
     {
@@ -283,12 +292,40 @@ router.beforeEach(async (to, from, next) => {
       }
     }
 
-    const applicationStatus = profileStore.applicationStatus || authStore.user?.application_status || null
-    const hasUnapprovedTutorApplication =
+    const tutorApplicationSnapshot = {
+      application_status: profileStore.applicationStatus || authStore.user?.application_status || null,
+      tutor_renewal_status: profileStore.loaded
+        ? profileStore.tutorRenewalStatus
+        : authStore.user?.tutor_renewal_status || null,
+      tutor_renewal_required: profileStore.loaded
+        ? profileStore.tutorRenewalRequired
+        : authStore.user?.tutor_renewal_required || false,
+    }
+    // Global lockout applies only to never-approved tutors. A renewal-due/pending/rejected tutor
+    // is forward-only (blocked only at booking/accept surfaces, enforced server-side) — see
+    // docs/plans/2026-07-01-tutee-verification-phase2-gate.md.
+    const hasTutorApplicationLockout =
       normalizedUserRole === 'tutor' &&
-      ['pending', 'rejected'].includes(applicationStatus)
+      needsTutorApplicationLockout(tutorApplicationSnapshot)
 
-    if (hasUnapprovedTutorApplication && to.name !== 'tutor-application-status') {
+    if (hasTutorApplicationLockout && to.name !== 'tutor-application-status') {
+      return next('/application-status')
+    }
+
+    // Tutee booking-flow gate: forward-only, only blocks the booking-creation routes, and only once
+    // the server-side grace period has actually ended — see
+    // docs/plans/2026-07-01-tutee-verification-phase3-ui.md.
+    const tuteeApplicationSnapshot = {
+      application_status: profileStore.applicationStatus || null,
+      document_renewal_status: profileStore.renewalStatus || null,
+      tutee_verification_enforced: profileStore.tuteeVerificationEnforced,
+    }
+    const hasTuteeVerificationBlock =
+      normalizedUserRole === 'tutee' &&
+      TUTEE_BOOKING_FLOW_ROUTE_NAMES.includes(to.name) &&
+      needsTuteeVerificationBlock(tuteeApplicationSnapshot)
+
+    if (hasTuteeVerificationBlock) {
       return next('/application-status')
     }
 

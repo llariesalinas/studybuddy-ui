@@ -1,0 +1,923 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>StudyBuddy Schedule AM PM Preview</title>
+    <style>
+      :root {
+        --sb-primary: #00895a;
+        --sb-primary-hover: #00704a;
+        --sb-dark: #0a1916;
+        --sb-canvas: #ffffff;
+        --sb-parchment: #f5f5f7;
+        --sb-ink: #1d1d1f;
+        --sb-muted: #6e6e73;
+        --sb-divider: #f0f0f0;
+        --sb-green-tint: #edf7f3;
+        --sb-green-border: #b8dece;
+        --sb-slot: #e1f5ee;
+        --sb-slot-strong: #d3eee4;
+        --sb-soft-red: #fff2f0;
+        --sb-red: #b42318;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--sb-parchment);
+        color: var(--sb-ink);
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      .page {
+        width: min(1560px, calc(100% - 48px));
+        margin: 0 auto;
+        padding: 34px 0 48px;
+      }
+
+      .preview-header {
+        display: flex;
+        justify-content: space-between;
+        gap: 24px;
+        align-items: flex-end;
+        margin-bottom: 22px;
+      }
+
+      .preview-kicker {
+        margin: 0 0 8px;
+        color: var(--sb-primary);
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 0;
+        color: #10251f;
+        font-size: 34px;
+        line-height: 1.12;
+        font-weight: 750;
+      }
+
+      .preview-summary {
+        margin: 8px 0 0;
+        max-width: 720px;
+        color: var(--sb-muted);
+        font-size: 15px;
+        line-height: 1.55;
+      }
+
+      .recommendation {
+        min-width: 260px;
+        padding: 13px 16px;
+        border: 1px solid var(--sb-green-border);
+        border-radius: 16px;
+        background: var(--sb-green-tint);
+        color: #12483b;
+        font-size: 13px;
+        line-height: 1.45;
+      }
+
+      .recommendation strong {
+        color: #063a30;
+      }
+
+      .design-stack {
+        display: grid;
+        gap: 28px;
+      }
+
+      .design-card {
+        overflow: hidden;
+        border: 1px solid #e8e8e8;
+        border-radius: 18px;
+        background: var(--sb-canvas);
+        box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+      }
+
+      .design-intro {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 18px;
+        align-items: start;
+        padding: 22px 24px 0;
+      }
+
+      .design-title {
+        margin: 0 0 6px;
+        color: #10251f;
+        font-size: 20px;
+        font-weight: 750;
+      }
+
+      .design-copy {
+        margin: 0;
+        color: var(--sb-muted);
+        font-size: 13px;
+        line-height: 1.5;
+      }
+
+      .clarity-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 28px;
+        padding: 6px 12px;
+        border-radius: 999px;
+        background: var(--sb-dark);
+        color: #ffffff;
+        font-size: 11px;
+        font-weight: 750;
+        white-space: nowrap;
+      }
+
+      .schedule-card {
+        margin: 18px 24px 24px;
+        padding: 24px;
+        border: 1px solid #eef1ef;
+        border-radius: 18px;
+        background: #ffffff;
+      }
+
+      .schedule-header {
+        margin-bottom: 22px;
+      }
+
+      .schedule-title {
+        margin: 0;
+        color: #163127;
+        font-size: 17px;
+        font-weight: 750;
+      }
+
+      .week-toolbar {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 24px;
+      }
+
+      .week-nav {
+        display: flex;
+        gap: 10px;
+      }
+
+      .week-nav-btn {
+        width: 40px;
+        height: 40px;
+        border: 0;
+        border-radius: 14px;
+        background: #edf6f1;
+        color: var(--sb-primary-hover);
+        font-size: 20px;
+        font-weight: 500;
+      }
+
+      .week-toolbar-copy {
+        display: grid;
+        gap: 2px;
+      }
+
+      .month-label {
+        margin: 0;
+        color: #6d8178;
+        font-size: 13px;
+        font-weight: 650;
+      }
+
+      .week-range {
+        margin: 0;
+        text-align: center;
+        color: #163127;
+        font-size: 17px;
+        font-weight: 750;
+      }
+
+      .week-columns-shell {
+        overflow-x: auto;
+        padding-bottom: 3px;
+      }
+
+      .week-columns {
+        display: grid;
+        grid-template-columns: repeat(7, minmax(148px, 1fr));
+        gap: 14px;
+        min-width: 1120px;
+        align-items: start;
+      }
+
+      .day-column {
+        display: grid;
+        gap: 8px;
+        min-width: 0;
+      }
+
+      .day-heading {
+        display: grid;
+        grid-template-rows: auto auto 22px auto auto;
+        gap: 6px;
+        justify-items: center;
+        text-align: center;
+      }
+
+      .day-name {
+        color: #687684;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .day-date {
+        color: #163127;
+        font-size: 13px;
+        font-weight: 800;
+      }
+
+      .slot-count-row {
+        min-height: 22px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .slot-count-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 4px 8px;
+        border-radius: 999px;
+        background: #e1f5ee;
+        color: #085041;
+        font-size: 11px;
+        font-weight: 800;
+        line-height: 1;
+      }
+
+      .day-block-date-btn,
+      .day-add-slot-btn {
+        width: 100%;
+        min-height: 34px;
+        border-radius: 11px;
+        font-size: 12px;
+        font-weight: 750;
+      }
+
+      .day-block-date-btn {
+        border: 1px dashed #f3b7b0;
+        background: var(--sb-soft-red);
+        color: var(--sb-red);
+      }
+
+      .day-add-slot-btn {
+        border: 1px dashed var(--sb-green-border);
+        background: var(--sb-green-tint);
+        color: var(--sb-primary-hover);
+      }
+
+      .day-availability-bar {
+        height: 3px;
+        border-radius: 999px;
+        background: var(--sb-primary);
+      }
+
+      .day-slots {
+        display: grid;
+        gap: 10px;
+      }
+
+      .empty-day-zone {
+        min-height: 44px;
+        display: grid;
+        place-items: center;
+        padding: 10px;
+        border: 1.5px dashed #9fe1cb;
+        border-radius: 8px;
+        color: #7a8f86;
+        font-size: 12px;
+      }
+
+      .slot-pill {
+        min-height: 46px;
+        width: 100%;
+        border: 1px solid transparent;
+        border-radius: 999px;
+        background: var(--sb-slot);
+        color: #085041;
+        font-weight: 800;
+      }
+
+      .design-a .slot-pill {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 8px 10px 8px 15px;
+        text-align: left;
+      }
+
+      .design-a .slot-time {
+        min-width: 0;
+        line-height: 1.1;
+        font-size: 13px;
+      }
+
+      .period-chip {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 35px;
+        padding: 5px 8px;
+        border-radius: 999px;
+        background: #ffffff;
+        color: var(--sb-primary-hover);
+        border: 1px solid var(--sb-green-border);
+        font-size: 11px;
+        font-weight: 850;
+        line-height: 1;
+      }
+
+      .period-chip.pm {
+        background: #113a31;
+        color: #ffffff;
+        border-color: #113a31;
+      }
+
+      .design-b .day-slots {
+        gap: 12px;
+      }
+
+      .slot-group {
+        display: grid;
+        gap: 8px;
+      }
+
+      .slot-group-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 24px;
+        padding: 0 2px;
+        color: #315447;
+        font-size: 11px;
+        font-weight: 850;
+        text-transform: uppercase;
+      }
+
+      .slot-group-header span:last-child {
+        color: #7a8f86;
+        font-size: 10px;
+        font-weight: 750;
+        text-transform: none;
+      }
+
+      .design-b .slot-pill {
+        display: grid;
+        align-content: center;
+        min-height: 42px;
+        padding: 8px 12px;
+        border-radius: 14px;
+        text-align: left;
+      }
+
+      .design-b .slot-pill.pm-slot {
+        background: var(--sb-slot-strong);
+      }
+
+      .design-b .time-main {
+        font-size: 13px;
+        line-height: 1.2;
+      }
+
+      .design-c .slot-pill {
+        display: grid;
+        grid-template-columns: 42px 1fr;
+        align-items: stretch;
+        min-height: 48px;
+        overflow: hidden;
+        padding: 0;
+        text-align: left;
+      }
+
+      .period-rail {
+        display: grid;
+        place-items: center;
+        background: #ffffff;
+        border-right: 1px solid var(--sb-green-border);
+        color: var(--sb-primary-hover);
+        font-size: 11px;
+        font-weight: 900;
+      }
+
+      .pm-slot .period-rail {
+        background: #113a31;
+        border-right-color: #113a31;
+        color: #ffffff;
+      }
+
+      .slot-rail-content {
+        display: grid;
+        align-content: center;
+        gap: 2px;
+        padding: 8px 12px;
+      }
+
+      .slot-rail-time {
+        color: #063a30;
+        font-size: 14px;
+        font-weight: 850;
+        line-height: 1;
+      }
+
+      .slot-rail-sub {
+        color: #5f776e;
+        font-size: 11px;
+        font-weight: 650;
+      }
+
+      @media (max-width: 920px) {
+        .page {
+          width: min(100% - 28px, 1560px);
+          padding-top: 24px;
+        }
+
+        .preview-header,
+        .design-intro,
+        .week-toolbar {
+          grid-template-columns: 1fr;
+        }
+
+        .preview-header {
+          align-items: start;
+        }
+
+        .week-range {
+          text-align: left;
+        }
+
+        .schedule-card {
+          margin-inline: 14px;
+          padding: 16px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <header class="preview-header">
+        <div>
+          <p class="preview-kicker">Schedule time clarity</p>
+          <h1>Three AM / PM treatments for weekly availability</h1>
+          <p class="preview-summary">
+            These keep the existing StudyBuddy schedule structure, but remove the current ambiguity around entries like
+            01:30 - 02:00 by making the period visible at scan speed.
+          </p>
+        </div>
+        <aside class="recommendation">
+          <strong>My pick: Design 1.</strong> It is the smallest change, fits the current pill layout, and makes every slot clear without adding more vertical groups.
+        </aside>
+      </header>
+
+      <section class="design-stack">
+        <article class="design-card design-a">
+          <div class="design-intro">
+            <div>
+              <h2 class="design-title">Design 1: Explicit AM / PM Pills</h2>
+              <p class="design-copy">
+                Converts each slot to 12-hour time and adds a high-contrast AM or PM chip on the right. Best when we want maximum clarity with minimal layout disruption.
+              </p>
+            </div>
+            <span class="clarity-badge">Recommended</span>
+          </div>
+
+          <div class="schedule-card">
+            <div class="schedule-header">
+              <h3 class="schedule-title">Weekly Availability</h3>
+            </div>
+            <div class="week-toolbar">
+              <div class="week-nav">
+                <button class="week-nav-btn" type="button">&lsaquo;</button>
+                <button class="week-nav-btn" type="button">&rsaquo;</button>
+              </div>
+              <div class="week-toolbar-copy">
+                <p class="month-label">June 2026</p>
+                <p class="week-range">Jun 15-21, 2026</p>
+              </div>
+            </div>
+
+            <div class="week-columns-shell">
+              <div class="week-columns">
+                <div class="day-column">
+                  <div class="day-heading">
+                    <div class="day-name">Mon</div>
+                    <div class="day-date">Jun 15</div>
+                    <div class="slot-count-row"></div>
+                    <button class="day-block-date-btn" type="button">Block Date</button>
+                    <button class="day-add-slot-btn" type="button">+ Add Slot</button>
+                  </div>
+                  <div class="day-availability-bar"></div>
+                  <div class="day-slots">
+                    <div class="empty-day-zone">No slots yet</div>
+                  </div>
+                </div>
+
+                <div class="day-column">
+                  <div class="day-heading">
+                    <div class="day-name">Tue</div>
+                    <div class="day-date">Jun 16</div>
+                    <div class="slot-count-row"></div>
+                    <button class="day-block-date-btn" type="button">Block Date</button>
+                    <button class="day-add-slot-btn" type="button">+ Add Slot</button>
+                  </div>
+                  <div class="day-availability-bar"></div>
+                  <div class="day-slots">
+                    <div class="empty-day-zone">No slots yet</div>
+                  </div>
+                </div>
+
+                <div class="day-column">
+                  <div class="day-heading">
+                    <div class="day-name">Wed</div>
+                    <div class="day-date">Jun 17</div>
+                    <div class="slot-count-row"><span class="slot-count-badge">6</span></div>
+                    <button class="day-block-date-btn" type="button">Block Date</button>
+                    <button class="day-add-slot-btn" type="button">+ Add Slot</button>
+                  </div>
+                  <div class="day-availability-bar"></div>
+                  <div class="day-slots">
+                    <button class="slot-pill" type="button"><span class="slot-time">9:00 - 9:30</span><span class="period-chip">AM</span></button>
+                    <button class="slot-pill" type="button"><span class="slot-time">9:30 - 10:00</span><span class="period-chip">AM</span></button>
+                    <button class="slot-pill" type="button"><span class="slot-time">10:00 - 10:30</span><span class="period-chip">AM</span></button>
+                    <button class="slot-pill" type="button"><span class="slot-time">10:30 - 11:00</span><span class="period-chip">AM</span></button>
+                    <button class="slot-pill" type="button"><span class="slot-time">11:00 - 11:30</span><span class="period-chip">AM</span></button>
+                    <button class="slot-pill" type="button"><span class="slot-time">11:30 AM - 12:00 PM</span><span class="period-chip">AM</span></button>
+                  </div>
+                </div>
+
+                <div class="day-column">
+                  <div class="day-heading">
+                    <div class="day-name">Thu</div>
+                    <div class="day-date">Jun 18</div>
+                    <div class="slot-count-row"><span class="slot-count-badge">2</span></div>
+                    <button class="day-block-date-btn" type="button">Block Date</button>
+                    <button class="day-add-slot-btn" type="button">+ Add Slot</button>
+                  </div>
+                  <div class="day-availability-bar"></div>
+                  <div class="day-slots">
+                    <button class="slot-pill" type="button"><span class="slot-time">10:30 - 11:00</span><span class="period-chip">AM</span></button>
+                    <button class="slot-pill" type="button"><span class="slot-time">12:00 - 12:30</span><span class="period-chip pm">PM</span></button>
+                  </div>
+                </div>
+
+                <div class="day-column">
+                  <div class="day-heading">
+                    <div class="day-name">Fri</div>
+                    <div class="day-date">Jun 19</div>
+                    <div class="slot-count-row"><span class="slot-count-badge">2</span></div>
+                    <button class="day-block-date-btn" type="button">Block Date</button>
+                    <button class="day-add-slot-btn" type="button">+ Add Slot</button>
+                  </div>
+                  <div class="day-availability-bar"></div>
+                  <div class="day-slots">
+                    <button class="slot-pill" type="button"><span class="slot-time">1:30 - 2:00</span><span class="period-chip pm">PM</span></button>
+                    <button class="slot-pill" type="button"><span class="slot-time">2:00 - 2:30</span><span class="period-chip pm">PM</span></button>
+                  </div>
+                </div>
+
+                <div class="day-column">
+                  <div class="day-heading">
+                    <div class="day-name">Sat</div>
+                    <div class="day-date">Jun 20</div>
+                    <div class="slot-count-row"><span class="slot-count-badge">3</span></div>
+                    <button class="day-block-date-btn" type="button">Block Date</button>
+                    <button class="day-add-slot-btn" type="button">+ Add Slot</button>
+                  </div>
+                  <div class="day-availability-bar"></div>
+                  <div class="day-slots">
+                    <button class="slot-pill" type="button"><span class="slot-time">7:00 - 7:30</span><span class="period-chip">AM</span></button>
+                    <button class="slot-pill" type="button"><span class="slot-time">7:30 - 8:00</span><span class="period-chip">AM</span></button>
+                    <button class="slot-pill" type="button"><span class="slot-time">8:00 - 8:30</span><span class="period-chip">AM</span></button>
+                  </div>
+                </div>
+
+                <div class="day-column">
+                  <div class="day-heading">
+                    <div class="day-name">Sun</div>
+                    <div class="day-date">Jun 21</div>
+                    <div class="slot-count-row"><span class="slot-count-badge">4</span></div>
+                    <button class="day-block-date-btn" type="button">Block Date</button>
+                    <button class="day-add-slot-btn" type="button">+ Add Slot</button>
+                  </div>
+                  <div class="day-availability-bar"></div>
+                  <div class="day-slots">
+                    <button class="slot-pill" type="button"><span class="slot-time">1:30 - 2:00</span><span class="period-chip pm">PM</span></button>
+                    <button class="slot-pill" type="button"><span class="slot-time">2:00 - 2:30</span><span class="period-chip pm">PM</span></button>
+                    <button class="slot-pill" type="button"><span class="slot-time">2:30 - 3:00</span><span class="period-chip pm">PM</span></button>
+                    <button class="slot-pill" type="button"><span class="slot-time">3:00 - 3:30</span><span class="period-chip pm">PM</span></button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="design-card design-b">
+          <div class="design-intro">
+            <div>
+              <h2 class="design-title">Design 2: AM / PM Grouped Lanes</h2>
+              <p class="design-copy">
+                Adds small Morning and Afternoon group labels inside each day. This is strongest when tutors often have mixed morning and afternoon availability on the same date.
+              </p>
+            </div>
+            <span class="clarity-badge">Best for dense days</span>
+          </div>
+
+          <div class="schedule-card">
+            <div class="schedule-header">
+              <h3 class="schedule-title">Weekly Availability</h3>
+            </div>
+            <div class="week-toolbar">
+              <div class="week-nav">
+                <button class="week-nav-btn" type="button">&lsaquo;</button>
+                <button class="week-nav-btn" type="button">&rsaquo;</button>
+              </div>
+              <div class="week-toolbar-copy">
+                <p class="month-label">June 2026</p>
+                <p class="week-range">Jun 15-21, 2026</p>
+              </div>
+            </div>
+
+            <div class="week-columns-shell">
+              <div class="week-columns">
+                <div class="day-column">
+                  <div class="day-heading">
+                    <div class="day-name">Mon</div>
+                    <div class="day-date">Jun 15</div>
+                    <div class="slot-count-row"></div>
+                    <button class="day-block-date-btn" type="button">Block Date</button>
+                    <button class="day-add-slot-btn" type="button">+ Add Slot</button>
+                  </div>
+                  <div class="day-availability-bar"></div>
+                  <div class="day-slots"><div class="empty-day-zone">No slots yet</div></div>
+                </div>
+
+                <div class="day-column">
+                  <div class="day-heading">
+                    <div class="day-name">Tue</div>
+                    <div class="day-date">Jun 16</div>
+                    <div class="slot-count-row"></div>
+                    <button class="day-block-date-btn" type="button">Block Date</button>
+                    <button class="day-add-slot-btn" type="button">+ Add Slot</button>
+                  </div>
+                  <div class="day-availability-bar"></div>
+                  <div class="day-slots"><div class="empty-day-zone">No slots yet</div></div>
+                </div>
+
+                <div class="day-column">
+                  <div class="day-heading">
+                    <div class="day-name">Wed</div>
+                    <div class="day-date">Jun 17</div>
+                    <div class="slot-count-row"><span class="slot-count-badge">6</span></div>
+                    <button class="day-block-date-btn" type="button">Block Date</button>
+                    <button class="day-add-slot-btn" type="button">+ Add Slot</button>
+                  </div>
+                  <div class="day-availability-bar"></div>
+                  <div class="day-slots">
+                    <div class="slot-group">
+                      <div class="slot-group-header"><span>Morning</span><span>AM</span></div>
+                      <button class="slot-pill" type="button"><span class="time-main">9:00-9:30 AM</span></button>
+                      <button class="slot-pill" type="button"><span class="time-main">9:30-10:00 AM</span></button>
+                      <button class="slot-pill" type="button"><span class="time-main">10:00-10:30 AM</span></button>
+                      <button class="slot-pill" type="button"><span class="time-main">10:30-11:00 AM</span></button>
+                      <button class="slot-pill" type="button"><span class="time-main">11:00-11:30 AM</span></button>
+                      <button class="slot-pill" type="button"><span class="time-main">11:30 AM-12:00 PM</span></button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="day-column">
+                  <div class="day-heading">
+                    <div class="day-name">Thu</div>
+                    <div class="day-date">Jun 18</div>
+                    <div class="slot-count-row"><span class="slot-count-badge">2</span></div>
+                    <button class="day-block-date-btn" type="button">Block Date</button>
+                    <button class="day-add-slot-btn" type="button">+ Add Slot</button>
+                  </div>
+                  <div class="day-availability-bar"></div>
+                  <div class="day-slots">
+                    <div class="slot-group">
+                      <div class="slot-group-header"><span>Morning</span><span>AM</span></div>
+                      <button class="slot-pill" type="button"><span class="time-main">10:30-11:00 AM</span></button>
+                    </div>
+                    <div class="slot-group">
+                      <div class="slot-group-header"><span>Afternoon</span><span>PM</span></div>
+                      <button class="slot-pill pm-slot" type="button"><span class="time-main">12:00-12:30 PM</span></button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="day-column">
+                  <div class="day-heading">
+                    <div class="day-name">Fri</div>
+                    <div class="day-date">Jun 19</div>
+                    <div class="slot-count-row"><span class="slot-count-badge">2</span></div>
+                    <button class="day-block-date-btn" type="button">Block Date</button>
+                    <button class="day-add-slot-btn" type="button">+ Add Slot</button>
+                  </div>
+                  <div class="day-availability-bar"></div>
+                  <div class="day-slots">
+                    <div class="slot-group">
+                      <div class="slot-group-header"><span>Afternoon</span><span>PM</span></div>
+                      <button class="slot-pill pm-slot" type="button"><span class="time-main">1:30-2:00 PM</span></button>
+                      <button class="slot-pill pm-slot" type="button"><span class="time-main">2:00-2:30 PM</span></button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="day-column">
+                  <div class="day-heading">
+                    <div class="day-name">Sat</div>
+                    <div class="day-date">Jun 20</div>
+                    <div class="slot-count-row"><span class="slot-count-badge">3</span></div>
+                    <button class="day-block-date-btn" type="button">Block Date</button>
+                    <button class="day-add-slot-btn" type="button">+ Add Slot</button>
+                  </div>
+                  <div class="day-availability-bar"></div>
+                  <div class="day-slots">
+                    <div class="slot-group">
+                      <div class="slot-group-header"><span>Morning</span><span>AM</span></div>
+                      <button class="slot-pill" type="button"><span class="time-main">7:00-7:30 AM</span></button>
+                      <button class="slot-pill" type="button"><span class="time-main">7:30-8:00 AM</span></button>
+                      <button class="slot-pill" type="button"><span class="time-main">8:00-8:30 AM</span></button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="day-column">
+                  <div class="day-heading">
+                    <div class="day-name">Sun</div>
+                    <div class="day-date">Jun 21</div>
+                    <div class="slot-count-row"><span class="slot-count-badge">4</span></div>
+                    <button class="day-block-date-btn" type="button">Block Date</button>
+                    <button class="day-add-slot-btn" type="button">+ Add Slot</button>
+                  </div>
+                  <div class="day-availability-bar"></div>
+                  <div class="day-slots">
+                    <div class="slot-group">
+                      <div class="slot-group-header"><span>Afternoon</span><span>PM</span></div>
+                      <button class="slot-pill pm-slot" type="button"><span class="time-main">1:30-2:00 PM</span></button>
+                      <button class="slot-pill pm-slot" type="button"><span class="time-main">2:00-2:30 PM</span></button>
+                      <button class="slot-pill pm-slot" type="button"><span class="time-main">2:30-3:00 PM</span></button>
+                      <button class="slot-pill pm-slot" type="button"><span class="time-main">3:00-3:30 PM</span></button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="design-card design-c">
+          <div class="design-intro">
+            <div>
+              <h2 class="design-title">Design 3: Compact Period Rail</h2>
+              <p class="design-copy">
+                Uses a fixed AM or PM rail on the left of each slot. It stays compact while giving the eye a repeated anchor for period changes.
+              </p>
+            </div>
+            <span class="clarity-badge">Most visual</span>
+          </div>
+
+          <div class="schedule-card">
+            <div class="schedule-header">
+              <h3 class="schedule-title">Weekly Availability</h3>
+            </div>
+            <div class="week-toolbar">
+              <div class="week-nav">
+                <button class="week-nav-btn" type="button">&lsaquo;</button>
+                <button class="week-nav-btn" type="button">&rsaquo;</button>
+              </div>
+              <div class="week-toolbar-copy">
+                <p class="month-label">June 2026</p>
+                <p class="week-range">Jun 15-21, 2026</p>
+              </div>
+            </div>
+
+            <div class="week-columns-shell">
+              <div class="week-columns">
+                <div class="day-column">
+                  <div class="day-heading">
+                    <div class="day-name">Mon</div>
+                    <div class="day-date">Jun 15</div>
+                    <div class="slot-count-row"></div>
+                    <button class="day-block-date-btn" type="button">Block Date</button>
+                    <button class="day-add-slot-btn" type="button">+ Add Slot</button>
+                  </div>
+                  <div class="day-availability-bar"></div>
+                  <div class="day-slots"><div class="empty-day-zone">No slots yet</div></div>
+                </div>
+
+                <div class="day-column">
+                  <div class="day-heading">
+                    <div class="day-name">Tue</div>
+                    <div class="day-date">Jun 16</div>
+                    <div class="slot-count-row"></div>
+                    <button class="day-block-date-btn" type="button">Block Date</button>
+                    <button class="day-add-slot-btn" type="button">+ Add Slot</button>
+                  </div>
+                  <div class="day-availability-bar"></div>
+                  <div class="day-slots"><div class="empty-day-zone">No slots yet</div></div>
+                </div>
+
+                <div class="day-column">
+                  <div class="day-heading">
+                    <div class="day-name">Wed</div>
+                    <div class="day-date">Jun 17</div>
+                    <div class="slot-count-row"><span class="slot-count-badge">6</span></div>
+                    <button class="day-block-date-btn" type="button">Block Date</button>
+                    <button class="day-add-slot-btn" type="button">+ Add Slot</button>
+                  </div>
+                  <div class="day-availability-bar"></div>
+                  <div class="day-slots">
+                    <button class="slot-pill" type="button"><span class="period-rail">AM</span><span class="slot-rail-content"><span class="slot-rail-time">9:00 - 9:30</span><span class="slot-rail-sub">morning</span></span></button>
+                    <button class="slot-pill" type="button"><span class="period-rail">AM</span><span class="slot-rail-content"><span class="slot-rail-time">9:30 - 10:00</span><span class="slot-rail-sub">morning</span></span></button>
+                    <button class="slot-pill" type="button"><span class="period-rail">AM</span><span class="slot-rail-content"><span class="slot-rail-time">10:00 - 10:30</span><span class="slot-rail-sub">morning</span></span></button>
+                    <button class="slot-pill" type="button"><span class="period-rail">AM</span><span class="slot-rail-content"><span class="slot-rail-time">10:30 - 11:00</span><span class="slot-rail-sub">morning</span></span></button>
+                    <button class="slot-pill" type="button"><span class="period-rail">AM</span><span class="slot-rail-content"><span class="slot-rail-time">11:00 - 11:30</span><span class="slot-rail-sub">morning</span></span></button>
+                    <button class="slot-pill" type="button"><span class="period-rail">AM</span><span class="slot-rail-content"><span class="slot-rail-time">11:30 AM - 12:00 PM</span><span class="slot-rail-sub">noon transition</span></span></button>
+                  </div>
+                </div>
+
+                <div class="day-column">
+                  <div class="day-heading">
+                    <div class="day-name">Thu</div>
+                    <div class="day-date">Jun 18</div>
+                    <div class="slot-count-row"><span class="slot-count-badge">2</span></div>
+                    <button class="day-block-date-btn" type="button">Block Date</button>
+                    <button class="day-add-slot-btn" type="button">+ Add Slot</button>
+                  </div>
+                  <div class="day-availability-bar"></div>
+                  <div class="day-slots">
+                    <button class="slot-pill" type="button"><span class="period-rail">AM</span><span class="slot-rail-content"><span class="slot-rail-time">10:30 - 11:00</span><span class="slot-rail-sub">morning</span></span></button>
+                    <button class="slot-pill pm-slot" type="button"><span class="period-rail">PM</span><span class="slot-rail-content"><span class="slot-rail-time">12:00 - 12:30</span><span class="slot-rail-sub">afternoon</span></span></button>
+                  </div>
+                </div>
+
+                <div class="day-column">
+                  <div class="day-heading">
+                    <div class="day-name">Fri</div>
+                    <div class="day-date">Jun 19</div>
+                    <div class="slot-count-row"><span class="slot-count-badge">2</span></div>
+                    <button class="day-block-date-btn" type="button">Block Date</button>
+                    <button class="day-add-slot-btn" type="button">+ Add Slot</button>
+                  </div>
+                  <div class="day-availability-bar"></div>
+                  <div class="day-slots">
+                    <button class="slot-pill pm-slot" type="button"><span class="period-rail">PM</span><span class="slot-rail-content"><span class="slot-rail-time">1:30 - 2:00</span><span class="slot-rail-sub">afternoon</span></span></button>
+                    <button class="slot-pill pm-slot" type="button"><span class="period-rail">PM</span><span class="slot-rail-content"><span class="slot-rail-time">2:00 - 2:30</span><span class="slot-rail-sub">afternoon</span></span></button>
+                  </div>
+                </div>
+
+                <div class="day-column">
+                  <div class="day-heading">
+                    <div class="day-name">Sat</div>
+                    <div class="day-date">Jun 20</div>
+                    <div class="slot-count-row"><span class="slot-count-badge">3</span></div>
+                    <button class="day-block-date-btn" type="button">Block Date</button>
+                    <button class="day-add-slot-btn" type="button">+ Add Slot</button>
+                  </div>
+                  <div class="day-availability-bar"></div>
+                  <div class="day-slots">
+                    <button class="slot-pill" type="button"><span class="period-rail">AM</span><span class="slot-rail-content"><span class="slot-rail-time">7:00 - 7:30</span><span class="slot-rail-sub">morning</span></span></button>
+                    <button class="slot-pill" type="button"><span class="period-rail">AM</span><span class="slot-rail-content"><span class="slot-rail-time">7:30 - 8:00</span><span class="slot-rail-sub">morning</span></span></button>
+                    <button class="slot-pill" type="button"><span class="period-rail">AM</span><span class="slot-rail-content"><span class="slot-rail-time">8:00 - 8:30</span><span class="slot-rail-sub">morning</span></span></button>
+                  </div>
+                </div>
+
+                <div class="day-column">
+                  <div class="day-heading">
+                    <div class="day-name">Sun</div>
+                    <div class="day-date">Jun 21</div>
+                    <div class="slot-count-row"><span class="slot-count-badge">4</span></div>
+                    <button class="day-block-date-btn" type="button">Block Date</button>
+                    <button class="day-add-slot-btn" type="button">+ Add Slot</button>
+                  </div>
+                  <div class="day-availability-bar"></div>
+                  <div class="day-slots">
+                    <button class="slot-pill pm-slot" type="button"><span class="period-rail">PM</span><span class="slot-rail-content"><span class="slot-rail-time">1:30 - 2:00</span><span class="slot-rail-sub">afternoon</span></span></button>
+                    <button class="slot-pill pm-slot" type="button"><span class="period-rail">PM</span><span class="slot-rail-content"><span class="slot-rail-time">2:00 - 2:30</span><span class="slot-rail-sub">afternoon</span></span></button>
+                    <button class="slot-pill pm-slot" type="button"><span class="period-rail">PM</span><span class="slot-rail-content"><span class="slot-rail-time">2:30 - 3:00</span><span class="slot-rail-sub">afternoon</span></span></button>
+                    <button class="slot-pill pm-slot" type="button"><span class="period-rail">PM</span><span class="slot-rail-content"><span class="slot-rail-time">3:00 - 3:30</span><span class="slot-rail-sub">afternoon</span></span></button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>

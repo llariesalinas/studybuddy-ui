@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Refined 2 — Match Line, Polished</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --sb-primary: #00895A;
+    --sb-bg: #F8F9FA;
+    --sb-card-bg: #ffffff;
+    --sb-card-border: #EAEAEA;
+    --sb-text-main: #163127;
+    --sb-text-muted: #6B7280;
+    --sb-dark: #0A1916;
+    --pop-yellow: #FFC94D;
+    --pop-orange: #FF8A5C;
+    --sb-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { font-family: 'Inter', system-ui, sans-serif; background: var(--sb-bg); color: var(--sb-text-main); overflow-x: hidden; }
+
+  .aurora { position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background:
+      radial-gradient(600px 420px at 12% 8%, rgba(0,137,90,.10), transparent 70%),
+      radial-gradient(520px 380px at 88% 20%, rgba(255,201,77,.12), transparent 70%),
+      radial-gradient(640px 480px at 50% 95%, rgba(0,137,90,.08), transparent 70%);
+  }
+
+  nav {
+    position: sticky; top: 0; z-index: 50; display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 36px; background: rgba(248,249,250,.82); backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--sb-card-border);
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 19px; }
+  .brand .mark { width: 34px; height: 34px; background: var(--sb-primary); color: #fff; border-radius: 10px; display: grid; place-items: center; font-size: 18px; }
+  .navlinks { display: flex; gap: 12px; align-items: center; }
+  .btn {
+    font: 600 14.5px 'Inter', sans-serif; text-decoration: none; padding: 10px 24px; border-radius: 999px;
+    transition: transform .2s var(--sb-spring), box-shadow .2s; display: inline-block;
+  }
+  .btn.primary { background: var(--sb-primary); color: #fff; box-shadow: 0 6px 18px rgba(0,137,90,.25); }
+  .btn.primary:hover { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(0,137,90,.3); }
+  .btn.outline { border: 1.5px solid var(--sb-card-border); color: var(--sb-text-main); background: #fff; }
+  .btn.outline:hover { transform: translateY(-3px); }
+  .btn.ghost { color: var(--sb-text-main); }
+  .back { position: fixed; bottom: 18px; left: 18px; z-index: 60; font-size: 13px; background:#fff; border:1px solid var(--sb-card-border); }
+
+  .journey { position: relative; z-index: 1; max-width: 1140px; margin: 0 auto; padding: 0 28px; }
+  #lineSvg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
+  #matchPath { stroke: rgba(0,137,90,.38); stroke-width: 2.5; fill: none; stroke-linecap: round; }
+  section { position: relative; z-index: 1; padding: 96px 0; }
+
+  /* parallax accents */
+  .px { position: absolute; z-index: 0; pointer-events: none; will-change: transform; opacity: .8; }
+
+  /* hero */
+  .hero { display: grid; grid-template-columns: 1.08fr .92fr; gap: 48px; align-items: center; min-height: 80vh; padding-top: 48px; }
+  .pill { display: inline-flex; align-items: center; gap: 8px; background: #fff; border: 1px solid var(--sb-card-border); border-radius: 999px; padding: 6px 16px; font-size: 13px; font-weight: 600; color: var(--sb-text-muted); margin-bottom: 22px; box-shadow: 0 2px 8px rgba(10,25,22,.04); }
+  .pill .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--sb-primary); }
+  h1 { font-size: clamp(42px, 5.4vw, 68px); font-weight: 800; letter-spacing: -2px; line-height: 1.02; }
+  h1 .accent { color: var(--sb-primary); position: relative; white-space: nowrap; }
+  h1 .accent svg { position: absolute; left: 0; right: 0; bottom: -8px; width: 100%; height: 12px; }
+  h1 .accent path { stroke: var(--pop-yellow); stroke-width: 5; fill: none; stroke-linecap: round; stroke-dasharray: 320; stroke-dashoffset: 320; animation: draw 1s ease forwards .5s; }
+  @keyframes draw { to { stroke-dashoffset: 0 } }
+  .hero p { font-size: 17.5px; line-height: 1.65; color: var(--sb-text-muted); margin: 22px 0 30px; max-width: 470px; }
+  .cta-row { display: flex; gap: 14px; flex-wrap: wrap; }
+  .hero-card { background: var(--sb-card-bg); border: 1px solid var(--sb-card-border); border-radius: 24px; padding: 26px; box-shadow: 0 24px 60px rgba(10,25,22,.08); }
+  .hero-card svg { width: 100%; height: auto; display: block; }
+
+  /* journey steps, alternating */
+  .step { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: center; }
+  .step.flip .copy { order: 2; }
+  .stepno { font-size: 12.5px; font-weight: 700; letter-spacing: 1.5px; color: var(--sb-primary); text-transform: uppercase; display: block; margin-bottom: 10px; }
+  .step h2 { font-size: clamp(26px, 3.2vw, 38px); font-weight: 800; letter-spacing: -1px; margin-bottom: 12px; }
+  .step h2 .uline { position: relative; }
+  .step h2 .uline svg { position: absolute; left: 0; right: 0; bottom: -7px; width: 100%; height: 10px; }
+  .step h2 .uline path { stroke: var(--pop-yellow); stroke-width: 4.5; fill: none; stroke-linecap: round; stroke-dasharray: 300; stroke-dashoffset: 300; }
+  .step.in h2 .uline path { animation: draw .8s ease forwards .25s; }
+  .step .copy p { font-size: 16px; line-height: 1.65; color: var(--sb-text-muted); max-width: 440px; }
+  .scene { background: var(--sb-card-bg); border: 1px solid var(--sb-card-border); border-radius: 24px; padding: 24px; box-shadow: 0 18px 48px rgba(10,25,22,.07); }
+  .scene svg { width: 100%; height: auto; display: block; }
+
+  /* features */
+  .shead { text-align: center; max-width: 600px; margin: 0 auto 52px; }
+  .shead h2 { font-size: clamp(28px, 3.4vw, 40px); font-weight: 800; letter-spacing: -1px; }
+  .shead p { color: var(--sb-text-muted); font-size: 16px; margin-top: 10px; }
+  .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 22px; }
+  .feat { background: var(--sb-card-bg); border: 1px solid var(--sb-card-border); border-radius: 20px; padding: 26px; box-shadow: 0 8px 28px rgba(10,25,22,.05); transition: transform .25s var(--sb-spring), box-shadow .25s; }
+  .feat:hover { transform: translateY(-6px); box-shadow: 0 18px 44px rgba(10,25,22,.09); }
+  .chip { width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center; margin-bottom: 16px; }
+  .chip.g { background: rgba(0,137,90,.1); }
+  .chip.y { background: rgba(255,201,77,.18); }
+  .chip.o { background: rgba(255,138,92,.16); }
+  .chip.t { background: rgba(0,137,90,.07); }
+  .feat h3 { font-size: 17px; font-weight: 700; margin-bottom: 8px; }
+  .feat p { font-size: 14.5px; line-height: 1.6; color: var(--sb-text-muted); }
+
+  /* CTA */
+  .ctapanel { background: var(--sb-dark); color: #fff; border-radius: 28px; padding: 72px 48px; text-align: center; position: relative; overflow: hidden; }
+  .ctapanel::before { content: ""; position: absolute; inset: 0; background: radial-gradient(420px 300px at 80% 10%, rgba(0,137,90,.35), transparent 70%); }
+  .ctapanel > * { position: relative; }
+  .ctapanel h2 { font-size: clamp(30px, 3.6vw, 44px); font-weight: 800; letter-spacing: -1px; }
+  .ctapanel p { color: rgba(255,255,255,.66); margin: 14px 0 30px; font-size: 16px; }
+  .ctapanel .btn.outline { background: transparent; color: #fff; border-color: rgba(255,255,255,.3); }
+
+  footer { border-top: 1px solid var(--sb-card-border); padding: 28px 36px; text-align: center; color: var(--sb-text-muted); font-size: 13.5px; position: relative; z-index: 1; }
+
+  .reveal { opacity: 0; transform: translateY(30px); transition: opacity .7s ease, transform .7s var(--sb-spring); }
+  .reveal.in { opacity: 1; transform: none; }
+  .pop { opacity: 0; transform: translateY(26px) scale(.95); transition: opacity .55s ease, transform .6s cubic-bezier(.34,1.56,.64,1); }
+  .pop.in { opacity: 1; transform: none; }
+  .features .feat { opacity: 0; transform: translateY(30px); transition: opacity .6s ease, transform .6s var(--sb-spring); }
+  .features .feat.in { opacity: 1; transform: none; }
+  .features .feat:nth-child(2) { transition-delay: .08s; }
+  .features .feat:nth-child(3) { transition-delay: .16s; }
+  .features .feat:nth-child(4) { transition-delay: .24s; }
+
+  @media (max-width: 880px) {
+    .hero, .step { grid-template-columns: 1fr; }
+    .step.flip .copy { order: 0; }
+    #lineSvg, .px { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .reveal, .pop, .features .feat { opacity: 1; transform: none; transition: none; }
+    h1 .accent path, .step h2 .uline path { stroke-dashoffset: 0; animation: none; }
+    #lineSvg, .px { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="aurora"></div>
+
+<nav>
+  <div class="brand"><span class="mark">S</span> Studybuddy</div>
+  <div class="navlinks">
+    <a class="btn ghost" href="#">Log in</a>
+    <a class="btn primary" href="#">Get started</a>
+  </div>
+</nav>
+
+<div class="journey">
+  <svg id="lineSvg" preserveAspectRatio="none"><path id="matchPath" d=""/></svg>
+
+  <div class="px" style="top:760px; left:2%" data-speed="-0.1">
+    <svg width="46" height="46" viewBox="0 0 46 46" fill="none"><circle cx="23" cy="23" r="14" fill="rgba(255,201,77,.5)"/></svg>
+  </div>
+  <div class="px" style="top:1400px; right:3%" data-speed="-0.18">
+    <svg width="56" height="56" viewBox="0 0 56 56" fill="none"><circle cx="28" cy="28" r="18" fill="rgba(0,137,90,.14)"/></svg>
+  </div>
+  <div class="px" style="top:2200px; left:4%" data-speed="-0.14">
+    <svg width="60" height="36" viewBox="0 0 60 36" fill="none"><path d="M6 28 Q 30 4 54 22" stroke="rgba(255,138,92,.55)" stroke-width="3.5" stroke-linecap="round"/><path d="M46 14 l 9 7 l -11 4" stroke="rgba(255,138,92,.55)" stroke-width="3.5" stroke-linecap="round"/></svg>
+  </div>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div>
+      <span class="pill"><span class="dot"></span> Peer tutoring at Central Philippine University</span>
+      <h1>Stuck at 11pm? Someone on campus <span class="accent">already cracked it<svg viewBox="0 0 320 12" preserveAspectRatio="none"><path d="M4 8 Q 80 3 160 8 T 316 7"/></svg></span></h1>
+      <p>Studybuddy matches you with CPU students who took the class, passed the exam, and can actually explain it. Follow the line — it ends with you getting it.</p>
+      <div class="cta-row">
+        <a class="btn primary" href="#">Find my tutor</a>
+        <a class="btn outline" href="#">Become a tutor</a>
+      </div>
+    </div>
+    <div class="hero-card">
+      <svg viewBox="0 0 460 300" fill="none">
+        <rect x="24" y="24" width="412" height="208" rx="18" fill="#F4FAF7" stroke="#D8EAE2" stroke-width="2"/>
+        <circle cx="150" cy="112" r="32" fill="#fff" stroke="#163127" stroke-width="3"/>
+        <path d="M120 104 q 2 -27 30 -27 q 26 0 30 21 M133 81 q 6 -7 12 -8 M154 78 q 7 -2 12 4" stroke="#163127" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+        <path d="M138 99 q 5 -4 10 -2 M160 97 q 5 -2 9 3" stroke="#163127" stroke-width="2.1" stroke-linecap="round" fill="none"/>
+        <path d="M140 108 q 3 4 8 0 M161 108 q 3 4 8 0" stroke="#163127" stroke-width="2.5" stroke-linecap="round"/>
+        <path d="M143 126 q 7 6 15 0" stroke="#163127" stroke-width="2.5" stroke-linecap="round"/>
+        <path d="M133 119 l 7 1 M174 120 l -7 -1" stroke="#FF8FA3" stroke-width="2.2" stroke-linecap="round" opacity=".75"/>
+        <path d="M150 146 v 50" stroke="#163127" stroke-width="3" stroke-linecap="round"/>
+        <circle cx="312" cy="116" r="32" fill="#fff" stroke="#163127" stroke-width="3"/>
+        <path d="M282 108 q 4 -26 30 -26 q 25 0 30 20" stroke="#163127" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+        <circle cx="340" cy="90" r="6" fill="#163127"/>
+        <path d="M302 112 q 3 4 8 0 M323 112 q 3 4 8 0" stroke="#163127" stroke-width="2.5" stroke-linecap="round"/>
+        <path d="M306 131 q 6 4 12 0" stroke="#163127" stroke-width="2.5" stroke-linecap="round"/>
+        <path d="M291 124 l 7 1 M333 125 l -7 -1" stroke="#FF8FA3" stroke-width="2.2" stroke-linecap="round" opacity=".75"/>
+        <path d="M312 150 v 46" stroke="#163127" stroke-width="3" stroke-linecap="round"/>
+        <path d="M190 108 q 41 -30 82 0" stroke="#00895A" stroke-width="3" stroke-linecap="round" stroke-dasharray="7 8"/>
+        <circle cx="231" cy="84" r="12" fill="#FFC94D"/>
+        <path d="M226 84 l 4 4 l 7 -8" stroke="#163127" stroke-width="2.4" stroke-linecap="round" fill="none"/>
+        <path d="M96 212 h 270" stroke="#163127" stroke-width="3" stroke-linecap="round"/>
+        <rect x="24" y="248" width="412" height="40" rx="12" fill="#fff" stroke="#EAEAEA" stroke-width="2"/>
+        <text x="44" y="273" font-family="Inter" font-size="14" font-weight="600" fill="#163127">98% match — Calculus 2 — Thu 7:00 PM confirmed</text>
+      </svg>
+    </div>
+  </section>
+
+  <!-- STEP 1 -->
+  <section class="step">
+    <div class="copy reveal">
+      <span class="stepno">Step 1</span>
+      <h2><span class="uline">Say what's hurting<svg viewBox="0 0 300 10" preserveAspectRatio="none"><path d="M3 7 Q 75 2 150 7 T 297 6"/></svg></span></h2>
+      <p>Pick the subject that's eating you alive and the hours you're actually free. Calc 2 on a Thursday night? Say less.</p>
+    </div>
+    <div class="scene pop">
+      <svg viewBox="0 0 440 220" fill="none">
+        <rect x="22" y="18" width="396" height="184" rx="16" fill="#fff" stroke="#EAEAEA" stroke-width="2"/>
+        <text x="48" y="58" font-family="Inter" font-size="16" font-weight="800" fill="#163127">What do you need help with?</text>
+        <rect x="48" y="78" width="118" height="38" rx="19" fill="#00895A"/>
+        <text x="68" y="102" font-family="Inter" font-size="14" font-weight="600" fill="#fff">Calculus 2</text>
+        <rect x="178" y="78" width="100" height="38" rx="19" fill="#fff" stroke="#EAEAEA" stroke-width="2"/>
+        <text x="198" y="102" font-family="Inter" font-size="14" fill="#6B7280">Physics</text>
+        <rect x="290" y="78" width="104" height="38" rx="19" fill="#fff" stroke="#EAEAEA" stroke-width="2"/>
+        <text x="308" y="102" font-family="Inter" font-size="14" fill="#6B7280">Chemistry</text>
+        <rect x="48" y="132" width="190" height="38" rx="19" fill="#fff" stroke="#EAEAEA" stroke-width="2"/>
+        <text x="66" y="156" font-family="Inter" font-size="14" fill="#6B7280">Thu, 7:00 PM onwards</text>
+        <path d="M330 156 q 24 12 48 -6" stroke="#FFC94D" stroke-width="3.5" stroke-linecap="round"/>
+        <path d="M368 150 l 11 1 l -4 10" stroke="#FFC94D" stroke-width="3.5" stroke-linecap="round"/>
+      </svg>
+    </div>
+  </section>
+
+  <!-- STEP 2 -->
+  <section class="step flip">
+    <div class="copy reveal">
+      <span class="stepno">Step 2</span>
+      <h2><span class="uline">Meet your match<svg viewBox="0 0 300 10" preserveAspectRatio="none"><path d="M3 6 Q 90 9 170 5 T 297 7"/></svg></span></h2>
+      <p>Our recommender pairs you with a fellow CPU student who aced that exact subject — matched on what you need, when you're free, and how they teach. The score is right there in the open.</p>
+    </div>
+    <div class="scene pop">
+      <svg viewBox="0 0 440 230" fill="none">
+        <rect x="22" y="16" width="396" height="198" rx="16" fill="#fff" stroke="#EAEAEA" stroke-width="2"/>
+        <circle cx="120" cy="96" r="30" fill="#fff" stroke="#163127" stroke-width="2.8"/>
+        <path d="M92 89 q 2 -25 28 -25 q 24 0 28 19 M105 67 q 5 -6 11 -7" stroke="#163127" stroke-width="2.4" stroke-linecap="round" fill="none"/>
+        <path d="M111 92 q 3 4 7 0 M131 92 q 3 4 7 0" stroke="#163127" stroke-width="2.4" stroke-linecap="round"/>
+        <path d="M113 109 q 7 5 14 0" stroke="#163127" stroke-width="2.4" stroke-linecap="round"/>
+        <path d="M104 102 l 6 1 M142 103 l -6 -1" stroke="#FF8FA3" stroke-width="2.1" stroke-linecap="round" opacity=".75"/>
+        <circle cx="320" cy="96" r="30" fill="#fff" stroke="#163127" stroke-width="2.8"/>
+        <path d="M292 88 q 4 -24 28 -24 q 23 0 28 18" stroke="#163127" stroke-width="2.4" stroke-linecap="round" fill="none"/>
+        <path d="M311 92 q 3 4 7 0 M331 92 q 3 4 7 0" stroke="#163127" stroke-width="2.4" stroke-linecap="round"/>
+        <circle cx="314.5" cy="93" r="7" fill="none" stroke="#163127" stroke-width="2"/>
+        <circle cx="334.5" cy="93" r="7" fill="none" stroke="#163127" stroke-width="2"/>
+        <path d="M322 93 h 5" stroke="#163127" stroke-width="2" stroke-linecap="round"/>
+        <path d="M314 108 q 6 6 13 0" stroke="#163127" stroke-width="2.4" stroke-linecap="round"/>
+        <path d="M156 90 q 64 -42 128 0" stroke="#00895A" stroke-width="3" stroke-linecap="round" stroke-dasharray="7 8"/>
+        <circle cx="220" cy="58" r="14" fill="#FFC94D"/>
+        <path d="M214 58 l 5 5 l 8 -9" stroke="#163127" stroke-width="2.6" stroke-linecap="round" fill="none"/>
+        <text x="96" y="156" font-family="Inter" font-size="13" fill="#6B7280">you</text>
+        <text x="276" y="156" font-family="Inter" font-size="13" fill="#6B7280">aced it last sem</text>
+        <rect x="148" y="172" width="144" height="30" rx="15" fill="#F4FAF7" stroke="#D8EAE2" stroke-width="2"/>
+        <text x="172" y="192" font-family="Inter" font-size="13.5" font-weight="700" fill="#00895A">98% match</text>
+      </svg>
+    </div>
+  </section>
+
+  <!-- STEP 3 -->
+  <section class="step">
+    <div class="copy reveal">
+      <span class="stepno">Step 3</span>
+      <h2><span class="uline">Study together, level up<svg viewBox="0 0 300 10" preserveAspectRatio="none"><path d="M3 7 Q 60 3 150 7 T 297 5"/></svg></span></h2>
+      <p>Book the session, meet up or hop online, and walk out actually getting it. Your progress is tracked session over session, and your tutor earns for sharing their brain.</p>
+    </div>
+    <div class="scene pop">
+      <svg viewBox="0 0 440 230" fill="none">
+        <rect x="22" y="16" width="396" height="198" rx="16" fill="#fff" stroke="#EAEAEA" stroke-width="2"/>
+        <path d="M70 178 h 300" stroke="#163127" stroke-width="2.8" stroke-linecap="round"/>
+        <circle cx="160" cy="110" r="26" fill="#fff" stroke="#163127" stroke-width="2.8"/>
+        <path d="M136 104 q 2 -22 24 -22 q 21 0 24 17 M147 86 q 4 -5 9 -6" stroke="#163127" stroke-width="2.3" stroke-linecap="round" fill="none"/>
+        <path d="M152 107 q 3 4 6 0 M170 107 q 3 4 6 0" stroke="#163127" stroke-width="2.3" stroke-linecap="round"/>
+        <path d="M154 121 q 6 5 12 0" stroke="#163127" stroke-width="2.3" stroke-linecap="round"/>
+        <path d="M147 115 l 5 1 M178 116 l -5 -1" stroke="#FF8FA3" stroke-width="2" stroke-linecap="round" opacity=".75"/>
+        <path d="M160 136 v 40" stroke="#163127" stroke-width="2.8" stroke-linecap="round"/>
+        <circle cx="270" cy="110" r="26" fill="#fff" stroke="#163127" stroke-width="2.8"/>
+        <path d="M246 104 q 2 -22 24 -22 q 21 0 24 17" stroke="#163127" stroke-width="2.3" stroke-linecap="round" fill="none"/>
+        <circle cx="292" cy="88" r="5" fill="#163127"/>
+        <path d="M262 107 q 3 4 6 0 M280 107 q 3 4 6 0" stroke="#163127" stroke-width="2.3" stroke-linecap="round"/>
+        <path d="M264 121 q 6 6 12 0" stroke="#163127" stroke-width="2.3" stroke-linecap="round"/>
+        <path d="M257 115 l 5 1 M288 116 l -5 -1" stroke="#FF8FA3" stroke-width="2" stroke-linecap="round" opacity=".75"/>
+        <path d="M270 136 v 40" stroke="#163127" stroke-width="2.8" stroke-linecap="round"/>
+        <rect x="192" y="148" width="48" height="28" rx="5" fill="#F4FAF7" stroke="#D8EAE2" stroke-width="2" transform="rotate(-3 216 162)"/>
+        <circle cx="160" cy="52" r="13" fill="#FFC94D"/>
+        <path d="M154 70 h 12" stroke="#163127" stroke-width="2.4" stroke-linecap="round"/>
+        <path d="M140 36 l -7 -6 M180 36 l 7 -6 M160 32 v -9" stroke="#FF8A5C" stroke-width="2.8" stroke-linecap="round"/>
+        <text x="306" y="64" font-family="Inter" font-size="15" font-weight="700" fill="#00895A">Got it!</text>
+      </svg>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section>
+    <div class="shead reveal">
+      <h2>What's under the hood</h2>
+      <p>The actual product, minus the marketing fluff.</p>
+    </div>
+    <div class="features">
+      <div class="feat">
+        <div class="chip g"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#00895A" stroke-width="2.2" stroke-linecap="round"><circle cx="10" cy="10" r="6"/><path d="m15 15 5 5"/></svg></div>
+        <h3>Smart matching</h3>
+        <p>A recommender scores every tutor on expertise overlap and session history — your best fits surface first.</p>
+      </div>
+      <div class="feat">
+        <div class="chip y"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#B8860B" stroke-width="2.2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></div>
+        <h3>Booking that bends</h3>
+        <p>Set your free hours once. Sessions only ever land where both calendars say yes — no chat ping-pong.</p>
+      </div>
+      <div class="feat">
+        <div class="chip o"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#D2622E" stroke-width="2.2" stroke-linecap="round"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg></div>
+        <h3>Progress you can see</h3>
+        <p>Every session feeds your progress report. Watch the line go up before the exam does.</p>
+      </div>
+      <div class="feat">
+        <div class="chip t"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#00895A" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></div>
+        <h3>Tutors get paid</h3>
+        <p>Good at something? Earn from it between classes. Wallet and payouts are built in.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section>
+    <div class="ctapanel reveal">
+      <h2>Your study buddy is already on campus.</h2>
+      <p>Free with your CPU email — whether you need the help or you are the help.</p>
+      <div class="cta-row" style="justify-content:center">
+        <a class="btn primary" href="#">Get started</a>
+        <a class="btn outline" href="#">Log in</a>
+      </div>
+    </div>
+  </section>
+</div>
+
+<footer>Studybuddy — built by students, for students at Central Philippine University</footer>
+<a class="btn back" href="index.html">&larr; All options</a>
+
+<script>
+  const svg = document.getElementById('lineSvg')
+  const path = document.getElementById('matchPath')
+  const journey = document.querySelector('.journey')
+
+  function buildPath() {
+    const w = journey.clientWidth
+    const h = journey.scrollHeight
+    svg.setAttribute('viewBox', `0 0 ${w} ${h}`)
+    const cx = w / 2
+    const d = [
+      `M ${cx + w * 0.16} ${h * 0.07}`,
+      `C ${cx + w * 0.28} ${h * 0.13}, ${cx - w * 0.3} ${h * 0.15}, ${cx - w * 0.2} ${h * 0.22}`,
+      `S ${cx + w * 0.28} ${h * 0.31}, ${cx + w * 0.18} ${h * 0.38}`,
+      `S ${cx - w * 0.28} ${h * 0.47}, ${cx - w * 0.18} ${h * 0.54}`,
+      `S ${cx + w * 0.24} ${h * 0.63}, ${cx + w * 0.04} ${h * 0.71}`,
+      `S ${cx - w * 0.12} ${h * 0.83}, ${cx} ${h * 0.9}`,
+    ].join(' ')
+    path.setAttribute('d', d)
+    const len = path.getTotalLength()
+    path.style.strokeDasharray = `${len}`
+    path.style.strokeDashoffset = `${len}`
+    return len
+  }
+
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches
+  let pathLen = reduced ? 0 : buildPath()
+
+  function drawOnScroll() {
+    const total = journey.scrollHeight - window.innerHeight
+    const progress = Math.min(1, Math.max(0, window.scrollY / total))
+    path.style.strokeDashoffset = `${pathLen * (1 - progress * 1.15)}`
+  }
+
+  const floats = [...document.querySelectorAll('.px')]
+  function parallax() {
+    const y = window.scrollY
+    floats.forEach((el) => { el.style.transform = `translateY(${y * parseFloat(el.dataset.speed)}px)` })
+  }
+
+  if (!reduced) {
+    addEventListener('scroll', () => requestAnimationFrame(() => { drawOnScroll(); parallax() }), { passive: true })
+    addEventListener('resize', () => { pathLen = buildPath(); drawOnScroll() })
+    drawOnScroll()
+    parallax()
+  }
+
+  const io = new IntersectionObserver(
+    (entries) => entries.forEach((e) => e.isIntersecting && e.target.classList.add('in')),
+    { threshold: 0.18 },
+  )
+  document.querySelectorAll('.reveal, .pop, .features .feat, .step').forEach((el) => io.observe(el))
+</script>
+</body>
+</html>

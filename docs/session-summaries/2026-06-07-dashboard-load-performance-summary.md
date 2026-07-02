@@ -2,10 +2,12 @@
 
 **Plan:** [2026-06-07-dashboard-load-performance.md](../plans/2026-06-07-dashboard-load-performance.md)
 **Date:** 2026-06-07
-**Status:** Phase 1 complete and verified end-to-end (code, unit tests, applied
+**Status:** Done. Phase 1 complete and verified end-to-end (code, unit tests, applied
 migration + `EXPLAIN ANALYZE`, and a `DEBUG=False` decisive re-measure); Phase 2
-(pagination) ruled out by the re-measure. Only redis e2e remains
-environment-blocked (no local server).
+(pagination) ruled out by the re-measure. The redis e2e check is accepted as a
+known gap — this machine has no redis-server, Docker, or WSL to stand one up,
+and closing it would require installing new infrastructure (Memurai or Docker
+Desktop), which was declined.
 
 ## What shipped
 
@@ -78,11 +80,14 @@ then deleted every trace of the account):
 ~9s/~6s was almost entirely `DEBUG=True` overhead plus the N+1s/uncached-recs
 that Phase 1 already fixed — not a data-volume problem pagination would solve.
 
-## Not done — environment-blocked
+## Not done — accepted gap
 
-- **Redis end-to-end**: no local redis server listening (port 6379
-  unreachable), so the `RedisCache` path remains unexercised against a live
-  server. Needs a redis instance to close out.
+- **Redis end-to-end**: no redis-server, Docker, or WSL available on this
+  machine, so the `RedisCache` path remains unexercised against a live server.
+  redis-py 7.4.0 imports cleanly and Django's `RedisCache` drives it with no
+  API errors. Closing this fully would require installing new infrastructure
+  (Memurai or Docker Desktop) — declined for this pass; the plan is closed out
+  as Done with this as a known, low-risk residual.
 
 ## Rendering / frontend siblings (separate plans, same session)
 

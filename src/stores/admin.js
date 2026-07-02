@@ -12,6 +12,8 @@ export const useAdminStore = defineStore(
     const institutions = ref([])
     const analytics = ref(null)
     const tutorApplications = ref([])
+    const tuteeApplications = ref([])
+    const operationalQueue = ref({ count: 0, items: [] })
 
     const loading = ref({
       stats: false,
@@ -19,7 +21,9 @@ export const useAdminStore = defineStore(
       withdrawals: false,
       institutions: false,
       analytics: false,
-      tutorApplications: false
+      tutorApplications: false,
+      tuteeApplications: false,
+      operationalQueue: false
     })
 
     const error = ref({
@@ -28,7 +32,9 @@ export const useAdminStore = defineStore(
       withdrawals: null,
       institutions: null,
       analytics: null,
-      tutorApplications: null
+      tutorApplications: null,
+      tuteeApplications: null,
+      operationalQueue: null
     })
 
     let statsPromise = null
@@ -61,6 +67,34 @@ export const useAdminStore = defineStore(
       })()
 
       return statsPromise
+    }
+
+    let operationalQueuePromise = null
+    const fetchOperationalQueue = async (force = false) => {
+      if (operationalQueue.value.items.length && !force) return
+
+      if (operationalQueuePromise) {
+        await operationalQueuePromise
+        if (!force) return
+      }
+
+      loading.value.operationalQueue = true
+      error.value.operationalQueue = null
+
+      operationalQueuePromise = (async () => {
+        try {
+          const response = await api.get('/admin/operational-queue/')
+          operationalQueue.value = response.data
+        } catch (err) {
+          console.error('Failed to load operational queue:', err)
+          error.value.operationalQueue = 'Failed to load operational queue.'
+        } finally {
+          loading.value.operationalQueue = false
+          operationalQueuePromise = null
+        }
+      })()
+
+      return operationalQueuePromise
     }
 
     let usersPromise = null
@@ -263,8 +297,11 @@ export const useAdminStore = defineStore(
     }
 
     let tutorApplicationsPromise = null
-    const fetchTutorApplications = async (status = null, force = false) => {
-      const params = status ? { status } : {}
+    const fetchTutorApplications = async (status = null, force = false, options = {}) => {
+      const params = {
+        ...(status ? { status } : {}),
+        ...(options.reviewType ? { review_type: options.reviewType } : {})
+      }
       if (tutorApplications.value.length && !status && !force) return
 
       if (tutorApplicationsPromise) {
@@ -291,16 +328,96 @@ export const useAdminStore = defineStore(
       return tutorApplicationsPromise
     }
 
-    const updateTutorApplicationStatus = async (id, applicationStatus, rejectionReason = '') => {
+    const updateTutorApplicationStatus = async (
+      id,
+      applicationStatus,
+      rejectionReason = '',
+      options = {}
+    ) => {
       try {
-        await api.patch(`/admin/tutor-applications/${id}/`, {
+        const payload = {
           application_status: applicationStatus,
           rejection_reason: rejectionReason
-        })
+        }
+
+        if (options.reviewType === 'renewal') {
+          payload.review_type = 'renewal'
+          payload.renewal_status = applicationStatus
+          payload.renewal_rejection_reason = rejectionReason
+        }
+
+        const endpoint = options.reviewType === 'renewal'
+          ? `/admin/tutor-document-renewals/${id}/`
+          : `/admin/tutor-applications/${id}/`
+
+        await api.patch(endpoint, payload)
         await fetchTutorApplications(null, true)
         await fetchStats(true)
       } catch (err) {
         console.error('Failed to update tutor application:', err)
+        throw err
+      }
+    }
+
+    let tuteeApplicationsPromise = null
+    const fetchTuteeApplications = async (status = null, force = false, options = {}) => {
+      const params = {
+        ...(status ? { status } : {}),
+        ...(options.reviewType ? { review_type: options.reviewType } : {})
+      }
+      if (tuteeApplications.value.length && !status && !force) return
+
+      if (tuteeApplicationsPromise) {
+        await tuteeApplicationsPromise
+        if (!force) return
+      }
+
+      loading.value.tuteeApplications = true
+      error.value.tuteeApplications = null
+
+      tuteeApplicationsPromise = (async () => {
+        try {
+          const response = await api.get('/admin/tutee-applications/', { params })
+          tuteeApplications.value = response.data
+        } catch (err) {
+          console.error('Failed to load tutee applications:', err)
+          error.value.tuteeApplications = 'Failed to load tutee applications.'
+        } finally {
+          loading.value.tuteeApplications = false
+          tuteeApplicationsPromise = null
+        }
+      })()
+
+      return tuteeApplicationsPromise
+    }
+
+    const updateTuteeApplicationStatus = async (
+      id,
+      applicationStatus,
+      rejectionReason = '',
+      options = {}
+    ) => {
+      try {
+        const payload = {
+          application_status: applicationStatus,
+          rejection_reason: rejectionReason
+        }
+
+        if (options.reviewType === 'renewal') {
+          payload.review_type = 'renewal'
+          payload.renewal_status = applicationStatus
+          payload.renewal_rejection_reason = rejectionReason
+        }
+
+        const endpoint = options.reviewType === 'renewal'
+          ? `/admin/tutee-document-renewals/${id}/`
+          : `/admin/tutee-applications/${id}/`
+
+        await api.patch(endpoint, payload)
+        await fetchTuteeApplications(null, true)
+        await fetchStats(true)
+      } catch (err) {
+        console.error('Failed to update tutee application:', err)
         throw err
       }
     }
@@ -312,10 +429,13 @@ export const useAdminStore = defineStore(
       institutions,
       analytics,
       tutorApplications,
+      tuteeApplications,
+      operationalQueue,
       loading,
       error,
 
       fetchStats,
+      fetchOperationalQueue,
       fetchUsers,
       updateUserStatus,
       deleteUser,
@@ -330,7 +450,10 @@ export const useAdminStore = defineStore(
       fetchAnalytics,
 
       fetchTutorApplications,
-      updateTutorApplicationStatus
+      updateTutorApplicationStatus,
+
+      fetchTuteeApplications,
+      updateTuteeApplicationStatus
     }
 
   },
@@ -345,7 +468,9 @@ export const useAdminStore = defineStore(
         'users',
         'withdrawals',
         'institutions',
-        'tutorApplications'
+        'tutorApplications',
+        'tuteeApplications',
+        'operationalQueue'
       ]
     }
   }

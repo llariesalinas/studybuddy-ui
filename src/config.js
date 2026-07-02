@@ -2,6 +2,10 @@ export const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api/'
 export const API_PROXY_TARGET = import.meta.env.VITE_API_PROXY_TARGET || ''
 
+// Client-safe publishable key for logo.dev (see ADR-0002) -- not a secret, but kept out
+// of source so it can vary by environment / be omitted in local dev.
+export const LOGO_DEV_TOKEN = import.meta.env.VITE_LOGO_DEV_TOKEN || ''
+
 // Derive WebSocket server root from API_BASE_URL at runtime
 export function wsServerRoot() {
   const fallbackOrigin =
@@ -23,6 +27,7 @@ export function wsServerProtocol() {
 // Auth
 export const ACCESS_REFRESH_INTERVAL_MS = 4 * 60 * 1000   // 4 min
 export const IDLE_LOGOUT_MS             = 10 * 60 * 1000  // 10 min
+export const MAX_DOCUMENT_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024 // 5 MB; keep in sync with backend
 
 // Polling
 export const SESSION_POLL_INTERVAL_MS      = 60_000

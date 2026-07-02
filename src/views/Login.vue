@@ -20,7 +20,7 @@
         <input
           type="email"
           v-model="email"
-          class="sb-auth-input"
+          class="sb-auth-input sb-field"
           placeholder="you@university.edu"
           required
         />
@@ -36,13 +36,13 @@
         <input
           type="password"
           v-model="password"
-          class="sb-auth-input"
+          class="sb-auth-input sb-field"
           placeholder="********"
           required
         />
       </div>
 
-      <button type="submit" class="sb-btn-pill sb-auth-submit" :disabled="isSubmitting">
+      <button type="submit" class="sb-btn-pill sb-auth-submit sb-btn sb-elevated sb-elevated--brand" :disabled="isSubmitting">
         <span v-if="isSubmitting" class="sb-spinner" aria-hidden="true"></span>
         {{ isSubmitting ? 'Signing In...' : 'Sign In' }}
       </button>
@@ -54,7 +54,7 @@
         <input
           type="text"
           v-model="otp"
-          class="sb-auth-input sb-auth-otp-input"
+          class="sb-auth-input sb-auth-otp-input sb-field"
           placeholder="Enter the code"
           autocomplete="one-time-code"
           inputmode="numeric"
@@ -62,7 +62,7 @@
         />
       </div>
 
-      <button type="submit" class="sb-btn-pill sb-auth-submit" :disabled="isSubmitting">
+      <button type="submit" class="sb-btn-pill sb-auth-submit sb-btn sb-elevated sb-elevated--brand" :disabled="isSubmitting">
         <span v-if="isSubmitting" class="sb-spinner" aria-hidden="true"></span>
         {{ isSubmitting ? 'Verifying...' : 'Verify Code' }}
       </button>
@@ -95,6 +95,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import api from '@/services/api/api'
 import AuthShell from '@/components/AuthShell.vue'
+import { needsTutorApplicationAttention } from '@/services/tutorApplicationState'
 
 const router = useRouter()
 const route = useRoute()
@@ -133,10 +134,7 @@ const getErrorMessage = (error, fallback) => {
 const redirectForRole = (role) => {
   const normalizedRole = role?.toLowerCase()
 
-  if (
-    normalizedRole === 'tutor' &&
-    ['pending', 'rejected'].includes(authStore.user?.application_status)
-  ) {
+  if (normalizedRole === 'tutor' && needsTutorApplicationAttention(authStore.user)) {
     router.push('/application-status')
   } else if (normalizedRole === 'tutor') router.push('/tch-dashboard')
   else if (normalizedRole === 'tutee') router.push('/dashboard')
@@ -252,9 +250,7 @@ const returnToPassword = () => {
   background: var(--sb-surface);
   color: var(--sb-text-main);
   outline: none;
-  transition:
-    border-color 0.15s ease,
-    box-shadow 0.15s ease;
+  transition: none;
 }
 
 .sb-auth-input:focus {
@@ -302,22 +298,11 @@ const returnToPassword = () => {
   font-weight: 500;
   border: none;
   cursor: pointer;
-  transition:
-    background 0.15s ease,
-    transform 0.15s ease;
+  transition: transform var(--sb-t-normal) var(--sb-spring);
 }
 
 .sb-btn-pill:hover:not(:disabled) {
   background: var(--sb-primary-hover);
-}
-
-.sb-btn-pill:active:not(:disabled) {
-  transform: scale(0.95);
-}
-
-.sb-btn-pill:disabled {
-  opacity: 0.65;
-  cursor: not-allowed;
 }
 
 .sb-auth-submit {

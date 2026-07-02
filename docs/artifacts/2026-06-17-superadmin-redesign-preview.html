@@ -1,0 +1,1047 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Super Admin Redesign — Preview</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <style>
+    :root {
+      --sb-primary: #00895A;
+      --sb-primary-hover: #00704A;
+      --sb-primary-mid: #18A36C;
+      --sb-primary-light: #edf6f1;
+      --sb-primary-border: #b8dece;
+      --sb-dark: #0A1916;
+      --sb-bg: #F3F7F5;
+      --sb-aurora-bg:
+        radial-gradient(circle at 8% -8%, rgba(0, 137, 90, 0.18), transparent 34%),
+        radial-gradient(circle at 52% -10%, rgba(103, 197, 220, 0.16), transparent 38%),
+        radial-gradient(circle at 100% 8%, rgba(148, 211, 181, 0.16), transparent 34%),
+        radial-gradient(circle at 84% 88%, rgba(255, 218, 137, 0.14), transparent 32%);
+      --sb-card-bg: #ffffff;
+      --sb-card-border: #E4E8E6;
+      --sb-surface: #ffffff;
+      --sb-text-main: #163127;
+      --sb-text-muted: #6B7280;
+      --sb-text-secondary: #495057;
+      --sb-text-subtle: #a0acb8;
+      --sb-border-light: #e0e7e3;
+      --sb-shadow-soft: rgba(10, 25, 22, 0.06);
+      --sb-danger: #ef4444;
+      --sb-danger-light: #fef2f2;
+      --sb-danger-border: #fecaca;
+      --sb-danger-text: #991b1b;
+      --sb-warning-bg: #fffbeb;
+      --sb-warning-border: #fde68a;
+      --sb-warning-text: #92400e;
+      --sb-info-bg: #eff6ff;
+      --sb-info-border: #bfdbfe;
+      --sb-info-text: #1d4ed8;
+      --sb-purple-bg: #f5f3ff;
+      --sb-purple-border: #ddd6fe;
+      --sb-purple-text: #5b21b6;
+      --sb-topbar-h: 52px;
+      --sb-sidebar-w: 210px;
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+      --radius-pill: 9999px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--sb-bg);
+      color: var(--sb-text-main);
+      font-size: 14px;
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    .aurora-layer {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: 680px;
+      background: var(--sb-aurora-bg);
+      z-index: 0;
+      pointer-events: none;
+      animation: aurora-in 1.4s ease forwards;
+    }
+    @keyframes aurora-in { from { opacity: 0; } to { opacity: 1; } }
+
+    /* ── Shell ─────────────────────────────────────────────────────────────── */
+    .topbar {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      height: var(--sb-topbar-h);
+      background: rgba(255,255,255,0.82);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(180, 220, 200, 0.5);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 1.5rem;
+    }
+    .topbar-left { display: flex; align-items: center; gap: 12px; }
+    .wordmark { font-size: 16px; font-weight: 700; color: var(--sb-primary); letter-spacing: -.02em; }
+    .topbar-sep { width: 1px; height: 20px; background: var(--sb-card-border); }
+    .topbar-role {
+      font-size: 11px; font-weight: 500; color: var(--sb-text-muted);
+      background: var(--sb-bg); padding: 3px 10px;
+      border-radius: var(--radius-pill); border: 1px solid var(--sb-card-border);
+      display: flex; align-items: center; gap: 5px;
+    }
+    .topbar-right { display: flex; align-items: center; gap: 14px; }
+    .topbar-icon { font-size: 18px; color: var(--sb-text-muted); cursor: pointer; }
+    .topbar-av {
+      width: 32px; height: 32px; border-radius: 50%;
+      background: var(--sb-primary-light); color: var(--sb-primary);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 600;
+    }
+    .topbar-name { font-size: 13px; font-weight: 500; color: var(--sb-text-main); }
+
+    .sidebar {
+      position: fixed; top: var(--sb-topbar-h); left: 0; bottom: 0;
+      width: var(--sb-sidebar-w); z-index: 90;
+      background: rgba(255,255,255,0.78);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-right: 1px solid rgba(180, 220, 200, 0.45);
+      overflow-y: auto; padding: 1.25rem 0;
+    }
+    .sb-section-label {
+      font-size: 10px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: .07em; color: var(--sb-text-subtle);
+      padding: 0 1.25rem; margin-bottom: 4px;
+    }
+    .sb-link {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 1.25rem; font-size: 13px; font-weight: 500;
+      color: var(--sb-text-muted); cursor: pointer;
+      border-left: 2px solid transparent;
+      transition: all .15s ease;
+      user-select: none;
+    }
+    .sb-link i { font-size: 17px; }
+    .sb-link:hover { color: var(--sb-text-main); background: var(--sb-bg); }
+    .sb-link.active {
+      color: var(--sb-primary); background: var(--sb-primary-light);
+      border-left-color: var(--sb-primary);
+    }
+    .sb-badge {
+      margin-left: auto; background: #ef4444; color: #fff;
+      font-size: 10px; font-weight: 600; min-width: 18px; height: 18px;
+      border-radius: var(--radius-pill); display: flex; align-items: center;
+      justify-content: center; padding: 0 5px;
+    }
+    .sb-divider { height: 1px; background: var(--sb-card-border); margin: 10px 1.25rem; }
+
+    .main {
+      margin-top: var(--sb-topbar-h);
+      margin-left: var(--sb-sidebar-w);
+      padding: 1.75rem 2rem;
+      min-height: calc(100vh - var(--sb-topbar-h));
+      position: relative; z-index: 1;
+    }
+
+    .page-header { margin-bottom: 1.5rem; }
+    .page-title { font-size: 20px; font-weight: 700; color: var(--sb-text-main); }
+    .page-sub { font-size: 13px; color: var(--sb-text-muted); margin-top: 2px; }
+
+    /* ── Cards ─────────────────────────────────────────────────────────────── */
+    .card {
+      background: rgba(255,255,255,0.88);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(180, 220, 200, 0.4);
+      border-radius: var(--radius-lg);
+    }
+    .card-body { padding: 1.25rem; }
+    .card-title {
+      font-size: 13px; font-weight: 600; color: var(--sb-text-main);
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 1rem;
+    }
+    .card-title-sub { font-size: 12px; font-weight: 400; color: var(--sb-text-muted); }
+
+    /* ── KPI cards ─────────────────────────────────────────────────────────── */
+    .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 1.25rem; }
+    .kpi {
+      background: rgba(255,255,255,0.88);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(180, 220, 200, 0.4);
+      border-radius: var(--radius-lg);
+      padding: 1.125rem 1.25rem;
+    }
+    .kpi.kpi-accent { background: var(--sb-primary); border-color: var(--sb-primary); }
+    .kpi-label {
+      font-size: 10px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: .06em; color: var(--sb-text-muted);
+      display: flex; align-items: center; gap: 5px; margin-bottom: 10px;
+    }
+    .kpi.kpi-accent .kpi-label { color: rgba(255,255,255,.7); }
+    .kpi-value { font-size: 26px; font-weight: 700; color: var(--sb-text-main); line-height: 1; margin-bottom: 6px; }
+    .kpi.kpi-accent .kpi-value { color: #fff; }
+    .kpi-delta { font-size: 12px; display: flex; align-items: center; gap: 4px; }
+    .kpi.kpi-accent .kpi-delta { color: rgba(255,255,255,.75); }
+    .delta-up { color: #059669; }
+    .delta-warn { color: #b45309; }
+    .delta-alert { color: #dc2626; }
+    .delta-muted { color: var(--sb-text-muted); }
+
+    /* ── Badges ────────────────────────────────────────────────────────────── */
+    .badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 3px 10px; border-radius: var(--radius-pill);
+      font-size: 11px; font-weight: 600; white-space: nowrap;
+    }
+    .b-green { background: var(--sb-primary-light); color: var(--sb-primary); border: 1px solid var(--sb-primary-border); }
+    .b-blue  { background: var(--sb-info-bg);       color: var(--sb-info-text);    border: 1px solid var(--sb-info-border); }
+    .b-warn  { background: var(--sb-warning-bg);    color: var(--sb-warning-text); border: 1px solid var(--sb-warning-border); }
+    .b-danger{ background: var(--sb-danger-light);  color: var(--sb-danger-text);  border: 1px solid var(--sb-danger-border); }
+    .b-purple{ background: var(--sb-purple-bg);     color: var(--sb-purple-text);  border: 1px solid var(--sb-purple-border); }
+    .b-gray  { background: var(--sb-bg);            color: var(--sb-text-muted);   border: 1px solid var(--sb-card-border); }
+    .b-dark  { background: #1e293b; color: #e2e8f0; border: 1px solid #334155; }
+
+    /* ── Avatar ────────────────────────────────────────────────────────────── */
+    .av {
+      border-radius: 50%; display: inline-flex; align-items: center;
+      justify-content: center; font-weight: 700; flex-shrink: 0;
+    }
+    .av-sm  { width: 30px; height: 30px; font-size: 11px; background: var(--sb-primary-light); color: var(--sb-primary); }
+    .av-md  { width: 42px; height: 42px; font-size: 15px; background: var(--sb-primary-light); color: var(--sb-primary); }
+    .av-lg  { width: 56px; height: 56px; font-size: 20px; background: var(--sb-primary-light); color: var(--sb-primary); }
+
+    /* ── Tables ────────────────────────────────────────────────────────────── */
+    .tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .tbl th {
+      padding: 9px 14px; font-size: 10px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: .06em;
+      color: var(--sb-text-muted); border-bottom: 1px solid var(--sb-card-border);
+      text-align: left; background: #f9fbfa;
+    }
+    .tbl td { padding: 11px 14px; border-bottom: 1px solid #f3f4f3; color: var(--sb-text-main); }
+    .tbl tbody tr:last-child td { border-bottom: none; }
+    .tbl tbody tr:hover td { background: #f7faf8; }
+    .tbl th:first-child { border-radius: var(--radius-sm) 0 0 0; }
+    .tbl th:last-child  { border-radius: 0 var(--radius-sm) 0 0; }
+
+    /* ── Buttons ───────────────────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 7px 18px; border-radius: var(--radius-pill);
+      font-size: 13px; font-weight: 500; cursor: pointer;
+      border: none; transition: all .15s ease;
+    }
+    .btn-primary { background: var(--sb-primary); color: #fff; }
+    .btn-primary:hover { background: var(--sb-primary-hover); }
+    .btn-secondary {
+      background: var(--sb-bg); color: var(--sb-text-main);
+      border: 1px solid var(--sb-card-border);
+    }
+    .btn-secondary:hover { background: var(--sb-card-border); }
+    .btn-danger { background: var(--sb-danger-light); color: var(--sb-danger-text); border: 1px solid var(--sb-danger-border); }
+    .btn-danger:hover { background: #fde8e8; }
+    .btn-ghost { background: none; color: var(--sb-text-muted); border: 1px solid var(--sb-card-border); }
+    .btn-ghost:hover { background: var(--sb-bg); color: var(--sb-text-main); }
+    .btn-sm { padding: 4px 12px; font-size: 12px; }
+    .btn-link { background: none; border: none; color: var(--sb-primary); font-size: 12px; font-weight: 500; cursor: pointer; padding: 0; }
+
+    /* ── Filter pills ──────────────────────────────────────────────────────── */
+    .filter-bar { display: flex; gap: 8px; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; }
+    .fpill {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 7px 16px; border-radius: var(--radius-pill);
+      border: 1px solid var(--sb-card-border);
+      background: var(--sb-card-bg); color: var(--sb-text-main);
+      font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap;
+      transition: all .15s;
+    }
+    .fpill i { font-size: 14px; }
+    .fpill:hover { background: var(--sb-bg); }
+    .fpill.active { background: var(--sb-primary-light); color: var(--sb-primary); border-color: var(--sb-primary-border); }
+    .search-wrap { position: relative; }
+    .search-wrap i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 15px; color: var(--sb-text-muted); pointer-events: none; }
+    .search-input {
+      padding: 7px 14px 7px 36px;
+      border: 1px solid var(--sb-card-border);
+      border-radius: var(--radius-pill);
+      font-size: 13px; background: var(--sb-card-bg);
+      color: var(--sb-text-main); width: 220px;
+    }
+    .search-input:focus { outline: none; border-color: var(--sb-primary); }
+
+    /* ── Pending actions ───────────────────────────────────────────────────── */
+    .pending-item {
+      display: flex; align-items: flex-start; gap: 12px;
+      padding: 12px 0; border-bottom: 1px solid #f3f4f3;
+    }
+    .pending-item:last-child { border-bottom: none; padding-bottom: 0; }
+    .p-icon {
+      width: 34px; height: 34px; border-radius: var(--radius-sm);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; flex-shrink: 0;
+    }
+    .p-icon-orange { background: #fff7ed; color: #c2410c; }
+    .p-icon-blue   { background: var(--sb-info-bg); color: var(--sb-info-text); }
+    .p-icon-purple { background: var(--sb-purple-bg); color: var(--sb-purple-text); }
+    .p-icon-yellow { background: #fefce8; color: #a16207; }
+    .p-body { flex: 1; min-width: 0; }
+    .p-title { font-size: 13px; font-weight: 600; color: var(--sb-text-main); margin-bottom: 2px; }
+    .p-meta  { font-size: 11px; color: var(--sb-text-muted); }
+
+    /* ── Layout helpers ────────────────────────────────────────────────────── */
+    .two-col   { display: grid; grid-template-columns: 1fr 290px; gap: 12px; margin-bottom: 1.25rem; }
+    .equal-col { display: grid; grid-template-columns: 1fr 1fr;   gap: 12px; }
+    .mb-4  { margin-bottom: 1.25rem; }
+    .mt-3  { margin-top: .875rem; }
+    .pt-3  { padding-top: .875rem; }
+    .border-top { border-top: 1px solid var(--sb-card-border); }
+
+    /* ── Sparkline field ───────────────────────────────────────────────────── */
+    .chart-legend { display: flex; gap: 1.25rem; margin-top: 10px; }
+    .legend-item  { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--sb-text-muted); }
+    .legend-line  { width: 18px; height: 2px; border-radius: 2px; }
+
+    /* ── Subject bars ──────────────────────────────────────────────────────── */
+    .sbar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+    .sbar:last-child { margin-bottom: 0; }
+    .sbar-label { font-size: 12px; color: var(--sb-text-muted); width: 90px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .sbar-track { flex: 1; height: 7px; border-radius: var(--radius-pill); background: var(--sb-bg); overflow: hidden; }
+    .sbar-fill  { height: 100%; border-radius: var(--radius-pill); }
+    .sbar-num   { font-size: 12px; font-weight: 600; color: var(--sb-text-main); width: 28px; text-align: right; }
+
+    /* ── Time toggle ───────────────────────────────────────────────────────── */
+    .time-toggle { display: flex; border: 1px solid var(--sb-card-border); border-radius: var(--radius-pill); overflow: hidden; }
+    .tg-btn { padding: 6px 16px; border: none; background: none; font-size: 12px; font-weight: 500; color: var(--sb-text-muted); cursor: pointer; transition: all .15s; }
+    .tg-btn:hover { color: var(--sb-text-main); }
+    .tg-btn.active { background: var(--sb-primary); color: #fff; }
+
+    /* ── Modal ─────────────────────────────────────────────────────────────── */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0; z-index: 500;
+      background: rgba(10, 25, 22, 0.45);
+      align-items: center; justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--sb-card-bg);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--sb-card-border);
+      width: 100%; max-width: 460px;
+      max-height: 90vh; overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(10,25,22,.15);
+    }
+    .modal-header {
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid var(--sb-card-border);
+      display: flex; align-items: flex-start; justify-content: space-between;
+    }
+    .modal-header-left { display: flex; gap: 14px; align-items: flex-start; }
+    .modal-close { background: none; border: none; font-size: 20px; color: var(--sb-text-muted); cursor: pointer; line-height: 1; }
+    .modal-close:hover { color: var(--sb-text-main); }
+
+    .modal-tabs { display: flex; border-bottom: 1px solid var(--sb-card-border); padding: 0 1.5rem; }
+    .modal-tab {
+      padding: 10px 0; margin-right: 1.5rem;
+      font-size: 13px; font-weight: 500; color: var(--sb-text-muted);
+      border-bottom: 2px solid transparent; cursor: pointer; background: none; border-top: none; border-left: none; border-right: none;
+      transition: all .15s;
+    }
+    .modal-tab:hover { color: var(--sb-text-main); }
+    .modal-tab.active { color: var(--sb-primary); border-bottom-color: var(--sb-primary); }
+
+    .modal-body { padding: 1.25rem 1.5rem; }
+    .modal-footer {
+      padding: 1rem 1.5rem; border-top: 1px solid var(--sb-card-border);
+      display: flex; gap: 8px; justify-content: flex-end;
+    }
+
+    .field { margin-bottom: 1rem; }
+    .field:last-child { margin-bottom: 0; }
+    .field-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--sb-text-muted); margin-bottom: 5px; }
+    .field-value { font-size: 14px; color: var(--sb-text-main); }
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+    .select-trigger {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 9px 14px; border-radius: var(--radius-sm);
+      border: 1px solid var(--sb-card-border); background: var(--sb-bg);
+      font-size: 13px; color: var(--sb-text-main); cursor: pointer; width: 100%;
+    }
+    .select-trigger:hover { border-color: var(--sb-primary); }
+
+    .action-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 0; border-bottom: 1px solid #f3f4f3;
+    }
+    .action-row:last-child { border-bottom: none; padding-bottom: 0; }
+    .action-label { font-size: 13px; font-weight: 500; color: var(--sb-text-main); }
+    .action-sub   { font-size: 11px; color: var(--sb-text-muted); margin-top: 2px; }
+
+    /* ── Section visibility ────────────────────────────────────────────────── */
+    .section { display: none; }
+    .section.active { display: block; }
+    .modal-section { display: none; }
+    .modal-section.active { display: block; }
+  </style>
+</head>
+<body>
+
+<div class="aurora-layer" aria-hidden="true"></div>
+
+<!-- Topbar -->
+<div class="topbar">
+  <div class="topbar-left">
+    <span class="wordmark">studybuddy</span>
+    <div class="topbar-sep"></div>
+    <span class="topbar-role"><i class="bi bi-shield-check"></i> Super admin</span>
+  </div>
+  <div class="topbar-right">
+    <i class="bi bi-bell topbar-icon"></i>
+    <div class="topbar-av">SA</div>
+    <span class="topbar-name">Super Admin</span>
+  </div>
+</div>
+
+<!-- Sidebar -->
+<nav class="sidebar">
+  <div class="sb-section-label" style="margin-bottom:8px">Platform</div>
+  <div class="sb-link active" id="nav-dashboard" onclick="showSection('dashboard', this)">
+    <i class="bi bi-grid"></i> Dashboard
+    <span class="sb-badge">4</span>
+  </div>
+  <div class="sb-link" id="nav-users" onclick="showSection('users', this)">
+    <i class="bi bi-people"></i> All users
+  </div>
+  <div class="sb-link" id="nav-reports" onclick="showSection('reports', this)">
+    <i class="bi bi-bar-chart-line"></i> Reports
+  </div>
+  <div class="sb-divider"></div>
+  <div class="sb-section-label" style="margin-bottom:8px">Manage</div>
+  <div class="sb-link"><i class="bi bi-building"></i> Institutions</div>
+  <div class="sb-link"><i class="bi bi-cash-stack"></i> Withdrawals</div>
+  <div class="sb-link"><i class="bi bi-gear"></i> Platform config</div>
+</nav>
+
+<!-- Main -->
+<main class="main">
+
+  <!-- ── DASHBOARD ──────────────────────────────────────────────────────── -->
+  <div id="sec-dashboard" class="section active">
+    <div class="page-header">
+      <div class="page-title">Dashboard</div>
+      <div class="page-sub">Platform overview — June 17, 2026</div>
+    </div>
+
+    <div class="kpi-row">
+      <div class="kpi kpi-accent">
+        <div class="kpi-label"><i class="bi bi-people-fill"></i> Total users</div>
+        <div class="kpi-value">1,284</div>
+        <div class="kpi-delta"><i class="bi bi-arrow-up-short"></i> +18 this week</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label"><i class="bi bi-calendar-check"></i> Sessions today</div>
+        <div class="kpi-value">47</div>
+        <div class="kpi-delta delta-up"><i class="bi bi-arrow-up-short"></i> +9 vs yesterday</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label"><i class="bi bi-cash"></i> Revenue MTD</div>
+        <div class="kpi-value">₱42,810</div>
+        <div class="kpi-delta delta-up"><i class="bi bi-arrow-up-short"></i> +23% vs last month</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label"><i class="bi bi-exclamation-circle"></i> Pending actions</div>
+        <div class="kpi-value">4</div>
+        <div class="kpi-delta delta-warn"><i class="bi bi-clock"></i> Needs attention</div>
+      </div>
+    </div>
+
+    <div class="two-col mb-4">
+      <!-- Enrollment trend + institution table -->
+      <div class="card">
+        <div class="card-body">
+          <div class="card-title">
+            Enrollment trend — last 14 days
+            <button class="btn-link">Full reports →</button>
+          </div>
+          <svg viewBox="0 0 480 90" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:90px;display:block">
+            <defs>
+              <linearGradient id="ga" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#00895A" stop-opacity=".18"/>
+                <stop offset="100%" stop-color="#00895A" stop-opacity="0"/>
+              </linearGradient>
+              <linearGradient id="gb" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#3b82f6" stop-opacity=".12"/>
+                <stop offset="100%" stop-color="#3b82f6" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <!-- Tutors area -->
+            <path d="M0,68 L36,62 L72,58 L108,64 L144,52 L180,44 L216,40 L252,46 L288,34 L324,26 L360,30 L396,18 L432,14 L468,8 L468,90 L0,90Z" fill="url(#ga)"/>
+            <polyline points="0,68 36,62 72,58 108,64 144,52 180,44 216,40 252,46 288,34 324,26 360,30 396,18 432,14 468,8" fill="none" stroke="#00895A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <!-- Tutees area -->
+            <path d="M0,76 L36,72 L72,70 L108,74 L144,67 L180,62 L216,58 L252,62 L288,54 L324,48 L360,51 L396,42 L432,38 L468,33 L468,90 L0,90Z" fill="url(#gb)"/>
+            <polyline points="0,76 36,72 72,70 108,74 144,67 180,62 216,58 252,62 288,54 324,48 360,51 396,42 432,38 468,33" fill="none" stroke="#3b82f6" stroke-width="2" stroke-dasharray="5 4" stroke-linecap="round" stroke-linejoin="round"/>
+            <!-- End dots -->
+            <circle cx="468" cy="8"  r="4" fill="#00895A"/>
+            <circle cx="468" cy="33" r="4" fill="#3b82f6"/>
+          </svg>
+          <div class="chart-legend">
+            <div class="legend-item"><div class="legend-line" style="background:#00895A"></div> New tutors</div>
+            <div class="legend-item"><div class="legend-line" style="border-top:2px dashed #3b82f6"></div> New tutees</div>
+          </div>
+
+          <!-- Institution table inside same card -->
+          <div class="border-top pt-3 mt-3">
+            <div class="card-title" style="margin-bottom:.75rem">
+              Institution performance
+              <button class="btn-link">See all →</button>
+            </div>
+            <table class="tbl">
+              <thead>
+                <tr>
+                  <th>Institution</th>
+                  <th>Tutors</th>
+                  <th>Tutees</th>
+                  <th>Sessions</th>
+                  <th>Avg rating</th>
+                  <th style="text-align:right">Commission</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>CPU</strong></td>
+                  <td>84</td><td>312</td>
+                  <td><span class="badge b-green">847</span></td>
+                  <td><span style="color:#f59e0b;font-weight:600">★ 4.8</span></td>
+                  <td style="text-align:right;font-weight:600">₱31,200</td>
+                </tr>
+                <tr>
+                  <td><strong>WVSU</strong></td>
+                  <td>42</td><td>187</td>
+                  <td><span class="badge b-green">391</span></td>
+                  <td><span style="color:#f59e0b;font-weight:600">★ 4.6</span></td>
+                  <td style="text-align:right;font-weight:600">₱14,820</td>
+                </tr>
+                <tr>
+                  <td><strong>UPV</strong></td>
+                  <td>28</td><td>104</td>
+                  <td><span class="badge b-green">203</span></td>
+                  <td><span style="color:#f59e0b;font-weight:600">★ 4.7</span></td>
+                  <td style="text-align:right;font-weight:600">₱7,880</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pending actions -->
+      <div class="card">
+        <div class="card-body" style="height:100%">
+          <div class="card-title">
+            Pending actions
+            <span class="badge b-warn" style="font-size:10px">4 items</span>
+          </div>
+
+          <div class="pending-item">
+            <div class="p-icon p-icon-orange"><i class="bi bi-building-add"></i></div>
+            <div class="p-body">
+              <div class="p-title">Institution registration</div>
+              <div class="p-meta">WVSU · wvsu.edu.ph · 2h ago</div>
+            </div>
+            <button class="btn btn-sm btn-secondary" style="flex-shrink:0" onclick="haptic(HAPTIC.light)">Review</button>
+          </div>
+
+          <div class="pending-item">
+            <div class="p-icon p-icon-yellow"><i class="bi bi-building-check"></i></div>
+            <div class="p-body">
+              <div class="p-title">Activation pending</div>
+              <div class="p-meta">EARIST · created 1d ago</div>
+            </div>
+            <button class="btn btn-sm btn-secondary" style="flex-shrink:0" onclick="haptic(HAPTIC.celebratory)">Activate</button>
+          </div>
+
+          <div class="pending-item">
+            <div class="p-icon p-icon-blue"><i class="bi bi-person-add"></i></div>
+            <div class="p-body">
+              <div class="p-title">Admin account request</div>
+              <div class="p-meta">UPV · from admin@upv.edu.ph · 5h ago</div>
+            </div>
+            <button class="btn btn-sm btn-secondary" style="flex-shrink:0" onclick="haptic(HAPTIC.medium)">Assign</button>
+          </div>
+
+          <div class="pending-item">
+            <div class="p-icon p-icon-purple"><i class="bi bi-shield-lock"></i></div>
+            <div class="p-body">
+              <div class="p-title">Domain exemption</div>
+              <div class="p-meta">ana@gmail.com · profile complete · 3h ago</div>
+            </div>
+            <button class="btn btn-sm btn-secondary" style="flex-shrink:0" onclick="haptic(HAPTIC.light)">Review</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── USERS ──────────────────────────────────────────────────────────── -->
+  <div id="sec-users" class="section">
+    <div class="page-header">
+      <div class="page-title">All users</div>
+      <div class="page-sub">1,284 users across 3 institutions</div>
+    </div>
+
+    <div class="filter-bar">
+      <div class="search-wrap">
+        <i class="bi bi-search"></i>
+        <input class="search-input" type="text" placeholder="Search name or email…">
+      </div>
+      <button class="fpill" onclick="toggleFpill(this)">
+        <i class="bi bi-shield"></i> All roles <i class="bi bi-chevron-down" style="font-size:11px"></i>
+      </button>
+      <button class="fpill" onclick="toggleFpill(this)">
+        <i class="bi bi-building"></i> All institutions <i class="bi bi-chevron-down" style="font-size:11px"></i>
+      </button>
+      <button class="fpill" onclick="toggleFpill(this)">
+        <i class="bi bi-circle-half"></i> All statuses <i class="bi bi-chevron-down" style="font-size:11px"></i>
+      </button>
+      <button class="btn btn-secondary btn-sm" style="margin-left:auto">
+        <i class="bi bi-download"></i> Export CSV
+      </button>
+    </div>
+
+    <div class="card mb-4" style="overflow:hidden">
+      <table class="tbl">
+        <thead>
+          <tr>
+            <th style="padding-left:1.25rem">User</th>
+            <th>Role</th>
+            <th>Institution</th>
+            <th>Status</th>
+            <th>Joined</th>
+            <th style="text-align:right;padding-right:1.25rem">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="padding-left:1.25rem">
+              <div style="display:flex;align-items:center;gap:10px">
+                <div class="av av-sm">AL</div>
+                <div>
+                  <div style="font-weight:600;font-size:13px">Ana Lim</div>
+                  <div style="font-size:11px;color:var(--sb-text-muted)">ana.lim@cpu.edu.ph</div>
+                </div>
+              </div>
+            </td>
+            <td><span class="badge b-blue">Tutor</span></td>
+            <td style="font-size:13px">CPU</td>
+            <td><span class="badge b-green"><i class="bi bi-check-circle-fill"></i> Active</span></td>
+            <td style="font-size:12px;color:var(--sb-text-muted)">Jan 12, 2026</td>
+            <td style="text-align:right;padding-right:1.25rem">
+              <button class="btn btn-sm btn-ghost" onclick="openModal()"><i class="bi bi-eye"></i> View</button>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding-left:1.25rem">
+              <div style="display:flex;align-items:center;gap:10px">
+                <div class="av av-sm">JS</div>
+                <div>
+                  <div style="font-weight:600;font-size:13px">Juan Santos</div>
+                  <div style="font-size:11px;color:var(--sb-text-muted)">j.santos@cpu.edu.ph</div>
+                </div>
+              </div>
+            </td>
+            <td><span class="badge b-gray">Tutee</span></td>
+            <td style="font-size:13px">CPU</td>
+            <td><span class="badge b-green"><i class="bi bi-check-circle-fill"></i> Active</span></td>
+            <td style="font-size:12px;color:var(--sb-text-muted)">Feb 3, 2026</td>
+            <td style="text-align:right;padding-right:1.25rem">
+              <button class="btn btn-sm btn-ghost" onclick="openModal()"><i class="bi bi-eye"></i> View</button>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding-left:1.25rem">
+              <div style="display:flex;align-items:center;gap:10px">
+                <div class="av av-sm" style="background:#fef2f2;color:#991b1b">MR</div>
+                <div>
+                  <div style="font-weight:600;font-size:13px">Maria Reyes</div>
+                  <div style="font-size:11px;color:var(--sb-text-muted)">m.reyes@wvsu.edu.ph</div>
+                </div>
+              </div>
+            </td>
+            <td><span class="badge b-blue">Tutor</span></td>
+            <td style="font-size:13px">WVSU</td>
+            <td><span class="badge b-danger"><i class="bi bi-x-circle-fill"></i> Suspended</span></td>
+            <td style="font-size:12px;color:var(--sb-text-muted)">Mar 8, 2026</td>
+            <td style="text-align:right;padding-right:1.25rem">
+              <button class="btn btn-sm btn-ghost" onclick="openModal()"><i class="bi bi-eye"></i> View</button>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding-left:1.25rem">
+              <div style="display:flex;align-items:center;gap:10px">
+                <div class="av av-sm" style="background:#f5f3ff;color:#5b21b6">RC</div>
+                <div>
+                  <div style="font-weight:600;font-size:13px">Ramon Cruz</div>
+                  <div style="font-size:11px;color:var(--sb-text-muted)">r.cruz@cpu.edu.ph</div>
+                </div>
+              </div>
+            </td>
+            <td><span class="badge b-purple">Admin</span></td>
+            <td style="font-size:13px">CPU</td>
+            <td><span class="badge b-green"><i class="bi bi-check-circle-fill"></i> Active</span></td>
+            <td style="font-size:12px;color:var(--sb-text-muted)">Nov 1, 2025</td>
+            <td style="text-align:right;padding-right:1.25rem">
+              <button class="btn btn-sm btn-ghost" onclick="openModal()"><i class="bi bi-eye"></i> View</button>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding-left:1.25rem">
+              <div style="display:flex;align-items:center;gap:10px">
+                <div class="av av-sm" style="background:#1e293b;color:#e2e8f0">SA</div>
+                <div>
+                  <div style="font-weight:600;font-size:13px">Super Admin</div>
+                  <div style="font-size:11px;color:var(--sb-text-muted)">superadmin@cpu.edu.ph</div>
+                </div>
+              </div>
+            </td>
+            <td><span class="badge b-dark">SuperAdmin</span></td>
+            <td style="font-size:13px">CPU</td>
+            <td><span class="badge b-green"><i class="bi bi-check-circle-fill"></i> Active</span></td>
+            <td style="font-size:12px;color:var(--sb-text-muted)">Aug 1, 2025</td>
+            <td style="text-align:right;padding-right:1.25rem">
+              <button class="btn btn-sm btn-ghost" onclick="openModal()"><i class="bi bi-eye"></i> View</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── REPORTS ────────────────────────────────────────────────────────── -->
+  <div id="sec-reports" class="section">
+    <div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px">
+      <div>
+        <div class="page-title">Reports</div>
+        <div class="page-sub">Platform analytics · All institutions</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <div class="time-toggle">
+          <button class="tg-btn" onclick="setTime(this)">7D</button>
+          <button class="tg-btn active" onclick="setTime(this)">30D</button>
+          <button class="tg-btn" onclick="setTime(this)">3M</button>
+          <button class="tg-btn" onclick="setTime(this)">All time</button>
+        </div>
+        <button class="fpill" onclick="toggleFpill(this)">
+          <i class="bi bi-building"></i> All institutions <i class="bi bi-chevron-down" style="font-size:11px"></i>
+        </button>
+        <button class="btn btn-secondary btn-sm"><i class="bi bi-download"></i> Export CSV</button>
+      </div>
+    </div>
+
+    <div class="kpi-row">
+      <div class="kpi">
+        <div class="kpi-label"><i class="bi bi-graph-up-arrow"></i> Gross revenue</div>
+        <div class="kpi-value" style="font-size:22px">₱138,400</div>
+        <div class="kpi-delta delta-up"><i class="bi bi-arrow-up-short"></i> +31% this period</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label"><i class="bi bi-percent"></i> Platform commissions</div>
+        <div class="kpi-value" style="font-size:22px">₱13,840</div>
+        <div class="kpi-delta delta-muted">10% of gross</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label"><i class="bi bi-wallet2"></i> Tutor payouts</div>
+        <div class="kpi-value" style="font-size:22px">₱124,560</div>
+        <div class="kpi-delta delta-muted">90% distributed</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label"><i class="bi bi-patch-check"></i> Completion rate</div>
+        <div class="kpi-value" style="font-size:22px">94.2%</div>
+        <div class="kpi-delta delta-up"><i class="bi bi-arrow-up-short"></i> +2.1 pts</div>
+      </div>
+    </div>
+
+    <div class="card mb-4">
+      <div class="card-body">
+        <div class="card-title">Sessions completed — last 30 days</div>
+        <svg viewBox="0 0 640 100" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100px;display:block;margin-bottom:8px">
+          <defs>
+            <linearGradient id="sc" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#00895A" stop-opacity=".2"/>
+              <stop offset="100%" stop-color="#00895A" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <path d="M0,78 L22,74 L44,70 L66,76 L88,66 L110,60 L132,55 L154,62 L176,50 L198,42 L220,47 L242,36 L264,40 L286,28 L308,32 L330,20 L352,24 L374,14 L396,18 L418,10 L440,14 L462,7 L484,11 L506,5 L528,9 L550,4 L572,7 L594,3 L616,6 L638,4 L638,100 L0,100Z" fill="url(#sc)"/>
+          <polyline points="0,78 22,74 44,70 66,76 88,66 110,60 132,55 154,62 176,50 198,42 220,47 242,36 264,40 286,28 308,32 330,20 352,24 374,14 396,18 418,10 440,14 462,7 484,11 506,5 528,9 550,4 572,7 594,3 616,6 638,4" fill="none" stroke="#00895A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--sb-text-muted)">
+          <span>May 18</span><span>Jun 1</span><span>Jun 16</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="equal-col">
+      <!-- Top tutors -->
+      <div class="card">
+        <div class="card-body">
+          <div class="card-title">Top tutors <span class="card-title-sub">by sessions</span></div>
+          <table class="tbl">
+            <thead>
+              <tr>
+                <th>Tutor</th>
+                <th style="text-align:center">Sessions</th>
+                <th style="text-align:center">Rating</th>
+                <th style="text-align:right">Earnings</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><div style="display:flex;align-items:center;gap:8px"><div class="av av-sm" style="width:26px;height:26px;font-size:10px">AL</div>Ana Lim</div></td>
+                <td style="text-align:center">84</td>
+                <td style="text-align:center;color:#f59e0b;font-weight:600">★ 4.9</td>
+                <td style="text-align:right;font-weight:600">₱7,560</td>
+              </tr>
+              <tr>
+                <td><div style="display:flex;align-items:center;gap:8px"><div class="av av-sm" style="width:26px;height:26px;font-size:10px">BG</div>Ben Go</div></td>
+                <td style="text-align:center">71</td>
+                <td style="text-align:center;color:#f59e0b;font-weight:600">★ 4.8</td>
+                <td style="text-align:right;font-weight:600">₱6,390</td>
+              </tr>
+              <tr>
+                <td><div style="display:flex;align-items:center;gap:8px"><div class="av av-sm" style="width:26px;height:26px;font-size:10px">KV</div>Kira Villanueva</div></td>
+                <td style="text-align:center">58</td>
+                <td style="text-align:center;color:#f59e0b;font-weight:600">★ 4.7</td>
+                <td style="text-align:right;font-weight:600">₱5,220</td>
+              </tr>
+              <tr>
+                <td><div style="display:flex;align-items:center;gap:8px"><div class="av av-sm" style="width:26px;height:26px;font-size:10px">DR</div>Dan Ramos</div></td>
+                <td style="text-align:center">47</td>
+                <td style="text-align:center;color:#f59e0b;font-weight:600">★ 4.6</td>
+                <td style="text-align:right;font-weight:600">₱4,230</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Subject popularity + institution breakdown -->
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div class="card">
+          <div class="card-body">
+            <div class="card-title">Subject popularity <span class="card-title-sub">by bookings</span></div>
+            <div class="sbar"><div class="sbar-label">Mathematics</div><div class="sbar-track"><div class="sbar-fill" style="width:87%;background:#00895A"></div></div><div class="sbar-num">87</div></div>
+            <div class="sbar"><div class="sbar-label">Science</div><div class="sbar-track"><div class="sbar-fill" style="width:72%;background:#3b82f6"></div></div><div class="sbar-num">72</div></div>
+            <div class="sbar"><div class="sbar-label">English</div><div class="sbar-track"><div class="sbar-fill" style="width:65%;background:#f59e0b"></div></div><div class="sbar-num">65</div></div>
+            <div class="sbar"><div class="sbar-label">Programming</div><div class="sbar-track"><div class="sbar-fill" style="width:48%;background:#8b5cf6"></div></div><div class="sbar-num">48</div></div>
+            <div class="sbar"><div class="sbar-label">History</div><div class="sbar-track"><div class="sbar-fill" style="width:38%;background:#ec4899"></div></div><div class="sbar-num">38</div></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-body">
+            <div class="card-title">Institution breakdown</div>
+            <table class="tbl">
+              <thead>
+                <tr>
+                  <th>Institution</th>
+                  <th style="text-align:center">Sessions</th>
+                  <th style="text-align:right">Completion</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>CPU</strong></td>
+                  <td style="text-align:center"><span class="badge b-green">847</span></td>
+                  <td style="text-align:right;font-weight:600;color:#059669">96%</td>
+                </tr>
+                <tr>
+                  <td><strong>WVSU</strong></td>
+                  <td style="text-align:center"><span class="badge b-green">391</span></td>
+                  <td style="text-align:right;font-weight:600;color:#059669">93%</td>
+                </tr>
+                <tr>
+                  <td><strong>UPV</strong></td>
+                  <td style="text-align:center"><span class="badge b-green">203</span></td>
+                  <td style="text-align:right;font-weight:600;color:#b45309">89%</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- ── User detail modal ──────────────────────────────────────────────── -->
+<div class="modal-overlay" id="userModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-header-left">
+        <div class="av av-lg">AL</div>
+        <div>
+          <div style="font-size:16px;font-weight:700;color:var(--sb-text-main)">Ana Lim</div>
+          <div style="font-size:13px;color:var(--sb-text-muted);margin-bottom:8px">ana.lim@cpu.edu.ph</div>
+          <div style="display:flex;gap:6px">
+            <span class="badge b-blue">Tutor</span>
+            <span class="badge b-green"><i class="bi bi-check-circle-fill"></i> Active</span>
+          </div>
+        </div>
+      </div>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+
+    <div class="modal-tabs">
+      <button class="modal-tab active" id="mtab-profile" onclick="showModalTab('profile')">Profile</button>
+      <button class="modal-tab" id="mtab-actions" onclick="showModalTab('actions')">Actions</button>
+    </div>
+
+    <div class="modal-body">
+      <!-- Profile tab -->
+      <div id="mtsec-profile" class="modal-section active">
+        <div class="field-row">
+          <div class="field">
+            <div class="field-label">Institution</div>
+            <div class="field-value">Central Philippine University</div>
+          </div>
+          <div class="field">
+            <div class="field-label">Role</div>
+            <div class="field-value"><span class="badge b-blue">Tutor</span></div>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <div class="field-label">Wallet balance</div>
+            <div class="field-value" style="color:#059669;font-weight:700;font-size:16px">₱3,420.00</div>
+          </div>
+          <div class="field">
+            <div class="field-label">Sessions completed</div>
+            <div class="field-value" style="font-size:16px;font-weight:700">84</div>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <div class="field-label">Joined</div>
+            <div class="field-value">January 12, 2026</div>
+          </div>
+          <div class="field">
+            <div class="field-label">Profile status</div>
+            <div class="field-value"><span class="badge b-green"><i class="bi bi-check"></i> Complete</span></div>
+          </div>
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <div class="field-label">Average rating</div>
+          <div class="field-value" style="color:#f59e0b;font-size:16px;font-weight:700">★ 4.9 <span style="font-size:13px;color:var(--sb-text-muted);font-weight:400">(84 reviews)</span></div>
+        </div>
+      </div>
+
+      <!-- Actions tab -->
+      <div id="mtsec-actions" class="modal-section">
+        <div class="action-row">
+          <div>
+            <div class="action-label">Change role</div>
+            <div class="action-sub">Currently: Tutor</div>
+          </div>
+          <button class="select-trigger" style="width:auto;min-width:130px">
+            Tutor <i class="bi bi-chevron-down" style="font-size:12px;margin-left:4px"></i>
+          </button>
+        </div>
+        <div class="action-row">
+          <div>
+            <div class="action-label">Change institution</div>
+            <div class="action-sub">Currently: CPU</div>
+          </div>
+          <button class="select-trigger" style="width:auto;min-width:130px">
+            CPU <i class="bi bi-chevron-down" style="font-size:12px;margin-left:4px"></i>
+          </button>
+        </div>
+        <div class="action-row">
+          <div>
+            <div class="action-label">Domain exemption</div>
+            <div class="action-sub">Allow login from non-partner domain</div>
+          </div>
+          <button class="btn btn-sm btn-secondary"><i class="bi bi-plus-circle"></i> Grant</button>
+        </div>
+        <div class="action-row" style="border-bottom:none;padding-bottom:0">
+          <div>
+            <div class="action-label" style="color:var(--sb-danger-text)">Suspend account</div>
+            <div class="action-sub">Blocks all platform access immediately</div>
+          </div>
+          <button class="btn btn-sm btn-danger" onclick="haptic(HAPTIC.celebratory)"><i class="bi bi-slash-circle"></i> Suspend</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal()">Close</button>
+      <button class="btn btn-primary" onclick="saveChanges()">Save changes</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const HAPTIC = { light: 12, medium: 30, celebratory: [18, 40, 18, 40, 60] }
+  function haptic(pattern) {
+    if (navigator && typeof navigator.vibrate === 'function') {
+      try { navigator.vibrate(pattern ?? HAPTIC.light) } catch {}
+    }
+  }
+
+  function showSection(name, el) {
+    haptic(HAPTIC.light)
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'))
+    document.querySelectorAll('.sb-link').forEach(l => l.classList.remove('active'))
+    const sec = document.getElementById('sec-' + name)
+    if (sec) sec.classList.add('active')
+    el.classList.add('active')
+  }
+
+  function openModal() {
+    haptic(HAPTIC.light)
+    document.getElementById('userModal').classList.add('open')
+    document.body.style.overflow = 'hidden'
+  }
+
+  function closeModal() {
+    haptic(HAPTIC.light)
+    document.getElementById('userModal').classList.remove('open')
+    document.body.style.overflow = ''
+  }
+
+  document.getElementById('userModal').addEventListener('click', function(e) {
+    if (e.target === this) closeModal()
+  })
+
+  function showModalTab(name) {
+    haptic(HAPTIC.light)
+    document.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'))
+    document.querySelectorAll('.modal-section').forEach(s => s.classList.remove('active'))
+    document.getElementById('mtab-' + name).classList.add('active')
+    document.getElementById('mtsec-' + name).classList.add('active')
+  }
+
+  function setTime(btn) {
+    haptic(HAPTIC.light)
+    btn.closest('.time-toggle').querySelectorAll('.tg-btn').forEach(b => b.classList.remove('active'))
+    btn.classList.add('active')
+  }
+
+  function toggleFpill(el) {
+    haptic(HAPTIC.light)
+    el.classList.toggle('active')
+  }
+
+  function saveChanges() {
+    haptic(HAPTIC.medium)
+  }
+
+  function confirmAction(label) {
+    haptic(HAPTIC.celebratory)
+  }
+</script>
+</body>
+</html>

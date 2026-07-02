@@ -1,1004 +1,1948 @@
 <template>
-  <div class="sb-landing relative-container">
-    <div class="sb-ambient-bg" aria-hidden="true">
-      <div class="blob-interactive" :style="{ transform: blob1Transform }">
-        <div class="sb-blob sb-blob-1"></div>
-      </div>
-      <div class="blob-interactive" :style="{ transform: blob2Transform }">
-        <div class="sb-blob sb-blob-2"></div>
-      </div>
-      <div class="blob-interactive" :style="{ transform: blob3Transform }">
-        <div class="sb-blob sb-blob-3"></div>
-      </div>
+  <div ref="pageRef" class="studio-landing">
+    <div class="bgwash" aria-hidden="true">
+      <i class="b1"></i>
+      <i class="b2"></i>
+      <i class="b3"></i>
     </div>
 
-    <nav class="sb-nav" aria-label="Main navigation">
-      <div class="sb-nav-inner">
-        <button class="sb-brand group" type="button" @click="router.push('/')">
-          <span class="sb-brand-mark" aria-hidden="true">S</span>
-          <span class="sb-brand-text">StudyBuddy</span>
+    <div ref="scrollSpaceRef" class="scroll-space" aria-hidden="true"></div>
+
+    <nav class="studio-nav" aria-label="Main navigation">
+      <button class="brand hoverable" type="button" @click="goTo('/')">
+        <span class="brand-mark" aria-hidden="true">S</span>
+        <span>Studybuddy</span>
+      </button>
+      <div class="navlinks">
+        <button class="btn outline hoverable" type="button" @click="goTo('/login')">
+          <span class="lbl">Log in</span>
         </button>
-        <div class="sb-nav-actions">
-          <button class="sb-nav-link" type="button" @click="router.push('/login')">Log in</button>
-          <button class="sb-btn-pill sb-btn-small hover-lift" type="button" @click="router.push('/register')">
-            Get started
-          </button>
-          <SbThemeToggle />
-        </div>
+        <button class="btn primary hoverable" type="button" @click="goTo('/register')">
+          <span class="fill"></span>
+          <span class="lbl">Get started</span>
+        </button>
+        <SbThemeToggle />
       </div>
     </nav>
 
-    <section class="sb-tile sb-hero">
-      <div class="sb-shell sb-split fade-in-up">
-        <div class="sb-hero-content text-left">
-          <p class="sb-eyebrow">University peer tutoring network</p>
-          <h1 class="sb-gradient-text">Learn better, together.</h1>
-          <p class="sb-hero-copy" style="margin-left: 0;">
-            Learn from trusted peer tutors, book around your schedule, and keep every session
-            organized in one StudyBuddy workspace.
-          </p>
-          <div class="sb-hero-actions" aria-label="Primary actions" style="justify-content: flex-start;">
-            <button class="sb-btn-pill hover-lift" type="button" @click="router.push('/register')">
-              Get started
-            </button>
-            <button class="sb-btn-link hover-lift" type="button" @click="router.push('/login')">Log in</button>
+    <main ref="smoothRef" class="smooth-root">
+      <section class="hero">
+        <div class="inner">
+          <p class="kick reveal in">Peer tutoring &mdash; by students, for students</p>
+          <h1 ref="heroTitleRef" class="hero-title">
+            <span class="row"><span>Learn it from</span></span>
+            <span class="row"><span>someone who</span></span>
+            <span class="row"><span><em>just aced it.</em></span></span>
+          </h1>
+          <div class="hero-sub">
+            <p class="reveal">
+              Studybuddy matches you with students on your campus who took the class,
+              passed the exam, and can actually explain it. Book a session, study
+              together, get it.
+            </p>
+            <div class="hero-actions" aria-label="Primary actions">
+              <button class="btn primary hoverable" type="button" @click="goTo('/register')">
+                <span class="fill"></span>
+                <span class="lbl">Find my tutor</span>
+              </button>
+              <button class="btn outline hoverable" type="button" @click="goTo('/register')">
+                <span class="lbl">Become a tutor</span>
+              </button>
+            </div>
+            <div class="scroll-cue" aria-hidden="true">
+              Scroll <span class="bar"></span>
+            </div>
           </div>
-          <div class="sb-badge-row" aria-label="StudyBuddy highlights" style="justify-content: flex-start;">
-            <span class="sb-badge hover-float">Smart matching</span>
-            <span class="sb-badge hover-float" style="animation-delay: 0.1s">Flexible booking</span>
-            <span class="sb-badge hover-float" style="animation-delay: 0.2s">Tutor earnings</span>
-            <span class="sb-badge hover-float" style="animation-delay: 0.3s">Progress reports</span>
-          </div>
         </div>
+      </section>
 
-        <div class="sb-image-wrapper sb-clipart-container hover-float">
-          <svg class="sb-clipart-svg" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="100" cy="100" r="80" fill="#ffffff" fill-opacity="0.2"/>
-            <path d="M60 110L100 80L140 110" stroke="#00895a" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
-            <circle cx="100" cy="80" r="16" fill="#00895a"/>
-            <circle cx="60" cy="110" r="12" fill="#00895a"/>
-            <circle cx="140" cy="110" r="12" fill="#00895a"/>
-            <path d="M100 80V130" stroke="#00895a" stroke-width="8" stroke-linecap="round"/>
-            <circle cx="100" cy="130" r="12" fill="#00895a"/>
-          </svg>
+      <div class="marquee" aria-label="Studybuddy highlights">
+        <div class="marquee-track">
+          <span v-for="copy in 2" :key="copy" class="marquee-copy">
+            <template v-for="item in marqueeItems" :key="`${copy}-${item.text}`">
+              <em v-if="item.em">{{ item.text }}</em>
+              <span v-else>{{ item.text }}</span>
+              <span class="dot" :class="item.dot" aria-hidden="true"></span>
+            </template>
+          </span>
         </div>
       </div>
-    </section>
 
-    <section class="sb-tile sb-tile-dark sb-stats glass-panel-dark" aria-label="StudyBuddy stats">
-      <div class="sb-shell sb-stats-grid">
-        <div v-for="stat in stats" :key="stat.label" class="sb-stat hover-scale">
-          <strong>{{ stat.value }}</strong>
-          <span>{{ stat.label }}</span>
-        </div>
-      </div>
-    </section>
-
-    <section class="sb-tile sb-tile-glass">
-      <div class="sb-shell">
-        <div class="sb-section-heading text-center">
-          <p class="sb-eyebrow">How it works</p>
-          <h2>From stuck to scheduled in minutes.</h2>
-          <p class="mx-auto" style="max-width: 600px; margin: 16px auto 0;">
-            StudyBuddy keeps the flow simple for students and tutors, from the first search to the
-            post-session recap.
-          </p>
-        </div>
-
-        <div class="sb-process-grid">
-          <article class="sb-step-card interactive-card text-center">
-            <div class="sb-icon-glass">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="11" cy="11" r="8"></circle>
-                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-              </svg>
-            </div>
-            <span class="sb-step-number-sm">Step 01</span>
-            <h3>Share what you need</h3>
-            <p>Choose a subject, topic, and goal so StudyBuddy can surface the right peers.</p>
-          </article>
-
-          <article class="sb-step-card interactive-card text-center">
-            <div class="sb-icon-glass" style="animation-delay: 0.1s">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                <line x1="16" y1="2" x2="16" y2="6"></line>
-                <line x1="8" y1="2" x2="8" y2="6"></line>
-                <line x1="3" y1="10" x2="21" y2="10"></line>
-              </svg>
-            </div>
-            <span class="sb-step-number-sm">Step 02</span>
-            <h3>Match and book</h3>
-            <p>Compare tutor fit, availability, and ratings, then reserve a time that works.</p>
-          </article>
-
-          <article class="sb-step-card interactive-card text-center">
-            <div class="sb-icon-glass" style="animation-delay: 0.2s">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
-              </svg>
-            </div>
-            <span class="sb-step-number-sm">Step 03</span>
-            <h3>Learn and track</h3>
-            <p>Wrap each session with history, compensation, and progress details in place.</p>
-          </article>
-        </div>
-      </div>
-    </section>
-
-    <section class="sb-tile sb-tile-glass">
-      <div class="sb-shell">
-        <div class="sb-section-heading text-center">
-          <p class="sb-eyebrow">Platform tools</p>
-          <h2>Everything the tutoring loop needs.</h2>
-          <p class="mx-auto" style="max-width: 600px; margin: 16px auto 0;">
-            Built for peer learning programs that need matching, scheduling, reporting, and fair
-            tutor visibility.
-          </p>
-        </div>
-
-        <div class="sb-feature-grid">
-          <article class="sb-card interactive-card">
-            <div class="sb-icon-glass-sm" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                <circle cx="9" cy="7" r="4"></circle>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-              </svg>
-            </div>
-            <h3>Smart tutor matching</h3>
-            <p>Rank peer tutors by subject fit, ratings, availability, and workload balance.</p>
-          </article>
-
-          <article class="sb-card interactive-card">
-            <div class="sb-icon-glass-sm" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                <line x1="16" y1="2" x2="16" y2="6"></line>
-                <line x1="8" y1="2" x2="8" y2="6"></line>
-                <line x1="3" y1="10" x2="21" y2="10"></line>
-              </svg>
-            </div>
-            <h3>Flexible scheduling</h3>
-            <p>Book around real tutor availability and keep upcoming sessions easy to scan.</p>
-          </article>
-
-          <article class="sb-card interactive-card">
-            <div class="sb-icon-glass-sm" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="18" y1="20" x2="18" y2="10"></line>
-                <line x1="12" y1="20" x2="12" y2="4"></line>
-                <line x1="6" y1="20" x2="6" y2="14"></line>
-              </svg>
-            </div>
-            <h3>Reports and earnings</h3>
-            <p>Track completed sessions, tutor compensation, and program-level performance.</p>
-          </article>
-
-          <article class="sb-card interactive-card">
-            <div class="sb-icon-glass-sm" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="4" y1="21" x2="4" y2="14"></line>
-                <line x1="4" y1="10" x2="4" y2="3"></line>
-                <line x1="12" y1="21" x2="12" y2="12"></line>
-                <line x1="12" y1="8" x2="12" y2="3"></line>
-                <line x1="20" y1="21" x2="20" y2="16"></line>
-                <line x1="20" y1="12" x2="20" y2="3"></line>
-                <line x1="1" y1="14" x2="7" y2="14"></line>
-                <line x1="9" y1="8" x2="15" y2="8"></line>
-                <line x1="17" y1="16" x2="23" y2="16"></line>
-              </svg>
-            </div>
-            <h3>Balanced workloads</h3>
-            <p>Protect session quality by keeping tutor demand visible before calendars fill up.</p>
-          </article>
-        </div>
-      </div>
-    </section>
-
-    <section class="sb-tile sb-tile-dark glass-panel-dark">
-      <div class="sb-shell">
-        <div class="sb-section-heading sb-heading-dark text-center">
-          <p class="sb-eyebrow" style="color: #fff">Student voices</p>
-          <h2>Peer support that feels close by.</h2>
-          <p class="mx-auto" style="max-width: 600px; margin: 16px auto 0;">Students and tutors get a focused place to meet, prepare, and keep learning moving.</p>
-        </div>
-        <div class="sb-testimonial-grid">
+      <section class="panels" aria-label="How Studybuddy works">
+        <div class="inner">
           <article
-            v-for="testimonial in testimonials"
-            :key="testimonial.name"
-            class="sb-testimonial-card interactive-card-dark"
+            v-for="(panel, index) in panels"
+            :key="panel.title"
+            class="panel"
           >
-            <p class="sb-quote">"{{ testimonial.quote }}"</p>
-            <div class="sb-person">
-              <div class="sb-avatar" aria-hidden="true">{{ testimonial.initials }}</div>
-              <div class="sb-person-info">
-                <strong>{{ testimonial.name }}</strong>
-                <span>{{ testimonial.role }}</span>
+            <div class="idx"><b>{{ String(index + 1).padStart(2, '0') }}</b> / 03</div>
+            <div class="panel-copy">
+              <h2>
+                <span v-for="line in panel.titleLines" :key="line" class="row">
+                  <span>{{ line }}</span>
+                </span>
+              </h2>
+              <p>{{ panel.copy }}</p>
+            </div>
+
+            <div class="viz hoverable">
+              <div class="ill" :data-depth="panel.depth">
+                <svg
+                  v-if="panel.id === 'need'"
+                  viewBox="0 0 440 240"
+                  fill="none"
+                  role="img"
+                  aria-label="Subject picker interface"
+                >
+                  <text x="24" y="48" class="svg-label svg-ink-fill">What do you need help with?</text>
+                  <rect x="24" y="70" width="118" height="40" rx="20" class="svg-primary-fill" />
+                  <text x="46" y="95" class="svg-small-label svg-contrast-fill">Calculus 2</text>
+                  <rect x="154" y="70" width="100" height="40" rx="20" class="svg-card-fill svg-card-stroke" stroke-width="2" />
+                  <text x="174" y="95" class="svg-muted-label svg-muted-fill">Physics</text>
+                  <rect x="266" y="70" width="110" height="40" rx="20" class="svg-card-fill svg-card-stroke" stroke-width="2" />
+                  <text x="284" y="95" class="svg-muted-label svg-muted-fill">Chemistry</text>
+                  <rect x="24" y="126" width="196" height="40" rx="20" class="svg-card-fill svg-card-stroke" stroke-width="2" />
+                  <text x="42" y="151" class="svg-muted-label svg-muted-fill">Thu, 7:00 PM onwards</text>
+                  <path d="M330 168 q 26 14 52 -6" class="svg-yellow-stroke" stroke-width="3.5" stroke-linecap="round" />
+                  <path d="M372 160 l 11 1 l -4 10" class="svg-yellow-stroke" stroke-width="3.5" stroke-linecap="round" />
+                </svg>
+
+                <svg
+                  v-else-if="panel.id === 'match'"
+                  viewBox="0 0 440 240"
+                  fill="none"
+                  role="img"
+                  aria-label="Two matched student avatars"
+                >
+                  <g class="char" data-amp="2.5">
+                    <circle cx="120" cy="106" r="32" class="svg-card-fill svg-ink-stroke" stroke-width="2.8" />
+                    <path d="M90 99 q 2 -27 30 -27 q 26 0 30 21 M103 76 q 6 -7 12 -8" class="svg-ink-stroke" stroke-width="2.4" stroke-linecap="round" />
+                    <path d="M110 102 q 3 4 8 0 M131 102 q 3 4 8 0 M113 118 q 7 5 14 0" class="svg-ink-stroke" stroke-width="2.4" stroke-linecap="round" />
+                    <path d="M103 110 l 7 1 M144 111 l -7 -1" class="svg-pink-stroke" stroke-width="2.2" stroke-linecap="round" opacity=".75" />
+                  </g>
+                  <g class="char" data-amp="3">
+                    <circle cx="320" cy="106" r="32" class="svg-card-fill svg-ink-stroke" stroke-width="2.8" />
+                    <path d="M290 99 q 4 -26 30 -26 q 25 0 30 20" class="svg-ink-stroke" stroke-width="2.4" stroke-linecap="round" />
+                    <circle cx="348" cy="80" r="6" class="svg-ink-fill" />
+                    <path d="M310 102 q 3 4 8 0 M331 102 q 3 4 8 0" class="svg-ink-stroke" stroke-width="2.4" stroke-linecap="round" />
+                    <circle cx="313.5" cy="103" r="8" class="svg-ink-stroke" stroke-width="2" />
+                    <circle cx="334.5" cy="103" r="8" class="svg-ink-stroke" stroke-width="2" />
+                    <path d="M321 103 h 6 M314 121 q 6 4 12 0" class="svg-ink-stroke" stroke-width="2.2" stroke-linecap="round" />
+                  </g>
+                  <path d="M158 98 q 62 -44 124 0" class="svg-primary-stroke" stroke-width="3" stroke-linecap="round" stroke-dasharray="7 8" />
+                  <g class="char" data-amp="6">
+                    <circle cx="220" cy="64" r="14" class="svg-yellow-fill" />
+                    <path d="M214 64 l 5 5 l 8 -9" class="svg-ink-stroke" stroke-width="2.6" stroke-linecap="round" />
+                  </g>
+                  <rect x="150" y="176" width="140" height="34" rx="17" class="svg-green-tint-fill svg-green-tint-stroke" stroke-width="2" />
+                  <text x="176" y="198" class="svg-small-label svg-primary-fill">98% match</text>
+                </svg>
+
+                <svg
+                  v-else
+                  viewBox="0 0 440 240"
+                  fill="none"
+                  role="img"
+                  aria-label="Two students studying at a table"
+                >
+                  <path d="M60 196 h 320" class="svg-ink-stroke" stroke-width="2.8" stroke-linecap="round" />
+                  <g class="char" data-amp="2.5">
+                    <circle cx="170" cy="120" r="28" class="svg-card-fill svg-ink-stroke" stroke-width="2.6" />
+                    <path d="M144 114 q 2 -23 26 -23 q 22 0 26 17" class="svg-ink-stroke" stroke-width="2.2" stroke-linecap="round" />
+                    <path d="M161 117 q 3 4 6 0 M180 117 q 3 4 6 0 M163 130 q 6 5 13 0" class="svg-ink-stroke" stroke-width="2.2" stroke-linecap="round" />
+                    <path d="M170 148 v 46" class="svg-ink-stroke" stroke-width="2.6" stroke-linecap="round" />
+                  </g>
+                  <g class="char" data-amp="3">
+                    <circle cx="276" cy="120" r="28" class="svg-card-fill svg-ink-stroke" stroke-width="2.6" />
+                    <path d="M250 114 q 2 -23 26 -23 q 22 0 26 17" class="svg-ink-stroke" stroke-width="2.2" stroke-linecap="round" />
+                    <circle cx="298" cy="96" r="5" class="svg-ink-fill" />
+                    <path d="M267 117 q 3 4 6 0 M286 117 q 3 4 6 0 M269 131 q 6 5 13 0" class="svg-ink-stroke" stroke-width="2.2" stroke-linecap="round" />
+                    <path d="M276 148 v 46" class="svg-ink-stroke" stroke-width="2.6" stroke-linecap="round" />
+                  </g>
+                  <rect x="200" y="160" width="48" height="30" rx="5" class="svg-note-fill svg-ink-stroke" stroke-width="2" transform="rotate(-3 224 175)" />
+                  <g class="char" data-amp="5">
+                    <circle cx="170" cy="58" r="13" class="svg-yellow-fill" />
+                    <path d="M164 76 h 12" class="svg-ink-stroke" stroke-width="2.4" stroke-linecap="round" />
+                    <path d="M150 42 l -7 -5 M190 42 l 7 -5 M170 38 v -9" class="svg-orange-stroke" stroke-width="2.6" stroke-linecap="round" />
+                  </g>
+                  <g class="char" data-amp="4">
+                    <text x="316" y="70" class="svg-small-label svg-primary-fill">Got it!</text>
+                  </g>
+                </svg>
               </div>
             </div>
           </article>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <section class="sb-tile sb-tile-glass">
-      <div class="sb-shell sb-faq-shell">
-        <div class="sb-section-heading text-center">
-          <p class="sb-eyebrow">FAQ</p>
-          <h2>Questions before your first session.</h2>
+      <section ref="toolsSectionRef" class="tools nopin">
+        <div ref="toolstageRef" class="toolstage">
+          <div ref="toolpinRef" class="toolpin">
+            <div class="inner toolhead">
+              <div class="head">
+                <span class="kick2">Platform tools</span>
+                <h2>
+                  <span class="row"><span>Everything the</span></span>
+                  <span class="row"><span>tutoring loop needs.</span></span>
+                </h2>
+                <p>
+                  Built for peer learning programs that need matching, scheduling, reporting,
+                  and fair tutor visibility.
+                </p>
+              </div>
+            </div>
+            <div ref="tooltrackRef" class="tooltrack">
+              <article
+                v-for="(tool, index) in railTools"
+                :key="tool.id"
+                class="tslab hoverable"
+              >
+                <span class="num" aria-hidden="true">{{ String(index + 1).padStart(2, '0') }}</span>
+                <div class="ttext">
+                  <h3>{{ tool.title }}</h3>
+                  <p>{{ tool.copy }}</p>
+                </div>
+                <div class="tviz" aria-hidden="true">
+                  <svg
+                    v-if="tool.id === 'matching'"
+                    viewBox="0 0 200 170"
+                    fill="none"
+                  >
+                    <g class="char" data-amp="3">
+                      <circle cx="86" cy="76" r="46" class="svg-green-tint-fill svg-ink-stroke" stroke-width="2.5" />
+                      <path d="M120 110 l 34 34" class="svg-ink-stroke" stroke-width="3" stroke-linecap="round" />
+                      <path
+                        d="M86 56 l 6.2 13.2 14.6 1.9 -10.7 10 2.8 14.4 -12.9 -7.1 -12.9 7.1 2.8 -14.4 -10.7 -10 14.6 -1.9 z"
+                        class="svg-yellow-fill svg-ink-stroke"
+                        stroke-width="2.2"
+                        stroke-linejoin="round"
+                      />
+                    </g>
+                    <g class="char" data-amp="5">
+                      <path d="M160 36 q 6 -10 14 -2" class="svg-primary-stroke" stroke-width="2.5" stroke-linecap="round" />
+                      <path d="M156 50 q 8 -4 12 2" class="svg-primary-stroke" stroke-width="2.5" stroke-linecap="round" />
+                    </g>
+                    <g class="char" data-amp="4">
+                      <path
+                        d="M22 28 l 3 8 8 1.5 -6 5.6 1.6 8.2 -6.6 -4.4 -6.6 4.4 1.6 -8.2 -6 -5.6 8 -1.5 z"
+                        class="svg-pink-fill svg-ink-stroke svg-fade-strong"
+                        stroke-width="2"
+                        stroke-linejoin="round"
+                      />
+                    </g>
+                  </svg>
+
+                  <svg
+                    v-else-if="tool.id === 'scheduling'"
+                    viewBox="0 0 200 170"
+                    fill="none"
+                  >
+                    <g class="char" data-amp="2.5">
+                      <rect x="30" y="34" width="124" height="108" rx="14" class="svg-card-fill svg-ink-stroke" stroke-width="2.5" />
+                      <path d="M30 64 h 124" class="svg-ink-stroke" stroke-width="2.5" />
+                      <path d="M58 24 v 18 M126 24 v 18" class="svg-ink-stroke" stroke-width="3" stroke-linecap="round" />
+                      <circle cx="58" cy="88" r="4" class="svg-calendar-dot-fill" />
+                      <circle cx="92" cy="88" r="4" class="svg-calendar-dot-fill" />
+                      <circle cx="126" cy="88" r="4" class="svg-calendar-dot-fill" />
+                      <circle cx="58" cy="116" r="4" class="svg-calendar-dot-fill" />
+                      <circle cx="126" cy="116" r="4" class="svg-calendar-dot-fill" />
+                      <circle cx="92" cy="116" r="13" class="svg-soft-primary-fill svg-primary-stroke" stroke-width="2.5" />
+                      <path d="M86.5 116 l 4 4.5 7 -9" class="svg-primary-stroke" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+                    </g>
+                    <g class="char" data-amp="4.5">
+                      <circle cx="166" cy="52" r="20" class="svg-soft-yellow-fill svg-ink-stroke" stroke-width="2.5" />
+                      <path d="M166 42 v 10 l 7 5" class="svg-ink-stroke" stroke-width="2.5" stroke-linecap="round" />
+                    </g>
+                  </svg>
+
+                  <svg
+                    v-else-if="tool.id === 'reports'"
+                    viewBox="0 0 200 170"
+                    fill="none"
+                  >
+                    <g class="char" data-amp="2.5">
+                      <path d="M34 142 q 66 4 132 0" class="svg-ink-stroke" stroke-width="2.5" stroke-linecap="round" />
+                      <rect x="48" y="100" width="26" height="40" rx="7" class="svg-soft-pink-fill svg-ink-stroke" stroke-width="2.5" />
+                      <rect x="88" y="76" width="26" height="64" rx="7" class="svg-soft-yellow-fill svg-ink-stroke" stroke-width="2.5" />
+                      <rect x="128" y="50" width="26" height="90" rx="7" class="svg-green-tint-fill svg-ink-stroke" stroke-width="2.5" />
+                    </g>
+                    <g class="char" data-amp="4">
+                      <path d="M44 64 q 48 -34 96 -22" class="svg-primary-stroke" stroke-width="2.5" stroke-dasharray="2 8" stroke-linecap="round" />
+                      <path d="M132 36 l 12 4 -6 11 z" class="svg-primary-fill" />
+                    </g>
+                    <g class="char" data-amp="5">
+                      <circle cx="170" cy="92" r="16" class="svg-yellow-fill svg-ink-stroke" stroke-width="2.5" />
+                      <path d="M170 84 v 16 M164 88 h 9 q 4 0 4 4 t -4 4 h -9" class="svg-ink-stroke" stroke-width="2" stroke-linecap="round" />
+                    </g>
+                  </svg>
+
+                  <svg
+                    v-else
+                    viewBox="0 0 200 170"
+                    fill="none"
+                  >
+                    <g class="char" data-amp="2.5">
+                      <path d="M100 50 v 64" class="svg-ink-stroke" stroke-width="2.5" stroke-linecap="round" />
+                      <path d="M76 130 q 24 -8 48 0 l -6 12 q -18 -6 -36 0 z" class="svg-green-tint-fill svg-ink-stroke" stroke-width="2.5" stroke-linejoin="round" />
+                      <path d="M40 56 q 60 -12 120 0" class="svg-ink-stroke" stroke-width="2.5" stroke-linecap="round" />
+                      <circle cx="100" cy="48" r="6" class="svg-yellow-fill svg-ink-stroke" stroke-width="2.2" />
+                    </g>
+                    <g class="char" data-amp="4">
+                      <path d="M40 56 l -10 26 q 10 8 20 0 z" class="svg-soft-primary-fill svg-ink-stroke" stroke-width="2.2" stroke-linejoin="round" />
+                      <circle cx="40" cy="94" r="11" class="svg-primary-fill svg-ink-stroke" stroke-width="2.2" />
+                    </g>
+                    <g class="char" data-amp="4.5">
+                      <path d="M160 56 l -10 26 q 10 8 20 0 z" class="svg-soft-pink-fill svg-ink-stroke" stroke-width="2.2" stroke-linejoin="round" />
+                      <circle cx="160" cy="94" r="11" class="svg-pink-fill svg-ink-stroke" stroke-width="2.2" />
+                    </g>
+                  </svg>
+                </div>
+              </article>
+            </div>
+          </div>
         </div>
-        <div class="sb-accordion">
-          <article v-for="(item, i) in faqs" :key="item.question" class="sb-accordion-item">
+      </section>
+
+      <section class="countband" aria-label="Studybuddy product facts">
+        <div class="inner countstrip">
+          <div v-for="count in counts" :key="count.label" class="count reveal">
+            <div class="n">
+              <span :data-count="count.value">0</span>{{ count.suffix }}
+            </div>
+            <div class="l">{{ count.label }}</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="faqsec">
+        <div class="inner faq">
+          <div class="head">
+            <span class="kick2">Common questions</span>
+            <h2>
+              <span class="row"><span>Asked a lot,</span></span>
+              <span class="row"><span>answered straight.</span></span>
+            </h2>
+          </div>
+          <article
+            v-for="(item, index) in faqs"
+            :key="item.question"
+            class="faqitem"
+            :class="{ open: openFaq === index }"
+          >
             <button
-              class="sb-accordion-trigger"
+              class="faqq hoverable"
               type="button"
-              :aria-expanded="openFaq === i"
-              :aria-controls="`faq-answer-${i}`"
-              @click="toggleFaq(i)"
+              :aria-expanded="openFaq === index"
+              :aria-controls="`faq-answer-${index}`"
+              @click="toggleFaq(index)"
             >
-              <span>{{ item.question }}</span>
-              <span class="sb-accordion-icon" :class="{'rotate-icon': openFaq === i}" aria-hidden="true">
-                +
+              <span class="no">{{ String(index + 1).padStart(2, '0') }}</span>
+              <span class="q">{{ item.question }}</span>
+              <span class="plusw" aria-hidden="true">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                  <path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                </svg>
               </span>
             </button>
-            <transition name="sb-accordion-panel">
-              <div v-show="openFaq === i" :id="`faq-answer-${i}`" class="sb-accordion-answer">
+            <div class="faqa" :id="`faq-answer-${index}`">
+              <div>
                 <p>{{ item.answer }}</p>
               </div>
-            </transition>
+            </div>
           </article>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <section class="sb-tile sb-tile-dark glass-panel-dark sb-cta">
-      <div class="sb-shell sb-split">
-        <div class="text-left">
-          <p class="sb-eyebrow" style="color: #fff">Ready when you are</p>
-          <h2 style="text-align: left;">Build your next study session around the right peer tutor.</h2>
-          <p style="margin-left: 0; text-align: left;">Join StudyBuddy and make academic support easier to find, book, and track.</p>
-          <div class="sb-cta-actions" style="justify-content: flex-start;">
-            <button class="sb-btn-pill hover-lift" type="button" @click="router.push('/register')">
-              Sign up free
+      <div class="ctawrap">
+        <section class="ctapanel" aria-labelledby="landing-cta-title">
+          <h2 id="landing-cta-title">
+            Your study buddy is<br />
+            <em>already on campus.</em>
+          </h2>
+          <p>Free with your student email &mdash; whether you need the help or you are the help.</p>
+          <span ref="magnetRef" class="magnet">
+            <button class="btn primary hoverable" type="button" @click="goTo('/register')">
+              <span class="fill"></span>
+              <span class="lbl">Get started</span>
             </button>
-            <button class="sb-btn-outline-dark hover-lift" type="button" @click="router.push('/login')">
-              Log in
-            </button>
-          </div>
-        </div>
-
-        <div class="sb-image-wrapper sb-clipart-container hover-float" style="border-color: rgba(255,255,255,0.1); background: rgba(255,255,255,0.05)">
-          <svg class="sb-clipart-svg" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M100 40L115 80L160 85L125 115L135 160L100 135L65 160L75 115L40 85L85 80L100 40Z" fill="#00895a"/>
-            <circle cx="100" cy="100" r="30" fill="#071310"/>
-            <path d="M85 100L95 110L115 90" stroke="#00895a" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </div>
+          </span>
+        </section>
       </div>
-    </section>
 
-    <footer class="sb-tile sb-tile-glass sb-footer">
-      <div class="sb-shell">
-        <div class="sb-footer-grid">
-          <div>
-            <h3>StudyBuddy</h3>
-            <p>Peer tutoring made easier for students, tutors, and learning programs.</p>
-          </div>
-          <div v-for="group in footerLinks" :key="group.title">
-            <h4>{{ group.title }}</h4>
-            <a v-for="link in group.links" :key="link" class="footer-link-hover" href="#top">{{ link }}</a>
-          </div>
-        </div>
-        <div class="sb-legal">
-          <span>© 2026 StudyBuddy. All rights reserved.</span>
-          <span>Built for focused peer learning.</span>
-        </div>
-      </div>
-    </footer>
+      <footer>Studybuddy &mdash; built by students, for students. Bring it to your campus.</footer>
+    </main>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import SbThemeToggle from '@/components/SbThemeToggle.vue'
 
 const router = useRouter()
+const route = useRoute()
 
-const mouseX = ref(0)
-const mouseY = ref(0)
-
-const handleMouseMove = (e) => {
-  if (typeof window !== 'undefined') {
-    mouseX.value = (e.clientX / window.innerWidth) * 2 - 1
-    mouseY.value = (e.clientY / window.innerHeight) * 2 - 1
-  }
-}
-
-const blob1Transform = computed(() => `translate(${mouseX.value * 150}px, ${mouseY.value * 150}px)`)
-const blob2Transform = computed(() => `translate(${mouseX.value * -150}px, ${mouseY.value * -150}px)`)
-const blob3Transform = computed(() => `translate(${mouseX.value * 250}px, ${mouseY.value * 250}px)`)
-
-onMounted(() => {
-  window.addEventListener('mousemove', handleMouseMove)
-})
-
-onUnmounted(() => {
-  window.removeEventListener('mousemove', handleMouseMove)
-})
-// ------------------------------------
-
+const pageRef = ref(null)
+const smoothRef = ref(null)
+const scrollSpaceRef = ref(null)
+const heroTitleRef = ref(null)
+const magnetRef = ref(null)
+const toolsSectionRef = ref(null)
+const toolstageRef = ref(null)
+const toolpinRef = ref(null)
+const tooltrackRef = ref(null)
 const openFaq = ref(null)
-const toggleFaq = (i) => {
-  openFaq.value = openFaq.value === i ? null : i
-}
 
-const stats = [
-  { value: '500+', label: 'Active tutors' },
-  { value: '2,000+', label: 'Sessions completed' },
-  { value: '4.8', label: 'Average rating' },
-  { value: '50+', label: 'Subjects covered' },
+const marqueeItems = [
+  { text: 'Get matched', dot: 'y' },
+  { text: 'Study together', dot: 'p' },
+  { text: 'Actually get it', dot: 'o', em: true },
+  { text: 'Tutors earn', dot: 'g' },
+  { text: 'Your campus, your buddies', dot: 'y' },
 ]
 
-const testimonials = [
+const panels = [
   {
-    initials: 'AM',
-    name: 'Alyssa M.',
-    role: 'Computer science student',
-    quote: 'I found someone who had taken the same professor and understood exactly where I was stuck.',
+    id: 'need',
+    titleLines: ['Share what', 'you need.'],
+    copy: 'Choose a subject, topic, and goal so Studybuddy can surface the right peers.',
+    depth: '0.06',
   },
   {
-    initials: 'JR',
-    name: 'Jon R.',
-    role: 'Peer tutor',
-    quote: 'My sessions, earnings, and schedule are all in one place, so tutoring feels organized.',
+    id: 'match',
+    titleLines: ['Match', 'and book.'],
+    copy: 'Compare tutor fit, availability, and ratings, then reserve a time that works.',
+    depth: '0.09',
   },
   {
-    initials: 'KC',
-    name: 'Kara C.',
-    role: 'Program coordinator',
-    quote: 'The workload view helps us keep support fair without losing sight of student demand.',
+    id: 'track',
+    titleLines: ['Learn', 'and track.'],
+    copy: 'Wrap each session with history, compensation, and progress details in place.',
+    depth: '0.07',
   },
+]
+
+const railTools = [
+  {
+    id: 'matching',
+    title: 'Smart tutor matching',
+    copy: 'Rank peer tutors by subject fit, ratings, availability, and workload balance.',
+  },
+  {
+    id: 'scheduling',
+    title: 'Flexible scheduling',
+    copy: 'Book around real tutor availability and keep upcoming sessions easy to scan.',
+  },
+  {
+    id: 'reports',
+    title: 'Reports and earnings',
+    copy: 'Track completed sessions, tutor compensation, and program-level performance.',
+  },
+  {
+    id: 'balance',
+    title: 'Balanced workloads',
+    copy: 'Protect session quality by keeping tutor demand visible before calendars fill up.',
+  },
+]
+
+const counts = [
+  { value: 20, suffix: 's', label: "to tell us what's hurting" },
+  { value: 98, suffix: '%', label: 'match scores, out in the open' },
+  { value: 1, suffix: ' min', label: 'to join with your student email' },
 ]
 
 const faqs = [
   {
     question: 'Who can become a tutor?',
-    answer: 'Approved students with strong subject knowledge can offer help in the courses they know best.',
+    answer: "Any student who's strong in a subject. Set your subjects, rate, and availability - you earn per completed session while keeping your own schedule.",
   },
   {
-    question: 'How are tutors recommended?',
-    answer: 'StudyBuddy weighs subject fit, availability, tutor ratings, and workload signals.',
+    question: 'How much does it cost?',
+    answer: "Joining is free. You only pay per booked session at the tutor's listed rate, and payments are handled online inside the platform.",
   },
   {
-    question: 'Can tutors manage their schedules?',
-    answer: 'Yes. Tutors can keep availability visible so students book sessions at realistic times.',
+    question: 'Can I use it on my campus?',
+    answer: "Studybuddy is open to any campus. Sign up with your student email and you'll be matched with peers from your own school.",
   },
   {
-    question: 'Does StudyBuddy track completed sessions?',
-    answer: 'Session history, earnings, and reporting data stay organized for review after tutoring ends.',
+    question: 'What happens if a session falls through?',
+    answer: 'You can reschedule or cancel ahead of time, and session history keeps everything on record. If something goes wrong, support is one tap away.',
   },
 ]
 
-const footerLinks = [
-  { title: 'Product', links: ['Matching', 'Scheduling', 'Reports'] },
-  { title: 'Community', links: ['Students', 'Tutors', 'Coordinators'] },
-  { title: 'Support', links: ['Help center', 'Privacy', 'Terms'] },
+const tiltCfg = [
+  { max: 7, dir: 1, twist: 0 },
+  { max: 12, dir: -1, twist: 1.4 },
+  { max: 9, dir: 1, twist: -1.8 },
 ]
+
+let reducedQuery = null
+let pointerQuery = null
+let resizeObserver = null
+let revealObserver = null
+let smoothRafId = null
+let heroTimeoutId = null
+let motionRunning = false
+let isMounted = false
+let targetScroll = 0
+let currentScroll = 0
+let railTravel = 0
+const cleanupFns = []
+const motionCleanupFns = []
+const countRafs = new Set()
+
+const goTo = (path) => {
+  stopContinuousMotion({ reset: true })
+  router.push(path)
+}
+
+const toggleFaq = (index) => {
+  openFaq.value = openFaq.value === index ? null : index
+}
+
+const addCleanup = (target, event, handler, options, bucket = cleanupFns) => {
+  target.addEventListener(event, handler, options)
+  bucket.push(() => target.removeEventListener(event, handler, options))
+}
+
+const canRunContinuousMotion = () => (
+  isMounted
+  && route.name === 'home'
+  && typeof document !== 'undefined'
+  && document.visibilityState === 'visible'
+  && reducedQuery
+  && pointerQuery
+  && !reducedQuery.matches
+  && pointerQuery.matches
+  && window.innerWidth >= 900
+)
+
+const setSpace = () => {
+  if (!smoothRef.value || !scrollSpaceRef.value) return
+  scrollSpaceRef.value.style.height = `${smoothRef.value.scrollHeight}px`
+}
+
+const parallax = () => {
+  if (!pageRef.value) return
+  const viewportCenter = window.innerHeight / 2
+  pageRef.value.querySelectorAll('[data-depth]').forEach((el) => {
+    const rect = el.getBoundingClientRect()
+    const centerOffset = rect.top + rect.height / 2 - viewportCenter
+    const depth = Number.parseFloat(el.dataset.depth || '0')
+    el.style.transform = `translateY(${-centerOffset * depth}px)`
+  })
+}
+
+const charWiggle = (scrollValue) => {
+  if (!pageRef.value) return
+  pageRef.value.querySelectorAll('.char').forEach((el, index) => {
+    const amp = Number.parseFloat(el.dataset.amp || '3')
+    const phase = index * 1.7
+    const rotate = Math.sin(scrollValue / 55 + phase) * amp
+    const y = Math.cos(scrollValue / 48 + phase) * amp * 0.7
+    el.style.transform = `rotate(${rotate.toFixed(3)}deg) translateY(${y.toFixed(3)}px)`
+  })
+}
+
+const measureRail = () => {
+  if (!tooltrackRef.value) return
+  railTravel = Math.max(0, tooltrackRef.value.scrollWidth - (window.innerWidth - 80))
+}
+
+const resetToolRail = () => {
+  railTravel = 0
+  toolsSectionRef.value?.classList.add('nopin')
+  if (toolpinRef.value) {
+    toolpinRef.value.style.transform = ''
+  }
+  if (tooltrackRef.value) {
+    tooltrackRef.value.style.transform = ''
+  }
+}
+
+const toolPin = () => {
+  if (!toolstageRef.value || !toolpinRef.value || !tooltrackRef.value || !toolsSectionRef.value) return
+
+  const rect = toolstageRef.value.getBoundingClientRect()
+  const span = rect.height - window.innerHeight
+  if (span <= 0) return
+
+  const y = Math.max(0, Math.min(span, -rect.top))
+  toolpinRef.value.style.transform = `translate3d(0, ${y.toFixed(1)}px, 0)`
+
+  const progress = y / span
+  if (progress > 0.01) {
+    toolsSectionRef.value.classList.add('in')
+  }
+
+  const railProgress = Math.max(0, Math.min(1, (progress - 0.05) / 0.85))
+  tooltrackRef.value.style.transform = `translate3d(${(-railProgress * railTravel).toFixed(1)}px, 0, 0)`
+}
+
+const runSmoothLoop = () => {
+  if (!motionRunning || !smoothRef.value) return
+
+  currentScroll += (targetScroll - currentScroll) * 0.085
+  if (Math.abs(targetScroll - currentScroll) < 0.05) {
+    currentScroll = targetScroll
+  }
+
+  smoothRef.value.style.transform = `translate3d(0, ${-currentScroll}px, 0)`
+  parallax()
+  charWiggle(currentScroll)
+  toolPin()
+  smoothRafId = window.requestAnimationFrame(runSmoothLoop)
+}
+
+const setupTilt = () => {
+  if (!pageRef.value) return
+  pageRef.value.querySelectorAll('.panel .viz').forEach((card, index) => {
+    const cfg = tiltCfg[index % tiltCfg.length]
+    const handleMove = (event) => {
+      const rect = card.getBoundingClientRect()
+      const px = (event.clientX - rect.left) / rect.width - 0.5
+      const py = (event.clientY - rect.top) / rect.height - 0.5
+      card.style.transition = 'clip-path .9s var(--sb-spring), box-shadow .4s ease, transform .1s linear'
+      card.style.transform =
+        `perspective(900px) rotateX(${(-py * cfg.max * cfg.dir).toFixed(2)}deg)` +
+        ` rotateY(${(px * cfg.max * cfg.dir).toFixed(2)}deg) rotate(${cfg.twist}deg) scale(1.025)`
+    }
+    const handleLeave = () => {
+      card.style.transition = 'clip-path .9s var(--sb-spring), box-shadow .4s ease, transform .6s var(--sb-spring)'
+      card.style.transform = ''
+    }
+    addCleanup(card, 'mousemove', handleMove, undefined, motionCleanupFns)
+    addCleanup(card, 'mouseleave', handleLeave, undefined, motionCleanupFns)
+  })
+}
+
+const setupMagnet = () => {
+  if (!magnetRef.value) return
+  const strength = 0.35
+  const handleMove = (event) => {
+    const rect = magnetRef.value.getBoundingClientRect()
+    const dx = event.clientX - (rect.left + rect.width / 2)
+    const dy = event.clientY - (rect.top + rect.height / 2)
+    magnetRef.value.style.transition = ''
+    magnetRef.value.style.transform = `translate(${dx * strength}px, ${dy * strength}px)`
+  }
+  const handleLeave = () => {
+    magnetRef.value.style.transition = 'transform .5s var(--sb-spring)'
+    magnetRef.value.style.transform = 'translate(0, 0)'
+  }
+  addCleanup(magnetRef.value, 'mousemove', handleMove, undefined, motionCleanupFns)
+  addCleanup(magnetRef.value, 'mouseleave', handleLeave, undefined, motionCleanupFns)
+}
+
+const startContinuousMotion = () => {
+  if (motionRunning || !canRunContinuousMotion() || !smoothRef.value || !scrollSpaceRef.value) return
+
+  motionRunning = true
+  targetScroll = window.scrollY
+  currentScroll = window.scrollY
+  toolsSectionRef.value?.classList.remove('nopin')
+  setSpace()
+  measureRail()
+  smoothRef.value.style.position = 'fixed'
+  smoothRef.value.style.top = '0'
+  smoothRef.value.style.left = '0'
+  smoothRef.value.style.width = '100%'
+  smoothRef.value.style.transform = `translate3d(0, ${-currentScroll}px, 0)`
+  scrollSpaceRef.value.style.display = 'block'
+
+  resizeObserver = new ResizeObserver(setSpace)
+  resizeObserver.observe(smoothRef.value)
+
+  addCleanup(window, 'scroll', () => {
+    targetScroll = window.scrollY
+  }, { passive: true }, motionCleanupFns)
+
+  addCleanup(window, 'resize', () => {
+    measureRail()
+  }, { passive: true }, motionCleanupFns)
+
+  setupTilt()
+  setupMagnet()
+  runSmoothLoop()
+}
+
+const stopContinuousMotion = ({ reset = false } = {}) => {
+  motionRunning = false
+
+  if (smoothRafId) window.cancelAnimationFrame(smoothRafId)
+  smoothRafId = null
+
+  motionCleanupFns.splice(0).forEach((cleanup) => cleanup())
+
+  if (resizeObserver) {
+    resizeObserver.disconnect()
+    resizeObserver = null
+  }
+
+  if (!reset) return
+
+  if (smoothRef.value) {
+    smoothRef.value.style.position = ''
+    smoothRef.value.style.top = ''
+    smoothRef.value.style.left = ''
+    smoothRef.value.style.width = ''
+    smoothRef.value.style.transform = ''
+  }
+  if (scrollSpaceRef.value) {
+    scrollSpaceRef.value.style.height = '0px'
+    scrollSpaceRef.value.style.display = 'none'
+  }
+  resetToolRail()
+  pageRef.value?.querySelectorAll('[data-depth], .char, .panel .viz').forEach((el) => {
+    el.style.transform = ''
+    el.style.transition = ''
+  })
+  if (magnetRef.value) {
+    magnetRef.value.style.transform = ''
+    magnetRef.value.style.transition = ''
+  }
+}
+
+const runCount = (el) => {
+  if (el.dataset.done) return
+  el.dataset.done = '1'
+  const end = Number.parseInt(el.dataset.count || '0', 10)
+
+  if (reducedQuery?.matches) {
+    el.textContent = String(end)
+    return
+  }
+
+  const startedAt = performance.now()
+  const tick = (time) => {
+    countRafs.delete(rafId)
+    if (!isMounted || document.visibilityState !== 'visible') {
+      return
+    }
+    const progress = Math.min(1, (time - startedAt) / 1100)
+    el.textContent = String(Math.round(end * (1 - Math.pow(1 - progress, 3))))
+    if (progress < 1) {
+      rafId = window.requestAnimationFrame(tick)
+      countRafs.add(rafId)
+    } else {
+      countRafs.delete(rafId)
+    }
+  }
+
+  let rafId = window.requestAnimationFrame(tick)
+  countRafs.add(rafId)
+}
+
+const revealAllStatic = () => {
+  if (!pageRef.value) return
+  pageRef.value.querySelectorAll('.reveal, .panel, .tools, .faq, .tslab, .faqitem, .hero-title').forEach((el) => {
+    el.classList.add('in')
+  })
+  pageRef.value.querySelectorAll('[data-count]').forEach((el) => {
+    el.textContent = el.dataset.count || '0'
+    el.dataset.done = '1'
+  })
+}
+
+const setupReveals = () => {
+  if (!pageRef.value) return
+
+  if (reducedQuery?.matches) {
+    revealAllStatic()
+    return
+  }
+
+  revealObserver = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (!entry.isIntersecting) return
+      entry.target.classList.add('in')
+      entry.target.querySelectorAll('[data-count]').forEach(runCount)
+    })
+  }, { threshold: 0.25 })
+
+  pageRef.value.querySelectorAll('.reveal, .panel, .tools, .faq, .tslab, .faqitem, .count').forEach((el) => {
+    revealObserver.observe(el)
+  })
+
+  heroTimeoutId = window.setTimeout(() => {
+    heroTitleRef.value?.classList.add('in')
+  }, 80)
+}
+
+const handleVisibilityChange = () => {
+  if (document.visibilityState === 'hidden') {
+    stopContinuousMotion({ reset: false })
+    return
+  }
+
+  setSpace()
+  startContinuousMotion()
+}
+
+const handleMotionPreferenceChange = () => {
+  stopContinuousMotion({ reset: true })
+  if (reducedQuery?.matches) {
+    revealAllStatic()
+    return
+  }
+  startContinuousMotion()
+}
+
+const handleEligibilityResize = () => {
+  if (!canRunContinuousMotion()) {
+    stopContinuousMotion({ reset: true })
+    return
+  }
+
+  if (motionRunning) {
+    setSpace()
+    measureRail()
+    return
+  }
+
+  startContinuousMotion()
+}
+
+const cleanupAll = () => {
+  isMounted = false
+  document.body.classList.remove('sb-landing-route')
+  stopContinuousMotion({ reset: true })
+
+  if (revealObserver) {
+    revealObserver.disconnect()
+    revealObserver = null
+  }
+
+  if (heroTimeoutId) {
+    window.clearTimeout(heroTimeoutId)
+    heroTimeoutId = null
+  }
+
+  countRafs.forEach((id) => window.cancelAnimationFrame(id))
+  countRafs.clear()
+  cleanupFns.splice(0).forEach((cleanup) => cleanup())
+}
+
+onMounted(async () => {
+  isMounted = true
+  document.body.classList.add('sb-landing-route')
+  reducedQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
+  pointerQuery = window.matchMedia('(pointer: fine)')
+
+  addCleanup(document, 'visibilitychange', handleVisibilityChange)
+  addCleanup(reducedQuery, 'change', handleMotionPreferenceChange)
+  addCleanup(pointerQuery, 'change', handleMotionPreferenceChange)
+  addCleanup(window, 'resize', handleEligibilityResize, { passive: true })
+
+  await nextTick()
+  setupReveals()
+  startContinuousMotion()
+})
+
+onBeforeRouteLeave(() => {
+  cleanupAll()
+})
+
+onUnmounted(() => {
+  cleanupAll()
+})
 </script>
 
 <style scoped>
-.sb-landing {
-  --sb-dark: #071310;
-  --sb-canvas: var(--sb-bg);
-  --sb-ink: var(--sb-text-main);
-  --sb-muted: var(--sb-text-muted);
-  --sb-muted-dark: #94a3b8;
-  --sb-divider: var(--sb-card-border);
-  --sb-glass-surface: color-mix(in srgb, var(--sb-card-bg) 68%, transparent);
-  --sb-glass-strong: color-mix(in srgb, var(--sb-card-bg) 90%, transparent);
-  --sb-glass-border: color-mix(in srgb, var(--sb-card-border) 72%, transparent);
-
+.studio-landing {
   min-height: 100vh;
-  background: transparent;
-  color: var(--sb-ink);
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  text-rendering: optimizeLegibility;
+  color: var(--sb-text-main);
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  overflow-x: hidden;
   position: relative;
-  overflow: hidden;
 }
 
-.sb-landing *,
-.sb-landing *::before,
-.sb-landing *::after {
+.studio-landing,
+.studio-landing *,
+.studio-landing *::before,
+.studio-landing *::after {
   box-sizing: border-box;
 }
 
-/* --- the aesthetic blobs --- */
-.sb-ambient-bg {
-  display: none;
+.bgwash {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  background: linear-gradient(180deg, var(--sb-aurora-wash-start) 0%, var(--sb-bg) 40%, var(--sb-aurora-wash-end) 100%);
 }
 
-.blob-interactive {
+.bgwash i {
   position: absolute;
-  width: 100%;
-  height: 100%;
-  transition: transform 0.2s ease-out;
-  will-change: transform;
+  display: block;
 }
 
-.sb-blob {
-  position: absolute;
-  border-radius: 50%;
-  mix-blend-mode: multiply;
-  animation: swoopIn 2.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  opacity: 0.18;
+.bgwash .b1 {
+  left: -25vw;
+  top: -14vh;
+  width: 150vw;
+  height: 58vh;
+  background: var(--sb-wash-blob-1);
+  animation: sway1 36s ease-in-out infinite alternate;
 }
 
-.sb-blob-1 {
-  width: 70vw;
-  height: 70vw;
-  background: rgba(16, 185, 129, 0.5);
-  top: -20%;
-  left: -10%;
+.bgwash .b2 {
+  right: -30vw;
+  top: 20vh;
+  width: 135vw;
+  height: 50vh;
+  background: var(--sb-wash-blob-2);
+  animation: sway2 44s ease-in-out infinite alternate;
 }
 
-.sb-blob-2 {
-  width: 60vw;
-  height: 60vw;
-  background: rgba(14, 165, 233, 0.45);
-  bottom: -10%;
-  right: -10%;
-  animation-delay: 0.3s;
+.bgwash .b3 {
+  left: -22vw;
+  bottom: -18vh;
+  width: 145vw;
+  height: 52vh;
+  background: var(--sb-wash-blob-3);
+  animation: sway3 40s ease-in-out infinite alternate;
 }
 
-.sb-blob-3 {
-  width: 50vw;
-  height: 50vw;
-  background: rgba(139, 92, 246, 0.4);
-  top: 30%;
-  left: 30%;
-  animation-delay: 0.6s;
+.scroll-space {
+  position: relative;
+  width: 1px;
+  height: 0;
+  pointer-events: none;
+  z-index: 0;
 }
 
-@keyframes swoopIn {
-  0% { opacity: 0; transform: translate(-10vw, -10vh) scale(0.8); }
-  100% { opacity: 1; transform: translate(0, 0) scale(1); }
-}
-
-/* --- FOREGROUND COMPONENTS --- */
-.sb-nav, .sb-tile {
+.smooth-root {
   position: relative;
   z-index: 1;
 }
 
-.sb-nav {
-  position: sticky;
+.studio-nav {
+  position: fixed;
   top: 0;
-  z-index: 20;
-  min-height: 60px;
-  background: color-mix(in srgb, var(--sb-surface) 96%, transparent);
-  border-bottom: 1px solid var(--sb-glass-border);
-  transition: all 0.3s ease;
-}
-
-.sb-nav-inner, .sb-shell {
-  width: min(100% - 40px, 1120px);
-  margin: 0 auto;
-}
-
-.sb-nav-inner {
-  min-height: 60px;
+  left: 0;
+  right: 0;
+  z-index: 100;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 18px;
+  gap: 16px;
+  padding: 18px 40px;
 }
 
-.sb-brand, .sb-nav-link, .sb-btn-link, .sb-btn-pill, .sb-btn-outline-dark, .sb-accordion-trigger {
-  font-family: inherit;
-  border: 0;
-  background: transparent;
-  cursor: pointer;
+.brand,
+.navlinks {
+  min-width: 0;
 }
 
-.sb-brand {
+.brand {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  color: var(--sb-ink);
-  font-size: 16px;
-  font-weight: 800;
-  padding: 0;
-  transition: transform 0.2s ease;
+  border: 0;
+  background: transparent;
+  color: var(--sb-text-main);
+  font: inherit;
+  font-size: 19px;
+  font-weight: 900;
+  cursor: pointer;
+  white-space: nowrap;
 }
 
-.sb-brand:hover { transform: scale(1.02); }
-
-.sb-brand-mark {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
+.brand-mark {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
   background: var(--sb-primary);
   color: var(--sb-primary-contrast);
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+}
+
+.navlinks {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.btn {
+  font: 600 14.5px 'Inter', system-ui, sans-serif;
+  text-decoration: none;
+  padding: 10px 26px;
+  border-radius: 999px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
-  box-shadow: 0 4px 10px rgba(0, 137, 90, 0.3);
-}
-
-.sb-nav-actions { display: flex; align-items: center; gap: 20px; }
-
-.sb-nav-link {
-  color: var(--sb-ink);
-  font-size: 13px;
-  font-weight: 600;
-  padding: 8px 0;
-  transition: color 0.2s ease;
-}
-
-.sb-nav-link:hover, .sb-btn-link:hover { color: var(--sb-primary); }
-
-.sb-tile { margin: 0; }
-
-.sb-tile-glass {
-  background: color-mix(in srgb, var(--sb-surface) 94%, transparent);
-  border-top: 1px solid var(--sb-glass-border);
-}
-
-.glass-panel-dark {
-  background: rgba(15, 23, 42, 0.92);
-  border-top: 1px solid rgba(255,255,255,0.1);
-  border-bottom: 1px solid rgba(0,0,0,0.5);
-  color: #fff;
-}
-
-.sb-tile:not(.sb-stats):not(.sb-hero):not(.sb-footer) { padding: 100px 0; }
-.sb-hero { padding: 120px 0 80px; }
-
-.sb-split {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 64px;
-  align-items: center;
-}
-
-.text-left { text-align: left !important; }
-.text-center { text-align: center !important; }
-
-.sb-image-wrapper {
   position: relative;
-  border-radius: 32px;
   overflow: hidden;
-  box-shadow: 0 24px 48px rgba(0,0,0,0.05);
-  border: 1px solid var(--sb-glass-border);
-  aspect-ratio: 1/1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--sb-glass-surface);
-  max-width: 380px;
+  border: 0;
+  cursor: pointer;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.btn.primary {
+  background: var(--sb-primary);
+  color: var(--sb-primary-contrast);
+}
+
+.btn.outline {
+  border: 1.5px solid color-mix(in srgb, var(--sb-text-main) 20%, transparent);
+  color: var(--sb-text-main);
+  background: color-mix(in srgb, var(--sb-card-bg) 84%, transparent);
+}
+
+.btn .fill {
+  position: absolute;
+  inset: 0;
+  background: var(--sb-dark);
+  border-radius: inherit;
+  transform: translateY(101%);
+  transition: transform .35s var(--sb-spring);
+  z-index: 0;
+}
+
+.btn .lbl {
+  position: relative;
+  z-index: 1;
+}
+
+.btn:hover .fill,
+.btn:focus-visible .fill {
+  transform: translateY(0);
+}
+
+.btn:focus-visible,
+.brand:focus-visible,
+.faqq:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--sb-primary) 34%, transparent);
+  outline-offset: 4px;
+}
+
+section {
+  position: relative;
+  padding: 0 40px;
+}
+
+.inner {
+  max-width: 1240px;
   margin: 0 auto;
 }
 
-.sb-clipart-svg {
-  width: 55%;
-  height: 55%;
-  position: relative;
-  z-index: 1;
-  transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+.hero {
+  min-height: 100vh;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding-top: 86px;
 }
 
-.sb-image-wrapper:hover .sb-clipart-svg {
-  transform: scale(1.1) translateY(-10px);
-}
-
-.sb-eyebrow {
-  margin: 0 0 16px;
-  color: var(--sb-primary);
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 1.5px;
+.kick,
+.kick2 {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 3px;
   text-transform: uppercase;
+  color: var(--sb-primary);
 }
 
-.sb-gradient-text { color: var(--sb-ink); }
+.kick {
+  margin: 0 0 26px;
+}
 
-.sb-hero h1, .sb-section-heading h2, .sb-cta h2 {
+.hero-title {
   margin: 0;
-  letter-spacing: -0.5px;
-  line-height: 1.1;
+  font-size: clamp(54px, 8.6vw, 132px);
+  font-weight: 900;
+  letter-spacing: -0.045em;
+  line-height: 0.96;
+  text-wrap: balance;
 }
 
-.sb-hero h1 { font-size: 56px; font-weight: 800; }
-
-.sb-hero-copy, .sb-section-heading p, .sb-cta p {
-  color: var(--sb-muted);
-  font-size: 18px;
-  font-weight: 400;
-  line-height: 1.6;
+.row {
+  display: block;
+  overflow: hidden;
+  padding-bottom: .08em;
+  margin-bottom: -.08em;
 }
 
-.sb-hero-copy { margin: 24px 0; }
+.row > span {
+  display: inline-block;
+  transform: translateY(112%);
+  transition: transform 1s var(--sb-spring);
+}
 
-.sb-hero-actions, .sb-cta-actions {
+.in .row > span,
+.hero-title.in .row > span {
+  transform: none;
+}
+
+.in .row,
+.hero-title.in .row {
+  overflow: visible;
+}
+
+.hero-title .row:nth-child(2) > span,
+.tools h2 .row:nth-child(2) > span,
+.faq h2 .row:nth-child(2) > span {
+  transition-delay: .08s;
+}
+
+.hero-title .row:nth-child(3) > span {
+  transition-delay: .16s;
+}
+
+.hero-title em,
+.marquee em {
+  font-style: normal;
+  color: var(--sb-primary);
+}
+
+.hero-sub {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-top: 40px;
+  gap: 32px;
+  flex-wrap: wrap;
+}
+
+.hero-sub p {
+  max-width: 430px;
+  min-width: min(100%, 280px);
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.65;
+  color: var(--sb-text-muted);
+}
+
+.hero-actions {
   display: flex;
   align-items: center;
-  gap: 18px;
+  gap: 12px;
   flex-wrap: wrap;
-  margin-top: 32px;
 }
 
-.sb-btn-pill {
-  background: var(--sb-primary);
-  color: #fff;
-  padding: 14px 32px;
-  border-radius: 9999px;
-  font-size: 15px;
-  font-weight: 600;
-  border: none;
-  cursor: pointer;
-  box-shadow: 0 4px 15px rgba(0, 137, 90, 0.3);
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.sb-btn-pill:hover { box-shadow: 0 8px 25px rgba(0, 137, 90, 0.5); }
-
-.hover-lift:hover { transform: translateY(-3px); }
-.hover-lift:active { transform: translateY(1px); }
-
-.sb-btn-small { padding: 10px 20px; font-size: 13px; box-shadow: none; }
-
-.sb-btn-link {
-  color: var(--sb-primary);
-  font-size: 15px;
-  font-weight: 600;
-  border-bottom: 2px solid transparent;
-  padding: 10px 0;
-  transition: all 0.2s ease;
-}
-
-.sb-btn-link:hover { border-bottom-color: var(--sb-primary); }
-
-.sb-badge-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 32px;
-}
-
-.sb-badge {
-  display: inline-block;
-  background: var(--sb-glass-strong);
-  color: var(--sb-ink);
-  border: 1px solid var(--sb-glass-border);
-  border-radius: 9999px;
+.scroll-cue {
   font-size: 12px;
-  font-weight: 600;
-  padding: 6px 14px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.03);
-  transition: transform 0.3s ease;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: var(--sb-text-muted);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
 }
 
-.hover-float:hover { transform: translateY(-4px); }
-
-.sb-stats { padding: 48px 0; }
-
-.sb-stats-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 22px;
-}
-
-.sb-stat {
-  text-align: center;
-  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-
-.hover-scale:hover { transform: scale(1.1); }
-
-.sb-stat strong {
-  display: block;
-  color: #fff;
-  font-size: 42px;
-  font-weight: 800;
-  line-height: 1;
-}
-
-.sb-stat span {
-  display: block;
-  margin-top: 10px;
-  color: var(--sb-muted-dark);
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.sb-section-heading {
-  max-width: 680px;
-  margin: 0 auto 50px;
-}
-
-.sb-section-heading h2 { font-size: 40px; font-weight: 700; }
-.sb-heading-dark p:not(.sb-eyebrow), .sb-cta p { color: var(--sb-muted-dark); }
-
-/* --- SIDE-BY-SIDE PROCESS CARDS --- */
-.sb-process-grid, .sb-feature-grid, .sb-testimonial-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 24px;
-}
-
-.sb-feature-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-
-.interactive-card, .sb-step-card {
-  background: var(--sb-glass-surface);
-  border: 1px solid var(--sb-glass-border);
-  border-radius: 24px;
-  padding: 32px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.02);
-  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+.scroll-cue .bar {
+  width: 1.5px;
+  height: 44px;
+  background: color-mix(in srgb, var(--sb-text-main) 25%, transparent);
   position: relative;
   overflow: hidden;
 }
 
-.sb-icon-glass {
-  width: 72px;
-  height: 72px;
-  margin: 0 auto 20px;
-  border-radius: 20px;
-  background: var(--sb-glass-strong);
-  border: 1px solid var(--sb-glass-border);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.04);
-  color: var(--sb-primary);
-}
-
-.sb-icon-glass svg { width: 32px; height: 32px; }
-
-.sb-icon-glass-sm {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
-  margin-bottom: 20px;
-  background: var(--sb-glass-strong);
-  border: 1px solid var(--sb-glass-border);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
-  color: var(--sb-primary);
-}
-
-.sb-icon-glass-sm svg { width: 24px; height: 24px; }
-
-.sb-step-number-sm {
-  display: inline-block;
-  padding: 6px 14px;
-  border-radius: 100px;
-  font-size: 11px;
-  font-weight: 800;
-  text-transform: uppercase;
-  margin-bottom: 16px;
-  background: rgba(0, 137, 90, 0.1);
-  color: var(--sb-primary);
-}
-
-.interactive-card::after, .sb-step-card::after {
-  content: '';
+.scroll-cue .bar::after {
+  content: "";
   position: absolute;
-  bottom: 0;
   left: 0;
-  height: 4px;
-  width: 0%;
+  right: 0;
+  height: 50%;
   background: var(--sb-primary);
-  transition: width 0.4s ease;
+  animation: cue 1.6s ease-in-out infinite;
 }
 
-.interactive-card:hover::after, .sb-step-card:hover::after { width: 100%; }
-
-.interactive-card:hover, .sb-step-card:hover {
-  transform: translateY(-6px);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
-  background: var(--sb-glass-strong);
+.marquee {
+  border-top: 1px solid var(--sb-card-border);
+  border-bottom: 1px solid var(--sb-card-border);
+  padding: 22px 0;
+  overflow: hidden;
+  background: var(--sb-card-bg);
+  position: relative;
+  z-index: 1;
 }
 
-.interactive-card-dark {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 24px;
-  padding: 32px;
-  transition: all 0.4s ease;
+.marquee-track {
+  display: flex;
+  width: fit-content;
+  animation: mq 26s linear infinite;
 }
 
-.interactive-card-dark:hover {
-  background: rgba(255, 255, 255, 0.1);
-  transform: translateY(-6px);
-  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+.marquee-copy {
+  font-size: clamp(20px, 2.4vw, 30px);
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  gap: 56px;
+  flex: 0 0 auto;
+  min-width: 100vw;
+  width: max-content;
+  padding-right: 56px;
 }
 
-.sb-card h3, .sb-step-card h3 {
-  margin: 0 0 12px;
-  color: var(--sb-ink);
-  font-size: 22px;
-  font-weight: 700;
-  line-height: 1.2;
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  flex: 0 0 auto;
 }
 
-.sb-card p, .sb-step-card p, .sb-testimonial-card p, .sb-footer p, .sb-footer a, .sb-legal {
+.dot.y { background: var(--sb-pop-yellow); }
+.dot.p { background: var(--sb-pop-pink); }
+.dot.o { background: var(--sb-pop-orange); }
+.dot.g { background: var(--sb-primary); }
+
+.panels {
+  padding-top: 110px;
+  padding-bottom: 40px;
+}
+
+.panel {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr) minmax(280px, 1fr);
+  gap: 40px;
+  align-items: center;
+  border-top: 1px solid var(--sb-card-border);
+  padding: 64px 0;
+}
+
+.idx {
   font-size: 15px;
+  font-weight: 800;
+  color: var(--sb-text-muted);
+}
+
+.idx b {
+  color: var(--sb-primary);
+}
+
+.panel-copy {
+  min-width: 0;
+}
+
+.panel h2,
+.tools h2,
+.faq h2 {
+  margin: 0;
+  font-weight: 900;
+  text-wrap: balance;
+}
+
+.panel h2 {
+  font-size: clamp(30px, 3.8vw, 52px);
+  letter-spacing: -0.03em;
+  line-height: 1.02;
+  margin-bottom: 16px;
+}
+
+.panel h2 .row > span {
+  transition-duration: .85s;
+}
+
+.panel p,
+.tools .head p,
+.faq .head p {
+  color: var(--sb-text-muted);
+  line-height: 1.65;
+}
+
+.panel p {
+  margin: 0;
+  font-size: 15.5px;
+  max-width: 430px;
+}
+
+.viz {
+  background: var(--sb-card-bg);
+  border: 1px solid var(--sb-card-border);
+  border-radius: 26px;
+  overflow: hidden;
+  box-shadow: 0 24px 60px color-mix(in srgb, var(--sb-dark) 7%, transparent);
+  clip-path: inset(12% 6% 12% 6% round 26px);
+  transition: clip-path .9s var(--sb-spring), box-shadow .4s ease, border-color .4s ease;
+  min-width: 0;
+}
+
+.panel.in .viz {
+  clip-path: inset(0 0 0 0 round 26px);
+}
+
+.panel:nth-of-type(1) .viz:hover {
+  border-color: color-mix(in srgb, var(--sb-primary) 55%, var(--sb-card-border));
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--sb-dark) 22%, transparent), 0 28px 56px color-mix(in srgb, var(--sb-dark) 26%, transparent), 0 48px 110px color-mix(in srgb, var(--sb-primary) 55%, transparent);
+}
+
+.panel:nth-of-type(2) .viz:hover {
+  border-color: color-mix(in srgb, var(--sb-pop-yellow) 55%, var(--sb-card-border));
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--sb-dark) 22%, transparent), 0 28px 56px color-mix(in srgb, var(--sb-dark) 26%, transparent), 0 48px 110px color-mix(in srgb, var(--sb-pop-yellow) 60%, transparent);
+}
+
+.panel:nth-of-type(3) .viz:hover {
+  border-color: color-mix(in srgb, var(--sb-pop-orange) 55%, var(--sb-card-border));
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--sb-dark) 22%, transparent), 0 28px 56px color-mix(in srgb, var(--sb-dark) 26%, transparent), 0 48px 110px color-mix(in srgb, var(--sb-pop-orange) 58%, transparent);
+}
+
+.ill {
+  padding: 30px;
+}
+
+.ill svg,
+.tviz svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.tviz svg {
+  overflow: visible;
+}
+
+.char {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.countband {
+  background: color-mix(in srgb, var(--sb-primary) 4.5%, transparent);
+  border-top: 1px solid color-mix(in srgb, var(--sb-primary) 12%, var(--sb-card-border));
+  border-bottom: 1px solid color-mix(in srgb, var(--sb-primary) 12%, var(--sb-card-border));
+}
+
+.countstrip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+  padding: 130px 0;
+}
+
+.count {
+  border-left: 1px solid color-mix(in srgb, var(--sb-primary) 28%, transparent);
+  padding-left: 28px;
+  min-width: 0;
+  position: relative;
+}
+
+.count::before {
+  content: "";
+  position: absolute;
+  top: 4px;
+  left: -2px;
+  width: 3px;
+  height: 58px;
+  border-radius: 999px;
+  background: var(--sb-primary);
+}
+
+.count .n {
+  font-size: clamp(54px, 6.7vw, 96px);
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  line-height: 1.04;
+}
+
+.count .l {
+  color: var(--sb-text-muted);
+  font-size: 14px;
+  margin-top: 6px;
+  line-height: 1.45;
+}
+
+.tools {
+  padding: 0 40px;
+}
+
+.kick2 {
+  margin-bottom: 18px;
+}
+
+.tools .head,
+.faq .head {
+  max-width: 780px;
+  margin-bottom: 84px;
+}
+
+.tools h2,
+.faq h2 {
+  font-size: clamp(34px, 4.6vw, 64px);
+  letter-spacing: -0.035em;
+  line-height: 1;
+}
+
+.tools h2 .row > span,
+.faq h2 .row > span {
+  transition-duration: .9s;
+}
+
+.tools .head p,
+.faq .head p {
+  font-size: 16.5px;
+  margin: 16px 0 0;
+  max-width: 540px;
+}
+
+.toolstage {
+  height: 300vh;
+}
+
+.toolpin {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  overflow: hidden;
+  will-change: transform;
+}
+
+.toolhead {
+  width: 100%;
+}
+
+.tooltrack {
+  display: flex;
+  gap: 28px;
+  will-change: transform;
+}
+
+.tslab {
+  flex: 0 0 60vw;
+  min-height: 30vh;
+  position: relative;
+  overflow: hidden;
+  background: var(--sb-card-bg);
+  border: 1px solid var(--sb-card-border);
+  border-radius: 30px;
+  padding: 46px 48px;
+  display: flex;
+  align-items: center;
+  gap: 40px;
+  box-shadow: 0 24px 60px color-mix(in srgb, var(--sb-dark) 6%, transparent);
+  transition: box-shadow .35s ease;
+  min-width: 0;
+}
+
+.tslab .num {
+  flex: none;
+  pointer-events: none;
+  user-select: none;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(90px, 8.5vw, 140px);
+  font-style: italic;
+  font-weight: 700;
+  line-height: .8;
+  opacity: .2;
+  transform: translateY(6px);
+}
+
+.tslab:nth-child(1) .num { color: var(--sb-primary); }
+.tslab:nth-child(2) .num { color: var(--sb-pop-yellow-deep); }
+.tslab:nth-child(3) .num { color: var(--sb-pop-orange-deep); }
+.tslab:nth-child(4) .num { color: var(--sb-pop-pink-deep); }
+
+.tslab:nth-child(1):hover {
+  box-shadow: 0 30px 70px color-mix(in srgb, var(--sb-primary) 20%, transparent);
+}
+
+.tslab:nth-child(2):hover {
+  box-shadow: 0 30px 70px color-mix(in srgb, var(--sb-pop-yellow) 26%, transparent);
+}
+
+.tslab:nth-child(3):hover {
+  box-shadow: 0 30px 70px color-mix(in srgb, var(--sb-pop-orange) 24%, transparent);
+}
+
+.tslab:nth-child(4):hover {
+  box-shadow: 0 30px 70px color-mix(in srgb, var(--sb-pop-pink) 26%, transparent);
+}
+
+.tslab .ttext {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.tslab h3 {
+  margin: 0 0 16px;
+  font-size: clamp(34px, 3.4vw, 58px);
+  font-weight: 900;
+  letter-spacing: -0.035em;
+  line-height: 1.02;
+  text-wrap: balance;
+}
+
+.tslab p {
+  max-width: 560px;
+  margin: 0;
+  color: var(--sb-text-muted);
+  font-size: clamp(17px, 1.5vw, 21px);
   line-height: 1.6;
 }
 
-.sb-card p, .sb-step-card p { margin: 0; color: var(--sb-muted); }
-.sb-quote { margin: 0 0 32px; color: #f8fafc; font-size: 16px; font-style: italic; }
-
-.sb-person { display: flex; align-items: center; gap: 16px; }
-
-.sb-person-info {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  text-align: left;
+.tslab .tviz {
+  flex: none;
+  width: clamp(120px, 11.5vw, 180px);
 }
 
-.sb-person-info strong {
-  display: block;
-  font-size: 15px;
-  color: #fff;
-  line-height: 1.2;
+.nopin .toolstage {
+  height: auto;
 }
 
-.sb-person-info span {
-  display: block;
-  margin-top: 4px;
-  color: var(--sb-muted-dark);
-  font-size: 13px;
+.nopin .toolpin {
+  height: auto;
+  padding: 110px 0 100px;
+  transform: none !important;
 }
 
-.sb-avatar {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255,255,255,0.2);
-  color: #fff;
-  font-size: 14px;
-  font-weight: 800;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
+.nopin .tooltrack {
+  flex-wrap: wrap;
+  transform: none !important;
 }
 
-/* --- FAQ & ACCORDION --- */
-.sb-faq-shell { max-width: 820px; }
-.sb-accordion { border-top: 1px solid var(--sb-divider); }
-.sb-accordion-item { border-bottom: 1px solid var(--sb-divider); }
+.nopin .tslab {
+  flex-basis: 100%;
+  min-height: 0;
+  padding: 44px 36px 40px;
+}
 
-.sb-accordion-trigger {
+.faqsec {
+  padding-top: 170px;
+  padding-bottom: 150px;
+}
+
+.faq {
+  max-width: 880px;
+  margin: 0 auto;
+}
+
+.faqitem {
+  border-top: 1px solid var(--sb-card-border);
+  transform: translateY(26px);
+  transition: transform .6s var(--sb-spring), border-color .25s ease;
+}
+
+.faqitem.in {
+  transform: none;
+}
+
+.faqitem:nth-of-type(2) { transition-delay: .07s; }
+.faqitem:nth-of-type(3) { transition-delay: .14s; }
+.faqitem:nth-of-type(4) { transition-delay: .21s; }
+.faqitem:last-of-type { border-bottom: 1px solid var(--sb-card-border); }
+
+.faqq {
   width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  padding: 28px 0;
-  font-size: 18px;
-  font-weight: 600;
-  line-height: 1.35;
+  background: none;
+  border: 0;
+  font: inherit;
   text-align: left;
-  transition: color 0.2s ease;
-}
-
-.sb-accordion-trigger:hover { color: var(--sb-primary); }
-
-.sb-accordion-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  border: 1px solid rgba(0,0,0,0.1);
-  color: var(--sb-ink);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  font-size: 20px;
-  line-height: 1;
-  transition: transform 0.3s ease, background 0.3s ease;
-}
-
-.rotate-icon {
-  transform: rotate(45deg);
-  background: var(--sb-primary);
-  color: white;
-  border-color: var(--sb-primary);
-}
-
-.sb-accordion-answer { overflow: hidden; }
-.sb-accordion-answer p { margin: 0; padding: 0 42px 28px 0; color: var(--sb-muted); font-size: 16px; line-height: 1.6; }
-
-.sb-accordion-panel-enter-active, .sb-accordion-panel-leave-active {
-  transition: max-height 0.3s ease, opacity 0.3s ease; max-height: 200px;
-}
-.sb-accordion-panel-enter-from, .sb-accordion-panel-leave-to { max-height: 0; opacity: 0; }
-.sb-accordion-panel-enter-to, .sb-accordion-panel-leave-from { max-height: 200px; opacity: 1; }
-
-.sb-btn-outline-dark {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 9999px;
-  padding: 14px 32px;
-  font-size: 15px;
-  font-weight: 600;
-  transition: all 0.2s ease;
-}
-
-.sb-btn-outline-dark:hover {
-  background: rgba(255, 255, 255, 0.15);
-  border-color: rgba(255, 255, 255, 0.8);
-}
-
-.sb-footer {
-  padding: 80px 0 32px;
-  background: color-mix(in srgb, var(--sb-surface) 56%, transparent);
-}
-
-.sb-footer-grid {
-  display: grid;
-  grid-template-columns: 1.5fr repeat(3, 1fr);
-  gap: 48px;
-}
-
-.sb-footer h3, .sb-footer h4 {
-  margin: 0 0 16px;
-  color: var(--sb-ink);
-  font-size: 14px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
-
-.sb-footer p { max-width: 280px; margin: 0; color: var(--sb-muted); }
-.sb-footer a { display: block; color: var(--sb-muted); text-decoration: none; line-height: 2.4; transition: color 0.2s ease; }
-.footer-link-hover:hover { color: var(--sb-primary); transform: translateX(2px); }
-
-.sb-legal {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  margin-top: 60px;
-  padding-top: 24px;
-  border-top: 1px solid var(--sb-divider);
-  color: var(--sb-muted);
-  line-height: 2.2;
+  gap: 22px;
+  padding: 38px 4px;
+  cursor: pointer;
+  color: var(--sb-text-main);
 }
 
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+.faqq .no {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--sb-primary);
+  width: 34px;
+  flex: none;
 }
 
-.fade-in-up { animation: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-
-@media (max-width: 991px) {
-  .sb-split { grid-template-columns: 1fr; gap: 40px; }
-  .text-left { text-align: center !important; }
-  .text-left .sb-eyebrow { justify-content: center; }
-  .sb-hero-actions, .sb-badge-row, .sb-section-heading { justify-content: center !important; margin-left: auto !important; margin-right: auto !important; }
-  .sb-hero-copy { margin-left: auto !important; margin-right: auto !important; }
-  .sb-image-wrapper { max-width: 300px; }
+.faqq .q {
+  font-size: clamp(17px, 2vw, 22px);
+  font-weight: 800;
+  letter-spacing: -0.3px;
+  line-height: 1.25;
+  flex: 1 1 auto;
+  min-width: 0;
+  transition: transform .35s var(--sb-spring), color .25s;
 }
 
-@media (max-width: 767px) {
-  .sb-nav-inner, .sb-shell { width: min(100% - 32px, 1120px); }
-  .sb-hero h1 { font-size: 42px; }
-  .sb-stats-grid, .sb-process-grid, .sb-feature-grid, .sb-testimonial-grid, .sb-footer-grid { grid-template-columns: 1fr; }
-  .sb-legal { align-items: flex-start; flex-direction: column; gap: 8px; }
+.faqq:hover .q {
+  transform: translateX(10px);
+  color: var(--sb-primary);
+}
+
+.faqq .plusw {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1.5px solid var(--sb-card-border);
+  display: grid;
+  place-items: center;
+  flex: none;
+  color: var(--sb-text-main);
+  transition: transform .45s var(--sb-spring), background .25s, border-color .25s, color .25s;
+}
+
+.faqitem.open .plusw {
+  transform: rotate(135deg);
+  background: var(--sb-primary);
+  border-color: var(--sb-primary);
+  color: var(--sb-primary-contrast);
+}
+
+.faqa {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows .5s var(--sb-spring);
+}
+
+.faqitem.open .faqa {
+  grid-template-rows: 1fr;
+}
+
+.faqa > div {
+  overflow: hidden;
+}
+
+.faqa p {
+  padding: 0 4px 38px 56px;
+  margin: 0;
+  color: var(--sb-text-muted);
+  font-size: 15.5px;
+  line-height: 1.65;
+  max-width: 660px;
+}
+
+.ctawrap {
+  padding: 40px 40px 120px;
+}
+
+.ctapanel {
+  background: var(--sb-dark);
+  color: white;
+  border-radius: 32px;
+  padding: 110px 48px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.ctapanel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(520px 360px at 78% 8%, color-mix(in srgb, var(--sb-primary) 40%, transparent), transparent 70%);
+}
+
+.ctapanel h2 {
+  position: relative;
+  margin: 0;
+  font-size: clamp(38px, 5.6vw, 84px);
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  line-height: 0.98;
+  text-wrap: balance;
+}
+
+.ctapanel h2 em {
+  font-style: normal;
+  color: var(--sb-pop-yellow);
+}
+
+.ctapanel p {
+  position: relative;
+  color: color-mix(in srgb, white 62%, transparent);
+  margin: 22px auto 38px;
+  font-size: 16px;
+  line-height: 1.65;
+  max-width: 560px;
+}
+
+.magnet {
+  position: relative;
+  display: inline-block;
+}
+
+.magnet .btn {
+  font-size: 16px;
+  padding: 16px 44px;
+}
+
+footer {
+  padding: 26px 40px 90px;
+  text-align: center;
+  color: var(--sb-text-muted);
+  font-size: 13.5px;
+  line-height: 1.65;
+}
+
+.reveal {
+  opacity: 0;
+  transform: translateY(34px);
+  transition: opacity .8s ease, transform .8s var(--sb-spring);
+}
+
+.reveal.in {
+  opacity: 1;
+  transform: none;
+}
+
+.svg-label { font: 800 17px 'Inter', system-ui, sans-serif; }
+.svg-small-label { font: 800 14px 'Inter', system-ui, sans-serif; }
+.svg-muted-label { font: 400 14px 'Inter', system-ui, sans-serif; }
+.svg-ink-fill { fill: var(--sb-text-main); }
+.svg-ink-stroke { stroke: var(--sb-text-main); }
+.svg-primary-fill { fill: var(--sb-primary); }
+.svg-primary-stroke { stroke: var(--sb-primary); }
+.svg-contrast-fill { fill: var(--sb-primary-contrast); }
+.svg-card-fill { fill: var(--sb-card-bg); }
+.svg-card-stroke { stroke: var(--sb-card-border); }
+.svg-muted-fill { fill: var(--sb-text-muted); }
+.svg-yellow-fill { fill: var(--sb-pop-yellow); }
+.svg-yellow-stroke { stroke: var(--sb-pop-yellow); }
+.svg-pink-fill { fill: var(--sb-pop-pink); }
+.svg-pink-stroke { stroke: var(--sb-pop-pink); }
+.svg-orange-stroke { stroke: var(--sb-pop-orange); }
+.svg-green-tint-fill { fill: var(--sb-primary-light); }
+.svg-green-tint-stroke { stroke: var(--sb-primary-lighter); }
+.svg-note-fill { fill: color-mix(in srgb, var(--sb-pop-yellow) 18%, var(--sb-card-bg)); }
+.svg-calendar-dot-fill { fill: color-mix(in srgb, var(--sb-text-muted) 34%, transparent); }
+.svg-soft-primary-fill { fill: color-mix(in srgb, var(--sb-primary) 12%, var(--sb-card-bg)); }
+.svg-soft-yellow-fill { fill: color-mix(in srgb, var(--sb-pop-yellow) 22%, var(--sb-card-bg)); }
+.svg-soft-pink-fill { fill: color-mix(in srgb, var(--sb-pop-pink) 20%, var(--sb-card-bg)); }
+.svg-fade-strong { opacity: .85; }
+
+@keyframes sway1 {
+  from { transform: rotate(-14deg); }
+  to { transform: rotate(-9deg) translate(6vw, 5vh) scaleY(1.18); }
+}
+
+@keyframes sway2 {
+  from { transform: rotate(10deg); }
+  to { transform: rotate(14deg) translate(-7vw, -4vh) scaleY(1.14); }
+}
+
+@keyframes sway3 {
+  from { transform: rotate(-6deg); }
+  to { transform: rotate(-2deg) translate(5vw, -3vh) scaleY(1.2); }
+}
+
+@keyframes cue {
+  0% { top: -50%; }
+  100% { top: 100%; }
+}
+
+@keyframes mq {
+  to { transform: translateX(-50%); }
+}
+
+@media (max-width: 900px) {
+  .studio-nav {
+    padding: 14px 20px;
+  }
+
+  section {
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+
+  .hero-title {
+    font-size: clamp(46px, 13vw, 80px);
+  }
+
+  .hero-sub {
+    align-items: flex-start;
+  }
+
+  .scroll-cue {
+    margin-left: 0;
+  }
+
+  .panel {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 22px;
+  }
+
+  .toolstage {
+    height: auto;
+  }
+
+  .toolpin {
+    height: auto;
+    padding: 110px 0 100px;
+    transform: none !important;
+  }
+
+  .tooltrack {
+    flex-wrap: wrap;
+    transform: none !important;
+  }
+
+  .tslab {
+    flex-basis: 100%;
+    min-height: 0;
+    padding: 36px 30px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .tslab .num {
+    font-size: 90px;
+    transform: none;
+  }
+
+  .countstrip {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 30px;
+  }
+
+  .faqsec {
+    padding-top: 110px;
+    padding-bottom: 100px;
+  }
+}
+
+@media (max-width: 600px) {
+  .brand {
+    font-size: 0;
+  }
+
+  .navlinks {
+    gap: 8px;
+  }
+
+  .btn {
+    padding: 9px 16px;
+    font-size: 13px;
+  }
+
+  .hero {
+    padding-top: 112px;
+  }
+
+  .hero-title {
+    font-size: clamp(40px, 14vw, 58px);
+    line-height: 1;
+  }
+
+  .hero-actions {
+    width: 100%;
+  }
+
+  .hero-actions .btn {
+    flex: 1 1 150px;
+  }
+
+  .marquee-copy {
+    gap: 34px;
+    padding-right: 34px;
+  }
+
+  .tools {
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+
+  .countstrip {
+    padding: 90px 0;
+  }
+
+  .faqq {
+    gap: 12px;
+    padding: 24px 0;
+  }
+
+  .faqa p {
+    padding-left: 4px;
+  }
+
+  .ctawrap {
+    padding: 32px 20px 90px;
+  }
+
+  .ctapanel {
+    padding: 74px 24px;
+    border-radius: 26px;
+  }
+
+  footer {
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+}
+
+@media (pointer: coarse) {
+  .toolstage {
+    height: auto;
+  }
+
+  .toolpin {
+    height: auto;
+    padding: 110px 0 100px;
+    transform: none !important;
+  }
+
+  .tooltrack {
+    flex-wrap: wrap;
+    transform: none !important;
+  }
+
+  .tslab {
+    flex-basis: 100%;
+    min-height: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .row > span {
+    transform: none;
+    transition: none;
+  }
+
+  .viz {
+    clip-path: none;
+  }
+
+  .reveal,
+  .tslab {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .toolstage {
+    height: auto;
+  }
+
+  .toolpin {
+    height: auto;
+    padding: 110px 0 100px;
+    transform: none !important;
+  }
+
+  .tooltrack {
+    flex-wrap: wrap;
+    transform: none !important;
+  }
+
+  .tslab {
+    flex-basis: 100%;
+    min-height: 0;
+  }
+
+  .faqa {
+    transition: none;
+  }
+
+  .marquee-track,
+  .bgwash i,
+  .scroll-cue .bar::after {
+    animation: none;
+  }
 }
 </style>

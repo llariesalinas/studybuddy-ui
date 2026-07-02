@@ -41,7 +41,7 @@
 
                 <div class="mb-5">
                   <label class="form-label fw-bold small sb-muted">HOURLY RATE (PHP)</label>
-                  <input type="number" v-model="form.hourly_rate" class="form-control border-sb shadow-none" placeholder="₱ 0.00" required>
+                  <input type="number" v-model="form.hourly_rate" class="form-control border-sb shadow-none sb-field" placeholder="₱ 0.00" required>
                 </div>
 
                 <button type="submit" class="btn bg-sb-primary text-white w-100 py-3 rounded-3 fw-bold shadow-sm sb-btn">

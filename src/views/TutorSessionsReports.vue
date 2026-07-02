@@ -4,7 +4,7 @@
       <article
         v-for="stat in statCards"
         :key="stat.label"
-        class="metric-card"
+        class="metric-card sb-card-lift"
       >
         <div class="metric-copy">
           <span class="metric-icon">
@@ -53,7 +53,7 @@
             v-for="tab in viewTabs"
             :key="tab.value"
             type="button"
-            class="view-tab sb-btn"
+            class="view-tab sb-btn sb-pill"
             :class="{ 'view-tab-active': activeTab === tab.value }"
             :aria-selected="activeTab === tab.value"
             role="tab"
@@ -73,8 +73,9 @@
               :key="filter.value"
               type="button"
               @click="currentFilter = filter.value"
-              class="filter-tab sb-btn"
+              class="filter-tab sb-btn sb-pill"
               :class="{ 'filter-tab-active': currentFilter === filter.value }"
+              :aria-pressed="currentFilter === filter.value"
             >
               {{ filter.label }}
             </button>
@@ -453,8 +454,6 @@ const getStatusClass = (status) => {
 .reports-panel {
   border: 1px solid var(--reports-border);
   background: var(--reports-glass);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
   box-shadow: 0 18px 42px rgba(15, 23, 42, 0.08);
 }
 
@@ -637,11 +636,7 @@ const getStatusClass = (status) => {
 .filter-tab,
 .details-btn {
   border: 0;
-  transition:
-    transform var(--sb-t-quick, 120ms) var(--sb-spring-fast, ease),
-    background-color var(--sb-t-normal, 250ms) var(--sb-spring, ease),
-    color var(--sb-t-normal, 250ms) var(--sb-spring, ease),
-    box-shadow var(--sb-t-normal, 250ms) var(--sb-spring, ease);
+  transition: transform var(--sb-t-quick) var(--sb-spring);
 }
 
 .view-tab,

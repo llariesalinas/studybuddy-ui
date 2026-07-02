@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tools strip — scroll motion demos</title>
+<style>
+  :root {
+    --sb-primary: #00895A;
+    --sb-bg: #F8F9FA;
+    --sb-card-bg: #FFFFFF;
+    --sb-card-border: #EAEAEA;
+    --sb-text-main: #163127;
+    --sb-text-muted: #6B7280;
+    --sb-dark: #0A1916;
+    --sb-spring: cubic-bezier(0.16, 1, 0.3, 1);
+    --pop-yellow: #FFC94D;
+    --pop-orange: #FF8A5C;
+    --pop-pink: #FF8FA3;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: Inter, system-ui, sans-serif; background: var(--sb-bg); color: var(--sb-text-main); overflow-x: hidden; }
+
+  .filler {
+    min-height: 90vh; display: flex; flex-direction: column; justify-content: center; align-items: center;
+    text-align: center; padding: 0 24px; gap: 14px;
+  }
+  .filler .kick { font-size: 13px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: var(--sb-primary); }
+  .filler h1 { font-size: clamp(30px, 4.5vw, 56px); font-weight: 900; letter-spacing: -0.03em; }
+  .filler p { color: var(--sb-text-muted); max-width: 520px; line-height: 1.65; }
+
+  /* ---- shared strip ---- */
+  .strip-sec { padding: 16vh 0 24vh; overflow: hidden; }
+  .strip-head { max-width: 1240px; margin: 0 auto 64px; padding: 0 40px; }
+  .strip-head .kick { font-size: 13px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: var(--sb-primary); display: block; margin-bottom: 14px; }
+  .strip-head h2 { font-size: clamp(30px, 4.2vw, 58px); font-weight: 900; letter-spacing: -0.035em; line-height: 1; }
+
+  .strip { display: flex; gap: 22px; padding: 0 40px; }
+  .tcard {
+    flex: 1 1 0; min-width: 0; position: relative; overflow: hidden;
+    background: var(--sb-card-bg); border: 1px solid var(--sb-card-border); border-radius: 24px;
+    padding: 120px 26px 30px; min-height: 300px;
+    will-change: transform;
+    transition: box-shadow .35s ease;
+  }
+  .tcard .ghost {
+    position: absolute; top: -28px; left: 8px; font-size: 150px; font-weight: 900; letter-spacing: -0.06em;
+    line-height: 1; pointer-events: none; user-select: none;
+  }
+  .tcard:nth-child(1) .ghost { color: rgba(0,137,90,.13); }
+  .tcard:nth-child(2) .ghost { color: rgba(255,176,46,.20); }
+  .tcard:nth-child(3) .ghost { color: rgba(255,120,70,.18); }
+  .tcard:nth-child(4) .ghost { color: rgba(255,143,163,.20); }
+  .tcard:nth-child(1):hover { box-shadow: 0 24px 56px rgba(0,137,90,.20); }
+  .tcard:nth-child(2):hover { box-shadow: 0 24px 56px rgba(255,176,46,.26); }
+  .tcard:nth-child(3):hover { box-shadow: 0 24px 56px rgba(255,120,70,.24); }
+  .tcard:nth-child(4):hover { box-shadow: 0 24px 56px rgba(255,143,163,.26); }
+  .tcard h3 { font-size: 18px; font-weight: 800; letter-spacing: -0.3px; margin-bottom: 10px; position: relative; }
+  .tcard p { font-size: 14.5px; line-height: 1.6; color: var(--sb-text-muted); position: relative; }
+
+  .demo-tag {
+    position: fixed; bottom: 18px; right: 18px; z-index: 50; background: var(--sb-dark); color: #fff;
+    font-size: 12.5px; font-weight: 700; padding: 8px 16px; border-radius: 999px; opacity: .85;
+  }
+
+  @media (max-width: 900px) {
+    .strip { flex-direction: column; }
+    .tcard { padding-top: 100px; min-height: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .tcard { transform: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="filler">
+  <span class="kick">Demo 1 of 2</span>
+  <h1>Scrubbed assembly</h1>
+  <p>Keep scrolling. The four cards start scattered — thrown off the strip — and scrub into a neat full-width row, tied directly to your scroll position. Scroll back up and it reverses.</p>
+</div>
+
+<section class="strip-sec" id="demo1">
+  <div class="strip-head">
+    <span class="kick">Platform tools</span>
+    <h2>Everything the tutoring loop needs.</h2>
+  </div>
+  <div class="strip">
+    <div class="tcard"><span class="ghost">01</span><h3>Smart tutor matching</h3><p>Rank peer tutors by subject fit, ratings, availability, and workload balance.</p></div>
+    <div class="tcard"><span class="ghost">02</span><h3>Flexible scheduling</h3><p>Book around real tutor availability and keep upcoming sessions easy to scan.</p></div>
+    <div class="tcard"><span class="ghost">03</span><h3>Reports and earnings</h3><p>Track completed sessions, tutor compensation, and program-level performance.</p></div>
+    <div class="tcard"><span class="ghost">04</span><h3>Balanced workloads</h3><p>Protect session quality by keeping tutor demand visible before calendars fill up.</p></div>
+  </div>
+</section>
+
+<div class="filler">
+  <span class="kick">Demo 2 of 2</span>
+  <h1>Fan from a stack</h1>
+  <p>Same strip, different entrance. The cards begin piled as one deck in the center — slightly rotated like held playing cards — and fan out sideways into the row as you scroll.</p>
+</div>
+
+<section class="strip-sec" id="demo2">
+  <div class="strip-head">
+    <span class="kick">Platform tools</span>
+    <h2>Everything the tutoring loop needs.</h2>
+  </div>
+  <div class="strip">
+    <div class="tcard"><span class="ghost">01</span><h3>Smart tutor matching</h3><p>Rank peer tutors by subject fit, ratings, availability, and workload balance.</p></div>
+    <div class="tcard"><span class="ghost">02</span><h3>Flexible scheduling</h3><p>Book around real tutor availability and keep upcoming sessions easy to scan.</p></div>
+    <div class="tcard"><span class="ghost">03</span><h3>Reports and earnings</h3><p>Track completed sessions, tutor compensation, and program-level performance.</p></div>
+    <div class="tcard"><span class="ghost">04</span><h3>Balanced workloads</h3><p>Protect session quality by keeping tutor demand visible before calendars fill up.</p></div>
+  </div>
+</section>
+
+<div class="filler">
+  <h1>That's both.</h1>
+  <p>Scroll back up to scrub either one in reverse. Each ghost number card also throws its own colored shadow on hover, same as the rest of the page.</p>
+</div>
+
+<div class="demo-tag" id="tag">Demo 1 — Scrubbed assembly</div>
+
+<script>
+(() => {
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches
+  if (reduce) return
+
+  const clamp01 = (v) => Math.max(0, Math.min(1, v))
+  // springy ease for the tail end of the motion
+  const ease = (t) => 1 - Math.pow(1 - t, 3)
+
+  // Section progress: 0 when section top hits viewport bottom,
+  // 1 when the strip is fully comfortable in view (~55% travel).
+  function progress(sec) {
+    const r = sec.getBoundingClientRect()
+    const vh = innerHeight
+    return clamp01((vh - r.top) / (vh * 0.85))
+  }
+
+  /* --- Demo 1: scrubbed assembly --- */
+  // per-card scattered start: [x, y, rot]
+  const scatter = [
+    [-140, 240, -14],
+    [60, 360, 9],
+    [-40, 300, -7],
+    [160, 260, 12],
+  ]
+  const d1 = document.getElementById('demo1')
+  const d1cards = [...d1.querySelectorAll('.tcard')]
+
+  /* --- Demo 2: fan from a stack --- */
+  const d2 = document.getElementById('demo2')
+  const d2cards = [...d2.querySelectorAll('.tcard')]
+  let deck = [] // per-card [dx to center, rot in deck]
+  function measureDeck() {
+    const stripR = d2.querySelector('.strip').getBoundingClientRect()
+    const cx = stripR.left + stripR.width / 2
+    deck = d2cards.map((c, i) => {
+      const r = c.getBoundingClientRect()
+      const cardCx = r.left + r.width / 2
+      // current transform offsets the rect; remove it from the measurement
+      const t = getComputedStyle(c).transform
+      const m = t === 'none' ? new DOMMatrixReadOnly() : new DOMMatrixReadOnly(t)
+      return [cx - (cardCx - m.m41), (i - 1.5) * 7]
+    })
+  }
+
+  function frame() {
+    // demo 1 — each card gets a staggered slice of the section progress
+    const p1 = progress(d1)
+    d1cards.forEach((c, i) => {
+      const local = ease(clamp01((p1 - i * 0.10) / 0.60))
+      const [sx, sy, sr] = scatter[i]
+      c.style.transform =
+        `translate(${sx * (1 - local)}px, ${sy * (1 - local)}px) rotate(${sr * (1 - local)}deg)`
+    })
+
+    // demo 2 — all cards leave the deck together, outer cards travel last
+    const p2 = progress(d2)
+    d2cards.forEach((c, i) => {
+      const local = ease(clamp01((p2 - Math.abs(i - 1.5) * 0.06) / 0.62))
+      const [dx, rot] = deck[i] || [0, 0]
+      c.style.transform =
+        `translate(${dx * (1 - local)}px, ${40 * (1 - local)}px) rotate(${rot * (1 - local)}deg)`
+    })
+
+    // tag
+    const tag = document.getElementById('tag')
+    tag.textContent = d2.getBoundingClientRect().top < innerHeight * 0.5
+      ? 'Demo 2 — Fan from a stack'
+      : 'Demo 1 — Scrubbed assembly'
+
+    requestAnimationFrame(frame)
+  }
+
+  measureDeck()
+  addEventListener('resize', measureDeck)
+  requestAnimationFrame(frame)
+})()
+</script>
+</body>
+</html>

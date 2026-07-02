@@ -4,7 +4,7 @@
       <article
         v-for="metric in dashboardMetrics"
         :key="metric.label"
-        class="metric-card"
+        class="metric-card sb-card-lift"
       >
         <div class="metric-copy">
           <span class="metric-icon" :class="`metric-icon-${metric.tone}`">
@@ -72,7 +72,7 @@
         <article
           v-for="booking in upcomingBookings"
           :key="getBookingId(booking)"
-          class="booking-card"
+          class="booking-card sb-card-lift"
         >
           <div class="booking-main">
             <span class="booking-avatar">
@@ -356,7 +356,6 @@ watch(
   background:
     radial-gradient(circle at 30% 35%, color-mix(in srgb, var(--sb-primary) 14%, transparent), transparent 58%),
     radial-gradient(circle at 72% 48%, rgba(56, 189, 248, 0.1), transparent 56%);
-  filter: blur(40px);
   opacity: 0.55;
   pointer-events: none;
 }
@@ -379,8 +378,6 @@ watch(
 .bookings-panel {
   border: 1px solid var(--dashboard-border);
   background: var(--dashboard-glass);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
   box-shadow: 0 18px 42px rgba(15, 23, 42, 0.08);
 }
 
@@ -685,11 +682,7 @@ watch(
 .details-btn,
 .retry-btn {
   border: 0;
-  transition:
-    transform var(--sb-t-quick, 120ms) var(--sb-spring-fast, ease),
-    background-color var(--sb-t-normal, 250ms) var(--sb-spring, ease),
-    color var(--sb-t-normal, 250ms) var(--sb-spring, ease),
-    box-shadow var(--sb-t-normal, 250ms) var(--sb-spring, ease);
+  transition: transform var(--sb-t-quick) var(--sb-spring);
 }
 
 .details-btn {

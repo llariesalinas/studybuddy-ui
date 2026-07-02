@@ -8,6 +8,9 @@ export const useSuperAdminStore = defineStore('superadmin', () => {
   const institutions = ref([])
   const institutionPerformance = ref([])
   const analytics = ref(null)
+  const pendingActions = ref({ count: 0, items: [] })
+  const institutionRequests = ref([])
+  const adminAccountRequests = ref([])
 
   const loading = ref({
     stats: false,
@@ -15,6 +18,10 @@ export const useSuperAdminStore = defineStore('superadmin', () => {
     institutions: false,
     institutionPerformance: false,
     analytics: false,
+    pendingActions: false,
+    institutionRequests: false,
+    adminAccountRequests: false,
+    export: false,
   })
 
   const error = ref({
@@ -23,20 +30,33 @@ export const useSuperAdminStore = defineStore('superadmin', () => {
     institutions: null,
     institutionPerformance: null,
     analytics: null,
+    pendingActions: null,
+    institutionRequests: null,
+    adminAccountRequests: null,
+    export: null,
   })
 
-  // ── Stats ──────────────────────────────────────────────────────────────────
+  const replaceUser = (updatedUser) => {
+    const index = users.value.findIndex((user) => user.id === updatedUser.id)
+    if (index !== -1) {
+      users.value[index] = { ...users.value[index], ...updatedUser }
+    }
+  }
+
   let statsPromise = null
   const fetchStats = async (force = false) => {
     if (stats.value && !force) return
-    if (statsPromise) { await statsPromise; if (!force) return }
+    if (statsPromise) {
+      await statsPromise
+      if (!force) return
+    }
 
     loading.value.stats = true
     error.value.stats = null
 
     statsPromise = (async () => {
       try {
-        const res = await api.get('/admin/stats')
+        const res = await api.get('/admin/stats/')
         stats.value = res.data
       } catch {
         error.value.stats = 'Failed to load statistics.'
@@ -49,19 +69,21 @@ export const useSuperAdminStore = defineStore('superadmin', () => {
     return statsPromise
   }
 
-  // ── Users ──────────────────────────────────────────────────────────────────
   let usersPromise = null
   const fetchUsers = async (params = {}, force = false) => {
     const isSearch = Object.keys(params).length > 0
     if (users.value.length && !force && !isSearch) return
-    if (usersPromise) { await usersPromise; if (!force && !isSearch) return }
+    if (usersPromise) {
+      await usersPromise
+      if (!force && !isSearch) return
+    }
 
     loading.value.users = true
     error.value.users = null
 
     usersPromise = (async () => {
       try {
-        const res = await api.get('/admin/users', { params })
+        const res = await api.get('/admin/users/', { params })
         users.value = res.data
       } catch {
         error.value.users = 'Failed to load users.'
@@ -75,17 +97,40 @@ export const useSuperAdminStore = defineStore('superadmin', () => {
   }
 
   const updateUserStatus = async (userId, isSuspended) => {
-    await api.patch(`/admin/users/${userId}/`, { is_suspended: isSuspended })
-    const u = users.value.find(u => u.id === userId)
-    if (u) u.is_suspended = isSuspended
-    Promise.all([fetchUsers({}, true), fetchStats(true)])
+    const res = await api.patch(`/admin/users/${userId}/`, { is_suspended: isSuspended })
+    replaceUser(res.data)
+    await Promise.all([fetchUsers({}, true), fetchStats(true), fetchPendingActions(true)])
+    return res.data
   }
 
-  // ── Institutions ───────────────────────────────────────────────────────────
+  const updateUserRole = async (userId, role) => {
+    const res = await api.patch(`/admin/users/${userId}/`, { role })
+    replaceUser(res.data)
+    await Promise.all([fetchUsers({}, true), fetchStats(true)])
+    return res.data
+  }
+
+  const updateUserInstitution = async (userId, institutionId) => {
+    const res = await api.patch(`/admin/users/${userId}/`, { institution: institutionId || null })
+    replaceUser(res.data)
+    await Promise.all([fetchUsers({}, true), fetchInstitutionPerformance(true)])
+    return res.data
+  }
+
+  const toggleDomainExemption = async (userId, value) => {
+    const res = await api.patch(`/admin/users/${userId}/`, { is_domain_exempt: value })
+    replaceUser(res.data)
+    await fetchPendingActions(true)
+    return res.data
+  }
+
   let instPromise = null
   const fetchInstitutions = async (force = false) => {
     if (institutions.value.length && !force) return
-    if (instPromise) { await instPromise; if (!force) return }
+    if (instPromise) {
+      await instPromise
+      if (!force) return
+    }
 
     loading.value.institutions = true
     error.value.institutions = null
@@ -112,16 +157,23 @@ export const useSuperAdminStore = defineStore('superadmin', () => {
 
   const toggleInstitutionActive = async (id, isActive) => {
     await api.patch(`/admin/institutions/${id}/`, { is_active: isActive })
-    const inst = institutions.value.find(i => i.id === id)
+    const inst = institutions.value.find((item) => item.id === id)
     if (inst) inst.is_active = isActive
-    Promise.all([fetchInstitutions(true), fetchStats(true)])
+    await Promise.all([
+      fetchInstitutions(true),
+      fetchStats(true),
+      fetchPendingActions(true),
+      fetchInstitutionPerformance(true),
+    ])
   }
 
-  // ── Institution Performance ────────────────────────────────────────────────
   let perfPromise = null
   const fetchInstitutionPerformance = async (force = false) => {
     if (institutionPerformance.value.length && !force) return
-    if (perfPromise) { await perfPromise; if (!force) return }
+    if (perfPromise) {
+      await perfPromise
+      if (!force) return
+    }
 
     loading.value.institutionPerformance = true
     error.value.institutionPerformance = null
@@ -141,19 +193,162 @@ export const useSuperAdminStore = defineStore('superadmin', () => {
     return perfPromise
   }
 
-  // ── Analytics ──────────────────────────────────────────────────────────────
-  const fetchAnalytics = async (institutionId = null) => {
+  let pendingPromise = null
+  const fetchPendingActions = async (force = false) => {
+    if (pendingActions.value.items.length && !force) return
+    if (pendingPromise) {
+      await pendingPromise
+      if (!force) return
+    }
+
+    loading.value.pendingActions = true
+    error.value.pendingActions = null
+
+    pendingPromise = (async () => {
+      try {
+        const res = await api.get('/admin/pending-actions/')
+        pendingActions.value = res.data
+      } catch {
+        error.value.pendingActions = 'Failed to load pending actions.'
+      } finally {
+        loading.value.pendingActions = false
+        pendingPromise = null
+      }
+    })()
+
+    return pendingPromise
+  }
+
+  let institutionRequestsPromise = null
+  const fetchInstitutionRequests = async (force = false) => {
+    if (institutionRequests.value.length && !force) return
+    if (institutionRequestsPromise) {
+      await institutionRequestsPromise
+      if (!force) return
+    }
+
+    loading.value.institutionRequests = true
+    error.value.institutionRequests = null
+
+    institutionRequestsPromise = (async () => {
+      try {
+        const res = await api.get('/admin/institution-requests/')
+        institutionRequests.value = res.data
+      } catch {
+        error.value.institutionRequests = 'Failed to load institution requests.'
+      } finally {
+        loading.value.institutionRequests = false
+        institutionRequestsPromise = null
+      }
+    })()
+
+    return institutionRequestsPromise
+  }
+
+  const approveInstitutionRequest = async (id) => {
+    const res = await api.patch(`/admin/institution-requests/${id}/`, { action: 'approve' })
+    await Promise.all([
+      fetchInstitutionRequests(true),
+      fetchPendingActions(true),
+      fetchInstitutions(true),
+      fetchInstitutionPerformance(true),
+      fetchStats(true),
+    ])
+    return res.data
+  }
+
+  const rejectInstitutionRequest = async (id) => {
+    const res = await api.patch(`/admin/institution-requests/${id}/`, { action: 'reject' })
+    await Promise.all([fetchInstitutionRequests(true), fetchPendingActions(true)])
+    return res.data
+  }
+
+  let adminAccountRequestsPromise = null
+  const fetchAdminAccountRequests = async (force = false) => {
+    if (adminAccountRequests.value.length && !force) return
+    if (adminAccountRequestsPromise) {
+      await adminAccountRequestsPromise
+      if (!force) return
+    }
+
+    loading.value.adminAccountRequests = true
+    error.value.adminAccountRequests = null
+
+    adminAccountRequestsPromise = (async () => {
+      try {
+        const res = await api.get('/admin/admin-account-requests/')
+        adminAccountRequests.value = res.data
+      } catch {
+        error.value.adminAccountRequests = 'Failed to load admin account requests.'
+      } finally {
+        loading.value.adminAccountRequests = false
+        adminAccountRequestsPromise = null
+      }
+    })()
+
+    return adminAccountRequestsPromise
+  }
+
+  const approveAdminAccountRequest = async (id, targetUserId) => {
+    const res = await api.patch(`/admin/admin-account-requests/${id}/`, {
+      action: 'approve',
+      target_user_id: targetUserId,
+    })
+    await Promise.all([
+      fetchAdminAccountRequests(true),
+      fetchPendingActions(true),
+      fetchUsers({}, true),
+      fetchStats(true),
+    ])
+    return res.data
+  }
+
+  const rejectAdminAccountRequest = async (id) => {
+    const res = await api.patch(`/admin/admin-account-requests/${id}/`, { action: 'reject' })
+    await Promise.all([fetchAdminAccountRequests(true), fetchPendingActions(true)])
+    return res.data
+  }
+
+  const fetchAnalytics = async (institutionId = null, period = '30d') => {
     loading.value.analytics = true
     error.value.analytics = null
 
     try {
-      const params = institutionId ? { institution_id: institutionId } : {}
-      const res = await api.get('/admin/analytics', { params })
+      const params = { period }
+      if (institutionId) params.institution_id = institutionId
+      const res = await api.get('/admin/analytics/', { params })
       analytics.value = res.data
     } catch {
       error.value.analytics = 'Failed to load analytics.'
     } finally {
       loading.value.analytics = false
+    }
+  }
+
+  const exportAnalyticsCsv = async ({ institutionId = null, period = '30d' } = {}) => {
+    loading.value.export = true
+    error.value.export = null
+
+    try {
+      const params = { period }
+      if (institutionId) params.institution_id = institutionId
+      const res = await api.get('/admin/analytics/export/', {
+        params,
+        responseType: 'blob',
+      })
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'text/csv' }))
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `studybuddy-report-${new Date().toISOString().slice(0, 10)}.csv`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+    } catch {
+      error.value.export = 'Failed to export analytics.'
+      throw new Error(error.value.export)
+    } finally {
+      loading.value.export = false
     }
   }
 
@@ -163,16 +358,30 @@ export const useSuperAdminStore = defineStore('superadmin', () => {
     institutions,
     institutionPerformance,
     analytics,
+    pendingActions,
+    institutionRequests,
+    adminAccountRequests,
     loading,
     error,
 
     fetchStats,
     fetchUsers,
     updateUserStatus,
+    updateUserRole,
+    updateUserInstitution,
+    toggleDomainExemption,
     fetchInstitutions,
     addInstitution,
     toggleInstitutionActive,
     fetchInstitutionPerformance,
+    fetchPendingActions,
+    fetchInstitutionRequests,
+    approveInstitutionRequest,
+    rejectInstitutionRequest,
+    fetchAdminAccountRequests,
+    approveAdminAccountRequest,
+    rejectAdminAccountRequest,
     fetchAnalytics,
+    exportAnalyticsCsv,
   }
 })

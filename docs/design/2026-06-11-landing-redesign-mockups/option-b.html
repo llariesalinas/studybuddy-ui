@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Option B — The Whiteboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Patrick+Hand&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --sb-primary: #00895A;
+    --pop-yellow: #FFC94D;
+    --pop-orange: #FF8A5C;
+    --pop-pink: #FF8FA3;
+    --board: #FFFFFF;
+    --ink: #2B3230;
+    --muted: #5d6d66;
+    --grid: rgba(0, 137, 90, 0.07);
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    font-family: 'Inter', sans-serif; color: var(--ink); overflow-x: hidden;
+    background: var(--board);
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 34px 34px;
+  }
+  .hand { font-family: 'Caveat', cursive; }
+
+  nav {
+    position: sticky; top: 0; z-index: 50; display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 32px; background: rgba(255,255,255,.86); backdrop-filter: blur(8px);
+    border-bottom: 3px solid var(--ink);
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-family: 'Caveat', cursive; font-size: 28px; font-weight: 700; color: var(--sb-primary); }
+  .brand .mark { width: 36px; height: 36px; background: var(--sb-primary); color: #fff; border-radius: 50%; display: grid; place-items: center; font-size: 22px; border: 2.5px solid var(--ink); transform: rotate(6deg); }
+  .btn {
+    font-family: 'Patrick Hand', cursive; font-size: 17px; text-decoration: none; padding: 8px 22px;
+    border-radius: 4px 14px 5px 16px; border: 2.5px solid var(--ink); color: var(--ink); background: #fff;
+    transition: transform .15s cubic-bezier(.34,1.56,.64,1); display: inline-block; box-shadow: 3px 3px 0 rgba(43,50,48,.18);
+  }
+  .btn:hover { transform: translateY(-3px) rotate(1deg); }
+  .btn.primary { background: var(--sb-primary); color: #fff; }
+  .btn.ghost { background: transparent; border-color: transparent; box-shadow: none; }
+  .navlinks { display: flex; gap: 12px; }
+  .back { position: fixed; bottom: 18px; left: 18px; z-index: 60; font-size: 14px; }
+
+  main { max-width: 1100px; margin: 0 auto; padding: 0 24px; position: relative; }
+  section { padding: 100px 0; position: relative; z-index: 2; }
+
+  /* parallax doodles */
+  .px { position: absolute; z-index: 1; pointer-events: none; will-change: transform; }
+  .px svg { overflow: visible; }
+
+  /* hero */
+  .hero { min-height: 82vh; display: grid; grid-template-columns: 1.05fr .95fr; gap: 36px; align-items: center; }
+  h1 { font-family: 'Caveat', cursive; font-size: clamp(50px, 6.5vw, 86px); line-height: .95; }
+  .mark-circle { position: relative; white-space: nowrap; }
+  .mark-circle svg.ring { position: absolute; inset: -14px -22px; width: calc(100% + 44px); height: calc(100% + 28px); }
+  .ring path { stroke: var(--pop-orange); stroke-width: 5; fill: none; stroke-linecap: round; }
+  .hero p { font-family: 'Patrick Hand', cursive; font-size: 21px; color: var(--muted); margin: 20px 0 28px; max-width: 470px; }
+  .cta-row { display: flex; gap: 14px; flex-wrap: wrap; }
+
+  /* marker underline headings */
+  h2.marker { font-family: 'Caveat', cursive; font-size: clamp(38px, 4.5vw, 56px); display: inline-block; position: relative; margin-bottom: 36px; }
+  h2.marker svg { position: absolute; left: -6px; right: -10px; bottom: -14px; width: calc(100% + 16px); height: 18px; }
+  h2.marker path { stroke: var(--pop-yellow); stroke-width: 7; fill: none; stroke-linecap: round; stroke-dasharray: 400; stroke-dashoffset: 400; }
+  h2.marker.in path { animation: drawline .9s ease forwards .15s; }
+  @keyframes drawline { to { stroke-dashoffset: 0; } }
+
+  /* duo scene on hero */
+  .board-scene { border: 4px solid var(--ink); border-radius: 14px; background: #fff; padding: 18px; box-shadow: 8px 8px 0 rgba(0,137,90,.16); transform: rotate(1deg); }
+  .board-scene svg { width: 100%; height: auto; display: block; }
+
+  /* sticky notes */
+  .notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 26px; }
+  .note {
+    padding: 24px 20px 28px; border: 2.5px solid rgba(43,50,48,.85); border-radius: 3px;
+    box-shadow: 4px 7px 14px rgba(43,50,48,.16); position: relative;
+    opacity: 0; transform: scale(.7) rotate(-9deg) translateY(30px);
+    transition: opacity .5s ease, transform .55s cubic-bezier(.34,1.56,.64,1);
+  }
+  .note.in { opacity: 1; }
+  .note.in.r1 { transform: rotate(-2.5deg); }
+  .note.in.r2 { transform: rotate(1.8deg); }
+  .note.in.r3 { transform: rotate(-1.2deg); }
+  .note.in.r4 { transform: rotate(2.6deg); }
+  .note:hover { transform: rotate(0) scale(1.04) !important; }
+  .note.y { background: var(--pop-yellow); }
+  .note.p { background: var(--pop-pink); }
+  .note.o { background: var(--pop-orange); }
+  .note.g { background: #BFE8D7; }
+  .note::before {
+    content: ""; position: absolute; top: -12px; left: 50%; transform: translateX(-50%) rotate(-2deg);
+    width: 76px; height: 22px; background: rgba(255,255,255,.65); border: 1.5px solid rgba(43,50,48,.3);
+  }
+  .note h3 { font-family: 'Caveat', cursive; font-size: 28px; margin-bottom: 6px; }
+  .note p { font-family: 'Patrick Hand', cursive; font-size: 16.5px; line-height: 1.45; color: #3c4742; }
+
+  /* steps row */
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; }
+  .stepcard { text-align: center; opacity: 0; transform: translateY(40px); transition: opacity .6s ease, transform .6s cubic-bezier(.16,1,.3,1); }
+  .stepcard.in { opacity: 1; transform: none; }
+  .stepcard:nth-child(2) { transition-delay: .12s; }
+  .stepcard:nth-child(3) { transition-delay: .24s; }
+  .stepcard .bubble { border: 3px solid var(--ink); border-radius: 18px; background: #fff; padding: 14px; margin-bottom: 14px; box-shadow: 5px 5px 0 rgba(43,50,48,.12); }
+  .stepcard svg { width: 100%; height: auto; }
+  .stepcard h3 { font-family: 'Caveat', cursive; font-size: 30px; }
+  .stepcard p { font-family: 'Patrick Hand', cursive; font-size: 17px; color: var(--muted); }
+  .arrow-px { width: 90px; }
+
+  /* deep dive split */
+  .deep { display: grid; grid-template-columns: 1fr 1fr; gap: 44px; align-items: center; }
+  .deep .shot { border: 4px solid var(--ink); border-radius: 14px; background: #fff; box-shadow: 8px 8px 0 rgba(255,138,92,.25); padding: 16px; transform: rotate(-1.4deg); }
+  .deep .shot svg { width: 100%; height: auto; display: block; }
+  .deep p.lead { font-family: 'Patrick Hand', cursive; font-size: 19px; color: var(--muted); margin-bottom: 16px; }
+  .check { display: flex; gap: 10px; align-items: start; font-family: 'Patrick Hand', cursive; font-size: 18px; margin-bottom: 12px; }
+  .check svg { flex: none; margin-top: 3px; }
+
+  /* CTA */
+  .ctaboard { border: 4px solid var(--ink); border-radius: 18px; background: var(--sb-primary); color: #fff; text-align: center; padding: 64px 32px; box-shadow: 10px 10px 0 rgba(43,50,48,.2); position: relative; overflow: hidden; }
+  .ctaboard h2 { font-family: 'Caveat', cursive; font-size: clamp(40px, 5vw, 62px); }
+  .ctaboard p { font-family: 'Patrick Hand', cursive; font-size: 20px; opacity: .9; margin: 10px 0 26px; }
+  .ctaboard .btn { background: #fff; }
+  .ctaboard .chalk { position: absolute; opacity: .35; }
+
+  footer { border-top: 3px solid var(--ink); padding: 26px 32px; text-align: center; font-family: 'Patrick Hand', cursive; color: var(--muted); margin-top: 90px; background: #fff; }
+
+  .reveal { opacity: 0; transform: translateY(34px); transition: opacity .65s ease, transform .65s cubic-bezier(.16,1,.3,1); }
+  .reveal.in { opacity: 1; transform: none; }
+
+  @media (max-width: 880px) {
+    .hero, .deep { grid-template-columns: 1fr; }
+    .steps { grid-template-columns: 1fr; }
+    .px { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .reveal, .note, .stepcard { opacity: 1; transform: none; transition: none; }
+    .px { display: none; }
+    h2.marker path { stroke-dashoffset: 0; animation: none; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="brand"><span class="mark">S</span> studybuddy</div>
+  <div class="navlinks">
+    <a class="btn ghost" href="#">Log in</a>
+    <a class="btn primary" href="#">Get started</a>
+  </div>
+</nav>
+
+<!-- parallax doodles (speeds set via data-speed) -->
+<div class="px" style="top:520px; left:4%" data-speed="-0.12">
+  <svg width="70" height="90" viewBox="0 0 70 90" fill="none" stroke="#FFC94D" stroke-width="4" stroke-linecap="round">
+    <circle cx="35" cy="32" r="20" fill="#FFC94D" stroke="#2B3230" stroke-width="3"/>
+    <path d="M28 56 h14 M30 64 h10" stroke="#2B3230" stroke-width="3"/>
+    <path d="M8 14 l 8 6 M62 14 l -8 6 M35 2 v 8" stroke="#FF8A5C"/>
+  </svg>
+</div>
+<div class="px" style="top:900px; right:5%" data-speed="-0.22">
+  <svg width="110" height="60" viewBox="0 0 110 60"><text x="4" y="42" font-family="Caveat" font-size="40" fill="#FF8FA3" transform="rotate(-6 50 30)">aha!</text></svg>
+</div>
+<div class="px" style="top:1500px; left:6%" data-speed="-0.18">
+  <svg width="80" height="80" viewBox="0 0 80 80" fill="none" stroke="#00895A" stroke-width="4" stroke-linecap="round">
+    <path d="M14 60 Q 40 4 66 48" stroke-dasharray="9 10"/>
+    <path d="M60 38 l 7 11 l -13 1" />
+  </svg>
+</div>
+<div class="px" style="top:2100px; right:8%" data-speed="-0.1">
+  <svg width="70" height="80" viewBox="0 0 70 80"><text x="6" y="58" font-family="Caveat" font-size="56" fill="#FF8A5C">?</text></svg>
+</div>
+<div class="px" style="top:2700px; left:10%" data-speed="-0.25">
+  <svg width="90" height="50" viewBox="0 0 90 50"><text x="2" y="36" font-family="Caveat" font-size="30" fill="#00895A" transform="rotate(4 45 25)">got it!</text></svg>
+</div>
+
+<main>
+  <!-- HERO -->
+  <section class="hero">
+    <div>
+      <h1>Learn it from someone who <span class="mark-circle">just survived it<svg class="ring" viewBox="0 0 300 80" preserveAspectRatio="none"><path d="M8 46 C 30 10, 270 4, 290 38 C 296 62, 60 78, 16 60"/></svg></span></h1>
+      <p>Studybuddy is peer tutoring at CPU: get matched with a student who aced the subject that's wrecking you, and study together on your schedule.</p>
+      <div class="cta-row">
+        <a class="btn primary" href="#">Find my buddy</a>
+        <a class="btn" href="#">I can tutor</a>
+      </div>
+    </div>
+    <div class="board-scene">
+      <!-- two students at whiteboard -->
+      <svg viewBox="0 0 440 300" fill="none" stroke="#2B3230" stroke-width="4" stroke-linecap="round">
+        <rect x="40" y="28" width="360" height="170" rx="8" fill="#fff"/>
+        <text x="70" y="76" font-family="Caveat" font-size="30" stroke="none" fill="#2B3230">f(x) = chaos</text>
+        <path d="M70 96 q 30 -18 60 0 t 60 0" stroke="#FF8FA3" stroke-width="4"/>
+        <text x="232" y="100" font-family="Caveat" font-size="30" stroke="none" fill="#00895A">f(x) = ok now</text>
+        <path d="M250 122 q 40 14 90 -8" stroke="#00895A" stroke-width="4"/>
+        <path d="M330 110 l 12 2 l -6 11" stroke="#00895A" stroke-width="4"/>
+        <!-- tutor pointing -->
+        <circle cx="120" cy="228" r="26" fill="#fff"/>
+        <path d="M112 224 q 3 4 7 0 M129 224 q 3 4 7 0" stroke-width="3"/>
+        <path d="M114 239 q 6 5 12 0" stroke-width="3"/>
+        <path d="M120 254 L 120 296 M120 264 Q 90 250 84 200" />
+        <!-- tutee with notepad -->
+        <circle cx="320" cy="232" r="26" fill="#fff"/>
+        <path d="M312 228 q 3 4 7 0 M329 228 q 3 4 7 0" stroke-width="3"/>
+        <path d="M315 244 q 6 4 11 0" stroke-width="3"/>
+        <path d="M320 258 L 320 296 M320 268 L 295 286" />
+        <rect x="276" y="276" width="42" height="26" rx="3" fill="#FFC94D" stroke-width="2.5" transform="rotate(-6 297 289)"/>
+      </svg>
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS -->
+  <section>
+    <h2 class="marker io-marker">How it works (no fine print)
+      <svg viewBox="0 0 400 18" preserveAspectRatio="none"><path d="M4 12 Q 100 4 200 11 T 396 9"/></svg>
+    </h2>
+    <div class="steps">
+      <div class="stepcard">
+        <div class="bubble">
+          <svg viewBox="0 0 220 130" fill="none" stroke="#2B3230" stroke-width="3" stroke-linecap="round">
+            <rect x="30" y="22" width="160" height="86" rx="12" fill="#fff"/>
+            <text x="48" y="55" font-family="Patrick Hand" font-size="17" stroke="none" fill="#2B3230">"Calc 2 is eating me"</text>
+            <rect x="48" y="68" width="78" height="24" rx="12" fill="#FFC94D" stroke-width="2"/>
+            <text x="58" y="85" font-family="Patrick Hand" font-size="14" stroke="none" fill="#2B3230">Calculus 2</text>
+          </svg>
+        </div>
+        <h3>1. Say what's hurting</h3>
+        <p>Subject, schedule, how you like to learn. Twenty seconds, tops.</p>
+      </div>
+      <div class="stepcard">
+        <div class="bubble">
+          <svg viewBox="0 0 220 130" fill="none" stroke="#2B3230" stroke-width="3" stroke-linecap="round">
+            <circle cx="80" cy="62" r="22" fill="#fff"/>
+            <path d="M73 59 q 2 3 6 0 M88 59 q 2 3 6 0" stroke-width="2.5"/>
+            <path d="M75 71 q 5 4 10 0" stroke-width="2.5"/>
+            <circle cx="146" cy="62" r="22" fill="#fff"/>
+            <path d="M139 59 q 2 3 6 0 M154 59 q 2 3 6 0" stroke-width="2.5"/>
+            <path d="M141 70 q 5 5 10 0" stroke-width="2.5"/>
+            <path d="M104 62 h 18" stroke="#00895A" stroke-width="4" stroke-dasharray="5 6"/>
+            <path d="M106 30 l 4 8 l 9 1 l -7 6 l 2 9 l -8 -5 l -8 5 l 2 -9 l -7 -6 l 9 -1 Z" fill="#FFC94D" stroke-width="2.5"/>
+          </svg>
+        </div>
+        <h3>2. Get matched</h3>
+        <p>Our recommender pairs you with a CPU student who aced it — and is free when you are.</p>
+      </div>
+      <div class="stepcard">
+        <div class="bubble">
+          <svg viewBox="0 0 220 130" fill="none" stroke="#2B3230" stroke-width="3" stroke-linecap="round">
+            <path d="M30 104 Q 110 98 190 104"/>
+            <circle cx="86" cy="62" r="20" fill="#fff"/>
+            <path d="M80 59 q 2 3 5 0 M93 59 q 2 3 5 0" stroke-width="2.5"/>
+            <path d="M81 70 q 5 4 10 0" stroke-width="2.5"/>
+            <path d="M86 82 L 86 102"/>
+            <circle cx="138" cy="62" r="20" fill="#fff"/>
+            <path d="M132 59 q 2 3 5 0 M145 59 q 2 3 5 0" stroke-width="2.5"/>
+            <path d="M133 70 q 5 4 10 0" stroke-width="2.5"/>
+            <path d="M138 82 L 138 102"/>
+            <circle cx="112" cy="26" r="11" fill="#FFC94D" stroke-width="2.5"/>
+            <path d="M108 40 h 8" stroke-width="2.5"/>
+          </svg>
+        </div>
+        <h3>3. Study together</h3>
+        <p>Book it, meet up, get it. Progress tracked, tutor paid, exam survived.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- STICKY NOTES -->
+  <section>
+    <h2 class="marker io-marker">Stuck on the board, solved on a note
+      <svg viewBox="0 0 400 18" preserveAspectRatio="none"><path d="M4 10 Q 120 16 220 8 T 396 11"/></svg>
+    </h2>
+    <div class="notes">
+      <div class="note y r1">
+        <h3>Smart matching</h3>
+        <p>Tutors ranked for you by expertise overlap and session history — your top match is genuinely your top match.</p>
+      </div>
+      <div class="note p r2">
+        <h3>Booking that bends</h3>
+        <p>Set your free hours once; sessions only land where both calendars agree. No "u free?" ping-pong.</p>
+      </div>
+      <div class="note o r3">
+        <h3>Progress reports</h3>
+        <p>Every session feeds your report. Watch your line go up before the exam does.</p>
+      </div>
+      <div class="note g r4">
+        <h3>Tutors earn</h3>
+        <p>Aced a subject? Get paid to walk someone through it — wallet and payouts are built in.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- DEEP DIVE -->
+  <section class="deep">
+    <div class="shot reveal">
+      <svg viewBox="0 0 440 300" fill="none" stroke="#2B3230" stroke-width="3" stroke-linecap="round">
+        <rect x="20" y="16" width="400" height="268" rx="14" fill="#fff"/>
+        <text x="44" y="54" font-family="Caveat" font-size="28" stroke="none" fill="#2B3230">Your matches for Calculus 2</text>
+        <g>
+          <rect x="44" y="72" width="352" height="56" rx="12" fill="#F0FAF5" stroke-width="2.5"/>
+          <circle cx="74" cy="100" r="16" fill="#fff" stroke-width="2.5"/>
+          <text x="100" y="95" font-family="Patrick Hand" font-size="16" stroke="none" fill="#2B3230">3rd yr, BS Math — aced Calc 2</text>
+          <text x="100" y="115" font-family="Patrick Hand" font-size="13" stroke="none" fill="#5d6d66">Free Thu nights, teaches with examples</text>
+          <text x="338" y="106" font-family="Caveat" font-size="26" stroke="none" fill="#00895A">98%</text>
+        </g>
+        <g>
+          <rect x="44" y="140" width="352" height="56" rx="12" fill="#fff" stroke-width="2.5"/>
+          <circle cx="74" cy="168" r="16" fill="#fff" stroke-width="2.5"/>
+          <text x="100" y="163" font-family="Patrick Hand" font-size="16" stroke="none" fill="#2B3230">2nd yr, Engineering</text>
+          <text x="100" y="183" font-family="Patrick Hand" font-size="13" stroke="none" fill="#5d6d66">Patient, draws everything out</text>
+          <text x="338" y="174" font-family="Caveat" font-size="26" stroke="none" fill="#00895A">91%</text>
+        </g>
+        <rect x="44" y="212" width="150" height="40" rx="20" fill="#00895A" stroke-width="2.5"/>
+        <text x="68" y="239" font-family="Patrick Hand" font-size="17" stroke="none" fill="#fff">Book a session</text>
+        <path d="M300 232 q 36 22 80 6" stroke="#FF8A5C" stroke-width="4"/>
+        <path d="M368 230 l 14 6 l -12 8" stroke="#FF8A5C" stroke-width="4"/>
+      </svg>
+    </div>
+    <div class="reveal">
+      <h2 class="marker io-marker">The matching, up close
+        <svg viewBox="0 0 400 18" preserveAspectRatio="none"><path d="M4 11 Q 90 5 200 12 T 396 8"/></svg>
+      </h2>
+      <p class="lead">No directory-diving. The recommender does the digging and shows you why each tutor fits:</p>
+      <div class="check"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#00895A" stroke-width="3.5" stroke-linecap="round"><path d="M4 13 l 5 5 L 20 6"/></svg>Expertise matched to your exact subjects</div>
+      <div class="check"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#00895A" stroke-width="3.5" stroke-linecap="round"><path d="M4 13 l 5 5 L 20 6"/></svg>Schedules overlapped before you ever see them</div>
+      <div class="check"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#00895A" stroke-width="3.5" stroke-linecap="round"><path d="M4 13 l 5 5 L 20 6"/></svg>Match score out in the open — no mystery ranking</div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section>
+    <div class="ctaboard reveal">
+      <svg class="chalk" style="top:18px; left:24px" width="90" height="90" viewBox="0 0 90 90" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"><path d="M10 70 Q 45 10 80 55" stroke-dasharray="8 9"/></svg>
+      <svg class="chalk" style="bottom:14px; right:28px" width="110" height="60" viewBox="0 0 110 60"><text x="4" y="42" font-family="Caveat" font-size="38" fill="#fff">you got this</text></svg>
+      <h2>The board's ready. Grab a marker.</h2>
+      <p>Free with your CPU email — whether you need the help or you are the help.</p>
+      <div class="cta-row" style="justify-content:center">
+        <a class="btn" href="#">Get started</a>
+        <a class="btn" href="#">Log in</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>studybuddy — built by students, for students at Central Philippine University</footer>
+<a class="btn back" href="index.html">&larr; All options</a>
+
+<script>
+  // parallax floaters
+  const floats = [...document.querySelectorAll('.px')]
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches
+  if (!reduced) {
+    const onScroll = () => {
+      const y = window.scrollY
+      floats.forEach((el) => {
+        el.style.transform = `translateY(${y * parseFloat(el.dataset.speed)}px)`
+      })
+    }
+    addEventListener('scroll', () => requestAnimationFrame(onScroll), { passive: true })
+    onScroll()
+  }
+
+  // reveals + marker underline draws + sticky notes
+  const io = new IntersectionObserver(
+    (entries) => entries.forEach((e) => e.isIntersecting && e.target.classList.add('in')),
+    { threshold: 0.2 },
+  )
+  document.querySelectorAll('.reveal, .note, .stepcard, h2.marker').forEach((el) => io.observe(el))
+</script>
+</body>
+</html>

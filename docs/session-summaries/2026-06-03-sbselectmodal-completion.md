@@ -1,7 +1,7 @@
 # SbSelectModal rollout completion
 
 **Date:** 2026-06-03
-**Plan:** `docs/superpowers/plans/2026-06-03-replace-selects-with-sbselectmodal.md`
+**Plan:** `docs/plans/2026-06-03-replace-selects-with-sbselectmodal.md`
 **Status:** Completed
 
 ## Summary

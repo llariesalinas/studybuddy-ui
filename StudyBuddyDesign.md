@@ -5,14 +5,16 @@ description: >
   Current StudyBuddy product design language: quiet foregrounds, StudyBuddy-green
   feedback, aurora glass depth, tactile haptics, and truthful academic data.
 sources:
-  - docs/superpowers/specs/2026-05-08-landing-redesign-design.md
-  - docs/superpowers/specs/2026-05-22-feel-haptics-design.md
-  - docs/superpowers/specs/2026-05-25-animation-system-design.md
-  - docs/superpowers/specs/2026-05-25-tutee-profile-redesign.md
-  - docs/superpowers/plans/2026-05-08-auth-pages-redesign.md
-  - docs/superpowers/plans/2026-05-23-chat-message-redesign.md
-  - docs/superpowers/plans/2026-05-23-sidebar-notification-badge.md
-  - docs/superpowers/plans/2026-05-25-haptics-rollout.md
+  - docs/specs/2026-05-08-landing-redesign-design.md
+  - docs/specs/2026-05-22-feel-haptics-design.md
+  - docs/specs/2026-05-25-animation-system-design.md
+  - docs/specs/2026-05-25-tutee-profile-redesign.md
+  - docs/plans/2026-05-08-auth-pages-redesign.md
+  - docs/plans/2026-05-23-chat-message-redesign.md
+  - docs/plans/2026-05-23-sidebar-notification-badge.md
+  - docs/plans/2026-05-25-haptics-rollout.md
+  - docs/plans/2026-06-07-aurora-hue-restoration.md
+  - docs/session-summaries/2026-06-07-aurora-hue-restoration-summary.md
 colors:
   surface: "#f5fbf4"
   surface-dim: "#d6dcd5"
@@ -330,6 +332,40 @@ profile surfaces. Apply it inside the route view only, not the shared app shell.
 Bento layouts should use 2-column or 3-column CSS grids and collapse below
 tablet widths. Avoid nested cards; use flat rows inside panels.
 
+### Aurora Hue (App Shell)
+
+The shared app shell uses one static aurora layer behind `#app`
+(`body > #app::before` in `src/assets/main.css`, driven by the `--sb-aurora-bg`
+token). This is the ambient background for the whole shell — distinct from the
+route-local Aurora Bento pattern above, which is a per-page treatment.
+
+A heavier, JS-driven version of this layer was removed for performance cost
+(`3015a8f`/`2a638ca`), then deliberately rebuilt as a single static layer — see
+`docs/plans/2026-06-07-aurora-hue-restoration.md`. Hard rules for any future
+change to it:
+
+- CSS-only: static `radial-gradient` stops. No JS, pointer tracking, or
+  `requestAnimationFrame`.
+- No `backdrop-filter`, `filter: blur`, `will-change`,
+  `background-attachment: fixed`, `transition: background`, or infinite
+  animation on this layer.
+- One pseudo-element, fixed pixel `height` — not `vh` (mobile address-bar
+  collapse changes `100vh` mid-scroll and forces relayout/repaint).
+- One one-shot fade-in on mount (`prefers-reduced-motion` aware); it never
+  changes after that.
+- Keep it a single shared layer. Do not duplicate it per route, or layer a
+  second aurora background onto `.public-layout`/`.app-main-surface` — that
+  reproduces the exact cost profile that got the old version removed.
+
+**Visual gotcha — raising alpha can expose a hard edge.** Increasing the rgba
+alphas in `--sb-aurora-bg` raises contrast between the glow and the flat
+`--sb-bg`, which can make the gradient's `transparent N%` stop visible as a
+perceptible boundary (a Mach-band-style artifact) instead of a smooth fade.
+It's most visible on content-light pages where flat background dominates
+(e.g. `/login`) and easy to miss on the long, content-dense landing page.
+Before committing any opacity change to this token, check it live on both a
+short page (`/login`) and a long page (`/`, scrolled to the footer).
+
 ### Weekly Schedule Navigation
 
 Weekly schedule controls should be compact and quiet:
@@ -389,25 +425,32 @@ Bootstrap `.btn-close`.
 
 ```css
 .sb-btn {
-  transition: transform var(--sb-t-quick) var(--sb-spring-fast),
-              box-shadow var(--sb-t-quick) var(--sb-spring-fast),
-              background-color var(--sb-t-quick) var(--sb-spring-fast);
+  --sb-motion-lift: var(--sb-lift-control);
+  transition: transform var(--sb-t-normal) var(--sb-spring);
   cursor: pointer;
 }
 ```
 
-- Hover: lift `translateY(-3px)` with deeper shadow.
-- Press: `scale(0.96) translateY(0)`.
+- Hover: lift `translateY(-4px)` on fine pointers.
+- Press: `scale(0.97) translateY(0)`.
 - Disabled: opacity `0.4`, no pointer events.
 - Icon-only buttons should use familiar Bootstrap Icons and an `aria-label`.
+- Add `.sb-elevated.sb-elevated--brand` only when a primary control needs the
+  Balanced layered shadow. Do not add it to elements that already own `::after`.
 
 ### Interactive Surfaces
 
 Clickable cards, rows, and panels get `.sb-interactive`.
 
-- Hover: lift up to `translateY(-6px)`, increase glass opacity, show green border.
-- Press: `scale(0.98) translateY(0)`.
+- Hover: lift `translateY(-6px)` on fine pointers.
+- Press: `scale(0.97) translateY(0)`.
 - Do not override transforms ad hoc.
+- Add `.sb-elevated` only to compatible surfaces; table rows, clipped surfaces,
+  and decorative pseudo-element owners remain transform-only.
+- Standard Bootstrap `.card` surfaces lift globally inside authenticated app
+  routes. Custom card surfaces opt in with `.sb-card-lift`; use `.sb-card-static`
+  only when a card must remain still. The public landing route keeps its own
+  isolated motion system.
 
 ### Badges And Pills
 
@@ -433,6 +476,12 @@ Semantic badges:
 - danger/rejected/failed: muted red
 - neutral/inactive: slate
 
+Interactive filters, tabs, and choice pills use `.sb-pill` plus an ARIA state
+such as `aria-pressed`, `aria-selected`, `aria-checked`, or `aria-current`.
+Selected pills retain a 2px StudyBuddy-green outline; all semantic
+`.rounded-pill` buttons show that outline while pressed. Passive badge pills do
+not lift or gain an interaction outline.
+
 ### Cards
 
 Use cards for repeated content, compact panels, modals, and framed tools. Avoid
@@ -446,14 +495,15 @@ Public utility cards:
   border: 1px solid #e8e8e8;
   border-radius: 18px;
   padding: 28px;
-  transition: box-shadow var(--sb-t-normal) var(--sb-spring),
-              transform var(--sb-t-normal) var(--sb-spring);
+  transition: transform var(--sb-t-normal) var(--sb-spring);
 }
 ```
 
 ### Forms
 
 - Inputs use 12px radius, clear labels, and green focus rings.
+- Eligible text-like inputs, selects, and textareas use `.sb-field`; focus color
+  and halo changes are immediate rather than paint-animated.
 - Disabled fields should explain why they are locked.
 - Use inline field errors when the error belongs to one field.
 - Use toast messages for global success/error feedback after actions.
@@ -468,8 +518,8 @@ Public utility cards:
 ### Accordions
 
 Use one open item ref unless multiple open sections are explicitly needed.
-Animate height with Vue `<Transition>` hooks and max-height/opacity transitions.
-Accordion icons rotate and turn green when open.
+Accordion layout opens immediately; optional Vue transitions animate only the
+panel's opacity and transform. Accordion icons rotate and turn green when open.
 
 ### Step Progress
 
@@ -505,14 +555,22 @@ The sidebar notification badge mirrors the shared Pinia notifications store. It:
 
 ### Tokens
 
-These tokens are global in `App.vue`:
+These tokens are global in `src/assets/main.css`. The Balanced calibration in
+`docs/artifacts/2026-06-21-feel-haptics-calibrations-reference.html` is the
+authoritative reference:
 
 ```css
 --sb-spring: cubic-bezier(0.16, 1, 0.3, 1);
---sb-spring-fast: cubic-bezier(0.34, 1.56, 0.64, 1);
---sb-t-quick: 120ms;
---sb-t-normal: 250ms;
---sb-t-slow: 400ms;
+--sb-t-quick: 130ms;
+--sb-t-normal: 180ms;
+--sb-lift-control: -4px;
+--sb-lift-surface: -6px;
+--sb-press: 0.97;
+--sb-halo: 0 0 0 4px rgba(0, 137, 90, 0.12);
+--sb-shadow-rest: 0 6px 16px rgba(15, 23, 42, 0.06);
+--sb-shadow-hover: 0 16px 36px rgba(15, 23, 42, 0.12);
+--sb-shadow-rest-brand: 0 8px 18px rgba(0, 137, 90, 0.20);
+--sb-shadow-hover-brand: 0 14px 30px rgba(0, 137, 90, 0.28);
 ```
 
 Never hardcode a new cubic-bezier when one of these applies.
@@ -528,7 +586,6 @@ Never hardcode a new cubic-bezier when one of these applies.
 | `sb-stagger-in` | newly mounted stat/card group | fade/slide up |
 | `sb-scale-in` | Bootstrap modal open | modal scales 0.94 to 1 |
 | `sb-shimmer` | skeleton placeholder | loading shimmer |
-| `sb-tab-indicator` | active filter/tab | underline grows from left |
 | `sb-toast-in` | toast enters | top-right spring entrance |
 | `sb-success-border` | confirmed success | green border pulse |
 
@@ -536,6 +593,10 @@ Use these utilities:
 
 - `.sb-btn`
 - `.sb-interactive`
+- `.sb-elevated` / `.sb-elevated--brand`
+- `.sb-card-lift`
+- `.sb-pill`
+- `.sb-field`
 - `.sb-stagger-item`
 - `.sb-skeleton`
 - `.sb-success-card`
@@ -552,7 +613,11 @@ Use these utilities:
 
 - Entrance animation is for newly rendered nodes only.
 - Never animate filtered history or existing rows on re-render.
-- Do not animate aurora blobs continuously.
+- Animate only `transform` and `opacity`; color, border, background, focus, and
+  layout state changes are immediate.
+- `SessionAurora.vue` is the sole temporary blur exception and is tracked for a
+  separate performance cleanup. Do not add another blur or backdrop-filter.
+- Do not add JavaScript pointer-driven motion.
 - Use foreground feedback, not background movement.
 
 ## Chat Design
@@ -695,6 +760,11 @@ expand smoothly and existing chevron state should remain intact.
 
 - Do not add decorative gradient blobs inside foreground cards.
 - Do not animate aurora backgrounds continuously.
+- Do not raise `--sb-aurora-bg` alpha values without checking a short page
+  (e.g. `/login`) for a visible hard edge where the gradient meets the flat
+  background — see "Aurora Hue (App Shell)".
+- Do not duplicate the app-shell aurora layer per route or layer a second
+  aurora background onto `.public-layout`/`.app-main-surface`.
 - Do not use browser `alert()`.
 - Do not use emojis in UI copy, buttons, empty states, badges, or notifications.
 - Do not use dropdowns as the default way to expose actions or settings. Prefer

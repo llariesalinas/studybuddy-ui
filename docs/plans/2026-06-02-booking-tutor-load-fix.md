@@ -5,7 +5,7 @@
 **Goal:** Make tutor searches return results by seeding realistic contiguous
 30-minute availability, and make the results empty state explain the real reason.
 **Stack:** Vue 3, Pinia, Django REST, Bootstrap 5
-**Spec:** `docs/superpowers/specs/2026-06-02-booking-tutor-load-fix-design.md`
+**Spec:** `docs/specs/2026-06-02-booking-tutor-load-fix-design.md`
 
 ---
 
@@ -128,7 +128,7 @@
 # Phase A Completion Report — Booking "tutors won't load" Fix
 **Date completed:** <YYYY-MM-DD>
 **Branch:** <branch>
-**Plan:** docs/superpowers/plans/2026-06-02-booking-tutor-load-fix.md
+**Plan:** docs/plans/2026-06-02-booking-tutor-load-fix.md
 
 ## Summary
 <1-2 sentences: what was broken and what fixed it>

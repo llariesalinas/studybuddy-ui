@@ -352,11 +352,7 @@ const selectToday = () => {
   font-weight: 700;
   display: grid;
   place-items: center;
-  transition:
-    background-color 150ms ease,
-    border-color 150ms ease,
-    color 150ms ease,
-    box-shadow 150ms ease;
+  transition: none;
 }
 
 .date-cell:hover:not(:disabled) {
