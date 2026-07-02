@@ -37,7 +37,10 @@
                 <i class="bi bi-mortarboard-fill"></i>
                 Tutor
               </span>
-              <span class="verified-badge">
+              <span
+                v-if="profileStore.applicationStatus === 'approved' && profileStore.renewalStatus === 'verified'"
+                class="verified-badge"
+              >
                 <i class="bi bi-patch-check-fill"></i>
                 Verified
               </span>
@@ -50,12 +53,15 @@
             <i class="bi bi-calendar3"></i>
             Schedule
           </button>
-          <button type="button" class="btn-primary-action sb-btn" @click="goToPendingSessions">
+          <button type="button" class="btn-primary-action sb-btn sb-elevated sb-elevated--brand" @click="goToPendingSessions">
             <i class="bi bi-inbox-fill"></i>
             Pending Sessions
           </button>
         </div>
       </header>
+
+      <VerificationStatusCard />
+      <VerificationDevPanel v-if="isDev" role="tutor" />
 
       <main class="profile-grid">
         <div class="profile-col">
@@ -75,7 +81,7 @@
                   <input
                     v-model.trim="profile.fullName"
                     type="text"
-                    class="input-glass"
+                    class="input-glass sb-field"
                     placeholder="First Last"
                   >
                 </label>
@@ -85,7 +91,7 @@
                   <input
                     :value="profile.email"
                     type="email"
-                    class="input-glass input-disabled"
+                    class="input-glass input-disabled sb-field"
                     disabled
                   >
                 </label>
@@ -233,7 +239,7 @@
                 <span class="field-label">Bio</span>
                 <textarea
                   v-model="profile.bio"
-                  class="input-glass bio-textarea"
+                  class="input-glass bio-textarea sb-field"
                   :class="{ 'bio-near-limit': bioCharCount > 450, 'bio-at-limit': bioCharCount >= 500 }"
                   maxlength="500"
                   rows="5"
@@ -314,14 +320,7 @@
                   ></i>
                 </button>
 
-                <Transition
-                  @before-enter="setAccordionClosed"
-                  @enter="openAccordionPanel"
-                  @after-enter="clearAccordionInlineStyles"
-                  @before-leave="setAccordionOpen"
-                  @leave="closeAccordionPanel"
-                  @after-leave="clearAccordionInlineStyles"
-                >
+                <Transition name="sb-accordion">
                   <div v-if="openSubjectCode === subject.subject_code" class="subject-accordion-body">
                     <label class="subject-accordion-label" :for="`subject-${subject.subject_code}`">
                       Subject Description
@@ -330,7 +329,7 @@
                       :id="`subject-${subject.subject_code}`"
                       v-model="subject.description"
                       rows="4"
-                      class="subject-description-input"
+                      class="subject-description-input sb-field"
                       placeholder="Describe your method, scope, and materials for this subject."
                     ></textarea>
                   </div>
@@ -357,7 +356,7 @@
               </button>
               <button
                 type="submit"
-                class="btn-save sb-btn"
+                class="btn-save sb-btn sb-elevated sb-elevated--brand"
                 :disabled="isSavingProfile || isLoadingProfile"
               >
                 <span
@@ -470,7 +469,7 @@
           <input
             v-model.trim="subjectSearch"
             type="text"
-            class="input-glass"
+            class="input-glass sb-field"
             placeholder="Search by subject name or code"
           >
         </label>
@@ -548,18 +547,28 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/services/api/api'
+import { useAuthStore } from '@/stores/auth'
 import { useCatalogStore } from '@/stores/catalog'
 import { useToastStore } from '@/stores/toast'
+import { useProfileStore } from '@/stores/profile'
+import VerificationStatusCard from '@/components/VerificationStatusCard.vue'
+import VerificationDevPanel from '@/components/VerificationDevPanel.vue'
+
+const isDev = import.meta.env.DEV
 
 const router = useRouter()
+const authStore = useAuthStore()
 const catalogStore = useCatalogStore()
 const toastStore = useToastStore()
+const profileStore = useProfileStore()
 
 const minHourlyRate = 50
 const hourlyRateStep = 10
 
 const profile = ref({
   fullName: '',
+  fname: '',
+  lname: '',
   email: '',
   course: '',
   year_level: null,
@@ -641,7 +650,10 @@ const normalizedRate = computed(() => {
 const avatarUrl = computed(() => profile.value.profile_picture_url || '')
 
 const initials = computed(() => {
-  const parts = String(profile.value.fullName || '')
+  const displayName = profile.value.fullName
+    || [profile.value.fname, profile.value.lname].filter(Boolean).join(' ')
+
+  const parts = String(displayName || '')
     .trim()
     .split(/\s+/)
     .filter(Boolean)
@@ -898,33 +910,6 @@ function toggleSubjectAccordion(subjectCode) {
   openSubjectCode.value = openSubjectCode.value === subjectCode ? null : subjectCode
 }
 
-function setAccordionClosed(element) {
-  element.style.maxHeight = '0'
-  element.style.opacity = '0'
-}
-
-function openAccordionPanel(element) {
-  void element.offsetHeight
-  element.style.maxHeight = `${element.scrollHeight}px`
-  element.style.opacity = '1'
-}
-
-function clearAccordionInlineStyles(element) {
-  element.style.maxHeight = ''
-  element.style.opacity = ''
-}
-
-function setAccordionOpen(element) {
-  element.style.maxHeight = `${element.scrollHeight}px`
-  element.style.opacity = '1'
-}
-
-function closeAccordionPanel(element) {
-  void element.offsetHeight
-  element.style.maxHeight = '0'
-  element.style.opacity = '0'
-}
-
 function incrementRate() {
   profile.value.hourly_rate = normalizedRate.value + hourlyRateStep
 }
@@ -964,6 +949,7 @@ async function handleAvatarUpload(event) {
     isUploadingAvatar.value = true
     const response = await api.post('/tutor/profile/avatar/', formData)
     profile.value.profile_picture_url = response.data.profile_picture_url || ''
+    authStore.patchUserProfile({ profile_picture_url: profile.value.profile_picture_url })
     toastStore.push('Photo updated successfully.')
   } catch (error) {
     console.error('Avatar upload failed:', error)
@@ -979,6 +965,8 @@ async function loadProfile() {
     const profileResponse = await api.get('/tutor/profile/')
     const data = profileResponse.data
 
+    profile.value.fname = data.fname || ''
+    profile.value.lname = data.lname || ''
     profile.value.fullName = [data.fname, data.lname].filter(Boolean).join(' ')
     profile.value.email = data.email || ''
     profile.value.course = data.course || ''
@@ -1104,6 +1092,7 @@ async function saveProfile() {
     await api.put('/tutee/profile/update/', profilePayload)
     await api.put('/tutor/update/', tutorPayload)
     await syncSubjects()
+    authStore.patchUserProfile({ fname: names.fname, lname: names.lname })
     toastStore.push('Profile updated successfully.')
     await loadProfile()
   } catch (error) {
@@ -1131,6 +1120,7 @@ onMounted(() => {
   loadProfile()
   loadSubjects()
   loadCourses()
+  if (!profileStore.loaded) profileStore.checkProfileStatus()
 })
 </script>
 
@@ -1165,7 +1155,6 @@ onMounted(() => {
   border: 1px solid color-mix(in srgb, var(--sb-card-border) 82%, transparent);
   border-radius: 24px;
   box-shadow: 0 24px 70px rgba(15, 23, 42, 0.1);
-  backdrop-filter: blur(8px);
   padding: 1.5rem;
 }
 
@@ -1298,16 +1287,6 @@ onMounted(() => {
 
 .sb-btn {
   border-radius: 12px;
-  transition: transform 0.16s ease, background-color 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease, color 0.16s ease;
-}
-
-.sb-btn:active:not(:disabled) {
-  transform: scale(0.97);
-}
-
-.sb-btn:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
 }
 
 .btn-soft,
@@ -1444,14 +1423,14 @@ onMounted(() => {
   color: #0f172a;
   font-size: 0.94rem;
   padding: 0.75rem 0.9rem;
-  transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+  transition: none;
 }
 
 .input-glass:focus {
   outline: none;
   background: #fff;
   border-color: var(--sb-primary);
-  box-shadow: 0 0 0 4px rgba(0, 137, 90, 0.12);
+  box-shadow: var(--sb-halo);
 }
 
 .input-disabled {
@@ -1709,11 +1688,7 @@ onMounted(() => {
   background: rgba(255, 255, 255, 0.68);
   box-shadow: 0 14px 34px rgba(15, 23, 42, 0.07);
   cursor: pointer;
-  transition:
-    transform 0.18s var(--sb-spring, cubic-bezier(0.16, 1, 0.3, 1)),
-    border-color 0.18s ease,
-    background-color 0.18s ease,
-    box-shadow 0.18s ease;
+  transition: transform var(--sb-t-normal) var(--sb-spring);
 }
 
 .mode-check:hover {
@@ -1806,7 +1781,7 @@ onMounted(() => {
   border-radius: 18px;
   background: rgba(246, 248, 247, 0.9);
   overflow: hidden;
-  transition: border-color 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease;
+  transition: none;
 }
 
 .subject-accordion-card-open {
@@ -1836,7 +1811,7 @@ onMounted(() => {
   border-radius: 999px;
   background: #dfe5e2;
   color: #65756d;
-  transition: background-color 0.18s ease, color 0.18s ease;
+  transition: none;
 }
 
 .subject-accordion-icon-open {
@@ -1864,7 +1839,19 @@ onMounted(() => {
   gap: 0.55rem;
   padding: 0 1rem 1rem;
   overflow: hidden;
-  transition: max-height 0.36s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.22s ease;
+}
+
+.sb-accordion-enter-active,
+.sb-accordion-leave-active {
+  transition:
+    opacity var(--sb-t-normal) var(--sb-spring),
+    transform var(--sb-t-normal) var(--sb-spring);
+}
+
+.sb-accordion-enter-from,
+.sb-accordion-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
 }
 
 .subject-description-input {
@@ -1881,7 +1868,7 @@ onMounted(() => {
 
 .subject-description-input:focus {
   outline: none;
-  box-shadow: 0 0 0 4px rgba(0, 137, 90, 0.12);
+  box-shadow: var(--sb-halo);
 }
 
 .actions-segment {
@@ -1934,7 +1921,6 @@ onMounted(() => {
   border-radius: 22px;
   background: rgba(255, 255, 255, 0.96);
   box-shadow: 0 28px 90px rgba(15, 23, 42, 0.26);
-  backdrop-filter: blur(8px);
   padding: 1.5rem;
 }
 

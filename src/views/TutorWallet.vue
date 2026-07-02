@@ -75,6 +75,10 @@
         </div>
 
         <div class="balance-actions">
+          <button class="balance-cashout-btn sb-btn" @click="showCashinModal = true">
+            <i class="bi bi-plus-circle"></i>
+            Cash In
+          </button>
           <button class="balance-cashout-btn sb-btn" @click="showCashoutModal = true">
             <i class="bi bi-cash-coin"></i>
             Cash Out
@@ -135,63 +139,6 @@
           </div>
         </TransitionGroup>
       </article>
-
-      <aside class="glass-panel destinations-card">
-        <header class="section-header compact">
-          <div>
-            <span class="eyebrow">Payout</span>
-            <h3>Destinations</h3>
-          </div>
-          <button
-            class="icon-btn sb-btn"
-            @click="openDestinationModal"
-            aria-label="Add payout destination"
-          >
-            <i class="bi bi-plus-lg"></i>
-          </button>
-        </header>
-
-        <div v-if="walletStore.payoutAccounts.length === 0" class="destination-empty">
-          <i class="bi bi-credit-card-2-front"></i>
-          <p>No payout destinations saved.</p>
-        </div>
-
-        <div v-else class="destination-list">
-          <div
-            v-for="account in walletStore.payoutAccounts"
-            :key="account.id"
-            class="destination-card sb-interactive"
-            :class="{ inactive: !account.is_active }"
-          >
-            <div class="destination-icon">
-              <i :class="account.destination_type === 'gcash' ? 'bi bi-phone' : 'bi bi-bank'"></i>
-            </div>
-            <div class="destination-content">
-              <div class="destination-title">
-                <strong>{{ account.receiving_institution_name }}</strong>
-                <span :class="account.is_active ? 'status-pill active' : 'status-pill inactive'">
-                  {{ account.is_active ? 'Active' : 'Inactive' }}
-                </span>
-              </div>
-              <p>{{ formatDestinationType(account.destination_type) }} · {{ account.provider || 'rail' }}</p>
-              <code>{{ maskAccount(account.account_number) }}</code>
-            </div>
-            <button
-              v-if="account.is_active"
-              class="destination-action sb-btn"
-              @click.stop="deactivateAccount(account.id)"
-              aria-label="Deactivate payout destination"
-            >
-              <i class="bi bi-slash-circle"></i>
-            </button>
-          </div>
-        </div>
-
-        <button class="add-destination-card sb-btn" @click="openDestinationModal">
-          <i class="bi bi-plus-circle"></i>
-          Add New Destination
-        </button>
-      </aside>
     </section>
 
     <section class="wallet-grid wallet-history-grid">
@@ -226,8 +173,7 @@
               </div>
               <p>
                 {{ formatDestinationType(cashout.method) }} ·
-                {{ maskAccount(cashout.account_number) }} ·
-                {{ cashout.rail || 'rail pending' }}
+                {{ maskAccount(cashout.account_number) }}
               </p>
               <small v-if="cashout.provider_reference_number">
                 Ref: {{ cashout.provider_reference_number }}
@@ -255,52 +201,111 @@
         </div>
       </div>
       <div class="dev-actions">
-        <input v-model.number="devAmount" type="number" min="1" aria-label="Dev amount" />
+        <input v-model.number="devAmount" class="sb-field" type="number" min="1" aria-label="Dev amount" />
         <button class="sb-btn" @click="addDevFunds">Add Test Funds</button>
         <button class="sb-btn secondary" @click="removeDevFunds">Remove Funds</button>
       </div>
     </section>
 
-    <div v-if="showDestinationModal" class="modal-backdrop fade show"></div>
-    <div v-if="showDestinationModal" class="modal fade show d-block" tabindex="-1">
+    <div v-if="showCashoutModal" class="modal-backdrop fade show"></div>
+    <div v-if="showCashoutModal" class="modal fade show d-block" tabindex="-1">
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content wallet-modal">
           <div class="modal-header border-0">
             <div>
-              <span class="eyebrow">Payout</span>
-              <h5 class="modal-title">Add Destination</h5>
+              <span class="eyebrow">Wallet</span>
+              <h5 class="modal-title">Cash Out</h5>
             </div>
-            <button type="button" class="btn-close" @click="closeDestinationModal"></button>
+            <button type="button" class="btn-close" @click="closeCashoutModal"></button>
           </div>
-          <form @submit.prevent="saveAccount">
-            <div class="modal-body">
-              <div class="form-grid">
-                <label>
-                  <span>Rail</span>
-                  <SbSelectModal
-                    v-model="accountForm.provider"
-                    :options="providerOptions"
-                    title="Rail"
-                    placeholder="Select rail"
-                    trigger-class="wallet-select-trigger"
-                  />
-                </label>
-                <label>
-                  <span>Type</span>
-                  <SbSelectModal
-                    v-model="accountForm.destination_type"
-                    :options="destinationTypeOptions"
-                    title="Destination Type"
-                    placeholder="Select type"
-                    trigger-class="wallet-select-trigger"
-                  />
-                </label>
+
+          <div v-if="showConfirmStep" class="modal-body">
+            <div class="confirm-summary">
+              <p class="confirm-lead">
+                This is a new payout destination. Please confirm the details below before we
+                send your cash-out.
+              </p>
+              <div class="confirm-row">
+                <span>Destination type</span>
+                <strong>{{ formatDestinationType(cashoutForm.destination_type) }}</strong>
               </div>
+              <div class="confirm-row">
+                <span>Receiving institution</span>
+                <strong>{{ cashoutForm.receiving_institution_name || '-' }}</strong>
+              </div>
+              <div class="confirm-row">
+                <span>Account number</span>
+                <strong>{{ maskAccount(cashoutForm.account_number) }}</strong>
+              </div>
+              <div class="confirm-row">
+                <span>Account name</span>
+                <strong>{{ cashoutForm.account_name || '-' }}</strong>
+              </div>
+              <div v-if="cashoutForm.destination_type === 'bank'" class="confirm-row">
+                <span>Bank name</span>
+                <strong>{{ cashoutForm.bank_name || '-' }}</strong>
+              </div>
+              <div class="confirm-row">
+                <span>Amount you receive</span>
+                <strong>PHP {{ money(cashoutAmount) }}</strong>
+              </div>
+              <div class="confirm-row">
+                <span>Total deducted</span>
+                <strong>PHP {{ money(totalDeducted) }}</strong>
+              </div>
+            </div>
+
+            <p v-if="cashoutError" class="form-error">{{ cashoutError }}</p>
+
+            <div class="modal-footer border-0">
+              <button type="button" class="modal-secondary sb-btn" @click="showConfirmStep = false">
+                Edit
+              </button>
+              <button
+                type="button"
+                class="modal-primary sb-btn"
+                :disabled="isSubmitting"
+                @click="submitCashout(true)"
+              >
+                {{ isSubmitting ? 'Processing...' : 'Confirm & Send' }}
+              </button>
+            </div>
+          </div>
+
+          <form v-else @submit.prevent="handleCashout">
+            <div class="modal-body">
+              <div v-if="walletStore.recentCashOuts.length" class="recent-shortcuts">
+                <span class="field-hint">Recent destinations</span>
+                <div class="recent-shortcut-list">
+                  <button
+                    v-for="recent in walletStore.recentCashOuts.slice(0, 4)"
+                    :key="recent.id"
+                    type="button"
+                    class="recent-shortcut-card sb-interactive"
+                    @click="applyRecentShortcut(recent)"
+                  >
+                    <strong>{{ recent.receiving_institution_name }}</strong>
+                    <code>{{ maskAccount(recent.account_number) }}</code>
+                    <small>{{ formatDate(recent.requested_at) }}</small>
+                  </button>
+                </div>
+              </div>
+
+              <label>
+                <span>Destination Type</span>
+                <SbSelectModal
+                  v-model="cashoutForm.destination_type"
+                  :options="destinationTypeOptions"
+                  title="Destination Type"
+                  placeholder="Select type"
+                  trigger-class="wallet-select-trigger"
+                />
+              </label>
 
               <label>
                 <span>Receiving Institution</span>
                 <SbSelectModal
-                  v-model="accountForm.receiving_institution_id"
+                  v-model="cashoutForm.receiving_institution_id"
                   :options="receivingInstitutionOptions"
                   title="Receiving Institution"
                   placeholder="Select institution"
@@ -312,50 +317,21 @@
 
               <label>
                 <span>Account Number</span>
-                <input v-model.trim="accountForm.account_number" required />
+                <input v-model.trim="cashoutForm.account_number" class="sb-field" required />
               </label>
 
               <label>
                 <span>Account Name</span>
-                <input v-model.trim="accountForm.account_name" required />
+                <input v-model.trim="cashoutForm.account_name" class="sb-field" required />
               </label>
-            </div>
-            <div class="modal-footer border-0">
-              <button type="button" class="modal-secondary sb-btn" @click="closeDestinationModal">
-                Cancel
-              </button>
-              <button class="modal-primary sb-btn" :disabled="savingAccount">
-                {{ savingAccount ? 'Saving...' : 'Save Destination' }}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
 
-    <div v-if="showCashoutModal" class="modal-backdrop fade show"></div>
-    <div v-if="showCashoutModal" class="modal fade show d-block" tabindex="-1">
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content wallet-modal">
-          <div class="modal-header border-0">
-            <div>
-              <span class="eyebrow">Wallet</span>
-              <h5 class="modal-title">Cash Out</h5>
-            </div>
-            <button type="button" class="btn-close" @click="showCashoutModal = false"></button>
-          </div>
-          <form @submit.prevent="handleCashout">
-            <div class="modal-body">
-              <label>
-                <span>Destination</span>
-                <SbSelectModal
-                  v-model="cashoutForm.payout_account_id"
-                  :options="payoutAccountOptions"
-                  title="Destination"
-                  placeholder="Select saved destination"
-                  :clearable="true"
-                  :searchable="true"
-                  trigger-class="wallet-select-trigger"
+              <label v-if="cashoutForm.destination_type === 'bank'">
+                <span>Bank Name</span>
+                <input
+                  v-model.trim="cashoutForm.bank_name"
+                  class="sb-field"
+                  required
+                  @input="bankNameAutoFilled = false"
                 />
               </label>
 
@@ -363,11 +339,22 @@
                 <span>Amount You Receive</span>
                 <input
                   v-model.number="cashoutForm.amount"
+                  class="sb-field"
                   type="number"
                   step="0.01"
                   :min="walletStore.cashoutMinimum"
+                  :max="walletStore.cashoutMaximum"
                   required
                 />
+                <small class="field-hint">
+                  Minimum PHP {{ money(walletStore.cashoutMinimum) }} · Maximum PHP
+                  {{ money(walletStore.cashoutMaximum) }} per request
+                </small>
+              </label>
+
+              <label>
+                <span>Note (optional)</span>
+                <textarea v-model.trim="cashoutForm.note" class="sb-field" rows="2"></textarea>
               </label>
 
               <div class="cashout-summary">
@@ -383,16 +370,12 @@
                   <span>Total deducted</span>
                   <strong>PHP {{ money(totalDeducted) }}</strong>
                 </div>
-                <div>
-                  <span>Rail</span>
-                  <strong>{{ cashoutRail }}</strong>
-                </div>
               </div>
 
               <p v-if="cashoutError" class="form-error">{{ cashoutError }}</p>
             </div>
             <div class="modal-footer border-0">
-              <button type="button" class="modal-secondary sb-btn" @click="showCashoutModal = false">
+              <button type="button" class="modal-secondary sb-btn" @click="closeCashoutModal">
                 Cancel
               </button>
               <button class="modal-primary sb-btn" :disabled="isSubmitting || !canSubmitCashout">
@@ -403,62 +386,53 @@
         </div>
       </div>
     </div>
+
+    <CashInModal v-if="showCashinModal" @close="showCashinModal = false" />
   </div>
 </template>
 
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import SbSelectModal from '@/components/SbSelectModal.vue'
+import CashInModal from '@/components/CashInModal.vue'
 import { useWalletStore } from '@/stores/wallet'
 import { useToastStore } from '@/stores/toast'
+import { getReceivingInstitutionLogoUrl } from '@/data/receivingInstitutionLogos'
+import { LOGO_DEV_TOKEN } from '@/config'
 
+const route = useRoute()
+const router = useRouter()
 const toastStore = useToastStore()
 const walletStore = useWalletStore()
+const showCashinModal = ref(false)
 const showCashoutModal = ref(false)
-const showDestinationModal = ref(false)
 const isSubmitting = ref(false)
-const savingAccount = ref(false)
 const isDev = import.meta.env.DEV
 const devAmount = ref(500)
 
-const accountForm = reactive({
-  provider: 'instapay',
-  destination_type: 'gcash',
-  receiving_institution_id: '',
-  account_number: '',
-  account_name: '',
-})
-
 const cashoutForm = reactive({
   amount: 0,
-  payout_account_id: null,
+  destination_type: 'gcash',
+  receiving_institution_id: '',
+  receiving_institution_name: '',
+  receiving_institution_code: '',
+  account_number: '',
+  account_name: '',
+  bank_name: '',
+  note: '',
 })
 
-const providerOptions = [
-  { label: 'InstaPay', value: 'instapay' },
-  { label: 'PESONet', value: 'pesonet' },
-]
+const showConfirmStep = ref(false)
+const bankNameAutoFilled = ref(false)
 
 const destinationTypeOptions = [
-  { label: 'GCash', value: 'gcash' },
+  { label: 'Digital Wallet', value: 'gcash' },
   { label: 'Bank', value: 'bank' },
 ]
 
-const activePayoutAccounts = computed(() =>
-  walletStore.payoutAccounts.filter((account) => account.is_active)
-)
-
 const cashoutAmount = computed(() => Number(cashoutForm.amount) || 0)
 const totalDeducted = computed(() => cashoutAmount.value + Number(walletStore.cashoutProviderFee || 0))
-const cashoutRail = computed(() => (cashoutAmount.value > 50000 ? 'pesonet' : 'instapay'))
-const selectedPayoutAccountId = computed(() =>
-  cashoutForm.payout_account_id === null || cashoutForm.payout_account_id === ''
-    ? null
-    : Number(cashoutForm.payout_account_id)
-)
-const selectedCashoutAccount = computed(() =>
-  activePayoutAccounts.value.find((account) => Number(account.id) === selectedPayoutAccountId.value)
-)
 
 const grossValue = computed(() => Number(walletStore.grossEarned) || 0)
 const netValue = computed(() => Number(walletStore.netEarned) || 0)
@@ -471,19 +445,21 @@ const deductionPercent = computed(() =>
 )
 
 const cashoutError = computed(() => {
-  if (!activePayoutAccounts.value.length) return 'Add an active payout destination before cashing out.'
-  if (!selectedCashoutAccount.value) return 'Select a payout destination.'
+  if (!cashoutForm.destination_type) return 'Select a destination type.'
+  if (!cashoutForm.receiving_institution_id) return 'Select a receiving institution.'
+  if (!cashoutForm.account_number) return 'Enter the account number.'
+  if (!cashoutForm.account_name) return 'Enter the account name.'
+  if (cashoutForm.destination_type === 'bank' && !cashoutForm.bank_name) {
+    return 'Enter the bank name.'
+  }
   if (cashoutAmount.value < Number(walletStore.cashoutMinimum)) {
     return `Minimum cash-out is PHP ${money(walletStore.cashoutMinimum)}.`
   }
   if (totalDeducted.value > Number(walletStore.balance || 0)) {
     return 'Balance must cover the amount plus provider fee.'
   }
-  if (
-    selectedCashoutAccount.value.provider &&
-    selectedCashoutAccount.value.provider !== cashoutRail.value
-  ) {
-    return `Use a ${cashoutRail.value} destination for this amount.`
+  if (cashoutAmount.value > Number(walletStore.cashoutMaximum)) {
+    return `Maximum cash-out per request is PHP ${money(walletStore.cashoutMaximum)}.`
   }
   return ''
 })
@@ -501,7 +477,6 @@ const refreshData = async () => {
     walletStore.fetchWallet(),
     walletStore.fetchTransactions(),
     walletStore.fetchWithdrawals(),
-    walletStore.fetchPayoutAccounts(),
   ])
 }
 
@@ -518,18 +493,11 @@ const receivingInstitutionOptions = computed(() =>
   walletStore.receivingInstitutions.map((institution) => ({
     label: institutionName(institution),
     value: institutionId(institution),
+    icon: getReceivingInstitutionLogoUrl({ name: institutionName(institution) }, LOGO_DEV_TOKEN),
   }))
 )
 
-const payoutAccountOptions = computed(() =>
-  activePayoutAccounts.value.map((account) => ({
-    label: `${account.receiving_institution_name} · ${maskAccount(account.account_number)}`,
-    value: Number(account.id),
-    description: formatDestinationType(account.destination_type),
-  }))
-)
-
-const formatDestinationType = (type) => (type === 'gcash' ? 'GCash' : 'Bank Transfer')
+const formatDestinationType = (type) => (type === 'gcash' ? 'Digital Wallet' : 'Bank Transfer')
 
 const maskAccount = (value = '') => {
   const account = String(value)
@@ -537,80 +505,101 @@ const maskAccount = (value = '') => {
   return `${account.slice(0, 4)} •••• ${account.slice(-3)}`
 }
 
-const resetAccountForm = () => {
-  accountForm.provider = 'instapay'
-  accountForm.destination_type = 'gcash'
-  accountForm.receiving_institution_id = ''
-  accountForm.account_number = ''
-  accountForm.account_name = ''
+const resetCashoutForm = () => {
+  cashoutForm.amount = 0
+  cashoutForm.destination_type = 'gcash'
+  cashoutForm.receiving_institution_id = ''
+  cashoutForm.receiving_institution_name = ''
+  cashoutForm.receiving_institution_code = ''
+  cashoutForm.account_number = ''
+  cashoutForm.account_name = ''
+  cashoutForm.bank_name = ''
+  cashoutForm.note = ''
+  bankNameAutoFilled.value = false
 }
 
-const openDestinationModal = async () => {
-  showDestinationModal.value = true
-  await walletStore.fetchReceivingInstitutions(accountForm.provider)
+const closeCashoutModal = () => {
+  showCashoutModal.value = false
+  showConfirmStep.value = false
+  resetCashoutForm()
 }
 
-const closeDestinationModal = () => {
-  showDestinationModal.value = false
-  resetAccountForm()
+const applyRecentShortcut = (recent) => {
+  cashoutForm.destination_type = recent.method
+  cashoutForm.receiving_institution_id = recent.receiving_institution_id
+  cashoutForm.receiving_institution_name = recent.receiving_institution_name
+  cashoutForm.receiving_institution_code = recent.receiving_institution_code
+  cashoutForm.account_number = recent.account_number
+  cashoutForm.account_name = recent.account_name
+  cashoutForm.bank_name = recent.bank_name || ''
+  bankNameAutoFilled.value = false
 }
 
-const saveAccount = async () => {
-  const institution = walletStore.receivingInstitutions.find(
-    (item) => String(institutionId(item)) === String(accountForm.receiving_institution_id)
+const matchesRecentDestination = () =>
+  walletStore.recentCashOuts.slice(0, 4).some(
+    (previous) =>
+      previous.method === cashoutForm.destination_type &&
+      String(previous.receiving_institution_id) === String(cashoutForm.receiving_institution_id) &&
+      previous.account_number === cashoutForm.account_number &&
+      previous.account_name === cashoutForm.account_name
   )
 
-  if (!institution) {
-    toastStore.push('Select a receiving institution.', 'warning')
-    return
-  }
+const buildCashoutPayload = () => ({
+  amount: cashoutForm.amount,
+  destination_type: cashoutForm.destination_type,
+  receiving_institution_id: cashoutForm.receiving_institution_id,
+  receiving_institution_name: cashoutForm.receiving_institution_name,
+  receiving_institution_code: cashoutForm.receiving_institution_code,
+  account_number: cashoutForm.account_number,
+  account_name: cashoutForm.account_name,
+  bank_name: cashoutForm.bank_name,
+  note: cashoutForm.note,
+})
 
-  savingAccount.value = true
+const cashoutSubmitErrorMessage = (error) =>
+  error.response?.data?.error ||
+  error.response?.data?.provider_error_message ||
+  error.response?.data?.failure_reason ||
+  'Unable to submit cash-out request.'
+
+const submitCashout = async (confirmNewDestination = false) => {
+  isSubmitting.value = true
   try {
-    await walletStore.savePayoutAccount({
-      ...accountForm,
-      receiving_institution_name: institutionName(institution),
-      receiving_institution_code: institutionCode(institution),
-      bank_name: accountForm.destination_type === 'bank' ? institutionName(institution) : '',
+    await walletStore.requestWithdrawal({
+      ...buildCashoutPayload(),
+      confirm_new_destination: confirmNewDestination,
     })
-    closeDestinationModal()
+    toastStore.push('Cash-out request submitted.')
+    closeCashoutModal()
   } catch (error) {
-    toastStore.push(error.response?.data?.error || 'Unable to save payout destination.', 'error')
+    if (error.response?.status === 409 && error.response?.data?.error === 'new_destination_confirmation_required') {
+      showConfirmStep.value = true
+    } else {
+      toastStore.push(cashoutSubmitErrorMessage(error), 'error')
+    }
   } finally {
-    savingAccount.value = false
+    isSubmitting.value = false
   }
-}
-
-const deactivateAccount = async (id) => {
-  if (!confirm('Deactivate this payout destination?')) return
-  await walletStore.deactivatePayoutAccount(id)
 }
 
 const handleCashout = async () => {
-  if (!selectedPayoutAccountId.value) {
-    toastStore.push('Select a payout destination.', 'error')
-    return
-  }
-
   if (!canSubmitCashout.value) {
     toastStore.push(cashoutError.value, 'error')
     return
   }
 
-  isSubmitting.value = true
-  const result = await walletStore.requestWithdrawal({
-    amount: cashoutForm.amount,
-    payout_account_id: selectedPayoutAccountId.value,
-  })
-  isSubmitting.value = false
+  const institution = walletStore.receivingInstitutions.find(
+    (item) => String(institutionId(item)) === String(cashoutForm.receiving_institution_id)
+  )
+  if (institution) {
+    cashoutForm.receiving_institution_name = institutionName(institution)
+    cashoutForm.receiving_institution_code = institutionCode(institution)
+  }
 
-  if (result.success) {
-    toastStore.push('Cash-out request submitted.')
-    showCashoutModal.value = false
-    cashoutForm.amount = 0
-    cashoutForm.payout_account_id = null
+  if (walletStore.recentCashOuts.length && !matchesRecentDestination()) {
+    showConfirmStep.value = true
   } else {
-    toastStore.push(result.error, 'error')
+    await submitCashout(false)
   }
 }
 
@@ -641,6 +630,7 @@ const transactionIcon = (type) => {
     cashout_fee: 'bi bi-receipt',
     cashout_fee_reversal: 'bi bi-arrow-counterclockwise',
     commission_deduction: 'bi bi-bank',
+    cash_in: 'bi bi-plus-circle',
   }
   return icons[type] || 'bi bi-wallet2'
 }
@@ -653,6 +643,7 @@ const transactionTone = (type) => {
     cashout_fee: 'tone-negative',
     cashout_fee_reversal: 'tone-warning',
     commission_deduction: 'tone-negative',
+    cash_in: 'tone-positive',
   }
   return tones[type] || 'tone-neutral'
 }
@@ -677,26 +668,44 @@ const getWithdrawalStatusClass = (status) => {
 onMounted(async () => {
   await Promise.allSettled([
     refreshData(),
-    walletStore.fetchReceivingInstitutions(accountForm.provider),
+    walletStore.fetchReceivingInstitutions(),
   ])
+
+  if (route.query.cashin === 'success' && route.query.id) {
+    try {
+      await walletStore.verifyCashIn(route.query.id)
+      toastStore.push('Wallet topped up successfully.', 'success')
+    } catch {
+      toastStore.push(
+        'We could not confirm your top-up. Refresh to check your balance.',
+        'error'
+      )
+    } finally {
+      router.replace({ query: {} })
+    }
+  } else if (route.query.cashin === 'cancelled') {
+    toastStore.push('Cash-in cancelled.', 'info')
+    router.replace({ query: {} })
+  }
 })
 
 watch(
-  () => accountForm.provider,
-  async (provider) => {
-    accountForm.receiving_institution_id = ''
-    if (showDestinationModal.value) {
-      await walletStore.fetchReceivingInstitutions(provider)
-    }
+  [() => cashoutForm.receiving_institution_id, () => cashoutForm.destination_type],
+  ([institutionId_]) => {
+    if (cashoutForm.destination_type !== 'bank') return
+    if (cashoutForm.bank_name && !bankNameAutoFilled.value) return
+
+    const institution = walletStore.receivingInstitutions.find(
+      (item) => String(institutionId(item)) === String(institutionId_)
+    )
+    cashoutForm.bank_name = institution ? institutionName(institution) : ''
+    bankNameAutoFilled.value = true
   }
 )
 
 watch(showCashoutModal, async (isOpen) => {
   if (!isOpen) return
-  await refreshData()
-  if (activePayoutAccounts.value.length && !cashoutForm.payout_account_id) {
-    cashoutForm.payout_account_id = Number(activePayoutAccounts.value[0].id)
-  }
+  await Promise.all([refreshData(), walletStore.fetchRecentCashOuts()])
   if (!cashoutForm.amount) {
     cashoutForm.amount = walletStore.cashoutMinimum
   }
@@ -739,7 +748,6 @@ watch(showCashoutModal, async (isOpen) => {
   width: 280px;
   height: 280px;
   border-radius: 999px;
-  filter: blur(60px);
   opacity: 0.45;
   pointer-events: none;
 }
@@ -783,7 +791,6 @@ watch(showCashoutModal, async (isOpen) => {
 
 .glass-panel {
   background: var(--wallet-glass);
-  backdrop-filter: blur(8px);
   border: 1px solid rgba(255, 255, 255, 0.9);
   border-radius: 24px;
   box-shadow: 0 12px 48px rgba(15, 23, 42, 0.06);
@@ -958,7 +965,6 @@ watch(showCashoutModal, async (isOpen) => {
   height: 210px;
   border-radius: 999px;
   background: rgba(140, 248, 191, 0.28);
-  filter: blur(16px);
   transition: transform var(--sb-t-normal) var(--sb-spring);
 }
 
@@ -1001,8 +1007,6 @@ watch(showCashoutModal, async (isOpen) => {
 .modal-primary,
 .modal-secondary,
 .section-action,
-.icon-btn,
-.destination-action,
 .dev-actions button {
   border: 0;
   user-select: none;
@@ -1037,27 +1041,14 @@ watch(showCashoutModal, async (isOpen) => {
   padding: 28px 30px 20px;
 }
 
-.section-header.compact {
-  padding: 0;
-}
-
-.section-action,
-.icon-btn {
+.section-action {
   color: var(--wallet-primary);
   background: rgba(0, 137, 90, 0.1);
   border: 1px solid rgba(0, 137, 90, 0.14);
   border-radius: 999px;
   font-size: 13px;
   font-weight: 800;
-}
-
-.section-action {
   padding: 9px 16px;
-}
-
-.icon-btn {
-  width: 36px;
-  height: 36px;
 }
 
 .activity-card,
@@ -1080,8 +1071,7 @@ watch(showCashoutModal, async (isOpen) => {
   border-top: 1px solid rgba(15, 23, 42, 0.06);
 }
 
-.activity-icon,
-.destination-icon {
+.activity-icon {
   width: 48px;
   height: 48px;
   border-radius: 16px;
@@ -1171,66 +1161,6 @@ watch(showCashoutModal, async (isOpen) => {
   background: rgba(71, 85, 105, 0.1);
 }
 
-.destinations-card {
-  display: grid;
-  gap: 20px;
-  padding: 26px;
-}
-
-.destination-list {
-  display: grid;
-  gap: 12px;
-}
-
-.destination-card {
-  position: relative;
-  display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) auto;
-  gap: 12px;
-  align-items: center;
-  padding: 14px;
-  border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.62);
-  background: rgba(255, 255, 255, 0.5);
-}
-
-.destination-card.inactive {
-  opacity: 0.58;
-}
-
-.destination-icon {
-  width: 44px;
-  height: 44px;
-  color: #fff;
-  background: var(--wallet-primary);
-}
-
-.destination-title {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.destination-title strong {
-  min-width: 0;
-  color: var(--wallet-ink);
-  font-size: 14px;
-}
-
-.destination-content {
-  min-width: 0;
-}
-
-.destination-content p,
-.destination-content code {
-  display: block;
-  margin: 4px 0 0;
-  color: var(--wallet-muted);
-  font-size: 12px;
-}
-
-.status-pill,
 .cashout-status {
   display: inline-flex;
   align-items: center;
@@ -1243,13 +1173,11 @@ watch(showCashoutModal, async (isOpen) => {
   letter-spacing: 0.04em;
 }
 
-.status-pill.active,
 .status-processed {
   color: var(--wallet-primary);
   background: rgba(0, 137, 90, 0.1);
 }
 
-.status-pill.inactive,
 .status-rejected {
   color: #64748b;
   background: rgba(100, 116, 139, 0.12);
@@ -1270,29 +1198,6 @@ watch(showCashoutModal, async (isOpen) => {
   background: rgba(0, 101, 145, 0.1);
 }
 
-.destination-action {
-  width: 34px;
-  height: 34px;
-  border-radius: 999px;
-  color: #9a3e3e;
-  background: rgba(154, 62, 62, 0.08);
-}
-
-.add-destination-card {
-  display: flex;
-  min-height: 96px;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  border: 1px dashed rgba(15, 23, 42, 0.22);
-  border-radius: 18px;
-  color: var(--wallet-muted);
-  background: rgba(255, 255, 255, 0.2);
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.destination-empty,
 .empty-state {
   display: grid;
   place-items: center;
@@ -1302,7 +1207,6 @@ watch(showCashoutModal, async (isOpen) => {
   text-align: center;
 }
 
-.destination-empty i,
 .empty-state i {
   font-size: 32px;
   color: var(--wallet-primary);
@@ -1484,12 +1388,6 @@ watch(showCashoutModal, async (isOpen) => {
   text-align: left;
 }
 
-.form-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-
 .modal-primary,
 .modal-secondary {
   min-height: 42px;
@@ -1534,6 +1432,79 @@ watch(showCashoutModal, async (isOpen) => {
   margin: 12px 0 0;
   color: #9a3e3e;
   font-size: 13px;
+}
+
+.field-hint {
+  color: var(--wallet-muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.recent-shortcuts {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.recent-shortcut-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.recent-shortcut-card {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.6);
+  text-align: left;
+}
+
+.recent-shortcut-card strong {
+  color: var(--wallet-ink);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.recent-shortcut-card code {
+  color: var(--wallet-muted);
+  font-size: 12px;
+}
+
+.recent-shortcut-card small {
+  color: var(--wallet-muted);
+  font-size: 11px;
+}
+
+.confirm-summary {
+  display: grid;
+  gap: 9px;
+  padding: 14px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.52);
+}
+
+.confirm-lead {
+  margin: 0 0 4px;
+  color: var(--wallet-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.confirm-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.confirm-row span {
+  color: var(--wallet-muted);
 }
 
 .spin {
@@ -1603,8 +1574,7 @@ watch(showCashoutModal, async (isOpen) => {
     width: 100%;
   }
 
-  .metric-grid,
-  .form-grid {
+  .metric-grid {
     grid-template-columns: 1fr;
   }
 
@@ -1631,15 +1601,6 @@ watch(showCashoutModal, async (isOpen) => {
     text-align: left;
     justify-items: start;
     white-space: normal;
-  }
-
-  .destination-card {
-    grid-template-columns: 44px minmax(0, 1fr);
-  }
-
-  .destination-action {
-    grid-column: 2;
-    justify-self: start;
   }
 
   .dev-tools-card {

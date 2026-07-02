@@ -2,8 +2,8 @@
 
 **Date completed:** 2026-06-02
 **Branch:** feature-darkmode-toggle
-**Plan:** `docs/superpowers/plans/2026-06-02-booking-tutor-load-fix.md`
-**Spec:** `docs/superpowers/specs/2026-06-02-booking-tutor-load-fix-design.md`
+**Plan:** `docs/plans/2026-06-02-booking-tutor-load-fix.md`
+**Spec:** `docs/specs/2026-06-02-booking-tutor-load-fix-design.md`
 
 ## Summary
 

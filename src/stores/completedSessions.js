@@ -27,6 +27,30 @@ export const useSessionsStore = defineStore('sessions', () => {
 
   const normalizeStatus = (status) => String(status || '').toLowerCase()
 
+  const normalizeDateKey = (dateValue) => {
+    const rawString = String(dateValue || '')
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(rawString)) {
+      return rawString
+    }
+
+    return rawString.slice(0, 10)
+  }
+
+  const getDashboardPillKey = (session) => {
+    const sessionDateKey = normalizeDateKey(session?.date)
+
+    if (session?.booking_request_id) {
+      return `request-${sessionDateKey}-${session.booking_request_id}`
+    }
+
+    if (session?.session_group_id) {
+      return `group-${sessionDateKey}-${session.session_group_id}`
+    }
+
+    return `booking-${session?.id}`
+  }
+
   const fetchRecommendations = async () => {
     try {
       const response = await api.get('/recommendations')
@@ -56,7 +80,7 @@ export const useSessionsStore = defineStore('sessions', () => {
   }
 
   const compareSessionsByDateTime = (left, right, direction = 'asc') => {
-    const dateDifference = new Date(left.date) - new Date(right.date)
+    const dateDifference = new Date(normalizeDateKey(left.date)) - new Date(normalizeDateKey(right.date))
 
     if (dateDifference !== 0) {
       return direction === 'asc' ? dateDifference : -dateDifference
@@ -70,7 +94,10 @@ export const useSessionsStore = defineStore('sessions', () => {
     const groupedSessions = new Map()
 
     rawSessions.forEach((session) => {
-      const groupKey = session.session_group_id || `booking-${session.id}`
+      const sessionDateKey = normalizeDateKey(session.date)
+      const groupKey = session.session_group_id
+        ? `${sessionDateKey}-${session.session_group_id}`
+        : `booking-${session.id}`
       const existingSession = groupedSessions.get(groupKey)
 
       if (!existingSession) {
@@ -86,7 +113,7 @@ export const useSessionsStore = defineStore('sessions', () => {
       groupedSessions.set(groupKey, {
         ...existingSession,
         id: existingStart <= nextStart ? existingSession.id : session.id,
-        date: existingSession.date <= session.date ? existingSession.date : session.date,
+        date: sessionDateKey,
         startTime: formatMinutes(Math.min(existingStart, nextStart)),
         endTime: formatMinutes(Math.max(existingEnd, nextEnd)),
         duration_hours: (existingSession.duration_hours || 0) + (session.duration_hours || 0),
@@ -94,11 +121,15 @@ export const useSessionsStore = defineStore('sessions', () => {
         tutor_confirmed: existingSession.tutor_confirmed || session.tutor_confirmed,
         rating: existingSession.rating ?? session.rating,
         rating_submitted: existingSession.rating_submitted || session.rating_submitted,
+        dashboard_hidden_by_current_user: (
+          existingSession.dashboard_hidden_by_current_user
+          || session.dashboard_hidden_by_current_user
+        ),
       })
     })
 
     return Array.from(groupedSessions.values()).sort((left, right) => {
-      const dateComparison = new Date(left.date) - new Date(right.date)
+      const dateComparison = new Date(normalizeDateKey(left.date)) - new Date(normalizeDateKey(right.date))
 
       if (dateComparison !== 0) {
         return dateComparison
@@ -193,6 +224,29 @@ export const useSessionsStore = defineStore('sessions', () => {
     return fetchSessionById(id)
   }
 
+  const dismissDashboardPill = async (id) => {
+    const targetSession = sessions.value.find(session => String(session.id) === String(id))
+    const targetPillKey = targetSession ? getDashboardPillKey(targetSession) : null
+    const response = await api.delete(`/bookings/${id}/dashboard-pill/`)
+    const hiddenBookingIds = new Set((response.data?.hidden_booking_ids || []).map(value => String(value)))
+
+    sessions.value = sessions.value.map((session) => {
+      const isHiddenBookingId = hiddenBookingIds.has(String(session.id))
+      const isSamePill = targetPillKey && getDashboardPillKey(session) === targetPillKey
+
+      if (!isHiddenBookingId && !isSamePill) {
+        return session
+      }
+
+      return {
+        ...session,
+        dashboard_hidden_by_current_user: true,
+      }
+    })
+
+    await fetchSessions({ force: true })
+  }
+
   const submitPayment = async (id, payload) => {
     await api.post(`/bookings/${id}/submit-payment/`, payload, {
       headers: {
@@ -218,6 +272,30 @@ export const useSessionsStore = defineStore('sessions', () => {
 
     await fetchSessions({ force: true })
     return fetchSessionById(id)
+  }
+
+  const confirmVenue = async (id, response) => {
+    await api.post(`/bookings/${id}/venue-confirmation/`, { response })
+    await fetchSessions({ force: true })
+    return fetchSessionById(id)
+  }
+
+  const submitMidpointCheckIn = async (id, response) => {
+    await api.post(`/bookings/${id}/midpoint-check-in/`, { response })
+    await fetchSessions({ force: true })
+    return fetchSessionById(id)
+  }
+
+  const devForceLive = async (id, phase = 'start') => {
+    const response = await api.post(`/dev/bookings/${id}/force-live/`, { phase })
+    await fetchSessions({ force: true })
+    return response.data
+  }
+
+  const devClearForceLive = async (id) => {
+    const response = await api.post(`/dev/bookings/${id}/clear-force-live/`)
+    await fetchSessions({ force: true })
+    return response.data
   }
 
   const completedSessions = computed(() =>
@@ -308,9 +386,14 @@ export const useSessionsStore = defineStore('sessions', () => {
     approveSession,
     rejectSession,
     cancelSession,
+    dismissDashboardPill,
     markPendingRequestsSeen,
     submitPayment,
     verifyOnlinePayment,
     submitRating,
+    confirmVenue,
+    submitMidpointCheckIn,
+    devForceLive,
+    devClearForceLive,
   }
 })

@@ -6,6 +6,7 @@ import hashlib
 import hmac
 import secrets
 import requests
+from types import SimpleNamespace
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
@@ -52,13 +53,15 @@ from .recommender.hybrid import recommend_tutors_hybrid
 from .recommender.CF import build_rating_matrix
 
 from .recommender.cbf import recommend_tutors
+from .recommender.utils import filter_tutors_by_institution
 from .recommender.dashboard import (
     bump_dashboard_recs_cache_version,
     dashboard_recs_cache_key,
     get_dashboard_recommendations,
 )
 from django.core.cache import cache
-from .models import Booking, Course, EmailOTPChallenge, Notification, PartnerInstitution, Payment, PaymentMethod, Preference, Rating, Subjects, Tutor, TutorApplication, TutorAvailability, TutorAvailabilityOverride, TutorSubjects, Wallet, PlatformActivity, Transaction, TutorPayoutAccount
+from . import _verification_dev
+from .models import Booking, Course, EmailOTPChallenge, Notification, PartnerInstitution, Payment, PaymentMethod, Preference, Rating, SessionCheckIn, Subjects, Tutor, TutorApplication, TutorAvailability, TutorAvailabilityOverride, TutorDocumentRenewalReview, TutorSubjects, Wallet, PlatformActivity, Transaction, TuteeApplication, TuteeDocumentRenewalReview
 from .serializers import (
     NotificationSerializer,
     SubjectSerializer,
@@ -68,9 +71,11 @@ from .serializers import (
     TutorProfileSerializer,
     TutorProfileUpdateSerializer,
     TutorSearchSerializer,
+    TuteeApplicationSerializer,
 )
 from .email_utils import send_application_received_email
 from .chat.services import create_booking_event
+from .image_utils import compress_image
 
 from .models import (
     UserProfile,
@@ -122,13 +127,7 @@ OTP_ERROR_MESSAGE = "Invalid or expired verification code."
 
 def build_login_response_payload(user, profile):
     refresh = RefreshToken.for_user(user)
-
-    application_status = None
-    if profile.role == 'Tutor':
-        try:
-            application_status = profile.tutor_application.application_status
-        except:
-            pass
+    tutor_document_context = get_tutor_document_review_context(profile)
 
     return {
         "access": str(refresh.access_token),
@@ -139,8 +138,276 @@ def build_login_response_payload(user, profile):
         "email": user.email,
         "fname": profile.fname,
         "lname": profile.lname,
-        "application_status": application_status,
+        **tutor_document_context,
     }
+
+
+EMPTY_DOCUMENT_REVIEW_CONTEXT = {
+    "application_status": None,
+    "document_renewal_status": None,
+    "document_renewal_due_at": None,
+    "document_renewal_rejection_reason": '',
+    "document_renewal_required": False,
+    "needs_document_renewal": False,
+    "tutor_renewal_status": None,
+    "tutor_renewal_required": False,
+    "tutor_renewal_due_at": None,
+    "tutor_renewal_rejection_reason": '',
+    "can_submit_document_renewal": False,
+}
+
+
+def get_document_review_context(application):
+    """Builds the document-verification/renewal-status dict shared by the login payload and
+    profile-status endpoint, from a TutorApplication or TuteeApplication instance. Role-generic;
+    not yet called for tutees (Phase 1 of tutee enrollment verification adds no user-facing
+    behavior change) — see docs/plans/2026-07-01-tutee-verification-phase1-model.md."""
+    document_renewal_status = application.document_renewal_status()
+    due_at = application.document_renewal_due_at()
+    document_renewal_due_at = due_at.isoformat() if due_at else None
+    can_submit_document_renewal = application.can_submit_document_renewal()
+
+    document_renewal_rejection_reason = ''
+    latest_renewal = application.latest_document_renewal_review()
+    if latest_renewal and latest_renewal.status == 'rejected':
+        document_renewal_rejection_reason = latest_renewal.rejection_reason
+
+    document_renewal_required = document_renewal_status in ['due', 'pending', 'rejected']
+
+    return {
+        "application_status": application.application_status,
+        "document_renewal_status": document_renewal_status,
+        "document_renewal_due_at": document_renewal_due_at,
+        "document_renewal_rejection_reason": document_renewal_rejection_reason,
+        "document_renewal_required": document_renewal_required,
+        "needs_document_renewal": document_renewal_required,
+        "tutor_renewal_status": document_renewal_status,
+        "tutor_renewal_required": document_renewal_required,
+        "tutor_renewal_due_at": document_renewal_due_at,
+        "tutor_renewal_rejection_reason": document_renewal_rejection_reason,
+        "can_submit_document_renewal": can_submit_document_renewal,
+    }
+
+
+def get_tutor_document_review_context(profile):
+    if profile.role != 'Tutor':
+        return dict(EMPTY_DOCUMENT_REVIEW_CONTEXT)
+
+    try:
+        application = profile.tutor_application
+    except TutorApplication.DoesNotExist:
+        return dict(EMPTY_DOCUMENT_REVIEW_CONTEXT)
+
+    return get_document_review_context(application)
+
+
+def get_role_document_review_context(profile):
+    """Role-generic dispatcher used by profile_status: identical output to
+    get_tutor_document_review_context for tutors (zero behavior change there), and the equivalent for
+    tutees via Phase 1's get_document_review_context — see
+    docs/plans/2026-07-01-tutee-verification-phase3-ui.md."""
+    if profile.role == 'Tutor':
+        return get_tutor_document_review_context(profile)
+
+    if profile.role == 'Tutee':
+        application = getattr(profile, 'tutee_application', None)
+        if application is None:
+            return dict(EMPTY_DOCUMENT_REVIEW_CONTEXT)
+        return get_document_review_context(application)
+
+    return dict(EMPTY_DOCUMENT_REVIEW_CONTEXT)
+
+
+def tutee_verification_enforced():
+    """True once the global grace-period cutover for tutee enrollment verification has passed.
+    A single global date, not per-account, and unset (never enforced) by default — see
+    docs/plans/2026-07-01-tutee-verification-phase2-gate.md."""
+    # Dev-only runtime override (self-service verification dev tools). Guarded by the flag so the
+    # production path does zero extra work — see docs/plans/2026-07-02-verification-dev-tools.md.
+    if settings.VERIFICATION_DEV_TOOLS_ENABLED:
+        override = _verification_dev.enforcement_override_get()
+        if override is not None:
+            return override
+
+    cutover_str = settings.TUTEE_VERIFICATION_ENFORCEMENT_START_DATE
+    if not cutover_str:
+        return False
+
+    try:
+        cutover = date.fromisoformat(cutover_str)
+    except ValueError:
+        logger.error(
+            "TUTEE_VERIFICATION_ENFORCEMENT_START_DATE is not a valid ISO date: %r. "
+            "Treating tutee verification as not yet enforced.",
+            cutover_str,
+        )
+        return False
+
+    return timezone.now().date() >= cutover
+
+
+def get_verification_application(profile):
+    if profile.role == 'Tutor':
+        return getattr(profile, 'tutor_application', None)
+    if profile.role == 'Tutee':
+        return getattr(profile, 'tutee_application', None)
+    return None
+
+
+def can_create_new_booking(profile):
+    """Source-of-truth check for the forward-only booking gate: can this profile take on NEW work
+    (a tutee creating a booking, a tutor accepting a pending booking request)? Existing bookings,
+    wallet, and dashboard access are never affected by this check."""
+    if profile.role == 'Tutee' and not tutee_verification_enforced():
+        return True
+
+    application = get_verification_application(profile)
+    if application is None:
+        return False
+
+    return (
+        application.application_status == 'approved'
+        and application.document_renewal_status() == 'verified'
+    )
+
+
+# --- Verification dev tools (self-service) ---------------------------------------------------------
+# Gated by settings.VERIFICATION_DEV_TOOLS_ENABLED, checked first in each view (403 when off) so the
+# endpoints are inert in production. Every action mutates only request.user's own application.
+# See docs/plans/2026-07-02-verification-dev-tools.md.
+
+def _verification_dev_readout(profile):
+    application = get_verification_application(profile)
+    due_at = application.document_renewal_due_at() if application else None
+    return {
+        "role": profile.role,
+        "role_has_verification": _verification_dev.role_has_verification(profile),
+        "application_status": application.application_status if application else None,
+        "document_renewal_status": application.document_renewal_status() if application else None,
+        "document_renewal_due_at": due_at.isoformat() if due_at else None,
+        "tutee_verification_enforced": tutee_verification_enforced(),
+        "enforcement_override": _verification_dev.enforcement_override_get(),
+        "available_states": list(_verification_dev.VERIFICATION_STATES),
+    }
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def dev_verification_readout(request):
+    if not settings.VERIFICATION_DEV_TOOLS_ENABLED:
+        return Response({"error": "Verification dev tools are disabled."}, status=403)
+    return Response(_verification_dev_readout(request.user.userprofile))
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def dev_verification_set_state(request):
+    if not settings.VERIFICATION_DEV_TOOLS_ENABLED:
+        return Response({"error": "Verification dev tools are disabled."}, status=403)
+
+    profile = request.user.userprofile
+    if not _verification_dev.role_has_verification(profile):
+        return Response({"error": f"Verification does not apply to role {profile.role}."}, status=400)
+
+    state = request.data.get("state")
+    if state not in _verification_dev.VERIFICATION_STATES:
+        return Response(
+            {"error": "Invalid state.", "available_states": list(_verification_dev.VERIFICATION_STATES)},
+            status=400,
+        )
+
+    with transaction.atomic():
+        _verification_dev.set_verification_state(profile, state)
+
+    PlatformActivity.objects.create(
+        activity_type='admin_action',
+        message=f"[DEV] {profile.fname} {profile.lname} set own verification state to '{state}'",
+        institution=profile.institution,
+    )
+    return Response(_verification_dev_readout(profile))
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def dev_verification_set_enforcement(request):
+    if not settings.VERIFICATION_DEV_TOOLS_ENABLED:
+        return Response({"error": "Verification dev tools are disabled."}, status=403)
+
+    mode = request.data.get("mode")
+    if mode == "on":
+        _verification_dev.enforcement_override_set(True)
+    elif mode == "off":
+        _verification_dev.enforcement_override_set(False)
+    elif mode == "clear":
+        _verification_dev.enforcement_override_clear()
+    else:
+        return Response({"error": "mode must be one of: on, off, clear."}, status=400)
+
+    profile = request.user.userprofile
+    PlatformActivity.objects.create(
+        activity_type='admin_action',
+        message=f"[DEV] {profile.fname} {profile.lname} set tutee verification enforcement override to '{mode}'",
+        institution=profile.institution,
+    )
+
+    return Response(_verification_dev_readout(request.user.userprofile))
+
+
+def build_admin_profile_defaults(user):
+    display_name = (
+        user.get_full_name().strip()
+        or user.email.split('@', 1)[0]
+        or user.username
+        or 'Admin'
+    )
+    name_parts = display_name.replace('.', ' ').replace('_', ' ').split()
+
+    fname = user.first_name or (name_parts[0] if name_parts else 'Admin')
+    lname = user.last_name or (' '.join(name_parts[1:]) if len(name_parts) > 1 else 'User')
+
+    return {
+        'fname': fname[:100],
+        'mname': '',
+        'lname': lname[:100],
+        'role': 'Admin',
+        'profile_completed': True,
+        'is_domain_exempt': True,
+        'is_suspended': False,
+    }
+
+
+def get_login_profile_for_user(user):
+    try:
+        profile = user.userprofile
+    except UserProfile.DoesNotExist:
+        if not (user.is_staff or user.is_superuser):
+            return None
+
+        profile = UserProfile.objects.create(
+            user=user,
+            **build_admin_profile_defaults(user),
+        )
+
+    if user.is_staff or user.is_superuser:
+        updated_fields = []
+
+        if profile.role not in ('Admin', 'SuperAdmin'):
+            profile.role = 'Admin'
+            updated_fields.append('role')
+
+        if not profile.profile_completed:
+            profile.profile_completed = True
+            updated_fields.append('profile_completed')
+
+        if not profile.is_domain_exempt:
+            profile.is_domain_exempt = True
+            updated_fields.append('is_domain_exempt')
+
+        if updated_fields:
+            updated_fields.append('updated_at')
+            profile.save(update_fields=updated_fields)
+
+    return profile
 
 
 def generate_otp_code():
@@ -392,6 +659,34 @@ def get_booking_request_bookings(booking):
     return sort_bookings_for_session_group(booking_group)
 
 
+def get_dashboard_pill_bookings(booking):
+    base_queryset = Booking.objects.select_related(
+        'student__course',
+        'student__user',
+        'tutor__profile__course',
+        'tutor__profile__user',
+        'availability',
+        'payment__method',
+        'rating',
+    ).filter(
+        student=booking.student,
+        tutor=booking.tutor,
+        session_date=booking.session_date,
+        status=booking.status,
+    )
+
+    if booking.booking_request_id:
+        booking_group = base_queryset.filter(booking_request_id=booking.booking_request_id)
+    elif booking.session_group_id:
+        booking_group = base_queryset.filter(session_group_id=booking.session_group_id)
+    else:
+        booking_group = base_queryset.filter(id=booking.id)
+
+    return sort_bookings_for_session_group(
+        booking_group.order_by('session_date', 'availability__time_slot', 'id')
+    )
+
+
 def get_representative_booking(bookings):
     if bookings is None:
         return None
@@ -407,6 +702,20 @@ def get_representative_booking(bookings):
         return booking
 
     return None
+
+
+def get_dashboard_hidden_for_profile(bookings, profile):
+    if not profile:
+        return False
+
+    for booking in bookings:
+        if profile == booking.student:
+            if booking.dashboard_hidden_by_student_at:
+                return True
+        elif profile == booking.tutor.profile and booking.dashboard_hidden_by_tutor_at:
+            return True
+
+    return False
 
 
 def get_session_notification_context(bookings):
@@ -434,6 +743,85 @@ def get_session_notification_context(bookings):
         "tutor_name": tutor_name,
         "tutee_name": tutee_name,
     }
+
+
+DEV_LIVE_PHASES = {
+    'start': (-5, 55),
+    'midpoint': (-30, 30),
+    'ending': (-55, 5),
+}
+DEV_LIVE_CACHE_TIMEOUT_SECONDS = 60 * 60 * 6
+
+
+def get_dev_live_cache_keys_for_booking(booking):
+    if booking.status == "Pending" and booking.booking_request_id:
+        return [f"studybuddy:dev-live:request:{booking.booking_request_id}"]
+
+    if booking.session_group_id:
+        return [f"studybuddy:dev-live:group:{booking.session_group_id}"]
+
+    if booking.booking_request_id:
+        return [f"studybuddy:dev-live:request:{booking.booking_request_id}"]
+
+    return [f"studybuddy:dev-live:booking:{booking.id}"]
+
+
+def get_dev_live_override_for_bookings(bookings):
+    if not settings.DEBUG:
+        return None
+
+    for booking in sort_bookings_for_session_group(bookings):
+        for key in get_dev_live_cache_keys_for_booking(booking):
+            override = cache.get(key)
+            if override:
+                return override
+
+    return None
+
+
+def set_dev_live_override_for_bookings(bookings, override):
+    keys = {
+        key
+        for booking in sort_bookings_for_session_group(bookings)
+        for key in get_dev_live_cache_keys_for_booking(booking)
+    }
+
+    for key in keys:
+        cache.set(key, override, DEV_LIVE_CACHE_TIMEOUT_SECONDS)
+
+
+def clear_dev_live_override_for_bookings(bookings):
+    for booking in sort_bookings_for_session_group(bookings):
+        for key in get_dev_live_cache_keys_for_booking(booking):
+            cache.delete(key)
+
+
+def build_dev_live_override(phase):
+    offsets = DEV_LIVE_PHASES[phase]
+    current_time = timezone.localtime(timezone.now()).replace(second=0, microsecond=0)
+    start_at = current_time + timedelta(minutes=offsets[0])
+    end_at = current_time + timedelta(minutes=offsets[1])
+
+    return {
+        "phase": phase,
+        "date": start_at.date().isoformat(),
+        "start_time": start_at.time().strftime("%H:%M"),
+        "end_time": end_at.time().strftime("%H:%M"),
+        "forced_at": current_time.isoformat(),
+    }
+
+
+def apply_dev_live_override(bookings, session_date, start_time, end_time):
+    override = get_dev_live_override_for_bookings(bookings)
+
+    if not override:
+        return session_date, start_time, end_time
+
+    return (
+        datetime.strptime(override["date"], "%Y-%m-%d").date(),
+        datetime.strptime(override["start_time"], "%H:%M").time(),
+        datetime.strptime(override["end_time"], "%H:%M").time(),
+    )
 
 
 def get_display_status(raw_status, session_date, start_time, end_time):
@@ -613,6 +1001,51 @@ def serialize_payment_summary(representative_booking):
         "status": payment.payment_status,
         "receipt_image": payment.receipt_image.url if payment.receipt_image else None,
     }
+
+
+def serialize_session_check_ins(representative_booking):
+    responses = {
+        SessionCheckIn.EVENT_VENUE_CONFIRM: None,
+        SessionCheckIn.EVENT_MIDPOINT_CHECKIN: None,
+    }
+
+    check_ins = getattr(representative_booking, 'prefetched_check_ins', None)
+    if check_ins is None:
+        check_ins = representative_booking.check_ins.all()
+
+    for check_in in check_ins:
+        responses[check_in.event_type] = {
+            "id": check_in.id,
+            "response": check_in.response,
+            "responded_at": check_in.responded_at.isoformat(),
+        }
+
+    return responses
+
+
+def get_tutee_owned_booking_or_403(request, booking_id):
+    profile = request.user.userprofile
+    booking = get_object_or_404(
+        Booking.objects.select_related(
+            'student',
+            'availability',
+            'tutor__profile',
+        ),
+        id=booking_id,
+    )
+
+    if profile != booking.student:
+        return None, Response({"error": "Unauthorized"}, status=403)
+
+    return booking, None
+
+
+def create_session_check_in_response(booking, event_type, response_value):
+    return SessionCheckIn.objects.get_or_create(
+        booking=booking,
+        event_type=event_type,
+        defaults={"response": response_value},
+    )
 @api_view(['GET'])
 @authentication_classes([])
 def partner_institutions_list(request):
@@ -743,8 +1176,8 @@ def register_user(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        MAX_UPLOAD_SIZE = 5 * 1024 * 1024  # 5 MB
-        if school_id.size > MAX_UPLOAD_SIZE or enrollment_proof.size > MAX_UPLOAD_SIZE:
+        if (school_id.size > settings.MAX_DOCUMENT_UPLOAD_SIZE
+                or enrollment_proof.size > settings.MAX_DOCUMENT_UPLOAD_SIZE):
             return Response(
                 {"error": "Each uploaded file must be under 5 MB. Please compress your images and try again."},
                 status=status.HTTP_400_BAD_REQUEST
@@ -797,18 +1230,21 @@ def register_user(request):
 @permission_classes([IsAuthenticated])
 def profile_status(request):
 
-    profile = request.user.userprofile
-    application_status = None
-    if profile.role == 'Tutor':
-        try:
-            application_status = profile.tutor_application.application_status
-        except:
-            pass
+    profile = get_login_profile_for_user(request.user)
+
+    if profile is None:
+        return Response(
+            {"error": "User profile not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    document_context = get_role_document_review_context(profile)
 
     return Response({
         "profile_completed": profile.profile_completed,
         "role": profile.role,
-        "application_status": application_status
+        "tutee_verification_enforced": tutee_verification_enforced(),
+        **document_context
     })
 
 @api_view(['POST'])
@@ -834,9 +1270,8 @@ def login_view(request):
             status=status.HTTP_401_UNAUTHORIZED
         )
 
-    try:
-        profile = UserProfile.objects.select_related('tutor_application', 'institution').get(user=user)
-    except UserProfile.DoesNotExist:
+    profile = get_login_profile_for_user(user)
+    if profile is None:
         return Response(
             {"error": "User profile not found"},
             status=status.HTTP_404_NOT_FOUND
@@ -856,8 +1291,8 @@ def login_view(request):
                     {"error": "Your application is still being processed. We will email you once it is approved."},
                     status=status.HTTP_403_FORBIDDEN
                 )
-        except Exception:
-            logger.exception("Error checking tutor application status for profile_id=%s", profile.id)
+        except TutorApplication.DoesNotExist:
+            pass
 
     if not profile.is_domain_exempt and profile.role not in ['Admin', 'SuperAdmin']:
         email_domain = normalize_email_domain(email)
@@ -1302,6 +1737,7 @@ def dashboard_recommendations(request):
 #SearchTutors
 
 class SearchTutorsView(APIView):
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
         subject_code = request.query_params.get('subject')
@@ -1312,9 +1748,13 @@ class SearchTutorsView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        tutors = Tutor.objects.filter(
-            tutorsubjects__subject__subject_code=subject_code
-        ).select_related('profile').distinct()
+        student_profile = request.user.userprofile
+        tutors = filter_tutors_by_institution(
+            Tutor.objects.filter(
+                tutorsubjects__subject__subject_code=subject_code
+            ).select_related('profile').distinct(),
+            student_profile,
+        )
 
         serializer = TutorSearchSerializer(tutors, many=True)
         return Response(serializer.data)
@@ -1326,7 +1766,7 @@ class SubjectListView(ListAPIView):
 
 
 
-def build_combined_block(group):
+def build_combined_block(group, profile=None):
 
     sorted_group = sort_bookings_for_session_group(group)
     first = sorted_group[0]
@@ -1334,11 +1774,17 @@ def build_combined_block(group):
     representative_booking = get_representative_booking(sorted_group)
 
     start_time = first.availability.time_slot
-
     end_time = (
         datetime.combine(first.session_date, last.availability.time_slot)
         + timedelta(minutes=SESSION_SLOT_MINUTES)
     ).time()
+    has_dev_live_override = get_dev_live_override_for_bookings(sorted_group) is not None
+    session_date, start_time, end_time = apply_dev_live_override(
+        sorted_group,
+        first.session_date,
+        start_time,
+        end_time,
+    )
 
     duration = get_duration_hours_for_bookings(sorted_group)
 
@@ -1346,13 +1792,14 @@ def build_combined_block(group):
     group_status = first.status
     display_status = get_display_status(
         group_status,
-        first.session_date,
+        session_date,
         start_time,
         end_time
     )
 
     if (
         settings.DEBUG
+        and not has_dev_live_override
         and representative_booking.status == "Confirmed"
         and representative_booking.tutor_confirmed
     ):
@@ -1364,7 +1811,7 @@ def build_combined_block(group):
         "booking_request_id": str(representative_booking.booking_request_id) if representative_booking.booking_request_id else None,
         "status": display_status,
         "raw_status": group_status,
-        "date": first.session_date,
+        "date": session_date,
         "student": f"{first.student.fname} {first.student.lname}",
         "tuteeName": f"{first.student.fname} {first.student.lname}",
         "tutor": f"{first.tutor.profile.fname} {first.tutor.profile.lname}",
@@ -1382,7 +1829,8 @@ def build_combined_block(group):
         "endTime": end_time.strftime("%H:%M"),
         "duration_hours": duration,
         "preferred_location": first.preferred_location,
-        "session_mode": first.session_mode
+        "session_mode": first.session_mode,
+        "dashboard_hidden_by_current_user": get_dashboard_hidden_for_profile(sorted_group, profile),
     }
 
 
@@ -1434,7 +1882,7 @@ def split_bookings_into_time_blocks(bookings):
             and previous_end == booking.availability.time_slot
         )
 
-        if same_session_group or is_contiguous:
+        if same_session_group and is_contiguous:
             current_block.append(booking)
             continue
 
@@ -1446,7 +1894,7 @@ def split_bookings_into_time_blocks(bookings):
     return [build_time_block_payload(block) for block in grouped_blocks]
 
 
-def build_booking_request_block(group):
+def build_booking_request_block(group, profile=None):
 
     sorted_group = sort_bookings_for_session_group(group)
     representative_booking = get_representative_booking(sorted_group)
@@ -1481,6 +1929,7 @@ def build_booking_request_block(group):
         "session_mode": first_booking.session_mode,
         "time_blocks": time_blocks,
         "hasMultipleTimeBlocks": len(time_blocks) > 1,
+        "dashboard_hidden_by_current_user": get_dashboard_hidden_for_profile(sorted_group, profile),
     }
 
 #Tutor Dashboard View
@@ -1606,7 +2055,7 @@ def tutor_detail(request, profile_id):
     except Tutor.DoesNotExist:
         return Response({"error": "Tutor not found"}, status=404)
 
-    serializer = TutorDetailSerializer(tutor)
+    serializer = TutorDetailSerializer(tutor, context={'request': request})
     return Response(serializer.data)
 
 #tutor availability schedule thing  vview
@@ -1769,6 +2218,15 @@ def bulk_booking(request):
 def confirm_payment_and_book(request):
 
     user_profile = get_object_or_404(UserProfile, user=request.user)
+
+    if user_profile.role == 'Tutee' and not can_create_new_booking(user_profile):
+        return Response(
+            {
+                "error": "Please verify your enrollment before booking a new session.",
+                "code": "verification_required",
+            },
+            status=403,
+        )
 
     tutor_id = request.data.get("tutor_id")
     slots = request.data.get("slots")
@@ -2184,6 +2642,15 @@ def approve_booking(request, booking_id):
     if request.user.userprofile != booking.tutor.profile:
         return Response({"error": "Unauthorized"}, status=403)
 
+    if not can_create_new_booking(request.user.userprofile):
+        return Response(
+            {
+                "error": "Please complete your enrollment verification before accepting new bookings.",
+                "code": "verification_required",
+            },
+            status=403,
+        )
+
     wallet, _ = Wallet.objects.get_or_create(tutor=booking.tutor)
     if wallet.balance < 0:
         return Response(
@@ -2396,10 +2863,16 @@ def list_bookings(request):
     grouped_bookings = defaultdict(list)
 
     for booking in bookings:
+        booking_date_key = booking.session_date.isoformat()
+
         if booking.status == "Pending" and booking.booking_request_id:
-            group_key = f"request-{booking.booking_request_id}"
+            group_key = f"request-{booking_date_key}-{booking.booking_request_id}"
         else:
-            group_key = str(booking.session_group_id) if booking.session_group_id else f"booking-{booking.id}"
+            group_key = (
+                f"group-{booking_date_key}-{booking.session_group_id}"
+                if booking.session_group_id
+                else f"booking-{booking.id}"
+            )
         grouped_bookings[group_key].append(booking)
 
     final_data = []
@@ -2408,13 +2881,54 @@ def list_bookings(request):
         representative_booking = get_representative_booking(group)
 
         if representative_booking and representative_booking.status == "Pending" and representative_booking.booking_request_id:
-            final_data.append(build_booking_request_block(group))
+            final_data.append(build_booking_request_block(group, profile))
         else:
-            final_data.append(build_combined_block(group))
+            final_data.append(build_combined_block(group, profile))
 
     final_data.sort(key=lambda booking: (booking["date"], booking["startTime"]))
 
     return Response(final_data)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def dismiss_dashboard_pill(request, booking_id):
+    profile = request.user.userprofile
+    booking = get_object_or_404(
+        Booking.objects.select_related(
+            'student',
+            'tutor__profile',
+            'availability',
+        ),
+        id=booking_id,
+    )
+
+    is_student = profile == booking.student
+    is_tutor = profile == booking.tutor.profile
+
+    if not (is_student or is_tutor):
+        return Response({"error": "Unauthorized"}, status=403)
+
+    if booking.status not in ("Rejected", "Cancelled"):
+        return Response(
+            {"error": "Only rejected or cancelled schedule pills can be removed."},
+            status=400,
+        )
+
+    session_group_bookings = get_dashboard_pill_bookings(booking)
+
+    if not session_group_bookings:
+        return Response({"error": "Booking not found."}, status=404)
+
+    hidden_field = "dashboard_hidden_by_student_at" if is_student else "dashboard_hidden_by_tutor_at"
+    Booking.objects.filter(
+        id__in=[group_booking.id for group_booking in session_group_bookings]
+    ).update(**{hidden_field: timezone.now()})
+
+    return Response({
+        "message": "Schedule pill removed from dashboard.",
+        "hidden_booking_ids": [group_booking.id for group_booking in session_group_bookings],
+    })
 
 
 def build_booking_detail_payload(session_group_bookings):
@@ -2427,15 +2941,23 @@ def build_booking_detail_payload(session_group_bookings):
         datetime.combine(first_booking.session_date, last_booking.availability.time_slot)
         + timedelta(minutes=SESSION_SLOT_MINUTES)
     ).time()
+    has_dev_live_override = get_dev_live_override_for_bookings(session_group_bookings) is not None
+    session_date, start_time, end_time = apply_dev_live_override(
+        session_group_bookings,
+        representative_booking.session_date,
+        start_time,
+        end_time,
+    )
     display_status = get_display_status(
         representative_booking.status,
-        representative_booking.session_date,
+        session_date,
         start_time,
         end_time
     )
 
     if (
         settings.DEBUG
+        and not has_dev_live_override
         and representative_booking.status == "Confirmed"
         and representative_booking.tutor_confirmed
     ):
@@ -2473,7 +2995,7 @@ def build_booking_detail_payload(session_group_bookings):
         },
         "session": {
             "subject": representative_booking.tutor.profile.course.course_name if representative_booking.tutor.profile.course else "General",
-            "date": representative_booking.session_date.strftime("%Y-%m-%d"),
+            "date": session_date.strftime("%Y-%m-%d"),
             "start_time": start_time.strftime("%H:%M"),
             "end_time": end_time.strftime("%H:%M"),
             "duration_hours": get_duration_hours_for_bookings(session_group_bookings),
@@ -2484,6 +3006,7 @@ def build_booking_detail_payload(session_group_bookings):
             "preferred_location": representative_booking.preferred_location,
         },
         "payment": serialize_payment_summary(representative_booking),
+        "check_ins": serialize_session_check_ins(representative_booking),
     }
 
 
@@ -2509,6 +3032,80 @@ def booking_detail(request, booking_id):
 
     session_group_bookings = get_booking_request_bookings(booking)
     return Response(build_booking_detail_payload(session_group_bookings))
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def confirm_session_venue(request, booking_id):
+    booking, error_response = get_tutee_owned_booking_or_403(request, booking_id)
+    if error_response:
+        return error_response
+
+    if booking.session_mode != "F2F":
+        return Response(
+            {"error": "Venue confirmation is only available for face-to-face sessions."},
+            status=400,
+        )
+
+    response_value = str(request.data.get("response", "")).strip().lower()
+    valid_responses = {
+        SessionCheckIn.RESPONSE_VENUE_YES,
+        SessionCheckIn.RESPONSE_VENUE_NO,
+    }
+
+    if response_value not in valid_responses:
+        return Response({"error": "Response must be 'yes' or 'no'."}, status=400)
+
+    check_in, created = create_session_check_in_response(
+        booking,
+        SessionCheckIn.EVENT_VENUE_CONFIRM,
+        response_value,
+    )
+
+    return Response(
+        {
+            "id": check_in.id,
+            "event_type": check_in.event_type,
+            "response": check_in.response,
+            "responded_at": check_in.responded_at.isoformat(),
+            "created": created,
+        },
+        status=201 if created else 200,
+    )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def record_midpoint_check_in(request, booking_id):
+    booking, error_response = get_tutee_owned_booking_or_403(request, booking_id)
+    if error_response:
+        return error_response
+
+    response_value = str(request.data.get("response", "")).strip().lower()
+    valid_responses = {
+        SessionCheckIn.RESPONSE_MIDPOINT_GOOD,
+        SessionCheckIn.RESPONSE_MIDPOINT_ISSUES,
+    }
+
+    if response_value not in valid_responses:
+        return Response({"error": "Response must be 'good' or 'issues'."}, status=400)
+
+    check_in, created = create_session_check_in_response(
+        booking,
+        SessionCheckIn.EVENT_MIDPOINT_CHECKIN,
+        response_value,
+    )
+
+    return Response(
+        {
+            "id": check_in.id,
+            "event_type": check_in.event_type,
+            "response": check_in.response,
+            "responded_at": check_in.responded_at.isoformat(),
+            "created": created,
+        },
+        status=201 if created else 200,
+    )
 
 
 @api_view(['POST'])
@@ -2646,6 +3243,67 @@ def tutor_confirm_booking(request, booking_id):
 @permission_classes([IsAuthenticated])
 def complete_booking(request, booking_id):
     return tutor_confirm_booking(request, booking_id)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def dev_force_booking_live(request, booking_id):
+    if not settings.DEBUG:
+        return Response(status=404)
+
+    profile = request.user.userprofile
+    booking = get_object_or_404(
+        Booking.objects.select_related('student', 'tutor__profile', 'availability'),
+        id=booking_id,
+    )
+
+    if profile not in (booking.student, booking.tutor.profile):
+        return Response({"error": "Unauthorized"}, status=403)
+
+    session_group_bookings = get_session_group_bookings(booking)
+
+    if any(group_booking.status != "Confirmed" for group_booking in session_group_bookings):
+        return Response(
+            {"error": "Only confirmed sessions can be forced live."},
+            status=400,
+        )
+
+    phase = str(request.data.get("phase", "start")).strip().lower()
+    if phase not in DEV_LIVE_PHASES:
+        return Response(
+            {"error": "Phase must be 'start', 'midpoint', or 'ending'."},
+            status=400,
+        )
+
+    set_dev_live_override_for_bookings(
+        session_group_bookings,
+        build_dev_live_override(phase),
+    )
+    refreshed_group = get_session_group_bookings(booking)
+
+    return Response(build_booking_detail_payload(refreshed_group))
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def dev_clear_booking_live(request, booking_id):
+    if not settings.DEBUG:
+        return Response(status=404)
+
+    profile = request.user.userprofile
+    booking = get_object_or_404(
+        Booking.objects.select_related('student', 'tutor__profile', 'availability'),
+        id=booking_id,
+    )
+
+    if profile not in (booking.student, booking.tutor.profile):
+        return Response({"error": "Unauthorized"}, status=403)
+
+    session_group_bookings = get_session_group_bookings(booking)
+    clear_dev_live_override_for_bookings(session_group_bookings)
+    refreshed_group = get_session_group_bookings(booking)
+
+    return Response(build_booking_detail_payload(refreshed_group))
 
 
 @api_view(['POST'])
@@ -2835,6 +3493,7 @@ def get_recommendation_time_slots(start_time_string, end_time_string):
 
 def get_recommendation_candidate_tutors(
     subject,
+    student_profile,
     preferred_mode=None,
     min_budget=None,
     max_budget=None,
@@ -2842,8 +3501,11 @@ def get_recommendation_candidate_tutors(
     start_time=None,
     end_time=None,
 ):
-    base_candidates = Tutor.objects.filter(
-        tutorsubjects__subject__subject_code=subject
+    base_candidates = filter_tutors_by_institution(
+        Tutor.objects.filter(
+            tutorsubjects__subject__subject_code=subject
+        ),
+        student_profile,
     )
 
     if preferred_mode == "Online":
@@ -2859,6 +3521,37 @@ def get_recommendation_candidate_tutors(
 
     session_date = parse_request_date(requested_date)
     required_slots = get_recommendation_time_slots(start_time, end_time)
+
+    # Tutors with a known conflict for this date (an existing booking, a full-day
+    # override, or a slot override) must be excluded from every stage below — a
+    # booked/unavailable tutor should never surface, even in the broad fallbacks.
+    excluded_tutor_ids = set()
+    if session_date:
+        weekday = WEEKDAY_MAP[session_date.weekday()]
+
+        if required_slots:
+            excluded_tutor_ids.update(
+                Booking.objects.filter(
+                    session_date=session_date,
+                    status__in=RECOMMENDATION_BLOCKING_STATUSES,
+                    availability__time_slot__in=required_slots,
+                ).values_list('tutor_id', flat=True)
+            )
+            excluded_tutor_ids.update(
+                TutorAvailabilityOverride.objects.filter(
+                    override_date=session_date,
+                    is_full_day=False,
+                    availability__day=weekday,
+                    availability__time_slot__in=required_slots,
+                ).values_list('tutor_id', flat=True)
+            )
+
+        excluded_tutor_ids.update(
+            TutorAvailabilityOverride.objects.filter(
+                override_date=session_date,
+                is_full_day=True,
+            ).values_list('tutor_id', flat=True)
+        )
 
     # Stage 1: Exact Match (Date + All Time Slots)
     if session_date and required_slots:
@@ -2880,32 +3573,8 @@ def get_recommendation_candidate_tutors(
             )
         ).filter(
             matching_available_slots=len(required_slots)
-        )
-
-        conflicting_tutor_ids = Booking.objects.filter(
-            session_date=session_date,
-            status__in=RECOMMENDATION_BLOCKING_STATUSES,
-            availability__time_slot__in=required_slots,
-        ).values_list('tutor_id', flat=True)
-
-        full_day_override_tutor_ids = TutorAvailabilityOverride.objects.filter(
-            override_date=session_date,
-            is_full_day=True,
-        ).values_list("tutor_id", flat=True)
-
-        slot_override_tutor_ids = TutorAvailabilityOverride.objects.filter(
-            override_date=session_date,
-            is_full_day=False,
-            availability__day=weekday,
-            availability__time_slot__in=required_slots,
-        ).values_list("tutor_id", flat=True)
-
-        stage1_candidates = stage1_candidates.exclude(
-            id__in=conflicting_tutor_ids
         ).exclude(
-            id__in=full_day_override_tutor_ids
-        ).exclude(
-            id__in=slot_override_tutor_ids
+            profile_id__in=excluded_tutor_ids
         )
 
         if stage1_candidates.exists():
@@ -2917,13 +3586,17 @@ def get_recommendation_candidate_tutors(
         stage2_candidates = base_candidates.filter(
             tutoravailability__day=weekday,
             tutoravailability__is_active=True,
+        ).exclude(
+            profile_id__in=excluded_tutor_ids
         ).distinct()
 
         if stage2_candidates.exists():
             return stage2_candidates
 
     # Stage 3: Broad Fallback (Subject only, ignore date/time)
-    return base_candidates.distinct()
+    return base_candidates.exclude(
+        profile_id__in=excluded_tutor_ids
+    ).distinct()
 
 
 @api_view(['POST'])
@@ -2949,6 +3622,7 @@ def recommend_tutors_view(request):
     ratings = build_rating_matrix()
     candidate_qs = get_recommendation_candidate_tutors(
         subject,
+        student_profile,
         preferred_mode=preferred_mode,
         min_budget=min_budget,
         max_budget=max_budget,
@@ -3096,13 +3770,18 @@ def upload_tutee_avatar(request):
     if not avatar.content_type.startswith('image/'):
         return Response({'error': 'File must be an image'}, status=400)
 
-    if avatar.size > 5 * 1024 * 1024:
+    if avatar.size > settings.MAX_DOCUMENT_UPLOAD_SIZE:
         return Response({'error': 'Image must be under 5MB'}, status=400)
+
+    try:
+        compressed = compress_image(avatar)
+    except Exception:
+        return Response({'error': 'Invalid image file'}, status=400)
 
     profile = request.user.userprofile
     if profile.profile_picture:
         profile.profile_picture.delete(save=False)
-    profile.profile_picture = avatar
+    profile.profile_picture = compressed
     profile.save()
 
     return Response({
@@ -3120,13 +3799,18 @@ def upload_tutor_avatar(request):
     if not avatar.content_type.startswith('image/'):
         return Response({'error': 'File must be an image'}, status=400)
 
-    if avatar.size > 5 * 1024 * 1024:
+    if avatar.size > settings.MAX_DOCUMENT_UPLOAD_SIZE:
         return Response({'error': 'Image must be under 5MB'}, status=400)
+
+    try:
+        compressed = compress_image(avatar)
+    except Exception:
+        return Response({'error': 'Invalid image file'}, status=400)
 
     profile = request.user.userprofile
     if profile.profile_picture:
         profile.profile_picture.delete(save=False)
-    profile.profile_picture = avatar
+    profile.profile_picture = compressed
     profile.save()
 
     return Response({
@@ -3384,13 +4068,15 @@ def update_booking_location(request, booking_request_id):
     return Response({"message": "Location updated."})
 
 # --- WALLET & PAYMENT VIEWS ---
-from .models import Transaction, WithdrawalRequest
+from .models import Transaction, WithdrawalRequest, WalletTopUp
 from .paymongo_money_movement import (
     PayMongoCashOutError,
     create_wallet_transaction,
     list_receiving_institutions,
     normalize_wallet_transaction,
 )
+
+PAYMONGO_REQUEST_TIMEOUT = 20  # seconds
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -3407,13 +4093,23 @@ def wallet_status(request):
         "balance": float(wallet.balance),
         "pending_amount": float(wallet.pending_amount),
         "currency": "PHP",
+        "cashin_minimum": float(get_cashin_minimum()),
         "cashout_minimum": float(get_cashout_minimum()),
+        "cashout_maximum": float(get_cashout_maximum()),
         "cashout_provider_fee": float(get_cashout_provider_fee()),
     })
 
 
+def get_cashin_minimum():
+    return decimal.Decimal(str(settings.CASHIN_MIN_PHP)).quantize(decimal.Decimal('0.01'))
+
+
 def get_cashout_minimum():
     return decimal.Decimal(str(settings.CASHOUT_MIN_PHP)).quantize(decimal.Decimal('0.01'))
+
+
+def get_cashout_maximum():
+    return decimal.Decimal(str(settings.CASHOUT_MAX_PHP)).quantize(decimal.Decimal('0.01'))
 
 
 def get_cashout_provider_fee():
@@ -3449,32 +4145,14 @@ def get_cashout_callback_url(request):
     return base_url
 
 
-def get_required_cashout_rail(amount):
-    return 'pesonet' if amount > decimal.Decimal('50000.00') else 'instapay'
-
-
-def serialize_payout_account(account):
-    return {
-        "id": account.id,
-        "destination_type": account.destination_type,
-        "provider": account.provider,
-        "receiving_institution_id": account.receiving_institution_id,
-        "receiving_institution_name": account.receiving_institution_name,
-        "receiving_institution_code": account.receiving_institution_code,
-        "account_number": account.account_number,
-        "account_name": account.account_name,
-        "bank_name": account.bank_name,
-        "is_active": account.is_active,
-        "created_at": account.created_at,
-        "updated_at": account.updated_at,
-    }
-
-
 def serialize_cash_out(withdrawal):
     return {
         "id": withdrawal.id,
         "amount": float(withdrawal.amount),
         "method": withdrawal.method,
+        "receiving_institution_id": withdrawal.receiving_institution_id,
+        "receiving_institution_name": withdrawal.receiving_institution_name,
+        "receiving_institution_code": withdrawal.receiving_institution_code,
         "account_number": withdrawal.account_number,
         "account_name": withdrawal.account_name,
         "bank_name": withdrawal.bank_name,
@@ -3488,11 +4166,28 @@ def serialize_cash_out(withdrawal):
         "provider_error_message": withdrawal.provider_error_message,
         "provider_fee": float(withdrawal.provider_fee),
         "net_amount": float(withdrawal.net_amount),
-        "rail": withdrawal.rail,
         "callback_received_at": withdrawal.callback_received_at,
         "requested_at": withdrawal.requested_at,
         "processed_at": withdrawal.processed_at,
-        "payout_account_id": withdrawal.payout_account_id,
+        "note": withdrawal.note,
+    }
+
+
+def cashout_method_display(withdrawal):
+    if withdrawal.method == 'gcash':
+        return 'Digital Wallet'
+    return withdrawal.get_method_display()
+
+
+def serialize_cash_in(topup):
+    return {
+        "id": topup.id,
+        "amount": float(topup.amount),
+        "status": topup.status,
+        "provider": topup.provider,
+        "provider_reference": topup.provider_reference,
+        "created_at": topup.created_at,
+        "paid_at": topup.paid_at,
     }
 
 
@@ -3649,8 +4344,9 @@ def request_withdrawal(request):
     if not amount or decimal.Decimal(str(amount)) > wallet.balance:
         return Response({"error": "Insufficient balance"}, status=400)
 
-    if decimal.Decimal(str(amount)) < 500:
-        return Response({"error": "Minimum withdrawal is ₱500"}, status=400)
+    minimum_amount = get_cashout_minimum()
+    if decimal.Decimal(str(amount)) < minimum_amount:
+        return Response({"error": f"Minimum withdrawal is PHP {minimum_amount}."}, status=400)
 
     with transaction.atomic():
         withdrawal = WithdrawalRequest.objects.create(
@@ -3670,7 +4366,7 @@ def request_withdrawal(request):
             wallet=wallet,
             transaction_type='withdrawal',
             amount=-decimal.Decimal(str(amount)),
-            description=f"Withdrawal request via {withdrawal.get_method_display()}",
+            description=f"Withdrawal request via {cashout_method_display(withdrawal)}",
             reference_id=f"WD-{withdrawal.id}"
         )
 
@@ -3679,81 +4375,12 @@ def request_withdrawal(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def receiving_institutions(request):
-    provider = request.query_params.get('provider', 'instapay').lower()
-    if provider not in ['instapay', 'pesonet']:
-        return Response({"error": "Provider must be instapay or pesonet."}, status=400)
-
     try:
-        provider_response = list_receiving_institutions(provider)
+        provider_response = list_receiving_institutions()
     except PayMongoCashOutError as exc:
         return Response({"error": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
 
     return Response(provider_response.get('data', provider_response))
-
-
-@api_view(['GET', 'POST', 'PATCH'])
-@permission_classes([IsAuthenticated])
-def payout_destinations(request, account_id=None):
-    tutor = get_request_tutor(request)
-    if tutor is None:
-        return Response({"error": "Not a tutor"}, status=403)
-
-    if request.method == 'GET':
-        accounts = TutorPayoutAccount.objects.filter(tutor=tutor).order_by('-is_active', '-updated_at')
-        return Response([serialize_payout_account(account) for account in accounts])
-
-    if request.method == 'POST':
-        data = request.data
-        destination_type = data.get('destination_type')
-        if destination_type not in ['gcash', 'bank']:
-            return Response({"error": "Destination type must be gcash or bank."}, status=400)
-
-        required_fields = [
-            'receiving_institution_id',
-            'receiving_institution_name',
-            'account_number',
-            'account_name',
-        ]
-        if any(not data.get(field) for field in required_fields):
-            return Response({"error": "Missing payout account details."}, status=400)
-
-        account = TutorPayoutAccount.objects.create(
-            tutor=tutor,
-            destination_type=destination_type,
-            provider=data.get('provider', ''),
-            receiving_institution_id=data.get('receiving_institution_id'),
-            receiving_institution_name=data.get('receiving_institution_name'),
-            receiving_institution_code=data.get('receiving_institution_code', ''),
-            account_number=data.get('account_number'),
-            account_name=data.get('account_name'),
-            bank_name=data.get('bank_name', ''),
-            is_active=bool(data.get('is_active', True)),
-        )
-        return Response(serialize_payout_account(account), status=status.HTTP_201_CREATED)
-
-    lookup_id = account_id or request.data.get('id')
-    account = get_object_or_404(TutorPayoutAccount, id=lookup_id, tutor=tutor)
-    editable_fields = [
-        'destination_type',
-        'provider',
-        'receiving_institution_id',
-        'receiving_institution_name',
-        'receiving_institution_code',
-        'account_number',
-        'account_name',
-        'bank_name',
-        'is_active',
-    ]
-
-    for field in editable_fields:
-        if field in request.data:
-            setattr(account, field, request.data.get(field))
-
-    if account.destination_type not in ['gcash', 'bank']:
-        return Response({"error": "Destination type must be gcash or bank."}, status=400)
-
-    account.save()
-    return Response(serialize_payout_account(account))
 
 
 @api_view(['GET'])
@@ -3792,20 +4419,57 @@ def cash_outs(request):
     if amount < minimum_amount:
         return Response({"error": f"Minimum cash-out is PHP {minimum_amount}."}, status=400)
 
-    payout_account_id = request.data.get('payout_account_id')
-    payout_account = get_object_or_404(
-        TutorPayoutAccount,
-        id=payout_account_id,
-        tutor=tutor,
-        is_active=True
+    maximum_amount = get_cashout_maximum()
+    if amount > maximum_amount:
+        return Response({"error": f"Maximum cash-out per request is PHP {maximum_amount}."}, status=400)
+
+    destination_type = request.data.get('destination_type')
+    if destination_type not in ('gcash', 'bank'):
+        return Response({"error": "Select a valid destination type (gcash or bank)."}, status=400)
+
+    account_number = request.data.get('account_number')
+    if not account_number:
+        return Response({"error": "Enter the destination account number."}, status=400)
+
+    account_name = request.data.get('account_name')
+    if not account_name:
+        return Response({"error": "Enter the destination account name."}, status=400)
+
+    receiving_institution_id = request.data.get('receiving_institution_id')
+    receiving_institution_name = request.data.get('receiving_institution_name')
+    if not receiving_institution_id or not receiving_institution_name:
+        return Response({"error": "Select the receiving institution."}, status=400)
+
+    receiving_institution_code = request.data.get('receiving_institution_code', '')
+    bank_name = request.data.get('bank_name')
+    if destination_type == 'bank' and not bank_name:
+        return Response({"error": "Enter the destination bank name."}, status=400)
+    note = request.data.get('note', '')
+
+    recent_withdrawals = list(
+        WithdrawalRequest.objects.filter(tutor=tutor).order_by('-requested_at')[:4]
+    )
+    has_history = len(recent_withdrawals) > 0
+    matches_recent_destination = any(
+        previous.method == destination_type
+        and previous.receiving_institution_id == receiving_institution_id
+        and previous.account_number == account_number
+        and previous.account_name == account_name
+        for previous in recent_withdrawals
     )
 
-    rail = get_required_cashout_rail(amount)
-    if payout_account.provider and payout_account.provider != rail:
-        return Response(
-            {"error": f"This destination is saved for {payout_account.provider}. Use a {rail} destination."},
-            status=400
-        )
+    if has_history and not matches_recent_destination and request.data.get('confirm_new_destination') is not True:
+        return Response({"error": "new_destination_confirmation_required"}, status=409)
+
+    destination = SimpleNamespace(
+        destination_type=destination_type,
+        receiving_institution_id=receiving_institution_id,
+        receiving_institution_name=receiving_institution_name,
+        receiving_institution_code=receiving_institution_code,
+        account_number=account_number,
+        account_name=account_name,
+        bank_name=bank_name,
+    )
 
     with transaction.atomic():
         wallet, _ = Wallet.objects.select_for_update().get_or_create(tutor=tutor)
@@ -3817,16 +4481,18 @@ def cash_outs(request):
 
         withdrawal = WithdrawalRequest.objects.create(
             tutor=tutor,
-            payout_account=payout_account,
             amount=amount,
-            method=payout_account.destination_type,
-            account_number=payout_account.account_number,
-            account_name=payout_account.account_name,
-            bank_name=payout_account.bank_name or payout_account.receiving_institution_name,
+            method=destination_type,
+            receiving_institution_id=receiving_institution_id,
+            receiving_institution_name=receiving_institution_name,
+            receiving_institution_code=receiving_institution_code,
+            account_number=account_number,
+            account_name=account_name,
+            bank_name=bank_name,
+            note=note,
             provider='paymongo',
             provider_fee=provider_fee,
             net_amount=amount,
-            rail=rail,
             status='pending',
         )
 
@@ -3837,7 +4503,7 @@ def cash_outs(request):
             wallet=wallet,
             transaction_type='withdrawal',
             amount=-amount,
-            description=f"Cash-out request via {withdrawal.get_method_display()}",
+            description=f"Cash-out request via {cashout_method_display(withdrawal)}",
             reference_id=f"WD-{withdrawal.id}"
         )
 
@@ -3853,9 +4519,8 @@ def cash_outs(request):
     try:
         provider_data = create_wallet_transaction(
             settings.PAYMONGO_WALLET_ID,
-            payout_account,
+            destination,
             amount,
-            rail,
             get_cashout_callback_url(request),
             withdrawal.id,
         )
@@ -3870,6 +4535,17 @@ def cash_outs(request):
 
     withdrawal = apply_cash_out_provider_result(withdrawal, provider_data)
     return Response(serialize_cash_out(withdrawal), status=status.HTTP_201_CREATED)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def recent_cash_outs(request):
+    tutor = get_request_tutor(request)
+    if tutor is None:
+        return Response({"error": "Not a tutor"}, status=403)
+
+    withdrawals = WithdrawalRequest.objects.filter(tutor=tutor).order_by('-requested_at')[:4]
+    return Response([serialize_cash_out(withdrawal) for withdrawal in withdrawals])
 
 
 request_withdrawal = cash_outs
@@ -4194,6 +4870,162 @@ def credit_tutor_wallet(booking):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
+def initiate_cash_in(request):
+    """Create a PayMongo Checkout Session for a wallet top-up."""
+    tutor = get_request_tutor(request)
+    if tutor is None:
+        return Response({"error": "Not a tutor"}, status=403)
+
+    amount = parse_money_amount(request.data.get('amount'))
+    if amount is None:
+        return Response({"error": "Enter a valid cash-in amount."}, status=400)
+
+    minimum_amount = get_cashin_minimum()
+    if amount < minimum_amount:
+        return Response({"error": f"Minimum cash-in is PHP {minimum_amount}."}, status=400)
+
+    topup = WalletTopUp.objects.create(
+        tutor=tutor, amount=amount, status='pending', provider='paymongo'
+    )
+
+    amount_cents = int(amount * decimal.Decimal("100"))
+    label = f"StudyBuddy Wallet Top-Up TOPUP-{topup.id}"
+    url = "https://api.paymongo.com/v1/checkout_sessions"
+    payload = {
+        "data": {
+            "attributes": {
+                "line_items": [
+                    {
+                        "currency": "PHP",
+                        "amount": amount_cents,
+                        "name": label,
+                        "quantity": 1,
+                    }
+                ],
+                "payment_method_types": ["gcash", "card", "paymaya"],
+                "description": label,
+                "success_url": f"{settings.FRONTEND_URL}/tch-wallet?cashin=success&id={topup.id}",
+                "cancel_url": f"{settings.FRONTEND_URL}/tch-wallet?cashin=cancelled&id={topup.id}",
+            }
+        }
+    }
+
+    try:
+        response = requests.post(
+            url,
+            json=payload,
+            headers=get_paymongo_auth_headers(),
+            timeout=PAYMONGO_REQUEST_TIMEOUT,
+        )
+        try:
+            res_data = response.json()
+        except ValueError:
+            res_data = {"raw": getattr(response, "text", "")}
+
+        if response.status_code in (200, 201):
+            checkout_url = (
+                res_data.get('data', {}).get('attributes', {}).get('checkout_url')
+            )
+            if not checkout_url:
+                topup.status = 'failed'
+                topup.save(update_fields=['status'])
+                return Response(
+                    {"error": "Payment provider did not return a checkout URL."},
+                    status=status.HTTP_502_BAD_GATEWAY,
+                )
+
+            topup.provider_reference = res_data['data']['id']
+            topup.save(update_fields=['provider_reference'])
+            return Response({"checkout_url": checkout_url, "id": topup.id})
+
+        topup.status = 'failed'
+        topup.save(update_fields=['status'])
+        provider_message = get_paymongo_error_message(res_data)
+        logger.error(
+            "Cash-in checkout failed status=%s error=%s", response.status_code, provider_message
+        )
+        return Response({"error": provider_message}, status=status.HTTP_502_BAD_GATEWAY)
+    except requests.RequestException as exc:
+        topup.status = 'failed'
+        topup.save(update_fields=['status'])
+        logger.error("Cash-in checkout request failed: %s", exc)
+        return Response(
+            {"error": "Could not reach the payment provider. Please try again."},
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def verify_cash_in(request, topup_id):
+    """Confirm a PayMongo checkout was paid and credit the wallet (idempotent)."""
+    tutor = get_request_tutor(request)
+    if tutor is None:
+        return Response({"error": "Not a tutor"}, status=403)
+
+    topup = get_object_or_404(WalletTopUp, id=topup_id, tutor=tutor)
+
+    if topup.status == 'paid':
+        wallet, _ = Wallet.objects.get_or_create(tutor=tutor)
+        payload = serialize_cash_in(topup)
+        payload["balance"] = float(wallet.balance)
+        return Response(payload)
+
+    if not topup.provider_reference:
+        return Response({"error": "No PayMongo checkout for this top-up."}, status=400)
+
+    url = f"https://api.paymongo.com/v1/checkout_sessions/{topup.provider_reference}"
+    try:
+        response = requests.get(
+            url, headers=get_paymongo_auth_headers(), timeout=PAYMONGO_REQUEST_TIMEOUT
+        )
+        try:
+            res_data = response.json()
+        except ValueError:
+            res_data = {"raw": getattr(response, "text", "")}
+    except requests.RequestException as exc:
+        logger.error("Cash-in verify request failed: %s", exc)
+        return Response(
+            {"error": "Could not reach the payment provider. Please try again."},
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
+
+    if response.status_code != 200:
+        return Response(
+            {"error": "Payment provider error."}, status=status.HTTP_502_BAD_GATEWAY
+        )
+
+    if not is_paymongo_checkout_paid(res_data):
+        return Response({"error": "Payment not completed yet."}, status=400)
+
+    with transaction.atomic():
+        wallet = Wallet.objects.select_for_update().get(tutor=tutor)
+        topup.refresh_from_db()
+        if topup.status != 'paid':
+            topup.status = 'paid'
+            topup.paid_at = timezone.now()
+            topup.save(update_fields=['status', 'paid_at'])
+
+            ref_id = f"TOPUP-{topup.id}"
+            if not Transaction.objects.filter(reference_id=ref_id).exists():
+                wallet.balance += topup.amount
+                wallet.save(update_fields=['balance'])
+                Transaction.objects.create(
+                    wallet=wallet,
+                    transaction_type='cash_in',
+                    amount=topup.amount,
+                    description=f"Wallet Top-Up {ref_id}",
+                    reference_id=ref_id,
+                )
+
+    wallet.refresh_from_db()
+    payload = serialize_cash_in(topup)
+    payload["balance"] = float(wallet.balance)
+    return Response(payload)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def dev_add_wallet_funds(request):
     if not settings.DEBUG:
         return Response(status=404)
@@ -4283,21 +5115,24 @@ def admin_claim_ticket(request, ticket_id):
         return Response(status=403)
 
     from .models import SupportTicket
-    queryset = SupportTicket.objects.all()
+    queryset = SupportTicket.objects.select_related('chatroom').all()
     if profile.role != 'SuperAdmin':
         queryset = queryset.filter(user__institution=profile.institution)
 
     ticket = get_object_or_404(queryset, id=ticket_id)
+    if ticket.status == 'Escalated' and profile.role != 'SuperAdmin':
+        return Response({"error": "Escalated tickets must be handled by a SuperAdmin."}, status=403)
 
     try:
         with transaction.atomic():
             ticket.assigned_agent = profile
-            ticket.status = 'In_Progress'
+            if ticket.status != 'Escalated':
+                ticket.status = 'In_Progress'
 
             ticket.chatroom.tutor = profile
 
-            ticket.save()
-            ticket.chatroom.save()
+            ticket.save(update_fields=['assigned_agent', 'status', 'updated_at'])
+            ticket.chatroom.save(update_fields=['tutor', 'updated_at'])
     except IntegrityError:
         return Response(
             {"error": "User already has an active support ticket claimed by you."},
@@ -4305,6 +5140,58 @@ def admin_claim_ticket(request, ticket_id):
         )
 
     return Response({"message": "Ticket claimed"})
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def admin_escalate_ticket(request, ticket_id):
+    profile = request.user.userprofile
+    if profile.role != 'Admin':
+        return Response(status=403)
+
+    reason = str(request.data.get('reason', '')).strip()
+    if not reason:
+        return Response({"error": "Escalation reason is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+    from .models import SupportTicket
+    ticket = get_object_or_404(
+        SupportTicket.objects.select_related('chatroom').filter(user__institution=profile.institution),
+        id=ticket_id,
+    )
+    if ticket.status == 'Resolved':
+        return Response({"error": "Resolved tickets cannot be escalated."}, status=status.HTTP_400_BAD_REQUEST)
+    if ticket.status == 'Escalated':
+        return Response({"error": "Ticket is already escalated."}, status=status.HTTP_400_BAD_REQUEST)
+
+    with transaction.atomic():
+        ticket.status = 'Escalated'
+        ticket.escalation_reason = reason
+        ticket.escalated_by = profile
+        ticket.escalated_at = timezone.now()
+        ticket.assigned_agent = None
+        ticket.save(update_fields=[
+            'status',
+            'escalation_reason',
+            'escalated_by',
+            'escalated_at',
+            'assigned_agent',
+            'updated_at',
+        ])
+
+        if ticket.chatroom:
+            ticket.chatroom.tutor = None
+            ticket.chatroom.save(update_fields=['tutor', 'updated_at'])
+
+            from studybuddy.chat.models import Message
+            Message.objects.create(
+                room=ticket.chatroom,
+                sender=None,
+                content="This support ticket has been escalated to SuperAdmin support.",
+            )
+
+    return Response({
+        "message": "Ticket escalated",
+        "status": "Escalated",
+    })
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -4338,10 +5225,12 @@ def admin_list_tickets(request):
         return Response(status=403)
 
     from .models import SupportTicket
-    tickets = SupportTicket.objects.select_related('user', 'assigned_agent').all().order_by('-created_at')
+    tickets = SupportTicket.objects.select_related('user', 'assigned_agent', 'escalated_by').all().order_by('-created_at')
 
-    if profile.role != 'SuperAdmin':
-        tickets = tickets.filter(user__institution=profile.institution)
+    if profile.role == 'SuperAdmin':
+        tickets = tickets.filter(Q(status='Escalated') | Q(escalated_at__isnull=False))
+    else:
+        tickets = tickets.filter(user__institution=profile.institution).exclude(status='Escalated')
 
     data = []
     for ticket in tickets:
@@ -4361,6 +5250,9 @@ def admin_list_tickets(request):
             "chatroom_id": ticket.chatroom_id,
             "assigned_agent": f"{ticket.assigned_agent.fname} {ticket.assigned_agent.lname}" if ticket.assigned_agent else None,
             "assigned_agent_id": ticket.assigned_agent_id,
+            "escalation_reason": ticket.escalation_reason,
+            "escalated_by": f"{ticket.escalated_by.fname} {ticket.escalated_by.lname}" if ticket.escalated_by else None,
+            "escalated_at": ticket.escalated_at,
             "created_at": ticket.created_at,
             "updated_at": ticket.updated_at,
         })
@@ -4379,6 +5271,9 @@ def admin_resolve_ticket(request, ticket_id):
         queryset = queryset.filter(user__institution=profile.institution)
 
     ticket = get_object_or_404(queryset, id=ticket_id)
+    if ticket.status == 'Escalated' and profile.role != 'SuperAdmin':
+        return Response({"error": "Escalated tickets must be resolved by a SuperAdmin."}, status=403)
+
     ticket.status = 'Resolved'
     ticket.save()
 
@@ -4408,7 +5303,7 @@ def tutor_application_status(request):
 @transaction.atomic
 def tutor_application_resubmit(request):
     try:
-        application = TutorApplication.objects.get(profile=request.user.userprofile)
+        application = TutorApplication.objects.select_for_update().get(profile=request.user.userprofile)
     except TutorApplication.DoesNotExist:
         return Response({"error": "No application found to resubmit."}, status=status.HTTP_404_NOT_FOUND)
 
@@ -4419,6 +5314,28 @@ def tutor_application_resubmit(request):
     if not school_id or not enrollment_proof:
         return Response(
             {"error": "Please provide both your School ID and Proof of Enrollment to resubmit."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    if (school_id.size > settings.MAX_DOCUMENT_UPLOAD_SIZE
+            or enrollment_proof.size > settings.MAX_DOCUMENT_UPLOAD_SIZE):
+        return Response(
+            {"error": "Each uploaded file must be under 5 MB. Please compress your images and try again."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    if application.application_status == 'approved':
+        return create_tutor_document_renewal_submission(
+            request,
+            application,
+            school_id,
+            enrollment_proof,
+            reason_to_tutor,
+        )
+
+    if application.application_status != 'rejected':
+        return Response(
+            {"error": "Your application is still being processed. It cannot be resubmitted right now."},
             status=status.HTTP_400_BAD_REQUEST
         )
 
@@ -4446,3 +5363,230 @@ def tutor_application_resubmit(request):
         logger.exception("Failed to send tutor application resubmission email for profile_id=%s", request.user.userprofile.id)
 
     return Response({"message": "Application resubmitted successfully. It is now back under review."})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@transaction.atomic
+def tutor_document_renewal_submit(request):
+    try:
+        application = TutorApplication.objects.select_for_update().get(profile=request.user.userprofile)
+    except TutorApplication.DoesNotExist:
+        return Response({"error": "No approved tutor application found."}, status=status.HTTP_404_NOT_FOUND)
+
+    school_id = request.FILES.get('school_id')
+    enrollment_proof = request.FILES.get('enrollment_proof')
+    reason_to_tutor = request.data.get('reason_to_tutor', '')
+
+    if not school_id or not enrollment_proof:
+        return Response(
+            {"error": "Please provide both your School ID and updated Enrollment/RF document."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    return create_tutor_document_renewal_submission(
+        request,
+        application,
+        school_id,
+        enrollment_proof,
+        reason_to_tutor,
+    )
+
+
+def create_tutor_document_renewal_submission(request, application, school_id, enrollment_proof, reason_to_tutor):
+    if application.application_status != 'approved':
+        return Response(
+            {"error": "Only approved tutors can submit recurring document renewals."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    renewal_status = application.document_renewal_status()
+    if renewal_status == 'pending':
+        return Response(
+            {"error": "Your updated documents are already pending review."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    if renewal_status == 'verified':
+        return Response(
+            {"error": "Your enrollment documents are still current."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    renewal = TutorDocumentRenewalReview.objects.create(
+        application=application,
+        profile=request.user.userprofile,
+        school_id=school_id,
+        enrollment_proof=enrollment_proof,
+        reason_to_tutor=reason_to_tutor,
+        status='pending',
+    )
+
+    PlatformActivity.objects.create(
+        activity_type='tutor_application',
+        message=f"Tutor document renewal submitted: {request.user.userprofile.fname} {request.user.userprofile.lname}",
+        institution=request.user.userprofile.institution
+    )
+
+    return Response({
+        "message": "Updated documents submitted successfully. They are now under review.",
+        "renewal_id": renewal.id,
+        **get_tutor_document_review_context(request.user.userprofile),
+    }, status=status.HTTP_201_CREATED)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def tutee_application_status(request):
+    try:
+        application = TuteeApplication.objects.get(profile=request.user.userprofile)
+        serializer = TuteeApplicationSerializer(application, context={'request': request})
+        return Response(serializer.data)
+    except TuteeApplication.DoesNotExist:
+        return Response({"error": "No application found for this user."}, status=status.HTTP_404_NOT_FOUND)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@transaction.atomic
+def tutee_application_resubmit(request):
+    school_id = request.FILES.get('school_id')
+    enrollment_proof = request.FILES.get('enrollment_proof')
+    reason_to_tutor = request.data.get('reason_to_tutor', '')
+
+    if not school_id or not enrollment_proof:
+        return Response(
+            {"error": "Please provide both your School ID and Proof of Enrollment to resubmit."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    if (school_id.size > settings.MAX_DOCUMENT_UPLOAD_SIZE
+            or enrollment_proof.size > settings.MAX_DOCUMENT_UPLOAD_SIZE):
+        return Response(
+            {"error": "Each uploaded file must be under 5 MB. Please compress your images and try again."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Unlike tutors (who submit documents at registration), tutees register free and submit
+    # verification documents later — so this is also the first-time submission endpoint, not just
+    # resubmission. See docs/plans/2026-07-01-tutee-verification-phase3-ui.md.
+    application, created = TuteeApplication.objects.select_for_update().get_or_create(
+        profile=request.user.userprofile,
+        defaults={
+            'school_id': school_id,
+            'enrollment_proof': enrollment_proof,
+            'reason_to_tutor': reason_to_tutor,
+            'application_status': 'pending',
+        }
+    )
+
+    if created:
+        PlatformActivity.objects.create(
+            activity_type='tutee_application',
+            message=f"Tutee application submitted: {request.user.userprofile.fname} {request.user.userprofile.lname}",
+            institution=request.user.userprofile.institution
+        )
+        return Response({"message": "Application submitted successfully. It is now under review."})
+
+    if application.application_status == 'approved':
+        return create_tutee_document_renewal_submission(
+            request,
+            application,
+            school_id,
+            enrollment_proof,
+            reason_to_tutor,
+        )
+
+    if application.application_status != 'rejected':
+        return Response(
+            {"error": "Your application is still being processed. It cannot be resubmitted right now."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    application.school_id = school_id
+    application.enrollment_proof = enrollment_proof
+    application.reason_to_tutor = reason_to_tutor
+    application.application_status = 'pending'
+    application.rejection_reason = ''
+    application.reviewed_at = None
+    application.reviewed_by = None
+    application.save()
+
+    PlatformActivity.objects.create(
+        activity_type='tutee_application',
+        message=f"Tutee application resubmitted: {request.user.userprofile.fname} {request.user.userprofile.lname}",
+        institution=request.user.userprofile.institution
+    )
+
+    # Email notification deliberately not sent yet — see AdminTuteeApplicationDetailView.patch for why
+    # (send_application_*_email is tutor-worded; Phase 4 generalizes it for both roles).
+
+    return Response({"message": "Application resubmitted successfully. It is now back under review."})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@transaction.atomic
+def tutee_document_renewal_submit(request):
+    try:
+        application = TuteeApplication.objects.select_for_update().get(profile=request.user.userprofile)
+    except TuteeApplication.DoesNotExist:
+        return Response({"error": "No approved tutee application found."}, status=status.HTTP_404_NOT_FOUND)
+
+    school_id = request.FILES.get('school_id')
+    enrollment_proof = request.FILES.get('enrollment_proof')
+    reason_to_tutor = request.data.get('reason_to_tutor', '')
+
+    if not school_id or not enrollment_proof:
+        return Response(
+            {"error": "Please provide both your School ID and updated Enrollment/RF document."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    return create_tutee_document_renewal_submission(
+        request,
+        application,
+        school_id,
+        enrollment_proof,
+        reason_to_tutor,
+    )
+
+
+def create_tutee_document_renewal_submission(request, application, school_id, enrollment_proof, reason_to_tutor):
+    if application.application_status != 'approved':
+        return Response(
+            {"error": "Only approved tutees can submit recurring document renewals."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    renewal_status = application.document_renewal_status()
+    if renewal_status == 'pending':
+        return Response(
+            {"error": "Your updated documents are already pending review."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    if renewal_status == 'verified':
+        return Response(
+            {"error": "Your enrollment documents are still current."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    renewal = TuteeDocumentRenewalReview.objects.create(
+        application=application,
+        profile=request.user.userprofile,
+        school_id=school_id,
+        enrollment_proof=enrollment_proof,
+        reason_to_tutor=reason_to_tutor,
+        status='pending',
+    )
+
+    PlatformActivity.objects.create(
+        activity_type='tutee_application',
+        message=f"Tutee document renewal submitted: {request.user.userprofile.fname} {request.user.userprofile.lname}",
+        institution=request.user.userprofile.institution
+    )
+
+    return Response({
+        "message": "Updated documents submitted successfully. They are now under review.",
+        "renewal_id": renewal.id,
+        **get_document_review_context(application),
+    }, status=status.HTTP_201_CREATED)

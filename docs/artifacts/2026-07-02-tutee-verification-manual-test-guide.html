@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tutee Enrollment Verification — Manual Test Guide</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #17211b;
+        --muted: #5b675f;
+        --line: #d8e3dc;
+        --panel: #ffffff;
+        --page: #f5f8f6;
+        --green: #176b4c;
+        --green-soft: #dff1e8;
+        --blue: #245f8f;
+        --blue-soft: #e3eef8;
+        --amber: #8a5d12;
+        --amber-soft: #f7ecd3;
+        --rose: #8f3434;
+        --rose-soft: #f6dfdf;
+        --shadow: 0 18px 60px rgba(23, 33, 27, 0.08);
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--page);
+        color: var(--ink);
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        line-height: 1.55;
+      }
+      main { width: min(980px, calc(100% - 32px)); margin: 0 auto; padding: 40px 0 64px; }
+      header {
+        padding: 28px 32px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        box-shadow: var(--shadow);
+        margin-bottom: 24px;
+      }
+      header h1 { margin: 0 0 6px; font-size: 1.5rem; }
+      header p { margin: 0; color: var(--muted); }
+      .scope-note {
+        margin-top: 14px;
+        padding: 10px 14px;
+        background: var(--amber-soft);
+        color: var(--amber);
+        border-radius: 6px;
+        font-size: 0.9rem;
+      }
+      .progress-bar-wrap {
+        margin-top: 16px;
+        height: 8px;
+        background: var(--line);
+        border-radius: 999px;
+        overflow: hidden;
+      }
+      .progress-bar-fill {
+        height: 100%;
+        background: var(--green);
+        width: 0%;
+        transition: width 0.2s ease;
+      }
+      .progress-label { margin-top: 6px; font-size: 0.85rem; color: var(--muted); }
+      section.phase {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        box-shadow: var(--shadow);
+        margin-bottom: 20px;
+        overflow: hidden;
+      }
+      .phase-head {
+        padding: 16px 24px;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .phase-head h2 { margin: 0; font-size: 1.1rem; }
+      .badge {
+        font-size: 0.72rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        padding: 3px 8px;
+        border-radius: 999px;
+        background: var(--blue-soft);
+        color: var(--blue);
+      }
+      .phase-head .meta { color: var(--muted); font-size: 0.85rem; }
+      .case {
+        padding: 16px 24px;
+        border-bottom: 1px solid var(--line);
+      }
+      .case:last-child { border-bottom: none; }
+      .case-title { display: flex; align-items: flex-start; gap: 10px; font-weight: 600; }
+      .case-title input[type="checkbox"] { margin-top: 4px; width: 16px; height: 16px; accent-color: var(--green); flex-shrink: 0; }
+      .case-body { margin: 8px 0 0 26px; color: var(--ink); }
+      .case-body ol, .case-body ul { margin: 6px 0; padding-left: 20px; }
+      .case-body li { margin: 3px 0; }
+      code {
+        background: var(--blue-soft);
+        color: var(--blue);
+        padding: 1px 5px;
+        border-radius: 4px;
+        font-size: 0.88em;
+      }
+      .expect {
+        margin-top: 8px;
+        padding: 8px 12px;
+        background: var(--green-soft);
+        color: var(--green);
+        border-radius: 6px;
+        font-size: 0.9rem;
+      }
+      .setup-box {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        box-shadow: var(--shadow);
+        padding: 20px 24px;
+        margin-bottom: 20px;
+      }
+      .setup-box h2 { margin-top: 0; font-size: 1.1rem; }
+      .reset-btn {
+        display: inline-block;
+        margin-top: 20px;
+        padding: 8px 14px;
+        background: var(--rose-soft);
+        color: var(--rose);
+        border: none;
+        border-radius: 6px;
+        font-size: 0.85rem;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Tutee Enrollment Verification — Manual Test Guide</h1>
+        <p>Covers Phases 1–3, which are shipped on <code>feat/tutee-enrollment-verification</code>. Check off each case as you verify it in the browser; progress is saved locally in this file.</p>
+        <div class="scope-note">
+          Phase 4 (email notifications + SuperAdmin dev tools) is still a Draft plan — not implemented — so it
+          is intentionally not covered here. See
+          <code>docs/plans/2026-07-01-tutee-verification-phase4-email-devtools.md</code>.
+        </div>
+        <div class="progress-bar-wrap"><div class="progress-bar-fill" id="progressFill"></div></div>
+        <div class="progress-label" id="progressLabel">0 / 0 checked</div>
+      </header>
+
+      <div class="setup-box">
+        <h2>Setup</h2>
+        <ul>
+          <li>Backend: <code>python manage.py runserver</code> (from <code>backend/</code>)</li>
+          <li>Frontend: <code>npm run dev</code> (from repo root)</li>
+          <li>Seed data if the DB is empty: <code>python manage.py seed_data</code></li>
+          <li>You need at least one <b>Tutee</b> account, one <b>Tutor</b> account, and one <b>Admin</b> (or <b>SuperAdmin</b>) account. Use Django admin (<code>/admin/</code>) or <code>manage.py shell</code> to inspect/adjust <code>UserProfile.role</code>, <code>TuteeApplication</code>, and <code>TutorApplication</code> rows directly when a test needs a specific state.</li>
+          <li>To simulate lapse/renewal without waiting 90 days, backdate <code>reviewed_at</code> on the relevant <code>TutorApplication</code>/<code>TuteeApplication</code> (or its latest approved <code>DocumentRenewalReview</code>) via the Django shell — this is what Phase 2's browser verification used.</li>
+          <li>To test the enforcement grace period, toggle <code>TUTEE_VERIFICATION_ENFORCEMENT_START_DATE</code> in <code>backend/.env</code> (unset or future date = grace period active; past date = enforced) and restart the backend.</li>
+        </ul>
+      </div>
+
+      <section class="phase" data-phase="1">
+        <div class="phase-head">
+          <h2>Phase 1 — Data model</h2>
+          <span class="badge">Backend / Django admin</span>
+        </div>
+        <div class="case">
+          <label class="case-title"><input type="checkbox" />TuteeApplication and TuteeDocumentRenewalReview exist as first-class models</label>
+          <div class="case-body">
+            <ol>
+              <li>Open <code>/admin/</code> (Django admin), log in as a superuser.</li>
+              <li>Confirm <b>Tutee applications</b> and <b>Tutee document renewal reviews</b> appear as separate model tables, alongside the existing Tutor equivalents.</li>
+            </ol>
+            <div class="expect">Expect: both tutee tables exist and are independently browsable/editable, mirroring the tutor tables' fields (status, reviewed_by, reviewed_at, reminder_7day_sent_at, reminder_1day_sent_at, enrollment_proof).</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="phase" data-phase="2">
+        <div class="phase-head">
+          <h2>Phase 2 — Booking gate</h2>
+          <span class="badge">Full stack</span>
+        </div>
+        <div class="case">
+          <label class="case-title"><input type="checkbox" />Unverified tutee is blocked from creating a new booking (enforcement active)</label>
+          <div class="case-body">
+            <ol>
+              <li>Set <code>TUTEE_VERIFICATION_ENFORCEMENT_START_DATE</code> to a past date (e.g. <code>2020-01-01</code>), restart backend.</li>
+              <li>Log in as a Tutee with no approved <code>TuteeApplication</code> (fresh account or one whose application is pending/rejected).</li>
+              <li>Attempt <code>POST bookings/confirm/</code> via the booking flow UI.</li>
+            </ol>
+            <div class="expect">Expect: request is rejected with 403 and a <code>verification_required</code> code; the UI surfaces a message pointing at verification, not a generic error.</div>
+          </div>
+        </div>
+        <div class="case">
+          <label class="case-title"><input type="checkbox" />Tutee without an application is allowed during the grace period</label>
+          <div class="case-body">
+            <ol>
+              <li>Unset <code>TUTEE_VERIFICATION_ENFORCEMENT_START_DATE</code> (or set it to a future date), restart backend.</li>
+              <li>Log in as a Tutee with no <code>TuteeApplication</code> at all.</li>
+              <li>Complete a booking through to confirmation.</li>
+            </ol>
+            <div class="expect">Expect: booking succeeds — no verification block while the grace period is active.</div>
+          </div>
+        </div>
+        <div class="case">
+          <label class="case-title"><input type="checkbox" />Renewal-due tutor can navigate freely but is blocked at accept-booking</label>
+          <div class="case-body">
+            <ol>
+              <li>Backdate an approved tutor's renewal clock (<code>reviewed_at</code> on the latest approved renewal review, or the application itself) by more than 90 days via shell/admin.</li>
+              <li>Log in as that tutor. Navigate around the app (dashboard, profile, messages, etc.) — no forced redirect.</li>
+              <li>Attempt <code>POST bookings/&lt;id&gt;/approve/</code> on a pending booking request.</li>
+            </ol>
+            <div class="expect">Expect: free navigation everywhere (the global lockout only applies to never-approved tutors); the accept action itself returns 403 with wording that does not say "renew" if the tutor was never approved, or correctly references renewal if they were previously approved and lapsed.</div>
+          </div>
+        </div>
+        <div class="case">
+          <label class="case-title"><input type="checkbox" />Never-approved tutor still hits the full-app lockout</label>
+          <div class="case-body">
+            <ol>
+              <li>Log in as a tutor whose <code>TutorApplication</code> has never been approved (pending or rejected, no prior approval history).</li>
+              <li>Try navigating to any authenticated route other than <code>/application-status</code>.</li>
+            </ol>
+            <div class="expect">Expect: router redirects to <code>/application-status</code> (the router-level lockout is narrowed to this case only, per Phase 2).</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="phase" data-phase="3">
+        <div class="phase-head">
+          <h2>Phase 3 — Application status UI & admin queue</h2>
+          <span class="badge">Frontend</span>
+        </div>
+        <div class="case">
+          <label class="case-title"><input type="checkbox" />Tutee first-time document submission on /application-status</label>
+          <div class="case-body">
+            <ol>
+              <li>Log in as a Tutee with no <code>TuteeApplication</code> yet.</li>
+              <li>Navigate to <code>/application-status</code>.</li>
+              <li>Submit school ID + enrollment proof through the first-submission form (not the resubmit form).</li>
+            </ol>
+            <div class="expect">Expect: a genuine first-submission path is shown (distinct from tutor registration, since tutees don't submit documents at signup); after submit, status flips to pending and the page reflects it without a full reload.</div>
+          </div>
+        </div>
+        <div class="case">
+          <label class="case-title"><input type="checkbox" />Tutor and tutee both see /application-status correctly generalized</label>
+          <div class="case-body">
+            <ol>
+              <li>Visit <code>/application-status</code> as a Tutor with a pending/rejected application, then as a Tutee in the same state.</li>
+            </ol>
+            <div class="expect">Expect: same route/component serves both roles with role-correct copy and actions (resubmit for existing applications, first-submission for tutees with none).</div>
+          </div>
+        </div>
+        <div class="case">
+          <label class="case-title"><input type="checkbox" />VerificationStatusCard renders on both profile views</label>
+          <div class="case-body">
+            <ol>
+              <li>Visit <code>TuteeProfile.vue</code> (tutee's own profile) — confirm the verification status card appears with the correct current status/renewal due date.</li>
+              <li>Visit <code>TutorProfile.vue</code> — confirm the same card appears, and that the previously-hardcoded "Verified" badge is now conditional (does not contradict the card when the tutor is actually unverified/due).</li>
+            </ol>
+            <div class="expect">Expect: no conflicting verification signals on either profile page.</div>
+          </div>
+        </div>
+        <div class="case">
+          <label class="case-title"><input type="checkbox" />Admin review queue: Tutor/Tutee role tabs</label>
+          <div class="case-body">
+            <ol>
+              <li>Log in as Admin or SuperAdmin, go to <code>/admin/tutor-applications</code>.</li>
+              <li>Confirm two tabs: <b>Tutors</b> and <b>Tutees</b>.</li>
+              <li>Switch to the Tutees tab — confirm it lists tutee submissions (not tutor rows), with columns matching the tutor tab's shape (status, renewal due date, etc.).</li>
+            </ol>
+            <div class="expect">Expect: tutor tab behavior is unchanged from before Phase 3; tutee tab is populated and independently filterable.</div>
+          </div>
+        </div>
+        <div class="case">
+          <label class="case-title"><input type="checkbox" />Admin approve/reject works for tutee applications</label>
+          <div class="case-body">
+            <ol>
+              <li>On the Tutees tab, open a pending application's detail offcanvas.</li>
+              <li>Approve one tutee application; reject another (with a reason).</li>
+            </ol>
+            <div class="expect">Expect: status updates reflect immediately in the queue; the tutee sees the new status on their own <code>/application-status</code> page and profile card on next load.</div>
+          </div>
+        </div>
+        <div class="case">
+          <label class="case-title"><input type="checkbox" />Tutee renewal review flow (approve/reject) mirrors the tutor flow</label>
+          <div class="case-body">
+            <ol>
+              <li>Get a tutee into a "renewal due" or "renewal pending" state (backdate renewal clock, then have the tutee resubmit documents).</li>
+              <li>As Admin, approve or reject the renewal submission from the admin queue.</li>
+            </ol>
+            <div class="expect">Expect: renewal status updates correctly, dedup/reminder fields reset on approval, and the tutee's profile card reflects the new due date.</div>
+          </div>
+        </div>
+        <div class="case">
+          <label class="case-title"><input type="checkbox" />Tutee router gate blocks booking-flow navigation only when actually unverified</label>
+          <div class="case-body">
+            <ol>
+              <li>With enforcement active (past cutover date) and a tutee with no approved application, try navigating directly to a booking-flow route (e.g. Find Tutors / Initial Booking).</li>
+              <li>Repeat with enforcement inactive (grace period) — same tutee, same route.</li>
+            </ol>
+            <div class="expect">Expect: blocked (redirected) when enforced and unverified; allowed during the grace period.</div>
+          </div>
+        </div>
+      </section>
+
+      <button class="reset-btn" id="resetBtn">Reset all checkmarks</button>
+    </main>
+    <script>
+      const STORAGE_KEY = 'tutee-verification-test-guide-2026-07-02';
+      const boxes = Array.from(document.querySelectorAll('input[type="checkbox"]'));
+      const fill = document.getElementById('progressFill');
+      const label = document.getElementById('progressLabel');
+
+      function loadState() {
+        try {
+          const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+          boxes.forEach((box, i) => { box.checked = !!saved[i]; });
+        } catch (e) {}
+      }
+      function saveState() {
+        const state = {};
+        boxes.forEach((box, i) => { state[i] = box.checked; });
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      }
+      function updateProgress() {
+        const checked = boxes.filter((b) => b.checked).length;
+        const pct = boxes.length ? Math.round((checked / boxes.length) * 100) : 0;
+        fill.style.width = pct + '%';
+        label.textContent = checked + ' / ' + boxes.length + ' checked';
+      }
+      boxes.forEach((box) => {
+        box.addEventListener('change', () => { saveState(); updateProgress(); });
+      });
+      document.getElementById('resetBtn').addEventListener('click', () => {
+        boxes.forEach((box) => (box.checked = false));
+        saveState();
+        updateProgress();
+      });
+      loadState();
+      updateProgress();
+    </script>
+  </body>
+</html>

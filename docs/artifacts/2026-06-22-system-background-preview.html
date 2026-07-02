@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>System Background — Current vs Proposed</title>
+<style>
+  /* ===== Light theme tokens (from src/assets/main.css :root) ===== */
+  :root {
+    --sb-primary: #00895A;
+    --sb-primary-mid: #18A36C;
+    --sb-pop-yellow: #FFC94D;
+    --sb-pop-orange: #FF8A5C;
+    --sb-pop-pink: #FF8FA3;
+    --sb-aurora-violet: #8E7CF4;
+    --sb-aurora-wash-start: #F1FAF6;
+    --sb-aurora-wash-end: #FDF9F1;
+    --sb-bg: #F8F9FA;
+    --sb-bg-gradient: linear-gradient(135deg, #f7fbf8 0%, #eef8f3 44%, #f7fbf8 100%);
+    --sb-aurora-bg:
+      radial-gradient(circle at 8% -8%, rgba(0, 137, 90, 0.22), transparent 34%),
+      radial-gradient(circle at 52% -10%, rgba(103, 197, 220, 0.23), transparent 38%),
+      radial-gradient(circle at 100% 8%, rgba(148, 211, 181, 0.24), transparent 34%),
+      radial-gradient(circle at 84% 88%, rgba(255, 218, 137, 0.22), transparent 32%);
+    --sb-card-bg: #ffffff;
+    --sb-card-border: #EAEAEA;
+    --sb-text-main: #163127;
+    --sb-text-muted: #6B7280;
+    --sb-primary-contrast: #ffffff;
+  }
+  /* ===== Dark theme tokens ([data-theme="dark"]) ===== */
+  [data-theme="dark"] {
+    --sb-primary: #86B7A3;
+    --sb-primary-mid: #9BC8B6;
+    --sb-pop-yellow: #8F742F;
+    --sb-pop-orange: #8B4C38;
+    --sb-pop-pink: #8C5662;
+    --sb-aurora-violet: #6155A8;
+    --sb-aurora-wash-start: #071310;
+    --sb-aurora-wash-end: #0B0F0E;
+    --sb-bg: #050807;
+    --sb-bg-gradient: linear-gradient(135deg, #050807 0%, #08100d 48%, #030504 100%);
+    --sb-aurora-bg:
+      radial-gradient(circle at 9% -4%, rgba(134, 183, 163, 0.22), transparent 34%),
+      radial-gradient(circle at 98% 12%, rgba(76, 201, 240, 0.12), transparent 34%),
+      radial-gradient(circle at 78% 86%, rgba(134, 183, 163, 0.10), transparent 34%);
+    --sb-card-bg: #0C1110;
+    --sb-card-border: #1B2A25;
+    --sb-text-main: #F3F7F5;
+    --sb-text-muted: #9fb1a8;
+    --sb-primary-contrast: #071310;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: Inter, system-ui, -apple-system, sans-serif;
+    background: #2a2a2a;
+    color: #eee;
+  }
+  .toolbar {
+    position: sticky; top: 0; z-index: 50;
+    display: flex; gap: 12px; align-items: center;
+    padding: 12px 20px; background: #1c1c1c;
+    border-bottom: 1px solid #333;
+  }
+  .toolbar h1 { font-size: 15px; margin: 0; font-weight: 600; }
+  .toolbar .spacer { flex: 1; }
+  .toolbar button {
+    border: 1px solid #555; background: #333; color: #eee;
+    padding: 7px 14px; border-radius: 8px; cursor: pointer; font-size: 13px;
+  }
+  .toolbar button.active { background: var(--sb-primary, #00895A); border-color: transparent; color: #fff; }
+  .grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #333;
+  }
+  .pane { position: relative; height: 78vh; overflow-y: auto; background: var(--sb-bg); }
+  .pane-label {
+    position: sticky; top: 0; z-index: 10;
+    padding: 8px 14px; font-size: 12px; font-weight: 600; letter-spacing: .03em;
+    background: rgba(0,0,0,.55); color: #fff; backdrop-filter: blur(6px);
+  }
+  .pane-label .bad { color: #ff8a8a; }
+  .pane-label .good { color: #8affc0; }
+
+  /* ====== CURRENT system background (the seam bug) ====== */
+  .cur-app {
+    position: relative; min-height: 1100px;
+    background: var(--sb-bg-gradient);
+  }
+  .cur-app::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0;
+    height: 680px; background: var(--sb-aurora-bg); z-index: 0; pointer-events: none;
+  }
+
+  /* ====== PROPOSED system background (landing-style, seamless) ====== */
+  .new-app { position: relative; min-height: 1100px; background: transparent; }
+  .new-bgwash {
+    position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden;
+    background: linear-gradient(180deg, var(--sb-aurora-wash-start) 0%, var(--sb-bg) 42%, var(--sb-aurora-wash-end) 100%);
+  }
+  .new-bgwash i { position: absolute; display: block; }
+  .new-bgwash .b1 {
+    left: -25%; top: -14%; width: 150%; height: 58%;
+    background:
+      radial-gradient(42% 58% at 28% 52%, color-mix(in srgb, var(--sb-primary) 18%, transparent), transparent 70%),
+      radial-gradient(36% 52% at 55% 44%, color-mix(in srgb, var(--sb-primary-mid) 15%, transparent), transparent 70%),
+      radial-gradient(30% 50% at 78% 56%, color-mix(in srgb, var(--sb-pop-yellow) 13%, transparent), transparent 70%);
+  }
+  .new-bgwash .b2 {
+    right: -30%; top: 30%; width: 135%; height: 50%;
+    background:
+      radial-gradient(40% 55% at 35% 50%, color-mix(in srgb, var(--sb-aurora-violet) 11%, transparent), transparent 70%),
+      radial-gradient(34% 52% at 62% 46%, color-mix(in srgb, var(--sb-pop-pink) 13%, transparent), transparent 70%);
+  }
+  .new-bgwash .b3 {
+    left: -22%; bottom: -18%; width: 145%; height: 52%;
+    background:
+      radial-gradient(40% 55% at 30% 50%, color-mix(in srgb, var(--sb-pop-orange) 11%, transparent), transparent 70%),
+      radial-gradient(38% 55% at 64% 46%, color-mix(in srgb, var(--sb-primary) 14%, transparent), transparent 70%);
+  }
+
+  /* ====== shared mock content ====== */
+  .content { position: relative; z-index: 1; padding: 40px 24px; }
+  .topbrand { display: flex; align-items: center; gap: 9px; font-weight: 700; color: var(--sb-text-main); font-size: 14px; }
+  .mark { width: 24px; height: 24px; border-radius: 50%; background: var(--sb-primary); color: var(--sb-primary-contrast); display: inline-flex; align-items: center; justify-content: center; font-size: 12px; }
+  .auth-card {
+    max-width: 420px; margin: 60px auto;
+    background: var(--sb-card-bg); border: 1px solid var(--sb-card-border);
+    border-radius: 18px; padding: 32px; box-shadow: 0 2px 16px rgba(0,0,0,.06);
+  }
+  .auth-card h2 { color: var(--sb-text-main); margin: 6px 0; font-size: 20px; }
+  .auth-card p { color: var(--sb-text-muted); font-size: 14px; margin: 0 0 20px; }
+  .field { display: block; width: 100%; padding: 11px 14px; border-radius: 12px; border: 1px solid var(--sb-card-border); background: var(--sb-card-bg); color: var(--sb-text-main); margin-bottom: 14px; }
+  .btn { display: block; width: 100%; padding: 12px; border: none; border-radius: 999px; background: var(--sb-primary); color: var(--sb-primary-contrast); font-weight: 600; cursor: pointer; }
+  .note { max-width: 640px; margin: 30px auto; color: var(--sb-text-muted); font-size: 13px; text-align: center; }
+  .filler-card { max-width: 640px; margin: 18px auto; background: var(--sb-card-bg); border: 1px solid var(--sb-card-border); border-radius: 14px; padding: 18px 20px; color: var(--sb-text-main); }
+</style>
+</head>
+<body>
+  <div class="toolbar">
+    <h1>System Background — Current vs Proposed</h1>
+    <div class="spacer"></div>
+    <span style="font-size:12px;color:#aaa">Scroll each pane to ~700px to see the seam</span>
+    <button id="lightBtn" class="active">Light</button>
+    <button id="darkBtn">Dark</button>
+  </div>
+
+  <div class="grid">
+    <div class="pane">
+      <div class="pane-label"><span class="bad">CURRENT</span> — body gradient + 680px aurora overlay (hard seam at 680px)</div>
+      <div class="cur-app">
+        <div class="content">
+          <div class="topbrand"><span class="mark">S</span> StudyBuddy</div>
+          <div class="auth-card">
+            <h2>Welcome Back</h2>
+            <p>Log in to your StudyBuddy account</p>
+            <input class="field" placeholder="you@university.edu" />
+            <input class="field" type="password" placeholder="********" />
+            <button class="btn">Sign In</button>
+          </div>
+          <div class="note">Keep scrolling. At 680px the aurora layer stops abruptly — that hard horizontal line is the seam from the screenshot.</div>
+          <div class="filler-card">Content block A</div>
+          <div class="filler-card">Content block B</div>
+          <div class="filler-card">Content block C</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pane">
+      <div class="pane-label"><span class="good">PROPOSED</span> — landing-style fixed wash + soft blobs (seamless, palette matches landing)</div>
+      <div class="new-app">
+        <div class="new-bgwash"><i class="b1"></i><i class="b2"></i><i class="b3"></i></div>
+        <div class="content">
+          <div class="topbrand"><span class="mark">S</span> StudyBuddy</div>
+          <div class="auth-card">
+            <h2>Welcome Back</h2>
+            <p>Log in to your StudyBuddy account</p>
+            <input class="field" placeholder="you@university.edu" />
+            <input class="field" type="password" placeholder="********" />
+            <button class="btn">Sign In</button>
+          </div>
+          <div class="note">No seam at any scroll position. Same green / mid-green / yellow / violet / pink / orange wash as the landing page.</div>
+          <div class="filler-card">Content block A</div>
+          <div class="filler-card">Content block B</div>
+          <div class="filler-card">Content block C</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+  const root = document.documentElement;
+  const lb = document.getElementById('lightBtn');
+  const db = document.getElementById('darkBtn');
+  function setTheme(t) {
+    if (t === 'dark') root.setAttribute('data-theme', 'dark');
+    else root.removeAttribute('data-theme');
+    db.classList.toggle('active', t === 'dark');
+    lb.classList.toggle('active', t !== 'dark');
+  }
+  lb.onclick = () => setTheme('light');
+  db.onclick = () => setTheme('dark');
+</script>
+</body>
+</html>

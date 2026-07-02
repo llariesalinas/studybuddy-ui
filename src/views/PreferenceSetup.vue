@@ -27,7 +27,7 @@
             <div class="row g-3">
               <div class="col-6" v-for="level in educationLevels" :key="level.value">
                 <div
-                  class="card sb-card-surface border rounded-4 p-4 text-center h-100 select-card sb-interactive"
+                  class="card sb-card-surface border rounded-4 p-4 text-center h-100 select-card sb-interactive sb-elevated"
                   :class="educationLevel === level.value
                     ? 'border-success bg-success bg-opacity-10 shadow-sm'
                     : ''"
@@ -62,7 +62,7 @@
               <div class="row g-3">
                 <div class="col-4" v-for="g in elementaryGrades" :key="g.value">
                   <div
-                    class="card sb-card-surface border rounded-4 p-3 text-center select-card sb-interactive"
+                    class="card sb-card-surface border rounded-4 p-3 text-center select-card sb-interactive sb-elevated"
                     :class="selectedGrade === g.value
                       ? 'border-success bg-success bg-opacity-10 shadow-sm'
                       : ''"
@@ -83,7 +83,7 @@
               <div class="row g-3">
                 <div class="col-6" v-for="g in jhsGrades" :key="g.value">
                   <div
-                    class="card sb-card-surface border rounded-4 p-4 text-center select-card sb-interactive"
+                    class="card sb-card-surface border rounded-4 p-4 text-center select-card sb-interactive sb-elevated"
                     :class="selectedGrade === g.value
                       ? 'border-success bg-success bg-opacity-10 shadow-sm'
                       : ''"
@@ -104,7 +104,7 @@
               <div class="row g-3 mb-3">
                 <div class="col-6" v-for="s in shsStrands" :key="s.value">
                   <div
-                    class="card sb-card-surface border rounded-4 p-4 text-center select-card sb-interactive"
+                    class="card sb-card-surface border rounded-4 p-4 text-center select-card sb-interactive sb-elevated"
                     :class="selectedStrand === s.value
                       ? 'border-success bg-success bg-opacity-10 shadow-sm'
                       : ''"
@@ -120,7 +120,7 @@
                 <div class="d-flex gap-3">
                   <div
                     v-for="g in shsGrades" :key="g.value"
-                    class="card sb-card-surface border rounded-3 p-3 text-center flex-grow-1 select-card sb-interactive"
+                    class="card sb-card-surface border rounded-3 p-3 text-center flex-grow-1 select-card sb-interactive sb-elevated"
                     :class="selectedGrade === g.value
                       ? 'border-success bg-success bg-opacity-10'
                       : ''"
@@ -155,7 +155,7 @@
                 <div class="row g-2">
                   <div class="col-3" v-for="y in collegeYears" :key="y.value">
                     <div
-                      class="card sb-card-surface border rounded-3 p-3 text-center select-card sb-interactive"
+                      class="card sb-card-surface border rounded-3 p-3 text-center select-card sb-interactive sb-elevated"
                       :class="selectedCollegeYear === y.value
                         ? 'border-success bg-success bg-opacity-10'
                         : ''"
@@ -204,7 +204,7 @@
               <div class="col-12" v-for="subject in filteredSubjects" :key="subject.subject_code">
                 <div
                   class="card sb-card-surface border rounded-3 p-3 d-flex flex-row align-items-center
-                         justify-content-between select-card sb-interactive"
+                         justify-content-between select-card sb-interactive sb-elevated"
                   :class="store.selectedSubjects.includes(subject.subject_code)
                     ? 'border-success bg-success bg-opacity-10 shadow-sm'
                     : ''"
@@ -458,7 +458,7 @@ const finish = async () => {
 <style scoped>
 .select-card {
   cursor: pointer;
-  transition: all 0.2s ease-in-out;
+  transition: transform var(--sb-t-normal) var(--sb-spring);
 }
 .select-card:hover {
   border-color: #198754 !important;

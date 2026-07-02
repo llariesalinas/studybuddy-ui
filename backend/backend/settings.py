@@ -246,6 +246,22 @@ else:
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024   # 10 MB hard ceiling on non-file POST data
 FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024    # 5 MB — files above this go to temp disk
 
+# Per-file size cap applied to tutor application documents and avatar uploads.
+# Mirrored in the frontend as MAX_DOCUMENT_UPLOAD_SIZE_BYTES (src/config.js) — keep in sync.
+MAX_DOCUMENT_UPLOAD_SIZE = 5 * 1024 * 1024  # 5 MB
+
+# Tutee enrollment verification booking gate (docs/plans/2026-07-01-tutee-verification-phase2-gate.md).
+# Existing tutees get a one-time, global 30-day grace period before new-booking creation is gated on
+# their document verification status. Unset by default — a fresh clone/CI run must never start gating
+# tutees just because wall-clock time passed some hardcoded date. Set the env var once, to (actual
+# rollout date + 30 days), at deploy time.
+TUTEE_VERIFICATION_ENFORCEMENT_START_DATE = os.getenv('TUTEE_VERIFICATION_ENFORCEMENT_START_DATE')
+
+# Enables the self-service verification dev panel (state jumper + enforcement override) and the
+# SuperAdmin verification dev tools. Defaults False so it is inert in production even if DEBUG is on;
+# the dev endpoints check this flag before any work and 403 when it is off.
+VERIFICATION_DEV_TOOLS_ENABLED = env_bool('VERIFICATION_DEV_TOOLS_ENABLED', False)
+
 PASSWORD_RESET_TIMEOUT = 3600
 LOGIN_OTP_TTL_SECONDS = 600
 LOGIN_OTP_MAX_ATTEMPTS = 5
@@ -280,6 +296,10 @@ Q_CLUSTER = {
     "catch_up": False,
     "label": "Django Q",
 }
+
+import sys
+if 'test' in sys.argv:
+    Q_CLUSTER["sync"] = True
 
 # Cache backend. Redis when REDIS_URL is set (preferred: fast and shared across
 # worker processes — required for correct invalidation in multi-worker prod).
@@ -338,5 +358,18 @@ PAYMONGO_CASHOUT_CALLBACK_URL = os.getenv("PAYMONGO_CASHOUT_CALLBACK_URL", "")
 # Shared secret appended to the cashout callback URL and verified on the inbound
 # callback. When set, callbacks without a matching ?token= are rejected.
 PAYMONGO_CASHOUT_CALLBACK_SECRET = os.getenv("PAYMONGO_CASHOUT_CALLBACK_SECRET", "")
+# Dev-only: simulate a successful PayMongo wallet transaction instead of calling the
+# live Money Movement API. PayMongo test mode has no payouts product, so this is the
+# only way to exercise cash-out locally. Must never be enabled in production.
+PAYMONGO_CASHOUT_MOCK = os.getenv("PAYMONGO_CASHOUT_MOCK", "false").lower() in ("1", "true", "yes")
+if PAYMONGO_CASHOUT_MOCK and not DEBUG:
+    import logging
+    logging.getLogger(__name__).warning(
+        "PAYMONGO_CASHOUT_MOCK is enabled with DEBUG=false. Cash-outs will be "
+        "simulated as successful without moving real money."
+    )
 CASHOUT_PROVIDER_FEE_PHP = os.getenv("CASHOUT_PROVIDER_FEE_PHP", "10")
-CASHOUT_MIN_PHP = os.getenv("CASHOUT_MIN_PHP", "500")
+CASHIN_MIN_PHP = os.getenv("CASHIN_MIN_PHP", "50")
+CASHOUT_MIN_PHP = os.getenv("CASHOUT_MIN_PHP", "50")
+# InstaPay's real per-transaction cap (see ADR-0001) -- every cash-out uses InstaPay now.
+CASHOUT_MAX_PHP = os.getenv("CASHOUT_MAX_PHP", "50000")

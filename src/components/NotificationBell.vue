@@ -144,7 +144,7 @@ onBeforeUnmount(() => {
   height: 52px;
   color: #153326;
   box-shadow: 0 12px 24px rgba(15, 23, 42, 0.06);
-  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  transition: transform var(--sb-t-normal) var(--sb-spring);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -235,7 +235,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  transition: background-color 0.18s ease;
+  transition: none;
 }
 
 .notification-item:hover {

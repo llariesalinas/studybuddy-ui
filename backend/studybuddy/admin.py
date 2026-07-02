@@ -2,6 +2,8 @@ from django.contrib import admin
 from .models import (
     Booking,
     Course,
+    AdminAccountRequest,
+    InstitutionRequest,
     Notification,
     PartnerInstitution,
     Payment,
@@ -17,7 +19,6 @@ from .models import (
     UserProfile,
     Wallet,
     Transaction,
-    TutorPayoutAccount,
     WithdrawalRequest,
 )
 
@@ -35,11 +36,12 @@ admin.site.register(PaymentMethod)
 admin.site.register(Preference)
 admin.site.register(Strand)
 admin.site.register(Course)
+admin.site.register(InstitutionRequest)
+admin.site.register(AdminAccountRequest)
 
 
 admin.site.register(Wallet)
 admin.site.register(Transaction)
-admin.site.register(TutorPayoutAccount)
 
 
 @admin.register(WithdrawalRequest)
@@ -49,14 +51,13 @@ class WithdrawalRequestAdmin(admin.ModelAdmin):
         'amount',
         'provider_fee',
         'method',
-        'rail',
         'provider_status',
         'provider_reference_number',
         'status',
         'requested_at',
         'processed_at'
     )
-    list_filter = ('status', 'method', 'rail', 'provider_status')
+    list_filter = ('status', 'method', 'provider_status')
     search_fields = (
         'tutor__profile__fname',
         'tutor__profile__lname',

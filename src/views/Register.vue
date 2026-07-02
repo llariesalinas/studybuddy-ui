@@ -14,7 +14,7 @@
         <input
           type="text"
           v-model="store.newUserFname"
-          class="sb-auth-input"
+          class="sb-auth-input sb-field"
           placeholder="Juan"
           required
         />
@@ -25,7 +25,7 @@
         <input
           type="text"
           v-model="store.newUserMname"
-          class="sb-auth-input"
+          class="sb-auth-input sb-field"
           placeholder="Optional"
         />
       </div>
@@ -35,7 +35,7 @@
         <input
           type="text"
           v-model="store.newUserLname"
-          class="sb-auth-input"
+          class="sb-auth-input sb-field"
           placeholder="Dela Cruz"
           required
         />
@@ -46,7 +46,7 @@
         <input
           type="email"
           v-model="store.newUserEmail"
-          class="sb-auth-input"
+          class="sb-auth-input sb-field"
           placeholder="you@university.edu"
           required
         />
@@ -74,7 +74,7 @@
         <input
           type="password"
           v-model="store.newUserPassword"
-          class="sb-auth-input"
+          class="sb-auth-input sb-field"
           placeholder="••••••••"
           required
         />
@@ -91,7 +91,7 @@
         />
       </div>
 
-      <button type="submit" class="sb-btn-pill sb-auth-submit" :disabled="isSubmitting">
+      <button type="submit" class="sb-btn-pill sb-auth-submit sb-btn sb-elevated sb-elevated--brand" :disabled="isSubmitting">
         <span v-if="isSubmitting" class="sb-spinner" aria-hidden="true"></span>
         {{ isSubmitting ? 'Processing...' : 'Create Account' }}
       </button>
@@ -328,9 +328,7 @@ onMounted(() => {
   background: var(--sb-surface);
   color: var(--sb-text-main);
   outline: none;
-  transition:
-    border-color 0.15s ease,
-    box-shadow 0.15s ease;
+  transition: none;
   appearance: none;
 }
 
@@ -376,22 +374,11 @@ onMounted(() => {
   font-weight: 500;
   border: none;
   cursor: pointer;
-  transition:
-    background 0.15s ease,
-    transform 0.15s ease;
+  transition: transform var(--sb-t-normal) var(--sb-spring);
 }
 
 .sb-btn-pill:hover:not(:disabled) {
   background: var(--sb-primary-hover);
-}
-
-.sb-btn-pill:active:not(:disabled) {
-  transform: scale(0.95);
-}
-
-.sb-btn-pill:disabled {
-  opacity: 0.65;
-  cursor: not-allowed;
 }
 
 .sb-auth-submit {

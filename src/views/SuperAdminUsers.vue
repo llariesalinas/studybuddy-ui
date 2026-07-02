@@ -1,66 +1,104 @@
 <template>
-  <div class="superadmin-users p-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-      <h3 class="mb-0">All Users</h3>
-      <div class="d-flex gap-2">
+  <div class="superadmin-users">
+    <header class="users-header">
+      <div>
+        <p class="eyebrow">Directory</p>
+        <h1>All Users</h1>
+      </div>
+      <div class="header-actions">
         <input
           v-model="filters.search"
           type="text"
-          class="form-control form-control-sm rounded-pill px-3"
-          placeholder="Search by name or email..."
-          style="width: 250px;"
+          class="search-input sb-field"
+          placeholder="Search name or email"
         >
-        <select v-model="filters.role" class="form-select form-select-sm rounded-pill" style="width: 140px;">
-          <option value="">All Roles</option>
-          <option value="Tutee">Tutee</option>
-          <option value="Tutor">Tutor</option>
-          <option value="Admin">Admin</option>
-          <option value="SuperAdmin">SuperAdmin</option>
-        </select>
-        <select v-model="filters.institution" class="form-select form-select-sm rounded-pill" style="width: 200px;">
-          <option value="">All Institutions</option>
-          <option v-for="inst in store.institutions" :key="inst.id" :value="inst.institution_name">
-            {{ inst.institution_name }}
-          </option>
-        </select>
-        <select v-model="filters.status" class="form-select form-select-sm rounded-pill" style="width: 130px;">
-          <option value="">All Status</option>
-          <option value="Active">Active</option>
-          <option value="Suspended">Suspended</option>
-        </select>
+        <button type="button" class="export-button" :disabled="store.loading.export" @click="exportUsers">
+          <i class="bi bi-download"></i>
+          Export CSV
+        </button>
       </div>
-    </div>
+    </header>
 
-    <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+    <section class="filter-row" aria-label="User filters">
+      <SbSelectModal
+        v-model="filters.role"
+        :options="roleFilterOptions"
+        title="Filter Role"
+        placeholder="All roles"
+        :searchable="false"
+        clearable
+        clear-label="All roles"
+        trigger-class="filter-trigger"
+      />
+      <SbSelectModal
+        v-model="filters.institution"
+        :options="institutionFilterOptions"
+        title="Filter Institution"
+        placeholder="All institutions"
+        searchable
+        clearable
+        clear-label="All institutions"
+        trigger-class="filter-trigger"
+      />
+      <SbSelectModal
+        v-model="filters.status"
+        :options="statusFilterOptions"
+        title="Filter Status"
+        placeholder="All statuses"
+        :searchable="false"
+        clearable
+        clear-label="All statuses"
+        trigger-class="filter-trigger"
+      />
+    </section>
+
+    <section v-if="store.adminAccountRequests.length" class="request-panel">
+      <div>
+        <p class="eyebrow">Admin account requests</p>
+        <h2>{{ store.adminAccountRequests.length }} pending request{{ store.adminAccountRequests.length === 1 ? '' : 's' }}</h2>
+      </div>
+      <div class="request-list">
+        <button
+          v-for="request in store.adminAccountRequests"
+          :key="request.id"
+          type="button"
+          class="request-chip"
+          :class="{ active: activeAdminRequest?.id === request.id }"
+          @click="selectAdminRequest(request)"
+        >
+          <i class="bi bi-person-badge"></i>
+          <span>{{ request.institution_name }}</span>
+          <small>{{ request.requesting_admin_name }}</small>
+        </button>
+      </div>
+      <button v-if="activeAdminRequest" type="button" class="clear-request" @click="activeAdminRequest = null">
+        <i class="bi bi-x-circle"></i>
+        Clear assignment mode
+      </button>
+    </section>
+
+    <section class="users-table-panel">
       <Transition name="fade" mode="out-in">
         <div v-if="store.loading.users && !store.users.length" class="table-responsive">
           <table class="table align-middle mb-0">
-            <thead class="bg-light">
+            <thead>
               <tr>
-                <th class="ps-4 py-3">User</th>
-                <th class="py-3">Role</th>
-                <th class="py-3">Institution</th>
-                <th class="py-3">Status</th>
-                <th class="py-3">Joined</th>
-                <th class="pe-4 py-3 text-end">Actions</th>
+                <th>User</th>
+                <th>Role</th>
+                <th>Institution</th>
+                <th>Status</th>
+                <th>Joined</th>
+                <th class="text-end">Actions</th>
               </tr>
             </thead>
             <tbody class="placeholder-glow">
-              <tr v-for="i in 6" :key="'sk-' + i">
-                <td class="ps-4">
-                  <div class="d-flex align-items-center">
-                    <div class="placeholder rounded-circle me-3" style="width: 32px; height: 32px;"></div>
-                    <div class="flex-grow-1">
-                      <p class="placeholder col-6 rounded mb-1"></p>
-                      <p class="placeholder col-4 rounded mb-0 small"></p>
-                    </div>
-                  </div>
-                </td>
+              <tr v-for="i in 7" :key="`user-sk-${i}`">
+                <td><span class="placeholder col-7 rounded"></span></td>
                 <td><span class="placeholder col-4 rounded"></span></td>
                 <td><span class="placeholder col-8 rounded"></span></td>
-                <td><span class="placeholder col-5 rounded-pill"></span></td>
-                <td><span class="placeholder col-6 rounded small"></span></td>
-                <td class="pe-4 text-end"><span class="placeholder col-6 rounded"></span></td>
+                <td><span class="placeholder col-5 rounded"></span></td>
+                <td><span class="placeholder col-6 rounded"></span></td>
+                <td class="text-end"><span class="placeholder col-5 rounded"></span></td>
               </tr>
             </tbody>
           </table>
@@ -68,148 +106,123 @@
 
         <div v-else class="table-responsive">
           <table class="table table-hover align-middle mb-0">
-            <thead class="bg-light">
+            <thead>
               <tr>
-                <th class="ps-4 py-3">User</th>
-                <th class="py-3">Role</th>
-                <th class="py-3">Institution</th>
-                <th class="py-3">Status</th>
-                <th class="py-3">Joined</th>
-                <th class="pe-4 py-3 text-end">Actions</th>
+                <th>User</th>
+                <th>Role</th>
+                <th>Institution</th>
+                <th>Status</th>
+                <th>Joined</th>
+                <th class="text-end">Actions</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="user in filteredUsers" :key="user.id">
-                <td class="ps-4">
-                  <div class="d-flex align-items-center">
-                    <div class="avatar-sm bg-primary-subtle text-primary rounded-circle d-flex align-items-center justify-content-center fw-bold me-3">
-                      {{ user.fname?.[0] }}{{ user.lname?.[0] }}
+                <td>
+                  <div class="user-cell">
+                    <div class="avatar-sm">
+                      <img v-if="user.profile_picture_url" :src="user.profile_picture_url" alt="">
+                      <span v-else>{{ getInitials(user) }}</span>
                     </div>
                     <div>
-                      <p class="mb-0 fw-bold">{{ user.full_name }}</p>
-                      <p class="small text-muted mb-0">{{ user.email }}</p>
+                      <p>{{ user.full_name }}</p>
+                      <span>{{ user.email }}</span>
                     </div>
                   </div>
                 </td>
+                <td><span :class="getRoleBadgeClass(user.role)">{{ user.role }}</span></td>
+                <td>{{ user.institution_name || 'Unassigned' }}</td>
                 <td>
-                  <span :class="getRoleBadgeClass(user.role)">{{ user.role }}</span>
+                  <span :class="user.is_suspended ? 'status-badge is-danger' : 'status-badge is-success'">
+                    {{ user.is_suspended ? 'Suspended' : 'Active' }}
+                  </span>
                 </td>
-                <td class="small">{{ user.institution_name || 'N/A' }}</td>
-                <td>
-                  <span v-if="user.is_suspended" class="badge bg-danger-subtle text-danger rounded-pill px-3">Suspended</span>
-                  <span v-else class="badge bg-success-subtle text-success rounded-pill px-3">Active</span>
-                </td>
-                <td class="small text-muted">{{ formatDate(user.created_at) }}</td>
-                <td class="pe-4 text-end">
-                  <button @click="openDetail(user)" class="btn btn-sm btn-light rounded-circle sb-btn">
+                <td>{{ formatDate(user.created_at) }}</td>
+                <td class="text-end">
+                  <button
+                    v-if="activeAdminRequest"
+                    type="button"
+                    class="assign-button"
+                    :disabled="assigningUserId === user.id"
+                    @click="assignAdminRequest(user)"
+                  >
+                    Assign
+                  </button>
+                  <button v-else type="button" class="icon-action" aria-label="View user details" @click="openDetail(user)">
                     <i class="bi bi-eye"></i>
                   </button>
                 </td>
               </tr>
             </tbody>
           </table>
-          <div v-if="!filteredUsers.length" class="text-center py-5">
-            <i class="bi bi-people fs-1 d-block mb-2 text-muted"></i>
-            <p class="text-muted">No users found matching your filters.</p>
+
+          <div v-if="!filteredUsers.length" class="empty-state">
+            <i class="bi bi-people"></i>
+            <p>No users found matching your filters.</p>
           </div>
         </div>
       </Transition>
-    </div>
+    </section>
 
-    <!-- Detail Side Panel -->
-    <div class="offcanvas offcanvas-end border-0 shadow" :class="{ show: selectedUser }" tabindex="-1" style="width: 450px;">
-      <div class="offcanvas-header bg-light">
-        <h5 class="offcanvas-title fw-bold">User Details</h5>
-        <button @click="selectedUser = null" type="button" class="btn-close shadow-none"></button>
-      </div>
-      <div v-if="selectedUser" class="offcanvas-body">
-        <div class="text-center mb-4">
-          <div
-            class="avatar-lg bg-primary-subtle text-primary rounded-circle d-flex align-items-center justify-content-center fw-bold mx-auto mb-3"
-            style="width: 80px; height: 80px; font-size: 2rem;"
-          >
-            {{ selectedUser.fname?.[0] }}{{ selectedUser.lname?.[0] }}
-          </div>
-          <h4 class="fw-bold mb-1">{{ selectedUser.full_name }}</h4>
-          <p class="text-muted mb-3">{{ selectedUser.email }}</p>
-          <div class="d-flex justify-content-center gap-2">
-            <span :class="getRoleBadgeClass(selectedUser.role)">{{ selectedUser.role }}</span>
-            <span v-if="selectedUser.is_suspended" class="badge bg-danger rounded-pill px-3">Suspended</span>
-          </div>
-        </div>
-
-        <div class="card border-0 bg-light rounded-4 p-3 mb-4">
-          <h6 class="fw-bold mb-3 small text-muted">PROFILE INFORMATION</h6>
-          <div class="mb-2">
-            <p class="small text-muted mb-0">Institution</p>
-            <p class="fw-semibold">{{ selectedUser.institution_name || 'N/A' }}</p>
-          </div>
-          <div class="mb-2">
-            <p class="small text-muted mb-0">Registration Date</p>
-            <p class="fw-semibold">{{ formatDateFull(selectedUser.created_at) }}</p>
-          </div>
-          <div>
-            <p class="small text-muted mb-0">Profile Status</p>
-            <p :class="selectedUser.profile_completed ? 'text-success' : 'text-warning'" class="fw-semibold mb-0">
-              {{ selectedUser.profile_completed ? 'Completed' : 'Incomplete' }}
-            </p>
-          </div>
-        </div>
-
-        <div v-if="selectedUser.role === 'Tutor'" class="card border-0 bg-light rounded-4 p-3 mb-4">
-          <h6 class="fw-bold mb-3 small text-muted">TUTOR DATA</h6>
-          <div class="mb-2">
-            <p class="small text-muted mb-0">Wallet Balance</p>
-            <p class="fw-bold text-success fs-5">₱{{ selectedUser.wallet_balance?.toLocaleString() || '0.00' }}</p>
-          </div>
-          <div class="mb-0">
-            <p class="small text-muted mb-0">Standard Commission</p>
-            <p class="fw-semibold mb-0">10% (Platform Fixed)</p>
-          </div>
-        </div>
-
-        <div class="mt-4 pt-4 border-top">
-          <button
-            @click="toggleSuspension(selectedUser)"
-            :disabled="suspending"
-            class="btn w-100 mb-2 rounded-pill py-2 sb-btn"
-            :class="selectedUser.is_suspended ? 'btn-success' : 'btn-outline-danger'"
-          >
-            <span v-if="suspending" class="spinner-border spinner-border-sm me-2"></span>
-            {{ suspending ? 'Updating...' : selectedUser.is_suspended ? 'Reactivate Account' : 'Suspend Account' }}
-          </button>
-        </div>
-      </div>
-    </div>
-    <div v-if="selectedUser" @click="selectedUser = null" class="offcanvas-backdrop fade show"></div>
+    <SuperAdminUserModal
+      v-if="selectedUser"
+      :user="selectedUser"
+      :institutions="store.institutions"
+      @close="selectedUser = null"
+      @updated="handleUserUpdated"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
+import SbSelectModal from '@/components/SbSelectModal.vue'
+import SuperAdminUserModal from '@/components/SuperAdminUserModal.vue'
+import { useHaptics } from '@/composables/useHaptics'
 import { useSuperAdminStore } from '@/stores/superadmin'
 import { useToastStore } from '@/stores/toast'
 
 const store = useSuperAdminStore()
 const toastStore = useToastStore()
-const selectedUser = ref(null)
-const suspending = ref(false)
+const { vibrate, patterns } = useHaptics()
 
+const selectedUser = ref(null)
+const activeAdminRequest = ref(null)
+const assigningUserId = ref(null)
 const filters = reactive({ search: '', role: '', institution: '', status: '' })
 
-onMounted(() => {
-  store.fetchUsers({}, true)
-  store.fetchInstitutions()
-})
+const roleFilterOptions = [
+  { label: 'All roles', value: '' },
+  { label: 'Tutee', value: 'Tutee' },
+  { label: 'Tutor', value: 'Tutor' },
+  { label: 'Admin', value: 'Admin' },
+  { label: 'SuperAdmin', value: 'SuperAdmin' },
+]
+
+const statusFilterOptions = [
+  { label: 'All statuses', value: '' },
+  { label: 'Active', value: 'Active' },
+  { label: 'Suspended', value: 'Suspended' },
+]
+
+const institutionFilterOptions = computed(() => [
+  { label: 'All institutions', value: '' },
+  ...store.institutions.map((institution) => ({
+    label: institution.institution_name,
+    value: institution.id,
+    description: institution.school_email_domain,
+  })),
+])
 
 const filteredUsers = computed(() => {
-  return store.users.filter(user => {
+  return store.users.filter((user) => {
     const search = filters.search.toLowerCase()
     const matchesSearch = !search ||
       user.full_name?.toLowerCase().includes(search) ||
       user.email?.toLowerCase().includes(search)
     const matchesRole = !filters.role || user.role === filters.role
-    const matchesInstitution = !filters.institution || user.institution_name === filters.institution
+    const matchesInstitution = !filters.institution ||
+      String(user.institution || '') === String(filters.institution)
     const matchesStatus = !filters.status ||
       (filters.status === 'Active' && !user.is_suspended) ||
       (filters.status === 'Suspended' && user.is_suspended)
@@ -217,46 +230,341 @@ const filteredUsers = computed(() => {
   })
 })
 
-const getRoleBadgeClass = (role) => {
+onMounted(() => {
+  store.fetchUsers({}, true)
+  store.fetchInstitutions()
+  store.fetchAdminAccountRequests(true)
+})
+
+function openDetail(user) {
+  selectedUser.value = user
+  vibrate(patterns.light)
+}
+
+function handleUserUpdated(updatedUser) {
+  selectedUser.value = updatedUser
+}
+
+function selectAdminRequest(request) {
+  activeAdminRequest.value = request
+  filters.role = ''
+  filters.institution = request.institution || ''
+  vibrate(patterns.light)
+}
+
+async function assignAdminRequest(user) {
+  if (!activeAdminRequest.value) return
+
+  assigningUserId.value = user.id
+  vibrate(patterns.medium)
+
+  try {
+    await store.approveAdminAccountRequest(activeAdminRequest.value.id, user.id)
+    toastStore.push(`${user.full_name} is now an institution admin.`)
+    activeAdminRequest.value = null
+  } catch {
+    toastStore.push('Failed to approve admin account request.', 'error')
+  } finally {
+    assigningUserId.value = null
+  }
+}
+
+async function exportUsers() {
+  vibrate(patterns.light)
+  try {
+    await store.exportAnalyticsCsv({ period: 'all' })
+  } catch {
+    toastStore.push('Failed to export CSV.', 'error')
+  }
+}
+
+function getInitials(user) {
+  return `${user.fname?.[0] || ''}${user.lname?.[0] || ''}` || 'SB'
+}
+
+function getRoleBadgeClass(role) {
   switch (role) {
-    case 'SuperAdmin': return 'badge bg-dark rounded-pill px-3'
-    case 'Admin': return 'badge bg-secondary rounded-pill px-3'
-    case 'Tutor': return 'badge bg-primary rounded-pill px-3'
-    default: return 'badge bg-info-subtle text-info rounded-pill px-3'
+    case 'SuperAdmin':
+      return 'role-badge is-super'
+    case 'Admin':
+      return 'role-badge is-admin'
+    case 'Tutor':
+      return 'role-badge is-tutor'
+    default:
+      return 'role-badge is-tutee'
   }
 }
 
-const formatDate = (dateStr) => {
-  const date = new Date(dateStr)
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
-
-const formatDateFull = (dateStr) => {
-  const date = new Date(dateStr)
-  return date.toLocaleString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
-}
-
-const openDetail = (user) => { selectedUser.value = user }
-
-const toggleSuspension = async (user) => {
-  const action = user.is_suspended ? 'reactivate' : 'suspend'
-  if (confirm(`Are you sure you want to ${action} ${user.full_name}?`)) {
-    suspending.value = true
-    try {
-      await store.updateUserStatus(user.id, !user.is_suspended)
-    } catch {
-      toastStore.push('Failed to update user status.', 'error')
-    } finally {
-      suspending.value = false
-    }
-  }
+function formatDate(value) {
+  if (!value) return 'N/A'
+  return new Date(value).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
 }
 </script>
 
 <style scoped>
-.fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
-.fade-enter-from, .fade-leave-to { opacity: 0; }
-.avatar-sm { width: 32px; height: 32px; font-size: 0.8rem; }
-.superadmin-users .table thead th { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: none; }
-.superadmin-users .table tbody td { border-bottom: 1px solid #f8f9fa; }
+.fade-enter-active,
+.fade-leave-active { transition: opacity 0.2s ease; }
+.fade-enter-from,
+.fade-leave-to { opacity: 0; }
+
+.superadmin-users {
+  min-height: 100%;
+  padding: 24px;
+  color: var(--sb-text-main);
+}
+
+.users-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18px;
+  margin-bottom: 16px;
+}
+
+.eyebrow {
+  color: var(--sb-text-muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  margin: 0 0 4px;
+}
+
+h1 {
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1.15;
+  margin: 0;
+}
+
+h2 {
+  font-size: 18px;
+  font-weight: 800;
+  margin: 0;
+}
+
+.header-actions,
+.filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.search-input {
+  width: min(280px, 100%);
+  border: 1px solid var(--sb-card-border);
+  border-radius: 999px;
+  padding: 9px 16px;
+  outline: 0;
+}
+
+.search-input:focus {
+  border-color: var(--sb-primary);
+  box-shadow: 0 0 0 3px rgba(0, 137, 90, 0.12);
+}
+
+.export-button,
+.assign-button,
+.clear-request {
+  border: 0;
+  border-radius: 999px;
+  background: var(--sb-primary);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 9px 15px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.filter-row {
+  margin-bottom: 16px;
+}
+
+:deep(.filter-trigger) {
+  min-width: 170px;
+  border-radius: 999px;
+}
+
+.request-panel,
+.users-table-panel {
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--sb-card-border);
+  border-radius: 18px;
+  box-shadow: 0 12px 32px rgba(10, 25, 22, 0.06);
+}
+
+.request-panel {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1.2fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.request-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.request-chip {
+  border: 1px solid var(--sb-card-border);
+  background: #fff;
+  color: var(--sb-text-main);
+  border-radius: 999px;
+  padding: 8px 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.request-chip small {
+  color: var(--sb-text-muted);
+  font-weight: 600;
+}
+
+.request-chip.active {
+  border-color: var(--sb-primary);
+  background: #edf6f1;
+  color: var(--sb-primary);
+}
+
+.clear-request {
+  background: #fff;
+  border: 1px solid var(--sb-card-border);
+  color: var(--sb-text-main);
+}
+
+.users-table-panel {
+  overflow: hidden;
+}
+
+.table thead th {
+  color: var(--sb-text-muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  border: 0;
+  padding: 14px 20px;
+}
+
+.table tbody td {
+  border-color: var(--sb-card-border);
+  padding: 16px 20px;
+}
+
+.user-cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 220px;
+}
+
+.avatar-sm {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #edf6f1;
+  color: var(--sb-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 800;
+  overflow: hidden;
+  flex: 0 0 auto;
+}
+
+.avatar-sm img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.user-cell p {
+  margin: 0;
+  font-weight: 800;
+}
+
+.user-cell span,
+.table tbody td {
+  color: var(--sb-text-muted);
+}
+
+.role-badge,
+.status-badge {
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.role-badge.is-super { background: #111827; color: #fff; }
+.role-badge.is-admin { background: #f5f3ff; color: #5b21b6; }
+.role-badge.is-tutor { background: #edf6f1; color: var(--sb-primary); }
+.role-badge.is-tutee { background: #eff6ff; color: #1d4ed8; }
+.status-badge.is-success { background: #ecfdf5; color: #047857; }
+.status-badge.is-danger { background: #fef2f2; color: #991b1b; }
+
+.icon-action {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid var(--sb-card-border);
+  background: #fff;
+  color: var(--sb-text-main);
+}
+
+.assign-button:disabled,
+.export-button:disabled {
+  opacity: 0.65;
+}
+
+.empty-state {
+  text-align: center;
+  color: var(--sb-text-muted);
+  padding: 42px 16px;
+}
+
+.empty-state i {
+  display: block;
+  font-size: 36px;
+  color: var(--sb-primary);
+  margin-bottom: 8px;
+}
+
+@media (max-width: 980px) {
+  .users-header,
+  .request-panel {
+    grid-template-columns: 1fr;
+    display: grid;
+  }
+
+  .header-actions {
+    width: 100%;
+  }
+
+  .search-input {
+    width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .superadmin-users {
+    padding: 16px;
+  }
+
+  .filter-row :deep(.filter-trigger),
+  .export-button {
+    width: 100%;
+  }
+}
 </style>

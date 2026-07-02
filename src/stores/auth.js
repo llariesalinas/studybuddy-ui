@@ -147,6 +147,17 @@ export const useAuthStore = defineStore('auth', () => {
     })
 
     const normalizedRole = normalizeRole(authPayload.role)
+    const tutorRenewalStatus =
+      authPayload.tutor_renewal_status ||
+      authPayload.renewal_status ||
+      authPayload.document_renewal_status ||
+      null
+    const tutorRenewalRequired = Boolean(
+      authPayload.tutor_renewal_required ||
+      authPayload.renewal_required ||
+      authPayload.document_renewal_required ||
+      authPayload.needs_document_renewal
+    )
 
     user.value = {
       email: authPayload.email,
@@ -155,7 +166,10 @@ export const useAuthStore = defineStore('auth', () => {
       profile_id: Number(authPayload.profile_id),
       fname: authPayload.fname,
       lname: authPayload.lname,
-      application_status: authPayload.application_status || null
+      application_status: authPayload.application_status || null,
+      tutor_renewal_status: tutorRenewalStatus,
+      tutor_renewal_required: tutorRenewalRequired,
+      profile_picture_url: null
     }
 
     localStorage.setItem('user_role', normalizedRole)
@@ -165,6 +179,16 @@ export const useAuthStore = defineStore('auth', () => {
       localStorage.setItem('application_status', authPayload.application_status)
     } else {
       localStorage.removeItem('application_status')
+    }
+    if (tutorRenewalStatus) {
+      localStorage.setItem('tutor_renewal_status', tutorRenewalStatus)
+    } else {
+      localStorage.removeItem('tutor_renewal_status')
+    }
+    if (tutorRenewalRequired) {
+      localStorage.setItem('tutor_renewal_required', 'true')
+    } else {
+      localStorage.removeItem('tutor_renewal_required')
     }
     profileStore.resetProfileState()
 
@@ -228,10 +252,31 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('user_id')
     localStorage.removeItem('profile_id')
     localStorage.removeItem('application_status')
+    localStorage.removeItem('tutor_renewal_status')
+    localStorage.removeItem('tutor_renewal_required')
     findTutorsStore.reset()
 
     // Clear any persisted Pinia stores in sessionStorage to prevent data leaks across sessions
     sessionStorage.clear()
+  }
+
+  // Merge updated display fields into the current user so the app shell
+  // (greetings, avatar) reflects profile edits immediately, without a re-login.
+  const patchUserProfile = (partial = {}) => {
+    if (!user.value) {
+      return
+    }
+
+    const allowedFields = ['fname', 'lname', 'profile_picture_url']
+    const updates = {}
+
+    allowedFields.forEach((field) => {
+      if (field in partial) {
+        updates[field] = partial[field]
+      }
+    })
+
+    user.value = { ...user.value, ...updates }
   }
 
   const initializeAuth = () => {
@@ -249,11 +294,16 @@ export const useAuthStore = defineStore('auth', () => {
       const storedUserId = localStorage.getItem('user_id')
       const storedProfileId = localStorage.getItem('profile_id')
       const storedApplicationStatus = localStorage.getItem('application_status')
+      const storedTutorRenewalStatus = localStorage.getItem('tutor_renewal_status')
+      const storedTutorRenewalRequired =
+        localStorage.getItem('tutor_renewal_required') === 'true'
       user.value = {
         role: normalizeRole(storedRole),
         id: storedUserId ? parseInt(storedUserId) : undefined,
         profile_id: storedProfileId ? parseInt(storedProfileId) : undefined,
-        application_status: storedApplicationStatus || null
+        application_status: storedApplicationStatus || null,
+        tutor_renewal_status: storedTutorRenewalStatus || null,
+        tutor_renewal_required: storedTutorRenewalRequired
       }
     }
   }
@@ -270,6 +320,7 @@ export const useAuthStore = defineStore('auth', () => {
     completeLogin,
     login,
     logout,
+    patchUserProfile,
     initializeAuth
   }
 })

@@ -21,7 +21,16 @@
             </div>
 
             <div class="profile-header">
-              <div class="avatar-fallback">{{ tutorInitials }}</div>
+              <div class="avatar-shell">
+                <img
+                  v-if="tutorProfile.profilePictureUrl && !avatarLoadError"
+                  :src="tutorProfile.profilePictureUrl"
+                  class="avatar-img"
+                  alt="Tutor profile photo"
+                  @error="avatarLoadError = true"
+                >
+                <div v-else class="avatar-fallback">{{ tutorInitials }}</div>
+              </div>
 
               <div class="profile-copy">
                 <div class="name-row">
@@ -111,7 +120,7 @@
                       :disabled="slot.is_booked || day.is_past || !day.in_month || isSlotHeldBySelection(day, slot)"
                       @click="toggleSlot(day, currentWeek, slot)"
                     >
-                      {{ formatTime(day.date, slot.time_slot) }}
+                      {{ formatSlotRange(day.date, slot.time_slot) }}
                     </button>
 
                     <div
@@ -203,7 +212,7 @@
                 <input
                   type="text"
                   v-model="bookedSessionStore.bookedSessionLocation"
-                  class="form-control border-sb shadow-none py-2 rounded-3"
+                  class="form-control border-sb shadow-none py-2 rounded-3 sb-field"
                   placeholder="e.g. Library Room 3"
                   required
                 />
@@ -214,6 +223,9 @@
               <div class="cost-counter" :class="{ 'cost-counter-active': selectedSessionCount > 0 }">
                 <div class="cost-counter-header">Estimated Total</div>
                 <div class="cost-counter-amount">{{ formattedEstimatedCost }}</div>
+                <div v-if="sessionTimeRangeLabel" class="cost-counter-session">
+                  Session: {{ sessionTimeRangeLabel }}
+                </div>
                 <div class="cost-counter-meta">
                   {{ selectedSessionCount }} slot{{ selectedSessionCount === 1 ? '' : 's' }}
                   ({{ selectedSessionHours }} hour{{ selectedSessionHours === 1 ? '' : 's' }})
@@ -268,6 +280,7 @@ const selectedSlots = ref([])
 const monthAvailability = ref(null)
 const showFullSchedule = ref(false)
 const isSubmittingBooking = ref(false)
+const avatarLoadError = ref(false)
 const expandedSubjects = ref([])
 const isFavorite = ref(false)
 
@@ -291,6 +304,7 @@ const tutorDetails = ref({
   subjects: [],
   rating: 4.7,
   bio: '',
+  profile_picture_url: '',
   hourly_rate: 0,
   total_sessions: 124,
   response_time_label: '',
@@ -331,6 +345,7 @@ const currentWeekLabel = computed(() => {
 
 const tutorProfile = computed(() => ({
   name: tutorDetails.value.name || 'Tutor Name',
+  profilePictureUrl: tutorDetails.value.profile_picture_url || '',
   hourlyRate: Number(tutorDetails.value.hourly_rate) || 0,
   rating: Number(tutorDetails.value.rating) || 4.7,
   sessionCount: Number(tutorDetails.value.total_sessions) || 124,
@@ -357,7 +372,11 @@ const tutorProfile = computed(() => ({
 }))
 
 const tutorInitials = computed(() => {
-  const parts = tutorProfile.value.name.split(' ').filter(Boolean)
+  const parts = String(tutorProfile.value.name || '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+
   return parts.slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'SB'
 })
 
@@ -445,6 +464,15 @@ const estimatedCost = computed(() => selectedSessionHours.value * tutorProfile.v
 
 const formattedEstimatedCost = computed(() => currencyFormatter.format(estimatedCost.value))
 
+const sessionTimeRangeLabel = computed(() => {
+  if (!effectiveSelectedSlots.value.length) return ''
+
+  const first = effectiveSelectedSlots.value[0]
+  const last = effectiveSelectedSlots.value[effectiveSelectedSlots.value.length - 1]
+
+  return formatTimeRangeLabel(first.session_date, first.time_slot, addThirtyMinutes(last.time_slot))
+})
+
 const backButton = () => {
   router.back()
 }
@@ -484,6 +512,27 @@ function formatTime(dateString, time) {
     minute: '2-digit',
     hour12: true
   }).format(slotDate)
+}
+
+function formatTimeWithoutPeriod(dateString, time) {
+  return formatTime(dateString, time).replace(/\s?[AP]M$/i, '')
+}
+
+function getTimePeriod(time) {
+  const [hours] = time.split(':').map(Number)
+  return hours >= 12 ? 'PM' : 'AM'
+}
+
+function formatTimeRangeLabel(dateString, startTime, endTime) {
+  if (getTimePeriod(startTime) !== getTimePeriod(endTime)) {
+    return `${formatTime(dateString, startTime)} - ${formatTime(dateString, endTime)}`
+  }
+
+  return `${formatTimeWithoutPeriod(dateString, startTime)} - ${formatTime(dateString, endTime)}`
+}
+
+function formatSlotRange(dateString, time) {
+  return formatTimeRangeLabel(dateString, time, addThirtyMinutes(time))
 }
 
 function formatShortDay(dayName) {
@@ -528,12 +577,14 @@ function availabilityBarClass(day) {
 const getTutorDetails = async () => {
   try {
     const response = await api.get(`tutors/${tutorID}/`)
+    avatarLoadError.value = false
     tutorDetails.value = {
       profile_id: response.data.profile_id,
-      name: `${response.data.fname} ${response.data.lname}`,
+      name: [response.data.fname, response.data.lname].filter(Boolean).join(' '),
       subjects: Array.isArray(response.data.subjects) ? response.data.subjects : [],
       rating: response.data.rating_average ?? 4.7,
       bio: response.data.bio,
+      profile_picture_url: response.data.profile_picture_url || '',
       hourly_rate: response.data.hourly_rate ?? 350,
       total_sessions: response.data.total_sessions ?? 124,
       response_time_label: response.data.response_time_label || '',
@@ -814,7 +865,7 @@ onMounted(async () => {
   display: grid;
   place-items: center;
   cursor: pointer;
-  transition: all 150ms ease;
+  transition: transform var(--sb-t-normal) var(--sb-spring);
 }
 
 .action-btn:hover {
@@ -833,10 +884,25 @@ onMounted(async () => {
   align-items: start;
 }
 
+.avatar-shell,
+.avatar-img,
 .avatar-fallback {
   width: 88px;
   height: 88px;
   border-radius: 50%;
+}
+
+.avatar-shell {
+  overflow: hidden;
+  flex: 0 0 auto;
+}
+
+.avatar-img {
+  display: block;
+  object-fit: cover;
+}
+
+.avatar-fallback {
   display: grid;
   place-items: center;
   background: linear-gradient(135deg, #0a7a51, #15a36a);
@@ -963,7 +1029,7 @@ onMounted(async () => {
   border-radius: 14px;
   background: #edf6f1;
   color: #0a7a51;
-  transition: background-color 150ms ease, transform 150ms ease, box-shadow 150ms ease;
+  transition: transform var(--sb-t-normal) var(--sb-spring);
 }
 
 .week-nav-btn:hover:not(:disabled) {
@@ -1099,10 +1165,12 @@ onMounted(async () => {
   border-radius: 14px;
   background: #ffffff;
   color: #163127;
+  font-size: 0.82rem;
+  line-height: 1.25;
   font-weight: 600;
   text-align: left;
   cursor: pointer;
-  transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+  transition: transform var(--sb-t-normal) var(--sb-spring);
 }
 
 .slot-link:hover:not(:disabled) {
@@ -1245,7 +1313,7 @@ onMounted(async () => {
   color: #315447;
   font-weight: 600;
   text-align: left;
-  transition: background-color 150ms ease;
+  transition: none;
   cursor: pointer;
 }
 
@@ -1256,7 +1324,7 @@ onMounted(async () => {
 .subject-accordion-collapse {
   display: grid;
   grid-template-rows: 0fr;
-  transition: grid-template-rows 250ms ease-in-out;
+  transition: none;
 }
 
 .subject-accordion-collapse.is-expanded {
@@ -1303,6 +1371,13 @@ onMounted(async () => {
   font-weight: 800;
   line-height: 1.2;
   margin-top: 3px;
+}
+
+.cost-counter-session {
+  color: #0e4d35;
+  font-size: 0.86rem;
+  font-weight: 600;
+  margin-top: 6px;
 }
 
 .cost-counter-meta {

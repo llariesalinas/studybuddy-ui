@@ -39,6 +39,9 @@ Save each confirmed plan as its own markdown file in `docs/plans/` (`YYYY-MM-DD-
 `docs/plans/_template.md`, with frontmatter tracking `status` (Draft → Approved → In Progress → Done).
 Log every plan as a row in the `docs/plans/README.md` index, and write a completion note in
 `docs/session-summaries/` when the work ships. Document the plan before writing code.
+For Graphify upkeep, see `docs/learning/2026-06-09-graphify-studybuddy-workflow.md`: code changes use
+`graphify update .` or the post-commit hook, while new `docs/plans/` markdown needs a full `/graphify .`
+only when those docs should be semantically reflected in the graph.
 
 ## Commit & Pull Request Guidelines
 
@@ -47,6 +50,24 @@ Recent history mixes concise feature commits with conventional fixes, for exampl
 use `fix:` for bug fixes. Pull requests should include a summary, linked issue when available,
 screenshots for UI changes, migration notes for schema changes, and checks run (`npm run lint`,
 `npm run build`, `python manage.py test`).
+
+## Agent skills
+
+### Issue tracker
+
+Issues live as GitHub Issues on `llariesalinas/studybuddy-ui` (via the `gh` CLI); external PRs are
+not a triage surface. GitHub issues sit alongside the existing `docs/plans/` workflow rather than
+replacing it — see `docs/agents/issue-tracker.md` for how the two stay in sync.
+
+### Triage labels
+
+Canonical roles map 1:1 to label names (`needs-triage`, `needs-info`, `ready-for-agent`,
+`ready-for-human`, `wontfix`); only `wontfix` exists on the repo today. See
+`docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context layout: `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
 
 ## Security & Configuration Tips
 
