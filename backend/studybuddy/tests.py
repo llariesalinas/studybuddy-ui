@@ -5470,3 +5470,111 @@ class InstitutionScopedMatchingTests(APITestCase):
     def test_search_tutors_requires_authentication(self):
         resp = self.client.get("/api/search-tutors/", {"subject": "SCOPE101"})
         self.assertEqual(resp.status_code, 401)
+
+
+@override_settings(VERIFICATION_DEV_TOOLS_ENABLED=True)
+class VerificationDevToolsTests(APITestCase):
+    """Self-service verification dev tools — state jumper, enforcement override, gating.
+    See docs/plans/2026-07-02-verification-dev-tools.md."""
+
+    def setUp(self):
+        from . import _verification_dev
+
+        _verification_dev.enforcement_override_clear()
+        self.institution = PartnerInstitution.objects.create(
+            institution_name="CPU", school_email_domain="cpu.edu", is_active=True,
+        )
+        self.tutee = self._make_profile("devtools-tutee@cpu.edu", "Tutee")
+        self.tutor = self._make_profile("devtools-tutor@cpu.edu", "Tutor")
+
+    def tearDown(self):
+        from . import _verification_dev
+
+        _verification_dev.enforcement_override_clear()
+
+    def _make_profile(self, email, role):
+        user = User.objects.create_user(username=email, email=email, password="password")
+        return UserProfile.objects.create(
+            user=user, fname="Dev", mname="", lname=role, role=role, institution=self.institution,
+        )
+
+    # --- Helper: set_verification_state produces each state -----------------------------------
+
+    def _assert_state(self, profile, state, expected_app_status, expected_renewal_status):
+        from . import _verification_dev
+
+        _verification_dev.set_verification_state(profile, state)
+        related_name = "tutee_application" if profile.role == "Tutee" else "tutor_application"
+        # Re-fetch the profile so a just-deleted OneToOne reverse accessor re-evaluates cleanly.
+        profile = UserProfile.objects.get(pk=profile.pk)
+        app = getattr(profile, related_name, None)
+        if state == "not_submitted":
+            self.assertIsNone(app)
+            return
+        app.refresh_from_db()
+        self.assertEqual(app.application_status, expected_app_status)
+        self.assertEqual(app.document_renewal_status(), expected_renewal_status)
+
+    def test_set_state_all_seven_states_tutee(self):
+        cases = [
+            ("initial_pending", "pending", None),
+            ("initial_rejected", "rejected", None),
+            ("verified", "approved", "verified"),
+            ("renewal_due", "approved", "due"),
+            ("renewal_pending", "approved", "pending"),
+            ("renewal_rejected", "approved", "rejected"),
+            ("not_submitted", None, None),
+        ]
+        for state, app_status, renewal_status in cases:
+            with self.subTest(state=state):
+                self._assert_state(self.tutee, state, app_status, renewal_status)
+
+    def test_set_state_works_for_tutor(self):
+        self._assert_state(self.tutor, "renewal_due", "approved", "due")
+        self._assert_state(self.tutor, "verified", "approved", "verified")
+
+    # --- Enforcement override -----------------------------------------------------------------
+
+    def test_enforcement_override_flips_gate(self):
+        from .views import tutee_verification_enforced
+        from . import _verification_dev
+
+        self.assertFalse(tutee_verification_enforced())  # default: unset env
+        _verification_dev.enforcement_override_set(True)
+        self.assertTrue(tutee_verification_enforced())
+        _verification_dev.enforcement_override_set(False)
+        self.assertFalse(tutee_verification_enforced())
+        _verification_dev.enforcement_override_clear()
+        self.assertFalse(tutee_verification_enforced())
+
+    # --- Endpoints ----------------------------------------------------------------------------
+
+    def test_set_state_endpoint_updates_state(self):
+        self.client.force_authenticate(user=self.tutee.user)
+        resp = self.client.post("/api/dev/verification/set-state/", {"state": "renewal_due"})
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data["document_renewal_status"], "due")
+
+    def test_set_state_endpoint_rejects_bad_state(self):
+        self.client.force_authenticate(user=self.tutee.user)
+        resp = self.client.post("/api/dev/verification/set-state/", {"state": "bogus"})
+        self.assertEqual(resp.status_code, 400)
+
+    def test_enforcement_endpoint_sets_override(self):
+        self.client.force_authenticate(user=self.tutee.user)
+        resp = self.client.post("/api/dev/verification/enforcement/", {"mode": "on"})
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.data["tutee_verification_enforced"])
+        self.assertTrue(resp.data["enforcement_override"])
+
+    @override_settings(VERIFICATION_DEV_TOOLS_ENABLED=False)
+    def test_endpoints_403_when_flag_disabled(self):
+        self.client.force_authenticate(user=self.tutee.user)
+        self.assertEqual(self.client.get("/api/dev/verification/").status_code, 403)
+        self.assertEqual(
+            self.client.post("/api/dev/verification/set-state/", {"state": "verified"}).status_code,
+            403,
+        )
+
+    def test_readout_endpoint_requires_auth(self):
+        self.assertEqual(self.client.get("/api/dev/verification/").status_code, 401)

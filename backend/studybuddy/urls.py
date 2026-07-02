@@ -144,6 +144,10 @@ urlpatterns = [
     path('bookings/<int:booking_id>/verify-online-payment/', views.verify_online_payment),
     path('dev/bookings/<int:booking_id>/force-live/', views.dev_force_booking_live),
     path('dev/bookings/<int:booking_id>/clear-force-live/', views.dev_clear_booking_live),
+    # Self-service verification dev tools (gated in-view by VERIFICATION_DEV_TOOLS_ENABLED)
+    path('dev/verification/', views.dev_verification_readout),
+    path('dev/verification/set-state/', views.dev_verification_set_state),
+    path('dev/verification/enforcement/', views.dev_verification_set_enforcement),
     path('tutor/setup/', views.tutor_setup),
     path('recommend-tutors/', views.recommend_tutors_view),
     path('chat/', include('studybuddy.chat.urls')),

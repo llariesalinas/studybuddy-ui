@@ -257,6 +257,11 @@ MAX_DOCUMENT_UPLOAD_SIZE = 5 * 1024 * 1024  # 5 MB
 # rollout date + 30 days), at deploy time.
 TUTEE_VERIFICATION_ENFORCEMENT_START_DATE = os.getenv('TUTEE_VERIFICATION_ENFORCEMENT_START_DATE')
 
+# Enables the self-service verification dev panel (state jumper + enforcement override) and the
+# SuperAdmin verification dev tools. Defaults False so it is inert in production even if DEBUG is on;
+# the dev endpoints check this flag before any work and 403 when it is off.
+VERIFICATION_DEV_TOOLS_ENABLED = env_bool('VERIFICATION_DEV_TOOLS_ENABLED', False)
+
 PASSWORD_RESET_TIMEOUT = 3600
 LOGIN_OTP_TTL_SECONDS = 600
 LOGIN_OTP_MAX_ATTEMPTS = 5

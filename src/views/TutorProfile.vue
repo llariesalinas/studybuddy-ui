@@ -61,6 +61,7 @@
       </header>
 
       <VerificationStatusCard />
+      <VerificationDevPanel v-if="isDev" role="tutor" />
 
       <main class="profile-grid">
         <div class="profile-col">
@@ -551,6 +552,9 @@ import { useCatalogStore } from '@/stores/catalog'
 import { useToastStore } from '@/stores/toast'
 import { useProfileStore } from '@/stores/profile'
 import VerificationStatusCard from '@/components/VerificationStatusCard.vue'
+import VerificationDevPanel from '@/components/VerificationDevPanel.vue'
+
+const isDev = import.meta.env.DEV
 
 const router = useRouter()
 const authStore = useAuthStore()

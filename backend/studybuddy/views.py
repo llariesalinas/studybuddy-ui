@@ -60,6 +60,7 @@ from .recommender.dashboard import (
     get_dashboard_recommendations,
 )
 from django.core.cache import cache
+from . import _verification_dev
 from .models import Booking, Course, EmailOTPChallenge, Notification, PartnerInstitution, Payment, PaymentMethod, Preference, Rating, SessionCheckIn, Subjects, Tutor, TutorApplication, TutorAvailability, TutorAvailabilityOverride, TutorDocumentRenewalReview, TutorSubjects, Wallet, PlatformActivity, Transaction, TuteeApplication, TuteeDocumentRenewalReview
 from .serializers import (
     NotificationSerializer,
@@ -221,6 +222,13 @@ def tutee_verification_enforced():
     """True once the global grace-period cutover for tutee enrollment verification has passed.
     A single global date, not per-account, and unset (never enforced) by default — see
     docs/plans/2026-07-01-tutee-verification-phase2-gate.md."""
+    # Dev-only runtime override (self-service verification dev tools). Guarded by the flag so the
+    # production path does zero extra work — see docs/plans/2026-07-02-verification-dev-tools.md.
+    if settings.VERIFICATION_DEV_TOOLS_ENABLED:
+        override = _verification_dev.enforcement_override_get()
+        if override is not None:
+            return override
+
     cutover_str = settings.TUTEE_VERIFICATION_ENFORCEMENT_START_DATE
     if not cutover_str:
         return False
@@ -261,6 +269,81 @@ def can_create_new_booking(profile):
         application.application_status == 'approved'
         and application.document_renewal_status() == 'verified'
     )
+
+
+# --- Verification dev tools (self-service) ---------------------------------------------------------
+# Gated by settings.VERIFICATION_DEV_TOOLS_ENABLED, checked first in each view (403 when off) so the
+# endpoints are inert in production. Every action mutates only request.user's own application.
+# See docs/plans/2026-07-02-verification-dev-tools.md.
+
+def _verification_dev_readout(profile):
+    application = get_verification_application(profile)
+    due_at = application.document_renewal_due_at() if application else None
+    return {
+        "role": profile.role,
+        "role_has_verification": _verification_dev.role_has_verification(profile),
+        "application_status": application.application_status if application else None,
+        "document_renewal_status": application.document_renewal_status() if application else None,
+        "document_renewal_due_at": due_at.isoformat() if due_at else None,
+        "tutee_verification_enforced": tutee_verification_enforced(),
+        "enforcement_override": _verification_dev.enforcement_override_get(),
+        "available_states": list(_verification_dev.VERIFICATION_STATES),
+    }
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def dev_verification_readout(request):
+    if not settings.VERIFICATION_DEV_TOOLS_ENABLED:
+        return Response({"error": "Verification dev tools are disabled."}, status=403)
+    return Response(_verification_dev_readout(request.user.userprofile))
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def dev_verification_set_state(request):
+    if not settings.VERIFICATION_DEV_TOOLS_ENABLED:
+        return Response({"error": "Verification dev tools are disabled."}, status=403)
+
+    profile = request.user.userprofile
+    if not _verification_dev.role_has_verification(profile):
+        return Response({"error": f"Verification does not apply to role {profile.role}."}, status=400)
+
+    state = request.data.get("state")
+    if state not in _verification_dev.VERIFICATION_STATES:
+        return Response(
+            {"error": "Invalid state.", "available_states": list(_verification_dev.VERIFICATION_STATES)},
+            status=400,
+        )
+
+    with transaction.atomic():
+        _verification_dev.set_verification_state(profile, state)
+
+    PlatformActivity.objects.create(
+        activity_type='admin_action',
+        message=f"[DEV] {profile.fname} {profile.lname} set own verification state to '{state}'",
+        institution=profile.institution,
+    )
+    return Response(_verification_dev_readout(profile))
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def dev_verification_set_enforcement(request):
+    if not settings.VERIFICATION_DEV_TOOLS_ENABLED:
+        return Response({"error": "Verification dev tools are disabled."}, status=403)
+
+    mode = request.data.get("mode")
+    if mode == "on":
+        _verification_dev.enforcement_override_set(True)
+    elif mode == "off":
+        _verification_dev.enforcement_override_set(False)
+    elif mode == "clear":
+        _verification_dev.enforcement_override_clear()
+    else:
+        return Response({"error": "mode must be one of: on, off, clear."}, status=400)
+
+    return Response(_verification_dev_readout(request.user.userprofile))
 
 
 def build_admin_profile_defaults(user):
