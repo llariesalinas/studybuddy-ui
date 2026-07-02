@@ -169,6 +169,24 @@ def send_password_changed_email_task(user_id):
     )
 
 
+def send_document_renewal_reminder_email_task(user_id, role_label, days_remaining, due_at_iso):
+    user = User.objects.get(pk=user_id)
+    status_url = f"{settings.FRONTEND_URL.rstrip('/')}/application-status"
+    text_body, html_body = _render(
+        "document_renewal_reminder",
+        {"days_remaining": days_remaining, "due_at": due_at_iso, "status_url": status_url},
+    )
+    _deliver(
+        subject=f"Your StudyBuddy {role_label.capitalize()} verification renewal is due soon",
+        text_body=text_body,
+        html_body=html_body,
+        recipient=_recipient_for(user),
+        purpose=EmailSendLog.PURPOSE_DOCUMENT_RENEWAL_REMINDER,
+        timeout=settings.EMAIL_TIMEOUT,
+        max_attempts=1,
+    )
+
+
 # --- Enqueue helpers (called from views) ----------------------------------
 
 def enqueue_password_reset(user):
@@ -185,3 +203,16 @@ def enqueue_password_changed(user):
     """Queue a password-changed security notice. Not capped: users should always
     be told their password changed."""
     async_task("studybuddy.mailer.send_password_changed_email_task", user.id)
+
+
+def enqueue_document_renewal_reminder(profile, role_label, days_remaining, due_at):
+    """Queue a renewal-due reminder. Not capped: this is a one-per-window event driven by the
+    caller's own dedup fields (reminder_7day_sent_at/reminder_1day_sent_at), not user-triggerable
+    spam — same reasoning as enqueue_password_changed."""
+    async_task(
+        "studybuddy.mailer.send_document_renewal_reminder_email_task",
+        profile.user.id,
+        role_label,
+        days_remaining,
+        due_at.isoformat(),
+    )

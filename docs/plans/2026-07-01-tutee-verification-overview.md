@@ -1,7 +1,7 @@
 ---
 title: Tutee enrollment verification — overview
 date: 2026-07-01
-status: In Progress
+status: Done
 spec: ../session-summaries/2026-07-01-tutee-verification-handoff.md
 ---
 
@@ -15,12 +15,13 @@ spec: ../session-summaries/2026-07-01-tutee-verification-handoff.md
 <!-- LIVING SUMMARY: keep this section and the Changelog current on every edit -->
 ## Status & Progress Summary
 
-**Status: In Progress — Phases 1-3 Done. User has pre-approved starting Phase 4 next.**
+**Status: Done — all 4 phases implemented, tested, and verified. Phase 4 (scope expanded via grilling on
+2026-07-03 to also cover two small display/badge fixes found during that session) shipped 2026-07-03.**
 
 - [x] Phase 1 — Model & backend foundation ([plan](2026-07-01-tutee-verification-phase1-model.md))
 - [x] Phase 2 — Booking gate & forward-only enforcement ([plan](2026-07-01-tutee-verification-phase2-gate.md))
 - [x] Phase 3 — UI surfaces ([plan](2026-07-01-tutee-verification-phase3-ui.md))
-- [ ] Phase 4 — Email & dev tools ([plan](2026-07-01-tutee-verification-phase4-email-devtools.md))
+- [x] Phase 4 — Email & dev tools ([plan](2026-07-01-tutee-verification-phase4-email-devtools.md))
 
 Execute one phase at a time; do not start the next phase without explicit go-ahead, per this project's
 "one plan file per phase" convention. Each phase is independently testable and leaves the app working.
@@ -94,3 +95,17 @@ flow, apply rules symmetrically. Concretely:
   and fixed a real gap during verification: tutees have no application at signup (unlike tutors), so the
   status page needed a genuine initial-submission path, not just resubmission — `tutee_application_resubmit`
   now creates on first submit. User pre-approved proceeding directly to Phase 4 next.
+- 2026-07-03: A `/grill-with-docs` session (starting from an "admin has no manage-tutee-request screen"
+  report that turned out to be Phase 3 working as designed against an empty dev DB) audited the full
+  verification flow's frontend/backend/email coverage and found two small real gaps beyond Phase 4's
+  original scope: the pending-status page doesn't render document/motivation data it already fetches, and
+  `TutorDetails.vue`'s public "Verified" badge is unconditional. Both bundled into the Phase 4 plan file
+  (see its own Changelog for the locked design decisions) rather than split into new phase files. Phase 4
+  moved from Draft to Approved; still not implemented.
+- 2026-07-03: Phase 4 implemented, tested, and browser-verified (see its own Changelog for full detail):
+  generalized emails wired into every previously-silent tutor/tutee application and renewal decision path,
+  opportunistic 7-day/1-day renewal reminders, SuperAdmin dev tools, plus the two bundled fixes (pending-
+  status document display, binary `TutorDetails.vue` verified badge). 32 new backend tests green; one real
+  regression found and fixed during full-suite verification (a pre-existing test using the old
+  `get_document_review_context` signature); all other full-suite failures verified pre-existing and
+  unrelated via isolated re-runs. All 4 phases of this plan are now Done.

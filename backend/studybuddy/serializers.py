@@ -252,6 +252,7 @@ class TutorDetailSerializer(serializers.ModelSerializer):
     response_time_label = serializers.CharField(read_only=True)
     pinned_review_id = serializers.IntegerField(read_only=True)
     pinned_review = PinnedReviewSerializer(read_only=True)
+    is_verified = serializers.SerializerMethodField()
 
     class Meta:
         model = Tutor
@@ -268,7 +269,8 @@ class TutorDetailSerializer(serializers.ModelSerializer):
             'response_time',
             'response_time_label',
             'pinned_review_id',
-            'pinned_review'
+            'pinned_review',
+            'is_verified',
         ]
 
     def get_profile_picture_url(self, obj):
@@ -276,6 +278,19 @@ class TutorDetailSerializer(serializers.ModelSerializer):
         if obj.profile.profile_picture and request:
             return request.build_absolute_uri(obj.profile.profile_picture.url)
         return None
+
+    def get_is_verified(self, obj):
+        """Binary, hidden-unless-verified — see
+        docs/plans/2026-07-01-tutee-verification-phase4-email-devtools.md (Section 6). Only True
+        when the tutor's initial application is approved AND their renewal cycle (if any) is
+        currently 'verified', not just when an application row exists."""
+        application = getattr(obj.profile, 'tutor_application', None)
+        if application is None:
+            return False
+        return (
+            application.application_status == 'approved'
+            and application.document_renewal_status() == 'verified'
+        )
 
     def get_subjects(self, obj):
         tutor_subjects = obj.tutorsubjects_set.select_related('subject').all()

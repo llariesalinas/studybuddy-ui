@@ -35,7 +35,7 @@
               <div class="profile-copy">
                 <div class="name-row">
                   <h1 class="profile-name">{{ tutorProfile.name }}</h1>
-                  <span class="verified-badge">
+                  <span v-if="tutorProfile.isVerified" class="verified-badge">
                     <i class="bi bi-patch-check-fill"></i>
                     Verified
                   </span>
@@ -346,6 +346,7 @@ const currentWeekLabel = computed(() => {
 const tutorProfile = computed(() => ({
   name: tutorDetails.value.name || 'Tutor Name',
   profilePictureUrl: tutorDetails.value.profile_picture_url || '',
+  isVerified: Boolean(tutorDetails.value.is_verified),
   hourlyRate: Number(tutorDetails.value.hourly_rate) || 0,
   rating: Number(tutorDetails.value.rating) || 4.7,
   sessionCount: Number(tutorDetails.value.total_sessions) || 124,
@@ -588,6 +589,7 @@ const getTutorDetails = async () => {
       hourly_rate: response.data.hourly_rate ?? 350,
       total_sessions: response.data.total_sessions ?? 124,
       response_time_label: response.data.response_time_label || '',
+      is_verified: Boolean(response.data.is_verified),
       pinned_review_id: response.data.pinned_review_id ?? null,
       pinned_review: response.data.pinned_review ?? null
     }

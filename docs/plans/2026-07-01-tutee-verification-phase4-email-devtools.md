@@ -1,7 +1,7 @@
 ---
 title: Tutee enrollment verification — Phase 4 (email & dev tools)
 date: 2026-07-01
-status: Draft
+status: Done
 spec: 2026-07-01-tutee-verification-overview.md
 ---
 
@@ -15,14 +15,18 @@ spec: 2026-07-01-tutee-verification-overview.md
 <!-- LIVING SUMMARY: keep this section and the Changelog current on every edit -->
 ## Status & Progress Summary
 
-**Status: Draft — fleshed out, awaiting go-ahead to implement.** Design locked, no open decisions. Codebase
-verified against current `HEAD` (post-Phase-3) on 2026-07-02: every file/line reference below was read
-directly, not assumed from the outline.
+**Status: Done — implemented, tested, and browser-verified end to end on 2026-07-03.** All six sections
+(generalized emails, opportunistic renewal reminders, SuperAdmin dev tools, the pending-status display fix,
+and the `TutorDetails.vue` verified-badge fix) shipped in one pass. 32 new backend tests, all green; full
+frontend build/lint/vitest clean; full backend suite run with the same pre-existing failures as baseline
+(see Changelog for the full trace, including one real regression found and fixed during verification).
 
 ## Goal
 
-Notify users of verification events and renewal deadlines for both roles, and give SuperAdmins a way to
-demo lapse/reminders without waiting out the real 90-day/30-day windows.
+Notify users of verification events and renewal deadlines for both roles, give SuperAdmins a way to demo
+lapse/reminders without waiting out the real 90-day/30-day windows, and close two small surfacing gaps found
+alongside this work: the pending-status page silently drops document/motivation data it already has, and the
+public tutor-browsing page shows an unconditional "Verified" badge regardless of actual status.
 
 ## Approach
 
@@ -149,6 +153,46 @@ and the login response (`views.py:137`), which together satisfy "opportunistic, 
   (`toggleSuspension:247-249`). This is the one place the outline's phrasing is interpreted rather than
   quoted verbatim — flagging it in case the reviewer wants an explicit visibility gate instead.
 
+### 5. Pending-status display fix (`TutorApplicationStatus.vue`, both roles)
+
+Found during the 2026-07-03 audit: `/application-status` already receives `school_id_url`,
+`enrollment_proof_url`, and `reason_to_tutor` from both `tutor_application_status` and
+`tutee_application_status` (both endpoints return the full `TutorApplicationSerializer`/
+`TuteeApplicationSerializer` payload), but the `flow.kind === 'initial' && flow.status === 'pending'` and
+`flow.kind === 'renewal' && flow.status === 'pending'` template branches (lines 24-34 and 43-53) only render
+the submitted date and a generic "we'll email you" note — the document/motivation data is fetched into
+`application.value` and then never displayed. Backend/API change: **none needed**, data is already there.
+
+- **Decision (locked): plain links, no thumbnails.** Add "School ID: [View file]" / "Enrollment Proof: [View
+  file]" links (`<a :href="application.school_id_url" target="_blank" rel="noopener">`) plus the motivation
+  text (`application.reason_to_tutor`, only rendered if non-empty) to both pending branches. No image-vs-PDF
+  branching, no thumbnail generation — consistent treatment regardless of file type, smallest surface for a
+  fix riding alongside the larger Phase 4 build. Rejected alternatives: thumbnail previews (nicer but adds
+  file-type detection for no functional gain here) and text-only with no document links (doesn't actually
+  answer "can I see what I submitted").
+- Applies to both the `initial`/`pending` and `renewal`/`pending` branches identically (same fields exist on
+  a renewal submission's data shape).
+
+### 6. Public verification badge fix (`TutorDetails.vue`)
+
+Found during Phase 3's own `/code-review` pass (flagged, not fixed, as an out-of-scope follow-up) and
+confirmed still present in the 2026-07-03 audit: the public tutor-browsing page tutees see before booking
+shows an unconditional "Verified" badge regardless of the tutor's actual `application_status`/
+`document_renewal_status`. Not a security gap (the booking gate is enforced server-side per Phase 2) — purely
+a false-information display bug.
+
+- **Decision (locked): binary badge, hidden by default.** Show the badge only when
+  `application_status === 'approved' AND document_renewal_status === 'verified'`; render nothing otherwise
+  (no "Unverified"/"Renewal Due" badge — just absence of the badge). Rejected alternatives: a tri-state badge
+  surfacing in-progress renewals (more serializer surface for information a tutee doesn't need to book —
+  the forward-only gate already keeps a renewal-pending tutor bookable), and removing the badge entirely
+  (throws away real signal for tutees comparing tutors, not just fixing the false-positive case).
+- Backend: whichever tutor-listing/detail serializer currently feeds `TutorDetails.vue` needs to expose
+  `application_status` and `document_renewal_status` (or a single derived boolean) for the tutor being
+  viewed — mirror the existing field names/shape from `TutorApplicationSerializer` rather than inventing new
+  ones. Exact serializer/view identified during implementation (not traced yet at plan time).
+- Frontend: `TutorDetails.vue`'s existing unconditional badge markup gated on the new boolean field.
+
 ## Risks
 
 - Force-send-email and force-expire are real side-effecting admin actions (send actual email, alter a real
@@ -157,6 +201,9 @@ and the login response (`views.py:137`), which together satisfy "opportunistic, 
 - The reminder dedup race (Section 3) can double-send at most once per window; accepted, not fixed.
 - `get_document_review_context`'s signature change (Section 3) has two call sites in the same file
   (`views.py:197`, `:212`) — both must be updated together or the module fails to import.
+- Section 6's serializer/view for `TutorDetails.vue` wasn't traced at plan time (unlike every other item in
+  this plan, which cites exact file/line) — implementation must locate the real source first and confirm no
+  existing consumer of that serializer breaks from the added fields.
 
 ## Checks to run
 
@@ -184,6 +231,11 @@ and the login response (`views.py:137`), which together satisfy "opportunistic, 
   send action against a seeded dev account and confirm a success toast + a real console-backend email log
   line; trigger `force_expire` on a test tutor/tutee and confirm their own `/application-status` page shows
   `due` afterward.
+- Browser-verify Section 5: submit a tutee (and a tutor) initial application, confirm the pending-status page
+  shows working links to both uploaded files and the motivation text; repeat for a pending renewal
+  submission.
+- Browser-verify Section 6: confirm the badge shows for an approved+verified tutor, and is absent for
+  pending/rejected/renewal-due tutors, on `TutorDetails.vue` as viewed by a tutee.
 - `/code-review` (8-angle finder + verify, same as every prior phase).
 
 ## Changelog
@@ -198,3 +250,75 @@ and the login response (`views.py:137`), which together satisfy "opportunistic, 
   outline: dev-tools buttons are always visible to SuperAdmins in the UI (no separate flag-visibility
   fetch), relying entirely on the server-side 403 gate — called out explicitly above for review. Still
   Draft; awaiting go-ahead to implement via TDD.
+- 2026-07-03: Ran a `/grill-with-docs` session starting from a user report of "tutors can make a request but
+  admin has no manage-tutee-request screen." Investigation found this wasn't a missing feature — Phase 3's
+  admin Tutees tab was already Done and working; the reported empty queue was just no submissions existing
+  yet in that dev environment, confirmed once the user submitted a real tutee application and it appeared
+  correctly. The user then asked for a broader audit of the whole verification flow (frontend vs.
+  backend/tests, plus notifications/emails), which surfaced two additional real gaps beyond this phase's
+  already-drafted scope: (1) the pending-status page fetches but never renders submitted document
+  links/motivation text it already has from the API, and (2) `TutorDetails.vue`'s public "Verified" badge is
+  unconditional (flagged as a follow-up during Phase 3's own code-review, not previously fixed). User chose
+  to bundle both into this phase file rather than spin up separate plan files, since this phase was the
+  natural home (already touches admin-facing verification UI and email wiring) and both fixes are small.
+  Locked two new design decisions via grilling: pending-status view shows plain file links + motivation text,
+  no thumbnails (Section 5); the public badge becomes binary/hidden-unless-verified rather than tri-state or
+  removed entirely (Section 6). Status moved to Approved — all decisions across the full bundled scope are
+  now locked; nothing implemented yet.
+- 2026-07-03: Implemented, tested, and browser-verified all six sections in one pass (TDD).
+  - **Sections 1-2** (`email_utils.py`, `views.py`, `admin_views.py`): added `role_label='tutor'` kwarg to
+    the three existing email functions (default preserves byte-identical tutor wording); added
+    `send_document_renewal_result_email(profile, role_label, new_status, reason='')`. Wired into the tutee
+    initial-submission and resubmission branches (`views.py`), and into all four admin `.patch` views —
+    tutor/tutee application approve/reject and tutor/tutee renewal approve/reject — closing every
+    previously-silent email gap the plan identified. Found a third `get_document_review_context` call site
+    the plan's own two-call-site risk note didn't catch (`create_tutee_document_renewal_submission`) — updated
+    it too.
+  - **Section 3** (renewal reminders): `get_document_review_context` now takes `role_label`; new
+    `_maybe_send_renewal_reminder` helper checks the 1-day window first, then 7-day, dedup-gated by the
+    existing `reminder_*_sent_at` fields. Added `mailer.enqueue_document_renewal_reminder` +
+    `send_document_renewal_reminder_email_task`, new `document_renewal_reminder.txt/.html` templates, and the
+    `EmailSendLog.PURPOSE_DOCUMENT_RENEWAL_REMINDER` migration (state-only, confirmed via
+    `makemigrations --check`).
+  - **Section 4** (SuperAdmin dev tools): new `AdminUserVerificationDevToolsView` — 403s before any query when
+    `VERIFICATION_DEV_TOOLS_ENABLED` is off (default), reuses the existing `_verification_dev` module for
+    `force_expire`. `SuperAdminUserModal.vue` got a "Verification Dev Tools" button group (always visible per
+    the plan's locked decision, server-side 403 is the real gate) plus `superadmin.js`'s
+    `sendVerificationDevAction`.
+  - **Section 5**: `TutorApplicationStatus.vue`'s pending branches (both `initial` and `renewal`) now render
+    plain links to `school_id_url`/`enrollment_proof_url` plus `reason_to_tutor` if present — no backend
+    change needed, the data was already in the API response.
+  - **Section 6**: added `TutorDetailSerializer.get_is_verified` (binary: `application_status == 'approved'
+    and document_renewal_status() == 'verified'`) and wired it through `TutorDetails.vue`'s previously
+    unconditional badge.
+  - **Code review** (self-review pass, addressed before finalizing): moved a per-branch local `from . import
+    mailer` to a module-level import in `admin_views.py`; added a 400 guard on the dev-tools `send_rejected`
+    action when the application has no `rejection_reason` set (previously would have silently sent an email
+    quoting an empty reason), with a new regression test.
+  - **Backend**: 32 new tests across 6 new test classes (`VerificationEmailWiringTests`,
+    `EmailUtilsRoleLabelTests`, `RenewalReminderTests`, `VerificationDevToolsAdminEndpointTests`,
+    `TutorDetailVerifiedBadgeTests`, plus one more case each in `ApplicationVerificationSharedBaseTests`), all
+    green. Caught and fixed one real regression during full-suite verification: a pre-existing test
+    (`ApplicationVerificationSharedBaseTests.test_generalized_document_review_context_matches_tutor_shape`)
+    called `get_document_review_context` with the old 1-arg signature — this is the third call site the
+    plan's own risk note about "two call sites" didn't anticipate. Fixed by passing `role_label` at that call
+    site too.
+  - **Full backend suite**: 238 tests, 14 failures + 3 errors — one error was the regression above (now
+    fixed and green); the other 13 failures + 2 errors were verified pre-existing and unrelated by isolating
+    and re-running each individually against the diff (recommendation-matching ID-set mismatches in
+    `RecommendTutorsViewTests`/`DashboardRecommendationServiceTests`, a `PaymentMethod` unique-constraint
+    fixture collision in `SuperAdminRedesignApiTests`, a 301-vs-200 redirect in
+    `AdminDashboardMetricsTests`, and avatar-upload 400s in `Tutee/TutorProfileTests`) — none touch any file
+    this phase changed, and each reproduces identically in complete isolation from this diff.
+  - **Frontend**: `npm run lint` clean (0 issues in touched files; the 18-error baseline is entirely a stale
+    copy of `TutorDetails.vue` inside an unrelated `.claude/worktrees/perf-debug/` checkout, not the real
+    file), `npm run build` clean, `npx vitest run` 54/54 passing.
+  - **Browser verification** (real accounts, cleaned up after): logged in as a tutee, submitted a real
+    initial application via the actual API (exercising Section 1-2's email wiring live), confirmed the
+    pending-status page renders the document links + motivation text (Section 5); confirmed the
+    `TutorDetails.vue` badge shows for an approved+verified tutor and disappears the moment the application
+    is flipped to `pending` (Section 6); confirmed the SuperAdmin dev-tools button group renders in
+    `SuperAdminUserModal.vue`'s Actions tab and correctly returns 403 with the flag off (Section 4). Section 3
+    (reminders) is opportunistic/time-window-gated and covered by the 5 new unit tests rather than a live
+    90-day wait, consistent with how Phase 2/3 verified similar time-gated logic.
+  - Status set to Done.

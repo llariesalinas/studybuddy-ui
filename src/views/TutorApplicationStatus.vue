@@ -26,6 +26,11 @@
           Your application was submitted on
           <strong>{{ formatDate(submittedAt) }}</strong> and is currently being reviewed.
         </p>
+        <div class="sb-info-card sb-submission-summary">
+          <p class="small mb-1"><a :href="application.school_id_url" target="_blank" rel="noopener">View School ID</a></p>
+          <p class="small mb-1"><a :href="application.enrollment_proof_url" target="_blank" rel="noopener">View Enrollment Proof</a></p>
+          <p v-if="application.reason_to_tutor" class="small mb-0">"{{ application.reason_to_tutor }}"</p>
+        </div>
         <div class="sb-info-card">
           <p class="small mb-0">
             We'll send an email to <strong>{{ application.email }}</strong> as soon as a decision is made.
@@ -45,6 +50,11 @@
           Your updated enrollment documents were submitted on
           <strong>{{ formatDate(submittedAt) }}</strong> and are now under renewal review.
         </p>
+        <div class="sb-info-card sb-submission-summary">
+          <p class="small mb-1"><a :href="application.school_id_url" target="_blank" rel="noopener">View School ID</a></p>
+          <p class="small mb-1"><a :href="application.enrollment_proof_url" target="_blank" rel="noopener">View Enrollment Proof</a></p>
+          <p v-if="application.reason_to_tutor" class="small mb-0">"{{ application.reason_to_tutor }}"</p>
+        </div>
         <div class="sb-info-card">
           <p class="small mb-0">
             No further upload is needed while the admin team reviews this renewal submission.
@@ -480,7 +490,8 @@ onMounted(() => {
   color: var(--sb-text-muted);
 }
 
-.sb-action-card {
+.sb-action-card,
+.sb-submission-summary {
   text-align: left;
 }
 

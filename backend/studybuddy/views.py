@@ -157,11 +157,33 @@ EMPTY_DOCUMENT_REVIEW_CONTEXT = {
 }
 
 
-def get_document_review_context(application):
+def _maybe_send_renewal_reminder(application, role_label, document_renewal_status, due_at):
+    """Opportunistic renewal reminder: fires from the read path (profile_status/login), not a
+    scheduler. Only for a currently-verified application with a real due date — due/pending/
+    rejected states already surface their own UI banner, no reminder needed. Dedup fields on the
+    application make this safe to call on every read; at most one reminder fires per call, and the
+    1-day window is checked first since it's the narrower/more urgent one. See
+    docs/plans/2026-07-01-tutee-verification-phase4-email-devtools.md."""
+    if document_renewal_status != 'verified' or due_at is None:
+        return
+
+    now = timezone.now()
+    if due_at - timedelta(days=1) <= now < due_at and application.reminder_1day_sent_at is None:
+        mailer.enqueue_document_renewal_reminder(application.profile, role_label, 1, due_at)
+        application.reminder_1day_sent_at = now
+        application.save(update_fields=['reminder_1day_sent_at'])
+    elif due_at - timedelta(days=7) <= now < due_at - timedelta(days=1) and application.reminder_7day_sent_at is None:
+        mailer.enqueue_document_renewal_reminder(application.profile, role_label, 7, due_at)
+        application.reminder_7day_sent_at = now
+        application.save(update_fields=['reminder_7day_sent_at'])
+
+
+def get_document_review_context(application, role_label):
     """Builds the document-verification/renewal-status dict shared by the login payload and
-    profile-status endpoint, from a TutorApplication or TuteeApplication instance. Role-generic;
-    not yet called for tutees (Phase 1 of tutee enrollment verification adds no user-facing
-    behavior change) — see docs/plans/2026-07-01-tutee-verification-phase1-model.md."""
+    profile-status endpoint, from a TutorApplication or TuteeApplication instance. Role-generic —
+    see docs/plans/2026-07-01-tutee-verification-phase1-model.md. ``role_label`` ('tutor'/'tutee')
+    is used only for the opportunistic renewal-reminder email, added in
+    docs/plans/2026-07-01-tutee-verification-phase4-email-devtools.md."""
     document_renewal_status = application.document_renewal_status()
     due_at = application.document_renewal_due_at()
     document_renewal_due_at = due_at.isoformat() if due_at else None
@@ -173,6 +195,8 @@ def get_document_review_context(application):
         document_renewal_rejection_reason = latest_renewal.rejection_reason
 
     document_renewal_required = document_renewal_status in ['due', 'pending', 'rejected']
+
+    _maybe_send_renewal_reminder(application, role_label, document_renewal_status, due_at)
 
     return {
         "application_status": application.application_status,
@@ -198,7 +222,7 @@ def get_tutor_document_review_context(profile):
     except TutorApplication.DoesNotExist:
         return dict(EMPTY_DOCUMENT_REVIEW_CONTEXT)
 
-    return get_document_review_context(application)
+    return get_document_review_context(application, 'tutor')
 
 
 def get_role_document_review_context(profile):
@@ -213,7 +237,7 @@ def get_role_document_review_context(profile):
         application = getattr(profile, 'tutee_application', None)
         if application is None:
             return dict(EMPTY_DOCUMENT_REVIEW_CONTEXT)
-        return get_document_review_context(application)
+        return get_document_review_context(application, 'tutee')
 
     return dict(EMPTY_DOCUMENT_REVIEW_CONTEXT)
 
@@ -5485,6 +5509,13 @@ def tutee_application_resubmit(request):
             message=f"Tutee application submitted: {request.user.userprofile.fname} {request.user.userprofile.lname}",
             institution=request.user.userprofile.institution
         )
+        try:
+            send_application_received_email(request.user.userprofile, role_label='tutee')
+        except Exception:
+            logger.exception(
+                "Failed to send tutee application received email for profile_id=%s",
+                request.user.userprofile.id,
+            )
         return Response({"message": "Application submitted successfully. It is now under review."})
 
     if application.application_status == 'approved':
@@ -5517,8 +5548,13 @@ def tutee_application_resubmit(request):
         institution=request.user.userprofile.institution
     )
 
-    # Email notification deliberately not sent yet — see AdminTuteeApplicationDetailView.patch for why
-    # (send_application_*_email is tutor-worded; Phase 4 generalizes it for both roles).
+    try:
+        send_application_received_email(request.user.userprofile, role_label='tutee')
+    except Exception:
+        logger.exception(
+            "Failed to send tutee application resubmission email for profile_id=%s",
+            request.user.userprofile.id,
+        )
 
     return Response({"message": "Application resubmitted successfully. It is now back under review."})
 
@@ -5588,5 +5624,5 @@ def create_tutee_document_renewal_submission(request, application, school_id, en
     return Response({
         "message": "Updated documents submitted successfully. They are now under review.",
         "renewal_id": renewal.id,
-        **get_document_review_context(application),
+        **get_document_review_context(application, 'tutee'),
     }, status=status.HTTP_201_CREATED)
