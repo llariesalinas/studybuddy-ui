@@ -1,7 +1,7 @@
 ---
 title: Full-system integration merge (tutee verification + cashout-branch features)
 date: 2026-07-02
-status: Draft
+status: In Progress
 spec: 2026-07-01-tutee-verification-overview.md
 ---
 
@@ -29,8 +29,10 @@ with **no filename collisions**; one `makemigrations --merge` node reconciles it
 
 ## Status & Progress Summary
 
-**Status: Draft — awaiting approval, nothing executed.** All facts below (conflict list, dominant
-sides, migration chains) were measured against the real branches on 2026-07-02, not assumed.
+**Status: In Progress — Task 1 complete.** Branch `feat/full-system-integration` created from
+`3b9d45a` (one docs-only commit ahead of the measured `1c0a075`); safety tag
+`pre-integration-merge-20260702` set. All facts below (conflict list, dominant sides, migration
+chains) were measured against the real branches on 2026-07-02, not assumed.
 
 ## Global Constraints
 
@@ -101,12 +103,13 @@ passed on either side may newly fail.
 
 **Files:** none (git only)
 
-- [ ] **Step 1: Verify clean tree** — `git status --short` shows only the four known untracked
+- [x] **Step 1: Verify clean tree** — `git status --short` shows only the four known untracked
   scratch files (`StudyBuddy_Algorithm_Explainer.pptx`, `graphify-out/`, `make_algo_pptx.cjs/.js`).
   Anything else: stop and ask.
-- [ ] **Step 2: Create branch** — `git switch -c feat/full-system-integration`
-  (from `feat/tutee-enrollment-verification` @ `1c0a075`).
-- [ ] **Step 3: Safety tag** — `git tag pre-integration-merge-20260702` so the exact pre-merge
+- [x] **Step 2: Create branch** — `git switch -c feat/full-system-integration`
+  (from `feat/tutee-enrollment-verification` @ `3b9d45a`, one docs-only commit past the measured
+  `1c0a075`).
+- [x] **Step 3: Safety tag** — `git tag pre-integration-merge-20260702` so the exact pre-merge
   state is trivially recoverable.
 
 ### Task 2: Start the merge
@@ -262,6 +265,9 @@ features + cashout-branch features).
 
 ## Changelog
 
+- 2026-07-02: Task 1 executed inline (user-approved, task-by-task with checkpoints): clean tree
+  verified, `feat/full-system-integration` branched from `3b9d45a`, safety tag
+  `pre-integration-merge-20260702` created. Status Draft → In Progress.
 - 2026-07-02: Plan written after cherry-pick approach failed (first commit conflicted immediately;
   branch turned out to carry 246 non-merge commits of parallel history, not 50). Facts measured:
   17-file conflict set with per-file dominant sides, disjoint migration chains with two heads, no
