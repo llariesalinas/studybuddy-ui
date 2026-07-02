@@ -29,10 +29,26 @@ with **no filename collisions**; one `makemigrations --merge` node reconciles it
 
 ## Status & Progress Summary
 
-**Status: In Progress — Task 1 complete.** Branch `feat/full-system-integration` created from
-`3b9d45a` (one docs-only commit ahead of the measured `1c0a075`); safety tag
-`pre-integration-merge-20260702` set. All facts below (conflict list, dominant sides, migration
-chains) were measured against the real branches on 2026-07-02, not assumed.
+**Status: In Progress — Tasks 1-6 complete; Task 7 verification underway.** Branch
+`feat/full-system-integration` created from `3b9d45a`; safety tag `pre-integration-merge-20260702`
+set. All 17 conflicts resolved and the merge committed (`dd0758d`); migration heads reconciled with
+`0065_merge_20260702_1734.py` (`3cdfb28`), no residual model-state drift. Verification so far:
+`npm run lint` clean (after removing 2 dead helpers carried in from the cashout branch, `4312ce8`),
+`npm run build` passes, `npx vitest run` 54/54 pass. Django test suite running against an ephemeral
+test DB. **Two gates remain and require the user:** Gate G1 (destructive dev-DB `migrate` including
+`0063_remove_tutorpayoutaccount`) and the Task 8 push/PR. All facts below were measured against the
+real branches on 2026-07-02.
+
+**Key resolution decisions (deviations worth noting):**
+- Adopted their `AppSidebar` shell; re-added the admin/superadmin "Tutor Applications" nav entry
+  into `AppSidebar.vue` (our access point, since their redesign dropped the old inline nav).
+- `AdminDashboard.vue`: took their redesign wholesale; our old-style "Tutor Applications" quick-action
+  card was dropped (access preserved via the sidebar nav), rather than force-fitting it into their
+  new layout.
+- `views.py`: adopted their `get_login_profile_for_user` (admin auto-provisioning) in both
+  `profile_status` and `login_view`, losing our `select_related` optimization in login (perf only).
+- Removed a duplicate `deferStartupWork` (App.vue) and dead accordion helpers (TutorProfile.vue)
+  created/orphaned by the merge.
 
 ## Global Constraints
 
@@ -116,12 +132,9 @@ passed on either side may newly fail.
 
 **Files:** all; git stops on the 17 conflicts.
 
-- [ ] **Step 1:** `git merge feature-cashout-recent-transactions` — expect
-  "Automatic merge failed; fix conflicts and then commit the result." with exactly the 17 files
-  above in `git diff --name-only --diff-filter=U`. If the set differs from the table, update this
-  plan's table before resolving anything.
-- [ ] **Step 2:** Confirm all non-conflicted changes staged cleanly: `git status` shows the
-  conflicts as "both modified" and everything else staged.
+- [x] **Step 1:** `git merge feature-cashout-recent-transactions` — conflict set matched the
+  17-file table exactly.
+- [x] **Step 2:** Confirmed all non-conflicted changes staged cleanly.
 
 ### Task 3: Resolve docs + small frontend conflicts (low risk)
 
@@ -129,12 +142,12 @@ passed on either side may newly fail.
 `src/components/TutorScreeningModal.vue`, `src/stores/auth.js`, `src/views/AdminUsers.vue`,
 `src/stores/admin.js`, `src/views/AdminTutorApplications.vue`, `src/views/TutorApplicationStatus.vue`
 
-- [ ] **Step 1:** For each, open the conflict, apply the per-file strategy from the table (dominant
-  side as base, re-apply the other side's delta). For `docs/plans/index.html`, resolve arbitrarily
-  (it gets regenerated in Task 8).
-- [ ] **Step 2:** After each file: `git add <file>`.
-- [ ] **Step 3:** Sanity: `npx oxlint src/stores/auth.js src/stores/admin.js` (or full
-  `npm run lint` once at the end of the task) — no *new* errors vs the known-18 baseline.
+- [x] **Step 1:** Resolved per-file. index.html took theirs (regenerated in Task 8). Notable:
+  auth.js/admin.js unions; TutorScreeningModal took their design-system button styling; AdminUsers
+  took their new `deleteUser`; AdminTutorApplications/TutorApplicationStatus kept our two-role
+  dynamic routes/placeholders + their `sb-field` styling.
+- [x] **Step 2:** Staged each.
+- [x] **Step 3:** `npx oxlint` on the 6 files: 0 errors.
 
 ### Task 4: Resolve backend core conflicts (highest risk)
 
@@ -143,16 +156,16 @@ passed on either side may newly fail.
 
 Resolution order = ascending difficulty, so import errors surface early:
 
-- [ ] **Step 1: urls.py** — union both route lists. Our routes: tutee application/renewal/status +
+- [x] **Step 1: urls.py** — union both route lists. Our routes: tutee application/renewal/status +
   admin tutee endpoints. Theirs: wallet cash-in/cash-out/recent-cash-outs, superadmin, support
   escalation, check-ins. Every route name from both sides must appear exactly once.
-- [ ] **Step 2: serializers.py** — our base; re-insert their serializer classes (wallet/top-up,
+- [x] **Step 2: serializers.py** — our base; re-insert their serializer classes (wallet/top-up,
   withdrawal fields incl. `receiving_institution_*` and `note`, superadmin, support). Delete any
   serializer referencing `TutorPayoutAccount` (model is removed on their side).
-- [ ] **Step 3: admin_views.py** — their base; re-insert our tutee admin views
+- [x] **Step 3: admin_views.py** — their base; re-insert our tutee admin views
   (`AdminTuteeApplicationListView/DetailView`, `AdminTuteeDocumentRenewalDetailView`) and any
   helper they depend on. Cross-check every view referenced from the merged `urls.py` exists.
-- [ ] **Step 4: views.py** — union by section. Our sections: verification context helpers
+- [x] **Step 4: views.py** — union by section. Our sections: verification context helpers
   (`get_document_review_context`, `get_role_document_review_context`,
   `get_verification_application`, `can_create_new_booking` + enforcement-date parsing), tutee
   submit/resubmit/renewal endpoints, booking-gate checks inside booking confirm/approve. Their
@@ -161,47 +174,44 @@ Resolution order = ascending difficulty, so import errors surface early:
   search/recommendations (`filter_tutors_by_institution` usage), check-ins, support escalation.
   Both sides' booking-confirm/approve edits must coexist — verification gate *and* their
   payment/check-in changes.
-- [ ] **Step 5: tests.py** — their file as base (they restructured/removed 644 old lines); append
+- [x] **Step 5: tests.py** — their file as base (they restructured/removed 644 old lines); append
   our added test classes verbatim (verification/booking-gate/tutee-admin suites from commits
   `a22e26d`, `a9cee86`, `cbc67e8`). No test class from either side may vanish.
-- [ ] **Step 6: Import smoke test** —
+- [x] **Step 6: Import smoke test** — passed (IMPORT OK). —
   `python -c "import django,os; os.environ.setdefault('DJANGO_SETTINGS_MODULE','backend.settings'); django.setup(); import studybuddy.views, studybuddy.admin_views, studybuddy.serializers, studybuddy.urls"`
   (run from `backend/`). Expected: no `ImportError`/`NameError`/`SyntaxError`.
-- [ ] **Step 7:** `git add` the five files.
+- [x] **Step 7:** `git add` the five files.
 
 ### Task 5: Resolve frontend shell conflicts
 
 **Files:** `src/App.vue`, `src/views/AdminDashboard.vue`, `src/views/TutorProfile.vue`
 
-- [ ] **Step 1: App.vue** — their AppSidebar-based shell is the base. Re-apply our +22 lines
-  (identified via `git diff b773afd..1c0a075 -- src/App.vue`): whatever of it isn't already
-  represented in their shell (e.g. nav entries for `/application-status`, toast usage) gets ported
-  into `AppSidebar.vue` instead if the nav moved there.
-- [ ] **Step 2: AdminDashboard.vue** — their redesign as base; re-apply our +10 lines (same
-  identification method).
-- [ ] **Step 3: TutorProfile.vue** — their redesign as base; re-wire our `VerificationStatusCard`
-  import/usage and the conditional "Verified" badge from `cbc67e8`.
-- [ ] **Step 4:** `git add` the three files; `npm run build` — must succeed (build failures here
-  are almost always a missed import or duplicate template block from resolution).
+- [x] **Step 1: App.vue** — took their AppSidebar shell; ported the admin/superadmin "Tutor
+  Applications" nav into `AppSidebar.vue` (their menu lacked it); removed a duplicate
+  `deferStartupWork` the merge produced. `tutor-application-submitted` public route + inline header
+  auto-merged.
+- [x] **Step 2: AdminDashboard.vue** — took their redesign; our old-style Tutor Applications
+  quick-action card dropped (access preserved via the sidebar nav) rather than force-fit.
+- [x] **Step 3: TutorProfile.vue** — their redesign as base; `VerificationStatusCard` import/usage
+  intact (auto-merged); removed dead accordion helpers their redesign orphaned.
+- [x] **Step 4:** `git add` the three files; `npm run build` succeeded.
 
 ### Task 6: Commit the merge + reconcile the migration graph
 
 **Files:** merge commit; possibly new `backend/studybuddy/migrations/0065_merge_*.py` + a
 reconciliation migration.
 
-- [ ] **Step 1:** `git commit` (default merge message + one-line summary of resolution strategy).
-- [ ] **Step 2:** `python manage.py makemigrations --check --dry-run` — expected: complaint about
-  conflicting heads (`0059_alter_platformactivity...` vs `0064_supportticket_escalation`).
-- [ ] **Step 3:** `python manage.py makemigrations --merge` — creates `0065_merge_*.py`. Read it:
-  it must contain only `dependencies`, no operations.
-- [ ] **Step 4:** `python manage.py makemigrations` again — if model-state drift remains (e.g.
-  both sides altered the same field's choices), it emits a small reconciliation migration; read it
-  and confirm it's state-only or trivially additive before accepting.
-- [ ] **Step 5 (Gate G1):** STOP. Report to user: applying migrations to the local dev DB includes
-  `0063_remove_tutorpayoutaccount` (drops the table). Proceed against local dev DB only on
-  explicit yes. Production rollout of this migration is a separate, later decision.
+- [x] **Step 1:** merge committed (`dd0758d`) with a resolution-strategy summary.
+- [x] **Step 2:** `makemigrations --check --dry-run` reported the expected two-head conflict
+  (`0059_alter_platformactivity...` vs `0064_supportticket_escalation`).
+- [x] **Step 3:** `makemigrations --merge` created `0065_merge_20260702_1734.py` — dependencies
+  only, no operations. Committed (`3cdfb28`).
+- [x] **Step 4:** re-ran `makemigrations --check --dry-run` → "No changes detected"; no residual
+  model-state drift, no reconciliation migration needed.
+- [x] **Step 5 (Gate G1): REPORTED — awaiting user go/no-go.** Applying migrations to the dev DB
+  includes `0063_remove_tutorpayoutaccount` (drops the table). Not run.
 - [ ] **Step 6 (after G1 yes):** `python manage.py migrate` on dev DB — no errors.
-- [ ] **Step 7:** `git add backend/studybuddy/migrations/ && git commit -m "chore: merge migration heads after full-system integration"`.
+- [x] **Step 7:** migration merge node committed (`3cdfb28`).
 
 ### Task 7: Full verification
 
@@ -265,6 +275,13 @@ features + cashout-branch features).
 
 ## Changelog
 
+- 2026-07-02: Tasks 2-6 executed inline. Merge produced exactly the 17-file conflict set; all
+  resolved (unions where both added logic; theirs for redesign/design-system surfaces; ours for the
+  two-role verification views). `TutorPayoutAccount` dropped from all imports. Import smoke test,
+  `npm run build`, `npx vitest run` (54/54), and `npm run lint` (after removing 2 dead helpers the
+  cashout branch carried into `Dashboard.vue`) all pass. Merge committed `dd0758d`; migration heads
+  reconciled via `0065_merge_20260702_1734.py` (`3cdfb28`) with no residual drift; lint fix
+  `4312ce8`. Gate G1 (destructive dev-DB migrate) reported and NOT run. Django test suite running.
 - 2026-07-02: Task 1 executed inline (user-approved, task-by-task with checkpoints): clean tree
   verified, `feat/full-system-integration` branched from `3b9d45a`, safety tag
   `pre-integration-merge-20260702` created. Status Draft → In Progress.
