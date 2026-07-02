@@ -68,7 +68,7 @@
 
           <textarea
             v-model="ratingComment"
-            class="form-control rating-stack-textarea"
+          class="form-control rating-stack-textarea sb-field"
             rows="2"
             placeholder="Additional feedback (optional)..."
           ></textarea>
@@ -295,7 +295,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform 0.1s ease, color 0.2s;
+  transition: transform var(--sb-t-quick) var(--sb-spring);
   cursor: pointer;
 }
 
@@ -304,7 +304,7 @@ onUnmounted(() => {
 
 .rating-category-label {
   font-size: 12px; font-weight: bold; color: #98a2b3;
-  transition: color 0.2s;
+  transition: none;
 }
 
 .text-dark { color: #344054 !important; }

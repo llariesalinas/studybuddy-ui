@@ -1,4 +1,6 @@
 <template>
+  <SbBgWash v-if="route.name !== 'home'" />
+
   <div v-if="isPublicRoute" class="public-layout">
     <router-view v-slot="{ Component }">
       <Transition name="page" mode="out-in">
@@ -8,138 +10,11 @@
   </div>
 
   <div v-else class="d-flex vh-100 overflow-hidden">
-    <aside class="sidebar d-flex flex-column text-white p-3 shadow-sm" style="width: 250px; background-color: var(--sb-dark);">
-      <div class="d-flex align-items-center mb-5 mt-3 px-2">
-        <i class="bi bi-book text-sb-primary fs-4 me-2"></i>
-        <h4 class="mb-0 fw-bold">StudyBuddy</h4>
-      </div>
-
-      <ul class="nav nav-pills flex-column mb-auto">
-        <li v-if="userRole!== 'admin' && userRole !==  'superadmin'" class="nav-item mb-2">
-          <router-link :to="userRole === 'tutor' ? '/tch-dashboard' : '/dashboard'" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
-            <i class="bi bi-grid-1x2 me-3"></i> Dashboard
-          </router-link>
-        </li>
-
-        <li v-if="userRole!== 'admin' && userRole !==  'superadmin'" class="nav-item mb-2">
-          <router-link :to="userRole === 'tutor' ? '/tutor-profile' : '/tutee-profile'" class="nav-link text-white opacity-75 d-flex align-items-center">
-            <i class="bi bi-person me-3"></i> Profile
-          </router-link>
-        </li>
-
-        <li class="nav-item mb-2" v-if="userRole === 'tutee'">
-          <router-link to="/tuteeSessions" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
-            <i class="bi bi-search me-3"></i> Sessions
-          </router-link>
-        </li>
-
-        <li class="nav-item mb-2" v-if="userRole === 'tutor'">
-          <router-link
-            to="/tch-availability"
-            class="nav-link text-white opacity-75 d-flex align-items-center"
-            active-class="active-nav"
-          >
-            <i class="bi bi-calendar3 me-3"></i> Schedule
-          </router-link>
-        </li>
-
-        <li class="nav-item mb-2" v-if="userRole === 'tutor'">
-          <router-link to="/reports" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
-            <i class="bi bi-file-earmark-text me-3"></i> Sessions & Reports
-          </router-link>
-        </li>
-
-        <li class="nav-item mb-2" v-if="userRole === 'tutor'">
-          <router-link to="/tch-wallet" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
-            <i class="bi bi-wallet2 me-3"></i> Wallet
-          </router-link>
-        </li>
-
-        <li class="nav-item mb-2" v-if="userRole === 'admin'">
-          <router-link to="/admin/dashboard" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
-            <i class="bi bi-grid-1x2 me-3"></i> Dashboard
-          </router-link>
-        </li>
-
-        <li class="nav-item mb-2" v-if="userRole === 'admin'">
-          <router-link to="/admin/withdrawals" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
-            <i class="bi bi-wallet2 me-3"></i> Withdrawals
-          </router-link>
-        </li>
-
-        <li class="nav-item mb-2" v-if="userRole === 'admin'">
-          <router-link to="/admin/users" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
-            <i class="bi bi-people me-3"></i> Users
-          </router-link>
-        </li>
-
-        <li class="nav-item mb-2" v-if="userRole === 'admin' || userRole === 'superadmin'">
-          <router-link to="/admin/tutor-applications" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
-            <i class="bi bi-person-check me-3"></i> Tutor Applications
-          </router-link>
-        </li>
-
-        <li class="nav-item mb-2" v-if="userRole === 'admin'">
-          <router-link to="/admin/reports" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
-            <i class="bi bi-bar-chart-line me-3"></i> Reports
-          </router-link>
-        </li>
-
-        <li class="nav-item mb-2" v-if="userRole === 'admin'">
-          <router-link to="/admin/support" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
-            <i class="bi bi-headset me-3"></i> Support Desk
-          </router-link>
-        </li>
-
-        <li class="nav-item mb-2" v-if="userRole === 'superadmin'">
-          <router-link to="/superadmin/dashboard" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
-            <i class="bi bi-grid-1x2 me-3"></i> Dashboard
-          </router-link>
-        </li>
-
-        <li class="nav-item mb-2" v-if="userRole === 'superadmin'">
-          <router-link to="/superadmin/institutions" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
-            <i class="bi bi-building me-3"></i> Institutions
-          </router-link>
-        </li>
-
-        <li class="nav-item mb-2" v-if="userRole === 'superadmin'">
-          <router-link to="/superadmin/users" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
-            <i class="bi bi-people me-3"></i> All Users
-          </router-link>
-        </li>
-
-        <li class="nav-item mb-2" v-if="userRole === 'superadmin'">
-          <router-link to="/superadmin/reports" class="nav-link text-white opacity-75 d-flex align-items-center" active-class="active-nav">
-            <i class="bi bi-bar-chart-line me-3"></i> Reports
-          </router-link>
-        </li>
-
-        <li class="nav-item mb-2">
-          <button
-           class="nav-link border-0 shadow-none bg-transparent text-white opacity-75 d-flex align-items-center sb-btn"
-           @click="openLogoutModal"
-           >
-            <i class="bi bi-box-arrow-right me-3"></i> Log-out
-          </button>
-        </li>
-      </ul>
-
-      <!-- Footer utility items: Help and Theme toggle -->
-      <div class="mt-auto pt-3 border-top border-secondary border-opacity-25 d-flex align-items-center justify-content-between px-2">
-        <button
-          class="btn p-0 text-white opacity-75 d-flex align-items-center sb-btn"
-          @click="openSupport('Other')"
-        >
-          <i class="bi bi-question-circle me-2"></i> Help
-        </button>
-        <SbThemeToggle />
-      </div>
-    </aside>
+    <AppSidebar @logout="openLogoutModal" @open-support="() => openSupport('Other')" />
 
     <SupportModal
       :open="isSupportModalOpen"
-      :type="supportContextType"
+      :context-type="supportContextType"
       :context-id="supportContextId"
       @close="isSupportModalOpen = false"
     />
@@ -176,7 +51,7 @@
             </button>
 
             <button
-              class="btn bg-sb-primary text-white sb-btn"
+              class="btn bg-sb-primary text-white sb-btn sb-elevated sb-elevated--brand"
               @click="logout"
             >
               Yes, Log out
@@ -300,6 +175,11 @@
             <p class="sb-muted">Cross-institution analytics — filter by institution or view globally.</p>
           </div>
 
+          <div v-if="route.path === '/superadmin/support'">
+            <h2 class="fw-bold sb-text">SuperAdmin Support</h2>
+            <p class="sb-muted">Claim and resolve escalated support tickets from institution admins.</p>
+          </div>
+
           <div v-if="route.path === '/tch-requestedSessions'">
             <div class="d-flex align-items-center gap-2 flex-wrap">
               <h2 class="fw-bold sb-text mb-1">Requested Sessions</h2>
@@ -311,14 +191,14 @@
           </div>
 
           <div class="d-flex gap-3 align-items-center ms-auto">
-            <router-link v-if="userRole === 'tutee' && route.path !== '/book'" to="/book" class="btn bg-sb-primary text-white px-4 py-2 rounded-3 fw-semibold shadow-sm sb-btn">
+            <router-link v-if="userRole === 'tutee' && route.path !== '/book'" to="/book" class="btn bg-sb-primary text-white px-4 py-2 rounded-3 fw-semibold sb-btn sb-elevated sb-elevated--brand">
               Book Session
             </router-link>
 
             <router-link
               v-if="userRole === 'tutor' && route.path !== '/tch-requestedSessions'"
               to="/tch-requestedSessions"
-              class="btn bg-sb-primary text-white px-4 py-2 rounded-3 fw-semibold shadow-sm pending-request-btn d-inline-flex align-items-center gap-2 sb-btn"
+              class="btn bg-sb-primary text-white px-4 py-2 rounded-3 fw-semibold pending-request-btn d-inline-flex align-items-center gap-2 sb-btn sb-elevated sb-elevated--brand"
             >
               <span v-if="sessionStore.hasNewPendingRequests" class="pending-request-dot" aria-hidden="true"></span>
               <span>Manage Pending Sessions</span>
@@ -332,10 +212,8 @@
             </router-link>
 
             <div v-if="authStore.isAuthenticated && !isPublicRoute" class="d-flex align-items-center gap-2 ms-auto">
-              <router-link to="/chat" class="chat-icon-btn" aria-label="Open chat">
-                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                </svg>
+              <router-link to="/chat" class="chat-icon-btn sb-btn" aria-label="Open chat">
+                <i class="bi bi-chat-dots fs-5" aria-hidden="true"></i>
                 <span
                   v-if="chatStore.totalUnread"
                   class="chat-unread-count"
@@ -365,29 +243,134 @@
     </main>
   </div>
 
+  <template v-if="authStore.isAuthenticated && !isPublicRoute">
+    <OngoingBookingBar v-if="!hideOngoingBookingBar" />
+
+    <template v-if="userRole === 'tutee'">
+      <VenueConfirmModal
+        :open="isVenueModalOpen"
+        :location="activeSession.preferredLocation"
+        :submitting="isSubmittingCheckIn"
+        @close="dismissCheckIn('venue')"
+        @confirm="handleVenueConfirmation"
+      />
+      <SessionCheckInModal
+        :open="isMidpointModalOpen"
+        :submitting="isSubmittingCheckIn"
+        @close="dismissCheckIn('midpoint')"
+        @confirm="handleMidpointCheckIn"
+      />
+    </template>
+  </template>
+
   <SbToast />
 </template>
 
 <script setup>
-import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth' // Import auth store
 import { useSessionsStore } from '@/stores/completedSessions'
+import { useActiveSessionStore } from '@/stores/activeSession'
+import { useToastStore } from '@/stores/toast'
 import NotificationBell from '@/components/NotificationBell.vue'
 import RatingReminderBanner from '@/components/RatingReminderBanner.vue'
+import OngoingBookingBar from '@/components/OngoingBookingBar.vue'
+import VenueConfirmModal from '@/components/VenueConfirmModal.vue'
+import SessionCheckInModal from '@/components/SessionCheckInModal.vue'
 import { useChatStore } from '@/stores/chat'
 import router from './router'
 import { SESSION_POLL_INTERVAL_MS } from './config.js'
 import SbToast from '@/components/SbToast.vue'
-import SbThemeToggle from '@/components/SbThemeToggle.vue'
+import AppSidebar from '@/components/AppSidebar.vue'
+import SbBgWash from '@/components/SbBgWash.vue'
 const SupportModal = defineAsyncComponent(() => import('@/components/SupportModal.vue'))
+const DEV_LIVE_REFRESH_KEY = 'studybuddy_dev_live_refresh'
 
 const route = useRoute()
 const authStore = useAuthStore()
 const chatStore = useChatStore()
 const sessionStore = useSessionsStore()
+const activeSession = useActiveSessionStore()
+const toastStore = useToastStore()
 const logoutModalRef = ref(null)
 const showLogoutModal = ref(false)
+
+const isVenueModalOpen = ref(false)
+const isMidpointModalOpen = ref(false)
+const isSubmittingCheckIn = ref(false)
+
+watch(
+  () => activeSession.dueCheckIn,
+  (due) => {
+    isVenueModalOpen.value = due === 'venue'
+    isMidpointModalOpen.value = due === 'midpoint'
+  },
+)
+
+const dismissCheckIn = (event) => {
+  if (isSubmittingCheckIn.value) {
+    return
+  }
+
+  activeSession.dismiss(event)
+
+  if (event === 'venue') {
+    isVenueModalOpen.value = false
+  } else {
+    isMidpointModalOpen.value = false
+  }
+}
+
+const handleVenueConfirmation = async (response) => {
+  if (isSubmittingCheckIn.value) {
+    return
+  }
+
+  isSubmittingCheckIn.value = true
+
+  try {
+    const bookingId = activeSession.activeBooking?.id
+    await activeSession.confirmVenue(response)
+    isVenueModalOpen.value = false
+
+    if (response === 'no') {
+      toastStore.push('Venue response saved. You can report a session issue if you need help.', 'warning')
+      openSupport('Booking', bookingId)
+    } else {
+      toastStore.push('Venue confirmation saved.')
+    }
+  } catch (error) {
+    toastStore.push(error.response?.data?.error || 'Failed to save venue confirmation.', 'error')
+  } finally {
+    isSubmittingCheckIn.value = false
+  }
+}
+
+const handleMidpointCheckIn = async (response) => {
+  if (isSubmittingCheckIn.value) {
+    return
+  }
+
+  isSubmittingCheckIn.value = true
+
+  try {
+    const bookingId = activeSession.activeBooking?.id
+    await activeSession.submitMidpointCheckIn(response)
+    isMidpointModalOpen.value = false
+
+    if (response === 'issues') {
+      toastStore.push('Check-in saved. Opening support so you can tell us what happened.', 'warning')
+      openSupport('Booking', bookingId)
+    } else {
+      toastStore.push('Thanks, your check-in was saved.')
+    }
+  } catch (error) {
+    toastStore.push(error.response?.data?.error || 'Failed to save session check-in.', 'error')
+  } finally {
+    isSubmittingCheckIn.value = false
+  }
+}
 
 const isSupportModalOpen = ref(false)
 const supportContextType = ref('Other')
@@ -399,16 +382,34 @@ const openSupport = (type = 'Other', id = null) => {
   isSupportModalOpen.value = true
 }
 let pendingSessionsRefreshId = null
+let startupIdleId = null
+let startupTimeoutId = null
 
 const deferStartupWork = (callback) => {
-  if (typeof window === 'undefined') return
-
-  if ('requestIdleCallback' in window) {
-    window.requestIdleCallback(callback, { timeout: 1500 })
+  if (typeof window === 'undefined') {
+    callback()
     return
   }
 
-  window.setTimeout(callback, 0)
+  if ('requestIdleCallback' in window) {
+    startupIdleId = window.requestIdleCallback(callback, { timeout: 2000 })
+    return
+  }
+
+  startupTimeoutId = window.setTimeout(callback, 800)
+}
+
+const cancelDeferredStartupWork = () => {
+  if (startupIdleId && typeof window !== 'undefined' && 'cancelIdleCallback' in window) {
+    window.cancelIdleCallback(startupIdleId)
+  }
+
+  if (startupTimeoutId) {
+    window.clearTimeout(startupTimeoutId)
+  }
+
+  startupIdleId = null
+  startupTimeoutId = null
 }
 
 const clearBootstrapModalState = () => {
@@ -432,6 +433,7 @@ const logout = async () => {
   closeLogoutModal()
   await nextTick()
   chatStore.disconnectAll()
+  activeSession.stopPolling()
   authStore.logout()
   await router.replace('/login')
   await nextTick()
@@ -454,6 +456,10 @@ const isPublicRoute = computed(() => {
   ].includes(route.name)
 })
 
+const hideOngoingBookingBar = computed(() => (
+  ['tuteeSessionDetails', 'booking-details'].includes(route.name)
+))
+
 // Get the role from the store to control the sidebar links
 const userRole = computed(() => authStore.user?.role?.toLowerCase() || null)
 const userFname =  computed(() => authStore.user?.fname || null)
@@ -471,12 +477,34 @@ const handleVisibilityChange = async () => {
     await refreshTutorPendingSessions()
   }
 }
+
+const refreshLiveSessionSurfaces = async () => {
+  if (!authStore.isAuthenticated) {
+    return
+  }
+
+  activeSession.currentTime = new Date()
+  await sessionStore.fetchSessions({ force: true })
+  await activeSession.refreshActive()
+}
+
+const handleDevLiveRefresh = async (event) => {
+  if (event.key !== DEV_LIVE_REFRESH_KEY) {
+    return
+  }
+
+  await refreshLiveSessionSurfaces()
+}
+
 onMounted(() => {
   if (authStore.isAuthenticated) {
     deferStartupWork(() => {
       chatStore.fetchRooms()
       chatStore.connectUpdates()
     })
+
+    activeSession.startPolling()
+    window.addEventListener('storage', handleDevLiveRefresh)
 
     if (userRole.value === 'tutor') {
       sessionStore.fetchSessions()
@@ -490,12 +518,15 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   closeLogoutModal()
+  cancelDeferredStartupWork()
   document.removeEventListener('visibilitychange', handleVisibilityChange)
+  window.removeEventListener('storage', handleDevLiveRefresh)
 
   if (pendingSessionsRefreshId) {
     window.clearInterval(pendingSessionsRefreshId)
   }
 
+  activeSession.stopPolling()
   chatStore.disconnectAll()
 })
 </script>
@@ -522,7 +553,7 @@ onBeforeUnmount(() => {
 
 .pending-request-btn {
   position: relative;
-  transition: transform 180ms ease, box-shadow 180ms ease, filter 180ms ease;
+  transition: transform var(--sb-t-normal) var(--sb-spring);
 }
 
 .pending-request-count {
@@ -555,24 +586,12 @@ onBeforeUnmount(() => {
   box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.18);
 }
 
-/* --- Sidebar Navigation Styles --- */
-.active-nav {
-  background-color: rgba(0, 137, 90, 0.1) !important;
-  color: var(--sb-primary) !important;
-  font-weight: 600;
-  border-radius: 8px;
-  opacity: 1 !important;
-}
-.nav-link:hover {
-  opacity: 1 !important;
-}
-
 .app-main {
   min-width: 0;
 }
 
 .app-main-surface {
-  background: var(--sb-bg);
+  background: transparent;
 }
 
 .app-main-chat {
@@ -602,19 +621,28 @@ onBeforeUnmount(() => {
   justify-content: center;
   width: var(--sb-bell-size);
   height: var(--sb-bell-size);
-  border-radius: 50%;
-  border: 1.5px solid var(--sb-card-border);
-  background: var(--sb-card-bg);
-  color: var(--sb-text-muted);
+  border-radius: 16px;
+  border: 1px solid #dbe4dd;
+  background: #ffffff;
+  color: #153326;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.06);
   text-decoration: none;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  transition:
+    transform var(--sb-t-normal) var(--sb-spring),
+    border-color var(--sb-t-normal) var(--sb-spring),
+    box-shadow var(--sb-t-normal) var(--sb-spring),
+    background-color var(--sb-t-normal) var(--sb-spring),
+    color var(--sb-t-normal) var(--sb-spring);
   position: relative;
 }
+
 .chat-icon-btn:hover,
 .chat-icon-btn.router-link-active {
-  background: var(--sb-primary);
-  color: #fff;
-  border-color: var(--sb-primary);
+  transform: translateY(-1px);
+  border-color: #b9cfbf;
+  background: #ffffff;
+  color: #153326;
+  box-shadow: 0 16px 28px rgba(15, 23, 42, 0.09);
 }
 
 .chat-unread-count {
@@ -667,158 +695,4 @@ onBeforeUnmount(() => {
   font-size: 12px;
 }
 
-/* --- Button Haptics Utility --- */
-.sb-btn {
-  transition: transform var(--sb-t-quick) var(--sb-spring-fast),
-              box-shadow var(--sb-t-quick) var(--sb-spring-fast),
-              background-color var(--sb-t-quick) var(--sb-spring-fast);
-  cursor: pointer;
-}
-.sb-btn:hover:not(:disabled) {
-  transform: translateY(-3px);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
-}
-.sb-btn:active:not(:disabled) {
-  transform: scale(0.96) translateY(0);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
-  transition-duration: 60ms;
-}
-.sb-btn:disabled,
-.sb-btn[disabled] {
-  opacity: 0.4;
-  pointer-events: none;
-}
-
-/* --- Interactive Card/Item Haptics Utility --- */
-.sb-interactive {
-  transition: transform var(--sb-t-normal) var(--sb-spring),
-              box-shadow var(--sb-t-normal) var(--sb-spring),
-              border-color var(--sb-t-normal) var(--sb-spring),
-              background-color var(--sb-t-normal) var(--sb-spring);
-  cursor: pointer;
-  border-bottom: 2px solid transparent;
-}
-.sb-interactive:hover {
-  transform: translateY(-6px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
-  background-color: rgba(255, 255, 255, 0.08);
-  border-bottom-color: var(--sb-primary);
-}
-.sb-interactive:active {
-  transform: scale(0.98) translateY(0);
-  transition-duration: 60ms;
-}
-
-/* --- Page Route Transition --- */
-.page-enter-active {
-  transition: opacity var(--sb-t-normal) var(--sb-spring),
-              transform var(--sb-t-normal) var(--sb-spring);
-}
-.page-enter-from {
-  opacity: 0;
-  transform: translateY(8px);
-}
-.page-leave-active {
-  transition: opacity var(--sb-t-quick) ease;
-}
-.page-leave-to {
-  opacity: 0;
-}
-
-/* --- Animation Keyframes --- */
-@keyframes sb-bubble-in {
-  from {
-    opacity: 0;
-    transform: translateY(12px) scale(0.94);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-@keyframes sb-pop {
-  0% {
-    transform: scale(0.6);
-    opacity: 0;
-  }
-  60% {
-    transform: scale(1.3);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-
-@keyframes sb-shake {
-  0%   { transform: translateX(0); }
-  15%  { transform: translateX(-5px); }
-  30%  { transform: translateX(4px); }
-  45%  { transform: translateX(-3px); }
-  60%  { transform: translateX(2px); }
-  75%  { transform: translateX(-1px); }
-  100% { transform: translateX(0); }
-}
-
-/* --- Layer A/B/C Keyframes --- */
-@keyframes sb-stagger-in {
-  from { opacity: 0; transform: translateY(10px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes sb-scale-in {
-  from { opacity: 0; transform: scale(0.94); }
-  to   { opacity: 1; transform: scale(1); }
-}
-
-@keyframes sb-tab-indicator {
-  from { transform: scaleX(0); opacity: 0; }
-  to   { transform: scaleX(1); opacity: 1; }
-}
-
-@keyframes sb-toast-in {
-  from { opacity: 0; transform: translateY(-14px) scale(0.95); }
-  to   { opacity: 1; transform: translateY(0)   scale(1); }
-}
-
-@keyframes sb-success-border {
-  0%   { box-shadow: 0 0 0 0 rgba(0, 137, 90, 0.5); }
-  60%  { box-shadow: 0 0 0 6px rgba(0, 137, 90, 0); }
-  100% { box-shadow: none; }
-}
-
-/* --- Layer A: Stagger entrance --- */
-.sb-stagger-item {
-  animation: sb-stagger-in var(--sb-t-normal) var(--sb-spring) both;
-  opacity: 0;
-}
-
-/* --- Layer A: Modal scale-in (all Bootstrap modals, no per-modal changes needed) --- */
-.modal.show .modal-content {
-  animation: sb-scale-in var(--sb-t-normal) var(--sb-spring) both;
-}
-
-/* --- Layer B: Skeleton shimmer --- */
-.sb-skeleton {
-  background: rgba(226, 232, 240, 0.86);
-  border-radius: 12px;
-}
-
-/* --- Layer C: Success card border pulse --- */
-.sb-success-card {
-  animation: sb-success-border 600ms var(--sb-spring) both;
-}
-
-/* --- Accessibility: kill all motion for users who ask --- */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 1ms !important;
-    animation-delay: 0ms !important;
-    transition-duration: 1ms !important;
-  }
-}
 </style>

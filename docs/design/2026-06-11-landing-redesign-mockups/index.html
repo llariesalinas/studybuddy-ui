@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Studybuddy Landing Redesign — 3 Directions</title>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Patrick+Hand&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --sb-primary: #00895A;
+    --pop-yellow: #FFC94D;
+    --pop-orange: #FF8A5C;
+    --pop-pink: #FF8FA3;
+    --paper: #FDF8EE;
+    --ink: #2B3230;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    min-height: 100vh;
+    padding: 48px 24px;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; }
+  h1 { font-family: 'Caveat', cursive; font-size: 56px; color: var(--sb-primary); }
+  .sub { font-family: 'Patrick Hand', cursive; font-size: 22px; margin: 8px 0 40px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; }
+  a.card {
+    display: block; text-decoration: none; color: var(--ink);
+    background: #fff; border: 3px solid var(--ink); border-radius: 18px;
+    padding: 28px 24px; position: relative;
+    box-shadow: 6px 6px 0 rgba(43,50,48,.15);
+    transition: transform .18s cubic-bezier(.34,1.56,.64,1), box-shadow .18s;
+  }
+  a.card:hover { transform: translateY(-6px) rotate(-1deg); box-shadow: 10px 12px 0 rgba(43,50,48,.18); }
+  .tag {
+    display: inline-block; font-family: 'Patrick Hand', cursive; font-size: 15px;
+    padding: 2px 14px; border-radius: 999px; border: 2px solid var(--ink); margin-bottom: 14px;
+  }
+  .a .tag { background: var(--pop-yellow); }
+  .b .tag { background: var(--pop-pink); }
+  .c .tag { background: var(--pop-orange); }
+  .card h2 { font-family: 'Caveat', cursive; font-size: 34px; line-height: 1.1; margin-bottom: 10px; }
+  .card p { font-size: 14.5px; line-height: 1.55; color: #4c5a55; }
+  .card .dark { margin-top: 14px; font-family: 'Patrick Hand', cursive; font-size: 14px; color: var(--sb-primary); }
+  .note { margin-top: 44px; font-family: 'Patrick Hand', cursive; font-size: 17px; color: #6b7a74; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Studybuddy landing — pick a direction</h1>
+  <p class="sub">Round 3: premium-site feel (smooth scroll, reactive cursor, big type) and scroll-scrubbed storytelling — both in Studybuddy's own design. Best viewed on desktop with a mouse.</p>
+  <div class="grid" style="margin-bottom:28px">
+    <a class="card a" href="motion-luxe.html">
+      <span class="tag" style="background:#163127; color:#fff; border-color:#163127">Direction M</span>
+      <h2>Studio Motion</h2>
+      <p>The marieweber-style feel in Studybuddy's skin: lerped smooth scrolling, a custom cursor that reacts to everything, oversized display type with staggered line reveals, a marquee strip, clip-path panel reveals, parallax illustrations, count-up numbers, and a magnetic CTA button.</p>
+      <div class="dark">Feel: premium studio site, reactive to every input</div>
+    </a>
+    <a class="card c" href="storytelling.html">
+      <span class="tag" style="background:#163127; color:#fff; border-color:#163127">Direction S</span>
+      <h2>Illustrated Storytelling</h2>
+      <p>Four pinned chapters scrubbed by your scroll: 11 PM panic (night scene, rising moon), the match (line draws, score counts to 98%), the whiteboard session (marker draws, bulb pops), exam day (sun rises, A paper, high-five). The page tells one student's week.</p>
+      <div class="dark">Feel: a story you scroll through, scene by scene</div>
+    </a>
+  </div>
+  <p class="sub" style="margin-bottom:16px">Round 2 (current look + subtle motion):</p>
+  <div class="grid" style="margin-bottom:28px">
+    <a class="card b" href="final-whiteboard-subtle.html">
+      <span class="tag" style="background:#BFE8D7">Merged</span>
+      <h2>Whiteboard + Subtle</h2>
+      <p>The whiteboard concept in the clean design language: faint grid, sticky-note features, marker underlines, doodly avatars.</p>
+      <div class="dark">Earlier pick, kept for comparison</div>
+    </a>
+    <a class="card a" href="refined-subtle.html">
+      <span class="tag" style="background:#BFE8D7">Refined 1</span>
+      <h2>Subtle Motion</h2>
+      <p>The current page's exact visual language with scroll reveals, staggered cards, one drawn underline in the hero, and clean line-art illustration cards. The safest, closest to today.</p>
+      <div class="dark">Dark mode: identical to the app's existing dark theme</div>
+    </a>
+    <a class="card b" href="refined-balanced.html">
+      <span class="tag" style="background:#BFE8D7">Refined 2</span>
+      <h2>Match Line, Polished</h2>
+      <p>Same clean base, but keeps the best mechanic from round 1: a thin green line that draws itself down the page connecting alternating journey steps, plus drawn underlines per section and soft parallax shapes.</p>
+      <div class="dark">Dark mode: line and accents shift to the dark-theme sage palette</div>
+    </a>
+  </div>
+  <p class="sub" style="margin-bottom:16px">Round 1 (cartoony versions, for reference):</p>
+  <div class="grid">
+    <a class="card a" href="option-a.html">
+      <span class="tag">Option A</span>
+      <h2>The Match Line</h2>
+      <p>A hand-drawn line literally draws itself down the page as you scroll, connecting a stuck student at the top to their tutor match — and ends in a high-five at the CTA. The whole page is the journey from "stuck" to "got it".</p>
+      <div class="dark">Dark mode: ink line becomes glow-marker on dark paper</div>
+    </a>
+    <a class="card b" href="option-b.html">
+      <span class="tag">Option B</span>
+      <h2>The Whiteboard</h2>
+      <p>The page is one giant shared whiteboard from a study session. Marker headings underline themselves, sticky-note feature cards slap on with a tilt, and doodles (lightbulbs, "aha!", arrows) float at parallax depths as you scroll.</p>
+      <div class="dark">Dark mode: whiteboard flips to chalkboard, chalk strokes</div>
+    </a>
+    <a class="card c" href="option-c.html">
+      <span class="tag">Option C</span>
+      <h2>The Conversation</h2>
+      <p>The page reads like a chat between a stressed student and Studybuddy. Speech bubbles pop in alternately as you scroll, and each reply hands off to a full section — the feature deep-dive is told as the conversation's answers.</p>
+      <div class="dark">Dark mode: late-night chat — dim paper, glowing bubbles</div>
+    </a>
+  </div>
+  <p class="note">These are visual mockups, not Vue code. The picked direction gets rebuilt properly inside LandingPage.vue with the design-system tokens, both themes, and reduced-motion support.</p>
+</div>
+</body>
+</html>

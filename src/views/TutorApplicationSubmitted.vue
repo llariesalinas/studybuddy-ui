@@ -42,7 +42,7 @@ onMounted(async () => {
       </div>
 
       <div class="sb-action-group">
-        <router-link to="/" class="sb-btn-pill">
+        <router-link to="/" class="sb-btn-pill sb-btn sb-elevated sb-elevated--brand">
           Back to Home
         </router-link>
       </div>
@@ -120,7 +120,7 @@ onMounted(async () => {
   border-radius: 999px;
   font-weight: 600;
   text-decoration: none;
-  transition: all 0.2s;
+  transition: transform var(--sb-t-normal) var(--sb-spring);
   background: var(--sb-primary);
   color: white;
   border: none;
@@ -128,7 +128,6 @@ onMounted(async () => {
 
 .sb-btn-pill:hover {
   background: var(--sb-primary-hover);
-  transform: translateY(-1px);
 }
 
 .sb-btn-outline {

@@ -7,11 +7,13 @@ export const useWalletStore = defineStore('wallet', () => {
   const catalogStore = useCatalogStore()
   const balance = ref(0)
   const pendingAmount = ref(0)
-  const cashoutMinimum = ref(500)
+  const cashinMinimum = ref(50)
+  const cashoutMinimum = ref(50)
+  const cashoutMaximum = ref(50000)
   const cashoutProviderFee = ref(10)
   const transactions = ref([])
   const withdrawals = ref([])
-  const payoutAccounts = ref([])
+  const recentCashOuts = ref([])
   const receivingInstitutions = ref([])
   const loading = ref(false)
 
@@ -45,7 +47,9 @@ export const useWalletStore = defineStore('wallet', () => {
       const { data } = await api.get('wallet/')
       balance.value = data.balance
       pendingAmount.value = data.pending_amount
-      cashoutMinimum.value = data.cashout_minimum ?? 500
+      cashinMinimum.value = data.cashin_minimum ?? 50
+      cashoutMinimum.value = data.cashout_minimum ?? 50
+      cashoutMaximum.value = data.cashout_maximum ?? 50000
       cashoutProviderFee.value = data.cashout_provider_fee ?? 10
     } finally {
       loading.value = false
@@ -62,41 +66,58 @@ export const useWalletStore = defineStore('wallet', () => {
     withdrawals.value = data
   }
 
-  async function fetchPayoutAccounts() {
-    const { data } = await api.get('wallet/payout-destinations/')
-    payoutAccounts.value = data
+  async function fetchRecentCashOuts() {
+    const { data } = await api.get('wallet/cash-outs/recent/')
+    recentCashOuts.value = data
   }
 
-  async function fetchReceivingInstitutions(provider = 'instapay') {
-    const data = await catalogStore.fetchReceivingInstitutions(provider)
+  async function fetchReceivingInstitutions() {
+    const data = await catalogStore.fetchReceivingInstitutions()
     receivingInstitutions.value = data
     return data
   }
 
-  async function savePayoutAccount(payload) {
-    const request = payload.id
-      ? api.patch(`wallet/payout-destinations/${payload.id}/`, payload)
-      : api.post('wallet/payout-destinations/', payload)
-
-    await request
-    await fetchPayoutAccounts()
-  }
-
-  async function deactivatePayoutAccount(id) {
-    await api.patch(`wallet/payout-destinations/${id}/`, { is_active: false })
-    await fetchPayoutAccounts()
-  }
-
   async function requestWithdrawal(payload) {
-    try {
-      await api.post('wallet/cash-outs/', payload)
-      await fetchWallet()
-      await fetchTransactions()
-      await fetchWithdrawals()
-      return { success: true }
-    } catch (e) {
-      return { success: false, error: e.response?.data?.error || 'Cash-out failed. Please try again.' }
-    }
+    const {
+      amount,
+      destination_type,
+      receiving_institution_id,
+      receiving_institution_name,
+      receiving_institution_code,
+      account_number,
+      account_name,
+      bank_name,
+      note,
+      confirm_new_destination,
+    } = payload
+
+    await api.post('wallet/cash-outs/', {
+      amount,
+      destination_type,
+      receiving_institution_id,
+      receiving_institution_name,
+      receiving_institution_code,
+      account_number,
+      account_name,
+      bank_name,
+      note,
+      confirm_new_destination,
+    })
+    await fetchWallet()
+    await fetchTransactions()
+    await fetchWithdrawals()
+  }
+
+  async function initiateCashIn(amount) {
+    const { data } = await api.post('wallet/cash-in/', { amount })
+    return data // { checkout_url, id }
+  }
+
+  async function verifyCashIn(id) {
+    const { data } = await api.post(`wallet/cash-in/${id}/verify/`)
+    await fetchWallet()
+    await fetchTransactions()
+    return data
   }
 
   async function devAddFunds(amount) {
@@ -107,11 +128,11 @@ export const useWalletStore = defineStore('wallet', () => {
     await api.post('dev/wallet/remove/', { amount })
   }
 
-  return { balance, pendingAmount, cashoutMinimum, cashoutProviderFee, transactions, withdrawals,
-           payoutAccounts, receivingInstitutions, loading,
+  return { balance, pendingAmount, cashinMinimum, cashoutMinimum, cashoutMaximum, cashoutProviderFee, transactions, withdrawals,
+           recentCashOuts, receivingInstitutions, loading,
            grossEarned, totalDeductions, netEarned,
-           fetchWallet, fetchTransactions, fetchWithdrawals, fetchPayoutAccounts,
-           fetchReceivingInstitutions, savePayoutAccount, deactivatePayoutAccount,
-           requestWithdrawal, devAddFunds,
+           fetchWallet, fetchTransactions, fetchWithdrawals, fetchRecentCashOuts,
+           fetchReceivingInstitutions,
+           requestWithdrawal, initiateCashIn, verifyCashIn, devAddFunds,
            devRemoveFunds }
 })

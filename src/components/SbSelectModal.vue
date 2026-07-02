@@ -8,6 +8,13 @@
     :aria-controls="dialogId"
     @click="openModal"
   >
+    <img
+      v-if="selectedOption?.icon"
+      :src="selectedOption.icon"
+      alt=""
+      class="sb-select-trigger-image"
+      @error="$event.target.style.display = 'none'"
+    />
     <span class="sb-select-trigger-text" :class="{ 'is-placeholder': !selectedOption }">
       {{ selectedOption?.label || placeholder }}
     </span>
@@ -47,7 +54,7 @@
             :id="searchId"
             ref="searchRef"
             v-model.trim="searchQuery"
-            class="sb-select-search"
+          class="sb-select-search sb-field"
             type="text"
             :placeholder="searchPlaceholder || `Search ${title.toLowerCase()}`"
             :aria-controls="listboxId"
@@ -94,6 +101,13 @@
                 :aria-selected="isSelected(option.value) ? 'true' : 'false'"
                 @click="selectValue(option.value)"
               >
+                <img
+                  v-if="option.icon"
+                  :src="option.icon"
+                  alt=""
+                  class="sb-select-option-icon"
+                  @error="$event.target.style.display = 'none'"
+                />
                 <span class="sb-select-option-copy">
                   <span class="sb-select-option-label">{{ option.label }}</span>
                   <span v-if="option.description" class="sb-select-option-description">
@@ -272,7 +286,8 @@ function normalizeOptions(options) {
     .map(option => ({
       label: String(option.label ?? option.value),
       value: option.value,
-      description: option.description || ''
+      description: option.description || '',
+      icon: option.icon || ''
     }))
 }
 
@@ -384,7 +399,7 @@ function unlockBodyScroll() {
   font: inherit;
   text-align: left;
   cursor: pointer;
-  transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+  transition: none;
 }
 
 .sb-select-trigger:hover,
@@ -395,6 +410,7 @@ function unlockBodyScroll() {
 }
 
 .sb-select-trigger-text {
+  flex: 1;
   min-width: 0;
   overflow: hidden;
   color: var(--sb-text-main);
@@ -409,6 +425,14 @@ function unlockBodyScroll() {
 .sb-select-trigger-icon {
   color: var(--sb-primary);
   flex: 0 0 auto;
+}
+
+.sb-select-trigger-image {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  border-radius: 6px;
+  object-fit: contain;
 }
 
 .sb-select-backdrop {
@@ -550,7 +574,7 @@ function unlockBodyScroll() {
   font: inherit;
   text-align: left;
   cursor: pointer;
-  transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+  transition: none;
 }
 
 .sb-select-option:hover,
@@ -562,8 +586,17 @@ function unlockBodyScroll() {
   outline: none;
 }
 
+.sb-select-option-icon {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  border-radius: 6px;
+  object-fit: contain;
+}
+
 .sb-select-option-copy {
   display: grid;
+  flex: 1;
   gap: 0.15rem;
   min-width: 0;
 }

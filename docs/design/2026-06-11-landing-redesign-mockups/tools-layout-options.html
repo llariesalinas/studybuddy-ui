@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Platform tools — layout alternatives</title>
+<style>
+  :root {
+    --sb-primary: #00895A;
+    --sb-bg: #F8F9FA;
+    --sb-card-bg: #FFFFFF;
+    --sb-card-border: #EAEAEA;
+    --sb-text-main: #163127;
+    --sb-text-muted: #6B7280;
+    --sb-dark: #0A1916;
+    --sb-spring: cubic-bezier(0.16, 1, 0.3, 1);
+    --pop-yellow: #FFC94D;
+    --pop-orange: #FF8A5C;
+    --pop-pink: #FF8FA3;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: Inter, system-ui, sans-serif; background: var(--sb-bg); color: var(--sb-text-main); overflow-x: hidden; }
+
+  .filler { min-height: 80vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 0 24px; gap: 14px; }
+  .filler .kick { font-size: 13px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: var(--sb-primary); }
+  .filler h1 { font-size: clamp(30px, 4.5vw, 54px); font-weight: 900; letter-spacing: -0.03em; }
+  .filler p { color: var(--sb-text-muted); max-width: 560px; line-height: 1.65; }
+
+  .head { max-width: 1240px; margin: 0 auto 64px; padding: 0 40px; }
+  .head .kick { font-size: 13px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: var(--sb-primary); display: block; margin-bottom: 14px; }
+  .head h2 { font-size: clamp(30px, 4.2vw, 58px); font-weight: 900; letter-spacing: -0.035em; line-height: 1; }
+
+  /* ============ OPTION A — INDEX ROWS (no cards) ============ */
+  .opt-a { padding: 14vh 0 18vh; }
+  .arow {
+    display: grid; grid-template-columns: 200px 1fr 1.1fr; align-items: center; gap: 40px;
+    border-top: 1px solid var(--sb-card-border); padding: 52px 40px;
+    max-width: 1380px; margin: 0 auto; position: relative; overflow: hidden;
+    opacity: 0; transform: translateX(-60px); transition: opacity .7s ease, transform .7s var(--sb-spring), background .35s ease;
+  }
+  .arow:last-of-type { border-bottom: 1px solid var(--sb-card-border); }
+  .arow.in { opacity: 1; transform: none; }
+  .arow:nth-child(odd).in { transition-delay: .05s; }
+  /* numeral: hollow outline, fills with the accent on hover */
+  .arow .num {
+    font-size: clamp(80px, 9vw, 132px); font-weight: 900; letter-spacing: -0.05em; line-height: 1;
+    color: transparent; -webkit-text-stroke: 2px var(--acc, var(--sb-primary));
+    transition: color .35s ease;
+  }
+  .arow:hover .num { color: var(--acc, var(--sb-primary)); }
+  .arow:hover { background: var(--tint, rgba(0,137,90,.05)); }
+  .arow h3 { font-size: clamp(24px, 2.6vw, 38px); font-weight: 900; letter-spacing: -0.5px; transition: transform .4s var(--sb-spring); }
+  .arow:hover h3 { transform: translateX(14px); }
+  .arow p { font-size: clamp(15px, 1.3vw, 17.5px); line-height: 1.65; color: var(--sb-text-muted); }
+  .arow.r1 { --acc: var(--sb-primary); --tint: rgba(0,137,90,.05); }
+  .arow.r2 { --acc: #DCA21B; --tint: rgba(255,201,77,.10); }
+  .arow.r3 { --acc: #E0683A; --tint: rgba(255,138,92,.09); }
+  .arow.r4 { --acc: #E26D86; --tint: rgba(255,143,163,.10); }
+
+  /* ============ OPTION B — HORIZONTAL RAIL (pinned sideways scroll) ============ */
+  .opt-b { position: relative; }
+  .bstage { height: 320vh; }
+  .bpin { position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; justify-content: center; overflow: hidden; }
+  .btrack { display: flex; gap: 30px; padding: 0 40px; will-change: transform; }
+  .bslab {
+    flex: 0 0 58vw; min-height: 46vh; border-radius: 30px; padding: 54px 56px;
+    display: flex; flex-direction: column; justify-content: flex-end; position: relative; overflow: hidden;
+  }
+  .bslab .num {
+    position: absolute; top: 24px; left: 40px;
+    font-family: Georgia, 'Times New Roman', serif; font-style: italic; font-weight: 700;
+    font-size: clamp(110px, 13vw, 200px); line-height: 1; opacity: .26;
+  }
+  .bslab h3 { font-size: clamp(28px, 3vw, 44px); font-weight: 900; letter-spacing: -0.5px; margin-bottom: 14px; position: relative; }
+  .bslab p { font-size: clamp(15.5px, 1.35vw, 18px); line-height: 1.65; max-width: 480px; position: relative; color: rgba(22,49,39,.72); }
+  .bslab.s1 { background: linear-gradient(135deg, #DDF2E9, #F3FBF7); }
+  .bslab.s2 { background: linear-gradient(135deg, #FFF0CC, #FFFAEE); }
+  .bslab.s3 { background: linear-gradient(135deg, #FFE3D4, #FFF7F2); }
+  .bslab.s4 { background: linear-gradient(135deg, #FFE0E7, #FFF5F7); }
+  .bslab.s1 .num { color: var(--sb-primary); }
+  .bslab.s2 .num { color: #DCA21B; }
+  .bslab.s3 .num { color: #E0683A; }
+  .bslab.s4 .num { color: #E26D86; }
+  .bhint { text-align: center; color: var(--sb-text-muted); font-size: 13.5px; margin-top: 34px; letter-spacing: 1px; text-transform: uppercase; }
+
+  /* ============ OPTION C — FULL-BLEED BANDS (no cards, edge to edge) ============ */
+  .opt-c { padding: 14vh 0 18vh; }
+  .cband {
+    display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 60px;
+    padding: 72px max(40px, calc((100vw - 1380px) / 2));
+    position: relative; overflow: hidden;
+    opacity: 0; transform: translateY(60px); transition: opacity .7s ease, transform .7s var(--sb-spring);
+  }
+  .cband.in { opacity: 1; transform: none; }
+  .cband.b1 { background: linear-gradient(100deg, rgba(0,137,90,.10), rgba(0,137,90,.02)); }
+  .cband.b2 { background: linear-gradient(100deg, rgba(255,201,77,.16), rgba(255,201,77,.03)); }
+  .cband.b3 { background: linear-gradient(100deg, rgba(255,138,92,.14), rgba(255,138,92,.03)); }
+  .cband.b4 { background: linear-gradient(100deg, rgba(255,143,163,.15), rgba(255,143,163,.03)); }
+  /* numeral: hand-doodled circle around a modest number */
+  .cband .doodlenum { position: relative; width: 110px; height: 110px; flex: none; display: grid; place-items: center; }
+  .cband .doodlenum span { font-size: 34px; font-weight: 900; }
+  .cband .doodlenum svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  .cband .doodlenum svg path { fill: none; stroke-width: 2.5; stroke-linecap: round; }
+  .cband .lead { display: flex; align-items: center; gap: 36px; }
+  .cband h3 { font-size: clamp(28px, 3.2vw, 48px); font-weight: 900; letter-spacing: -0.6px; line-height: 1.05; }
+  .cband p { font-size: clamp(15.5px, 1.35vw, 18px); line-height: 1.7; color: var(--sb-text-muted); max-width: 520px; }
+
+  .demo-tag { position: fixed; bottom: 18px; right: 18px; z-index: 50; background: var(--sb-dark); color: #fff; font-size: 12.5px; font-weight: 700; padding: 8px 16px; border-radius: 999px; opacity: .85; }
+
+  @media (max-width: 900px) {
+    .arow { grid-template-columns: 90px 1fr; }
+    .arow p { grid-column: 2; }
+    .bslab { flex-basis: 84vw; padding: 36px 30px; }
+    .cband { grid-template-columns: 1fr; gap: 26px; padding-top: 54px; padding-bottom: 54px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .arow, .cband { opacity: 1; transform: none; transition: none; }
+    .btrack { transform: none !important; }
+    .bstage { height: auto; }
+    .bpin { position: static; height: auto; padding: 80px 0; }
+    .btrack { flex-wrap: wrap; }
+  }
+</style>
+</head>
+<body>
+
+<div class="filler">
+  <span class="kick">Option A</span>
+  <h1>Index rows</h1>
+  <p>No cards at all. Each tool is a full-width editorial row — hollow outlined numeral, title, copy — divided by hairlines like the journey panels. Rows slide in from the left; hovering fills the numeral and tints the whole row.</p>
+</div>
+
+<section class="opt-a">
+  <div class="head">
+    <span class="kick">Platform tools</span>
+    <h2>Everything the tutoring loop needs.</h2>
+  </div>
+  <div class="arow r1"><div class="num">01</div><h3>Smart tutor matching</h3><p>Rank peer tutors by subject fit, ratings, availability, and workload balance.</p></div>
+  <div class="arow r2"><div class="num">02</div><h3>Flexible scheduling</h3><p>Book around real tutor availability and keep upcoming sessions easy to scan.</p></div>
+  <div class="arow r3"><div class="num">03</div><h3>Reports and earnings</h3><p>Track completed sessions, tutor compensation, and program-level performance.</p></div>
+  <div class="arow r4"><div class="num">04</div><h3>Balanced workloads</h3><p>Protect session quality by keeping tutor demand visible before calendars fill up.</p></div>
+</section>
+
+<div class="filler">
+  <span class="kick">Option B</span>
+  <h1>Horizontal rail</h1>
+  <p>The section pins and your vertical scroll drives the row sideways — four wide tinted slabs, each over half the viewport wide, glide through. Numerals are big italic serif watermarks. The most "studio site" of the three.</p>
+</div>
+
+<section class="opt-b">
+  <div class="bstage" id="bstage">
+    <div class="bpin">
+      <div class="head" style="margin-bottom: 44px;">
+        <span class="kick">Platform tools</span>
+        <h2>Everything the tutoring loop needs.</h2>
+      </div>
+      <div class="btrack" id="btrack">
+        <div class="bslab s1"><span class="num">01</span><h3>Smart tutor matching</h3><p>Rank peer tutors by subject fit, ratings, availability, and workload balance.</p></div>
+        <div class="bslab s2"><span class="num">02</span><h3>Flexible scheduling</h3><p>Book around real tutor availability and keep upcoming sessions easy to scan.</p></div>
+        <div class="bslab s3"><span class="num">03</span><h3>Reports and earnings</h3><p>Track completed sessions, tutor compensation, and program-level performance.</p></div>
+        <div class="bslab s4"><span class="num">04</span><h3>Balanced workloads</h3><p>Protect session quality by keeping tutor demand visible before calendars fill up.</p></div>
+      </div>
+      <div class="bhint">Keep scrolling — the rail rides sideways</div>
+    </div>
+  </div>
+</section>
+
+<div class="filler">
+  <span class="kick">Option C</span>
+  <h1>Full-bleed bands</h1>
+  <p>Edge-to-edge tinted bands, one per tool — no borders, no cards, the color itself is the container. Numerals are modest digits wrapped in a hand-doodled circle that draws itself as the band reveals.</p>
+</div>
+
+<section class="opt-c">
+  <div class="head">
+    <span class="kick">Platform tools</span>
+    <h2>Everything the tutoring loop needs.</h2>
+  </div>
+  <div class="cband b1">
+    <div class="lead">
+      <div class="doodlenum"><span>01</span><svg viewBox="0 0 110 110"><path d="M55 8 C 88 6, 104 28, 102 55 C 100 86, 80 104, 53 102 C 22 100, 6 80, 8 52 C 10 24, 30 9, 58 10" stroke="#00895A"/></svg></div>
+      <h3>Smart tutor matching</h3>
+    </div>
+    <p>Rank peer tutors by subject fit, ratings, availability, and workload balance.</p>
+  </div>
+  <div class="cband b2">
+    <div class="lead">
+      <div class="doodlenum"><span>02</span><svg viewBox="0 0 110 110"><path d="M52 9 C 84 4, 103 26, 103 53 C 103 84, 82 103, 54 103 C 24 103, 7 82, 7 54 C 7 26, 26 8, 56 11" stroke="#DCA21B"/></svg></div>
+      <h3>Flexible scheduling</h3>
+    </div>
+    <p>Book around real tutor availability and keep upcoming sessions easy to scan.</p>
+  </div>
+  <div class="cband b3">
+    <div class="lead">
+      <div class="doodlenum"><span>03</span><svg viewBox="0 0 110 110"><path d="M58 7 C 90 9, 105 30, 102 57 C 99 87, 77 105, 50 101 C 21 97, 5 76, 9 49 C 13 23, 33 7, 60 9" stroke="#E0683A"/></svg></div>
+      <h3>Reports and earnings</h3>
+    </div>
+    <p>Track completed sessions, tutor compensation, and program-level performance.</p>
+  </div>
+  <div class="cband b4">
+    <div class="lead">
+      <div class="doodlenum"><span>04</span><svg viewBox="0 0 110 110"><path d="M50 10 C 80 3, 102 22, 104 50 C 106 80, 86 102, 56 104 C 26 106, 8 84, 6 56 C 4 28, 24 11, 54 12" stroke="#E26D86"/></svg></div>
+      <h3>Balanced workloads</h3>
+    </div>
+    <p>Protect session quality by keeping tutor demand visible before calendars fill up.</p>
+  </div>
+</section>
+
+<div class="filler">
+  <h1>That's all three.</h1>
+  <p>A: index rows (outline numerals) · B: horizontal rail (serif watermarks) · C: full-bleed bands (doodle-circled digits). Numeral styles are swappable between layouts.</p>
+</div>
+
+<div class="demo-tag" id="tag">Option A — Index rows</div>
+
+<script>
+(() => {
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches
+
+  // reveals for A rows and C bands
+  const io = new IntersectionObserver((es) => es.forEach(e => {
+    if (e.isIntersecting) e.target.classList.add('in')
+  }), { threshold: 0.2 })
+  document.querySelectorAll('.arow, .cband').forEach(el => io.observe(el))
+
+  if (reduce) return
+
+  // Option B: vertical scroll scrubs the rail horizontally while pinned
+  const stage = document.getElementById('bstage')
+  const track = document.getElementById('btrack')
+  function rail() {
+    const r = stage.getBoundingClientRect()
+    const span = r.height - innerHeight
+    const p = Math.max(0, Math.min(1, -r.top / span))
+    const travel = track.scrollWidth - innerWidth + 80
+    track.style.transform = `translate3d(${-p * Math.max(0, travel)}px, 0, 0)`
+
+    const tag = document.getElementById('tag')
+    const cTop = document.querySelector('.opt-c').getBoundingClientRect().top
+    tag.textContent = cTop < innerHeight * 0.6 ? 'Option C — Full-bleed bands'
+      : r.top < innerHeight * 0.6 ? 'Option B — Horizontal rail'
+      : 'Option A — Index rows'
+    requestAnimationFrame(rail)
+  }
+  requestAnimationFrame(rail)
+})()
+</script>
+</body>
+</html>

@@ -21,7 +21,7 @@
             Tutees
           </button>
         </div>
-        <select v-model="filters.status" class="form-select form-select-sm rounded-pill" style="width: 150px;">
+        <select v-model="filters.status" class="form-select form-select-sm rounded-pill sb-field" style="width: 150px;">
           <option value="">All Statuses</option>
           <option value="pending">Pending</option>
           <option value="approved">Approved</option>
@@ -171,7 +171,7 @@
         <div v-if="isPendingReview(selectedApp)" class="mt-5 pt-3 border-top">
           <div v-if="rejectionMode">
             <label class="form-label fw-bold small">Reason for Rejection</label>
-            <textarea v-model="rejectionReason" class="form-control mb-3" rows="3" :placeholder="rejectionPlaceholder"></textarea>
+            <textarea v-model="rejectionReason" class="form-control mb-3 sb-field" rows="3" :placeholder="rejectionPlaceholder"></textarea>
             <div class="d-flex gap-2">
               <button @click="handleStatusUpdate('rejected')" class="btn btn-danger flex-grow-1 rounded-pill" :disabled="!rejectionReason || processing">
                 <span v-if="processing" class="spinner-border spinner-border-sm me-2"></span>
@@ -418,12 +418,7 @@ onMounted(() => {
 }
 
 .sb-btn {
-  transition: all 0.2s;
   font-weight: 500;
-}
-
-.sb-btn:hover {
-  transform: translateY(-1px);
 }
 
 .doc-preview {
@@ -432,7 +427,7 @@ onMounted(() => {
   min-height: 120px;
   cursor: pointer;
   border: 1px solid var(--sb-card-border);
-  transition: all 0.2s;
+  transition: none;
 }
 
 .doc-preview img {

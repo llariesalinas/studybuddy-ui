@@ -50,7 +50,7 @@
             <i class="bi bi-arrow-counterclockwise"></i>
             Discard
           </button>
-          <button type="submit" class="btn-primary-action sb-btn" :disabled="isSavingProfile || isLoadingProfile">
+          <button type="submit" class="btn-primary-action sb-btn sb-elevated sb-elevated--brand" :disabled="isSavingProfile || isLoadingProfile">
             <span
               v-if="isSavingProfile"
               class="spinner-border spinner-border-sm"
@@ -81,7 +81,7 @@
                   <input
                     v-model.trim="profile.fname"
                     type="text"
-                    class="input-glass"
+                    class="input-glass sb-field"
                     placeholder="First name"
                   >
                 </label>
@@ -91,7 +91,7 @@
                   <input
                     v-model.trim="profile.lname"
                     type="text"
-                    class="input-glass"
+                    class="input-glass sb-field"
                     placeholder="Last name"
                   >
                 </label>
@@ -102,7 +102,7 @@
                 <input
                   v-model.trim="profile.mname"
                   type="text"
-                  class="input-glass"
+                  class="input-glass sb-field"
                   placeholder="Optional"
                 >
               </label>
@@ -112,7 +112,7 @@
                 <input
                   :value="profile.email"
                   type="email"
-                  class="input-glass input-disabled"
+                  class="input-glass input-disabled sb-field"
                   disabled
                 >
               </label>
@@ -196,7 +196,7 @@
                 <span class="field-label">Bio</span>
                 <textarea
                   v-model="profile.bio"
-                  class="input-glass bio-textarea"
+                  class="input-glass bio-textarea sb-field"
                   :class="{ 'bio-near-limit': bioCharCount > 450, 'bio-at-limit': bioCharCount >= 500 }"
                   maxlength="500"
                   rows="5"
@@ -358,7 +358,7 @@
           <input
             v-model.trim="subjectSearch"
             type="text"
-            class="input-glass"
+            class="input-glass sb-field"
             placeholder="Search by subject name or code"
           >
         </label>
@@ -1234,14 +1234,14 @@ onMounted(() => {
   padding: 0.82rem 0.95rem;
   font: inherit;
   outline: none;
-  transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+  transition: none;
 }
 
 .input-glass:focus,
 .subject-description-input:focus {
   border-color: var(--sb-primary);
   background: #fff;
-  box-shadow: 0 0 0 4px rgba(0, 137, 90, 0.1);
+  box-shadow: var(--sb-halo);
 }
 
 .input-disabled {

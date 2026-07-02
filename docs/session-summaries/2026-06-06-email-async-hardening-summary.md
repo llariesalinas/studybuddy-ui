@@ -1,7 +1,7 @@
 # Session Summary: Email system hardening (async queue + resilience)
 
 **Date:** 2026-06-06
-**Plan:** [2026-06-06-email-async-hardening.md](../superpowers/plans/2026-06-06-email-async-hardening.md)
+**Plan:** [2026-06-06-email-async-hardening.md](../plans/2026-06-06-email-async-hardening.md)
 **Learning artifact:** [email-async-architecture.html](../learning/2026-06-06-email-async-architecture.html)
 
 ## What shipped

@@ -5,7 +5,7 @@
         <article
           v-for="(stat, index) in stats"
           :key="index"
-          class="glass-panel metric-card"
+          class="glass-panel metric-card sb-card-lift sb-elevated"
         >
           <span class="metric-icon">
             <i :class="['bi', stat.icon]"></i>
@@ -45,7 +45,7 @@
               </button>
               <button
                 type="button"
-                class="week-range-pill sb-btn"
+                class="week-range-pill sb-btn sb-pill"
                 :class="{ 'week-range-pill-current': isViewingCurrentWeek }"
                 :aria-label="weekRangeAriaLabel"
                 :aria-current="isViewingCurrentWeek ? 'date' : undefined"
@@ -98,24 +98,64 @@
                   </div>
 
                   <div class="day-body">
-                    <button
+                    <article
                       v-for="session in daySessionsMap[day.key]"
                       :key="session.id"
-                      type="button"
-                      class="weekly-session-card sb-interactive"
-                      :class="getWeeklySessionCardClasses(session.status)"
+                      class="weekly-session-card sb-interactive sb-elevated"
+                      :class="[
+                        getWeeklySessionCardClasses(session.status),
+                        { 'weekly-session-card-dismissible': canDismissDashboardPill(session) }
+                      ]"
+                      role="button"
+                      tabindex="0"
+                      :aria-label="getSessionCardAriaLabel(session)"
                       @click="goToDetails(session.id)"
+                      @keydown.enter.prevent="goToDetails(session.id)"
+                      @keydown.space.prevent="goToDetails(session.id)"
                     >
                       <p class="weekly-session-time">{{ formatSessionTime(session) }}</p>
-                      <h3 class="weekly-session-title">{{ session.subject }}</h3>
+                      <h4 class="weekly-session-subject">{{ session.subject }}</h4>
                       <p class="weekly-session-tutor">{{ session.tutor }}</p>
-                      <div class="weekly-session-meta">
-                        <span class="weekly-session-status">{{ session.status }}</span>
-                        <span class="weekly-session-duration">
-                          {{ getSessionSlotSpan(session) }} slot{{ getSessionSlotSpan(session) === 1 ? '' : 's' }}
-                        </span>
+                      <span
+                        class="weekly-session-status weekly-session-status-face"
+                        :title="session.status"
+                      >{{ session.status }}</span>
+
+                      <div class="weekly-session-popout">
+                        <p class="weekly-session-popout-time">{{ formatSessionTime(session) }}</p>
+                        <h3 class="weekly-session-title">{{ session.subject }}</h3>
+                        <div class="weekly-session-detail-grid">
+                          <span class="weekly-session-detail-row">
+                            <strong>Tutor</strong>
+                            <span>{{ session.tutor }}</span>
+                          </span>
+                          <span class="weekly-session-detail-row">
+                            <strong>Slots</strong>
+                            <span>{{ getSessionSlotLabel(session) }}</span>
+                          </span>
+                          <span class="weekly-session-detail-row">
+                            <strong>Mode</strong>
+                            <span>{{ session.session_mode || 'Online' }}</span>
+                          </span>
+                          <span class="weekly-session-detail-row">
+                            <strong>Location</strong>
+                            <span>{{ getSessionLocationLabel(session) }}</span>
+                          </span>
+                        </div>
+                        <span class="weekly-session-status" :title="session.status">{{ session.status }}</span>
+
+                        <button
+                          v-if="canDismissDashboardPill(session)"
+                          type="button"
+                          class="weekly-session-dismiss-btn sb-btn"
+                          :aria-label="`Remove ${session.status} schedule pill for ${session.subject}`"
+                          @click.stop="openDismissPillDialog(session)"
+                        >
+                          <i class="bi bi-trash3" aria-hidden="true"></i>
+                          <span>Remove schedule pill</span>
+                        </button>
                       </div>
-                    </button>
+                    </article>
 
                     <div v-if="!daySessionsMap[day.key]?.length" class="day-empty-state">
                       <i :class="getEmptyStateIcon(day.index)"></i>
@@ -133,7 +173,7 @@
             <div class="panel-heading">
               <p class="panel-kicker">Discover</p>
               <h2 class="panel-title">Try out these tutors</h2>
-              <p class="panel-subtitle">Browse recommended tutors without leaving your dashboard rhythm.</p>
+              <p class="panel-subtitle">Recommended for your courses.</p>
             </div>
           </header>
 
@@ -151,31 +191,35 @@
 
               <div v-else class="recommendation-list-wrap">
                 <div class="recommendation-list">
-                  <div v-if="pagedTutors.length === 0" class="recommendation-empty">
+                  <div v-if="featuredTutors.length === 0" class="recommendation-empty">
                     No recommended tutors available at the moment.
                   </div>
 
                   <button
-                    v-for="tutor in pagedTutors"
+                    v-for="tutor in featuredTutors"
                     :key="tutor.id"
                     type="button"
                     class="tutor-list-item sb-interactive"
                     @click="bookTutor(tutor.id)"
                   >
+                    <span class="tutor-avatar" aria-hidden="true">{{ getTutorInitials(tutor) }}</span>
                     <span class="tutor-copy">
                       <span class="tutor-name">{{ tutor.name }}</span>
                       <span class="tutor-meta" :title="getTutorMetaTitle(tutor)">
                         {{ formatTutorMeta(tutor) }}
                       </span>
                     </span>
-                    <span class="tutor-rate">PHP {{ tutor.hourlyRate || 0 }}/hr</span>
+                    <span class="tutor-rate">
+                      <span>PHP</span>
+                      <strong>{{ tutor.hourlyRate || 0 }}/hr</strong>
+                    </span>
                   </button>
                 </div>
 
-                <div v-if="totalPages > 1" class="recommendation-pagination">
-                  <button class="pagination-btn sb-btn" @click="prevPage" :disabled="page === 1">Prev</button>
-                  <span class="pagination-label">Page {{ page }} of {{ totalPages || 1 }}</span>
-                  <button class="pagination-btn sb-btn" @click="nextPage" :disabled="page >= totalPages">Next</button>
+                <div v-if="hasMoreRecommendations" class="recommendation-more">
+                  <button type="button" class="recommendation-more-btn sb-btn" @click="viewMoreTutors">
+                    View More Recommendations
+                  </button>
                 </div>
               </div>
             </Transition>
@@ -183,6 +227,53 @@
         </aside>
       </section>
     </div>
+
+    <Teleport to="body">
+      <Transition name="fade">
+        <div
+          v-if="dismissDialogSession"
+          class="dashboard-modal-backdrop"
+          @click.self="closeDismissPillDialog"
+        >
+          <section
+            class="dashboard-confirm-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="dismiss-pill-title"
+          >
+            <div class="dashboard-confirm-icon" aria-hidden="true">
+              <i class="bi bi-trash3"></i>
+            </div>
+            <div class="dashboard-confirm-copy">
+              <h2 id="dismiss-pill-title">Remove schedule pill?</h2>
+              <p>
+                This hides the {{ dismissDialogSession.status }} pill from your dashboard only.
+                Session history and details stay available.
+              </p>
+              <p v-if="dismissPillError" class="dashboard-confirm-error">{{ dismissPillError }}</p>
+            </div>
+            <div class="dashboard-confirm-actions">
+              <button
+                type="button"
+                class="dashboard-confirm-secondary sb-btn"
+                :disabled="dismissPillPending"
+                @click="closeDismissPillDialog"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                class="dashboard-confirm-danger sb-btn"
+                :disabled="dismissPillPending"
+                @click="confirmDismissDashboardPill"
+              >
+                {{ dismissPillPending ? 'Removing...' : 'Remove pill' }}
+              </button>
+            </div>
+          </section>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -196,6 +287,9 @@ const route = useRoute()
 const sessionsStore = useSessionsStore()
 const loading = ref(false)
 const weekOffset = ref(0)
+const dismissDialogSession = ref(null)
+const dismissPillPending = ref(false)
+const dismissPillError = ref('')
 
 const getSessionDateKey = (session) => {
   const rawDate = session?.date
@@ -334,6 +428,7 @@ const visibleSessions = computed(() => {
       return (
         session.dateKey >= startKey
         && session.dateKey <= endKey
+        && !session.dashboard_hidden_by_current_user
       )
     })
     .sort((left, right) => {
@@ -420,6 +515,31 @@ const getSessionDurationMinutes = (session) => {
 
 const getSessionSlotSpan = (session) => Math.max(1, Math.ceil(getSessionDurationMinutes(session) / 30))
 
+const getSessionDurationLabel = (session) => {
+  const minutes = getSessionDurationMinutes(session)
+
+  if (minutes < 60) {
+    return `${minutes} mins`
+  }
+
+  const hours = minutes / 60
+  return `${Number.isInteger(hours) ? hours : hours.toFixed(1)} hr${hours === 1 ? '' : 's'}`
+}
+
+const getSessionSlotLabel = (session) => {
+  const slots = getSessionSlotSpan(session)
+  return `${slots} slot${slots === 1 ? '' : 's'} / ${getSessionDurationLabel(session)}`
+}
+
+const getSessionLocationLabel = (session) => (
+  session?.preferred_location
+  || (session?.session_mode === 'F2F' ? 'No location set' : 'Online')
+)
+
+const getSessionCardAriaLabel = (session) => (
+  `${formatSessionTime(session)} with ${session.tutor}. ${session.subject}. ${session.status}. Click for full session information.`
+)
+
 const getEmptyStateLabel = (dayIndex) => {
   if (dayIndex === 5) {
     return 'No Sessions'
@@ -457,27 +577,73 @@ const getWeeklySessionCardClasses = (status) => {
   return 'weekly-session-card-upcoming'
 }
 
-const getTutorSubjects = (tutor) => (
-  Array.isArray(tutor?.subjects)
-    ? tutor.subjects.filter(Boolean)
-    : []
-)
+const canDismissDashboardPill = (session) => {
+  const status = String(session?.status || '').toLowerCase()
+  return ['rejected', 'cancelled'].includes(status) && !session?.dashboard_hidden_by_current_user
+}
+
+const openDismissPillDialog = (session) => {
+  dismissDialogSession.value = session
+  dismissPillError.value = ''
+}
+
+const closeDismissPillDialog = () => {
+  if (dismissPillPending.value) {
+    return
+  }
+
+  dismissDialogSession.value = null
+  dismissPillError.value = ''
+}
+
+const confirmDismissDashboardPill = async () => {
+  if (!dismissDialogSession.value) {
+    return
+  }
+
+  dismissPillPending.value = true
+  dismissPillError.value = ''
+
+  try {
+    await sessionsStore.dismissDashboardPill(dismissDialogSession.value.id)
+    dismissDialogSession.value = null
+  } catch (error) {
+    console.error('Failed to remove dashboard pill:', error)
+    dismissPillError.value = 'Could not remove this pill right now. Please try again.'
+  } finally {
+    dismissPillPending.value = false
+  }
+}
+
+const getTutorSubjects = (tutor) => Array.isArray(tutor?.subjects) ? tutor.subjects.filter(Boolean) : []
+
+const formatTutorMeta = (tutor) => {
+  const rating = tutor?.rating || 'N/A'
+  const subjects = getTutorSubjects(tutor)
+  const visible = subjects.slice(0, 2).join(', ') || 'Various subjects'
+  const remaining = subjects.length > 2 ? ` · +${subjects.length - 2} more` : ''
+
+  return `Rating ${rating} · ${visible}${remaining}`
+}
+
+const getTutorInitials = (tutor) => {
+  const name = String(tutor?.name || 'Tutor').trim()
+  const parts = name.split(/\s+/).filter(Boolean)
+
+  return parts
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join('') || 'T'
+}
 
 const getTutorRatingLabel = (tutor) => tutor?.rating || 'N/A'
 
-const formatTutorMeta = (tutor) => {
-  const subjects = getTutorSubjects(tutor)
-  const visibleSubjects = subjects.slice(0, 2).join(', ') || 'Various subjects'
-  const remainingSubjects = subjects.length > 2 ? ` - +${subjects.length - 2} more` : ''
+const getTutorPrimarySubject = (tutor) => getTutorSubjects(tutor)[0] || 'Various subjects'
 
-  return `Rating ${getTutorRatingLabel(tutor)} - ${visibleSubjects}${remainingSubjects}`
-}
 
 const getTutorMetaTitle = (tutor) => {
   const subjects = getTutorSubjects(tutor)
-  const subjectList = subjects.length ? subjects.join(', ') : 'Various subjects'
-
-  return `Rating ${getTutorRatingLabel(tutor)} - ${subjectList}`
+  return subjects.length ? `Rating ${tutor?.rating || 'N/A'} · ${subjects.join(', ')}` : 'Various subjects'
 }
 
 const goToPreviousWeek = () => {
@@ -499,31 +665,16 @@ const stats = computed(() => [
   { label: 'Completed', count: sessionsStore.completedSessions?.length || 0, icon: 'bi-check-square', bgClass: 'bg-success bg-opacity-10' }
 ])
 
-const page = ref(1)
-const pageSize = 5
+const featuredTutorLimit = 5
 
-const totalPages = computed(() => {
-  const total = sessionsStore.recommendedTutors?.length || 0
-  return Math.ceil(total / pageSize) || 1
-})
-
-const pagedTutors = computed(() => {
+const featuredTutors = computed(() => {
   const tutors = sessionsStore.recommendedTutors || []
-  const start = (page.value - 1) * pageSize
-  return tutors.slice(start, start + pageSize)
+  return tutors.slice(0, featuredTutorLimit)
 })
 
-const nextPage = () => {
-  if (page.value < totalPages.value) {
-    page.value += 1
-  }
-}
-
-const prevPage = () => {
-  if (page.value > 1) {
-    page.value -= 1
-  }
-}
+const hasMoreRecommendations = computed(() => (
+  (sessionsStore.recommendedTutors?.length || 0) > featuredTutorLimit
+))
 
 const goToDetails = (id) => {
   router.push({
@@ -536,12 +687,14 @@ const bookTutor = (id) => router.push({
   name: 'tutor-details',
   params: { id }
 })
+
+const viewMoreTutors = () => router.push({ name: 'tutors' })
 </script>
 
 <style scoped>
 .fade-enter-active,
 .fade-leave-active {
-  transition: opacity 0.24s var(--sb-spring, cubic-bezier(0.16, 1, 0.3, 1));
+  transition: opacity var(--sb-t-normal) var(--sb-spring);
 }
 
 .fade-enter-from,
@@ -573,7 +726,7 @@ const bookTutor = (id) => router.push({
   display: grid;
   gap: 1rem;
   width: 100%;
-  max-width: 1180px;
+  max-width: 1280px;
   margin: 0 auto;
 }
 
@@ -652,6 +805,10 @@ const bookTutor = (id) => router.push({
   overflow: hidden;
 }
 
+.weekly-panel {
+  overflow: visible;
+}
+
 .panel-header {
   display: flex;
   align-items: flex-start;
@@ -723,9 +880,7 @@ const bookTutor = (id) => router.push({
   white-space: nowrap;
   user-select: none;
   box-shadow: 0 1px 2px rgba(17, 24, 39, 0.06);
-  transition: border-color var(--sb-t-normal) var(--sb-spring),
-              box-shadow var(--sb-t-normal) var(--sb-spring),
-              color var(--sb-t-normal) var(--sb-spring);
+  transition: none;
 }
 
 .week-range-pill:hover {
@@ -752,7 +907,7 @@ const bookTutor = (id) => router.push({
   border-radius: 999px;
   background: transparent;
   color: var(--sb-muted);
-  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+  transition: transform var(--sb-t-normal) var(--sb-spring);
 }
 
 .schedule-nav-btn:hover:not(:disabled) {
@@ -780,11 +935,8 @@ const bookTutor = (id) => router.push({
 .weekly-board-scroll {
   flex: 1;
   min-height: 0;
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding-bottom: 4px;
-  scrollbar-gutter: stable;
-  contain: paint;
+  overflow: visible;
+  padding-bottom: 0;
 }
 
 .weekly-board-skeleton {
@@ -796,7 +948,7 @@ const bookTutor = (id) => router.push({
 .weekly-grid {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 0.7rem;
+  gap: 0.5rem;
   min-width: 0;
   align-items: start;
 }
@@ -809,7 +961,7 @@ const bookTutor = (id) => router.push({
   border: 1px solid var(--sb-card-border);
   border-radius: 20px;
   background: transparent;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .day-column-today {
@@ -827,7 +979,7 @@ const bookTutor = (id) => router.push({
 }
 
 .day-header {
-  padding: 0.75rem 0.65rem;
+  padding: 0.65rem 0.45rem;
   background: var(--sb-bg);
   text-align: center;
 }
@@ -850,39 +1002,188 @@ const bookTutor = (id) => router.push({
 }
 
 .day-body {
-  display: grid;
-  align-content: start;
-  gap: 0.55rem;
-  padding: 0.65rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.5rem;
   min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: visible;
   min-width: 0;
   background: color-mix(in srgb, var(--sb-bg) 76%, var(--sb-card-bg));
-  scrollbar-gutter: stable;
-  contain: paint;
 }
 
 .weekly-session-card {
+  position: relative;
   display: flex;
   flex-direction: column;
+  justify-content: flex-start;
   width: 100%;
-  height: 128px;
-  min-height: 128px;
-  max-height: 128px;
+  height: 150px;
+  min-height: 150px;
+  max-height: 150px;
   border: 1px solid transparent;
-  border-radius: 16px;
-  padding: 0.75rem;
+  border-radius: 14px;
+  padding: 0.56rem;
   text-align: left;
-  transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+  transition: transform var(--sb-t-normal) var(--sb-spring);
   box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05);
   min-width: 0;
-  overflow: hidden;
+  overflow: visible;
+  cursor: pointer;
 }
 
 .weekly-session-card:hover {
+  z-index: 10;
   box-shadow: 0 0 0 1px rgba(0, 137, 90, 0.18),
               0 3px 8px rgba(15, 23, 42, 0.05);
+}
+
+.weekly-session-card:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--sb-primary) 72%, white);
+  outline-offset: 2px;
+}
+
+.weekly-session-card-dismissible .weekly-session-time {
+  padding-right: 0;
+}
+
+.weekly-session-popout {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 0.45rem);
+  z-index: 20;
+  width: min(240px, calc(100vw - 40px));
+  border: 1px solid var(--sb-card-border);
+  border-radius: 14px;
+  background: var(--sb-card-bg);
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.16);
+  padding: 0.75rem;
+  opacity: 0;
+  visibility: hidden;
+  transform: translate(-50%, -4px) scale(0.98);
+  transition:
+    opacity 0.18s ease 0.2s,
+    transform 0.18s ease 0.2s,
+    visibility 0s linear 0.38s;
+}
+
+.weekly-session-card:hover .weekly-session-popout,
+.weekly-session-card:focus-within .weekly-session-popout,
+.weekly-session-card:focus-visible .weekly-session-popout {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(-50%, 0) scale(1);
+  transition-delay: 0s;
+}
+
+.weekly-session-popout::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -7px;
+  width: 12px;
+  height: 12px;
+  border-left: 1px solid var(--sb-card-border);
+  border-top: 1px solid var(--sb-card-border);
+  background: var(--sb-card-bg);
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.day-column:nth-child(n + 6) .weekly-session-popout {
+  right: 0;
+  left: auto;
+  transform: translateY(-4px) scale(0.98);
+}
+
+.day-column:nth-child(n + 6) .weekly-session-card:hover .weekly-session-popout,
+.day-column:nth-child(n + 6) .weekly-session-card:focus-within .weekly-session-popout,
+.day-column:nth-child(n + 6) .weekly-session-card:focus-visible .weekly-session-popout {
+  transform: translateY(0) scale(1);
+}
+
+.day-column:nth-child(n + 6) .weekly-session-popout::before {
+  right: 1rem;
+  left: auto;
+  transform: rotate(45deg);
+}
+
+.weekly-session-popout-time {
+  margin: 0 0 0.25rem;
+  color: #006c49;
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.weekly-session-detail-grid {
+  display: grid;
+  gap: 0.38rem;
+}
+
+.weekly-session-detail-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.65rem;
+  min-width: 0;
+  color: var(--sb-muted);
+  font-size: 0.68rem;
+  line-height: 1.25;
+}
+
+.weekly-session-detail-row strong {
+  flex: 0 0 auto;
+  color: var(--sb-ink);
+  font-size: 0.6rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.weekly-session-detail-row span {
+  min-width: 0;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.weekly-session-popout .weekly-session-dismiss-btn {
+  position: static;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  width: 100%;
+  min-height: 30px;
+  margin-top: 0.65rem;
+  border: 1px solid #dc2626;
+  border-radius: 999px;
+  background: transparent;
+  color: #b91c1c;
+  padding: 0.3rem 0.55rem;
+  font-size: 0.68rem;
+  font-weight: 850;
+  line-height: 1;
+  transition:
+    opacity var(--sb-t-normal) var(--sb-spring),
+    transform var(--sb-t-normal) var(--sb-spring);
+}
+
+.weekly-session-popout .weekly-session-status {
+  flex: 0 0 auto;
+  max-width: 100%;
+  margin-top: 0.5rem;
+  padding: 0.16rem 0.5rem;
+  font-size: 0.6rem;
+}
+
+.weekly-session-dismiss-btn:hover,
+.weekly-session-dismiss-btn:focus-visible {
+  background: #fee2e2;
+  color: #991b1b;
 }
 
 .weekly-session-card-upcoming {
@@ -928,13 +1229,14 @@ const bookTutor = (id) => router.push({
 .weekly-session-status {
   display: inline-flex;
   align-items: center;
+  flex: 1 1 auto;
   min-width: 0;
-  max-width: 100%;
-  min-height: 22px;
-  padding: 0.1rem 0.45rem;
+  max-width: min(100%, 58px);
+  min-height: 20px;
+  padding: 0.08rem 0.36rem;
   border-radius: 999px;
   background: var(--sb-bg);
-  font-size: 0.58rem;
+  font-size: 0.54rem;
   font-weight: 800;
   letter-spacing: 0;
   text-transform: uppercase;
@@ -988,18 +1290,18 @@ const bookTutor = (id) => router.push({
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
-  margin: 0 0 0.25rem;
-  font-size: 0.72rem;
+  margin: 0 0 0.2rem;
+  font-size: 0.68rem;
   font-weight: 800;
-  line-height: 1.3;
+  line-height: 1.25;
   color: var(--sb-ink);
   overflow: hidden;
   word-break: break-word;
 }
 
 .weekly-session-time {
-  margin: 0 0 0.45rem;
-  font-size: 0.62rem;
+  margin: 0 0 0.32rem;
+  font-size: 0.58rem;
   font-weight: 800;
   color: #006c49;
   letter-spacing: 0;
@@ -1009,52 +1311,224 @@ const bookTutor = (id) => router.push({
   text-overflow: ellipsis;
 }
 
-.weekly-session-tutor {
-  margin: 0 0 0.55rem;
+.weekly-session-subject {
+  margin: 0 0 0.18rem;
   font-size: 0.66rem;
+  font-weight: 800;
+  line-height: 1.2;
+  color: var(--sb-ink);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  word-break: break-word;
+}
+
+.weekly-session-tutor {
+  margin: 0 0 0.36rem;
+  font-size: 0.62rem;
   color: var(--sb-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.weekly-session-status-face {
+  margin-top: auto;
+  max-width: 100%;
+  align-self: flex-start;
+  flex: 0 0 auto;
+}
+
 .weekly-session-meta {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.5rem;
+  gap: 0.25rem;
   min-width: 0;
   margin-top: auto;
+  width: 100%;
 }
 
 .weekly-session-duration {
-  font-size: 0.58rem;
+  font-size: 0.54rem;
   font-weight: 700;
   color: var(--sb-muted);
-  flex-shrink: 0;
+  flex: 0 0 auto;
   white-space: nowrap;
+}
+
+.dashboard-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1080;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(15, 23, 42, 0.36);
+}
+
+.dashboard-confirm-modal {
+  width: min(100%, 390px);
+  border: 1px solid var(--sb-card-border);
+  border-radius: 18px;
+  background: var(--sb-card-bg);
+  color: var(--sb-ink);
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.22);
+  padding: 1.15rem;
+}
+
+.dashboard-confirm-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.35rem;
+  height: 2.35rem;
+  border-radius: 999px;
+  background: #fee2e2;
+  color: #b91c1c;
+  margin-bottom: 0.85rem;
+}
+
+.dashboard-confirm-copy h2 {
+  margin: 0 0 0.45rem;
+  color: var(--sb-ink);
+  font-size: 1.05rem;
+  font-weight: 850;
+  letter-spacing: 0;
+}
+
+.dashboard-confirm-copy p {
+  margin: 0;
+  color: var(--sb-muted);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.dashboard-confirm-error {
+  margin-top: 0.65rem !important;
+  color: #b91c1c !important;
+  font-weight: 750;
+}
+
+.dashboard-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  margin-top: 1rem;
+}
+
+.dashboard-confirm-secondary,
+.dashboard-confirm-danger {
+  min-height: 36px;
+  border-radius: 999px;
+  padding: 0.48rem 0.85rem;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.dashboard-confirm-secondary {
+  border: 1px solid var(--sb-card-border);
+  background: var(--sb-card-bg);
+  color: var(--sb-muted);
+}
+
+.dashboard-confirm-danger {
+  border: 1px solid #dc2626;
+  background: #dc2626;
+  color: #fff;
+}
+
+.dashboard-confirm-secondary:disabled,
+.dashboard-confirm-danger:disabled {
+  opacity: 0.68;
+  cursor: not-allowed;
+}
+
+:global([data-sb-theme="dark"]) .weekly-session-dismiss-btn {
+  border-color: rgba(248, 113, 113, 0.35);
+  background: rgba(15, 23, 42, 0.72);
+  color: #fecaca;
+}
+
+:global([data-sb-theme="dark"]) .weekly-session-popout {
+  background: #0b241c;
+  border-color: #1d4537;
+  box-shadow: 0 20px 54px rgba(2, 18, 13, 0.34);
+}
+
+:global([data-sb-theme="dark"]) .weekly-session-popout::before {
+  background: #0b241c;
+  border-color: #1d4537;
+}
+
+:global([data-sb-theme="dark"]) .weekly-session-popout-time {
+  color: #8ee4bf;
+}
+
+:global([data-sb-theme="dark"]) .weekly-session-detail-row {
+  color: #a8bbb3;
+}
+
+:global([data-sb-theme="dark"]) .weekly-session-detail-row strong {
+  color: #f3f7f5;
+}
+
+:global([data-sb-theme="dark"]) .weekly-session-dismiss-btn:hover,
+:global([data-sb-theme="dark"]) .weekly-session-dismiss-btn:focus-visible {
+  background: rgba(127, 29, 29, 0.78);
+  color: #fff;
+}
+
+:global([data-sb-theme="dark"]) .dashboard-modal-backdrop {
+  background: rgba(2, 6, 23, 0.58);
+}
+
+:global([data-sb-theme="dark"]) .dashboard-confirm-icon {
+  background: rgba(127, 29, 29, 0.42);
+  color: #fecaca;
+}
+
+:global([data-sb-theme="dark"]) .dashboard-confirm-error {
+  color: #fca5a5 !important;
 }
 
 
 .day-empty-state {
-  min-height: 86px;
+  width: 100%;
+  min-height: 82px;
+  flex-grow: 1;
   border: 1px dashed var(--sb-card-border);
-  border-radius: 16px;
+  border-radius: 14px;
   background: color-mix(in srgb, var(--sb-card-bg) 72%, transparent);
-  display: grid;
-  place-items: center;
-  gap: 0.45rem;
-  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.38rem;
+  padding: 0.55rem;
   text-align: center;
   color: var(--sb-muted);
-  font-size: 0.62rem;
+  font-size: 0.58rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0;
 }
 
 .day-empty-state i {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.2rem;
+  height: 1.2rem;
   font-size: 1rem;
+  line-height: 1;
+}
+
+.day-empty-state span {
+  display: block;
+  max-width: 100%;
+  line-height: 1.25;
 }
 
 .session-card-skeleton {
@@ -1069,6 +1543,49 @@ const bookTutor = (id) => router.push({
   margin-bottom: 0.8rem;
 }
 
+.recommendation-panel {
+  --recommendation-panel-bg: color-mix(in srgb, var(--sb-card-bg) 96%, var(--sb-bg));
+  --recommendation-panel-border: var(--sb-card-border);
+  --recommendation-card-bg: color-mix(in srgb, var(--sb-card-bg) 84%, transparent);
+  --recommendation-card-border: color-mix(in srgb, var(--sb-card-border) 88%, var(--sb-primary));
+  --recommendation-card-hover: color-mix(in srgb, var(--sb-card-bg) 94%, var(--sb-primary));
+  --recommendation-title: var(--sb-ink);
+  --recommendation-muted: var(--sb-muted);
+  --recommendation-rate: var(--sb-primary);
+  --recommendation-avatar-bg: var(--sb-green-tint);
+  --recommendation-avatar-border: color-mix(in srgb, var(--sb-primary) 50%, var(--sb-card-border));
+  --recommendation-divider: color-mix(in srgb, var(--sb-card-border) 92%, transparent);
+  background: var(--recommendation-panel-bg);
+  border-color: var(--recommendation-panel-border);
+}
+
+:global([data-sb-theme="dark"]) .recommendation-panel {
+  --recommendation-panel-bg: #09231c;
+  --recommendation-panel-border: #1f4d3c;
+  --recommendation-card-bg: #172d25;
+  --recommendation-card-border: #1f3b32;
+  --recommendation-card-hover: #1b3a30;
+  --recommendation-title: #f3f7f5;
+  --recommendation-muted: #a7bbb3;
+  --recommendation-rate: #a8e5cd;
+  --recommendation-avatar-bg: #0b1815;
+  --recommendation-avatar-border: #75b59c;
+  --recommendation-divider: #1a332b;
+  box-shadow: 0 12px 28px rgba(2, 18, 13, 0.2);
+}
+
+:global([data-sb-theme="dark"]) .recommendation-panel .panel-kicker {
+  color: #789189;
+}
+
+:global([data-sb-theme="dark"]) .recommendation-panel .panel-title {
+  color: var(--recommendation-title);
+}
+
+:global([data-sb-theme="dark"]) .recommendation-panel .panel-subtitle {
+  color: #b6c8c0;
+}
+
 .recommendation-body,
 .recommendation-list-wrap {
   display: flex;
@@ -1079,18 +1596,18 @@ const bookTutor = (id) => router.push({
 
 .recommendation-list {
   display: grid;
-  gap: 0.65rem;
+  grid-template-rows: repeat(5, minmax(0, 1fr));
+  gap: 0.45rem;
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
-  padding-right: 0.15rem;
-  scrollbar-gutter: stable;
+  overflow: hidden;
   contain: paint;
 }
 
 .recommendation-empty {
   display: grid;
-  min-height: 160px;
+  grid-row: 1 / -1;
+  min-height: 0;
   place-items: center;
   border: 1px dashed var(--sb-card-border);
   border-radius: 18px;
@@ -1103,41 +1620,63 @@ const bookTutor = (id) => router.push({
 }
 
 .tutor-list-item {
-  display: flex;
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) minmax(58px, auto);
   align-items: center;
-  justify-content: space-between;
-  gap: 0.9rem;
+  gap: 0.5rem;
   width: 100%;
-  height: 84px;
-  min-height: 84px;
-  max-height: 84px;
-  border: 1px solid var(--sb-card-border);
-  border-radius: 18px;
-  background: color-mix(in srgb, var(--sb-card-bg) 78%, transparent);
+  height: 100%;
+  min-height: 0;
+  max-height: none;
+  border: 1px solid var(--recommendation-card-border);
+  border-radius: 16px;
+  background: var(--recommendation-card-bg);
   color: inherit;
-  padding: 0.85rem;
+  padding: 0.55rem;
   text-align: left;
   cursor: pointer;
-  transition: border-color 0.18s ease, background-color 0.18s ease;
+  overflow: hidden;
+  transition:
+    transform var(--sb-t-normal) var(--sb-spring),
+    border-color var(--sb-t-normal) var(--sb-spring),
+    background-color var(--sb-t-normal) var(--sb-spring);
 }
 
 .tutor-list-item:hover {
   border-color: color-mix(in srgb, var(--sb-primary) 30%, var(--sb-card-border));
-  background: color-mix(in srgb, var(--sb-card-bg) 92%, var(--sb-primary));
+  background: var(--recommendation-card-hover);
+}
+
+.tutor-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 2px solid var(--recommendation-avatar-border);
+  border-radius: 50%;
+  background: var(--recommendation-avatar-bg);
+  color: var(--recommendation-rate);
+  font-size: 0.7rem;
+  font-weight: 900;
+  line-height: 1;
+  flex: 0 0 auto;
 }
 
 .tutor-copy {
   display: grid;
-  gap: 0.25rem;
+  align-content: center;
+  gap: 0.16rem;
   min-width: 0;
   overflow: hidden;
 }
 
 .tutor-name {
   display: block;
-  color: var(--sb-ink);
-  font-size: 0.96rem;
+  color: var(--recommendation-title);
+  font-size: 0.88rem;
   font-weight: 850;
+  line-height: 1.2;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1145,64 +1684,87 @@ const bookTutor = (id) => router.push({
 
 .tutor-meta {
   display: -webkit-box;
-  -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
-  color: var(--sb-muted);
-  font-size: 0.78rem;
-  font-weight: 650;
-  line-height: 1.35;
+  -webkit-box-orient: vertical;
   overflow: hidden;
+  color: var(--recommendation-muted);
+  font-size: 0.66rem;
+  font-weight: 750;
+  line-height: 1.25;
 }
 
-.tutor-rate {
+.tutor-rating {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
+  gap: 0.16rem;
   flex: 0 0 auto;
-  min-height: 34px;
-  border: 1px solid rgba(0, 137, 90, 0.24);
-  border-radius: 999px;
-  background: rgba(0, 137, 90, 0.09);
-  color: #07543a;
-  padding: 0.35rem 0.65rem;
-  font-size: 0.78rem;
-  font-weight: 850;
-  min-width: 96px;
+  color: #d99912;
+  font-weight: 900;
   white-space: nowrap;
 }
 
-.recommendation-pagination {
+:global([data-sb-theme="dark"]) .tutor-rating {
+  color: #ffc84d;
+}
+
+.tutor-rating i {
+  font-size: 0.64rem;
+  line-height: 1;
+}
+
+.tutor-meta-dot {
+  color: var(--recommendation-muted);
+  flex: 0 0 auto;
+  opacity: 0.9;
+}
+
+.tutor-subject {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tutor-rate {
+  display: grid;
+  align-content: center;
+  justify-items: end;
+  flex: 0 0 auto;
+  gap: 0.12rem;
+  color: var(--recommendation-rate);
+  font-weight: 900;
+  min-width: 54px;
+  white-space: nowrap;
+}
+
+.tutor-rate span {
+  font-size: 0.64rem;
+  line-height: 1;
+}
+
+.tutor-rate strong {
+  font-size: 0.8rem;
+  line-height: 1.15;
+}
+
+.recommendation-more {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
+  justify-content: center;
   flex: 0 0 auto;
-  margin-top: 0.8rem;
-  padding-top: 0.8rem;
-  border-top: 1px solid var(--sb-card-border);
+  margin-top: 0.55rem;
+  padding-top: 0.55rem;
+  border-top: 1px solid var(--recommendation-divider);
 }
 
-.pagination-btn {
-  min-height: 36px;
+.recommendation-more-btn {
   border: 0;
-  border-radius: 999px;
-  background: var(--sb-primary);
-  color: #fff;
-  padding: 0.5rem 0.85rem;
+  background: transparent;
+  color: var(--recommendation-muted);
+  padding: 0.25rem 0;
   font-size: 0.8rem;
   font-weight: 850;
-}
-
-.pagination-btn:disabled {
-  background: var(--sb-card-border);
-  color: var(--sb-muted);
-  cursor: not-allowed;
-}
-
-.pagination-label {
-  color: var(--sb-muted);
-  font-size: 0.82rem;
-  font-weight: 750;
+  text-align: center;
 }
 
 .recommendation-skeleton {
@@ -1239,8 +1801,8 @@ const bookTutor = (id) => router.push({
   }
 
   .weekly-grid {
-    grid-template-columns: repeat(7, minmax(118px, 1fr));
-    min-width: 860px;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    min-width: 0;
   }
 }
 
@@ -1277,12 +1839,12 @@ const bookTutor = (id) => router.push({
   }
 
   .weekly-grid {
-    grid-template-columns: repeat(7, minmax(150px, 1fr));
-    min-width: 1080px;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    min-width: 0;
   }
 
   .weekly-board-nav,
-  .recommendation-pagination {
+  .recommendation-more {
     width: 100%;
   }
 
@@ -1292,44 +1854,12 @@ const bookTutor = (id) => router.push({
   }
 
   .tutor-list-item {
-    align-items: flex-start;
-    flex-direction: column;
-    height: 132px;
-    min-height: 132px;
-    max-height: 132px;
+    grid-template-columns: 36px minmax(0, 1fr) minmax(58px, auto);
   }
 
-  .tutor-rate,
-  .pagination-btn {
+  .recommendation-more-btn {
     width: 100%;
   }
 }
 
-/* Remove Animations and Hover Effects for Tutee Dashboard */
-
-/* 1. Remove hover effects from interactive elements */
-.week-range-pill:hover,
-.schedule-nav-btn:hover:not(:disabled),
-.weekly-session-card:hover,
-.tutor-list-item:hover {
-  transform: none !important;
-  box-shadow: 0 1px 2px rgba(17, 24, 39, 0.06) !important; /* Restore base shadow, no hover shadow */
-  background-color: inherit !important;
-  border-color: inherit !important;
-  color: inherit !important;
-}
-
-/* 2. Remove animations from elements */
-.week-range-pill-current {
-  animation: none !important;
-}
-
-.weekly-session-card {
-  transition: none !important;
-}
-
-/* 3. Remove stagger animation from metric cards */
-.metric-card {
-  animation: none !important;
-}
 </style>

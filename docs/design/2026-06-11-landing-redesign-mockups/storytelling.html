@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Direction S — Illustrated Storytelling</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --sb-primary: #00895A;
+    --sb-bg: #F8F9FA;
+    --sb-card-border: #EAEAEA;
+    --sb-text-main: #163127;
+    --sb-text-muted: #6B7280;
+    --sb-dark: #0A1916;
+    --pop-yellow: #FFC94D;
+    --pop-orange: #FF8A5C;
+    --pop-pink: #FF8FA3;
+    --sb-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { font-family: 'Inter', system-ui, sans-serif; background: var(--sb-bg); color: var(--sb-text-main); overflow-x: hidden; }
+
+  nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100; display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 36px; transition: background .4s, backdrop-filter .4s;
+  }
+  nav.solid { background: rgba(248,249,250,.85); backdrop-filter: blur(10px); border-bottom: 1px solid var(--sb-card-border); }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 900; font-size: 19px; }
+  .brand .mark { width: 34px; height: 34px; background: var(--sb-primary); color: #fff; border-radius: 10px; display: grid; place-items: center; font-size: 18px; }
+  .navlinks { display: flex; gap: 12px; }
+  .btn { font: 600 14.5px 'Inter'; text-decoration: none; padding: 10px 24px; border-radius: 999px; transition: transform .2s var(--sb-spring); display: inline-block; }
+  .btn.primary { background: var(--sb-primary); color: #fff; box-shadow: 0 6px 18px rgba(0,137,90,.25); }
+  .btn.primary:hover { transform: translateY(-3px); }
+  .btn.outline { border: 1.5px solid var(--sb-card-border); color: var(--sb-text-main); background: #fff; }
+  .back { position: fixed; bottom: 18px; left: 18px; z-index: 160; font-size: 13px; background: #fff; border: 1px solid var(--sb-card-border); }
+
+  /* chapter progress dots */
+  .dots { position: fixed; right: 22px; top: 50%; transform: translateY(-50%); z-index: 90; display: flex; flex-direction: column; gap: 10px; }
+  .dots i { width: 8px; height: 8px; border-radius: 50%; background: rgba(22,49,39,.18); transition: background .3s, transform .3s; }
+  .dots i.on { background: var(--sb-primary); transform: scale(1.4); }
+
+  /* intro */
+  .intro { min-height: 92vh; display: grid; place-items: center; text-align: center; padding: 110px 28px 40px; }
+  .intro .kick { font-size: 13px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: var(--sb-primary); margin-bottom: 20px; }
+  .intro h1 { font-size: clamp(40px, 6vw, 80px); font-weight: 900; letter-spacing: -0.04em; line-height: 1; max-width: 900px; }
+  .intro h1 em { font-style: normal; color: var(--sb-primary); }
+  .intro p { color: var(--sb-text-muted); font-size: 17px; margin-top: 20px; }
+  .intro .cue { margin-top: 44px; font-size: 12px; letter-spacing: 2.5px; text-transform: uppercase; color: var(--sb-text-muted); }
+  .intro .cue .bar { width: 1.5px; height: 44px; background: rgba(22,49,39,.22); margin: 10px auto 0; position: relative; overflow: hidden; }
+  .intro .cue .bar::after { content: ""; position: absolute; left: 0; right: 0; height: 50%; background: var(--sb-primary); animation: cue 1.6s ease-in-out infinite; }
+  @keyframes cue { 0% { top: -50% } 100% { top: 100% } }
+
+  /* chapters */
+  .chapter { height: 300vh; position: relative; }
+  .stage { position: sticky; top: 0; height: 100vh; overflow: hidden; display: grid; grid-template-columns: 1fr 1.15fr; align-items: center; gap: 30px; padding: 0 6vw; }
+  .stage .txt h2 { font-size: clamp(30px, 3.8vw, 52px); font-weight: 900; letter-spacing: -0.03em; line-height: 1.02; margin-bottom: 16px; }
+  .stage .txt .chno { font-size: 13px; font-weight: 800; letter-spacing: 2.5px; text-transform: uppercase; margin-bottom: 14px; display: block; }
+  .stage .txt p { font-size: 16.5px; line-height: 1.65; max-width: 420px; }
+  .stage .art { display: grid; place-items: center; }
+  .stage .art svg { width: min(46vw, 620px); height: auto; }
+
+  /* ch1 — night */
+  #ch1 .stage { background: var(--sb-dark); color: #fff; }
+  #ch1 .chno { color: var(--pop-yellow); }
+  #ch1 p { color: rgba(255,255,255,.66); }
+  /* ch2 — dawn paper */
+  #ch2 .stage { background: #EDF4F0; }
+  #ch2 .chno { color: var(--sb-primary); }
+  #ch2 p { color: var(--sb-text-muted); }
+  /* ch3 — whiteboard */
+  #ch3 .stage { background: #fff; background-image: linear-gradient(rgba(0,137,90,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(0,137,90,.05) 1px, transparent 1px); background-size: 36px 36px; }
+  #ch3 .chno { color: var(--pop-orange); }
+  #ch3 p { color: var(--sb-text-muted); }
+  /* ch4 — morning */
+  #ch4 .stage { background: linear-gradient(180deg, #FFF7E2 0%, #F8F9FA 80%); }
+  #ch4 .chno { color: var(--sb-primary); }
+  #ch4 p { color: var(--sb-text-muted); }
+
+  .line { opacity: 0; transform: translateY(20px); transition: opacity .5s ease, transform .5s var(--sb-spring); }
+  .line.on { opacity: 1; transform: none; }
+
+  /* CTA */
+  .ctawrap { padding: 110px 28px 120px; text-align: center; }
+  .ctawrap h2 { font-size: clamp(34px, 4.6vw, 64px); font-weight: 900; letter-spacing: -0.035em; }
+  .ctawrap h2 em { font-style: normal; color: var(--sb-primary); }
+  .ctawrap p { color: var(--sb-text-muted); font-size: 16.5px; margin: 16px 0 30px; }
+  .cta-row { display: flex; gap: 14px; justify-content: center; }
+  footer { border-top: 1px solid var(--sb-card-border); padding: 26px; text-align: center; color: var(--sb-text-muted); font-size: 13.5px; }
+
+  .reveal { opacity: 0; transform: translateY(30px); transition: opacity .8s ease, transform .8s var(--sb-spring); }
+  .reveal.in { opacity: 1; transform: none; }
+
+  @media (max-width: 880px) {
+    .stage { grid-template-columns: 1fr; grid-template-rows: auto 1fr; padding-top: 90px; text-align: center; }
+    .stage .txt p { margin: 0 auto; }
+    .stage .art svg { width: min(86vw, 480px); }
+    .dots { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .chapter { height: auto; }
+    .stage { position: static; height: auto; padding: 80px 6vw; }
+    .line { opacity: 1; transform: none; }
+    .reveal { opacity: 1; transform: none; transition: none; }
+  }
+</style>
+</head>
+<body>
+
+<nav id="topnav">
+  <div class="brand"><span class="mark">S</span> Studybuddy</div>
+  <div class="navlinks">
+    <a class="btn outline" href="#">Log in</a>
+    <a class="btn primary" href="#">Get started</a>
+  </div>
+</nav>
+
+<div class="dots" id="dots"><i></i><i></i><i></i><i></i></div>
+
+<!-- INTRO -->
+<section class="intro">
+  <div>
+    <div class="kick reveal in">Peer tutoring — Central Philippine University</div>
+    <h1 class="reveal in">Every "finally, <em>I get it</em>" starts the same way.</h1>
+    <p class="reveal in">Scroll through one student's week. Yours could go like this too.</p>
+    <div class="cue reveal in">Scroll<span class="bar"></span></div>
+  </div>
+</section>
+
+<!-- CHAPTER 1 — 11 PM -->
+<section class="chapter" id="ch1">
+  <div class="stage">
+    <div class="txt">
+      <span class="chno">Chapter 01 — 11:04 PM</span>
+      <h2>Three days to the midterm.</h2>
+      <p class="line" data-at="0.12">Integration by parts has officially won.</p>
+      <p class="line" data-at="0.3">The lecture slides aren't helping. The 2-hour video isn't either.</p>
+      <p class="line" data-at="0.5">Then a classmate sends a link...</p>
+    </div>
+    <div class="art">
+      <svg viewBox="0 0 560 420" fill="none">
+        <!-- moon, rises with p -->
+        <g id="moon"><circle cx="452" cy="96" r="30" fill="#FFC94D" opacity=".9"/><circle cx="441" cy="88" r="26" fill="#0A1916"/></g>
+        <circle cx="90" cy="70" r="2.5" fill="#fff" opacity=".7"/>
+        <circle cx="180" cy="44" r="2" fill="#fff" opacity=".5"/>
+        <circle cx="320" cy="80" r="2.5" fill="#fff" opacity=".6"/>
+        <circle cx="500" cy="190" r="2" fill="#fff" opacity=".5"/>
+        <!-- desk -->
+        <path d="M80 330 h 400" stroke="#3D5A4F" stroke-width="4" stroke-linecap="round"/>
+        <!-- laptop glow -->
+        <path d="M210 328 l 14 -44 h 112 l 14 44 Z" fill="#10241E" stroke="#3D5A4F" stroke-width="3"/>
+        <ellipse id="glow" cx="280" cy="282" rx="90" ry="48" fill="rgba(255,201,77,.10)"/>
+        <!-- student, head sinks with p -->
+        <g id="student1">
+          <circle cx="280" cy="208" r="34" fill="#0A1916" stroke="#E8F1ED" stroke-width="3"/>
+          <path d="M249 200 q 2 -28 31 -28 q 27 0 31 22" stroke="#E8F1ED" stroke-width="2.6" stroke-linecap="round"/>
+          <path d="M268 206 q 3 -3 7 0 M291 206 q 3 -3 7 0" stroke="#E8F1ED" stroke-width="2.6" stroke-linecap="round"/>
+          <path d="M272 224 q 8 -4 16 0" stroke="#E8F1ED" stroke-width="2.6" stroke-linecap="round"/>
+          <path d="M280 242 v 50 M280 254 q -30 14 -42 34 M280 254 q 30 14 42 34" stroke="#E8F1ED" stroke-width="3" stroke-linecap="round"/>
+        </g>
+        <!-- floating question marks, rise + fade with p -->
+        <text id="q1" x="160" y="180" font-family="Inter" font-weight="800" font-size="34" fill="#FF8FA3" opacity="0">?</text>
+        <text id="q2" x="380" y="150" font-family="Inter" font-weight="800" font-size="44" fill="#FF8A5C" opacity="0">?</text>
+        <text id="q3" x="330" y="220" font-family="Inter" font-weight="800" font-size="26" fill="#FFC94D" opacity="0">?</text>
+        <!-- notification pops at end -->
+        <g id="notif" opacity="0">
+          <rect x="330" y="96" width="180" height="56" rx="14" fill="#fff"/>
+          <circle cx="358" cy="124" r="13" fill="#00895A"/>
+          <text x="352" y="130" font-family="Inter" font-weight="800" font-size="14" fill="#fff">S</text>
+          <text x="380" y="119" font-family="Inter" font-weight="700" font-size="12.5" fill="#163127">Studybuddy</text>
+          <text x="380" y="136" font-family="Inter" font-size="11.5" fill="#6B7280">Someone aced Calc 2...</text>
+        </g>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- CHAPTER 2 — THE MATCH -->
+<section class="chapter" id="ch2">
+  <div class="stage">
+    <div class="txt">
+      <span class="chno">Chapter 02 — The match</span>
+      <h2>Someone on campus already cracked it.</h2>
+      <p class="line" data-at="0.12">Subject: Calculus 2. Free: Thursday nights.</p>
+      <p class="line" data-at="0.32">The recommender digs through CPU's tutors and pulls up the one who fits.</p>
+      <p class="line" data-at="0.55">Match score, out in the open.</p>
+    </div>
+    <div class="art">
+      <svg viewBox="0 0 560 420" fill="none">
+        <!-- you -->
+        <g id="you2">
+          <circle cx="140" cy="190" r="40" fill="#fff" stroke="#163127" stroke-width="3"/>
+          <path d="M103 181 q 3 -33 37 -33 q 32 0 37 26 M119 153 q 7 -9 15 -10" stroke="#163127" stroke-width="2.8" stroke-linecap="round"/>
+          <path d="M127 186 q 4 5 9 0 M153 186 q 4 5 9 0" stroke="#163127" stroke-width="2.8" stroke-linecap="round"/>
+          <path d="M131 206 q 9 7 18 0" stroke="#163127" stroke-width="2.8" stroke-linecap="round"/>
+          <path d="M119 196 l 8 1 M169 197 l -8 -1" stroke="#FF8FA3" stroke-width="2.5" stroke-linecap="round" opacity=".75"/>
+        </g>
+        <!-- tutor slides in from right -->
+        <g id="tutor2">
+          <circle cx="420" cy="190" r="40" fill="#fff" stroke="#163127" stroke-width="3"/>
+          <path d="M383 181 q 5 -32 37 -32 q 31 0 37 25" stroke="#163127" stroke-width="2.8" stroke-linecap="round"/>
+          <circle cx="455" cy="158" r="7" fill="#163127"/>
+          <path d="M407 186 q 4 5 9 0 M433 186 q 4 5 9 0" stroke="#163127" stroke-width="2.8" stroke-linecap="round"/>
+          <circle cx="411.5" cy="187" r="10" fill="none" stroke="#163127" stroke-width="2.4"/>
+          <circle cx="437.5" cy="187" r="10" fill="none" stroke="#163127" stroke-width="2.4"/>
+          <path d="M421 187 h 7" stroke="#163127" stroke-width="2.4" stroke-linecap="round"/>
+          <path d="M411 209 q 8 6 16 0" stroke="#163127" stroke-width="2.8" stroke-linecap="round"/>
+        </g>
+        <!-- connecting dashed line draws -->
+        <path id="connect" d="M188 178 Q 280 110 372 178" stroke="#00895A" stroke-width="4" stroke-linecap="round" fill="none"/>
+        <!-- star check -->
+        <g id="star2" opacity="0"><circle cx="280" cy="128" r="18" fill="#FFC94D"/><path d="M272 128 l 6 6 l 11 -12" stroke="#163127" stroke-width="3" stroke-linecap="round" fill="none"/></g>
+        <!-- match card -->
+        <g id="card2" opacity="0">
+          <rect x="120" y="268" width="320" height="84" rx="18" fill="#fff" stroke="#EAEAEA" stroke-width="2"/>
+          <text x="144" y="302" font-family="Inter" font-weight="700" font-size="15" fill="#163127">BS Math, 3rd yr — aced Calc 2</text>
+          <text x="144" y="324" font-family="Inter" font-size="12.5" fill="#6B7280">Free Thu nights · explains with examples</text>
+          <text id="pct" x="424" y="318" text-anchor="end" font-family="Inter" font-weight="900" font-size="26" fill="#00895A">0%</text>
+        </g>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- CHAPTER 3 — THE SESSION -->
+<section class="chapter" id="ch3">
+  <div class="stage">
+    <div class="txt">
+      <span class="chno">Chapter 03 — Thursday, 7 PM</span>
+      <h2>One whiteboard. Two students.</h2>
+      <p class="line" data-at="0.12">No lecture voice. Just someone who sat in the same seat last semester.</p>
+      <p class="line" data-at="0.35">"Forget the formula sheet — watch what actually happens."</p>
+      <p class="line" data-at="0.6">And then, somewhere around the third example...</p>
+    </div>
+    <div class="art">
+      <svg viewBox="0 0 560 420" fill="none">
+        <rect x="60" y="40" width="440" height="220" rx="14" fill="#fff" stroke="#D8EAE2" stroke-width="3"/>
+        <text x="92" y="92" font-family="Inter" font-weight="800" font-size="22" fill="#163127">f(x) = chaos</text>
+        <path id="strike" d="M86 84 L 248 84" stroke="#FF8FA3" stroke-width="4" stroke-linecap="round"/>
+        <text id="oknow" x="288" y="92" font-family="Inter" font-weight="800" font-size="22" fill="#00895A" opacity="0">f(x) = ok now</text>
+        <path id="marker" d="M92 160 Q 160 120 230 156 T 380 150 Q 430 146 462 120" stroke="#00895A" stroke-width="4" stroke-linecap="round" fill="none"/>
+        <!-- bulb pops -->
+        <g id="bulb" opacity="0"><circle cx="462" cy="96" r="16" fill="#FFC94D"/><path d="M456 116 h 12 M448 80 l -7 -6 M476 80 l 7 -6 M462 76 v -10" stroke="#163127" stroke-width="2.6" stroke-linecap="round"/></g>
+        <!-- tutor pointing -->
+        <g>
+          <circle cx="180" cy="320" r="30" fill="#fff" stroke="#163127" stroke-width="2.8"/>
+          <path d="M152 313 q 2 -25 28 -25 q 24 0 28 19 M165 291 q 5 -6 11 -7" stroke="#163127" stroke-width="2.4" stroke-linecap="round"/>
+          <path d="M170 316 q 3 4 7 0 M191 316 q 3 4 7 0 M173 332 q 7 5 14 0" stroke="#163127" stroke-width="2.4" stroke-linecap="round"/>
+          <path d="M210 330 q 24 -16 30 -52" stroke="#163127" stroke-width="2.8" stroke-linecap="round"/>
+        </g>
+        <!-- tutee -->
+        <g id="tutee3">
+          <circle cx="392" cy="324" r="30" fill="#fff" stroke="#163127" stroke-width="2.8"/>
+          <path d="M364 317 q 4 -24 28 -24 q 23 0 28 18" stroke="#163127" stroke-width="2.4" stroke-linecap="round"/>
+          <circle cx="416" cy="298" r="5.5" fill="#163127"/>
+          <path d="M382 320 q 3 4 7 0 M403 320 q 3 4 7 0" stroke="#163127" stroke-width="2.4" stroke-linecap="round"/>
+          <path id="smile3" d="M385 338 q 7 3 14 0" stroke="#163127" stroke-width="2.4" stroke-linecap="round"/>
+        </g>
+        <text id="ohh" x="430" y="270" font-family="Inter" font-weight="900" font-size="22" fill="#FF8A5C" opacity="0">ohhh!</text>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- CHAPTER 4 — EXAM DAY -->
+<section class="chapter" id="ch4">
+  <div class="stage">
+    <div class="txt">
+      <span class="chno">Chapter 04 — Exam day</span>
+      <h2>Three days later. Pen down early.</h2>
+      <p class="line" data-at="0.15">Integration by parts never stood a chance.</p>
+      <p class="line" data-at="0.4">And the tutor? Earned for sharing what they already knew.</p>
+      <p class="line" data-at="0.62">Two students, both better off. That's the whole idea.</p>
+    </div>
+    <div class="art">
+      <svg viewBox="0 0 560 420" fill="none">
+        <!-- sun rises -->
+        <g id="sun"><circle cx="120" cy="110" r="34" fill="#FFC94D"/><path d="M120 56 v -16 M120 164 v 8 M66 110 h -16 M174 110 h 12 M82 72 l -11 -11 M158 72 l 11 -11" stroke="#FF8A5C" stroke-width="4" stroke-linecap="round"/></g>
+        <!-- paper with grade, rises with p -->
+        <g id="paper">
+          <rect x="226" y="140" width="116" height="148" rx="8" fill="#fff" stroke="#163127" stroke-width="3" transform="rotate(-4 284 214)"/>
+          <path d="M248 178 h 64 M248 198 h 72 M248 218 h 56" stroke="#D8EAE2" stroke-width="4" stroke-linecap="round" transform="rotate(-4 284 214)"/>
+          <circle cx="316" cy="170" r="22" fill="none" stroke="#00895A" stroke-width="3.5" transform="rotate(-4 284 214)"/>
+          <text x="306" y="180" font-family="Inter" font-weight="900" font-size="24" fill="#00895A" transform="rotate(-4 284 214)">A</text>
+        </g>
+        <!-- the duo, high five -->
+        <g id="duo4">
+          <circle cx="420" cy="262" r="32" fill="#fff" stroke="#163127" stroke-width="2.8"/>
+          <path d="M390 255 q 3 -27 30 -27 q 26 0 30 21" stroke="#163127" stroke-width="2.4" stroke-linecap="round"/>
+          <path d="M410 258 q 3 4 7 0 M431 258 q 3 4 7 0 M413 274 q 7 6 14 0" stroke="#163127" stroke-width="2.4" stroke-linecap="round"/>
+          <circle cx="498" cy="266" r="32" fill="#fff" stroke="#163127" stroke-width="2.8"/>
+          <path d="M468 259 q 4 -26 30 -26 q 25 0 30 20" stroke="#163127" stroke-width="2.4" stroke-linecap="round"/>
+          <circle cx="524" cy="238" r="6" fill="#163127"/>
+          <path d="M488 262 q 3 4 7 0 M509 262 q 3 4 7 0 M491 278 q 7 5 14 0" stroke="#163127" stroke-width="2.4" stroke-linecap="round"/>
+          <path d="M438 290 Q 456 270 462 252 M480 294 Q 464 272 462 252" stroke="#163127" stroke-width="2.8" stroke-linecap="round"/>
+          <path d="M456 240 l 3 -10 M448 244 l -7 -8 M472 244 l 7 -8" stroke="#FFC94D" stroke-width="3.5" stroke-linecap="round"/>
+        </g>
+        <!-- confetti -->
+        <circle id="cf1" cx="220" cy="90" r="5" fill="#FF8FA3" opacity="0"/>
+        <circle id="cf2" cx="360" cy="70" r="4" fill="#00895A" opacity="0"/>
+        <circle id="cf3" cx="430" cy="120" r="5" fill="#FFC94D" opacity="0"/>
+        <circle id="cf4" cx="500" cy="80" r="4" fill="#FF8A5C" opacity="0"/>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="ctawrap">
+  <h2 class="reveal">Your week could <em>end like this too.</em></h2>
+  <p class="reveal">Free with your CPU email — whether you need the help or you are the help.</p>
+  <div class="cta-row reveal">
+    <a class="btn primary" href="#">Get started</a>
+    <a class="btn outline" href="#">Log in</a>
+  </div>
+</section>
+
+<footer>Studybuddy — built by students, for students at Central Philippine University</footer>
+<a class="btn back" href="index.html">&larr; All options</a>
+
+<script>
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches
+  const $ = (id) => document.getElementById(id)
+  const clamp = (v) => Math.min(1, Math.max(0, v))
+  const seg = (p, a, b) => clamp((p - a) / (b - a))
+
+  const chapters = ['ch1', 'ch2', 'ch3', 'ch4'].map($)
+  const dots = [...document.querySelectorAll('#dots i')]
+  const nav = $('topnav')
+
+  // prepare drawn paths
+  const connect = $('connect'); const connLen = connect.getTotalLength()
+  connect.style.strokeDasharray = connLen; connect.style.strokeDashoffset = connLen
+  const marker = $('marker'); const markLen = marker.getTotalLength()
+  marker.style.strokeDasharray = markLen; marker.style.strokeDashoffset = markLen
+  const strike = $('strike'); const strikeLen = strike.getTotalLength()
+  strike.style.strokeDasharray = strikeLen; strike.style.strokeDashoffset = strikeLen
+
+  function chapterProgress(el) {
+    const r = el.getBoundingClientRect()
+    return clamp(-r.top / (r.height - innerHeight))
+  }
+
+  function update() {
+    const vh = innerHeight
+    nav.classList.toggle('solid', scrollY > 40)
+
+    chapters.forEach((ch, i) => {
+      const r = ch.getBoundingClientRect()
+      const active = r.top < vh * 0.5 && r.bottom > vh * 0.5
+      dots[i].classList.toggle('on', active)
+    })
+
+    // text lines per chapter
+    chapters.forEach((ch) => {
+      const p = chapterProgress(ch)
+      ch.querySelectorAll('.line').forEach((l) => l.classList.toggle('on', p >= parseFloat(l.dataset.at)))
+    })
+
+    // CH1
+    const p1 = chapterProgress(chapters[0])
+    $('moon').style.transform = `translateY(${(1 - seg(p1, 0, .5)) * 70}px)`
+    $('student1').style.transform = `translateY(${seg(p1, .1, .5) * 10}px)`
+    ;['q1', 'q2', 'q3'].forEach((q, i) => {
+      const s = seg(p1, .1 + i * .1, .45 + i * .1)
+      const el = $(q)
+      el.style.opacity = s < .85 ? s : (1 - (s - .85) / .15)
+      el.style.transform = `translateY(${-s * 46}px)`
+    })
+    const n1 = seg(p1, .62, .8)
+    $('notif').style.opacity = n1
+    $('notif').style.transform = `translateY(${(1 - n1) * 24}px)`
+    $('glow').style.opacity = .4 + seg(p1, .6, .9) * .6
+
+    // CH2
+    const p2 = chapterProgress(chapters[1])
+    $('tutor2').style.transform = `translateX(${(1 - seg(p2, .08, .4)) * 140}px)`
+    $('tutor2').style.opacity = seg(p2, .08, .3)
+    connect.style.strokeDashoffset = connLen * (1 - seg(p2, .3, .6))
+    const s2 = seg(p2, .55, .7)
+    $('star2').style.opacity = s2
+    $('star2').style.transform = `scale(${0.5 + s2 * 0.5})`; $('star2').style.transformOrigin = '280px 128px'
+    const c2 = seg(p2, .6, .85)
+    $('card2').style.opacity = c2
+    $('card2').style.transform = `translateY(${(1 - c2) * 30}px)`
+    $('pct').textContent = Math.round(seg(p2, .6, .95) * 98) + '%'
+
+    // CH3
+    const p3 = chapterProgress(chapters[2])
+    marker.style.strokeDashoffset = markLen * (1 - seg(p3, .1, .6))
+    strike.style.strokeDashoffset = strikeLen * (1 - seg(p3, .35, .5))
+    $('oknow').style.opacity = seg(p3, .5, .62)
+    const b3 = seg(p3, .66, .78)
+    $('bulb').style.opacity = b3
+    $('bulb').style.transform = `scale(${0.4 + b3 * 0.6})`; $('bulb').style.transformOrigin = '462px 96px'
+    $('ohh').style.opacity = seg(p3, .74, .86)
+    $('ohh').style.transform = `translateY(${(1 - seg(p3, .74, .86)) * 16}px)`
+
+    // CH4
+    const p4 = chapterProgress(chapters[3])
+    $('sun').style.transform = `translateY(${(1 - seg(p4, 0, .4)) * 90}px)`
+    const pp = seg(p4, .15, .5)
+    $('paper').style.opacity = pp
+    $('paper').style.transform = `translateY(${(1 - pp) * 60}px)`
+    const d4 = seg(p4, .4, .65)
+    $('duo4').style.opacity = d4
+    $('duo4').style.transform = `translateY(${(1 - d4) * 40}px)`
+    ;['cf1', 'cf2', 'cf3', 'cf4'].forEach((c, i) => {
+      const s = seg(p4, .6 + i * .04, .9)
+      const el = $(c)
+      el.style.opacity = s < .8 ? s : (1 - (s - .8) / .2)
+      el.style.transform = `translateY(${-s * 70}px)`
+    })
+  }
+
+  if (!reduced) {
+    addEventListener('scroll', () => requestAnimationFrame(update), { passive: true })
+    addEventListener('resize', () => requestAnimationFrame(update))
+    update()
+  } else {
+    // static fallback: show everything
+    document.querySelectorAll('.line').forEach((l) => l.classList.add('on'))
+    ;['notif','star2','card2','bulb','ohh','oknow','paper','duo4'].forEach((id) => { $(id).style.opacity = 1 })
+    connect.style.strokeDashoffset = 0; marker.style.strokeDashoffset = 0; strike.style.strokeDashoffset = 0
+    $('pct').textContent = '98%'
+  }
+
+  const io = new IntersectionObserver((es) => es.forEach((e) => e.isIntersecting && e.target.classList.add('in')), { threshold: 0.2 })
+  document.querySelectorAll('.reveal').forEach((el) => io.observe(el))
+</script>
+</body>
+</html>

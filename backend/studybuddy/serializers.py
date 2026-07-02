@@ -1,5 +1,24 @@
 from rest_framework import serializers
-from .models import Notification, Preference, Rating, Subjects, Tutor, TutorApplication, TutorAvailability, TutorAvailabilityOverride, TutorDocumentRenewalReview, TuteeApplication, TuteeDocumentRenewalReview, WithdrawalRequest, UserProfile, PartnerInstitution, PlatformActivity, Wallet
+from .models import (
+    AdminAccountRequest,
+    InstitutionRequest,
+    Notification,
+    PartnerInstitution,
+    PlatformActivity,
+    Preference,
+    Rating,
+    Subjects,
+    Tutor,
+    TutorApplication,
+    TutorAvailability,
+    TutorAvailabilityOverride,
+    TutorDocumentRenewalReview,
+    TuteeApplication,
+    TuteeDocumentRenewalReview,
+    UserProfile,
+    Wallet,
+    WithdrawalRequest,
+)
 
 # Create Serializers here.
 
@@ -34,7 +53,6 @@ class AdminWithdrawalSerializer(serializers.ModelSerializer):
             'provider_error_message',
             'provider_fee',
             'net_amount',
-            'rail',
             'callback_received_at',
             'requested_at',
             'processed_at'
@@ -49,8 +67,12 @@ class AdminWithdrawalSerializer(serializers.ModelSerializer):
 class AdminUserSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(source='user.email')
     full_name = serializers.SerializerMethodField()
+    institution = serializers.PrimaryKeyRelatedField(read_only=True)
     institution_name = serializers.CharField(source='institution.institution_name', read_only=True)
     wallet_balance = serializers.SerializerMethodField()
+    profile_picture_url = serializers.SerializerMethodField()
+    tutor_sessions_completed = serializers.SerializerMethodField()
+    tutor_avg_rating = serializers.SerializerMethodField()
 
     class Meta:
         model = UserProfile
@@ -61,10 +83,15 @@ class AdminUserSerializer(serializers.ModelSerializer):
             'lname',
             'full_name',
             'role',
+            'institution',
             'institution_name',
             'profile_completed',
+            'is_domain_exempt',
             'is_suspended',
             'wallet_balance',
+            'profile_picture_url',
+            'tutor_sessions_completed',
+            'tutor_avg_rating',
             'created_at'
         ]
 
@@ -79,6 +106,28 @@ class AdminUserSerializer(serializers.ModelSerializer):
                 return 0.0
         return None
 
+    def get_profile_picture_url(self, obj):
+        request = self.context.get('request')
+        if obj.profile_picture and request:
+            return request.build_absolute_uri(obj.profile_picture.url)
+        return obj.profile_picture.url if obj.profile_picture else None
+
+    def get_tutor_sessions_completed(self, obj):
+        if obj.role != 'Tutor':
+            return None
+        try:
+            return obj.tutor.total_sessions
+        except Exception:
+            return 0
+
+    def get_tutor_avg_rating(self, obj):
+        if obj.role != 'Tutor':
+            return None
+        try:
+            return obj.tutor.rating_average
+        except Exception:
+            return 0
+
 class PartnerInstitutionSerializer(serializers.ModelSerializer):
     class Meta:
         model = PartnerInstitution
@@ -90,6 +139,74 @@ class PartnerInstitutionSerializer(serializers.ModelSerializer):
             'contact_person',
             'date_added'
         ]
+
+
+class InstitutionRequestSerializer(serializers.ModelSerializer):
+    reviewed_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = InstitutionRequest
+        fields = [
+            'id',
+            'institution_name',
+            'school_email_domain',
+            'contact_person',
+            'contact_email',
+            'note',
+            'status',
+            'reviewed_by',
+            'reviewed_by_name',
+            'created_at',
+            'reviewed_at',
+        ]
+        read_only_fields = ['reviewed_by', 'reviewed_by_name', 'created_at', 'reviewed_at']
+
+    def get_reviewed_by_name(self, obj):
+        if not obj.reviewed_by:
+            return None
+        full_name = obj.reviewed_by.get_full_name()
+        return full_name or obj.reviewed_by.email or obj.reviewed_by.username
+
+
+class AdminAccountRequestSerializer(serializers.ModelSerializer):
+    requesting_admin_name = serializers.SerializerMethodField()
+    institution_name = serializers.CharField(source='institution.institution_name', read_only=True)
+    target_user_name = serializers.SerializerMethodField()
+    target_user_email = serializers.EmailField(source='target_user.user.email', read_only=True)
+
+    class Meta:
+        model = AdminAccountRequest
+        fields = [
+            'id',
+            'requesting_admin',
+            'requesting_admin_name',
+            'institution',
+            'institution_name',
+            'target_user',
+            'target_user_name',
+            'target_user_email',
+            'note',
+            'status',
+            'created_at',
+            'reviewed_at',
+        ]
+        read_only_fields = [
+            'requesting_admin',
+            'requesting_admin_name',
+            'institution_name',
+            'target_user_name',
+            'target_user_email',
+            'created_at',
+            'reviewed_at',
+        ]
+
+    def get_requesting_admin_name(self, obj):
+        return f"{obj.requesting_admin.fname} {obj.requesting_admin.lname}".strip()
+
+    def get_target_user_name(self, obj):
+        if not obj.target_user:
+            return None
+        return f"{obj.target_user.fname} {obj.target_user.lname}".strip()
 
 class TutorSearchSerializer(serializers.ModelSerializer):
 
@@ -131,6 +248,7 @@ class TutorDetailSerializer(serializers.ModelSerializer):
     lname = serializers.CharField(source='profile.lname')
     bio = serializers.CharField(source='profile.bio', allow_null=True)
     subjects = serializers.SerializerMethodField()
+    profile_picture_url = serializers.SerializerMethodField()
     response_time_label = serializers.CharField(read_only=True)
     pinned_review_id = serializers.IntegerField(read_only=True)
     pinned_review = PinnedReviewSerializer(read_only=True)
@@ -145,12 +263,19 @@ class TutorDetailSerializer(serializers.ModelSerializer):
             'hourly_rate',
             'total_sessions',
             'bio',
+            'profile_picture_url',
             'subjects',
             'response_time',
             'response_time_label',
             'pinned_review_id',
             'pinned_review'
         ]
+
+    def get_profile_picture_url(self, obj):
+        request = self.context.get('request')
+        if obj.profile.profile_picture and request:
+            return request.build_absolute_uri(obj.profile.profile_picture.url)
+        return None
 
     def get_subjects(self, obj):
         tutor_subjects = obj.tutorsubjects_set.select_related('subject').all()

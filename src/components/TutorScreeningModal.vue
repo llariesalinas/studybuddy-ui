@@ -43,7 +43,7 @@
             <label class="sb-auth-label">Why do you want to become a tutor? (Optional)</label>
             <textarea
               v-model="localReason"
-              class="sb-auth-input sb-auth-textarea"
+              class="sb-auth-input sb-auth-textarea sb-field"
               placeholder="Tell us about your motivation..."
               rows="3"
             ></textarea>
@@ -51,9 +51,9 @@
         </div>
 
         <div class="sb-modal-actions">
-          <button type="button" class="sb-btn-pill sb-btn-outline" @click="close" :disabled="isSubmitting">Cancel</button>
-          <button type="button" class="sb-btn-pill sb-btn-primary d-flex justify-content-center align-items-center gap-2" @click="submit" :disabled="isSubmitting">
-            <span v-if="isSubmitting" class="sb-spinner" aria-hidden="true"></span>
+          <button type="button" class="sb-btn-pill sb-btn-outline sb-btn" @click="close" :disabled="isSubmitting">Cancel</button>
+          <button type="button" class="sb-btn-pill sb-btn-primary sb-btn sb-elevated sb-elevated--brand" @click="submit" :disabled="isSubmitting">
+            <span v-if="isSubmitting" class="spinner-border spinner-border-sm me-2"></span>
             {{ isSubmitting ? 'Submitting...' : 'Confirm & Submit' }}
           </button>
         </div>
@@ -150,7 +150,6 @@ const submit = async () => {
   justify-content: center;
   padding: 1.25rem;
   background: rgba(7, 19, 16, 0.48);
-  backdrop-filter: blur(8px);
 }
 
 .sb-modal-dialog {
@@ -216,7 +215,7 @@ const submit = async () => {
   border: none;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: none;
 }
 
 .sb-btn-primary {

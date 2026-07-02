@@ -103,6 +103,68 @@ class UserProfile(models.Model):
         return f"{self.fname} {self.lname}"
 
 
+class InstitutionRequest(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    ]
+
+    institution_name = models.CharField(max_length=200)
+    school_email_domain = models.CharField(max_length=100)
+    contact_person = models.CharField(max_length=200)
+    contact_email = models.EmailField()
+    note = models.TextField(blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    reviewed_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='institution_requests_reviewed'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f"{self.institution_name} ({self.status})"
+
+
+class AdminAccountRequest(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    ]
+
+    requesting_admin = models.ForeignKey(
+        UserProfile,
+        on_delete=models.CASCADE,
+        related_name='admin_requests_sent'
+    )
+    institution = models.ForeignKey(PartnerInstitution, on_delete=models.CASCADE)
+    target_user = models.ForeignKey(
+        UserProfile,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='admin_requests_received'
+    )
+    note = models.TextField(blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    created_at = models.DateTimeField(auto_now_add=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f"Admin request for {self.institution.institution_name} ({self.status})"
+
+
 class EmailOTPChallenge(models.Model):
     PURPOSE_LOGIN = 'login'
     PURPOSE_CHOICES = [
@@ -470,6 +532,7 @@ class Transaction(models.Model):
         ('cashout_fee', 'Cash-Out Provider Fee'),
         ('cashout_fee_reversal', 'Cash-Out Provider Fee Reversal'),
         ('commission_deduction', 'Commission Deduction'),
+        ('cash_in', 'Wallet Top-Up'),
     ]
 
     wallet = models.ForeignKey(Wallet, on_delete=models.CASCADE, related_name='transactions')
@@ -481,31 +544,6 @@ class Transaction(models.Model):
 
     class Meta:
         ordering = ['-created_at']
-
-class TutorPayoutAccount(models.Model):
-    DESTINATION_TYPES = [
-        ('gcash', 'GCash'),
-        ('bank', 'Bank Transfer'),
-    ]
-
-    tutor = models.ForeignKey(Tutor, on_delete=models.CASCADE, related_name='payout_accounts')
-    destination_type = models.CharField(max_length=10, choices=DESTINATION_TYPES)
-    receiving_institution_id = models.CharField(max_length=100)
-    receiving_institution_name = models.CharField(max_length=150)
-    receiving_institution_code = models.CharField(max_length=50, blank=True)
-    provider = models.CharField(max_length=20, blank=True, default='')
-    account_number = models.CharField(max_length=50)
-    account_name = models.CharField(max_length=100)
-    bank_name = models.CharField(max_length=100, blank=True, null=True)
-    is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        ordering = ['-is_active', '-updated_at']
-
-    def __str__(self):
-        return f"{self.tutor.profile.fname} - {self.receiving_institution_name}"
 
 class WithdrawalRequest(models.Model):
     STATUS_CHOICES = [
@@ -521,15 +559,11 @@ class WithdrawalRequest(models.Model):
     ]
 
     tutor = models.ForeignKey(Tutor, on_delete=models.CASCADE)
-    payout_account = models.ForeignKey(
-        TutorPayoutAccount,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='cash_outs'
-    )
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     method = models.CharField(max_length=10, choices=METHOD_CHOICES)
+    receiving_institution_id = models.CharField(max_length=100, blank=True, default='')
+    receiving_institution_name = models.CharField(max_length=150, blank=True, default='')
+    receiving_institution_code = models.CharField(max_length=50, blank=True, default='')
     account_number = models.CharField(max_length=50)
     account_name = models.CharField(max_length=100)
     bank_name = models.CharField(max_length=100, blank=True, null=True)
@@ -543,10 +577,31 @@ class WithdrawalRequest(models.Model):
     provider_error_message = models.TextField(blank=True, default='')
     provider_fee = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     net_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    rail = models.CharField(max_length=20, blank=True, default='')
     callback_received_at = models.DateTimeField(null=True, blank=True)
     requested_at = models.DateTimeField(auto_now_add=True)
     processed_at = models.DateTimeField(null=True, blank=True)
+    note = models.TextField(blank=True, default='')
+
+class WalletTopUp(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('paid', 'Paid'),
+        ('failed', 'Failed'),
+    ]
+
+    tutor = models.ForeignKey(Tutor, on_delete=models.CASCADE, related_name='top_ups')
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    provider = models.CharField(max_length=20, default='paymongo')
+    provider_reference = models.CharField(max_length=100, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    paid_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"TopUp {self.id} - {self.tutor.profile.fname} (₱{self.amount}, {self.status})"
 
 class PlatformActivity(models.Model):
     ACTIVITY_TYPES = [
@@ -737,6 +792,8 @@ class Booking(models.Model):
     )
     tutee_confirmed = models.BooleanField(default=False)
     tutor_confirmed = models.BooleanField(default=False)
+    dashboard_hidden_by_student_at = models.DateTimeField(null=True, blank=True)
+    dashboard_hidden_by_tutor_at = models.DateTimeField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -760,6 +817,51 @@ class Booking(models.Model):
                 name='unique_active_booking_per_slot_date',
             ),
         ]
+
+
+class SessionCheckIn(models.Model):
+    EVENT_VENUE_CONFIRM = 'venue_confirm'
+    EVENT_MIDPOINT_CHECKIN = 'midpoint_checkin'
+    EVENT_TYPE_CHOICES = [
+        (EVENT_VENUE_CONFIRM, 'Venue confirmation'),
+        (EVENT_MIDPOINT_CHECKIN, 'Mid-session check-in'),
+    ]
+
+    RESPONSE_VENUE_YES = 'yes'
+    RESPONSE_VENUE_NO = 'no'
+    RESPONSE_MIDPOINT_GOOD = 'good'
+    RESPONSE_MIDPOINT_ISSUES = 'issues'
+    RESPONSE_CHOICES = [
+        (RESPONSE_VENUE_YES, 'Yes'),
+        (RESPONSE_VENUE_NO, 'No'),
+        (RESPONSE_MIDPOINT_GOOD, 'Good'),
+        (RESPONSE_MIDPOINT_ISSUES, 'Having issues'),
+    ]
+
+    booking = models.ForeignKey(
+        Booking,
+        on_delete=models.CASCADE,
+        related_name='check_ins'
+    )
+    event_type = models.CharField(max_length=30, choices=EVENT_TYPE_CHOICES)
+    response = models.CharField(max_length=30, choices=RESPONSE_CHOICES)
+    responded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-responded_at']
+        indexes = [
+            models.Index(fields=['booking', 'event_type']),
+            models.Index(fields=['event_type', 'responded_at']),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['booking', 'event_type'],
+                name='unique_session_check_in_per_booking_event',
+            ),
+        ]
+
+    def __str__(self):
+        return f"Booking {self.booking_id} {self.event_type}: {self.response}"
 
 class PaymentMethod(models.Model):
 
@@ -919,6 +1021,7 @@ class SupportTicket(models.Model):
     STATUS_CHOICES = [
         ('Open', 'Open'),
         ('In_Progress', 'In Progress'),
+        ('Escalated', 'Escalated'),
         ('Resolved', 'Resolved'),
     ]
 
@@ -934,6 +1037,9 @@ class SupportTicket(models.Model):
     chatroom = models.OneToOneField('ChatRoom', on_delete=models.SET_NULL, null=True, related_name='ticket')
 
     assigned_agent = models.ForeignKey(UserProfile, on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_tickets')
+    escalation_reason = models.TextField(blank=True, default='')
+    escalated_by = models.ForeignKey(UserProfile, on_delete=models.SET_NULL, null=True, blank=True, related_name='escalated_tickets')
+    escalated_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Chat Accept/Reject — Design Options</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+<style>
+  :root {
+    --sb-dark: #0A1916;
+    --sb-primary: #00895A;
+    --sb-primary-hover: #00704A;
+    --sb-bg: #F8F9FA;
+    --sb-card-bg: #ffffff;
+    --sb-danger-bs: #dc3545;
+    --sb-warning-bg: #ffc107;
+    --sb-warning-text: #997404;
+    --sb-info-bg: #0dcaf0;
+    --sb-link: #0d6efd;
+    --sb-text-main: #163127;
+    --sb-text-muted: #6B7280;
+    --sb-text-secondary: #475569;
+    --sb-text-dark: #0f172a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    margin: 0;
+    color: var(--sb-text-main);
+    background:
+      radial-gradient(circle at 8% -8%, rgba(0,137,90,.16), transparent 34%),
+      radial-gradient(circle at 100% 8%, rgba(148,211,181,.18), transparent 34%),
+      #eef4f1;
+    min-height: 100vh;
+    padding: 40px 24px 80px;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; }
+  h1 { font-size: 26px; font-weight: 800; margin: 0 0 6px; }
+  .lede { color: var(--sb-text-muted); font-size: 15px; margin: 0 0 8px; max-width: 640px; line-height: 1.6; }
+  .role-toggle { display: inline-flex; gap: 4px; background: #fff; border-radius: 999px; padding: 4px; box-shadow: 0 6px 20px rgba(15,23,42,.06); margin: 18px 0 6px; }
+  .role-toggle button { border: 0; background: transparent; padding: 7px 18px; border-radius: 999px; font-size: 13px; font-weight: 600; cursor: pointer; color: var(--sb-text-secondary); }
+  .role-toggle button.active { background: var(--sb-primary); color: #fff; }
+  .mode-note { font-size: 12.5px; color: var(--sb-text-muted); margin: 6px 0 0; }
+
+  .option { margin-top: 34px; }
+  .option-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
+  .option-tag { font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--sb-primary); }
+  .option-title { font-size: 18px; font-weight: 800; margin: 0; }
+  .option-desc { color: var(--sb-text-muted); font-size: 13.5px; margin: 2px 0 16px; line-height: 1.55; }
+
+  /* chat shell to give context */
+  .chat-shell {
+    background: var(--sb-bg);
+    border-radius: 22px;
+    padding: 16px;
+    box-shadow: 0 18px 48px rgba(15,23,42,.08);
+    border: 1px solid rgba(255,255,255,.7);
+  }
+  .chat-head { display: flex; align-items: center; gap: 10px; padding: 4px 6px 14px; border-bottom: 1px solid #eceff1; margin-bottom: 14px; }
+  .avatar { width: 38px; height: 38px; border-radius: 50%; background: var(--sb-primary); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 14px; }
+  .chat-head .nm { font-weight: 700; font-size: 14px; }
+  .chat-head .sub { font-size: 12px; color: var(--sb-text-muted); }
+  .bubble-row { display: flex; margin-bottom: 8px; }
+  .bubble-row.me { justify-content: flex-end; }
+  .bubble { max-width: 70%; padding: 9px 13px; border-radius: 16px; font-size: 13px; line-height: 1.4; }
+  .bubble.them { background: #fff; border: 1px solid #eceff1; border-bottom-left-radius: 5px; }
+  .bubble.me { background: var(--sb-primary); color: #fff; border-bottom-right-radius: 5px; }
+
+  /* ---- shared banner base ---- */
+  .chat-banner {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 14px 18px; border: 1px solid rgba(255,255,255,.86); border-radius: 20px;
+    background: rgba(255,193,7,.15); box-shadow: 0 14px 36px rgba(15,23,42,.06);
+    margin: 4px 0 14px;
+  }
+  .cb-body { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .cb-icon { color: var(--sb-warning-text); font-size: 16px; flex-shrink: 0; }
+  .cb-text { display: flex; flex-direction: column; min-width: 0; }
+  .cb-label { font-size: 13px; font-weight: 700; color: var(--sb-text-main); }
+  .cb-sub { font-size: 12px; color: var(--sb-text-muted); margin-top: 1px; }
+  .cb-badge { font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 20px; background: var(--sb-warning-bg); color: var(--sb-text-dark); white-space: nowrap; }
+  .cb-loc-input { border: 1px solid #dee2e6; border-radius: 8px; font-size: 13px; min-width: 150px; padding: 6px 10px; }
+  .cb-loc-value { font-size: 13px; color: var(--sb-text-secondary); }
+  .btn {
+    border: 0; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600;
+    padding: 7px 14px; background: transparent; color: var(--sb-text-secondary); text-decoration: none; white-space: nowrap;
+    transition: filter .12s ease, background .12s ease;
+  }
+  .btn:hover { filter: brightness(.97); }
+  .btn--primary { background: var(--sb-primary); color: #fff; }
+  .btn--primary:hover { background: var(--sb-primary-hover); }
+  .btn--ghost { color: var(--sb-primary); font-weight: 700; }
+  .btn--accept { background: var(--sb-primary); color: #fff; }
+  .btn--accept:hover { background: var(--sb-primary-hover); }
+  .btn--reject { background: #fff; color: var(--sb-danger-bs); border: 1px solid rgba(220,53,69,.4); }
+  .btn--reject:hover { background: rgba(220,53,69,.08); }
+  .btn--reject-text { color: var(--sb-danger-bs); font-weight: 600; }
+  .btn--reject-text:hover { background: rgba(220,53,69,.08); }
+
+  .cb-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .tutee-wait { font-size: 12px; color: var(--sb-text-muted); font-style: italic; }
+
+  /* Option 2: decision bar layout */
+  .cb-stack { display: flex; flex-direction: column; gap: 0; padding: 0; align-items: stretch; }
+  .cb-stack .cb-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px; }
+  .cb-stack .cb-decisionbar {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 12px 18px; border-top: 1px dashed rgba(153,116,4,.35);
+  }
+  .cb-meta { display: flex; gap: 16px; font-size: 12px; color: var(--sb-text-secondary); flex-wrap: wrap; }
+  .cb-meta i { color: var(--sb-warning-text); margin-right: 4px; }
+
+  /* Option 3 */
+  .cb-loc-chip { display: inline-flex; align-items: center; gap: 6px; background: #fff; border: 1px solid #e6e1cf; border-radius: 999px; padding: 5px 12px 5px 10px; font-size: 12.5px; color: var(--sb-text-secondary); }
+  .cb-loc-chip .edit { color: var(--sb-primary); font-weight: 700; cursor: pointer; }
+  .btn--wide { padding: 9px 18px; }
+
+  .done-state { font-size: 13px; font-weight: 700; display: inline-flex; gap: 7px; align-items: center; }
+  .done-accept { color: var(--sb-primary); }
+  .done-reject { color: var(--sb-danger-bs); }
+
+  .pros { display: flex; gap: 18px; margin-top: 12px; flex-wrap: wrap; }
+  .pros div { font-size: 12.5px; color: var(--sb-text-secondary); }
+  .pros b { color: var(--sb-text-main); }
+
+  @media (max-width: 640px) {
+    .chat-banner, .cb-stack .cb-top, .cb-stack .cb-decisionbar { flex-direction: column; align-items: stretch; }
+    .cb-actions { width: 100%; }
+    .cb-actions .btn { flex: 1; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Accept / Reject pending sessions in chat</h1>
+  <p class="lede">
+    Three ways to let a tutor accept or reject a pending session straight from the chat banner —
+    alongside the existing edit-final-location control. Toggle the role and session type to see how
+    each design adapts. The buttons are clickable.
+  </p>
+
+  <div class="role-toggle" id="roleToggle">
+    <button data-role="tutor" class="active">Tutor view</button>
+    <button data-role="tutee">Tutee view</button>
+  </div>
+  <div class="role-toggle" id="modeToggle">
+    <button data-mode="f2f" class="active">Face-to-face (editable location)</button>
+    <button data-mode="online">Online (no location)</button>
+  </div>
+  <p class="mode-note">Tutees never see Accept/Reject — only the tutor decides. F2F shows the location control; online does not.</p>
+
+  <!-- ============ OPTION A ============ -->
+  <div class="option">
+    <div class="option-head">
+      <span class="option-tag">Option A</span>
+      <h2 class="option-title">Inline actions</h2>
+    </div>
+    <p class="option-desc">Smallest change. Keeps today's banner and just adds Accept + Reject pills to the action area, next to the location control.</p>
+    <div class="chat-shell">
+      <div class="chat-head">
+        <div class="avatar">JM</div>
+        <div><div class="nm">Jamie Marquez</div><div class="sub">Tutee · Calculus II</div></div>
+      </div>
+      <div class="chat-banner" data-banner="A">
+        <div class="cb-body">
+          <i class="bi bi-geo-alt-fill cb-icon icon-f2f"></i>
+          <i class="bi bi-hourglass-split cb-icon icon-online" style="display:none"></i>
+          <div class="cb-text">
+            <span class="cb-label">Session Pending</span>
+            <span class="cb-sub sub-tutor-f2f">Set the location, then accept or decline.</span>
+            <span class="cb-sub sub-tutor-online" style="display:none">Accept or decline this request.</span>
+            <span class="cb-sub sub-tutee" style="display:none">Waiting for the tutor to respond.</span>
+          </div>
+          <span class="cb-badge">Pending</span>
+        </div>
+        <div class="cb-actions tutor-only">
+          <span class="cb-loc-value f2f-only">Rm. 204, Science Bldg</span>
+          <button class="btn btn--ghost f2f-only">Edit</button>
+          <button class="btn btn--accept act-accept">Accept</button>
+          <button class="btn btn--reject act-reject">Reject</button>
+        </div>
+        <span class="tutee-wait tutee-only" style="display:none">Pending tutor response…</span>
+      </div>
+      <div class="bubble-row them"><div class="bubble them">Hi! Looking forward to the session 🙂</div></div>
+      <div class="bubble-row me"><div class="bubble me">Great, confirming the details now.</div></div>
+    </div>
+    <div class="pros">
+      <div><b>Pro:</b> least code, matches current banner exactly.</div>
+      <div><b>Con:</b> action row gets crowded on F2F (location + edit + 2 buttons).</div>
+    </div>
+  </div>
+
+  <!-- ============ OPTION B ============ -->
+  <div class="option">
+    <div class="option-head">
+      <span class="option-tag">Option B</span>
+      <h2 class="option-title">Decision bar</h2>
+    </div>
+    <p class="option-desc">Splits info from action. Session summary on top; a dedicated bar below holds the location control on the left and Accept / Reject on the right. Clearest separation.</p>
+    <div class="chat-shell">
+      <div class="chat-head">
+        <div class="avatar">JM</div>
+        <div><div class="nm">Jamie Marquez</div><div class="sub">Tutee · Calculus II</div></div>
+      </div>
+      <div class="chat-banner cb-stack" data-banner="B">
+        <div class="cb-top">
+          <div class="cb-body">
+            <i class="bi bi-geo-alt-fill cb-icon icon-f2f"></i>
+            <i class="bi bi-hourglass-split cb-icon icon-online" style="display:none"></i>
+            <div class="cb-text">
+              <span class="cb-label">Session Request Pending</span>
+              <span class="cb-sub">Sat, Jun 21 · 2:00–3:00 PM · Calculus II</span>
+            </div>
+          </div>
+          <span class="cb-badge">Pending</span>
+        </div>
+        <div class="cb-decisionbar tutor-only">
+          <div class="cb-meta f2f-only">
+            <span><i class="bi bi-geo-alt-fill"></i>Rm. 204, Science Bldg <a class="btn--ghost btn" style="padding:2px 6px">Edit</a></span>
+          </div>
+          <div class="cb-meta online-only" style="display:none">
+            <span><i class="bi bi-camera-video-fill"></i>Online session</span>
+          </div>
+          <div class="cb-actions">
+            <button class="btn btn--reject act-reject">Reject</button>
+            <button class="btn btn--accept act-accept">Accept request</button>
+          </div>
+        </div>
+        <div class="cb-decisionbar tutee-only" style="display:none">
+          <span class="tutee-wait">Waiting for the tutor to accept…</span>
+        </div>
+      </div>
+      <div class="bubble-row them"><div class="bubble them">Hi! Looking forward to the session 🙂</div></div>
+      <div class="bubble-row me"><div class="bubble me">Great, confirming the details now.</div></div>
+    </div>
+    <div class="pros">
+      <div><b>Pro:</b> uncluttered, scales well, reads as a clear decision.</div>
+      <div><b>Con:</b> taller banner, more markup than today's.</div>
+    </div>
+  </div>
+
+  <!-- ============ OPTION C ============ -->
+  <div class="option">
+    <div class="option-head">
+      <span class="option-tag">Option C</span>
+      <h2 class="option-title">Confirm &amp; Accept (combined)</h2>
+    </div>
+    <p class="option-desc">Fewest steps for F2F: the location is an editable chip, and the primary button confirms location and accepts in one tap. Reject is a quiet text link.</p>
+    <div class="chat-shell">
+      <div class="chat-head">
+        <div class="avatar">JM</div>
+        <div><div class="nm">Jamie Marquez</div><div class="sub">Tutee · Calculus II</div></div>
+      </div>
+      <div class="chat-banner" data-banner="C">
+        <div class="cb-body">
+          <i class="bi bi-geo-alt-fill cb-icon icon-f2f"></i>
+          <i class="bi bi-hourglass-split cb-icon icon-online" style="display:none"></i>
+          <div class="cb-text">
+            <span class="cb-label">Approve this session?</span>
+            <span class="cb-sub">Sat, Jun 21 · 2:00–3:00 PM</span>
+          </div>
+        </div>
+        <div class="cb-actions tutor-only">
+          <span class="cb-loc-chip f2f-only"><i class="bi bi-geo-alt-fill" style="color:var(--sb-warning-text)"></i> Rm. 204, Science Bldg <span class="edit">Edit</span></span>
+          <button class="btn btn--accept btn--wide act-accept f2f-only">Confirm &amp; Accept</button>
+          <button class="btn btn--accept btn--wide act-accept online-only" style="display:none">Accept</button>
+          <button class="btn btn--reject-text act-reject">Reject</button>
+        </div>
+        <span class="tutee-wait tutee-only" style="display:none">Pending tutor response…</span>
+      </div>
+      <div class="bubble-row them"><div class="bubble them">Hi! Looking forward to the session 🙂</div></div>
+      <div class="bubble-row me"><div class="bubble me">Great, confirming the details now.</div></div>
+    </div>
+    <div class="pros">
+      <div><b>Pro:</b> one tap to set-location-and-accept; lowest friction.</div>
+      <div><b>Con:</b> combining two actions is less explicit; reject is de-emphasised.</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // role + mode toggles
+  function applyState() {
+    const role = document.querySelector('#roleToggle button.active').dataset.role;
+    const mode = document.querySelector('#modeToggle button.active').dataset.mode;
+    const isTutor = role === 'tutor';
+    const isF2F = mode === 'f2f';
+
+    document.querySelectorAll('.tutor-only').forEach(el => el.style.display = isTutor ? '' : 'none');
+    document.querySelectorAll('.tutee-only').forEach(el => el.style.display = isTutor ? 'none' : '');
+    document.querySelectorAll('.f2f-only').forEach(el => el.style.display = isF2F ? '' : 'none');
+    document.querySelectorAll('.online-only').forEach(el => el.style.display = isF2F ? 'none' : '');
+    document.querySelectorAll('.icon-f2f').forEach(el => el.style.display = isF2F ? '' : 'none');
+    document.querySelectorAll('.icon-online').forEach(el => el.style.display = isF2F ? 'none' : '');
+
+    // sub-text swaps for option A
+    document.querySelectorAll('.sub-tutor-f2f').forEach(el => el.style.display = (isTutor && isF2F) ? '' : 'none');
+    document.querySelectorAll('.sub-tutor-online').forEach(el => el.style.display = (isTutor && !isF2F) ? '' : 'none');
+    document.querySelectorAll('.sub-tutee').forEach(el => el.style.display = isTutor ? 'none' : '');
+  }
+  document.querySelectorAll('.role-toggle').forEach(group => {
+    group.addEventListener('click', e => {
+      if (e.target.tagName !== 'BUTTON') return;
+      group.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+      e.target.classList.add('active');
+      applyState();
+    });
+  });
+
+  // interactive accept/reject demo
+  document.querySelectorAll('.chat-banner').forEach(banner => {
+    banner.addEventListener('click', e => {
+      const accept = e.target.closest('.act-accept');
+      const reject = e.target.closest('.act-reject');
+      if (!accept && !reject) return;
+      const actions = banner.querySelector('.cb-actions') || banner.querySelector('.cb-decisionbar');
+      const badge = banner.querySelector('.cb-badge');
+      if (accept) {
+        actions.innerHTML = '<span class="done-state done-accept"><i class="bi bi-check-circle-fill"></i> Session confirmed</span>';
+        if (badge) { badge.textContent = 'Confirmed'; badge.style.background = 'rgba(0,137,90,.15)'; badge.style.color = 'var(--sb-primary)'; }
+      } else {
+        actions.innerHTML = '<span class="done-state done-reject"><i class="bi bi-x-circle-fill"></i> Request declined</span>';
+        if (badge) { badge.textContent = 'Rejected'; badge.style.background = 'rgba(220,53,69,.12)'; badge.style.color = 'var(--sb-danger-bs)'; }
+      }
+    });
+  });
+
+  applyState();
+</script>
+</body>
+</html>

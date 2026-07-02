@@ -1,7 +1,7 @@
 # Session Summary: Real email provider (shipped on Gmail SMTP)
 
 **Date:** 2026-06-06
-**Plan:** [2026-06-06-resend-email-integration.md](../superpowers/plans/2026-06-06-resend-email-integration.md)
+**Plan:** [2026-06-06-resend-email-integration.md](../plans/2026-06-06-resend-email-integration.md)
 **Branch:** feature-darkmode-toggle
 
 ## What shipped

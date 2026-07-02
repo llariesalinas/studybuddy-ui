@@ -13,6 +13,7 @@ export const useAdminStore = defineStore(
     const analytics = ref(null)
     const tutorApplications = ref([])
     const tuteeApplications = ref([])
+    const operationalQueue = ref({ count: 0, items: [] })
 
     const loading = ref({
       stats: false,
@@ -21,7 +22,8 @@ export const useAdminStore = defineStore(
       institutions: false,
       analytics: false,
       tutorApplications: false,
-      tuteeApplications: false
+      tuteeApplications: false,
+      operationalQueue: false
     })
 
     const error = ref({
@@ -31,7 +33,8 @@ export const useAdminStore = defineStore(
       institutions: null,
       analytics: null,
       tutorApplications: null,
-      tuteeApplications: null
+      tuteeApplications: null,
+      operationalQueue: null
     })
 
     let statsPromise = null
@@ -64,6 +67,34 @@ export const useAdminStore = defineStore(
       })()
 
       return statsPromise
+    }
+
+    let operationalQueuePromise = null
+    const fetchOperationalQueue = async (force = false) => {
+      if (operationalQueue.value.items.length && !force) return
+
+      if (operationalQueuePromise) {
+        await operationalQueuePromise
+        if (!force) return
+      }
+
+      loading.value.operationalQueue = true
+      error.value.operationalQueue = null
+
+      operationalQueuePromise = (async () => {
+        try {
+          const response = await api.get('/admin/operational-queue/')
+          operationalQueue.value = response.data
+        } catch (err) {
+          console.error('Failed to load operational queue:', err)
+          error.value.operationalQueue = 'Failed to load operational queue.'
+        } finally {
+          loading.value.operationalQueue = false
+          operationalQueuePromise = null
+        }
+      })()
+
+      return operationalQueuePromise
     }
 
     let usersPromise = null
@@ -399,10 +430,12 @@ export const useAdminStore = defineStore(
       analytics,
       tutorApplications,
       tuteeApplications,
+      operationalQueue,
       loading,
       error,
 
       fetchStats,
+      fetchOperationalQueue,
       fetchUsers,
       updateUserStatus,
       deleteUser,
@@ -436,7 +469,8 @@ export const useAdminStore = defineStore(
         'withdrawals',
         'institutions',
         'tutorApplications',
-        'tuteeApplications'
+        'tuteeApplications',
+        'operationalQueue'
       ]
     }
   }

@@ -11,8 +11,9 @@
                         v-for="filter in filters"
                         :key="filter.value"
                         @click="currentFilter = filter.value"
-                        class="btn rounded-pill px-3 py-1 fw-semibold shadow-none sb-btn filter-tab"
+                        class="btn rounded-pill px-3 py-1 fw-semibold shadow-none sb-btn sb-pill filter-tab"
                         :class="{ 'filter-tab-active': currentFilter === filter.value }"
+                        :aria-pressed="currentFilter === filter.value"
                     >
                         {{ filter.label }}
                     </button>
@@ -25,7 +26,7 @@
                     <input
                         v-model="searchQuery"
                         type="text"
-                        class="form-control border-start-0 shadow-none sb-search-input"
+                      class="form-control border-start-0 shadow-none sb-search-input sb-field"
                         placeholder="Search tutor or subject..."
                     >
                 </div>
@@ -200,19 +201,6 @@ const goToDetails = (id) => router.push(`/tuteeSessionDetails/${id}`)
   color: var(--sb-text-main);
   box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
 }
-.filter-tab-active::after {
-  content: '';
-  position: absolute;
-  bottom: -2px;
-  left: 12px;
-  right: 12px;
-  height: 2px;
-  background: var(--sb-primary);
-  border-radius: 999px;
-  transform-origin: left center;
-  animation: sb-tab-indicator var(--sb-t-normal) var(--sb-spring) both;
-}
-
 .sb-input-addon,
 .sb-search-input {
     background: var(--sb-card-bg);

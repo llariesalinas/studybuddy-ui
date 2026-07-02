@@ -1,7 +1,7 @@
 ---
 title: Dashboard load performance (backend)
 date: 2026-06-07
-status: Done     # Phase 1 verified end-to-end; Phase 2 (pagination) ruled out by re-measure; redis e2e still pending (no local server)
+status: Done     # Phase 1 verified end-to-end; Phase 2 (pagination) ruled out by re-measure; redis e2e accepted as a known gap (no local redis/Docker/WSL on this machine)
 spec:
 ---
 
@@ -85,7 +85,11 @@ shows it is still over target — it would get its own plan.
   which is the cheaper plan at the current ~440-row table size; the composite
   index is there and selected exactly when its 3-column condition matches.**
 - redis e2e: with `REDIS_URL` set and a running redis, re-run the cache tests.
-  **Pending (no local redis server — port 6379 unreachable).**
+  **Accepted gap — no redis-server, Docker, or WSL available on this machine to
+  stand one up. redis-py 7.4.0 imports cleanly and Django's `RedisCache` drives
+  it with no API errors; closing this fully would require installing new
+  infrastructure (Memurai or Docker Desktop), which was declined for this
+  pass.**
 - Decisive re-measure: backend `DEBUG=False` + frontend `npm run preview`, then
   re-time `/api/bookings/`, `/api/recommendations`, and FCP. Use to decide
   whether Phase 2 (pagination) is needed. **Done — measured directly against
@@ -130,3 +134,8 @@ shows it is still over target — it would get its own plan.
   not needed** at current data scale. Only the redis e2e check remains
   environment-blocked (no local redis server); everything else in this plan is
   verified.
+- **2026-06-20** — Done. Confirmed no redis-server/Docker/WSL is available on
+  this machine to close the redis e2e check; decided (with explicit sign-off)
+  to accept that gap rather than install new infrastructure for it. Everything
+  else in this plan was already verified end-to-end, so closing it out as
+  Done with the redis e2e noted as a known, low-risk residual.

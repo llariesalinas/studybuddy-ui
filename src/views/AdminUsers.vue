@@ -3,13 +3,13 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
       <h3 class="mb-0">User Management</h3>
       <div class="d-flex gap-2">
-        <input v-model="filters.search" type="text" class="form-control form-control-sm rounded-pill px-3" placeholder="Search by name or email..." style="width: 250px;">
-        <select v-model="filters.role" class="form-select form-select-sm rounded-pill" style="width: 120px;">
+        <input v-model="filters.search" type="text" class="form-control form-control-sm rounded-pill px-3 sb-field" placeholder="Search by name or email..." style="width: 250px;">
+        <select v-model="filters.role" class="form-select form-select-sm rounded-pill sb-field" style="width: 120px;">
           <option value="">All Roles</option>
           <option value="Tutee">Tutee</option>
           <option value="Tutor">Tutor</option>
         </select>
-        <select v-model="filters.status" class="form-select form-select-sm rounded-pill" style="width: 120px;">
+        <select v-model="filters.status" class="form-select form-select-sm rounded-pill sb-field" style="width: 120px;">
           <option value="">All Status</option>
           <option value="Active">Active</option>
           <option value="Suspended">Suspended</option>
@@ -151,14 +151,23 @@
         </div>
 
         <div class="mt-4 pt-4 border-top">
-          <button 
-            @click="toggleSuspension(selectedUser)" 
+          <button
+            @click="toggleSuspension(selectedUser)"
             :disabled="suspending"
-            class="btn w-100 mb-2 rounded-pill py-2 sb-btn" 
+            class="btn w-100 mb-2 rounded-pill py-2 sb-btn"
             :class="selectedUser.is_suspended ? 'btn-success' : 'btn-outline-danger'"
           >
             <span v-if="suspending" class="spinner-border spinner-border-sm me-2"></span>
             {{ suspending ? 'Updating...' : selectedUser.is_suspended ? 'Reactivate Account' : 'Suspend Account' }}
+          </button>
+
+          <button
+            @click="deleteUser(selectedUser)"
+            :disabled="deleting"
+            class="btn btn-danger w-100 rounded-pill py-2 sb-btn"
+          >
+            <span v-if="deleting" class="spinner-border spinner-border-sm me-2"></span>
+            {{ deleting ? 'Deleting...' : 'Delete Account' }}
           </button>
         </div>
       </div>
@@ -241,6 +250,22 @@ const toggleSuspension = async (user) => {
   }
 }
 
+const deleting = ref(false)
+
+const deleteUser = async (user) => {
+  if (confirm(`CRITICAL ACTION: Are you sure you want to PERMANENTLY DELETE ${user.full_name}? This cannot be undone.`)) {
+    deleting.value = true
+    try {
+      await store.deleteUser(user.id)
+      selectedUser.value = null
+      toastStore.push('User deleted.', 'success')
+    } catch {
+      toastStore.push('Failed to delete user.', 'error')
+    } finally {
+      deleting.value = false
+    }
+  }
+}
 </script>
 
 <style scoped>

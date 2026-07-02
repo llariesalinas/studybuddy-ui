@@ -27,12 +27,14 @@ from .views import(
                     get_tutor_profile
                    )
 from .admin_views import (
+    AdminAccountRequestView, AdminAnalyticsExportView,
     AdminStatsView, AdminWithdrawalListView, AdminWithdrawalDetailView,
     AdminUserListView, AdminInstitutionView, AdminAnalyticsView,
+    AdminPendingActionsView, InstitutionRequestView,
     AdminTutorApplicationListView, AdminTutorApplicationDetailView,
     AdminTutorDocumentRenewalDetailView, SuperAdminInstitutionPerformanceView,
     AdminTuteeApplicationListView, AdminTuteeApplicationDetailView,
-    AdminTuteeDocumentRenewalDetailView
+    AdminTuteeDocumentRenewalDetailView, AdminOperationalQueueView
 )
 from . import views
 
@@ -41,6 +43,7 @@ print("STUDYBUDDY URLS LOADED")
 urlpatterns = [
     # Admin Routes
     path('admin/stats/', AdminStatsView.as_view()),
+    path('admin/operational-queue/', AdminOperationalQueueView.as_view()),
     path('admin/withdrawals/', AdminWithdrawalListView.as_view()),
     path('admin/withdrawals/<int:pk>/', AdminWithdrawalDetailView.as_view()),
     path('admin/tutor-applications/', AdminTutorApplicationListView.as_view()),
@@ -55,8 +58,15 @@ urlpatterns = [
     path('admin/institutions/<int:pk>/', AdminInstitutionView.as_view()),
     path('admin/institutions/performance/', SuperAdminInstitutionPerformanceView.as_view()),
     path('admin/analytics/', AdminAnalyticsView.as_view()),
+    path('admin/analytics/export/', AdminAnalyticsExportView.as_view()),
+    path('admin/pending-actions/', AdminPendingActionsView.as_view()),
+    path('admin/institution-requests/', InstitutionRequestView.as_view()),
+    path('admin/institution-requests/<int:pk>/', InstitutionRequestView.as_view()),
+    path('admin/admin-account-requests/', AdminAccountRequestView.as_view()),
+    path('admin/admin-account-requests/<int:pk>/', AdminAccountRequestView.as_view()),
     path('admin/support/tickets/', views.admin_list_tickets),
     path('admin/support/tickets/<int:ticket_id>/claim/', views.admin_claim_ticket),
+    path('admin/support/tickets/<int:ticket_id>/escalate/', views.admin_escalate_ticket),
     path('admin/support/tickets/<int:ticket_id>/resolve/', views.admin_resolve_ticket),
 
     path('support/tickets/create/', views.create_support_ticket),
@@ -107,6 +117,9 @@ urlpatterns = [
     path('bookings/<int:booking_id>/tutor-confirm/', tutor_confirm_booking),
     path('bookings/<int:booking_id>/rating/', submit_session_rating),
     path('bookings/<int:booking_id>/cancel/', cancel_booking),
+    path('bookings/<int:booking_id>/venue-confirmation/', views.confirm_session_venue),
+    path('bookings/<int:booking_id>/midpoint-check-in/', views.record_midpoint_check_in),
+    path('bookings/<int:booking_id>/dashboard-pill/', views.dismiss_dashboard_pill),
     path('template-availability/', template_availability),
     path('template-availability/<int:pk>/', template_availability),
     path('availability-overrides/', views.availability_overrides),
@@ -119,15 +132,18 @@ urlpatterns = [
     path('notifications/<int:notification_id>/read/', mark_notification_read),
     path('wallet/', views.wallet_status),
     path('wallet/transactions/', views.wallet_transactions),
-    path('wallet/payout-destinations/', views.payout_destinations),
-    path('wallet/payout-destinations/<int:account_id>/', views.payout_destinations),
     path('wallet/receiving-institutions/', views.receiving_institutions),
+    path('wallet/cash-outs/recent/', views.recent_cash_outs),
     path('wallet/cash-outs/', views.cash_outs),
     path('wallet/paymongo/callback/', views.paymongo_cashout_callback),
     path('wallet/withdraw/', views.cash_outs),
     path('wallet/withdrawals/', views.list_withdrawals),
+    path('wallet/cash-in/', views.initiate_cash_in),
+    path('wallet/cash-in/<int:topup_id>/verify/', views.verify_cash_in),
     path('payments/initiate/', views.initiate_online_payment),
     path('bookings/<int:booking_id>/verify-online-payment/', views.verify_online_payment),
+    path('dev/bookings/<int:booking_id>/force-live/', views.dev_force_booking_live),
+    path('dev/bookings/<int:booking_id>/clear-force-live/', views.dev_clear_booking_live),
     path('tutor/setup/', views.tutor_setup),
     path('recommend-tutors/', views.recommend_tutors_view),
     path('chat/', include('studybuddy.chat.urls')),

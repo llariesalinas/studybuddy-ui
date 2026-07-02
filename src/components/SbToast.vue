@@ -67,7 +67,7 @@ const toastStore = useToastStore()
 
 /* TransitionGroup hooks — sb-toast-in keyframe is defined globally in App.vue */
 .toast-enter-active {
-  animation: sb-toast-in var(--sb-t-normal) var(--sb-spring-fast) both;
+  animation: sb-toast-in var(--sb-t-normal) var(--sb-spring) both;
 }
 .toast-leave-active {
   transition: opacity var(--sb-t-quick) ease, transform var(--sb-t-quick) ease;

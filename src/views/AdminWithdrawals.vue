@@ -10,7 +10,7 @@
         <select
           v-model="statusFilter"
           @change="fetchWithdrawals"
-          class="form-select form-select-sm rounded-pill"
+          class="form-select form-select-sm rounded-pill sb-field"
           style="width: 150px;"
         >
           <option value="">All Transactions</option>
@@ -238,9 +238,6 @@
 
                 <!-- Provider -->
                 <td class="small">
-                  <p class="mb-0 fw-semibold text-uppercase">
-                    {{ w?.rail || '-' }}
-                  </p>
                   <p class="mb-0 text-muted">
                     {{ w?.provider_status || 'pending' }}
                   </p>
@@ -415,11 +412,6 @@
               </p>
 
               <p class="mb-1">
-                <strong>Rail:</strong>
-                {{ activeWithdrawal?.rail || '-' }}
-              </p>
-
-              <p class="mb-1">
                 <strong>Status:</strong>
                 {{ activeWithdrawal?.provider_status || '-' }}
               </p>
@@ -452,7 +444,7 @@
 
               <textarea
                 v-model="failureReason"
-                class="form-control rounded-3"
+                class="form-control rounded-3 sb-field"
                 rows="2"
                 placeholder="Describe the error or audit finding..."
               ></textarea>

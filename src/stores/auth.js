@@ -168,7 +168,8 @@ export const useAuthStore = defineStore('auth', () => {
       lname: authPayload.lname,
       application_status: authPayload.application_status || null,
       tutor_renewal_status: tutorRenewalStatus,
-      tutor_renewal_required: tutorRenewalRequired
+      tutor_renewal_required: tutorRenewalRequired,
+      profile_picture_url: null
     }
 
     localStorage.setItem('user_role', normalizedRole)
@@ -259,6 +260,25 @@ export const useAuthStore = defineStore('auth', () => {
     sessionStorage.clear()
   }
 
+  // Merge updated display fields into the current user so the app shell
+  // (greetings, avatar) reflects profile edits immediately, without a re-login.
+  const patchUserProfile = (partial = {}) => {
+    if (!user.value) {
+      return
+    }
+
+    const allowedFields = ['fname', 'lname', 'profile_picture_url']
+    const updates = {}
+
+    allowedFields.forEach((field) => {
+      if (field in partial) {
+        updates[field] = partial[field]
+      }
+    })
+
+    user.value = { ...user.value, ...updates }
+  }
+
   const initializeAuth = () => {
     const storedToken = localStorage.getItem('access_token')
     const storedRefreshToken = localStorage.getItem('refresh_token')
@@ -300,6 +320,7 @@ export const useAuthStore = defineStore('auth', () => {
     completeLogin,
     login,
     logout,
+    patchUserProfile,
     initializeAuth
   }
 })

@@ -37,7 +37,7 @@
         <p class="sb-status-text">
           Great news! Your application has been approved. You can now access your dashboard.
         </p>
-        <router-link :to="dashboardRoute" class="sb-btn-pill">Go to Dashboard</router-link>
+        <router-link :to="dashboardRoute" class="sb-btn-pill sb-btn sb-elevated sb-elevated--brand">Go to Dashboard</router-link>
       </div>
 
       <div v-else-if="flow.kind === 'renewal' && flow.status === 'pending'" class="sb-status-content">
@@ -112,13 +112,13 @@
             <label class="sb-auth-label">{{ notesLabel }}</label>
             <textarea
               v-model="resubmitData.reasonToTutor"
-              class="sb-auth-input"
+              class="sb-auth-input sb-field"
               :placeholder="notesPlaceholder"
               rows="3"
             ></textarea>
           </div>
 
-          <button type="submit" class="sb-btn-pill" :disabled="isResubmitting">
+          <button type="submit" class="sb-btn-pill sb-btn sb-elevated sb-elevated--brand" :disabled="isResubmitting">
             <span v-if="isResubmitting" class="sb-spinner me-2"></span>
             {{ submitButtonLabel }}
           </button>
@@ -549,16 +549,11 @@ onMounted(() => {
   color: white;
   border: none;
   font-weight: 600;
-  transition: all 0.2s;
+  transition: none;
 }
 
 .sb-btn-pill:hover:not(:disabled) {
   background: var(--sb-primary-hover);
-}
-
-.sb-btn-pill:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
 }
 
 .sb-spinner {

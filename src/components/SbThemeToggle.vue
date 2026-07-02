@@ -75,10 +75,7 @@ const themeStore = useThemeStore()
   box-shadow:
     inset 0 1px 2px rgba(255, 255, 255, 0.62),
     0 4px 12px rgba(10, 25, 22, 0.1);
-  transition:
-    border-color 0.26s ease,
-    background 0.26s ease,
-    box-shadow 0.26s ease;
+  transition: none;
 }
 
 .sb-theme-toggle__thumb {
@@ -92,10 +89,7 @@ const themeStore = useThemeStore()
   box-shadow:
     0 0 0 3px rgba(240, 200, 90, 0.14),
     0 2px 6px rgba(88, 62, 15, 0.16);
-  transition:
-    transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1),
-    background 0.26s ease,
-    box-shadow 0.26s ease;
+  transition: transform var(--sb-t-normal) var(--sb-spring);
 }
 
 .sb-theme-toggle__sun,
@@ -104,8 +98,8 @@ const themeStore = useThemeStore()
   inset: 0;
   border-radius: 50%;
   transition:
-    opacity 0.22s ease,
-    transform 0.28s ease;
+    opacity var(--sb-t-normal) var(--sb-spring),
+    transform var(--sb-t-normal) var(--sb-spring);
 }
 
 .sb-theme-toggle__sun {
@@ -161,8 +155,8 @@ const themeStore = useThemeStore()
   background: rgba(255, 255, 255, 0.78);
   box-shadow: 10px 2px 0 rgba(255, 255, 255, 0.36);
   transition:
-    opacity 0.22s ease,
-    transform 0.28s ease;
+    opacity var(--sb-t-normal) var(--sb-spring),
+    transform var(--sb-t-normal) var(--sb-spring);
 }
 
 .sb-theme-toggle__cloud-puff {
@@ -196,8 +190,8 @@ const themeStore = useThemeStore()
   opacity: 0;
   transform: translateY(4px);
   transition:
-    opacity 0.22s ease,
-    transform 0.28s ease;
+    opacity var(--sb-t-normal) var(--sb-spring),
+    transform var(--sb-t-normal) var(--sb-spring);
 }
 
 .sb-theme-toggle__star {

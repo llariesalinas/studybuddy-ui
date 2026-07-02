@@ -1,5 +1,5 @@
 <template>
-  <div class="container py-2">
+  <div class="session-details-page container py-2">
     <div v-if="loading" class="text-center py-5">
       <div class="spinner-border text-sb-primary" role="status"></div>
       <div class="mt-2 text-muted">Loading session details...</div>
@@ -25,158 +25,163 @@
         <span>{{ paymentReturnMessage }}</span>
       </div>
 
-      <div class="row g-4">
-        <div class="col-12 col-lg-8">
-          <div class="card shadow-sm p-4 h-100">
-          <div class="d-flex gap-3 align-items-start">
-            <div class="avatar-shell">
-              <img
-                v-if="sessionDetail.tutor?.avatar"
-                :src="sessionDetail.tutor.avatar"
-                alt="Tutor Avatar"
-                class="avatar-image"
+      <section class="session-alive-frame">
+        <SessionAurora />
+        <div v-if="showConfetti" class="session-confetti" aria-hidden="true">
+          <i
+            v-for="piece in confettiPieces"
+            :key="piece"
+            :style="{
+              '--session-confetti-index': piece,
+              '--session-confetti-x': `${(piece % 11) - 5}`,
+              '--session-confetti-color': confettiColors[piece % confettiColors.length],
+            }"
+          ></i>
+        </div>
+
+        <div class="session-alive-stage">
+          <div class="session-alive-grid">
+            <div class="session-alive-column">
+              <SessionHero
+                :profile="counterpartProfile"
+                :subject="sessionDetail.session?.subject"
+                :status="normalizedStatus"
+                :status-label="sessionDetail.session?.status || 'Session'"
+                :is-ongoing="isOngoing"
+                :clock="heroClock"
               />
-              <div v-else class="avatar-fallback">
-                {{ tutorInitials }}
+
+              <div class="session-detail-pair">
+                <SessionInfoGrid :items="sessionInfoItems" />
+
+                <SessionTimeline
+                  :status="normalizedStatus"
+                  :is-ongoing="isOngoing"
+                  :date-label="formattedSessionDate"
+                  :time-label="formattedTimeRange"
+                  :live-caption="`${heroClock.formattedElapsed} elapsed`"
+                />
               </div>
             </div>
 
-            <div class="flex-grow-1">
-              <h3 class="fw-bold mb-1">{{ sessionDetail.tutor?.name || 'Tutor' }}</h3>
-              <p class="text-muted mb-1"><strong>Email:</strong> {{ sessionDetail.tutor?.email || 'N/A' }}</p>
-              <p class="text-muted mb-1"><strong>Course:</strong> {{ sessionDetail.tutor?.course || 'N/A' }}</p>
-              <p class="text-muted mb-1"><strong>Rating:</strong> {{ sessionDetail.tutor?.rating ?? 'N/A' }}</p>
-
-              <div class="mt-3">
-                <span
-                  v-for="subject in sessionDetail.tutor?.subjects_taught || []"
-                  :key="subject"
-                  class="badge bg-sb-primary me-2 mb-2"
-                >
-                  {{ subject }}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <hr class="my-4">
-
-          <h5 class="fw-bold mb-3">Session Information</h5>
-          <div class="row g-3">
-            <div class="col-sm-6">
-              <div class="info-card">
-                <span class="info-label">Subject</span>
-                <div class="info-value">{{ sessionDetail.session?.subject || 'N/A' }}</div>
-              </div>
-            </div>
-            <div class="col-sm-6">
-              <div class="info-card">
-                <span class="info-label">Date</span>
-                <div class="info-value">{{ sessionDetail.session?.date || 'N/A' }}</div>
-              </div>
-            </div>
-            <div class="col-sm-6">
-              <div class="info-card">
-                <span class="info-label">Time</span>
-                <div class="info-value">{{ formattedTimeRange }}</div>
-              </div>
-            </div>
-            <div class="col-sm-6">
-              <div class="info-card">
-                <span class="info-label">Status</span>
-                <div class="info-value">
-                  <span class="badge rounded-pill px-3 py-2" :class="statusClass">
-                    {{ sessionDetail.session?.status }}
+            <div class="session-alive-column">
+              <section class="session-action-card">
+                <div class="session-action-head">
+                  <h4>{{ actionTitle }}</h4>
+                  <span v-if="isOngoing" class="session-live-pill">
+                    <span></span>
+                    Live
                   </span>
                 </div>
-              </div>
-            </div>
-            <div class="col-sm-6">
-              <div class="info-card">
-                <span class="info-label">Session Mode</span>
-                <div class="info-value">{{ sessionDetail.session?.session_mode || 'N/A' }}</div>
-              </div>
-            </div>
-            <div class="col-sm-6">
-              <div class="info-card">
-                <span class="info-label">Preferred Location</span>
-                <div class="info-value">
-                  {{ sessionDetail.session?.preferred_location || (sessionDetail.session?.session_mode === 'Online' ? 'Online' : 'N/A') }}
+
+                <template v-if="isOngoing">
+                  <p>Your session is live. Use the quick actions to stay in sync.</p>
+                  <button class="session-action-button session-action-primary" @click="handleLightAction(goToChat)">
+                    <i class="bi bi-chat-dots"></i>
+                    Open chat
+                  </button>
+                </template>
+
+                <template v-else-if="canSubmitPayment">
+                  <p>
+                    Your session has ended. Submit your post-session payment details so your tutor can verify them.
+                  </p>
+                  <button class="session-action-button session-action-primary" @click="handleLightAction(goToPayment)">
+                    Submit Payment
+                  </button>
+                </template>
+
+                <template v-else-if="isAwaitingPaymentVerification">
+                  <p>Waiting for your tutor to review the submitted payment.</p>
+                  <button class="session-action-button session-action-muted" disabled>
+                    Waiting for tutor verification...
+                  </button>
+                </template>
+
+                <template v-else-if="isCompleted && !sessionDetail.rating_submitted">
+                  <p>Your session is complete. A rating is optional, but it helps improve StudyBuddy matches.</p>
+                  <button
+                    class="session-action-button session-action-yellow"
+                    @click="openRatingModal"
+                  >
+                    <i class="bi bi-star"></i>
+                    Leave a Rating
+                  </button>
+                </template>
+
+                <template v-else-if="showCancelAction">
+                  <p>{{ cancelActionMessage }}</p>
+                  <button
+                    class="session-action-button session-action-danger"
+                    :disabled="isCancelling || !canCancelSession"
+                    @click="handleLightAction(() => { isCancelModalOpen = true })"
+                  >
+                    {{ isCancelling ? 'Cancelling...' : isPending ? 'Withdraw request' : 'Cancel Session' }}
+                  </button>
+                </template>
+
+                <template v-else>
+                  <p>No pending action for this session right now.</p>
+                </template>
+              </section>
+
+              <section v-if="isOngoing" class="session-action-card">
+                <h4>Quick actions</h4>
+                <div class="session-quick-grid">
+                  <button
+                    class="session-quick-button session-quick-hot"
+                    :disabled="isQuickSubmitting"
+                    @click="handleVenueQuickAction"
+                  >
+                    <i class="bi bi-geo-alt"></i>
+                    I've arrived
+                  </button>
+                  <button class="session-quick-button" @click="handleLightAction(goToChat)">
+                    <i class="bi bi-chat-dots"></i>
+                    Message
+                  </button>
+                  <button
+                    class="session-quick-button"
+                    :disabled="isQuickSubmitting"
+                    @click="handleMidpointQuickAction"
+                  >
+                    <i class="bi bi-emoji-smile"></i>
+                    All good?
+                  </button>
+                  <button
+                    class="session-quick-button"
+                    @click="handleLightAction(() => openSupport('Booking', sessionDetail?.session?.id))"
+                  >
+                    <i class="bi bi-flag"></i>
+                    Report
+                  </button>
                 </div>
-              </div>
+              </section>
+
+              <section class="session-action-card">
+                <h4>Support</h4>
+                <p>Something off with this session?</p>
+                <button
+                  class="session-action-button session-action-danger"
+                  @click="handleLightAction(() => openSupport('Booking', sessionDetail?.session?.id))"
+                >
+                  <i class="bi bi-exclamation-circle"></i>
+                  Report issue
+                </button>
+              </section>
+
             </div>
           </div>
-          </div>
         </div>
+      </section>
 
-        <div class="col-12 col-lg-4">
-          <div class="card shadow-sm p-4 h-100">
-          <h5 class="fw-bold mb-3">Next Action</h5>
-
-          <template v-if="canSubmitPayment">
-            <p class="text-muted">
-              Your session has ended. Submit your post-session payment details so your tutor can verify them.
-            </p>
-            <button class="btn bg-sb-primary text-white w-100 sb-btn" @click="goToPayment">
-              Submit Payment
-            </button>
-          </template>
-
-          <template v-else-if="isAwaitingPaymentVerification">
-            <p class="text-muted mb-3">
-              Waiting for your tutor to review the submitted payment.
-            </p>
-            <button class="btn btn-outline-secondary w-100 sb-btn" disabled>
-              Waiting for tutor verification...
-            </button>
-          </template>
-
-          <template v-else-if="isCompleted && !sessionDetail.rating_submitted">
-            <p class="text-muted mb-3">
-              Your session is complete. A rating is optional, but it helps improve StudyBuddy matches.
-            </p>
-            <button
-              class="btn bg-sb-primary text-white w-100 sb-btn"
-              @click="isRatingModalOpen = true"
-            >
-              Leave a Rating
-            </button>
-          </template>
-
-          <template v-else-if="showCancelAction">
-            <p class="text-muted mb-3">
-              {{ cancelActionMessage }}
-            </p>
-            <button
-              class="btn btn-outline-danger w-100 sb-btn"
-              :disabled="isCancelling || !canCancelSession"
-              @click="isCancelModalOpen = true"
-            >
-              {{ isCancelling ? 'Cancelling...' : 'Cancel Session' }}
-            </button>
-          </template>
-
-          <template v-else>
-            <p class="text-muted mb-0">
-              No pending action for this session right now.
-            </p>
-          </template>
-        </div>
-
-        <div class="card shadow-sm p-4 mt-4">
-          <h5 class="fw-bold mb-3">Support</h5>
-          <p class="text-muted small mb-3">
-            Need help? If there's an issue with this session, you can report it to our support team.
-          </p>
-          <button
-            class="btn btn-outline-danger w-100 sb-btn"
-            @click="openSupport('Booking', sessionDetail?.session?.id)"
-          >
-            <i class="bi bi-exclamation-circle me-2"></i>Report Issue
-          </button>
-        </div>
-      </div>
-    </div>
+      <DevSessionQaPanel
+        class="mt-3"
+        :booking-id="sessionDetail?.id"
+        :session-mode="sessionDetail?.session?.session_mode"
+        :location="sessionDetail?.session?.preferred_location"
+        @refresh="loadSession"
+      />
     </template>
 
     <RatingStackModal
@@ -212,7 +217,7 @@
             <label class="form-label fw-semibold small">Reason (required)</label>
             <textarea
               v-model="cancelReason"
-              class="form-control border-sb shadow-none"
+              class="form-control border-sb shadow-none sb-field"
               rows="3"
               placeholder="Let your tutor know why you're cancelling..."
               :disabled="isCancelling"
@@ -262,19 +267,27 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useSessionsStore } from '@/stores/completedSessions'
 import { useNotificationsStore } from '@/stores/notifications'
 import { useToastStore } from '@/stores/toast'
+import { useHaptics } from '@/composables/useHaptics'
+import { useSessionClock } from '@/composables/useSessionClock'
 import RatingStackModal from '@/components/RatingStackModal.vue'
 import SupportModal from '@/components/SupportModal.vue'
+import DevSessionQaPanel from '@/components/DevSessionQaPanel.vue'
+import SessionAurora from '@/components/session/SessionAurora.vue'
+import SessionHero from '@/components/session/SessionHero.vue'
+import SessionInfoGrid from '@/components/session/SessionInfoGrid.vue'
+import SessionTimeline from '@/components/session/SessionTimeline.vue'
 
 const route = useRoute()
 const router = useRouter()
 const sessionsStore = useSessionsStore()
 const notificationsStore = useNotificationsStore()
 const toastStore = useToastStore()
+const { vibrate, patterns } = useHaptics()
 
 const sessionDetail = ref(null)
 const loading = ref(true)
@@ -282,14 +295,26 @@ const errorMessage = ref('')
 const isRatingModalOpen = ref(false)
 const isCancelModalOpen = ref(false)
 const isCancelling = ref(false)
+const isQuickSubmitting = ref(false)
 const cancelReason = ref('')
 const paymentSyncing = ref(false)
 const paymentReturnMessage = ref('')
 const paymentReturnState = ref('info')
+const showConfetti = ref(false)
 
 const isSupportModalOpen = ref(false)
 const supportContextType = ref('Booking')
 const supportContextId = ref(null)
+
+const confettiPieces = Array.from({ length: 26 }, (_, index) => index)
+const confettiColors = [
+  'var(--sb-primary)',
+  'var(--sb-primary-mid)',
+  'var(--sb-pop-yellow)',
+  'var(--sb-pop-pink)',
+  'var(--sb-pop-orange)',
+  'var(--sb-aurora-violet)',
+]
 
 const openSupport = (type, id) => {
   supportContextType.value = type
@@ -301,6 +326,7 @@ const normalizedStatus = computed(() => String(sessionDetail.value?.session?.sta
 const canSubmitPayment = computed(() => normalizedStatus.value === 'payment required')
 const isAwaitingPaymentVerification = computed(() => normalizedStatus.value === 'awaiting verification')
 const isCompleted = computed(() => normalizedStatus.value === 'completed')
+const statusOngoing = computed(() => normalizedStatus.value === 'ongoing')
 const isUpcoming = computed(() => normalizedStatus.value === 'upcoming')
 const isPending = computed(() => normalizedStatus.value === 'pending')
 const reasonValid = computed(() => cancelReason.value.trim().length >= 5)
@@ -337,12 +363,39 @@ const paymentReturnIcon = computed(() => {
   return 'bi-info-circle-fill'
 })
 
-const tutorInitials = computed(() => {
-  const parts = String(sessionDetail.value?.tutor?.name || '')
-    .split(' ')
-    .filter(Boolean)
-  return parts.slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'SB'
-})
+const counterpartProfile = computed(() => ({
+  avatar: sessionDetail.value?.tutor?.avatar || '',
+  name: sessionDetail.value?.tutor?.name || 'Tutor',
+  meta: [
+    'Your tutor',
+    sessionDetail.value?.tutor?.course,
+    sessionDetail.value?.tutor?.rating ? `Rating ${sessionDetail.value.tutor.rating}` : null,
+  ].filter(Boolean).join(' · '),
+}))
+
+const formatSessionDate = (dateValue) => {
+  if (!dateValue) {
+    return 'N/A'
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: 'medium',
+    timeZone: 'Asia/Manila',
+  }).format(new Date(`${String(dateValue).slice(0, 10)}T00:00:00+08:00`))
+}
+
+const formatTime = (value) => {
+  if (!value) {
+    return 'N/A'
+  }
+
+  const [hour, minute] = String(value).split(':').map(Number)
+  const suffix = hour >= 12 ? 'PM' : 'AM'
+  const displayHour = hour % 12 || 12
+  return `${displayHour}:${String(minute).padStart(2, '0')} ${suffix}`
+}
+
+const formattedSessionDate = computed(() => formatSessionDate(sessionDetail.value?.session?.date))
 
 const formattedTimeRange = computed(() => {
   const start = sessionDetail.value?.session?.start_time
@@ -352,37 +405,117 @@ const formattedTimeRange = computed(() => {
     return 'N/A'
   }
 
-  const formatTime = (value) => {
-    const [hour, minute] = value.split(':').map(Number)
-    const suffix = hour >= 12 ? 'PM' : 'AM'
-    const displayHour = hour % 12 || 12
-    return `${displayHour}:${String(minute).padStart(2, '0')} ${suffix}`
-  }
-
   return `${formatTime(start)} - ${formatTime(end)}`
 })
 
-const statusClass = computed(() => {
-  switch (normalizedStatus.value) {
-    case 'pending':
-      return 'bg-warning text-dark'
-    case 'upcoming':
-      return 'bg-primary text-white'
-    case 'ongoing':
-      return 'bg-info text-white'
-    case 'payment required':
-      return 'bg-warning-subtle text-dark'
-    case 'awaiting verification':
-      return 'bg-info text-dark'
-    case 'completed':
-      return 'bg-success text-white'
-    case 'rejected':
-    case 'cancelled':
-      return 'bg-danger text-white'
-    default:
-      return 'bg-secondary text-white'
+const clock = useSessionClock({
+  date: computed(() => sessionDetail.value?.session?.date),
+  startTime: computed(() => sessionDetail.value?.session?.start_time),
+  endTime: computed(() => sessionDetail.value?.session?.end_time),
+  isOngoing: statusOngoing,
+})
+
+const isOngoing = computed(() => statusOngoing.value || clock.isLive.value)
+
+const heroClock = computed(() => ({
+  formattedElapsed: clock.formattedElapsed.value,
+  progress: clock.progress.value,
+  startedLabel: clock.startedLabel.value,
+  endsLabel: clock.endsLabel.value,
+  minutesLeft: clock.minutesLeft.value,
+}))
+
+const sessionInfoItems = computed(() => [
+  { label: 'Subject', value: sessionDetail.value?.session?.subject },
+  { label: 'Date', value: formattedSessionDate.value },
+  { label: 'Time', value: formattedTimeRange.value },
+  { label: 'Mode', value: sessionDetail.value?.session?.session_mode },
+  {
+    label: 'Location',
+    value: sessionDetail.value?.session?.preferred_location
+      || (sessionDetail.value?.session?.session_mode === 'Online' ? 'Online' : 'N/A'),
+  },
+  { label: 'Status', value: sessionDetail.value?.session?.status },
+])
+
+const actionTitle = computed(() => {
+  if (isOngoing.value) return 'Happening now'
+  if (canSubmitPayment.value) return 'Next action'
+  if (isAwaitingPaymentVerification.value) return 'Payment review'
+  if (isCompleted.value) return sessionDetail.value?.rating_submitted ? 'All done' : 'All done'
+  return 'Next action'
+})
+
+const prefersReducedMotion = () => (
+  typeof window !== 'undefined'
+  && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+)
+
+const fireConfetti = () => {
+  if (prefersReducedMotion()) {
+    return
+  }
+
+  showConfetti.value = false
+  window.setTimeout(() => {
+    showConfetti.value = true
+    window.setTimeout(() => {
+      showConfetti.value = false
+    }, 1300)
+  }, 0)
+}
+
+watch(isCompleted, (completed, wasCompleted) => {
+  if (completed && !wasCompleted) {
+    fireConfetti()
   }
 })
+
+const handleLightAction = (callback) => {
+  vibrate(patterns.light)
+  callback()
+}
+
+const openRatingModal = () => {
+  vibrate(patterns.celebratory)
+  isRatingModalOpen.value = true
+}
+
+const handleVenueQuickAction = async () => {
+  if (isQuickSubmitting.value || !sessionDetail.value?.id) {
+    return
+  }
+
+  vibrate(patterns.light)
+  isQuickSubmitting.value = true
+
+  try {
+    sessionDetail.value = await sessionsStore.confirmVenue(sessionDetail.value.id, 'yes')
+    toastStore.push('Arrival saved. Have a great session.')
+  } catch (error) {
+    toastStore.push(error.response?.data?.error || 'Failed to save your arrival.', 'error')
+  } finally {
+    isQuickSubmitting.value = false
+  }
+}
+
+const handleMidpointQuickAction = async () => {
+  if (isQuickSubmitting.value || !sessionDetail.value?.id) {
+    return
+  }
+
+  vibrate(patterns.light)
+  isQuickSubmitting.value = true
+
+  try {
+    sessionDetail.value = await sessionsStore.submitMidpointCheckIn(sessionDetail.value.id, 'good')
+    toastStore.push('Check-in saved. Thanks for the update.')
+  } catch (error) {
+    toastStore.push(error.response?.data?.error || 'Failed to save your check-in.', 'error')
+  } finally {
+    isQuickSubmitting.value = false
+  }
+}
 
 const loadSession = async () => {
   try {
@@ -472,58 +605,319 @@ const handleRated = async () => {
 onMounted(async () => {
   await loadSession()
   await syncReturnedOnlinePayment()
+
+  if (isCompleted.value) {
+    fireConfetti()
+  }
 })
 </script>
 
 <style scoped>
-.avatar-shell {
-  width: 108px;
-  height: 108px;
-  flex-shrink: 0;
+.session-details-page {
+  color: var(--sb-text-main);
 }
 
-.avatar-image,
-.avatar-fallback {
-  width: 100%;
-  height: 100%;
-  border-radius: 20px;
+.session-alive-frame {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--sb-border-light);
+  border-radius: 22px;
+  background: linear-gradient(
+    180deg,
+    var(--sb-aurora-wash-start),
+    var(--sb-aurora-wash-end) 60%,
+    color-mix(in srgb, var(--sb-pop-pink) 14%, var(--sb-card-bg))
+  );
 }
 
-.avatar-image {
-  object-fit: cover;
+.session-alive-stage {
+  position: relative;
+  z-index: 1;
+  padding: 14px;
 }
 
-.avatar-fallback {
+.session-alive-grid {
   display: grid;
-  place-items: center;
-  background: rgba(0, 137, 90, 0.1);
-  color: var(--sb-primary);
-  font-size: 1.75rem;
-  font-weight: 700;
+  grid-template-columns: minmax(0, 1.7fr) minmax(280px, 1fr);
+  gap: 13px;
 }
 
-.info-card {
+.session-alive-column {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 13px;
+}
+
+.session-detail-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 13px;
+}
+
+.session-action-card {
+  border: 1px solid color-mix(in srgb, var(--sb-card-border) 70%, transparent);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--sb-card-bg) 88%, transparent);
+  box-shadow: 0 14px 36px var(--sb-shadow-soft);
+  padding: 15px;
+  transition: transform var(--sb-t-normal) var(--sb-spring);
+}
+
+.session-action-card:hover {
+  border-color: color-mix(in srgb, var(--sb-primary) 22%, var(--sb-card-border));
+  background: color-mix(in srgb, var(--sb-card-bg) 94%, transparent);
+  box-shadow: 0 22px 54px color-mix(in srgb, var(--sb-shadow-soft) 74%, rgba(15, 23, 42, 0.12));
+  transform: translateY(-3px);
+}
+
+.session-alive-column > .session-action-card:first-child {
+  border-left: 4px solid var(--sb-primary);
+}
+
+.session-action-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 11px;
+}
+
+.session-action-card h4 {
+  margin: 0 0 11px;
+  color: var(--sb-text-main);
+  font-size: 0.92rem;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.session-action-head h4 {
+  margin: 0;
+}
+
+.session-action-card p {
+  margin: 0 0 11px;
+  color: var(--sb-text-muted);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.session-live-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--sb-pop-pink) 16%, var(--sb-card-bg));
+  color: var(--sb-pop-pink-deep);
+  padding: 4px 10px;
+  font-size: 0.64rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.session-live-pill span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: session-live-beat 1.1s ease-in-out infinite;
+}
+
+.session-action-button,
+.session-quick-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: 100%;
+  border: 0;
+  border-radius: 12px;
+  padding: 11px;
+  font: inherit;
+  font-size: 0.83rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform var(--sb-t-quick) var(--sb-spring);
+}
+
+.session-action-button:hover:not(:disabled),
+.session-quick-button:hover:not(:disabled) {
+  transform: translateY(-3px);
+}
+
+.session-action-button:focus-visible,
+.session-quick-button:focus-visible {
+  outline: 0;
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--sb-primary) 18%, transparent),
+    0 10px 24px var(--sb-shadow-soft);
+}
+
+.session-action-button:active:not(:disabled),
+.session-quick-button:active:not(:disabled) {
+  transform: scale(0.96) translateY(0);
+}
+
+.session-action-button:disabled,
+.session-quick-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.session-action-primary {
+  background: var(--sb-primary);
+  color: var(--sb-primary-contrast);
+  box-shadow: 0 8px 20px var(--sb-shadow-primary);
+}
+
+.session-action-primary:hover:not(:disabled) {
+  background: var(--sb-primary-hover);
+  box-shadow: 0 14px 30px var(--sb-shadow-primary);
+}
+
+.session-action-yellow {
+  background: var(--sb-pop-yellow);
+  color: var(--sb-dark);
+}
+
+.session-action-yellow:hover:not(:disabled) {
+  box-shadow: 0 14px 30px color-mix(in srgb, var(--sb-pop-yellow) 36%, transparent);
+}
+
+.session-action-danger {
+  border: 1px solid color-mix(in srgb, var(--sb-danger) 24%, var(--sb-card-border));
+  background: var(--sb-card-bg);
+  color: var(--sb-danger);
+}
+
+.session-action-danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--sb-danger) 8%, var(--sb-card-bg));
+  border-color: color-mix(in srgb, var(--sb-danger) 42%, var(--sb-card-border));
+}
+
+.session-action-muted {
   border: 1px solid var(--sb-card-border);
-  border-radius: 16px;
-  padding: 16px;
-  height: 100%;
+  background: var(--sb-card-bg);
+  color: var(--sb-text-muted);
+}
+
+.session-quick-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.session-quick-button {
+  min-height: 78px;
+  flex-direction: column;
+  border: 1px solid var(--sb-card-border);
+  background: color-mix(in srgb, var(--sb-card-bg) 82%, transparent);
+  color: var(--sb-text-secondary);
+  font-size: 0.72rem;
+  line-height: 1.1;
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--sb-shadow-soft) 76%, transparent);
+}
+
+.session-quick-button:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--sb-primary) 34%, var(--sb-card-border));
+  background: color-mix(in srgb, var(--sb-card-bg) 96%, transparent);
+  box-shadow: 0 16px 34px color-mix(in srgb, var(--sb-shadow-soft) 78%, rgba(15, 23, 42, 0.1));
+}
+
+.session-quick-button i {
+  color: var(--sb-primary);
+  font-size: 21px;
+  transition: transform var(--sb-t-normal) var(--sb-spring);
+}
+
+.session-quick-button:hover:not(:disabled) i {
+  transform: scale(1.12);
+}
+
+.session-quick-hot {
+  border-color: color-mix(in srgb, var(--sb-primary) 32%, var(--sb-card-border));
+  background: linear-gradient(180deg, var(--sb-live-hero-start), var(--sb-card-bg));
+}
+
+.session-confetti {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.session-confetti i {
+  position: absolute;
+  top: 26%;
+  left: 50%;
+  width: 9px;
+  height: 5px;
+  border-radius: 2px;
+  background: var(--session-confetti-color);
+  animation: session-confetti-burst 1.2s ease-out forwards;
+  animation-delay: calc(var(--session-confetti-index) * 14ms);
 }
 
 .modal {
   background: rgba(17, 24, 39, 0.35);
 }
 
-.info-label {
-  display: block;
-  font-size: 0.78rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  color: #6b7280;
-  margin-bottom: 4px;
+@keyframes session-live-beat {
+  50% {
+    transform: scale(1.7);
+    opacity: 0.4;
+  }
 }
 
-.info-value {
-  font-weight: 600;
-  color: #1f2937;
+@keyframes session-confetti-burst {
+  to {
+    transform:
+      translate(
+        calc(var(--session-confetti-x) * 34px),
+        calc(260px + (var(--session-confetti-index) % 5) * 24px)
+      )
+      rotate(calc(var(--session-confetti-index) * 28deg));
+    opacity: 0;
+  }
+}
+
+@media (max-width: 900px) {
+  .session-alive-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .session-detail-pair {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 575px) {
+  .session-quick-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .session-live-pill span,
+  .session-confetti i {
+    animation: none;
+  }
+
+  .session-action-card,
+  .session-action-button,
+  .session-quick-button,
+  .session-quick-button i {
+    transition: none;
+  }
+
+  .session-action-card:hover,
+  .session-action-button:hover:not(:disabled),
+  .session-quick-button:hover:not(:disabled),
+  .session-quick-button:hover:not(:disabled) i {
+    transform: none;
+  }
 }
 </style>
