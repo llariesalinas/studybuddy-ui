@@ -7,6 +7,7 @@ Status moves Draft → Approved → In Progress → Done. When a plan is complet
 
 | Date | Plan | Status | Summary |
 |------|------|--------|---------|
+| 2026-07-02 | [Verification dev tools (self-service profile panel)](2026-07-02-verification-dev-tools.md) | Approved | Pending |
 | 2026-07-02 | [Full-system integration merge](2026-07-02-full-system-integration-merge.md) | Done | [Summary](../session-summaries/2026-07-02-full-system-integration-merge-summary.md) |
 | 2026-07-01 | [Tutee verification — overview](2026-07-01-tutee-verification-overview.md) | In Progress | Pending |
 | 2026-07-01 | [Tutee verification — Phase 1 (model)](2026-07-01-tutee-verification-phase1-model.md) | Done | Pending |
@@ -90,3 +91,4 @@ Entries marked Done&ast; predate the session-summary convention; their status is
 | 2026-07-01 | Marked local cash-out dev stub Done; linked summary |
 | 2026-07-02 | Merged both branches' plan tables; added full-system integration merge row (In Progress) |
 | 2026-07-02 | Marked full-system integration merge Done; linked summary (branch verified, push deferred) |
+| 2026-07-02 | Added verification dev tools plan (Approved) from grilling session |
