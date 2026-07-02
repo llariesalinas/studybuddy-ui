@@ -636,11 +636,6 @@ const getTutorInitials = (tutor) => {
     .join('') || 'T'
 }
 
-const getTutorRatingLabel = (tutor) => tutor?.rating || 'N/A'
-
-const getTutorPrimarySubject = (tutor) => getTutorSubjects(tutor)[0] || 'Various subjects'
-
-
 const getTutorMetaTitle = (tutor) => {
   const subjects = getTutorSubjects(tutor)
   return subjects.length ? `Rating ${tutor?.rating || 'N/A'} · ${subjects.join(', ')}` : 'Various subjects'
