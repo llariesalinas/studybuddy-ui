@@ -6097,3 +6097,193 @@ class TutorDetailVerifiedBadgeTests(APITestCase):
         response = self.client.get(f"/api/tutors/{profile.id}/")
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.data["is_verified"])
+
+
+class SuperAdminApplicantReviewBlockedTests(APITestCase):
+    """SuperAdmins must not be able to list or mutate applicant records.
+
+    Applicant review (initial applications and document renewals for both
+    tutors and tutees) is an institution-Admin responsibility.  A SuperAdmin
+    JWT must receive HTTP 403 on every endpoint, while a regular Admin JWT
+    must still succeed (HTTP 200).
+    """
+
+    def setUp(self):
+        self.institution = PartnerInstitution.objects.create(
+            institution_name="Test University",
+            school_email_domain="testuni.edu",
+            is_active=True,
+            contact_person="Registrar",
+        )
+
+        # ── SuperAdmin ──────────────────────────────────────────────────
+        super_user = User.objects.create_user(
+            username="sa_block_test",
+            email="sa@studybuddy.test",
+            password="password",
+        )
+        self.super_profile = UserProfile.objects.create(
+            user=super_user,
+            fname="Super",
+            lname="Admin",
+            role="SuperAdmin",
+            profile_completed=True,
+            is_domain_exempt=True,
+        )
+        self.super_user = super_user
+
+        # ── Regular Admin ────────────────────────────────────────────────
+        admin_user = User.objects.create_user(
+            username="admin_block_test",
+            email="admin@testuni.edu",
+            password="password",
+        )
+        self.admin_profile = UserProfile.objects.create(
+            user=admin_user,
+            fname="Inst",
+            lname="Admin",
+            role="Admin",
+            institution=self.institution,
+            profile_completed=True,
+        )
+        self.admin_user = admin_user
+
+        # ── Applicant (Tutor) ─────────────────────────────────────────────
+        tutor_user = User.objects.create_user(
+            username="tutor_applicant",
+            email="tutor@testuni.edu",
+            password="password",
+        )
+        self.tutor_profile = UserProfile.objects.create(
+            user=tutor_user,
+            fname="Tutor",
+            lname="Applicant",
+            role="Tutor",
+            institution=self.institution,
+            profile_completed=True,
+        )
+        import tempfile, os
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        dummy_file = SimpleUploadedFile("doc.pdf", b"pdf", content_type="application/pdf")
+        self.tutor_application = TutorApplication.objects.create(
+            profile=self.tutor_profile,
+            school_id=dummy_file,
+            enrollment_proof=dummy_file,
+            application_status="pending",
+        )
+        self.tutor_renewal = TutorDocumentRenewalReview.objects.create(
+            profile=self.tutor_profile,
+            application=self.tutor_application,
+            school_id=dummy_file,
+            enrollment_proof=dummy_file,
+            status="pending",
+        )
+
+        # ── Applicant (Tutee) ─────────────────────────────────────────────
+        tutee_user = User.objects.create_user(
+            username="tutee_applicant",
+            email="tutee@testuni.edu",
+            password="password",
+        )
+        self.tutee_profile = UserProfile.objects.create(
+            user=tutee_user,
+            fname="Tutee",
+            lname="Applicant",
+            role="Tutee",
+            institution=self.institution,
+            profile_completed=True,
+        )
+        self.tutee_application = TuteeApplication.objects.create(
+            profile=self.tutee_profile,
+            school_id=dummy_file,
+            enrollment_proof=dummy_file,
+            application_status="pending",
+        )
+        self.tutee_renewal = TuteeDocumentRenewalReview.objects.create(
+            profile=self.tutee_profile,
+            application=self.tutee_application,
+            school_id=dummy_file,
+            enrollment_proof=dummy_file,
+            status="pending",
+        )
+
+    # ── SuperAdmin is blocked (403) ───────────────────────────────────────
+
+    def test_super_admin_cannot_list_tutor_applications(self):
+        self.client.force_authenticate(user=self.super_user)
+        response = self.client.get("/api/admin/tutor-applications/")
+        self.assertEqual(response.status_code, 403)
+
+    def test_super_admin_cannot_get_tutor_application_detail(self):
+        self.client.force_authenticate(user=self.super_user)
+        response = self.client.get(f"/api/admin/tutor-applications/{self.tutor_application.id}/")
+        self.assertEqual(response.status_code, 403)
+
+    def test_super_admin_cannot_patch_tutor_application(self):
+        self.client.force_authenticate(user=self.super_user)
+        response = self.client.patch(
+            f"/api/admin/tutor-applications/{self.tutor_application.id}/",
+            {"application_status": "approved"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_super_admin_cannot_get_tutor_document_renewal(self):
+        self.client.force_authenticate(user=self.super_user)
+        response = self.client.get(f"/api/admin/tutor-document-renewals/{self.tutor_renewal.id}/")
+        self.assertEqual(response.status_code, 403)
+
+    def test_super_admin_cannot_patch_tutor_document_renewal(self):
+        self.client.force_authenticate(user=self.super_user)
+        response = self.client.patch(
+            f"/api/admin/tutor-document-renewals/{self.tutor_renewal.id}/",
+            {"application_status": "approved"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_super_admin_cannot_list_tutee_applications(self):
+        self.client.force_authenticate(user=self.super_user)
+        response = self.client.get("/api/admin/tutee-applications/")
+        self.assertEqual(response.status_code, 403)
+
+    def test_super_admin_cannot_get_tutee_application_detail(self):
+        self.client.force_authenticate(user=self.super_user)
+        response = self.client.get(f"/api/admin/tutee-applications/{self.tutee_application.id}/")
+        self.assertEqual(response.status_code, 403)
+
+    def test_super_admin_cannot_patch_tutee_application(self):
+        self.client.force_authenticate(user=self.super_user)
+        response = self.client.patch(
+            f"/api/admin/tutee-applications/{self.tutee_application.id}/",
+            {"application_status": "approved"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_super_admin_cannot_get_tutee_document_renewal(self):
+        self.client.force_authenticate(user=self.super_user)
+        response = self.client.get(f"/api/admin/tutee-document-renewals/{self.tutee_renewal.id}/")
+        self.assertEqual(response.status_code, 403)
+
+    def test_super_admin_cannot_patch_tutee_document_renewal(self):
+        self.client.force_authenticate(user=self.super_user)
+        response = self.client.patch(
+            f"/api/admin/tutee-document-renewals/{self.tutee_renewal.id}/",
+            {"application_status": "approved"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 403)
+
+    # ── Regular Admin still has access (200) ─────────────────────────────
+
+    def test_admin_can_list_tutor_applications(self):
+        self.client.force_authenticate(user=self.admin_user)
+        response = self.client.get("/api/admin/tutor-applications/")
+        self.assertEqual(response.status_code, 200)
+
+    def test_admin_can_list_tutee_applications(self):
+        self.client.force_authenticate(user=self.admin_user)
+        response = self.client.get("/api/admin/tutee-applications/")
+        self.assertEqual(response.status_code, 200)
+
