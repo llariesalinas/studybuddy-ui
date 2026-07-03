@@ -3,10 +3,11 @@
 Every finalized plan lives in this folder as its own dated file, created from [`_template.md`](_template.md).
 Status moves Draft → Approved → In Progress → Done. When a plan is complete, its summary is linked below.
 
-**Status & Progress Summary** (2026-07-01): Local cash-out dev stub (`PAYMONGO_CASHOUT_MOCK`) implemented and marked Done. Support ticket escalation and cash-out recent transactions remain Done.
+**Status & Progress Summary** (2026-07-03): Session countdown implementation was approved with the Orbit Strip direction. Verification dev tools remain Approved, and the July 2 full-system integration merge remains Done.
 
 | Date | Plan | Status | Summary |
 |------|------|--------|---------|
+| 2026-07-03 | [Session countdown implementation (Orbit Strip)](2026-07-03-session-countdown-prototype-plan.md) | Approved | Pending |
 | 2026-07-02 | [Verification dev tools (self-service profile panel)](2026-07-02-verification-dev-tools.md) | Approved | Pending |
 | 2026-07-02 | [Full-system integration merge](2026-07-02-full-system-integration-merge.md) | Done | [Summary](../session-summaries/2026-07-02-full-system-integration-merge-summary.md) |
 | 2026-07-01 | [Tutee verification — overview](2026-07-01-tutee-verification-overview.md) | In Progress | Pending |
@@ -92,3 +93,4 @@ Entries marked Done&ast; predate the session-summary convention; their status is
 | 2026-07-02 | Merged both branches' plan tables; added full-system integration merge row (In Progress) |
 | 2026-07-02 | Marked full-system integration merge Done; linked summary (branch verified, push deferred) |
 | 2026-07-02 | Added verification dev tools plan (Approved) from grilling session |
+| 2026-07-03 | Added session countdown implementation plan (Approved) with Orbit Strip direction |
