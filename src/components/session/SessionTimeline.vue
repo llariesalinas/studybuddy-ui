@@ -94,29 +94,24 @@ const steps = computed(() => [
 
 <style scoped>
 .session-card {
-  border: 1px solid color-mix(in srgb, var(--sb-card-border) 70%, transparent);
-  border-radius: 18px;
-  background: color-mix(in srgb, var(--sb-card-bg) 88%, transparent);
-  box-shadow: 0 14px 36px var(--sb-shadow-soft);
-  transition: transform var(--sb-t-normal) var(--sb-spring);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .session-card:hover {
-  border-color: color-mix(in srgb, var(--sb-primary) 22%, var(--sb-card-border));
-  background: color-mix(in srgb, var(--sb-card-bg) 94%, transparent);
-  box-shadow: 0 22px 54px color-mix(in srgb, var(--sb-shadow-soft) 74%, rgba(15, 23, 42, 0.12));
-  transform: translateY(var(--sb-lift-surface));
+  transform: none;
 }
 
 .session-timeline-card {
-  padding: 24px;
+  padding: 28px;
 }
 
 .session-timeline-card h4 {
-  margin: 0 0 24px;
+  margin: 0 0 22px;
   color: var(--sb-text-main);
-  font-size: 1.15rem;
-  font-weight: 800;
+  font-size: 1.08rem;
+  font-weight: 850;
   letter-spacing: 0;
 }
 
@@ -128,8 +123,8 @@ const steps = computed(() => [
   position: relative;
   display: flex;
   gap: 16px;
-  min-height: 50px;
-  padding-bottom: 18px;
+  min-height: 76px;
+  padding-bottom: 0;
   transition: transform var(--sb-t-normal) var(--sb-spring);
 }
 
@@ -193,14 +188,14 @@ const steps = computed(() => [
   display: block;
   color: var(--sb-text-dark);
   font-size: 0.98rem;
-  font-weight: 800;
+  font-weight: 850;
   line-height: 1.2;
 }
 
 .session-timeline-step p {
   margin: 3px 0 0;
-  color: var(--sb-text-subtle);
-  font-size: 0.78rem;
+  color: var(--sb-text-muted);
+  font-size: 0.8rem;
 }
 
 .session-timeline-step-now strong {

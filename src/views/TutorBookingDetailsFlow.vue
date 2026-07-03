@@ -9,7 +9,6 @@
     </div>
 
     <section v-else class="session-alive-frame">
-      <SessionAurora />
       <div v-if="showConfetti" class="session-confetti" aria-hidden="true">
         <i
           v-for="piece in confettiPieces"
@@ -218,7 +217,7 @@
       class="mt-3"
       :booking-id="bookingDetailsStore.booking?.id"
       :session-mode="bookingDetailsStore.sessionInfo?.session_mode"
-      :location="bookingDetailsStore.sessionInfo?.preferred_location"
+      :location="sessionLocationValue"
       @refresh="refreshBookingDetails"
     />
 
@@ -306,7 +305,6 @@ import { useHaptics } from '@/composables/useHaptics'
 import { useSessionClock } from '@/composables/useSessionClock'
 import DevSessionQaPanel from '@/components/DevSessionQaPanel.vue'
 import SupportModal from '@/components/SupportModal.vue'
-import SessionAurora from '@/components/session/SessionAurora.vue'
 import SessionHero from '@/components/session/SessionHero.vue'
 import SessionInfoGrid from '@/components/session/SessionInfoGrid.vue'
 import SessionTimeline from '@/components/session/SessionTimeline.vue'
@@ -420,6 +418,18 @@ const formattedTimeRange = computed(() => {
   return `${formatTime(start)} - ${formatTime(end)}`
 })
 
+const sessionModeLabel = computed(() => String(bookingDetailsStore.sessionInfo?.session_mode || ''))
+
+const isOnlineSession = computed(() => sessionModeLabel.value.toLowerCase() === 'online')
+
+const sessionLocationValue = computed(() => {
+  if (isOnlineSession.value) {
+    return 'Online'
+  }
+
+  return bookingDetailsStore.sessionInfo?.preferred_location || 'N/A'
+})
+
 const clock = useSessionClock({
   date: computed(() => bookingDetailsStore.sessionInfo?.date),
   startTime: computed(() => bookingDetailsStore.sessionInfo?.start_time),
@@ -441,12 +451,8 @@ const sessionInfoItems = computed(() => [
   { label: 'Subject', value: bookingDetailsStore.sessionInfo?.subject },
   { label: 'Date', value: formattedSessionDate.value },
   { label: 'Time', value: formattedTimeRange.value },
-  { label: 'Mode', value: bookingDetailsStore.sessionInfo?.session_mode },
-  {
-    label: 'Location',
-    value: bookingDetailsStore.sessionInfo?.preferred_location
-      || (bookingDetailsStore.sessionInfo?.session_mode === 'Online' ? 'Online' : 'N/A'),
-  },
+  { label: 'Mode', value: sessionModeLabel.value },
+  { label: 'Location', value: sessionLocationValue.value },
   { label: 'Status', value: bookingDetailsStore.sessionInfo?.status },
 ])
 
@@ -622,59 +628,81 @@ onBeforeUnmount(() => {
 .session-alive-frame {
   position: relative;
   overflow: hidden;
-  border: 1px solid var(--sb-border-light);
-  border-radius: 22px;
-  background: linear-gradient(
-    180deg,
-    var(--sb-aurora-wash-start),
-    var(--sb-aurora-wash-end) 60%,
-    color-mix(in srgb, var(--sb-pop-pink) 14%, var(--sb-card-bg))
-  );
+  border: 1px solid color-mix(in srgb, var(--sb-card-border) 86%, transparent);
+  border-radius: 28px;
+  background: color-mix(in srgb, var(--sb-card-bg) 84%, transparent);
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.1);
 }
 
 .session-alive-stage {
   position: relative;
   z-index: 1;
-  padding: 14px;
+  padding: 0;
 }
 
 .session-alive-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.7fr) minmax(280px, 1fr);
-  gap: 13px;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 0.38fr);
+  gap: 0;
 }
 
 .session-alive-column {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 13px;
+  gap: 0;
+}
+
+.session-alive-column:first-child {
+  background: color-mix(in srgb, var(--sb-card-bg) 66%, transparent);
+}
+
+.session-alive-column:last-child {
+  border-left: 1px solid var(--sb-card-border);
+  background: color-mix(in srgb, var(--sb-primary-light) 38%, var(--sb-card-bg));
 }
 
 .session-detail-pair {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 13px;
+  grid-template-columns: minmax(0, 0.86fr) minmax(0, 1fr);
+  gap: 0;
+  border-top: 1px solid var(--sb-card-border);
+}
+
+.session-detail-pair > :first-child {
+  border-right: 1px solid var(--sb-card-border);
 }
 
 .session-action-card {
-  border: 1px solid color-mix(in srgb, var(--sb-card-border) 70%, transparent);
-  border-radius: 18px;
-  background: color-mix(in srgb, var(--sb-card-bg) 88%, transparent);
-  box-shadow: 0 14px 36px var(--sb-shadow-soft);
-  padding: 15px;
-  transition: transform var(--sb-t-normal) var(--sb-spring);
+  border: 0;
+  border-bottom: 1px solid var(--sb-card-border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 24px;
 }
 
 .session-action-card:hover {
-  border-color: color-mix(in srgb, var(--sb-primary) 22%, var(--sb-card-border));
-  background: color-mix(in srgb, var(--sb-card-bg) 94%, transparent);
-  box-shadow: 0 22px 54px color-mix(in srgb, var(--sb-shadow-soft) 74%, rgba(15, 23, 42, 0.12));
-  transform: translateY(-3px);
+  background: color-mix(in srgb, var(--sb-card-bg) 38%, transparent);
 }
 
 .session-alive-column > .session-action-card:first-child {
-  border-left: 4px solid var(--sb-primary);
+  display: grid;
+  gap: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 22px;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--sb-dark) 94%, transparent),
+    color-mix(in srgb, var(--sb-primary) 84%, var(--sb-dark))
+  );
+  color: #fff;
+  margin: 24px;
+  padding: 18px;
+}
+
+.session-alive-column > .session-action-card:last-child {
+  border-bottom: 0;
 }
 
 .session-action-head {
@@ -688,8 +716,8 @@ onBeforeUnmount(() => {
 .session-action-card h4 {
   margin: 0 0 11px;
   color: var(--sb-text-main);
-  font-size: 0.92rem;
-  font-weight: 800;
+  font-size: 0.96rem;
+  font-weight: 850;
   letter-spacing: 0;
 }
 
@@ -697,11 +725,19 @@ onBeforeUnmount(() => {
   margin: 0;
 }
 
+.session-alive-column > .session-action-card:first-child h4 {
+  color: #fff;
+}
+
 .session-action-card p {
   margin: 0 0 11px;
   color: var(--sb-text-muted);
   font-size: 0.8rem;
   line-height: 1.5;
+}
+
+.session-alive-column > .session-action-card:first-child p {
+  color: rgba(255, 255, 255, 0.78);
 }
 
 .session-note {
@@ -825,11 +861,11 @@ onBeforeUnmount(() => {
   min-height: 78px;
   flex-direction: column;
   border: 1px solid var(--sb-card-border);
-  background: color-mix(in srgb, var(--sb-card-bg) 82%, transparent);
+  background: color-mix(in srgb, var(--sb-card-bg) 72%, transparent);
   color: var(--sb-text-secondary);
   font-size: 0.72rem;
   line-height: 1.1;
-  box-shadow: 0 10px 22px color-mix(in srgb, var(--sb-shadow-soft) 76%, transparent);
+  box-shadow: none;
 }
 
 .session-quick-button:hover:not(:disabled) {
@@ -942,11 +978,21 @@ onBeforeUnmount(() => {
   .session-alive-grid {
     grid-template-columns: 1fr;
   }
+
+  .session-alive-column:last-child {
+    border-top: 1px solid var(--sb-card-border);
+    border-left: 0;
+  }
 }
 
 @media (max-width: 760px) {
   .session-detail-pair {
     grid-template-columns: 1fr;
+  }
+
+  .session-detail-pair > :first-child {
+    border-right: 0;
+    border-bottom: 1px solid var(--sb-card-border);
   }
 }
 

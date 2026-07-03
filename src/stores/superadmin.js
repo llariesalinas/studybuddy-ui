@@ -124,6 +124,11 @@ export const useSuperAdminStore = defineStore('superadmin', () => {
     return res.data
   }
 
+  const sendVerificationDevAction = async (userId, action) => {
+    const res = await api.post(`/admin/users/${userId}/verification-dev-tools/`, { action })
+    return res.data
+  }
+
   let instPromise = null
   const fetchInstitutions = async (force = false) => {
     if (institutions.value.length && !force) return
@@ -370,6 +375,7 @@ export const useSuperAdminStore = defineStore('superadmin', () => {
     updateUserRole,
     updateUserInstitution,
     toggleDomainExemption,
+    sendVerificationDevAction,
     fetchInstitutions,
     addInstitution,
     toggleInstitutionActive,

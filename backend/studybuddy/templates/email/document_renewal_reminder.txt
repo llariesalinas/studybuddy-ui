@@ -1,0 +1,6 @@
+Your StudyBuddy enrollment verification is due for renewal in {{ days_remaining }} day{{ days_remaining|pluralize }} (by {{ due_at }}).
+
+Please upload your updated School ID and proof of enrollment before then to keep your access uninterrupted:
+{{ status_url }}
+
+If you have any questions, please reach out to StudyBuddySupport@gmail.com.

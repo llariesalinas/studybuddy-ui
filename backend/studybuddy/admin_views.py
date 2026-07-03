@@ -27,8 +27,17 @@ from .serializers import (
     TutorApplicationSerializer, TutorDocumentRenewalReviewSerializer,
     TuteeApplicationSerializer, TuteeDocumentRenewalReviewSerializer
 )
+from django.conf import settings
 from .permissions import IsAdminUser, IsSuperAdminUser
-from .email_utils import send_application_approved_email, send_application_rejected_email
+from .email_utils import (
+    send_application_received_email,
+    send_application_approved_email,
+    send_application_rejected_email,
+    send_document_renewal_result_email,
+)
+from .views import get_verification_application
+from . import _verification_dev
+from . import mailer
 
 logger = logging.getLogger(__name__)
 
@@ -444,6 +453,77 @@ class AdminUserListView(BaseAdminView):
 
         user.delete() # This cascades to UserProfile
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class AdminUserVerificationDevToolsView(BaseAdminView):
+    """SuperAdmin-only actions to demo verification emails/lapse without waiting out the real
+    90-day/30-day windows. Gated server-side by settings.VERIFICATION_DEV_TOOLS_ENABLED (default
+    False), checked before any query so it 403s even for a valid SuperAdmin token when the flag is
+    off. See docs/plans/2026-07-01-tutee-verification-phase4-email-devtools.md."""
+
+    permission_classes = [permissions.IsAuthenticated, IsSuperAdminUser]
+
+    SEND_ACTIONS = {
+        'send_received',
+        'send_approved',
+        'send_rejected',
+        'send_reminder_7day',
+        'send_reminder_1day',
+    }
+
+    @transaction.atomic
+    def post(self, request, pk):
+        if not settings.VERIFICATION_DEV_TOOLS_ENABLED:
+            return Response({"error": "Verification dev tools are disabled."}, status=status.HTTP_403_FORBIDDEN)
+
+        profile = get_object_or_404(UserProfile, pk=pk)
+        if profile.role not in ('Tutor', 'Tutee'):
+            return Response(
+                {"error": f"Verification does not apply to role {profile.role}."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        action = request.data.get('action')
+        if action not in self.SEND_ACTIONS and action != 'force_expire':
+            return Response({"error": "Invalid action."}, status=status.HTTP_400_BAD_REQUEST)
+
+        role_label = profile.role.lower()
+
+        if action in self.SEND_ACTIONS:
+            application = get_verification_application(profile)
+            if application is None:
+                return Response(
+                    {"error": "This user has no verification application to email about."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            if action == 'send_received':
+                send_application_received_email(profile, role_label=role_label)
+            elif action == 'send_approved':
+                send_application_approved_email(profile, role_label=role_label)
+            elif action == 'send_rejected':
+                if not application.rejection_reason:
+                    return Response(
+                        {"error": "This application has no rejection reason to send."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                send_application_rejected_email(profile, application.rejection_reason, role_label=role_label)
+            elif action == 'send_reminder_7day':
+                due_at = application.document_renewal_due_at() or timezone.now()
+                mailer.enqueue_document_renewal_reminder(profile, role_label, 7, due_at)
+            elif action == 'send_reminder_1day':
+                due_at = application.document_renewal_due_at() or timezone.now()
+                mailer.enqueue_document_renewal_reminder(profile, role_label, 1, due_at)
+        else:
+            _verification_dev.set_verification_state(profile, 'renewal_due')
+
+        PlatformActivity.objects.create(
+            activity_type='admin_action',
+            message=f"[DEV] SuperAdmin {request.user.userprofile.fname} triggered '{action}' for "
+                     f"{profile.fname} {profile.lname}",
+            institution=request.user.userprofile.institution,
+        )
+        return Response({"message": f"'{action}' triggered successfully."})
+
 
 class AdminInstitutionView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsSuperAdminUser]
@@ -1039,9 +1119,9 @@ class AdminTutorApplicationDetailView(BaseAdminView):
         # Send email notification
         try:
             if new_status == 'approved':
-                send_application_approved_email(application.profile)
+                send_application_approved_email(application.profile, role_label='tutor')
             else:
-                send_application_rejected_email(application.profile, rejection_reason)
+                send_application_rejected_email(application.profile, rejection_reason, role_label='tutor')
         except Exception:
             logger.exception("Failed to send screening result email for application_id=%s", application.id)
 
@@ -1106,6 +1186,11 @@ class AdminTutorDocumentRenewalDetailView(BaseAdminView):
             message=f"Admin {request.user.userprofile.fname} {new_status} document renewal for {renewal.profile.fname} {renewal.profile.lname}",
             institution=request.user.userprofile.institution
         )
+
+        try:
+            send_document_renewal_result_email(renewal.profile, 'tutor', new_status, rejection_reason)
+        except Exception:
+            logger.exception("Failed to send renewal result email for renewal_id=%s", renewal.id)
 
         return Response({"message": f"Document renewal {new_status} successfully."})
 
@@ -1186,8 +1271,13 @@ class AdminTuteeApplicationDetailView(BaseAdminView):
             institution=request.user.userprofile.institution
         )
 
-        # Email notification deliberately not sent yet — send_application_*_email is tutor-worded and
-        # Phase 4 owns generalizing it to take role/label (docs/plans/2026-07-01-tutee-verification-phase4-email-devtools.md).
+        try:
+            if new_status == 'approved':
+                send_application_approved_email(application.profile, role_label='tutee')
+            else:
+                send_application_rejected_email(application.profile, rejection_reason, role_label='tutee')
+        except Exception:
+            logger.exception("Failed to send screening result email for application_id=%s", application.id)
 
         return Response({"message": f"Application {new_status} successfully."})
 
@@ -1249,5 +1339,10 @@ class AdminTuteeDocumentRenewalDetailView(BaseAdminView):
             message=f"Admin {request.user.userprofile.fname} {new_status} document renewal for {renewal.profile.fname} {renewal.profile.lname}",
             institution=request.user.userprofile.institution
         )
+
+        try:
+            send_document_renewal_result_email(renewal.profile, 'tutee', new_status, rejection_reason)
+        except Exception:
+            logger.exception("Failed to send renewal result email for renewal_id=%s", renewal.id)
 
         return Response({"message": f"Document renewal {new_status} successfully."})
