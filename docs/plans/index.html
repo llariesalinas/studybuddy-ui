@@ -107,11 +107,11 @@
 </head>
 <body>
 <h1>StudyBuddy Plans Index</h1>
-<p class="subtitle">Updated 2026-07-03 after approving the session countdown Orbit Strip implementation plan.</p>
+<p class="subtitle">Updated 2026-07-03 &mdash; session countdown moved to In Progress after finding its implementation was already committed outside the grilling session.</p>
 
 <div class="badge-row">
-  <span class="count">4 In Progress</span>
-  <span class="count">9 Approved</span>
+  <span class="count">5 In Progress</span>
+  <span class="count">8 Approved</span>
   <span class="count">1 Draft</span>
   <span class="count">33 Done</span>
 </div>
@@ -119,11 +119,6 @@
 <section class="group">
   <h2>Approved</h2>
   <div class="cards">
-    <article class="card">
-      <a href="2026-07-03-session-countdown-prototype-plan.md">Session countdown implementation (Orbit Strip)</a>
-      <div class="meta"><span class="status approved">Approved</span>2026-07-03</div>
-      <div class="summary">Orbit Strip selected for the session detail bar and global dock, with scheduled-window countdown logic and `upcoming`, `live`, and `handoff` states.</div>
-    </article>
     <article class="card">
       <a href="2026-07-02-verification-dev-tools.md">Verification dev tools (self-service profile panel)</a>
       <div class="meta"><span class="status approved">Approved</span>2026-07-02</div>
@@ -142,6 +137,11 @@
 <section class="group">
   <h2>In Progress</h2>
   <div class="cards">
+    <article class="card">
+      <a href="2026-07-03-session-countdown-prototype-plan.md">Session countdown implementation (Orbit Strip)</a>
+      <div class="meta"><span class="status in-progress">In Progress</span>2026-07-03</div>
+      <div class="summary">Orbit Strip for the session detail bar and global dock (`upcoming`/`live`/`handoff` states). Grilled end-to-end (13 decisions resolved), then found already implemented outside that session (commit `df994ca`). Outstanding: full decision-by-decision audit, `npm run lint` / `npm run build` / tests. See the <a href="../session-summaries/2026-07-03-session-countdown-handoff.md">handoff</a>.</div>
+    </article>
     <article class="card">
       <a href="2026-07-01-tutee-verification-overview.md">Tutee verification overview</a>
       <div class="meta"><span class="status in-progress">In Progress</span>2026-07-01</div>

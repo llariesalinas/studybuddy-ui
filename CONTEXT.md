@@ -52,3 +52,46 @@ in the domain — only a historical term for anyone reading older code/data.
 **InstaPay Cap**:
 The ₱50,000 per-transaction ceiling enforced by the InstaPay network itself (not a Studybuddy
 choice) that a single Withdrawal Request cannot exceed.
+
+### Sessions & the countdown surface
+
+**Display Status**:
+The time-aware status shown to users for a Booking (`Upcoming`, `Ongoing`, `Payment Required`,
+`Awaiting Verification`, `Completed`, or a passthrough of the raw status for `Pending` /
+`Rejected` / `Cancelled`). Computed server-side per request by `get_display_status`
+(`backend/studybuddy/views.py:851`) from the Booking's raw `status` field plus the current time —
+it is never stored, only derived. Contrast with the Booking's raw `status` field
+(`Pending` / `Confirmed` / `Awaiting Payment Verification` / `Completed` / `Rejected` /
+`Cancelled`), which only changes on explicit user/admin action.
+_Avoid_: "session status" as a stand-in for the raw `status` field — always be clear which of the
+two is meant.
+
+**Handoff**:
+A UI-only grouping, not a Display Status value of its own: a session whose Display Status is
+`Payment Required` or `Awaiting Verification` — i.e. its scheduled window has ended but payment or
+payment verification is still unresolved. Introduced for the Orbit Strip countdown surface to give
+these two Display Statuses a shared identity distinct from `Upcoming`/`Ongoing`.
+_Avoid_: "pending" (already means something else — a Booking awaiting tutor confirmation)
+
+**Queue Item** / **Front-of-Queue**:
+The single most urgent session Studybuddy surfaces to a user across all of their sessions at any
+moment, chosen by priority: Live > Handoff > Upcoming-within-15-minutes > none. Owned by
+`src/stores/activeSession.js`. A user can have many sessions in flight; at most one is ever the
+Queue Item.
+_Avoid_: "active session" alone (ambiguous with `activeSession.js`'s existing `activeBooking`,
+which only recognizes `ongoing`/`upcoming` sessions inside their time window and predates the
+Handoff concept)
+
+**Orbit Zone**:
+One of four presentation bands in the countdown UI (the "Orbit Strip") that visualize progress
+through the current Queue Item's active window — countdown-to-start while Upcoming, elapsed time
+while Live, or time-since-ended (capped at 24 hours) while in Handoff. Orbit Zones are a rhythm
+for the UI only; they do not correspond to Booking status transitions, and are distinct from the
+five lifecycle steps (`Requested`/`Confirmed`/`In session now`/`Payment needed or Awaiting
+verification`/`Completed`) that `SessionTimeline.vue` already renders for the full booking
+lifecycle. The Orbit Strip replaces `SessionTimeline` only while a session is the Queue Item;
+`SessionTimeline` continues to own every other state (far-future confirmed, completed, pending,
+etc.).
+_Avoid_: "phase" (the codebase already uses `sessionPhase` for a narrower, Live-only concept —
+`before`/`venue-window`/`midpoint`/`over` — which is being superseded by Orbit Zones for display
+purposes but may still be referenced internally)
