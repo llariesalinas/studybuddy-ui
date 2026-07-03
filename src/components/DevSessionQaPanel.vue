@@ -5,7 +5,7 @@
         <span class="dev-session-qa-eyebrow">Dev only</span>
         <h5 class="fw-bold mb-1">Session QA</h5>
         <p class="text-muted small mb-0">
-          Force this booking into a live window or preview the check-in modals.
+          Force this booking into countdown states or preview the check-in modals.
         </p>
       </div>
       <span class="dev-session-qa-pill">
@@ -15,6 +15,14 @@
     </div>
 
     <div class="dev-session-qa-grid">
+      <button
+        type="button"
+        class="btn btn-outline-warning fw-semibold sb-btn"
+        :disabled="isBusy || !bookingId"
+        @click="forceUpcoming"
+      >
+        Force upcoming (T-12min)
+      </button>
       <button
         type="button"
         class="btn btn-warning fw-semibold sb-btn"
@@ -38,6 +46,14 @@
         @click="forceLive('ending')"
       >
         Force ending soon
+      </button>
+      <button
+        type="button"
+        class="btn btn-outline-warning fw-semibold sb-btn"
+        :disabled="isBusy || !bookingId"
+        @click="forceHandoff"
+      >
+        Force handoff (payment required)
       </button>
       <button
         type="button"
@@ -152,6 +168,44 @@ const forceLive = async (phase) => {
     toastStore.push(`Dev: session forced to ${phase} for tutor and tutee.`)
   } catch (error) {
     toastStore.push(error.response?.data?.error || 'Failed to force the session live.', 'error')
+  } finally {
+    isSubmitting.value = false
+  }
+}
+
+const forceUpcoming = async () => {
+  if (!props.bookingId || isSubmitting.value) {
+    return
+  }
+
+  isSubmitting.value = true
+
+  try {
+    await sessionsStore.devForceUpcoming(props.bookingId)
+    notifySharedRefresh('force-upcoming', 'upcoming')
+    await refreshSurfaces()
+    toastStore.push('Dev: session forced to upcoming countdown.')
+  } catch (error) {
+    toastStore.push(error.response?.data?.error || 'Failed to force the session upcoming.', 'error')
+  } finally {
+    isSubmitting.value = false
+  }
+}
+
+const forceHandoff = async () => {
+  if (!props.bookingId || isSubmitting.value) {
+    return
+  }
+
+  isSubmitting.value = true
+
+  try {
+    await sessionsStore.devForceHandoff(props.bookingId)
+    notifySharedRefresh('force-handoff', 'handoff')
+    await refreshSurfaces()
+    toastStore.push('Dev: session forced to payment handoff.')
+  } catch (error) {
+    toastStore.push(error.response?.data?.error || 'Failed to force the session handoff.', 'error')
   } finally {
     isSubmitting.value = false
   }

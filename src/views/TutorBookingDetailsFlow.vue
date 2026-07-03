@@ -33,10 +33,16 @@
               :clock="heroClock"
             />
 
-            <div class="session-detail-pair">
+            <SessionCountdownBar
+              v-if="showDetailOrbit"
+              :presentation="detailOrbitPresentation"
+            />
+
+            <div class="session-detail-pair" :class="{ 'session-detail-pair-single': showDetailOrbit }">
               <SessionInfoGrid :items="sessionInfoItems" />
 
               <SessionTimeline
+                v-if="!showDetailOrbit"
                 :status="normalizedStatus"
                 :is-ongoing="isOngoing"
                 :date-label="formattedSessionDate"
@@ -302,9 +308,11 @@ import { useNotificationsStore } from '@/stores/notifications'
 import { useTutorBookingDetailStore } from '@/stores/tutorBookingDetails'
 import { useToastStore } from '@/stores/toast'
 import { useHaptics } from '@/composables/useHaptics'
+import { useOrbitStrip } from '@/composables/useOrbitStrip'
 import { useSessionClock } from '@/composables/useSessionClock'
 import DevSessionQaPanel from '@/components/DevSessionQaPanel.vue'
 import SupportModal from '@/components/SupportModal.vue'
+import SessionCountdownBar from '@/components/session/SessionCountdownBar.vue'
 import SessionHero from '@/components/session/SessionHero.vue'
 import SessionInfoGrid from '@/components/session/SessionInfoGrid.vue'
 import SessionTimeline from '@/components/session/SessionTimeline.vue'
@@ -435,6 +443,10 @@ const clock = useSessionClock({
   startTime: computed(() => bookingDetailsStore.sessionInfo?.start_time),
   endTime: computed(() => bookingDetailsStore.sessionInfo?.end_time),
   isOngoing: statusOngoing,
+})
+const { presentation: detailOrbitPresentation, hasOrbit: showDetailOrbit } = useOrbitStrip({
+  session: computed(() => bookingDetailsStore.booking),
+  isTutor: true,
 })
 
 const isOngoing = computed(() => statusOngoing.value || clock.isLive.value)
@@ -671,6 +683,14 @@ onBeforeUnmount(() => {
 
 .session-detail-pair > :first-child {
   border-right: 1px solid var(--sb-card-border);
+}
+
+.session-detail-pair-single {
+  grid-template-columns: 1fr;
+}
+
+.session-detail-pair-single > :first-child {
+  border-right: 0;
 }
 
 .session-action-card {

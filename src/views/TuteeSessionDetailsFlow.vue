@@ -50,10 +50,16 @@
                 :clock="heroClock"
               />
 
-              <div class="session-detail-pair">
+              <SessionCountdownBar
+                v-if="showDetailOrbit"
+                :presentation="detailOrbitPresentation"
+              />
+
+              <div class="session-detail-pair" :class="{ 'session-detail-pair-single': showDetailOrbit }">
                 <SessionInfoGrid :items="sessionInfoItems" />
 
                 <SessionTimeline
+                  v-if="!showDetailOrbit"
                   :status="normalizedStatus"
                   :is-ongoing="isOngoing"
                   :date-label="formattedSessionDate"
@@ -272,10 +278,12 @@ import { useSessionsStore } from '@/stores/completedSessions'
 import { useNotificationsStore } from '@/stores/notifications'
 import { useToastStore } from '@/stores/toast'
 import { useHaptics } from '@/composables/useHaptics'
+import { useOrbitStrip } from '@/composables/useOrbitStrip'
 import { useSessionClock } from '@/composables/useSessionClock'
 import RatingStackModal from '@/components/RatingStackModal.vue'
 import SupportModal from '@/components/SupportModal.vue'
 import DevSessionQaPanel from '@/components/DevSessionQaPanel.vue'
+import SessionCountdownBar from '@/components/session/SessionCountdownBar.vue'
 import SessionHero from '@/components/session/SessionHero.vue'
 import SessionInfoGrid from '@/components/session/SessionInfoGrid.vue'
 import SessionTimeline from '@/components/session/SessionTimeline.vue'
@@ -423,6 +431,9 @@ const clock = useSessionClock({
   startTime: computed(() => sessionDetail.value?.session?.start_time),
   endTime: computed(() => sessionDetail.value?.session?.end_time),
   isOngoing: statusOngoing,
+})
+const { presentation: detailOrbitPresentation, hasOrbit: showDetailOrbit } = useOrbitStrip({
+  session: sessionDetail,
 })
 
 const isOngoing = computed(() => statusOngoing.value || clock.isLive.value)
@@ -669,6 +680,14 @@ onMounted(async () => {
 
 .session-detail-pair > :first-child {
   border-right: 1px solid var(--sb-card-border);
+}
+
+.session-detail-pair-single {
+  grid-template-columns: 1fr;
+}
+
+.session-detail-pair-single > :first-child {
+  border-right: 0;
 }
 
 .session-action-card {

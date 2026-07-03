@@ -770,9 +770,11 @@ def get_session_notification_context(bookings):
 
 
 DEV_LIVE_PHASES = {
+    'upcoming': (12, 72),
     'start': (-5, 55),
     'midpoint': (-30, 30),
     'ending': (-55, 5),
+    'handoff': (-70, -10),
 }
 DEV_LIVE_CACHE_TIMEOUT_SECONDS = 60 * 60 * 6
 
@@ -3295,7 +3297,7 @@ def dev_force_booking_live(request, booking_id):
     phase = str(request.data.get("phase", "start")).strip().lower()
     if phase not in DEV_LIVE_PHASES:
         return Response(
-            {"error": "Phase must be 'start', 'midpoint', or 'ending'."},
+            {"error": "Phase must be 'upcoming', 'start', 'midpoint', 'ending', or 'handoff'."},
             status=400,
         )
 

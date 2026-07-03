@@ -244,7 +244,7 @@
   </div>
 
   <template v-if="authStore.isAuthenticated && !isPublicRoute">
-    <OngoingBookingBar v-if="!hideOngoingBookingBar" />
+    <OngoingBookingBar />
 
     <template v-if="userRole === 'tutee'">
       <VenueConfirmModal
@@ -455,10 +455,6 @@ const isPublicRoute = computed(() => {
     'tutorpreferencesetup'
   ].includes(route.name)
 })
-
-const hideOngoingBookingBar = computed(() => (
-  ['tuteeSessionDetails', 'booking-details'].includes(route.name)
-))
 
 // Get the role from the store to control the sidebar links
 const userRole = computed(() => authStore.user?.role?.toLowerCase() || null)

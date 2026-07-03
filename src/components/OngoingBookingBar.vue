@@ -1,37 +1,40 @@
 <template>
   <Transition name="dock-rise">
-    <div v-if="booking" class="ongoing-dock" role="status" aria-live="polite">
-      <div class="ongoing-dock-card">
-        <div class="ongoing-dock-avatar" :class="{ 'is-due': isCheckInDue }">
-          <i class="bi" :class="isCheckInDue ? 'bi-bell-fill' : 'bi-broadcast'"></i>
-        </div>
-
-        <div class="ongoing-dock-info">
+    <div v-if="hasDock" class="ongoing-dock" role="status" aria-live="polite">
+      <div class="ongoing-dock-card" :class="`is-${presentation.state}`">
+        <div class="ongoing-dock-copy">
           <div class="ongoing-dock-heading">
-            <span class="ongoing-dock-pill" :class="isCheckInDue ? 'is-due' : 'is-live'">
+            <span class="ongoing-dock-pill">
               <span class="ongoing-dock-dot"></span>
-              {{ isCheckInDue ? 'Check-in due' : 'Ongoing' }}
+              {{ presentation.stateLabel }}
             </span>
-            <span class="ongoing-dock-subject">{{ subject }}</span>
+            <strong>{{ presentation.timerText }}</strong>
           </div>
 
-          <p class="ongoing-dock-partner">{{ partnerLabel }}</p>
-
-          <div class="ongoing-dock-progress" :aria-label="`Session phase: ${sessionPhase}`">
-            <template v-for="(step, index) in steps" :key="step.key">
-              <span class="ongoing-dock-step" :class="{ done: step.reached }" :title="step.label"></span>
-              <span
-                v-if="index < steps.length - 1"
-                class="ongoing-dock-line"
-                :class="{ done: steps[index + 1].reached }"
-              ></span>
-            </template>
-          </div>
+          <p>{{ presentation.primaryText }}</p>
+          <span v-if="presentation.upNextHint" class="ongoing-dock-upnext">
+            {{ presentation.upNextHint }}
+          </span>
         </div>
 
-        <button type="button" class="btn bg-sb-primary text-white sb-btn ongoing-dock-open" @click="openSession">
-          Open
-          <i class="bi bi-arrow-right ms-1"></i>
+        <div
+          class="ongoing-dock-orbit"
+          :style="{ '--orbit-progress': `${presentation.progress}%` }"
+          :aria-label="`${presentation.zoneLabel}, ${presentation.timerText}`"
+        >
+          <span
+            v-for="zone in 4"
+            :key="zone"
+            class="ongoing-dock-zone"
+            :class="{ active: presentation.zone >= zone }"
+          ></span>
+          <span class="ongoing-dock-fill"></span>
+          <span class="ongoing-dock-bead"></span>
+        </div>
+
+        <button type="button" class="ongoing-dock-open sb-btn" @click="openSession">
+          <span>Open</span>
+          <i class="bi bi-arrow-right" aria-hidden="true"></i>
         </button>
       </div>
     </div>
@@ -40,49 +43,27 @@
 
 <script setup>
 import { computed } from 'vue'
-import { useRouter } from 'vue-router'
-import { storeToRefs } from 'pinia'
-import { useActiveSessionStore } from '@/stores/activeSession'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useOrbitStrip } from '@/composables/useOrbitStrip'
 
+const route = useRoute()
 const router = useRouter()
-const activeSession = useActiveSessionStore()
 const authStore = useAuthStore()
 
-const { activeBooking, activeDetail, sessionPhase, dueCheckIn } = storeToRefs(activeSession)
-
-const booking = computed(() => activeBooking.value)
 const role = computed(() => authStore.user?.role?.toLowerCase() || null)
 const isTutor = computed(() => role.value === 'tutor')
-const isCheckInDue = computed(() => Boolean(dueCheckIn.value))
+const { presentation, hasOrbit } = useOrbitStrip({ isTutor })
 
-const subject = computed(() => booking.value?.subject || 'Tutoring session')
+const isMatchingDetailRoute = computed(() => (
+  ['tuteeSessionDetails', 'booking-details'].includes(route.name)
+  && String(route.params.id || '') === String(presentation.value.id || '')
+))
 
-const partnerLabel = computed(() => {
-  if (isTutor.value) {
-    const name = booking.value?.tuteeName || booking.value?.tutee || activeDetail.value?.tutee?.name
-    return name ? `with ${name}` : 'Your session in progress'
-  }
-
-  const name = booking.value?.tutor || activeDetail.value?.tutor?.name
-  return name ? `with ${name}` : 'Your session in progress'
-})
-
-const PHASE_ORDER = ['before', 'venue-window', 'midpoint', 'over']
-
-const steps = computed(() => {
-  const currentIndex = PHASE_ORDER.indexOf(sessionPhase.value)
-
-  return [
-    { key: 'booked', label: 'Booked', reached: true },
-    { key: 'started', label: 'Started', reached: currentIndex >= 1 },
-    { key: 'midpoint', label: 'Midpoint', reached: currentIndex >= 2 },
-    { key: 'ending', label: 'Ending', reached: currentIndex >= 3 },
-  ]
-})
+const hasDock = computed(() => hasOrbit.value && !isMatchingDetailRoute.value)
 
 const openSession = () => {
-  const id = booking.value?.id
+  const id = presentation.value.id
 
   if (id == null) {
     return
@@ -108,125 +89,157 @@ const openSession = () => {
 }
 
 .ongoing-dock-card {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 14px 18px;
-  background: var(--sb-card-bg);
-  border: 1px solid var(--sb-card-border);
-  border-top: 3px solid var(--sb-primary);
-  border-radius: 16px;
-  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.18);
-}
-
-.ongoing-dock-avatar {
-  flex: none;
-  width: 44px;
-  height: 44px;
+  position: relative;
   display: grid;
-  place-items: center;
-  border-radius: 12px;
-  background: rgba(0, 137, 90, 0.12);
-  color: var(--sb-primary);
-  font-size: 20px;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 0.42fr) auto;
+  align-items: center;
+  gap: 14px;
+  overflow: hidden;
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 18% 0%, rgba(21, 184, 143, 0.32), transparent 34%),
+    radial-gradient(circle at 86% 100%, rgba(244, 171, 60, 0.22), transparent 30%),
+    linear-gradient(135deg, #071914, #0f2f28 54%, #13201d);
+  box-shadow: 0 18px 44px rgba(6, 18, 14, 0.3);
+  color: #ffffff;
 }
 
-.ongoing-dock-avatar.is-due {
-  background: rgba(234, 179, 8, 0.16);
-  color: var(--sb-warning, #a16207);
+.ongoing-dock-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
+  opacity: 0.7;
+  pointer-events: none;
 }
 
-.ongoing-dock-info {
-  flex: 1;
+.ongoing-dock-copy {
+  position: relative;
+  z-index: 1;
   min-width: 0;
 }
 
 .ongoing-dock-heading {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 4px;
+  gap: 8px;
+  min-width: 0;
+  margin-bottom: 5px;
+}
+
+.ongoing-dock-heading strong {
+  color: rgba(255, 255, 255, 0.96);
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
 }
 
 .ongoing-dock-pill {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 3px 10px;
+  flex: none;
+  padding: 4px 9px;
   border-radius: 999px;
   font-size: 11px;
   font-weight: 700;
-}
-
-.ongoing-dock-pill.is-live {
-  background: rgba(0, 137, 90, 0.12);
-  color: var(--sb-primary);
-}
-
-.ongoing-dock-pill.is-due {
-  background: rgba(234, 179, 8, 0.16);
-  color: var(--sb-warning, #a16207);
+  background: rgba(255, 255, 255, 0.12);
+  color: #d9fff2;
 }
 
 .ongoing-dock-dot {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: currentColor;
+  background: #45f0bd;
+  box-shadow: 0 0 12px rgba(69, 240, 189, 0.8);
 }
 
-.ongoing-dock-subject {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--sb-text, #0f172a);
+.ongoing-dock-copy p,
+.ongoing-dock-upnext {
+  display: block;
+  margin: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.ongoing-dock-partner {
-  margin: 0 0 8px;
-  font-size: 12px;
-  color: var(--sb-text-muted, #64748b);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.ongoing-dock-copy p {
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 13px;
 }
 
-.ongoing-dock-progress {
-  display: flex;
+.ongoing-dock-upnext {
+  margin-top: 3px;
+  color: rgba(206, 255, 237, 0.74);
+  font-size: 11px;
+}
+
+.ongoing-dock-orbit {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+  min-width: 0;
+  height: 24px;
   align-items: center;
-  gap: 4px;
 }
 
-.ongoing-dock-step {
-  flex: none;
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: var(--sb-card-border);
+.ongoing-dock-zone {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
 }
 
-.ongoing-dock-step.done {
-  background: var(--sb-primary);
+.ongoing-dock-zone.active {
+  background: rgba(118, 255, 213, 0.5);
 }
 
-.ongoing-dock-line {
+.ongoing-dock-fill {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: var(--orbit-progress);
+  max-width: 100%;
   height: 2px;
-  flex: 1;
-  background: var(--sb-card-border);
+  border-radius: 999px;
+  background: linear-gradient(90deg, #5ff0c2, #f8d47a);
+  transform: translateY(-50%);
 }
 
-.ongoing-dock-line.done {
-  background: var(--sb-primary);
+.ongoing-dock-bead {
+  position: absolute;
+  left: var(--orbit-progress);
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.82);
+  border-radius: 50%;
+  background: #f9fefb;
+  box-shadow:
+    0 0 0 5px rgba(95, 240, 194, 0.16),
+    0 0 18px rgba(248, 212, 122, 0.55);
+  transform: translate(-50%, -50%);
 }
 
 .ongoing-dock-open {
+  position: relative;
+  z-index: 1;
   flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
   border-radius: 999px;
-  padding: 8px 18px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #10231d;
+  padding: 8px 14px;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 800;
 }
 
 .dock-rise-enter-active,
@@ -242,11 +255,16 @@ const openSession = () => {
 
 @media (max-width: 575px) {
   .ongoing-dock-card {
-    flex-wrap: wrap;
+    grid-template-columns: 1fr;
   }
 
   .ongoing-dock-open {
     width: 100%;
+  }
+
+  .ongoing-dock-heading {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 </style>
