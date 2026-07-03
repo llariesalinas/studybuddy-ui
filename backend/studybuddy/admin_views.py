@@ -70,6 +70,18 @@ class BaseAdminView(APIView):
 
         return queryset.filter(**{kwarg: profile.institution})
 
+    def assert_not_super_admin(self, request):
+        """Raise 403 if the caller is a SuperAdmin.
+
+        Applicant review (tutor/tutee applications and document renewals) is an
+        institution-Admin responsibility. SuperAdmins are not permitted to read
+        or mutate applicant records — they should work through the Admin of the
+        relevant institution instead.
+        """
+        if request.user.userprofile.role == 'SuperAdmin':
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("SuperAdmins may not review applicant records.")
+
 class AdminStatsView(BaseAdminView):
     permission_classes = [permissions.IsAuthenticated, IsAdminUser]
 
@@ -1044,6 +1056,7 @@ class AdminTutorApplicationListView(BaseAdminView):
     permission_classes = [permissions.IsAuthenticated, IsAdminUser]
 
     def get(self, request):
+        self.assert_not_super_admin(request)
         status_filter = request.query_params.get('status')
         application_queryset = self.get_queryset_for_user(
             request,
@@ -1087,6 +1100,7 @@ class AdminTutorApplicationDetailView(BaseAdminView):
     permission_classes = [permissions.IsAuthenticated, IsAdminUser]
 
     def get(self, request, pk):
+        self.assert_not_super_admin(request)
         queryset = self.get_queryset_for_user(request, TutorApplication.objects.all(), user_path='profile')
         application = get_object_or_404(queryset, pk=pk)
         serializer = TutorApplicationSerializer(application, context={'request': request})
@@ -1094,6 +1108,7 @@ class AdminTutorApplicationDetailView(BaseAdminView):
 
     @transaction.atomic
     def patch(self, request, pk):
+        self.assert_not_super_admin(request)
         queryset = self.get_queryset_for_user(request, TutorApplication.objects.all(), user_path='profile')
         application = get_object_or_404(queryset.select_for_update(), pk=pk)
 
@@ -1132,6 +1147,7 @@ class AdminTutorDocumentRenewalDetailView(BaseAdminView):
     permission_classes = [permissions.IsAuthenticated, IsAdminUser]
 
     def get(self, request, pk):
+        self.assert_not_super_admin(request)
         queryset = self.get_queryset_for_user(
             request,
             TutorDocumentRenewalReview.objects.select_related(
@@ -1147,6 +1163,7 @@ class AdminTutorDocumentRenewalDetailView(BaseAdminView):
 
     @transaction.atomic
     def patch(self, request, pk):
+        self.assert_not_super_admin(request)
         queryset = self.get_queryset_for_user(
             request,
             TutorDocumentRenewalReview.objects.select_related('application', 'profile').all(),
@@ -1199,6 +1216,7 @@ class AdminTuteeApplicationListView(BaseAdminView):
     permission_classes = [permissions.IsAuthenticated, IsAdminUser]
 
     def get(self, request):
+        self.assert_not_super_admin(request)
         status_filter = request.query_params.get('status')
         application_queryset = self.get_queryset_for_user(
             request,
@@ -1242,6 +1260,7 @@ class AdminTuteeApplicationDetailView(BaseAdminView):
     permission_classes = [permissions.IsAuthenticated, IsAdminUser]
 
     def get(self, request, pk):
+        self.assert_not_super_admin(request)
         queryset = self.get_queryset_for_user(request, TuteeApplication.objects.all(), user_path='profile')
         application = get_object_or_404(queryset, pk=pk)
         serializer = TuteeApplicationSerializer(application, context={'request': request})
@@ -1249,6 +1268,7 @@ class AdminTuteeApplicationDetailView(BaseAdminView):
 
     @transaction.atomic
     def patch(self, request, pk):
+        self.assert_not_super_admin(request)
         queryset = self.get_queryset_for_user(request, TuteeApplication.objects.all(), user_path='profile')
         application = get_object_or_404(queryset.select_for_update(), pk=pk)
 
@@ -1286,6 +1306,7 @@ class AdminTuteeDocumentRenewalDetailView(BaseAdminView):
     permission_classes = [permissions.IsAuthenticated, IsAdminUser]
 
     def get(self, request, pk):
+        self.assert_not_super_admin(request)
         queryset = self.get_queryset_for_user(
             request,
             TuteeDocumentRenewalReview.objects.select_related(
@@ -1301,6 +1322,7 @@ class AdminTuteeDocumentRenewalDetailView(BaseAdminView):
 
     @transaction.atomic
     def patch(self, request, pk):
+        self.assert_not_super_admin(request)
         queryset = self.get_queryset_for_user(
             request,
             TuteeDocumentRenewalReview.objects.select_related('application', 'profile').all(),

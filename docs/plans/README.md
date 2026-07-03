@@ -7,6 +7,7 @@ Status moves Draft → Approved → In Progress → Done. When a plan is complet
 
 | Date | Plan | Status | Summary |
 |------|------|--------|---------|
+| 2026-07-03 | [Remove Applicant Review from Super Admin](2026-07-03-remove-superadmin-applicant-review.md) | Done | [Summary](../session-summaries/2026-07-03-remove-superadmin-applicant-review-summary.md) |
 | 2026-07-02 | [Verification dev tools (self-service profile panel)](2026-07-02-verification-dev-tools.md) | Approved | Pending |
 | 2026-07-02 | [Full-system integration merge](2026-07-02-full-system-integration-merge.md) | Done | [Summary](../session-summaries/2026-07-02-full-system-integration-merge-summary.md) |
 | 2026-07-01 | [Tutee verification — overview](2026-07-01-tutee-verification-overview.md) | In Progress | Pending |
