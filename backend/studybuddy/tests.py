@@ -11,6 +11,7 @@ from django.core.management import call_command
 from django.contrib.auth.models import User
 from django.db import connection
 from django.test import override_settings
+from django.utils import timezone
 from django.test.utils import CaptureQueriesContext
 from rest_framework.test import APITestCase, APIRequestFactory, force_authenticate
 from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
@@ -3048,8 +3049,8 @@ class ApplicationVerificationSharedBaseTests(APITestCase):
         tutee_application = self.make_application(TuteeApplication, self.tutee_profile, due_reviewed_at)
 
         tutor_context = get_tutor_document_review_context(self.tutor_profile)
-        generalized_tutor_context = get_document_review_context(tutor_application)
-        generalized_tutee_context = get_document_review_context(tutee_application)
+        generalized_tutor_context = get_document_review_context(tutor_application, 'tutor')
+        generalized_tutee_context = get_document_review_context(tutee_application, 'tutee')
 
         self.assertEqual(tutor_context, generalized_tutor_context)
         self.assertEqual(set(generalized_tutor_context.keys()), set(generalized_tutee_context.keys()))
@@ -5585,3 +5586,514 @@ class VerificationDevToolsTests(APITestCase):
 
     def test_readout_endpoint_requires_auth(self):
         self.assertEqual(self.client.get("/api/dev/verification/").status_code, 401)
+
+
+class VerificationEmailWiringTests(APITestCase):
+    """Phase 4 email wiring — see docs/plans/2026-07-01-tutee-verification-phase4-email-devtools.md.
+
+    Asserts the right email function is called with the right role_label/status, not the actual
+    SMTP send (that's email_utils's own concern and already synchronous/best-effort)."""
+
+    def setUp(self):
+        self.institution = PartnerInstitution.objects.create(
+            institution_name="CPU", school_email_domain="cpu.edu", is_active=True,
+        )
+        self.admin_user = User.objects.create_user(
+            username="email-admin@cpu.edu", email="email-admin@cpu.edu", password="password",
+        )
+        UserProfile.objects.create(
+            user=self.admin_user, fname="Admin", mname="", lname="User", role="Admin",
+            institution=self.institution,
+        )
+        self.tutor_profile = self._make_profile("email-tutor@cpu.edu", "Tutor")
+        self.tutee_profile = self._make_profile("email-tutee@cpu.edu", "Tutee")
+
+    def _make_profile(self, email, role):
+        user = User.objects.create_user(username=email, email=email, password="password")
+        return UserProfile.objects.create(
+            user=user, fname="Email", mname="", lname=role, role=role, institution=self.institution,
+        )
+
+    def upload(self, name, content, content_type):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        return SimpleUploadedFile(name, content, content_type=content_type)
+
+    def test_tutee_initial_submission_sends_received_email_with_tutee_label(self):
+        self.client.force_authenticate(user=self.tutee_profile.user)
+        with patch("studybuddy.views.send_application_received_email") as mock_send:
+            response = self.client.post(
+                "/api/tutee-application/resubmit/",
+                {
+                    "school_id": self.upload("id.jpg", b"id", "image/jpeg"),
+                    "enrollment_proof": self.upload("rf.pdf", b"rf", "application/pdf"),
+                    "reason_to_tutor": "",
+                },
+                format="multipart",
+            )
+        self.assertEqual(response.status_code, 200)
+        mock_send.assert_called_once_with(self.tutee_profile, role_label='tutee')
+
+    def test_tutee_resubmission_sends_received_email_with_tutee_label(self):
+        TuteeApplication.objects.create(
+            profile=self.tutee_profile,
+            school_id=self.upload("old-id.jpg", b"old-id", "image/jpeg"),
+            enrollment_proof=self.upload("old-rf.pdf", b"old-rf", "application/pdf"),
+            application_status="rejected",
+            rejection_reason="Blurry photo.",
+        )
+        self.client.force_authenticate(user=self.tutee_profile.user)
+        with patch("studybuddy.views.send_application_received_email") as mock_send:
+            response = self.client.post(
+                "/api/tutee-application/resubmit/",
+                {
+                    "school_id": self.upload("new-id.jpg", b"new-id", "image/jpeg"),
+                    "enrollment_proof": self.upload("new-rf.pdf", b"new-rf", "application/pdf"),
+                    "reason_to_tutor": "",
+                },
+                format="multipart",
+            )
+        self.assertEqual(response.status_code, 200)
+        mock_send.assert_called_once_with(self.tutee_profile, role_label='tutee')
+
+    def test_admin_approve_tutor_application_sends_approved_email_with_tutor_label(self):
+        application = TutorApplication.objects.create(
+            profile=self.tutor_profile,
+            school_id=self.upload("id.jpg", b"id", "image/jpeg"),
+            enrollment_proof=self.upload("rf.pdf", b"rf", "application/pdf"),
+            application_status="pending",
+        )
+        self.client.force_authenticate(user=self.admin_user)
+        with patch("studybuddy.admin_views.send_application_approved_email") as mock_send:
+            response = self.client.patch(
+                f"/api/admin/tutor-applications/{application.id}/",
+                {"application_status": "approved"},
+                format="json",
+            )
+        self.assertEqual(response.status_code, 200)
+        mock_send.assert_called_once_with(self.tutor_profile, role_label='tutor')
+
+    def test_admin_reject_tutee_application_sends_rejected_email_with_tutee_label(self):
+        application = TuteeApplication.objects.create(
+            profile=self.tutee_profile,
+            school_id=self.upload("id.jpg", b"id", "image/jpeg"),
+            enrollment_proof=self.upload("rf.pdf", b"rf", "application/pdf"),
+            application_status="pending",
+        )
+        self.client.force_authenticate(user=self.admin_user)
+        with patch("studybuddy.admin_views.send_application_rejected_email") as mock_send:
+            response = self.client.patch(
+                f"/api/admin/tutee-applications/{application.id}/",
+                {"application_status": "rejected", "rejection_reason": "Illegible ID."},
+                format="json",
+            )
+        self.assertEqual(response.status_code, 200)
+        mock_send.assert_called_once_with(self.tutee_profile, "Illegible ID.", role_label='tutee')
+
+    def test_admin_approve_tutor_renewal_sends_renewal_result_email(self):
+        application = TutorApplication.objects.create(
+            profile=self.tutor_profile,
+            school_id=self.upload("id.jpg", b"id", "image/jpeg"),
+            enrollment_proof=self.upload("rf.pdf", b"rf", "application/pdf"),
+            application_status="approved",
+        )
+        renewal = TutorDocumentRenewalReview.objects.create(
+            application=application,
+            profile=self.tutor_profile,
+            school_id=self.upload("r-id.jpg", b"r-id", "image/jpeg"),
+            enrollment_proof=self.upload("r-rf.pdf", b"r-rf", "application/pdf"),
+            status="pending",
+        )
+        self.client.force_authenticate(user=self.admin_user)
+        with patch("studybuddy.admin_views.send_document_renewal_result_email") as mock_send:
+            response = self.client.patch(
+                f"/api/admin/tutor-document-renewals/{renewal.id}/",
+                {"application_status": "approved"},
+                format="json",
+            )
+        self.assertEqual(response.status_code, 200)
+        mock_send.assert_called_once_with(self.tutor_profile, 'tutor', 'approved', '')
+
+    def test_admin_reject_tutee_renewal_sends_renewal_result_email(self):
+        application = TuteeApplication.objects.create(
+            profile=self.tutee_profile,
+            school_id=self.upload("id.jpg", b"id", "image/jpeg"),
+            enrollment_proof=self.upload("rf.pdf", b"rf", "application/pdf"),
+            application_status="approved",
+        )
+        renewal = TuteeDocumentRenewalReview.objects.create(
+            application=application,
+            profile=self.tutee_profile,
+            school_id=self.upload("r-id.jpg", b"r-id", "image/jpeg"),
+            enrollment_proof=self.upload("r-rf.pdf", b"r-rf", "application/pdf"),
+            status="pending",
+        )
+        self.client.force_authenticate(user=self.admin_user)
+        with patch("studybuddy.admin_views.send_document_renewal_result_email") as mock_send:
+            response = self.client.patch(
+                f"/api/admin/tutee-document-renewals/{renewal.id}/",
+                {"application_status": "rejected", "rejection_reason": "Expired ID."},
+                format="json",
+            )
+        self.assertEqual(response.status_code, 200)
+        mock_send.assert_called_once_with(self.tutee_profile, 'tutee', 'rejected', 'Expired ID.')
+
+
+class EmailUtilsRoleLabelTests(APITestCase):
+    """email_utils role_label generalization — default stays byte-identical to the original
+    tutor-worded text; role_label='tutee' swaps the wording.
+
+    Patches send_mail directly (not just EMAIL_BACKEND) because _get_smtp_connection() builds its
+    own dedicated SMTP connection straight from settings.EMAIL_HOST_* whenever those are configured
+    (they are, in this dev .env) — bypassing EMAIL_BACKEND overrides entirely. Asserting via
+    mail.outbox would silently attempt real outbound SMTP connections during the test run."""
+
+    def setUp(self):
+        self.institution = PartnerInstitution.objects.create(
+            institution_name="CPU", school_email_domain="cpu.edu", is_active=True,
+        )
+        user = User.objects.create_user(
+            username="wording@cpu.edu", email="wording@cpu.edu", password="password",
+        )
+        self.profile = UserProfile.objects.create(
+            user=user, fname="Word", mname="", lname="Ing", role="Tutor", institution=self.institution,
+        )
+
+    def test_received_email_defaults_to_tutor_wording(self):
+        from .email_utils import send_application_received_email
+
+        with patch("studybuddy.email_utils.send_mail") as mock_send:
+            send_application_received_email(self.profile)
+        subject, message = mock_send.call_args[0][0], mock_send.call_args[0][1]
+        self.assertEqual(subject, "Your StudyBuddy Tutor Application")
+        self.assertIn("applying to be a tutor on StudyBuddy", message)
+
+    def test_received_email_tutee_label_swaps_wording(self):
+        from .email_utils import send_application_received_email
+
+        with patch("studybuddy.email_utils.send_mail") as mock_send:
+            send_application_received_email(self.profile, role_label='tutee')
+        subject, message = mock_send.call_args[0][0], mock_send.call_args[0][1]
+        self.assertEqual(subject, "Your StudyBuddy Tutee Application")
+        self.assertIn("applying to be a tutee on StudyBuddy", message)
+
+    def test_renewal_result_email_approved(self):
+        from .email_utils import send_document_renewal_result_email
+
+        with patch("studybuddy.email_utils.send_mail") as mock_send:
+            send_document_renewal_result_email(self.profile, 'tutee', 'approved')
+        subject, message = mock_send.call_args[0][0], mock_send.call_args[0][1]
+        self.assertIn("Approved", subject)
+        self.assertIn("tutee verification is current again", message)
+
+    def test_renewal_result_email_rejected_includes_reason(self):
+        from .email_utils import send_document_renewal_result_email
+
+        with patch("studybuddy.email_utils.send_mail") as mock_send:
+            send_document_renewal_result_email(self.profile, 'tutor', 'rejected', reason="Blurry scan.")
+        message = mock_send.call_args[0][1]
+        self.assertIn("Blurry scan.", message)
+
+
+class RenewalReminderTests(APITestCase):
+    """Opportunistic 7-day/1-day renewal reminders, triggered from get_document_review_context via
+    profile_status. See docs/plans/2026-07-01-tutee-verification-phase4-email-devtools.md."""
+
+    def setUp(self):
+        self.institution = PartnerInstitution.objects.create(
+            institution_name="CPU", school_email_domain="cpu.edu", is_active=True,
+        )
+        self.tutor_profile = self._make_profile("reminder-tutor@cpu.edu", "Tutor")
+        self.tutee_profile = self._make_profile("reminder-tutee@cpu.edu", "Tutee")
+
+    def _make_profile(self, email, role):
+        user = User.objects.create_user(username=email, email=email, password="password")
+        return UserProfile.objects.create(
+            user=user, fname="Rem", mname="", lname=role, role=role, institution=self.institution,
+        )
+
+    def upload(self, name, content, content_type):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        return SimpleUploadedFile(name, content, content_type=content_type)
+
+    def _approved_application(self, profile, reviewed_at):
+        model = TutorApplication if profile.role == "Tutor" else TuteeApplication
+        return model.objects.create(
+            profile=profile,
+            school_id=self.upload("id.jpg", b"id", "image/jpeg"),
+            enrollment_proof=self.upload("rf.pdf", b"rf", "application/pdf"),
+            application_status="approved",
+            reviewed_at=reviewed_at,
+        )
+
+    def test_1day_window_enqueues_reminder_and_stamps_dedup_field(self):
+        interval = TutorApplication.DOCUMENT_RENEWAL_INTERVAL_DAYS
+        reviewed_at = timezone.now() - timedelta(days=interval) + timedelta(hours=12)
+        application = self._approved_application(self.tutor_profile, reviewed_at)
+
+        with patch("studybuddy.views.mailer.enqueue_document_renewal_reminder") as mock_enqueue:
+            from .views import get_document_review_context
+
+            get_document_review_context(application, 'tutor')
+
+        mock_enqueue.assert_called_once()
+        args = mock_enqueue.call_args[0]
+        self.assertEqual(args[0], self.tutor_profile)
+        self.assertEqual(args[1], 'tutor')
+        self.assertEqual(args[2], 1)
+        application.refresh_from_db()
+        self.assertIsNotNone(application.reminder_1day_sent_at)
+        self.assertIsNone(application.reminder_7day_sent_at)
+
+    def test_7day_window_enqueues_reminder_when_1day_window_not_reached(self):
+        interval = TutorApplication.DOCUMENT_RENEWAL_INTERVAL_DAYS
+        reviewed_at = timezone.now() - timedelta(days=interval) + timedelta(days=4)
+        application = self._approved_application(self.tutee_profile, reviewed_at)
+
+        with patch("studybuddy.views.mailer.enqueue_document_renewal_reminder") as mock_enqueue:
+            from .views import get_document_review_context
+
+            get_document_review_context(application, 'tutee')
+
+        mock_enqueue.assert_called_once()
+        args = mock_enqueue.call_args[0]
+        self.assertEqual(args[1], 'tutee')
+        self.assertEqual(args[2], 7)
+        application.refresh_from_db()
+        self.assertIsNotNone(application.reminder_7day_sent_at)
+
+    def test_no_reenqueue_when_dedup_field_already_set(self):
+        interval = TutorApplication.DOCUMENT_RENEWAL_INTERVAL_DAYS
+        reviewed_at = timezone.now() - timedelta(days=interval) + timedelta(hours=12)
+        application = self._approved_application(self.tutor_profile, reviewed_at)
+        application.reminder_1day_sent_at = timezone.now()
+        application.save(update_fields=['reminder_1day_sent_at'])
+
+        with patch("studybuddy.views.mailer.enqueue_document_renewal_reminder") as mock_enqueue:
+            from .views import get_document_review_context
+
+            get_document_review_context(application, 'tutor')
+
+        mock_enqueue.assert_not_called()
+
+    def test_no_reminder_outside_verified_status(self):
+        interval = TutorApplication.DOCUMENT_RENEWAL_INTERVAL_DAYS
+        due_reviewed_at = timezone.now() - timedelta(days=interval + 1)
+        application = self._approved_application(self.tutor_profile, due_reviewed_at)
+        self.assertEqual(application.document_renewal_status(), 'due')
+
+        with patch("studybuddy.views.mailer.enqueue_document_renewal_reminder") as mock_enqueue:
+            from .views import get_document_review_context
+
+            get_document_review_context(application, 'tutor')
+
+        mock_enqueue.assert_not_called()
+
+    def test_no_reminder_when_not_yet_in_any_window(self):
+        application = self._approved_application(self.tutor_profile, timezone.now())
+        self.assertEqual(application.document_renewal_status(), 'verified')
+
+        with patch("studybuddy.views.mailer.enqueue_document_renewal_reminder") as mock_enqueue:
+            from .views import get_document_review_context
+
+            get_document_review_context(application, 'tutor')
+
+        mock_enqueue.assert_not_called()
+
+
+class VerificationDevToolsAdminEndpointTests(APITestCase):
+    """AdminUserVerificationDevToolsView — see docs/plans/2026-07-01-tutee-verification-phase4-email-devtools.md."""
+
+    def setUp(self):
+        self.institution = PartnerInstitution.objects.create(
+            institution_name="CPU", school_email_domain="cpu.edu", is_active=True,
+        )
+        self.super_user = User.objects.create_user(
+            username="devtools-super@cpu.edu", email="devtools-super@cpu.edu", password="password",
+        )
+        self.super_profile = UserProfile.objects.create(
+            user=self.super_user, fname="Super", mname="", lname="Admin", role="SuperAdmin",
+            institution=self.institution,
+        )
+        self.admin_user = User.objects.create_user(
+            username="devtools-admin@cpu.edu", email="devtools-admin@cpu.edu", password="password",
+        )
+        UserProfile.objects.create(
+            user=self.admin_user, fname="Regular", mname="", lname="Admin", role="Admin",
+            institution=self.institution,
+        )
+        self.tutee_user = User.objects.create_user(
+            username="devtools-tutee@cpu.edu", email="devtools-tutee@cpu.edu", password="password",
+        )
+        self.tutee_profile = UserProfile.objects.create(
+            user=self.tutee_user, fname="Dev", mname="", lname="Tutee", role="Tutee",
+            institution=self.institution,
+        )
+
+    def upload(self, name, content, content_type):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        return SimpleUploadedFile(name, content, content_type=content_type)
+
+    @override_settings(VERIFICATION_DEV_TOOLS_ENABLED=True)
+    def test_403_for_regular_admin_even_with_flag_on(self):
+        self.client.force_authenticate(user=self.admin_user)
+        response = self.client.post(
+            f"/api/admin/users/{self.tutee_profile.id}/verification-dev-tools/",
+            {"action": "send_received"},
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_403_for_superadmin_when_flag_off(self):
+        self.client.force_authenticate(user=self.super_user)
+        response = self.client.post(
+            f"/api/admin/users/{self.tutee_profile.id}/verification-dev-tools/",
+            {"action": "send_received"},
+        )
+        self.assertEqual(response.status_code, 403)
+
+    @override_settings(VERIFICATION_DEV_TOOLS_ENABLED=True)
+    def test_400_for_invalid_action(self):
+        self.client.force_authenticate(user=self.super_user)
+        response = self.client.post(
+            f"/api/admin/users/{self.tutee_profile.id}/verification-dev-tools/",
+            {"action": "bogus"},
+        )
+        self.assertEqual(response.status_code, 400)
+
+    @override_settings(VERIFICATION_DEV_TOOLS_ENABLED=True)
+    def test_send_approved_calls_email_function(self):
+        TuteeApplication.objects.create(
+            profile=self.tutee_profile,
+            school_id=self.upload("id.jpg", b"id", "image/jpeg"),
+            enrollment_proof=self.upload("rf.pdf", b"rf", "application/pdf"),
+            application_status="approved",
+        )
+        self.client.force_authenticate(user=self.super_user)
+        with patch("studybuddy.admin_views.send_application_approved_email") as mock_send:
+            response = self.client.post(
+                f"/api/admin/users/{self.tutee_profile.id}/verification-dev-tools/",
+                {"action": "send_approved"},
+            )
+        self.assertEqual(response.status_code, 200)
+        mock_send.assert_called_once_with(self.tutee_profile, role_label='tutee')
+
+    @override_settings(VERIFICATION_DEV_TOOLS_ENABLED=True)
+    def test_force_expire_flips_renewal_status_to_due(self):
+        application = TuteeApplication.objects.create(
+            profile=self.tutee_profile,
+            school_id=self.upload("id.jpg", b"id", "image/jpeg"),
+            enrollment_proof=self.upload("rf.pdf", b"rf", "application/pdf"),
+            application_status="approved",
+        )
+        self.client.force_authenticate(user=self.super_user)
+        response = self.client.post(
+            f"/api/admin/users/{self.tutee_profile.id}/verification-dev-tools/",
+            {"action": "force_expire"},
+        )
+        self.assertEqual(response.status_code, 200)
+        application.refresh_from_db()
+        self.assertEqual(application.document_renewal_status(), 'due')
+
+    @override_settings(VERIFICATION_DEV_TOOLS_ENABLED=True)
+    def test_404_for_send_action_when_no_application(self):
+        self.client.force_authenticate(user=self.super_user)
+        response = self.client.post(
+            f"/api/admin/users/{self.tutee_profile.id}/verification-dev-tools/",
+            {"action": "send_received"},
+        )
+        self.assertEqual(response.status_code, 404)
+
+    @override_settings(VERIFICATION_DEV_TOOLS_ENABLED=True)
+    def test_400_for_send_rejected_when_no_rejection_reason(self):
+        TuteeApplication.objects.create(
+            profile=self.tutee_profile,
+            school_id=self.upload("id.jpg", b"id", "image/jpeg"),
+            enrollment_proof=self.upload("rf.pdf", b"rf", "application/pdf"),
+            application_status="pending",
+        )
+        self.client.force_authenticate(user=self.super_user)
+        response = self.client.post(
+            f"/api/admin/users/{self.tutee_profile.id}/verification-dev-tools/",
+            {"action": "send_rejected"},
+        )
+        self.assertEqual(response.status_code, 400)
+
+
+class TutorDetailVerifiedBadgeTests(APITestCase):
+    """Public tutor-detail page's is_verified field — binary, hidden unless approved + verified.
+    See docs/plans/2026-07-01-tutee-verification-phase4-email-devtools.md (Section 6)."""
+
+    def setUp(self):
+        self.institution = PartnerInstitution.objects.create(
+            institution_name="CPU", school_email_domain="cpu.edu", is_active=True,
+        )
+        self.viewer_user = User.objects.create_user(
+            username="badge-viewer@cpu.edu", email="badge-viewer@cpu.edu", password="password",
+        )
+        UserProfile.objects.create(
+            user=self.viewer_user, fname="Viewer", mname="", lname="Tutee", role="Tutee",
+            institution=self.institution,
+        )
+
+    def upload(self, name, content, content_type):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        return SimpleUploadedFile(name, content, content_type=content_type)
+
+    def _make_tutor(self, email):
+        user = User.objects.create_user(username=email, email=email, password="password")
+        profile = UserProfile.objects.create(
+            user=user, fname="Badge", mname="", lname="Tutor", role="Tutor", institution=self.institution,
+        )
+        Tutor.objects.create(profile=profile)
+        return profile
+
+    def test_is_verified_false_when_no_application(self):
+        profile = self._make_tutor("badge-noapp@cpu.edu")
+        self.client.force_authenticate(user=self.viewer_user)
+        response = self.client.get(f"/api/tutors/{profile.id}/")
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.data["is_verified"])
+
+    def test_is_verified_true_when_approved_and_current(self):
+        profile = self._make_tutor("badge-verified@cpu.edu")
+        TutorApplication.objects.create(
+            profile=profile,
+            school_id=self.upload("id.jpg", b"id", "image/jpeg"),
+            enrollment_proof=self.upload("rf.pdf", b"rf", "application/pdf"),
+            application_status="approved",
+        )
+        self.client.force_authenticate(user=self.viewer_user)
+        response = self.client.get(f"/api/tutors/{profile.id}/")
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["is_verified"])
+
+    def test_is_verified_false_when_pending(self):
+        profile = self._make_tutor("badge-pending@cpu.edu")
+        TutorApplication.objects.create(
+            profile=profile,
+            school_id=self.upload("id.jpg", b"id", "image/jpeg"),
+            enrollment_proof=self.upload("rf.pdf", b"rf", "application/pdf"),
+            application_status="pending",
+        )
+        self.client.force_authenticate(user=self.viewer_user)
+        response = self.client.get(f"/api/tutors/{profile.id}/")
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.data["is_verified"])
+
+    def test_is_verified_false_when_renewal_due(self):
+        interval = TutorApplication.DOCUMENT_RENEWAL_INTERVAL_DAYS
+        profile = self._make_tutor("badge-renewaldue@cpu.edu")
+        TutorApplication.objects.create(
+            profile=profile,
+            school_id=self.upload("id.jpg", b"id", "image/jpeg"),
+            enrollment_proof=self.upload("rf.pdf", b"rf", "application/pdf"),
+            application_status="approved",
+            reviewed_at=timezone.now() - timedelta(days=interval + 1),
+        )
+        self.client.force_authenticate(user=self.viewer_user)
+        response = self.client.get(f"/api/tutors/{profile.id}/")
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.data["is_verified"])

@@ -1,10 +1,5 @@
 <template>
   <section class="session-card session-hero" :class="{ 'session-hero-live': isOngoing }">
-    <div v-if="isOngoing" class="session-hero-glow" aria-hidden="true"></div>
-    <i v-if="isOngoing" class="session-hero-orb session-hero-orb-primary" aria-hidden="true"></i>
-    <i v-if="isOngoing" class="session-hero-orb session-hero-orb-yellow" aria-hidden="true"></i>
-    <i v-if="isOngoing" class="session-hero-orb session-hero-orb-pink" aria-hidden="true"></i>
-
     <div class="session-hero-top">
       <div class="session-avatar" aria-hidden="true">
         <img
@@ -142,75 +137,24 @@ const statusClass = computed(() => {
 .session-card {
   position: relative;
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--sb-card-border) 70%, transparent);
-  border-radius: 18px;
-  background: color-mix(in srgb, var(--sb-card-bg) 88%, transparent);
-  box-shadow: 0 14px 36px var(--sb-shadow-soft);
-  transition: transform var(--sb-t-normal) var(--sb-spring);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .session-card:hover {
-  border-color: color-mix(in srgb, var(--sb-primary) 22%, var(--sb-card-border));
-  background: color-mix(in srgb, var(--sb-card-bg) 94%, transparent);
-  box-shadow: 0 22px 54px color-mix(in srgb, var(--sb-shadow-soft) 74%, rgba(15, 23, 42, 0.12));
-  transform: translateY(var(--sb-lift-surface));
+  transform: none;
 }
 
 .session-hero {
+  min-height: 100%;
   padding: 24px;
-}
-
-.session-hero-live {
-  border-color: var(--sb-live-hero-border);
   background: linear-gradient(
     135deg,
-    var(--sb-live-hero-start),
-    var(--sb-live-hero-mid) 55%,
-    var(--sb-live-hero-end)
+    color-mix(in srgb, var(--sb-dark) 96%, transparent),
+    color-mix(in srgb, var(--sb-primary) 88%, var(--sb-dark))
   );
-}
-
-.session-hero-glow {
-  position: absolute;
-  inset: 0;
-  background:
-    radial-gradient(420px 240px at 82% -10%, color-mix(in srgb, var(--sb-primary-mid) 22%, transparent), transparent 70%),
-    radial-gradient(300px 200px at 6% 120%, color-mix(in srgb, var(--sb-pop-yellow) 18%, transparent), transparent 70%);
-  pointer-events: none;
-}
-
-.session-hero-orb {
-  position: absolute;
-  border-radius: 50%;
-  opacity: 0.4;
-  pointer-events: none;
-}
-
-.session-hero-orb-primary {
-  left: 62%;
-  top: -8%;
-  width: 40px;
-  height: 40px;
-  background: var(--sb-primary-mid);
-  animation: session-hero-float-one 9s ease-in-out infinite alternate;
-}
-
-.session-hero-orb-yellow {
-  left: 75%;
-  top: 22%;
-  width: 62px;
-  height: 62px;
-  background: var(--sb-pop-yellow);
-  animation: session-hero-float-two 12s ease-in-out infinite alternate;
-}
-
-.session-hero-orb-pink {
-  left: 88%;
-  top: 52%;
-  width: 84px;
-  height: 84px;
-  background: var(--sb-pop-pink);
-  animation: session-hero-float-three 15s ease-in-out infinite alternate;
+  color: #fff;
 }
 
 .session-hero-top,
@@ -229,16 +173,16 @@ const statusClass = computed(() => {
   display: grid;
   flex: none;
   place-items: center;
-  width: 74px;
-  height: 74px;
+  width: 104px;
+  height: 104px;
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--sb-card-bg) 70%, transparent);
-  border-radius: 18px;
-  background: color-mix(in srgb, var(--sb-primary) 12%, transparent);
-  color: var(--sb-primary);
-  font-size: 1.25rem;
-  font-weight: 800;
-  box-shadow: 0 12px 28px color-mix(in srgb, var(--sb-shadow-soft) 78%, transparent);
+  border: 4px solid rgba(255, 255, 255, 0.42);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  font-size: 1.7rem;
+  font-weight: 850;
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.18);
   transition: transform var(--sb-t-normal) var(--sb-spring);
 }
 
@@ -249,8 +193,10 @@ const statusClass = computed(() => {
 }
 
 .session-hero-live .session-avatar {
-  background: color-mix(in srgb, var(--sb-primary) 14%, transparent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--sb-primary) 18%, transparent);
+  background: rgba(255, 255, 255, 0.18);
+  box-shadow:
+    0 18px 36px rgba(0, 0, 0, 0.18),
+    0 0 0 6px rgba(142, 240, 192, 0.1);
 }
 
 .session-card:hover .session-avatar {
@@ -271,30 +217,31 @@ const statusClass = computed(() => {
 
 .session-hero h3 {
   margin: 0 0 2px;
-  color: var(--sb-text-main);
-  font-size: 1.16rem;
-  font-weight: 800;
+  color: #fff;
+  font-size: 2.3rem;
+  font-weight: 850;
   letter-spacing: 0;
-  line-height: 1.18;
+  line-height: 1;
 }
 
 .session-hero p {
   margin: 0;
-  color: var(--sb-text-muted);
-  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.74);
+  font-size: 0.86rem;
 }
 
 .session-subject-pill {
   display: inline-flex;
   max-width: 100%;
-  margin-top: 7px;
-  padding: 4px 11px;
+  margin-top: 12px;
+  padding: 6px 12px;
   overflow: hidden;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--sb-primary) 10%, transparent);
-  color: var(--sb-primary-dark);
-  font-size: 0.72rem;
-  font-weight: 700;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 800;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -304,10 +251,13 @@ const statusClass = computed(() => {
   align-items: center;
   flex: none;
   gap: 6px;
-  padding: 5px 11px;
+  padding: 7px 12px;
   border-radius: 999px;
-  font-size: 0.7rem;
-  font-weight: 700;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-size: 0.74rem;
+  font-weight: 850;
   line-height: 1;
   white-space: nowrap;
 }
@@ -324,39 +274,31 @@ const statusClass = computed(() => {
 }
 
 .session-status-pending {
-  background: color-mix(in srgb, var(--sb-pop-yellow) 24%, var(--sb-card-bg));
-  color: var(--sb-pop-yellow-deep);
+  color: #fff;
 }
 
 .session-status-upcoming {
-  background: color-mix(in srgb, var(--sb-info-bg) 16%, var(--sb-card-bg));
-  color: var(--sb-link);
+  color: #fff;
 }
 
 .session-status-awaiting {
-  background: color-mix(in srgb, var(--sb-info-bg) 20%, var(--sb-card-bg));
-  color: var(--sb-text-secondary);
+  color: #fff;
 }
 
 .session-status-completed {
-  background: color-mix(in srgb, var(--sb-primary) 16%, var(--sb-card-bg));
-  color: var(--sb-primary-dark);
+  color: #fff;
 }
 
 .session-status-ongoing {
-  background: var(--sb-card-bg);
-  color: var(--sb-primary);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--sb-primary) 40%, transparent);
+  color: #fff;
 }
 
 .session-status-stopped {
-  background: color-mix(in srgb, var(--sb-danger) 12%, var(--sb-card-bg));
-  color: var(--sb-danger);
+  color: #fff;
 }
 
 .session-status-neutral {
-  background: color-mix(in srgb, var(--sb-text-muted) 12%, var(--sb-card-bg));
-  color: var(--sb-text-secondary);
+  color: #fff;
 }
 
 .session-live-panel {
@@ -366,20 +308,20 @@ const statusClass = computed(() => {
   align-items: flex-end;
   margin-top: 26px;
   padding-top: 24px;
-  border-top: 1px solid color-mix(in srgb, var(--sb-primary) 18%, var(--sb-card-border));
+  border-top: 1px solid rgba(255, 255, 255, 0.16);
 }
 
 .session-live-label {
   margin: 0 0 3px;
-  color: var(--sb-text-muted-green);
+  color: rgba(255, 255, 255, 0.68);
   font-size: 0.62rem;
-  font-weight: 700;
+  font-weight: 850;
   letter-spacing: 0;
   text-transform: uppercase;
 }
 
 .session-live-timer {
-  color: var(--sb-primary);
+  color: #fff;
   font-variant-numeric: tabular-nums;
   font-size: 3rem;
   font-weight: 800;
@@ -396,19 +338,19 @@ const statusClass = computed(() => {
   height: 9px;
   overflow: hidden;
   border-radius: 999px;
-  background: var(--sb-live-track);
+  background: rgba(255, 255, 255, 0.16);
 }
 
 .session-live-fill {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, var(--sb-primary), var(--sb-primary-mid), var(--sb-pop-yellow));
+  background: linear-gradient(90deg, #8ef0c0, #fff2a8);
 }
 
 .session-live-progress p {
   margin-top: 7px;
-  color: var(--sb-text-muted-green);
+  color: rgba(255, 255, 255, 0.68);
   font-size: 0.68rem;
 }
 
@@ -416,24 +358,6 @@ const statusClass = computed(() => {
   50% {
     transform: scale(1.7);
     opacity: 0.4;
-  }
-}
-
-@keyframes session-hero-float-one {
-  to {
-    transform: translate(8%, 6%) scale(1.15);
-  }
-}
-
-@keyframes session-hero-float-two {
-  to {
-    transform: translate(-7%, 8%) scale(1.2);
-  }
-}
-
-@keyframes session-hero-float-three {
-  to {
-    transform: translate(6%, -7%) scale(1.12);
   }
 }
 
@@ -449,6 +373,11 @@ const statusClass = computed(() => {
   .session-avatar {
     width: 62px;
     height: 62px;
+    border-width: 3px;
+  }
+
+  .session-hero h3 {
+    font-size: 1.7rem;
   }
 
   .session-live-timer {
@@ -458,7 +387,7 @@ const statusClass = computed(() => {
 
 @media (prefers-reduced-motion: reduce) {
   .session-status-dot-live,
-  .session-hero-orb {
+  .session-avatar {
     animation: none;
   }
 

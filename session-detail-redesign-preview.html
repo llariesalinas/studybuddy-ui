@@ -1,0 +1,750 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>StudyBuddy Session Detail Preview</title>
+  <link rel="stylesheet" href="node_modules/bootstrap-icons/font/bootstrap-icons.css">
+  <style>
+    :root {
+      --sb-dark: #0a1916;
+      --sb-primary: #00895a;
+      --sb-primary-dark: #07543a;
+      --sb-primary-hover: #00704a;
+      --sb-primary-light: #edf6f1;
+      --sb-card-bg: #ffffff;
+      --sb-card-border: #e3ebe6;
+      --sb-bg: #f5f8f6;
+      --sb-ink: #163127;
+      --sb-muted: #6b7b74;
+      --sb-soft: #f7faf8;
+      --sb-danger: #dc3545;
+      --sb-warning: #ffc94d;
+      --sb-shadow: 0 24px 70px rgba(15, 23, 42, 0.1);
+      --sb-shadow-hover: 0 20px 42px rgba(15, 23, 42, 0.13);
+      --sb-spring: cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        linear-gradient(180deg, #f1faf6 0%, #fdf9f1 100%);
+      color: var(--sb-ink);
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    button {
+      font: inherit;
+    }
+
+    .preview-shell {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 36px 0;
+    }
+
+    .session-dossier {
+      overflow: hidden;
+      border: 1px solid rgba(219, 231, 225, 0.92);
+      border-radius: 28px;
+      background: rgba(255, 255, 255, 0.82);
+      box-shadow: var(--sb-shadow);
+    }
+
+    .session-identity {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(260px, 0.34fr);
+      gap: 24px;
+      align-items: stretch;
+      padding: 24px;
+      background: linear-gradient(135deg, rgba(10, 25, 22, 0.96), rgba(0, 137, 90, 0.88));
+      color: #fff;
+    }
+
+    .identity-main {
+      display: flex;
+      align-items: center;
+      min-width: 0;
+      gap: 18px;
+    }
+
+    .session-avatar {
+      display: grid;
+      place-items: center;
+      width: 108px;
+      height: 108px;
+      flex: 0 0 auto;
+      border: 4px solid rgba(255, 255, 255, 0.42);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.15);
+      color: #fff;
+      font-size: 30px;
+      font-weight: 850;
+      box-shadow: 0 18px 36px rgba(0, 0, 0, 0.18);
+      transition: transform 180ms var(--sb-spring);
+    }
+
+    .session-dossier:hover .session-avatar {
+      transform: scale(1.025);
+    }
+
+    .identity-copy {
+      min-width: 0;
+    }
+
+    .eyebrow {
+      margin: 0 0 5px;
+      color: rgba(255, 255, 255, 0.72);
+      font-size: 12px;
+      font-weight: 850;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      color: #fff;
+      font-size: 42px;
+      font-weight: 850;
+      line-height: 1;
+      letter-spacing: 0;
+    }
+
+    .identity-subline {
+      margin: 8px 0 0;
+      color: rgba(255, 255, 255, 0.78);
+      font-size: 14px;
+    }
+
+    .identity-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 16px;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      min-height: 34px;
+      border: 1px solid rgba(255, 255, 255, 0.24);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.14);
+      color: #fff;
+      padding: 6px 11px;
+      font-size: 13px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .chip-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #8ef0c0;
+      box-shadow: 0 0 0 5px rgba(142, 240, 192, 0.14);
+    }
+
+    .command-panel {
+      display: grid;
+      align-content: space-between;
+      gap: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 22px;
+      background: rgba(255, 255, 255, 0.12);
+      padding: 16px;
+    }
+
+    .command-panel p {
+      margin: 0;
+      color: rgba(255, 255, 255, 0.78);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .command-title {
+      margin: 0 0 6px;
+      color: #fff;
+      font-size: 16px;
+      font-weight: 850;
+    }
+
+    .button-stack {
+      display: grid;
+      gap: 10px;
+    }
+
+    .action-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 44px;
+      border: 0;
+      border-radius: 999px;
+      padding: 10px 16px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 850;
+      transition:
+        transform 180ms var(--sb-spring),
+        box-shadow 180ms var(--sb-spring),
+        background-color 180ms var(--sb-spring);
+    }
+
+    .action-btn:active {
+      transform: scale(0.96);
+    }
+
+    .action-primary {
+      background: #fff;
+      color: var(--sb-primary-dark);
+      box-shadow: 0 16px 32px rgba(0, 0, 0, 0.16);
+    }
+
+    .action-secondary {
+      border: 1px solid rgba(255, 255, 255, 0.28);
+      background: rgba(255, 255, 255, 0.12);
+      color: #fff;
+    }
+
+    .session-body {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(300px, 0.38fr);
+      gap: 0;
+      min-height: 520px;
+    }
+
+    .session-main {
+      display: grid;
+      align-content: start;
+      gap: 0;
+      padding: 0;
+    }
+
+    .facts-strip {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      border-bottom: 1px solid var(--sb-card-border);
+      background: rgba(255, 255, 255, 0.54);
+    }
+
+    .fact {
+      display: grid;
+      gap: 5px;
+      min-height: 104px;
+      padding: 22px;
+      border-right: 1px solid var(--sb-card-border);
+    }
+
+    .fact:last-child {
+      border-right: 0;
+    }
+
+    .fact dt {
+      color: var(--sb-muted);
+      font-size: 12px;
+      font-weight: 850;
+      text-transform: uppercase;
+    }
+
+    .fact dd {
+      margin: 0;
+      color: #17251f;
+      font-size: 17px;
+      font-weight: 850;
+      line-height: 1.25;
+    }
+
+    .content-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 0.82fr) minmax(0, 1fr);
+      gap: 0;
+    }
+
+    .progress-rail,
+    .session-notes {
+      padding: 28px;
+    }
+
+    .progress-rail {
+      border-right: 1px solid var(--sb-card-border);
+    }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 0 0 22px;
+      color: #17251f;
+      font-size: 18px;
+      font-weight: 850;
+    }
+
+    .section-icon {
+      display: inline-grid;
+      place-items: center;
+      width: 42px;
+      height: 42px;
+      border-radius: 16px;
+      background: rgba(0, 137, 90, 0.1);
+      color: var(--sb-primary);
+    }
+
+    .timeline {
+      position: relative;
+      display: grid;
+      gap: 0;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .timeline li {
+      position: relative;
+      display: grid;
+      grid-template-columns: 26px minmax(0, 1fr);
+      gap: 14px;
+      min-height: 76px;
+    }
+
+    .timeline li::before {
+      position: absolute;
+      top: 22px;
+      bottom: -6px;
+      left: 8px;
+      width: 2px;
+      background: #dce7e1;
+      content: "";
+    }
+
+    .timeline li:last-child::before {
+      display: none;
+    }
+
+    .timeline-node {
+      position: relative;
+      z-index: 1;
+      width: 18px;
+      height: 18px;
+      margin-top: 2px;
+      border: 2px solid #c9dad2;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 0 0 5px rgba(0, 137, 90, 0.06);
+    }
+
+    .timeline li.done .timeline-node,
+    .timeline li.active .timeline-node {
+      border-color: var(--sb-primary);
+      background: var(--sb-primary);
+    }
+
+    .timeline li.done::before {
+      background: var(--sb-primary);
+    }
+
+    .timeline li.active .timeline-node::after {
+      position: absolute;
+      inset: -8px;
+      border: 2px solid rgba(0, 137, 90, 0.28);
+      border-radius: inherit;
+      content: "";
+    }
+
+    .timeline strong {
+      display: block;
+      color: #17251f;
+      font-size: 15px;
+      font-weight: 850;
+    }
+
+    .timeline p {
+      margin: 4px 0 0;
+      color: var(--sb-muted);
+      font-size: 13px;
+      line-height: 1.35;
+    }
+
+    .note-block {
+      border-top: 1px solid var(--sb-card-border);
+      padding: 18px 0;
+    }
+
+    .note-block:first-of-type {
+      border-top: 0;
+      padding-top: 0;
+    }
+
+    .note-block h3 {
+      margin: 0 0 6px;
+      color: #17251f;
+      font-size: 15px;
+      font-weight: 850;
+    }
+
+    .note-block p {
+      margin: 0;
+      color: var(--sb-muted);
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
+    .side-rail {
+      border-left: 1px solid var(--sb-card-border);
+      background: rgba(247, 250, 248, 0.76);
+    }
+
+    .rail-section {
+      padding: 24px;
+      border-bottom: 1px solid var(--sb-card-border);
+    }
+
+    .rail-section:last-child {
+      border-bottom: 0;
+    }
+
+    .rail-title {
+      margin: 0 0 14px;
+      color: #17251f;
+      font-size: 15px;
+      font-weight: 850;
+    }
+
+    .quick-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .quick-action {
+      display: grid;
+      gap: 8px;
+      place-items: center;
+      min-height: 96px;
+      border: 1px solid #d9e8e0;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.72);
+      color: #31463d;
+      cursor: pointer;
+      padding: 14px 10px;
+      font-size: 13px;
+      font-weight: 850;
+      transition:
+        transform 180ms var(--sb-spring),
+        box-shadow 180ms var(--sb-spring),
+        border-color 180ms var(--sb-spring),
+        background-color 180ms var(--sb-spring);
+    }
+
+    .quick-action i {
+      color: var(--sb-primary);
+      font-size: 22px;
+    }
+
+    .quick-action:hover,
+    .action-btn:hover {
+      transform: translateY(-3px);
+    }
+
+    .quick-action:hover {
+      border-color: rgba(0, 137, 90, 0.38);
+      background: #fff;
+      box-shadow: var(--sb-shadow-hover);
+    }
+
+    .quiet-list {
+      display: grid;
+      gap: 12px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .quiet-list li {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      border-bottom: 1px dashed #d7e5de;
+      padding-bottom: 12px;
+      color: var(--sb-muted);
+      font-size: 13px;
+    }
+
+    .quiet-list li:last-child {
+      border-bottom: 0;
+      padding-bottom: 0;
+    }
+
+    .quiet-list strong {
+      color: #17251f;
+      font-weight: 850;
+      text-align: right;
+    }
+
+    .support-btn {
+      width: 100%;
+      border: 1px solid rgba(220, 53, 69, 0.2);
+      background: #fff;
+      color: var(--sb-danger);
+    }
+
+    .preview-caption {
+      margin: 14px 4px 0;
+      color: var(--sb-muted);
+      font-size: 13px;
+    }
+
+    @media (max-width: 980px) {
+      .session-identity,
+      .session-body,
+      .content-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .side-rail,
+      .progress-rail {
+        border-left: 0;
+        border-right: 0;
+        border-top: 1px solid var(--sb-card-border);
+      }
+
+      .facts-strip {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .fact:nth-child(2) {
+        border-right: 0;
+      }
+
+      .fact:nth-child(-n + 2) {
+        border-bottom: 1px solid var(--sb-card-border);
+      }
+    }
+
+    @media (max-width: 620px) {
+      .preview-shell {
+        width: min(100% - 18px, 1180px);
+        padding: 16px 0;
+      }
+
+      .session-dossier {
+        border-radius: 22px;
+      }
+
+      .session-identity,
+      .progress-rail,
+      .session-notes,
+      .rail-section {
+        padding: 18px;
+      }
+
+      .identity-main {
+        align-items: flex-start;
+      }
+
+      .session-avatar {
+        width: 76px;
+        height: 76px;
+        font-size: 22px;
+      }
+
+      h1 {
+        font-size: 30px;
+      }
+
+      .facts-strip,
+      .quick-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .fact,
+      .fact:nth-child(2) {
+        min-height: auto;
+        border-right: 0;
+        border-bottom: 1px solid var(--sb-card-border);
+      }
+
+      .fact:last-child {
+        border-bottom: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="preview-shell">
+    <section class="session-dossier" aria-label="Session detail redesign preview">
+      <header class="session-identity">
+        <div class="identity-main">
+          <div class="session-avatar" aria-hidden="true">MR</div>
+
+          <div class="identity-copy">
+            <p class="eyebrow">Session with</p>
+            <h1>Mara Reyes</h1>
+            <p class="identity-subline">Your tutor for Calculus 2</p>
+
+            <div class="identity-chips" aria-label="Session summary">
+              <span class="chip"><span class="chip-dot"></span>Ongoing</span>
+              <span class="chip"><i class="bi bi-camera-video"></i>Online</span>
+              <span class="chip"><i class="bi bi-star-fill"></i>4.9 tutor rating</span>
+            </div>
+          </div>
+        </div>
+
+        <aside class="command-panel" aria-label="Primary action">
+          <div>
+            <h2 class="command-title">Happening now</h2>
+            <p>Stay synced with your tutor while the live session is running.</p>
+          </div>
+
+          <div class="button-stack">
+            <button class="action-btn action-primary" type="button">
+              <i class="bi bi-chat-dots"></i>
+              Open chat
+            </button>
+            <button class="action-btn action-secondary" type="button">
+              <i class="bi bi-geo-alt"></i>
+              Mark arrived
+            </button>
+          </div>
+        </aside>
+      </header>
+
+      <div class="session-body">
+        <section class="session-main" aria-label="Session details">
+          <dl class="facts-strip">
+            <div class="fact">
+              <dt>Date</dt>
+              <dd>Jul 10, 2026</dd>
+            </div>
+            <div class="fact">
+              <dt>Time</dt>
+              <dd>2:00 PM to 3:30 PM</dd>
+            </div>
+            <div class="fact">
+              <dt>Location</dt>
+              <dd>Online</dd>
+            </div>
+            <div class="fact">
+              <dt>Duration</dt>
+              <dd>1.5 hours</dd>
+            </div>
+          </dl>
+
+          <div class="content-grid">
+            <section class="progress-rail" aria-label="Session progress">
+              <h2 class="section-title">
+                <span class="section-icon"><i class="bi bi-activity"></i></span>
+                Progress
+              </h2>
+
+              <ol class="timeline">
+                <li class="done">
+                  <span class="timeline-node"></span>
+                  <div>
+                    <strong>Requested</strong>
+                    <p>Your booking request was sent to the tutor.</p>
+                  </div>
+                </li>
+                <li class="done">
+                  <span class="timeline-node"></span>
+                  <div>
+                    <strong>Confirmed</strong>
+                    <p>Mara accepted the session.</p>
+                  </div>
+                </li>
+                <li class="active">
+                  <span class="timeline-node"></span>
+                  <div>
+                    <strong>In session now</strong>
+                    <p>37 minutes elapsed. 53 minutes left.</p>
+                  </div>
+                </li>
+                <li>
+                  <span class="timeline-node"></span>
+                  <div>
+                    <strong>Payment and rating</strong>
+                    <p>Submit payment details after the session ends.</p>
+                  </div>
+                </li>
+              </ol>
+            </section>
+
+            <section class="session-notes" aria-label="Session context">
+              <h2 class="section-title">
+                <span class="section-icon"><i class="bi bi-journal-text"></i></span>
+                Session context
+              </h2>
+
+              <article class="note-block">
+                <h3>Next step</h3>
+                <p>Use chat for coordination. When the timer reaches the end, the payment step becomes the main action.</p>
+              </article>
+
+              <article class="note-block">
+                <h3>Focus</h3>
+                <p>Integration by parts, trigonometric substitution, and two review problems from last week's worksheet.</p>
+              </article>
+
+              <article class="note-block">
+                <h3>Cancellation window</h3>
+                <p>Changes are locked during a live session. Support can still help if something goes wrong.</p>
+              </article>
+            </section>
+          </div>
+        </section>
+
+        <aside class="side-rail" aria-label="Session actions and summary">
+          <section class="rail-section">
+            <h2 class="rail-title">Quick actions</h2>
+            <div class="quick-grid">
+              <button class="quick-action" type="button">
+                <i class="bi bi-check2-circle"></i>
+                Arrived
+              </button>
+              <button class="quick-action" type="button">
+                <i class="bi bi-chat-dots"></i>
+                Message
+              </button>
+              <button class="quick-action" type="button">
+                <i class="bi bi-emoji-smile"></i>
+                All good
+              </button>
+              <button class="quick-action" type="button">
+                <i class="bi bi-flag"></i>
+                Report
+              </button>
+            </div>
+          </section>
+
+          <section class="rail-section">
+            <h2 class="rail-title">Payment preview</h2>
+            <ul class="quiet-list">
+              <li><span>Hourly rate</span><strong>PHP 180.00</strong></li>
+              <li><span>Session total</span><strong>PHP 270.00</strong></li>
+              <li><span>Status</span><strong>Pending end</strong></li>
+            </ul>
+          </section>
+
+          <section class="rail-section">
+            <h2 class="rail-title">Support</h2>
+            <button class="action-btn support-btn" type="button">
+              <i class="bi bi-exclamation-circle"></i>
+              Report issue
+            </button>
+          </section>
+        </aside>
+      </div>
+    </section>
+
+    <p class="preview-caption">
+      Static preview only. The Vue session screens are unchanged.
+    </p>
+  </main>
+</body>
+</html>

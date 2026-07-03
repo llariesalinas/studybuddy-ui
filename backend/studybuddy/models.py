@@ -201,10 +201,12 @@ class EmailSendLog(models.Model):
     PURPOSE_LOGIN_OTP = 'login_otp'
     PURPOSE_PASSWORD_RESET = 'password_reset'
     PURPOSE_PASSWORD_CHANGED = 'password_changed'
+    PURPOSE_DOCUMENT_RENEWAL_REMINDER = 'document_renewal_reminder'
     PURPOSE_CHOICES = [
         (PURPOSE_LOGIN_OTP, 'Login OTP'),
         (PURPOSE_PASSWORD_RESET, 'Password reset'),
         (PURPOSE_PASSWORD_CHANGED, 'Password changed'),
+        (PURPOSE_DOCUMENT_RENEWAL_REMINDER, 'Document renewal reminder'),
     ]
 
     STATUS_SENT = 'sent'

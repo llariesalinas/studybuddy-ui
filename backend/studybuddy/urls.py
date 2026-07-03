@@ -34,7 +34,8 @@ from .admin_views import (
     AdminTutorApplicationListView, AdminTutorApplicationDetailView,
     AdminTutorDocumentRenewalDetailView, SuperAdminInstitutionPerformanceView,
     AdminTuteeApplicationListView, AdminTuteeApplicationDetailView,
-    AdminTuteeDocumentRenewalDetailView, AdminOperationalQueueView
+    AdminTuteeDocumentRenewalDetailView, AdminOperationalQueueView,
+    AdminUserVerificationDevToolsView
 )
 from . import views
 
@@ -54,6 +55,7 @@ urlpatterns = [
     path('admin/tutee-document-renewals/<int:pk>/', AdminTuteeDocumentRenewalDetailView.as_view()),
     path('admin/users/', AdminUserListView.as_view()),
     path('admin/users/<int:pk>/', AdminUserListView.as_view()),
+    path('admin/users/<int:pk>/verification-dev-tools/', AdminUserVerificationDevToolsView.as_view()),
     path('admin/institutions/', AdminInstitutionView.as_view()),
     path('admin/institutions/<int:pk>/', AdminInstitutionView.as_view()),
     path('admin/institutions/performance/', SuperAdminInstitutionPerformanceView.as_view()),

@@ -138,6 +138,30 @@
                 {{ user?.is_suspended ? 'Reactivate account' : 'Suspend account' }}
               </button>
             </div>
+
+            <div v-if="user?.role === 'Tutor' || user?.role === 'Tutee'" class="dev-tools-action">
+              <span class="dev-tools-label">Verification dev tools</span>
+              <div class="dev-tools-grid">
+                <button type="button" class="secondary-action compact" :disabled="busy" @click="sendDevAction('send_received')">
+                  Send received email
+                </button>
+                <button type="button" class="secondary-action compact" :disabled="busy" @click="sendDevAction('send_approved')">
+                  Send approved email
+                </button>
+                <button type="button" class="secondary-action compact" :disabled="busy" @click="sendDevAction('send_rejected')">
+                  Send rejected email
+                </button>
+                <button type="button" class="secondary-action compact" :disabled="busy" @click="sendDevAction('send_reminder_7day')">
+                  Send 7-day reminder
+                </button>
+                <button type="button" class="secondary-action compact" :disabled="busy" @click="sendDevAction('send_reminder_1day')">
+                  Send 1-day reminder
+                </button>
+                <button type="button" class="secondary-action compact" :disabled="busy" @click="sendDevAction('force_expire')">
+                  Force-expire renewal
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -304,6 +328,20 @@ async function confirmSuspension() {
     emit('updated', updated)
   } catch {
     toastStore.push('Failed to update user status.', 'error')
+  } finally {
+    busy.value = false
+  }
+}
+
+async function sendDevAction(action) {
+  if (!props.user) return
+
+  busy.value = true
+  try {
+    await store.sendVerificationDevAction(props.user.id, action)
+    toastStore.push(`'${action}' triggered.`)
+  } catch (err) {
+    toastStore.push(err.response?.data?.error || 'Dev action failed.', 'error')
   } finally {
     busy.value = false
   }
@@ -575,6 +613,29 @@ dd {
 .confirm-row {
   display: flex;
   flex-wrap: wrap;
+  gap: 10px;
+}
+
+.dev-tools-action {
+  border: 1px solid var(--sb-card-border, #e4e8e6);
+  border-radius: 14px;
+  background: var(--sb-surface-variant, #f8f9fa);
+  padding: 14px;
+}
+
+.dev-tools-label {
+  display: block;
+  margin: 0 0 12px;
+  color: var(--sb-text-muted, #5b6660);
+  font-weight: 700;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.dev-tools-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 10px;
 }
 

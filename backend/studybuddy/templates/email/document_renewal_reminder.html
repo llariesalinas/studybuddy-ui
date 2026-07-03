@@ -1,0 +1,15 @@
+{% extends "email/base.html" %}
+{% block content %}
+<h1 style="margin:0 0 12px;font-size:20px;">Enrollment verification due for renewal</h1>
+<p style="margin:0 0 18px;color:#5b6660;font-size:14px;">
+  Your StudyBuddy enrollment verification is due for renewal in {{ days_remaining }} day{{ days_remaining|pluralize }}
+  (by {{ due_at }}).
+</p>
+<p style="margin:0 0 18px;color:#5b6660;font-size:14px;">
+  Please upload your updated School ID and proof of enrollment before then to keep your access uninterrupted:
+  <a href="{{ status_url }}">{{ status_url }}</a>
+</p>
+<p style="margin:0;color:#8a938e;font-size:13px;">
+  If you have any questions, please reach out to StudyBuddySupport@gmail.com.
+</p>
+{% endblock %}
