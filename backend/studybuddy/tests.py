@@ -3297,8 +3297,8 @@ class BookingVerificationGateTests(APITestCase):
     def test_tutor_acceptance_load_counts_session_groups_not_rows(self):
         self.make_verified_application(TutorApplication, self.tutor_profile)
         shared_group_id = uuid4()
-        self.create_accepted_booking_group(start_hour=14, group_id=shared_group_id)
         self.create_accepted_booking_group(start_hour=15, group_id=shared_group_id)
+        self.create_accepted_booking_group(start_hour=16, group_id=shared_group_id)
 
         self.assertEqual(self.tutor.accepted_session_load(), 1)
 
@@ -3306,8 +3306,9 @@ class BookingVerificationGateTests(APITestCase):
     def test_tutor_at_acceptance_limit_cannot_approve_new_booking(self):
         self.make_verified_application(TutorApplication, self.tutor_profile)
 
-        for index in range(10):
-            self.create_accepted_booking_group(start_hour=8 + index)
+        accepted_hours = [8, 9, 10, 11, 12, 13, 15, 16, 17, 18]
+        for start_hour in accepted_hours:
+            self.create_accepted_booking_group(start_hour=start_hour)
 
         booking = self.create_pending_booking()
         self.client.force_authenticate(user=self.tutor_user)

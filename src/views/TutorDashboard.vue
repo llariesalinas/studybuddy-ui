@@ -138,6 +138,8 @@ const sessionsStore = useSessionsStore()
 const totalSessions = ref(0)
 const avgRating = ref(0)
 const earnings = ref(0)
+const acceptedSessionLoad = ref(0)
+const sessionLoadLimit = ref(10)
 const upcomingBookings = ref([])
 const isLoading = ref(false)
 const errorMessage = ref('')
@@ -173,6 +175,20 @@ const dashboardMetrics = computed(() => [
     bars: [34, 52, 72, 92, 64, 44],
   },
   {
+    label: 'Accepted Sessions',
+    value: `${acceptedSessionLoad.value} / ${sessionLoadLimit.value}`,
+    note:
+      acceptedSessionLoad.value >= sessionLoadLimit.value
+        ? 'At capacity for new accepts'
+        : `${Math.max(sessionLoadLimit.value - acceptedSessionLoad.value, 0)} slots left`,
+    icon: 'bi-clipboard-check',
+    tone: acceptedSessionLoad.value >= sessionLoadLimit.value ? 'gold' : 'blue',
+    visual: 'ring',
+    progress: sessionLoadLimit.value
+      ? Math.min(Math.round((acceptedSessionLoad.value / sessionLoadLimit.value) * 100), 100)
+      : 0,
+  },
+  {
     label: 'Next Session',
     value: nextBooking.value ? formatDate(nextBooking.value.date, 'short') : 'None',
     note: nextBooking.value
@@ -205,6 +221,8 @@ const loadTutorDashboard = async () => {
     totalSessions.value = response.data.total_sessions
     avgRating.value = response.data.rating_average
     earnings.value = response.data.total_earnings
+    acceptedSessionLoad.value = response.data.accepted_session_load ?? 0
+    sessionLoadLimit.value = response.data.session_load_limit ?? 10
 
     const apiBookings = response.data.upcoming_bookings || []
     const fallbackBookings = sessionsStore.upcomingSessions || []
@@ -362,7 +380,7 @@ watch(
 
 .metric-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 1rem;
   position: relative;
   z-index: 1;

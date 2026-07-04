@@ -700,6 +700,16 @@ def get_session_group_bookings(booking):
     return sort_bookings_for_session_group(booking_group)
 
 
+def get_tutor_acceptance_load_snapshot(tutor):
+    accepted_session_load = tutor.accepted_session_load()
+    session_load_limit = int(tutor.session_load_limit or 0)
+    return {
+        "accepted_session_load": accepted_session_load,
+        "session_load_limit": session_load_limit,
+        "session_load_remaining": max(session_load_limit - accepted_session_load, 0),
+    }
+
+
 def get_booking_request_bookings(booking):
     if booking.booking_request_id is None:
         return get_session_group_bookings(booking)
@@ -2029,6 +2039,8 @@ def tutor_dashboard(request):
     except Tutor.DoesNotExist:
         return Response({"error": "Tutor not found"}, status=404)
 
+    load_snapshot = get_tutor_acceptance_load_snapshot(tutor)
+
     # 📌 Completed sessions for earnings
     completed_bookings = Booking.objects.filter(
         tutor=tutor,
@@ -2103,6 +2115,9 @@ def tutor_dashboard(request):
         "rating_average": tutor.rating_average,
         "hourly_rate": tutor.hourly_rate,
         "total_earnings": round(total_earnings, 2),
+        "session_load_limit": load_snapshot["session_load_limit"],
+        "accepted_session_load": load_snapshot["accepted_session_load"],
+        "session_load_remaining": load_snapshot["session_load_remaining"],
         "upcoming_bookings": bookings_data
     })
 
@@ -2718,57 +2733,75 @@ def delete_availability_override(request, override_id):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def approve_booking(request, booking_id):
-
-    booking = get_object_or_404(Booking, id=booking_id)
-    session_group_bookings = get_booking_request_bookings(booking) if booking.status == "Pending" else get_session_group_bookings(booking)
-
-    # Ensure tutor owns booking
-    if request.user.userprofile != booking.tutor.profile:
-        return Response({"error": "Unauthorized"}, status=403)
-
-    if not can_create_new_booking(request.user.userprofile):
-        return Response(
-            {
-                "error": "Please complete your enrollment verification before accepting new bookings.",
-                "code": "verification_required",
-            },
-            status=403,
+    with transaction.atomic():
+        booking = get_object_or_404(Booking.objects.select_for_update(), id=booking_id)
+        session_group_bookings = (
+            get_booking_request_bookings(booking)
+            if booking.status == "Pending"
+            else get_session_group_bookings(booking)
         )
 
-    wallet, _ = Wallet.objects.get_or_create(tutor=booking.tutor)
-    if wallet.balance < 0:
-        return Response(
-            {"error": "You cannot accept bookings while your wallet balance is negative."},
-            status=400
+        # Ensure tutor owns booking
+        if request.user.userprofile != booking.tutor.profile:
+            return Response({"error": "Unauthorized"}, status=403)
+
+        if not can_create_new_booking(request.user.userprofile):
+            return Response(
+                {
+                    "error": "Please complete your enrollment verification before accepting new bookings.",
+                    "code": "verification_required",
+                },
+                status=403,
+            )
+
+        wallet, _ = Wallet.objects.get_or_create(tutor=booking.tutor)
+        if wallet.balance < 0:
+            return Response(
+                {"error": "You cannot accept bookings while your wallet balance is negative."},
+                status=400
+            )
+
+        if booking.status == "Confirmed":
+            return Response({"message": "Booking is already confirmed."})
+
+        if booking.status != "Pending":
+            return Response({"error": "Only pending bookings can be approved."}, status=400)
+
+        load_snapshot = get_tutor_acceptance_load_snapshot(booking.tutor)
+        if load_snapshot["accepted_session_load"] >= load_snapshot["session_load_limit"]:
+            return Response(
+                {
+                    "error": (
+                        "You have reached your accepted session limit. "
+                        "Please clear some accepted sessions before approving more."
+                    ),
+                    "code": "session_load_limit_reached",
+                    **load_snapshot,
+                },
+                status=409,
+            )
+
+        Booking.objects.filter(id__in=[group_booking.id for group_booking in session_group_bookings]).update(
+            status="Confirmed",
+            tutee_confirmed=False,
+            tutor_confirmed=False,
         )
 
-    if booking.status == "Confirmed":
-        return Response({"message": "Booking is already confirmed."})
+        create_booking_status_notification(
+            booking.student,
+            "confirmed",
+            session_group_bookings
+        )
 
-    if booking.status != "Pending":
-        return Response({"error": "Only pending bookings can be approved."}, status=400)
+        booking.refresh_from_db()
+        create_booking_event(
+            booking,
+            request.user,
+            "Booking request approved.",
+            "booking_approved"
+        )
 
-    Booking.objects.filter(id__in=[group_booking.id for group_booking in session_group_bookings]).update(
-        status="Confirmed",
-        tutee_confirmed=False,
-        tutor_confirmed=False,
-    )
-
-    create_booking_status_notification(
-        booking.student,
-        "confirmed",
-        session_group_bookings
-    )
-
-    booking.refresh_from_db()
-    create_booking_event(
-        booking,
-        request.user,
-        "Booking request approved.",
-        "booking_approved"
-    )
-
-    return Response({"message": "Booking confirmed successfully."})
+        return Response({"message": "Booking confirmed successfully."})
 
 #Reject booking
 @api_view(['POST'])

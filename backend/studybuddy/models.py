@@ -3,6 +3,7 @@ from datetime import timedelta
 
 from django.db import models
 from django.db.models import Q
+from django.core.validators import MinValueValidator, MaxValueValidator
 from django.contrib.auth.models import User
 from django.db.models.signals import post_save
 from django.dispatch import receiver
@@ -10,6 +11,11 @@ from django.utils import timezone
 
 
 # Create your models here.
+
+TUTOR_ACCEPTED_SESSION_LOAD_STATUSES = (
+    'Confirmed',
+    'Awaiting Payment Verification',
+)
 
 class Strand(models.Model):
 
@@ -292,11 +298,31 @@ class Tutor(models.Model):
 
     total_sessions = models.IntegerField(default=0)
 
+    session_load_limit = models.PositiveSmallIntegerField(
+        default=10,
+        validators=[MinValueValidator(1), MaxValueValidator(20)],
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     def save(self, *args, **kwargs):
         self.response_time_label = self.RESPONSE_TIME_LABELS.get(self.response_time)
         super().save(*args, **kwargs)
+
+    def accepted_session_load(self):
+        grouped_session_keys = set()
+        bookings = self.tutor_bookings.filter(
+            status__in=TUTOR_ACCEPTED_SESSION_LOAD_STATUSES
+        ).order_by('session_date', 'availability__time_slot', 'id')
+
+        for booking in bookings.only('id', 'booking_request_id', 'session_group_id'):
+            group_key = booking.session_group_id or booking.booking_request_id or booking.id
+            grouped_session_keys.add(str(group_key))
+
+        return len(grouped_session_keys)
+
+    def accepted_session_load_remaining(self):
+        return max(int(self.session_load_limit or 0) - self.accepted_session_load(), 0)
 
     def __str__(self):
         return f"Tutor: {self.profile.fname} {self.profile.lname}"

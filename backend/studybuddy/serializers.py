@@ -73,6 +73,9 @@ class AdminUserSerializer(serializers.ModelSerializer):
     profile_picture_url = serializers.SerializerMethodField()
     tutor_sessions_completed = serializers.SerializerMethodField()
     tutor_avg_rating = serializers.SerializerMethodField()
+    tutor_session_load_limit = serializers.SerializerMethodField()
+    tutor_accepted_session_load = serializers.SerializerMethodField()
+    tutor_session_load_remaining = serializers.SerializerMethodField()
 
     class Meta:
         model = UserProfile
@@ -92,6 +95,9 @@ class AdminUserSerializer(serializers.ModelSerializer):
             'profile_picture_url',
             'tutor_sessions_completed',
             'tutor_avg_rating',
+            'tutor_session_load_limit',
+            'tutor_accepted_session_load',
+            'tutor_session_load_remaining',
             'created_at'
         ]
 
@@ -125,6 +131,30 @@ class AdminUserSerializer(serializers.ModelSerializer):
             return None
         try:
             return obj.tutor.rating_average
+        except Exception:
+            return 0
+
+    def get_tutor_session_load_limit(self, obj):
+        if obj.role != 'Tutor':
+            return None
+        try:
+            return obj.tutor.session_load_limit
+        except Exception:
+            return 10
+
+    def get_tutor_accepted_session_load(self, obj):
+        if obj.role != 'Tutor':
+            return None
+        try:
+            return obj.tutor.accepted_session_load()
+        except Exception:
+            return 0
+
+    def get_tutor_session_load_remaining(self, obj):
+        if obj.role != 'Tutor':
+            return None
+        try:
+            return obj.tutor.accepted_session_load_remaining()
         except Exception:
             return 0
 

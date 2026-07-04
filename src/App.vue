@@ -62,6 +62,44 @@
       </div>
     </div>
 
+    <div
+      v-if="isBookingGateModalOpen"
+      class="modal show"
+      tabindex="-1"
+      role="dialog"
+      aria-modal="true"
+      style="display: block;"
+      @click.self="closeBookingGateModal"
+    >
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-4">
+          <div class="modal-header border-0 pb-0">
+            <div>
+              <h5 class="modal-title fw-bold">Verify your enrollment first</h5>
+              <p class="small text-muted mb-0">You need a verified profile before booking a session.</p>
+            </div>
+            <button type="button" class="btn-close" @click="closeBookingGateModal"></button>
+          </div>
+
+          <div class="modal-body">
+            <p class="mb-0">
+              If you believe your verification status is wrong, open Support and send a booking ticket to your institution admin.
+            </p>
+          </div>
+
+          <div class="modal-footer border-0 pt-0">
+            <button class="btn btn-light sb-btn" @click="closeBookingGateModal">Close</button>
+            <button class="btn bg-sb-primary text-white sb-btn sb-elevated sb-elevated--brand" @click="closeBookingGateModal(); openSupport('Booking')">
+              Open Support
+            </button>
+            <button class="btn btn-outline-primary sb-btn" @click="goToVerificationStatus">
+              View Status
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <main
       class="app-main app-main-surface flex-grow-1 overflow-auto p-5 position-relative"
       :class="{ 'app-main-chat': route.name === 'chat' }"
@@ -191,9 +229,14 @@
           </div>
 
           <div class="d-flex gap-3 align-items-center ms-auto">
-            <router-link v-if="userRole === 'tutee' && route.path !== '/book'" to="/book" class="btn bg-sb-primary text-white px-4 py-2 rounded-3 fw-semibold sb-btn sb-elevated sb-elevated--brand">
+            <button
+              v-if="userRole === 'tutee' && route.path !== '/book'"
+              type="button"
+              class="btn bg-sb-primary text-white px-4 py-2 rounded-3 fw-semibold sb-btn sb-elevated sb-elevated--brand"
+              @click="handleBookSessionClick"
+            >
               Book Session
-            </router-link>
+            </button>
 
             <router-link
               v-if="userRole === 'tutor' && route.path !== '/tch-requestedSessions'"
@@ -270,6 +313,7 @@
 import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth' // Import auth store
+import { useProfileStore } from '@/stores/profile'
 import { useSessionsStore } from '@/stores/completedSessions'
 import { useActiveSessionStore } from '@/stores/activeSession'
 import { useToastStore } from '@/stores/toast'
@@ -284,11 +328,13 @@ import { SESSION_POLL_INTERVAL_MS } from './config.js'
 import SbToast from '@/components/SbToast.vue'
 import AppSidebar from '@/components/AppSidebar.vue'
 import SbBgWash from '@/components/SbBgWash.vue'
+import { needsTuteeVerificationBlock } from '@/services/tutorApplicationState'
 const SupportModal = defineAsyncComponent(() => import('@/components/SupportModal.vue'))
 const DEV_LIVE_REFRESH_KEY = 'studybuddy_dev_live_refresh'
 
 const route = useRoute()
 const authStore = useAuthStore()
+const profileStore = useProfileStore()
 const chatStore = useChatStore()
 const sessionStore = useSessionsStore()
 const activeSession = useActiveSessionStore()
@@ -375,11 +421,50 @@ const handleMidpointCheckIn = async (response) => {
 const isSupportModalOpen = ref(false)
 const supportContextType = ref('Other')
 const supportContextId = ref(null)
+const isBookingGateModalOpen = ref(false)
 
 const openSupport = (type = 'Other', id = null) => {
   supportContextType.value = type
   supportContextId.value = id
   isSupportModalOpen.value = true
+}
+
+const closeBookingGateModal = () => {
+  isBookingGateModalOpen.value = false
+}
+
+const goToVerificationStatus = async () => {
+  closeBookingGateModal()
+  await router.push('/application-status')
+}
+
+const handleBookSessionClick = async () => {
+  if (userRole.value !== 'tutee') {
+    await router.push('/book')
+    return
+  }
+
+  if (!profileStore.loaded) {
+    try {
+      await profileStore.checkProfileStatus()
+    } catch (error) {
+      toastStore.push(error.response?.data?.error || 'Unable to check verification status right now.', 'error')
+      return
+    }
+  }
+
+  const tuteeVerificationSnapshot = {
+    application_status: profileStore.applicationStatus || null,
+    document_renewal_status: profileStore.renewalStatus || null,
+    tutee_verification_enforced: profileStore.tuteeVerificationEnforced,
+  }
+
+  if (needsTuteeVerificationBlock(tuteeVerificationSnapshot)) {
+    isBookingGateModalOpen.value = true
+    return
+  }
+
+  await router.push('/book')
 }
 let pendingSessionsRefreshId = null
 let startupIdleId = null

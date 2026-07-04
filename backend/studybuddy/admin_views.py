@@ -392,10 +392,12 @@ class AdminUserListView(BaseAdminView):
         profile = get_object_or_404(queryset, pk=pk)
         actor = request.user.userprofile
         changed_fields = []
+        profile_update_fields = []
         is_suspended = request.data.get('is_suspended')
 
         if is_suspended is not None:
             profile.is_suspended = parse_bool(is_suspended)
+            profile_update_fields.append('is_suspended')
             changed_fields.append('is_suspended')
 
         if 'role' in request.data:
@@ -408,6 +410,7 @@ class AdminUserListView(BaseAdminView):
                 return Response({'error': 'Invalid role.'}, status=status.HTTP_400_BAD_REQUEST)
 
             profile.role = role
+            profile_update_fields.append('role')
             changed_fields.append('role')
 
         if 'institution' in request.data:
@@ -419,6 +422,7 @@ class AdminUserListView(BaseAdminView):
                 profile.institution = None
             else:
                 profile.institution = get_object_or_404(PartnerInstitution, pk=institution_id)
+            profile_update_fields.append('institution')
             changed_fields.append('institution')
 
         if 'is_domain_exempt' in request.data:
@@ -426,11 +430,29 @@ class AdminUserListView(BaseAdminView):
                 return Response({'error': 'Only SuperAdmin can change domain exemptions.'}, status=status.HTTP_403_FORBIDDEN)
 
             profile.is_domain_exempt = parse_bool(request.data.get('is_domain_exempt'))
+            profile_update_fields.append('is_domain_exempt')
             changed_fields.append('is_domain_exempt')
 
-        if changed_fields:
-            profile.save(update_fields=list(set(changed_fields)) + ['updated_at'])
+        if 'session_load_limit' in request.data:
+            if profile.role != 'Tutor':
+                return Response({'error': 'Only tutors have a session load limit.'}, status=status.HTTP_400_BAD_REQUEST)
 
+            try:
+                session_load_limit = int(request.data.get('session_load_limit'))
+            except (TypeError, ValueError):
+                return Response({'error': 'Session load limit must be a whole number.'}, status=status.HTTP_400_BAD_REQUEST)
+
+            if session_load_limit < 1 or session_load_limit > 20:
+                return Response({'error': 'Session load limit must be between 1 and 20.'}, status=status.HTTP_400_BAD_REQUEST)
+
+            profile.tutor.session_load_limit = session_load_limit
+            profile.tutor.save(update_fields=['session_load_limit'])
+            changed_fields.append('session_load_limit')
+
+        if profile_update_fields:
+            profile.save(update_fields=list(set(profile_update_fields)) + ['updated_at'])
+
+        if changed_fields:
             PlatformActivity.objects.create(
                 activity_type='admin_action',
                 message=f"Admin updated {profile.fname} {profile.lname}: {', '.join(sorted(set(changed_fields)))}",

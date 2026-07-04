@@ -106,6 +106,21 @@ press (keyboard / assistive tech) to avoid accidental submission.
 _Avoid_: "rating" (that is the post-session score, a different concept), "All good?" (an older
 one-tap control that only recorded `good` and gave no way to flag `issues`)
 
+**Accepted Session Load**:
+The number of future or unresolved accepted session groups a Tutor is currently carrying, including
+`Confirmed` and `Awaiting Payment Verification` groups. Count session groups, not individual
+30-minute Booking rows, because a multi-slot appointment is one tutoring commitment.
+_Avoid_: accepted booking rows, raw slot count, pending requests
+
+**Accepted Session Load Limit**:
+The maximum Accepted Session Load a Tutor may carry before Studybuddy blocks accepting another
+booking request. The default limit is 10 session groups, but an institution admin may adjust a
+Tutor's limit from Tutor Management for tutors in that admin's institution; the rationale can live
+in a Support Ticket and its chat rather than in a required edit note. The editable range is 1 to 20
+session groups. The limit is prospective: it blocks new accepts only and does not retroactively
+cancel existing accepted sessions.
+_Avoid_: pending request limit, booking row limit, slot limit
+
 ### Recommendation & matching
 
 **Hybrid Score**:

@@ -150,6 +150,29 @@ export const useAdminStore = defineStore(
       }
     }
 
+    const updateUserTutorSessionLoadLimit = async (userId, sessionLoadLimit) => {
+      try {
+        const response = await api.patch(`/admin/users/${userId}/`, {
+          session_load_limit: sessionLoadLimit,
+        })
+
+        const user = users.value.find(u => u.id === userId)
+        if (user) {
+          Object.assign(user, response.data)
+        }
+
+        Promise.all([
+          fetchUsers({}, true),
+          fetchStats(true)
+        ])
+
+        return response.data
+      } catch (err) {
+        console.error('Failed to update tutor session load limit:', err)
+        throw err
+      }
+    }
+
     const deleteUser = async (userId) => {
       try {
 
@@ -438,6 +461,7 @@ export const useAdminStore = defineStore(
       fetchOperationalQueue,
       fetchUsers,
       updateUserStatus,
+      updateUserTutorSessionLoadLimit,
       deleteUser,
 
       fetchWithdrawals,
