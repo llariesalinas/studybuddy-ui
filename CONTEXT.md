@@ -95,3 +95,52 @@ etc.).
 _Avoid_: "phase" (the codebase already uses `sessionPhase` for a narrower, Live-only concept —
 `before`/`venue-window`/`midpoint`/`over` — which is being superseded by Orbit Zones for display
 purposes but may still be referenced internally)
+
+**Midpoint Check-in**:
+A lightweight self-report a participant makes while a session is Live, answering whether things
+are on track (`good`) or they are having issues (`issues`). Its purpose is to let support step in
+while there is still time to help, rather than after the fact. At most one Midpoint Check-in per
+session; once recorded it is shown back as a settled status, not re-asked. Surfaced in the UI as
+the "Mid-session pulse" card and confirmed with a deliberate hold gesture (pointer) or a single
+press (keyboard / assistive tech) to avoid accidental submission.
+_Avoid_: "rating" (that is the post-session score, a different concept), "All good?" (an older
+one-tap control that only recorded `good` and gave no way to flag `issues`)
+
+### Recommendation & matching
+
+**Hybrid Score**:
+The final ranking number the tutor recommender produces for a (Tutee, Tutor) pair:
+`0.7 * CBF Score + 0.3 * (CF Score / 5)`. Computed by `hybrid_prediction`
+(`backend/studybuddy/recommender/hybrid.py:10`). This is the number shown to students as
+"recommended for you" ordering.
+_Avoid_: "match score", "recommendation score" — the codebase and this glossary use Hybrid Score
+only.
+
+**CBF Score**:
+The Content-Based Filtering half of the Hybrid Score — how well a Tutor's profile fits a Tutee's
+stated preferences, independent of any other student's history. A weighted sum of five sub-scores:
+subject match (0.35), expertise level (0.20), course match (0.20), year-level proximity (0.15),
+and teaching-level fit (0.10). Computed by `compute_cbf_score`
+(`backend/studybuddy/recommender/cbf.py:23`).
+
+**CF Score**:
+The Collaborative Filtering half of the Hybrid Score — a predicted rating for a (Tutee, Tutor)
+pair derived from how similar Tutees (see Top-K Neighbor) have rated that Tutor. Computed by
+`compute_cf_score` (`backend/studybuddy/recommender/CF.py:88`). Returns `None` when the Tutee has
+no Rating history at all — see Cold-Start Tutee for what happens to the Hybrid Score in that case.
+
+**Top-K Neighbor**:
+One of up to 5 other Tutees whose past Ratings are most similar (by Pearson similarity) to the
+Tutee being scored. Found by `top_k` (`backend/studybuddy/recommender/CF.py:64`). A Tutee's set of
+Top-K Neighbors is computed once per recommendation request and reused across every candidate
+Tutor in that request.
+
+**Cold-Start Tutee**:
+A Tutee with no Rating history, so `compute_cf_score` returns `None` for every Tutor. `None` is
+coerced to `0` in `hybrid_prediction`, not excluded from the weighting — so a Cold-Start Tutee's
+Hybrid Score is always `0.7 * CBF Score`, capped below what a Tutee with rating history could
+reach for an identical CBF match. This is a property of the current formula (CF weight is never
+reallocated to CBF when CF is unavailable), not a bug. Surfaced in the UI as a "Cold Start" badge
+with the subtext "CF unavailable — no rating history."
+_Avoid_: "new user" (too broad — a Tutee with bookings but no completed/rated ones is also
+Cold-Start; the defining trait is absence of Rating rows, not account age)

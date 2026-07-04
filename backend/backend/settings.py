@@ -262,6 +262,11 @@ TUTEE_VERIFICATION_ENFORCEMENT_START_DATE = os.getenv('TUTEE_VERIFICATION_ENFORC
 # the dev endpoints check this flag before any work and 403 when it is off.
 VERIFICATION_DEV_TOOLS_ENABLED = env_bool('VERIFICATION_DEV_TOOLS_ENABLED', False)
 
+# Enables the staff-only recommendation algorithm demo endpoints (score breakdown for the live
+# panel demo tool). Defaults False so it is inert in production; the endpoints check this flag
+# before any work and 403 when it is off.
+ALGORITHM_DEMO_TOOLS_ENABLED = env_bool('ALGORITHM_DEMO_TOOLS_ENABLED', False)
+
 PASSWORD_RESET_TIMEOUT = 3600
 LOGIN_OTP_TTL_SECONDS = 600
 LOGIN_OTP_MAX_ATTEMPTS = 5

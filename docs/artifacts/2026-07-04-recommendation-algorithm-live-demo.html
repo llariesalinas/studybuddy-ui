@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Studybuddy Recommendation Algorithm — Live Demo</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --card: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --accent: #388bfd;
+    --green: #2ea043;
+    --amber: #d29922;
+    --red: #f85149;
+    --purple: #a371f7;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    margin: 0;
+    padding: 28px;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .subtitle { color: var(--muted); margin: 0 0 20px; font-size: 13px; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+    margin-bottom: 16px;
+  }
+  label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  input[type="text"], input[type="email"], input[type="password"] {
+    width: 100%;
+    background: #0d1117;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+    color: var(--text);
+    font-size: 14px;
+    margin-bottom: 12px;
+  }
+  button {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button:disabled { opacity: 0.5; cursor: default; }
+  button.secondary { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .error { color: var(--red); font-size: 13px; margin: 8px 0; }
+  .hint { color: var(--muted); font-size: 12px; margin-top: -6px; margin-bottom: 12px; }
+  .row { display: flex; gap: 10px; align-items: flex-end; }
+  .row > * { flex: 1; }
+  .badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 999px;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+  .badge.cold { background: rgba(248,81,73,0.15); color: var(--red); border: 1px solid var(--red); }
+  .badge.super { background: rgba(56,139,253,0.15); color: var(--accent); border: 1px solid var(--accent); }
+
+  #search-results {
+    position: absolute;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    max-height: 240px;
+    overflow-y: auto;
+    width: 340px;
+    z-index: 5;
+    display: none;
+  }
+  #search-results div {
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 13px;
+    border-bottom: 1px solid var(--border);
+  }
+  #search-results div:last-child { border-bottom: none; }
+  #search-results div:hover { background: #1c2530; }
+  #search-results .muted { color: var(--muted); font-size: 11px; }
+
+  .split { display: grid; grid-template-columns: 340px 1fr; gap: 16px; }
+  .list-pane { display: flex; flex-direction: column; gap: 8px; }
+  .tutor-row {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  .tutor-row:hover { border-color: var(--accent); }
+  .tutor-row.selected { border-color: var(--accent); background: #14202e; }
+  .tutor-row .rank { color: var(--muted); font-size: 11px; margin-right: 6px; }
+  .tutor-row .score { float: right; font-weight: 700; color: var(--accent); }
+
+  .detail-pane {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    min-height: 320px;
+  }
+  .detail-pane h2 { margin: 0 0 2px; font-size: 18px; }
+  .detail-pane .final-score { font-size: 13px; color: var(--muted); margin-bottom: 18px; }
+  .detail-pane .final-score b { color: var(--accent); font-size: 20px; }
+
+  .bar-row { margin-bottom: 12px; }
+  .bar-row .bar-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+  .bar-track { background: #21262d; border-radius: 4px; height: 10px; width: 100%; overflow: hidden; }
+  .bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    width: 0%;
+    background: var(--accent);
+    transition: width 0.4s ease;
+  }
+  .bar-fill.cf { background: var(--purple); }
+  .bar-fill.hybrid { background: var(--green); }
+
+  .neighbor-list { margin-top: 8px; font-size: 12px; color: var(--muted); }
+  .neighbor-list div { padding: 3px 0; }
+
+  .empty-state { color: var(--muted); font-size: 14px; text-align: center; padding: 40px 0; }
+  #api-base-row { margin-bottom: 10px; }
+  #status-line { font-size: 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Studybuddy Recommendation Algorithm — Live Demo</h1>
+  <p class="subtitle">Runs the real hybrid recommender (CBF + CF) against real seeded data. Staff-only; requires ALGORITHM_DEMO_TOOLS_ENABLED=true on the backend.</p>
+
+  <div class="card" id="api-base-card">
+    <div id="api-base-row">
+      <label for="api-base">Backend API base URL</label>
+      <input type="text" id="api-base" value="http://127.0.0.1:8000/api/">
+    </div>
+    <div id="status-line">Not logged in.</div>
+  </div>
+
+  <div class="card" id="login-panel">
+    <div class="row">
+      <div>
+        <label for="login-email">Email</label>
+        <input type="email" id="login-email">
+      </div>
+      <div>
+        <label for="login-password">Password</label>
+        <input type="password" id="login-password">
+      </div>
+      <div style="flex: 0;">
+        <button id="login-btn">Log in</button>
+      </div>
+    </div>
+    <div class="error" id="login-error"></div>
+
+    <div id="otp-row" hidden>
+      <div class="row">
+        <div>
+          <label for="otp-code">Verification code (sent to email)</label>
+          <input type="text" id="otp-code">
+          <div class="hint" id="otp-hint"></div>
+        </div>
+        <div style="flex: 0;">
+          <button id="otp-btn">Verify</button>
+        </div>
+      </div>
+      <div class="error" id="otp-error"></div>
+    </div>
+  </div>
+
+  <div class="card" id="search-card" hidden>
+    <label for="tutee-search">Tutee</label>
+    <input type="text" id="tutee-search" placeholder="Search by name…" autocomplete="off">
+    <div id="search-results"></div>
+    <div class="error" id="recommend-error"></div>
+  </div>
+
+  <div class="split" id="results-split" hidden>
+    <div class="list-pane" id="list-pane"></div>
+    <div class="detail-pane" id="detail-pane">
+      <div class="empty-state">Select a tutor from the ranked list to see the calculation.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var state = { accessToken: null, challengeId: null, rows: [], selectedTutorId: null };
+
+  function apiBase() {
+    var raw = document.getElementById('api-base').value.trim();
+    return raw.endsWith('/') ? raw : raw + '/';
+  }
+
+  function authHeaders(extra) {
+    var headers = Object.assign({ 'Content-Type': 'application/json' }, extra || {});
+    if (state.accessToken) headers['Authorization'] = 'Bearer ' + state.accessToken;
+    return headers;
+  }
+
+  function setStatus(text) {
+    document.getElementById('status-line').textContent = text;
+  }
+
+  // ---- Login ----
+  document.getElementById('login-btn').addEventListener('click', function () {
+    var email = document.getElementById('login-email').value.trim();
+    var password = document.getElementById('login-password').value;
+    var errEl = document.getElementById('login-error');
+    errEl.textContent = '';
+
+    fetch(apiBase() + 'login/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email, password: password }),
+    })
+      .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+      .then(function (result) {
+        if (!result.ok) {
+          errEl.textContent = result.data.error || 'Login failed.';
+          return;
+        }
+        if (result.data.requires_2fa) {
+          state.challengeId = result.data.challenge_id;
+          document.getElementById('otp-row').hidden = false;
+          var hint = document.getElementById('otp-hint');
+          hint.textContent = result.data.debug_code
+            ? 'Dev mode code (auto-filled): ' + result.data.debug_code
+            : 'Check your email for the code.';
+          if (result.data.debug_code) {
+            document.getElementById('otp-code').value = result.data.debug_code;
+          }
+          setStatus(result.data.message || 'Verification code sent.');
+        } else {
+          onAuthenticated(result.data);
+        }
+      })
+      .catch(function () { errEl.textContent = 'Could not reach the backend at ' + apiBase(); });
+  });
+
+  document.getElementById('otp-btn').addEventListener('click', function () {
+    var code = document.getElementById('otp-code').value.trim();
+    var errEl = document.getElementById('otp-error');
+    errEl.textContent = '';
+
+    fetch(apiBase() + 'login/verify-otp/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ challenge_id: state.challengeId, code: code }),
+    })
+      .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+      .then(function (result) {
+        if (!result.ok) {
+          errEl.textContent = result.data.error || 'Verification failed.';
+          return;
+        }
+        onAuthenticated(result.data);
+      })
+      .catch(function () { errEl.textContent = 'Could not reach the backend at ' + apiBase(); });
+  });
+
+  function onAuthenticated(loginData) {
+    state.accessToken = loginData.access;
+    document.getElementById('login-panel').hidden = true;
+    document.getElementById('search-card').hidden = false;
+    setStatus('Logged in as ' + loginData.fname + ' ' + loginData.lname + ' (' + loginData.role + ')');
+  }
+
+  // ---- Tutee search ----
+  var searchTimer = null;
+  document.getElementById('tutee-search').addEventListener('input', function (e) {
+    var query = e.target.value.trim();
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(function () { runSearch(query); }, 250);
+  });
+
+  function runSearch(query) {
+    fetch(apiBase() + 'dev/algorithm-demo/tutees/?q=' + encodeURIComponent(query), {
+      headers: authHeaders(),
+    })
+      .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, status: res.status, data: data }; }); })
+      .then(function (result) {
+        var errEl = document.getElementById('recommend-error');
+        if (!result.ok) {
+          errEl.textContent = result.data.error || ('Search failed (' + result.status + ').');
+          return;
+        }
+        errEl.textContent = '';
+        renderSearchResults(result.data.tutees);
+      });
+  }
+
+  function renderSearchResults(tutees) {
+    var box = document.getElementById('search-results');
+    box.innerHTML = '';
+    if (!tutees.length) { box.style.display = 'none'; return; }
+
+    tutees.forEach(function (tutee) {
+      var row = document.createElement('div');
+      row.textContent = tutee.name;
+      var sub = document.createElement('span');
+      sub.className = 'muted';
+      sub.textContent = tutee.subjects.length ? ('  ·  ' + tutee.subjects.join(', ')) : '  ·  no subject preferences set';
+      row.appendChild(sub);
+      row.addEventListener('click', function () {
+        document.getElementById('tutee-search').value = tutee.name;
+        box.style.display = 'none';
+        loadRecommendation(tutee.id);
+      });
+      box.appendChild(row);
+    });
+    box.style.display = 'block';
+  }
+
+  // ---- Recommendation list ----
+  function loadRecommendation(tuteeId) {
+    var errEl = document.getElementById('recommend-error');
+    errEl.textContent = '';
+    document.getElementById('results-split').hidden = true;
+
+    fetch(apiBase() + 'dev/algorithm-demo/recommend/?tutee_id=' + encodeURIComponent(tuteeId), {
+      headers: authHeaders(),
+    })
+      .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, status: res.status, data: data }; }); })
+      .then(function (result) {
+        if (!result.ok) {
+          errEl.textContent = result.data.error || ('Request failed (' + result.status + ').');
+          return;
+        }
+        state.rows = result.data.rows;
+        state.selectedTutorId = null;
+        renderList(result.data);
+        document.getElementById('results-split').hidden = false;
+      })
+      .catch(function () { errEl.textContent = 'Could not reach the backend at ' + apiBase(); });
+  }
+
+  function renderList(data) {
+    var pane = document.getElementById('list-pane');
+    pane.innerHTML = '';
+    document.getElementById('detail-pane').innerHTML =
+      '<div class="empty-state">Select a tutor from the ranked list to see the calculation.</div>';
+
+    if (data.reason === 'no_preferences') {
+      pane.innerHTML = '<div class="empty-state">This tutee hasn\'t set any subject preferences yet — nothing for the CBF matcher to score against.</div>';
+      return;
+    }
+    if (data.reason === 'no_candidates') {
+      pane.innerHTML = '<div class="empty-state">No candidate tutors match this tutee\'s institution and subjects.</div>';
+      return;
+    }
+
+    data.rows.forEach(function (row, index) {
+      var el = document.createElement('div');
+      el.className = 'tutor-row';
+      el.dataset.tutorId = row.tutor_id;
+      el.innerHTML =
+        '<span class="rank">' + (index + 1) + '.</span>' + row.name +
+        (row.cold_start ? '<span class="badge cold">Cold Start</span>' : '') +
+        '<span class="score">' + row.hybrid_score.toFixed(2) + '</span>';
+      el.addEventListener('click', function () { selectTutor(row.tutor_id); });
+      pane.appendChild(el);
+    });
+
+    if (data.rows.length) selectTutor(data.rows[0].tutor_id);
+  }
+
+  function selectTutor(tutorId) {
+    state.selectedTutorId = tutorId;
+    document.querySelectorAll('.tutor-row').forEach(function (el) {
+      el.classList.toggle('selected', Number(el.dataset.tutorId) === Number(tutorId));
+    });
+    var row = state.rows.find(function (r) { return r.tutor_id === tutorId; });
+    if (row) animateBreakdown(row);
+  }
+
+  // ---- Calculation animation (progress bar cascade) ----
+  var CBF_PARTS = [
+    ['subject', 'Subject match'],
+    ['expertise', 'Expertise'],
+    ['course', 'Course match'],
+    ['year', 'Year proximity'],
+    ['level', 'Teaching level'],
+  ];
+  var STAGGER_MS = 280;
+
+  function animateBreakdown(row) {
+    var pane = document.getElementById('detail-pane');
+    var html = '<h2>' + row.name + '</h2>' +
+      '<div class="final-score">Hybrid Score <b id="hybrid-final">…</b></div>';
+
+    CBF_PARTS.forEach(function (part) {
+      var key = part[0];
+      var sub = row.cbf[key];
+      html +=
+        '<div class="bar-row" data-bar="' + key + '">' +
+        '<div class="bar-label"><span>' + part[1] + ' (weight ' + sub.weight.toFixed(2) + ')</span>' +
+        '<span class="bar-value">–</span></div>' +
+        '<div class="bar-track"><div class="bar-fill" id="bar-' + key + '"></div></div>' +
+        '</div>';
+    });
+
+    html +=
+      '<div class="bar-row" data-bar="cf">' +
+      '<div class="bar-label"><span>CF (peer ratings)' +
+      (row.cold_start ? '<span class="badge cold">Cold Start</span>' : '') +
+      '</span><span class="bar-value" id="cf-value">–</span></div>' +
+      '<div class="bar-track"><div class="bar-fill cf" id="bar-cf"></div></div>' +
+      '<div class="neighbor-list" id="cf-neighbors"></div>' +
+      '</div>';
+
+    html +=
+      '<div class="bar-row" data-bar="hybrid">' +
+      '<div class="bar-label"><span>Hybrid Score = 0.7×CBF + 0.3×(CF/5)</span></div>' +
+      '<div class="bar-track"><div class="bar-fill hybrid" id="bar-hybrid"></div></div>' +
+      '</div>';
+
+    pane.innerHTML = html;
+
+    var steps = [];
+    CBF_PARTS.forEach(function (part) {
+      steps.push(function () { fillBar(part[0], row.cbf[part[0]].value, row.cbf[part[0]].value.toFixed(2)); });
+    });
+    steps.push(function () {
+      if (row.cold_start) {
+        document.getElementById('cf-value').textContent = 'unavailable';
+        document.getElementById('cf-neighbors').textContent = 'CF unavailable — no rating history.';
+      } else if (row.cf.score === null) {
+        document.getElementById('cf-value').textContent = 'no signal';
+        document.getElementById('cf-neighbors').textContent = 'None of this tutee\'s similar peers have rated this tutor yet.';
+        fillBar('cf', 0, null);
+      } else {
+        fillBar('cf', Math.max(0, Math.min(1, row.cf.score / 5)), row.cf.score.toFixed(2));
+        var list = document.getElementById('cf-neighbors');
+        row.cf.neighbors.forEach(function (n) {
+          var line = document.createElement('div');
+          line.textContent = n.name + ' — similarity ' + n.similarity.toFixed(2) + ', rated this tutor ' + n.rating + '/5';
+          list.appendChild(line);
+        });
+      }
+    });
+    steps.push(function () {
+      fillBar('hybrid', Math.max(0, Math.min(1, row.hybrid_score)), null);
+      document.getElementById('hybrid-final').textContent = row.hybrid_score.toFixed(3);
+    });
+
+    steps.forEach(function (step, index) {
+      setTimeout(step, index * STAGGER_MS);
+    });
+  }
+
+  function fillBar(key, fraction, label) {
+    var bar = document.getElementById('bar-' + key);
+    if (!bar) return;
+    bar.style.width = Math.round(fraction * 100) + '%';
+    var row = document.querySelector('.bar-row[data-bar="' + key + '"] .bar-value');
+    if (row && label !== null) row.textContent = label;
+  }
+})();
+</script>
+</body>
+</html>

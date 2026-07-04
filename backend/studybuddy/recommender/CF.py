@@ -85,16 +85,21 @@ def top_k(ratings, student_id, k=5):
 # -----------------------------
 # PREDICT RATING
 # -----------------------------
-def compute_cf_score(ratings, student_id, tutor_id, k=5, neighbors=None):
+def compute_cf_breakdown(ratings, student_id, tutor_id, k=5, neighbors=None):
+    """Same computation as compute_cf_score, but also returns which neighbors
+    contributed a rating for this tutor and whether the student is Cold-Start
+    (no Rating history at all). Used by compute_cf_score and by the algorithm
+    demo tool (recommender/demo.py) to show which peers drove the CF score."""
 
     if student_id not in ratings:
-        return None
+        return {"score": None, "cold_start": True, "neighbors": []}
 
     if neighbors is None:
         neighbors = top_k(ratings, student_id, k)
 
     numerator = 0
     denominator = 0
+    contributing = []
 
     student_avg = sum(ratings[student_id].values()) / len(ratings[student_id])
 
@@ -104,17 +109,26 @@ def compute_cf_score(ratings, student_id, tutor_id, k=5, neighbors=None):
             continue
 
         neighbor_avg = sum(ratings[neighbor].values()) / len(ratings[neighbor])
+        neighbor_rating = ratings[neighbor][tutor_id]
 
-        numerator += similarity * (
-            ratings[neighbor][tutor_id] - neighbor_avg
-        )
-
+        numerator += similarity * (neighbor_rating - neighbor_avg)
         denominator += abs(similarity)
 
-    if denominator == 0:
-        return None
+        contributing.append({
+            "neighbor_id": neighbor,
+            "similarity": similarity,
+            "rating": neighbor_rating,
+        })
 
-    return student_avg + (numerator / denominator)
+    if denominator == 0:
+        return {"score": None, "cold_start": False, "neighbors": contributing}
+
+    score = student_avg + (numerator / denominator)
+    return {"score": score, "cold_start": False, "neighbors": contributing}
+
+
+def compute_cf_score(ratings, student_id, tutor_id, k=5, neighbors=None):
+    return compute_cf_breakdown(ratings, student_id, tutor_id, k=k, neighbors=neighbors)["score"]
 
 
 # -----------------------------

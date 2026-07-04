@@ -3,11 +3,13 @@
 Every finalized plan lives in this folder as its own dated file, created from [`_template.md`](_template.md).
 Status moves Draft → Approved → In Progress → Done. When a plan is complete, its summary is linked below.
 
-**Status & Progress Summary** (2026-07-03): Session countdown implementation (Orbit Strip) was grilled end-to-end (13 decisions resolved), then found to already be implemented outside that session (commit `df994ca`) — moved to In Progress pending a full decision audit + lint/build/test verification. Verification dev tools remain Approved, and the July 2 full-system integration merge remains Done.
+**Status & Progress Summary** (2026-07-04): Recommendation algorithm live demo tool is Done — staff-gated debug endpoints + a standalone HTML tool that replay the real Hybrid Score (CBF+CF) calculation live for the thesis panel, with a two-step OTP login, tutee search, and a staged bar-cascade animation. Two bugs found and fixed during manual verification (multi-word tutee search, a mislabeled "no CF signal" state). Session details redesign (profile-page feel + animated status bar + mid-session pulse) is Done on `feat/verification-phase4-session-redesign`, with shared profile-style primitives, two-column tutee/tutor detail layouts, animated Orbit Strip presentation, and accessible Mid-session pulse. The 2026-07-03 session countdown (Orbit Strip) remains Done; verification dev tools remain Approved; the July 2 full-system integration merge remains Done.
 
 | Date | Plan | Status | Summary |
 |------|------|--------|---------|
-| 2026-07-03 | [Session countdown implementation (Orbit Strip)](2026-07-03-session-countdown-prototype-plan.md) | In Progress | Grilled end-to-end (13 decisions resolved); implementation already committed (`df994ca`), audit + verification outstanding — [Handoff](../session-summaries/2026-07-03-session-countdown-handoff.md) |
+| 2026-07-04 | [Recommendation algorithm live demo tool](2026-07-04-recommendation-algorithm-demo-tool.md) | Done | Staff-only debug endpoints + standalone HTML tool replaying the real Hybrid Score (CBF+CF) breakdown live; fixed a multi-word tutee-search bug and a mislabeled CF "no signal" state found during manual verification — [Summary](../session-summaries/2026-07-04-recommendation-algorithm-demo-tool-summary.md) |
+| 2026-07-04 | [Session details redesign (profile feel + animated status bar + pulse)](2026-07-04-session-details-profile-redesign.md) | Done | Two-column glass layout, saturated green hero, Level 3 animated Orbit Strip, accessible hold-to-confirm mid-session pulse, and profile-style action tiers for both tutee/tutor detail pages - [Summary](../session-summaries/2026-07-04-session-details-profile-redesign-summary.md) |
+| 2026-07-03 | [Session countdown implementation (Orbit Strip)](2026-07-03-session-countdown-prototype-plan.md) | Done | Verified all 13 decisions against real data; fixed a Decision 8 bug (detail bar leaking global queue state) and a pre-existing `SessionHero.vue` layout bug — [Summary](../session-summaries/2026-07-03-session-countdown-summary.md) |
 | 2026-07-02 | [Verification dev tools (self-service profile panel)](2026-07-02-verification-dev-tools.md) | Approved | Pending |
 | 2026-07-02 | [Full-system integration merge](2026-07-02-full-system-integration-merge.md) | Done | [Summary](../session-summaries/2026-07-02-full-system-integration-merge-summary.md) |
 | 2026-07-01 | [Tutee verification — overview](2026-07-01-tutee-verification-overview.md) | In Progress | Pending |
@@ -98,3 +100,10 @@ Entries marked Done&ast; predate the session-summary convention; their status is
 | 2026-07-03 | Linked session-countdown-concepts.html preview to the session countdown plan row |
 | 2026-07-03 | Removed duplicate preview link from this row; moved the file to docs/artifacts/ and kept the single canonical link in the plan file itself |
 | 2026-07-03 | Discovered implementation already committed outside the grilling session (`df994ca`); moved row Approved -> In Progress and linked the handoff doc |
+| 2026-07-03 | Ran full verification (lint/build/tests/browser); found and fixed a Decision 8 bug in `useOrbitStrip.js`; moved row In Progress -> Done and linked the summary |
+| 2026-07-03 | User caught a second, pre-existing layout bug via screenshot (`SessionHero.vue` oversized blank block) that the first verification pass missed; fixed and re-verified; updated row summary |
+| 2026-07-04 | Grilled the session details redesign end-to-end (7 decisions, interactive previews); added the Approved plan and glossary term Midpoint Check-in |
+| 2026-07-04 | Started execution of the session details redesign; moved row Approved -> In Progress |
+| 2026-07-04 | Marked session details redesign Done; linked summary and updated dashboard/index status |
+| 2026-07-04 | Grilled the recommendation algorithm live demo tool end-to-end (10+ decisions, Visual Companion mockups for layout + calculation animation); added the Approved plan and glossary terms Hybrid Score, CBF Score, CF Score, Top-K Neighbor, Cold-Start Tutee |
+| 2026-07-04 | Implemented the recommendation algorithm live demo tool (TDD backend + standalone HTML tool); found and fixed two bugs during manual verification; ran a two-axis (Standards/Spec) review; marked the plan Done and linked the summary |

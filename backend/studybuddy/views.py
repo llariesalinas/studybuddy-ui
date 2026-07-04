@@ -59,6 +59,8 @@ from .recommender.dashboard import (
     dashboard_recs_cache_key,
     get_dashboard_recommendations,
 )
+from .recommender.demo import build_algorithm_demo_recommendation, search_tutees
+from .permissions import IsSuperAdminUser
 from django.core.cache import cache
 from . import _verification_dev
 from .models import Booking, Course, EmailOTPChallenge, Notification, PartnerInstitution, Payment, PaymentMethod, Preference, Rating, SessionCheckIn, Subjects, Tutor, TutorApplication, TutorAvailability, TutorAvailabilityOverride, TutorDocumentRenewalReview, TutorSubjects, Wallet, PlatformActivity, Transaction, TuteeApplication, TuteeDocumentRenewalReview
@@ -375,6 +377,39 @@ def dev_verification_set_enforcement(request):
     )
 
     return Response(_verification_dev_readout(request.user.userprofile))
+
+
+# --- Recommendation algorithm demo tool (staff-only) ------------------------------------------
+# Gated by settings.ALGORITHM_DEMO_TOOLS_ENABLED, checked first in each view (403 when off), plus
+# IsSuperAdminUser (not the looser IsAdminUser) since this reads other users' names and rating
+# history — mirrors AdminUserVerificationDevToolsView, which restricts to SuperAdmin for the same
+# reason. Backs the standalone HTML demo tool at
+# docs/artifacts/2026-07-04-recommendation-algorithm-live-demo.html.
+# See docs/plans/2026-07-04-recommendation-algorithm-demo-tool.md.
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsSuperAdminUser])
+def algorithm_demo_search_tutees(request):
+    if not settings.ALGORITHM_DEMO_TOOLS_ENABLED:
+        return Response({"error": "Algorithm demo tools are disabled."}, status=403)
+
+    query = request.query_params.get('q', '').strip()
+    return Response({"tutees": search_tutees(query)})
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsSuperAdminUser])
+def algorithm_demo_recommend(request):
+    if not settings.ALGORITHM_DEMO_TOOLS_ENABLED:
+        return Response({"error": "Algorithm demo tools are disabled."}, status=403)
+
+    tutee_id = request.query_params.get('tutee_id')
+    if not tutee_id:
+        return Response({"error": "tutee_id is required."}, status=400)
+
+    tutee = get_object_or_404(UserProfile, id=tutee_id, role="Tutee")
+    result = build_algorithm_demo_recommendation(tutee)
+    return Response(result)
 
 
 def build_admin_profile_defaults(user):

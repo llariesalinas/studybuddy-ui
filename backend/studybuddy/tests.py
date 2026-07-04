@@ -4477,6 +4477,143 @@ class DashboardLoadPerformanceTests(APITestCase):
         self.assertIsNone(booking.dashboard_hidden_by_student_at)
 
 
+@override_settings(ALGORITHM_DEMO_TOOLS_ENABLED=True)
+class AlgorithmDemoToolTests(APITestCase):
+    """Staff-only recommendation algorithm demo endpoints — see
+    docs/plans/2026-07-04-recommendation-algorithm-demo-tool.md."""
+
+    def setUp(self):
+        self.institution = PartnerInstitution.objects.create(
+            institution_name="CPU", school_email_domain="cpu.edu", is_active=True,
+        )
+        self.subject = Subjects.objects.create(
+            subject_code="IT201", subject_name="Data Structures", department="IT",
+        )
+
+        self.super_user = User.objects.create_user(
+            username="algo-super@cpu.edu", email="algo-super@cpu.edu", password="password",
+        )
+        UserProfile.objects.create(
+            user=self.super_user, fname="Super", mname="", lname="Admin", role="SuperAdmin",
+            institution=self.institution,
+        )
+
+        self.admin_user = User.objects.create_user(
+            username="algo-admin@cpu.edu", email="algo-admin@cpu.edu", password="password",
+        )
+        UserProfile.objects.create(
+            user=self.admin_user, fname="Regular", mname="", lname="Admin", role="Admin",
+            institution=self.institution,
+        )
+
+        self.tutee_user = User.objects.create_user(
+            username="algo-tutee@cpu.edu", email="algo-tutee@cpu.edu", password="password",
+        )
+        self.tutee = UserProfile.objects.create(
+            user=self.tutee_user, fname="Maria", mname="", lname="Santos", role="Tutee",
+            year_level=11, institution=self.institution,
+        )
+        pref, _ = Preference.objects.get_or_create(user=self.tutee)
+        pref.subjects.set([self.subject])
+
+        self.tutor_user = User.objects.create_user(
+            username="algo-tutor@cpu.edu", email="algo-tutor@cpu.edu", password="password",
+        )
+        self.tutor_profile = UserProfile.objects.create(
+            user=self.tutor_user, fname="Carlo", mname="", lname="Reyes", role="Tutor",
+            year_level=12, institution=self.institution,
+        )
+        self.tutor = Tutor.objects.create(
+            profile=self.tutor_profile, hourly_rate=200, can_online=True, can_f2f=False,
+            teaching_level="College",
+        )
+        TutorSubjects.objects.create(tutor=self.tutor, subject=self.subject, expertise_level=4)
+
+    def test_403_when_flag_disabled_even_for_superadmin(self):
+        self.client.force_authenticate(user=self.super_user)
+        with override_settings(ALGORITHM_DEMO_TOOLS_ENABLED=False):
+            response = self.client.get(f"/api/dev/algorithm-demo/recommend/?tutee_id={self.tutee.id}")
+        self.assertEqual(response.status_code, 403)
+
+    def test_403_for_regular_admin_even_with_flag_on(self):
+        self.client.force_authenticate(user=self.admin_user)
+        response = self.client.get(f"/api/dev/algorithm-demo/recommend/?tutee_id={self.tutee.id}")
+        self.assertEqual(response.status_code, 403)
+
+    def test_tutee_search_returns_matching_profiles(self):
+        self.client.force_authenticate(user=self.super_user)
+        response = self.client.get("/api/dev/algorithm-demo/tutees/?q=mar")
+        self.assertEqual(response.status_code, 200)
+        ids = {row["id"] for row in response.data["tutees"]}
+        self.assertIn(self.tutee.id, ids)
+
+    def test_tutee_search_matches_full_name(self):
+        self.client.force_authenticate(user=self.super_user)
+        response = self.client.get("/api/dev/algorithm-demo/tutees/?q=Maria+Santos")
+        self.assertEqual(response.status_code, 200)
+        ids = {row["id"] for row in response.data["tutees"]}
+        self.assertIn(self.tutee.id, ids)
+
+    def test_recommend_requires_tutee_id(self):
+        self.client.force_authenticate(user=self.super_user)
+        response = self.client.get("/api/dev/algorithm-demo/recommend/")
+        self.assertEqual(response.status_code, 400)
+
+    def test_recommend_404_for_unknown_tutee(self):
+        self.client.force_authenticate(user=self.super_user)
+        response = self.client.get("/api/dev/algorithm-demo/recommend/?tutee_id=999999")
+        self.assertEqual(response.status_code, 404)
+
+    def test_recommend_matches_direct_hybrid_computation(self):
+        from studybuddy.recommender.CF import build_rating_matrix
+        from studybuddy.recommender.hybrid import hybrid_prediction
+
+        self.client.force_authenticate(user=self.super_user)
+        response = self.client.get(f"/api/dev/algorithm-demo/recommend/?tutee_id={self.tutee.id}")
+        self.assertEqual(response.status_code, 200)
+
+        rows = response.data["rows"]
+        self.assertEqual(len(rows), 1)
+        row = rows[0]
+        self.assertEqual(row["tutor_id"], self.tutor.profile_id)
+
+        expected = hybrid_prediction(
+            build_rating_matrix(), self.tutee, self.tutor, None,
+        )
+        self.assertAlmostEqual(row["hybrid_score"], expected, places=6)
+
+        cbf = row["cbf"]
+        self.assertAlmostEqual(
+            cbf["subject"]["contribution"]
+            + cbf["expertise"]["contribution"]
+            + cbf["course"]["contribution"]
+            + cbf["year"]["contribution"]
+            + cbf["level"]["contribution"],
+            cbf["score"],
+            places=6,
+        )
+
+    def test_recommend_flags_cold_start_tutee_with_no_ratings(self):
+        self.client.force_authenticate(user=self.super_user)
+        response = self.client.get(f"/api/dev/algorithm-demo/recommend/?tutee_id={self.tutee.id}")
+        self.assertEqual(response.status_code, 200)
+
+        row = response.data["rows"][0]
+        self.assertTrue(row["cold_start"])
+        self.assertIsNone(row["cf"]["score"])
+        self.assertEqual(row["cf"]["neighbors"], [])
+
+    def test_recommend_returns_no_preferences_reason_when_tutee_has_no_subjects(self):
+        Preference.objects.filter(user=self.tutee).delete()
+
+        self.client.force_authenticate(user=self.super_user)
+        response = self.client.get(f"/api/dev/algorithm-demo/recommend/?tutee_id={self.tutee.id}")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["reason"], "no_preferences")
+        self.assertEqual(response.data["rows"], [])
+
+
 class SessionCheckInTests(APITestCase):
     def setUp(self):
         self.course = Course.objects.create(

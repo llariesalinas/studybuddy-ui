@@ -150,6 +150,9 @@ urlpatterns = [
     path('dev/verification/', views.dev_verification_readout),
     path('dev/verification/set-state/', views.dev_verification_set_state),
     path('dev/verification/enforcement/', views.dev_verification_set_enforcement),
+    # Recommendation algorithm demo tool (gated in-view by ALGORITHM_DEMO_TOOLS_ENABLED + IsSuperAdminUser)
+    path('dev/algorithm-demo/tutees/', views.algorithm_demo_search_tutees),
+    path('dev/algorithm-demo/recommend/', views.algorithm_demo_recommend),
     path('tutor/setup/', views.tutor_setup),
     path('recommend-tutors/', views.recommend_tutors_view),
     path('chat/', include('studybuddy.chat.urls')),
