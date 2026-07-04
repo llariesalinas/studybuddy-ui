@@ -229,6 +229,12 @@ const router = createRouter({
       component: () => import('@/views/AdminSupport.vue'),
       meta: { requiresAuth: true, role: 'SuperAdmin' }
     },
+    {
+      path: '/superadmin/algorithm-demo',
+      name: 'superadmin-algorithm-demo',
+      component: () => import('@/views/SuperAdminAlgorithmDemo.vue'),
+      meta: { requiresAuth: true, role: 'SuperAdmin' }
+    },
 
     // ---------- SHARED ROUTES ----------
     {
