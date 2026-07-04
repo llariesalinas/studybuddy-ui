@@ -4613,6 +4613,32 @@ class AlgorithmDemoToolTests(APITestCase):
         self.assertEqual(response.data["reason"], "no_preferences")
         self.assertEqual(response.data["rows"], [])
 
+    def test_recommend_row_includes_tutor_subjects_and_rating(self):
+        self.tutor.rating_average = 4.5
+        self.tutor.total_sessions = 12
+        self.tutor.save()
+
+        self.client.force_authenticate(user=self.super_user)
+        response = self.client.get(f"/api/dev/algorithm-demo/recommend/?tutee_id={self.tutee.id}")
+        self.assertEqual(response.status_code, 200)
+
+        row = response.data["rows"][0]
+        self.assertEqual(row["rating_average"], 4.5)
+        self.assertEqual(row["total_sessions"], 12)
+        self.assertEqual(
+            row["tutor_subjects"],
+            [{"code": self.subject.subject_code, "expertise_level": 4}],
+        )
+
+    def test_recommend_row_zero_rating_for_new_tutor(self):
+        self.client.force_authenticate(user=self.super_user)
+        response = self.client.get(f"/api/dev/algorithm-demo/recommend/?tutee_id={self.tutee.id}")
+        self.assertEqual(response.status_code, 200)
+
+        row = response.data["rows"][0]
+        self.assertEqual(row["rating_average"], 0)
+        self.assertEqual(row["total_sessions"], 0)
+
 
 class SessionCheckInTests(APITestCase):
     def setUp(self):

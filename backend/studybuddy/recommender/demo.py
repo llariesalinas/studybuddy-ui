@@ -81,6 +81,12 @@ def build_algorithm_demo_recommendation(tutee):
             "name": f"{tutor.profile.fname} {tutor.profile.lname}",
             "hybrid_score": breakdown["hybrid_score"],
             "cold_start": cf["cold_start"],
+            "rating_average": tutor.rating_average,
+            "total_sessions": tutor.total_sessions,
+            "tutor_subjects": [
+                {"code": ts.subject.subject_code, "expertise_level": ts.expertise_level}
+                for ts in tutor.tutorsubjects_set.all()
+            ],
             "cbf": breakdown["cbf"],
             "cf": {
                 "score": cf["score"],
