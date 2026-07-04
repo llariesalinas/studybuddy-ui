@@ -1,0 +1,3 @@
+# Vercel for frontend, Render for backend
+
+The Django backend uses Channels for chat ([consumers.py](../../backend/studybuddy/chat/consumers.py)), which needs a host that keeps a persistent WebSocket connection open — this rules out serverless-only platforms (e.g. Vercel serverless functions) for the backend. We chose Vercel for the Vite/Vue frontend (free tier, zero-config Vite builds, native per-branch deploys) and Render for the backend + managed Postgres + Redis (WebSocket support, native per-branch deploy targets, hobby-tier pricing suitable for a demo). `main` and `develop` each get their own Vercel deployment and Render service, each pointing at its own database.

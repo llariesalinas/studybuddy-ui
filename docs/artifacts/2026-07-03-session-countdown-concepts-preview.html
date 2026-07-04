@@ -1,0 +1,1317 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>StudyBuddy Session Countdown Concepts</title>
+  <link rel="stylesheet" href="node_modules/bootstrap-icons/font/bootstrap-icons.css">
+  <style>
+    :root {
+      --bg-top: #f4fbf5;
+      --bg-bottom: #fbf3e7;
+      --ink: #10241c;
+      --muted: #61756b;
+      --line: rgba(16, 36, 28, 0.1);
+      --surface: rgba(255, 255, 255, 0.78);
+      --surface-strong: rgba(255, 255, 255, 0.92);
+      --green-900: #123326;
+      --green-700: #0b6b47;
+      --green-600: #00895a;
+      --green-500: #10a36e;
+      --aurora-violet: #7c6cf2;
+      --aurora-pink: #ff7eb6;
+      --aurora-gold: #ffbe3b;
+      --aurora-mint: #7df0c2;
+      --shadow: 0 26px 70px rgba(13, 28, 22, 0.12);
+      --shadow-soft: 0 12px 28px rgba(13, 28, 22, 0.08);
+      --spring: cubic-bezier(0.2, 0.9, 0.2, 1);
+      --radius-xl: 28px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      font-family: "Avenir Next", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(16, 163, 110, 0.12), transparent 32%),
+        radial-gradient(circle at top right, rgba(255, 190, 59, 0.16), transparent 28%),
+        linear-gradient(180deg, var(--bg-top), var(--bg-bottom));
+    }
+
+    button, select { font: inherit; }
+
+    .page {
+      width: min(1240px, calc(100% - 28px));
+      margin: 0 auto;
+      padding: 28px 0 120px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+      gap: 18px;
+      align-items: start;
+      margin-bottom: 24px;
+    }
+
+    .hero-panel,
+    .controls-panel,
+    .concept,
+    .session-shell {
+      border: 1px solid rgba(255, 255, 255, 0.7);
+      border-radius: var(--radius-xl);
+      background: var(--surface);
+      backdrop-filter: blur(18px);
+      box-shadow: var(--shadow);
+    }
+
+    .hero-panel {
+      padding: 28px;
+      background: linear-gradient(135deg, rgba(18, 51, 38, 0.96), rgba(0, 137, 90, 0.9));
+      color: #fff;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .hero-panel::after {
+      content: "";
+      position: absolute;
+      inset: auto -40px -60px auto;
+      width: 220px;
+      height: 220px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(255, 255, 255, 0.22), transparent 70%);
+      pointer-events: none;
+    }
+
+    .eyebrow {
+      margin: 0 0 10px;
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: rgba(255, 255, 255, 0.72);
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: 46px;
+      line-height: 0.96;
+      letter-spacing: 0;
+    }
+
+    .hero-copy {
+      max-width: 720px;
+      margin: 0;
+      color: rgba(255, 255, 255, 0.82);
+      font-size: 15px;
+      line-height: 1.5;
+    }
+
+    .plan-list {
+      display: grid;
+      gap: 10px;
+      margin: 22px 0 0;
+    }
+
+    .plan-item {
+      display: grid;
+      grid-template-columns: 30px minmax(0, 1fr);
+      gap: 12px;
+      align-items: start;
+    }
+
+    .plan-index {
+      display: grid;
+      place-items: center;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.18);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .plan-item strong {
+      display: block;
+      font-size: 14px;
+    }
+
+    .plan-item span {
+      color: rgba(255, 255, 255, 0.8);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .controls-panel {
+      padding: 20px;
+      background: var(--surface-strong);
+    }
+
+    .controls-panel h2 {
+      margin: 0 0 6px;
+      font-size: 18px;
+    }
+
+    .controls-panel p {
+      margin: 0 0 18px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .controls-grid {
+      display: grid;
+      gap: 14px;
+    }
+
+    .field {
+      display: grid;
+      gap: 6px;
+    }
+
+    .field label {
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .segmented {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .segmented button,
+    .field select {
+      min-height: 42px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #fff;
+      color: var(--ink);
+      padding: 0 14px;
+      cursor: pointer;
+      transition: transform 180ms var(--spring), background-color 180ms var(--spring), border-color 180ms var(--spring), color 180ms var(--spring);
+    }
+
+    .segmented button.active {
+      background: var(--green-600);
+      color: #fff;
+      border-color: var(--green-600);
+      box-shadow: 0 10px 20px rgba(0, 137, 90, 0.18);
+    }
+
+    .segmented button:hover,
+    .field select:hover {
+      transform: translateY(-1px);
+    }
+
+    .facts {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+      padding-top: 14px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .facts strong { color: var(--ink); }
+
+    .concept-grid {
+      display: grid;
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+
+    .concept {
+      padding: 20px;
+      overflow: hidden;
+    }
+
+    .concept-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      align-items: flex-start;
+      margin-bottom: 16px;
+    }
+
+    .concept-head h3 {
+      margin: 0 0 4px;
+      font-size: 22px;
+    }
+
+    .concept-head p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.45;
+      max-width: 720px;
+    }
+
+    .concept-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      min-height: 34px;
+      border-radius: 999px;
+      background: rgba(16, 163, 110, 0.1);
+      color: var(--green-700);
+      padding: 0 12px;
+      font-size: 12px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .concept-preview {
+      display: grid;
+      gap: 18px;
+    }
+
+    .detail-preview {
+      padding: 20px;
+      border: 1px solid rgba(16, 36, 28, 0.08);
+      border-radius: 24px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(247, 251, 248, 0.9));
+    }
+
+    .detail-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .person {
+      display: flex;
+      gap: 14px;
+      align-items: center;
+      min-width: 0;
+    }
+
+    .avatar {
+      display: grid;
+      place-items: center;
+      width: 66px;
+      height: 66px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--green-700), var(--green-500));
+      color: #fff;
+      font-size: 22px;
+      font-weight: 800;
+      box-shadow: var(--shadow-soft);
+    }
+
+    .person h4 {
+      margin: 0;
+      font-size: 24px;
+    }
+
+    .person p {
+      margin: 3px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .detail-facts {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      min-height: 34px;
+      border-radius: 999px;
+      background: rgba(16, 163, 110, 0.08);
+      border: 1px solid rgba(16, 163, 110, 0.14);
+      padding: 0 12px;
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--green-700);
+    }
+
+    .surface-title {
+      margin: 0 0 10px;
+      font-size: 13px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+    }
+
+    .status-card {
+      position: relative;
+      overflow: hidden;
+      border-radius: 22px;
+      padding: 18px;
+      background: #fff;
+      border: 1px solid rgba(16, 36, 28, 0.08);
+      box-shadow: var(--shadow-soft);
+      transition: transform 220ms var(--spring), box-shadow 220ms var(--spring);
+    }
+
+    .status-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 18px 34px rgba(13, 28, 22, 0.1);
+    }
+
+    .status-topline {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .status-kicker {
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+      color: var(--muted);
+      letter-spacing: 0.06em;
+    }
+
+    .status-timer {
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: 0;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .status-title {
+      margin: 0 0 4px;
+      font-size: 24px;
+      line-height: 1.05;
+    }
+
+    .status-copy {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .progress-shell {
+      margin-top: 14px;
+      height: 10px;
+      border-radius: 999px;
+      background: rgba(16, 36, 28, 0.08);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .progress-fill {
+      height: 100%;
+      border-radius: inherit;
+      width: var(--progress, 0%);
+      background: linear-gradient(90deg, var(--green-700), var(--green-500));
+      transition: width 800ms var(--spring);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .progress-fill::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+      transform: translateX(-100%);
+      animation: shimmer 2.4s linear infinite;
+    }
+
+    .meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .meta-row strong { color: var(--ink); }
+
+    .dock-preview {
+      position: sticky;
+      bottom: 18px;
+      width: min(920px, 100%);
+      margin: 0 auto;
+    }
+
+    .dock-card {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 16px 18px;
+      border-radius: 22px;
+      background: rgba(18, 51, 38, 0.96);
+      color: #fff;
+      box-shadow: 0 30px 70px rgba(12, 25, 21, 0.32);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(16px);
+    }
+
+    .dock-icon {
+      display: grid;
+      place-items: center;
+      width: 48px;
+      height: 48px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.12);
+      font-size: 20px;
+      flex: 0 0 auto;
+    }
+
+    .dock-copy {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .dock-copy strong {
+      display: block;
+      font-size: 18px;
+      line-height: 1.1;
+    }
+
+    .dock-copy span {
+      display: block;
+      margin-top: 4px;
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.76);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .dock-side {
+      text-align: right;
+      flex: 0 0 auto;
+    }
+
+    .dock-side small {
+      display: block;
+      font-size: 11px;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.62);
+      letter-spacing: 0.06em;
+    }
+
+    .dock-side strong {
+      display: block;
+      margin-top: 3px;
+      font-size: 22px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .design-a .status-card {
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(238, 249, 243, 0.96));
+    }
+
+    .design-a .status-card::before {
+      content: "";
+      position: absolute;
+      inset: auto -10% -65% auto;
+      width: 180px;
+      height: 180px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(16, 163, 110, 0.16), transparent 70%);
+    }
+
+    .design-a .status-timer.live {
+      color: var(--green-700);
+      animation: pulseGlow 1.8s ease-in-out infinite;
+    }
+
+    .design-b .status-card {
+      background:
+        radial-gradient(circle at 12% 18%, rgba(125, 240, 194, 0.24), transparent 24%),
+        radial-gradient(circle at 82% 22%, rgba(124, 108, 242, 0.28), transparent 26%),
+        radial-gradient(circle at 64% 78%, rgba(255, 126, 182, 0.2), transparent 24%),
+        linear-gradient(135deg, #10281f, #17372c 56%, #18342c);
+      color: #fff;
+      border-color: rgba(255, 255, 255, 0.08);
+    }
+
+    .design-b .status-card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(115deg, transparent 12%, rgba(255, 255, 255, 0.06) 34%, transparent 58%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 48%);
+      pointer-events: none;
+    }
+
+    .design-b .status-kicker,
+    .design-b .status-copy,
+    .design-b .meta-row {
+      color: rgba(255, 255, 255, 0.74);
+    }
+
+    .design-b .meta-row strong,
+    .design-b .status-timer { color: #fff; }
+
+    .design-b .status-title {
+      color: #f7fbf9;
+    }
+
+    .design-b .progress-shell {
+      height: 48px;
+      padding: 8px;
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .orbit-track {
+      position: relative;
+      height: 100%;
+      border-radius: 999px;
+      background:
+        linear-gradient(90deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.12)),
+        linear-gradient(90deg, rgba(124, 108, 242, 0.12), rgba(16, 163, 110, 0.14), rgba(255, 126, 182, 0.12));
+      overflow: hidden;
+    }
+
+    .orbit-track::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.16), transparent);
+      transform: translateX(-100%);
+      animation: shimmer 3s linear infinite;
+      pointer-events: none;
+    }
+
+    .orbit-track::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at var(--progress, 0%) 50%, rgba(125, 240, 194, 0.2), transparent 18%),
+        radial-gradient(circle at calc(var(--progress, 0%) + 6%) 50%, rgba(124, 108, 242, 0.16), transparent 16%);
+      transition: background-position 800ms var(--spring);
+      pointer-events: none;
+    }
+
+    .orbit-segments {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      padding: 6px 10px;
+    }
+
+    .orbit-segments span {
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      transition: background-color 400ms ease;
+    }
+
+    .orbit-segments span.on {
+      background: linear-gradient(90deg, rgba(124, 108, 242, 0.42), rgba(125, 240, 194, 0.46), rgba(255, 126, 182, 0.42));
+    }
+
+    .orbit-dot {
+      position: absolute;
+      top: 50%;
+      left: var(--progress, 0%);
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #fff7d8, #ffffff 38%, #baf4da 72%, #c7c0ff);
+      box-shadow:
+        0 0 0 6px rgba(16, 163, 110, 0.14),
+        0 0 24px rgba(124, 108, 242, 0.34),
+        0 0 44px rgba(255, 126, 182, 0.18);
+      transform: translate(-50%, -50%);
+      transition: left 800ms var(--spring);
+      animation: orbitBreath 1.8s ease-in-out infinite;
+    }
+
+    .orbit-dot::after {
+      content: "";
+      position: absolute;
+      inset: -11px;
+      border-radius: 50%;
+      border: 1px solid rgba(255, 255, 255, 0.26);
+      opacity: 0.65;
+      animation: orbitPulse 1.8s ease-out infinite;
+    }
+
+    .orbit-legend {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 12px;
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.72);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .orbit-legend span {
+      text-align: center;
+    }
+
+    .motion-note {
+      margin-top: 12px;
+      color: rgba(255, 255, 255, 0.72);
+      font-size: 12px;
+    }
+
+    .design-c .status-card {
+      background: linear-gradient(180deg, rgba(255, 248, 237, 0.95), rgba(255, 255, 255, 0.96));
+    }
+
+    .queue-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .queue-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 36px;
+      border-radius: 999px;
+      padding: 0 12px;
+      background: #fff;
+      border: 1px solid rgba(16, 36, 28, 0.08);
+      color: var(--ink);
+      font-size: 12px;
+      font-weight: 800;
+      transition: transform 180ms var(--spring), box-shadow 180ms var(--spring);
+    }
+
+    .queue-chip.primary {
+      background: linear-gradient(90deg, var(--green-600), var(--green-500));
+      color: #fff;
+      border-color: transparent;
+      box-shadow: 0 14px 24px rgba(0, 137, 90, 0.18);
+    }
+
+    .queue-chip:hover { transform: translateY(-1px); }
+
+    .hold-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 14px;
+      padding: 10px 12px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.72);
+      border: 1px dashed rgba(16, 36, 28, 0.12);
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .mini-wave {
+      position: relative;
+      width: 48px;
+      height: 14px;
+      overflow: hidden;
+      flex: 0 0 auto;
+    }
+
+    .mini-wave::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: 999px;
+      background: linear-gradient(90deg, rgba(16, 163, 110, 0.15), rgba(16, 163, 110, 0.7), rgba(16, 163, 110, 0.15));
+      animation: waveSlide 1.8s linear infinite;
+    }
+
+    .muted-note {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .session-shell {
+      padding: 20px;
+      background: rgba(255, 255, 255, 0.86);
+    }
+
+    .session-shell h2 {
+      margin: 0 0 14px;
+      font-size: 18px;
+    }
+
+    .session-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .session-box {
+      min-height: 116px;
+      border-radius: 18px;
+      background: rgba(16, 163, 110, 0.06);
+      border: 1px solid rgba(16, 163, 110, 0.08);
+      padding: 16px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .session-box strong {
+      display: block;
+      margin-bottom: 7px;
+      color: var(--ink);
+      font-size: 14px;
+    }
+
+    .phase-upcoming .phase-live-only,
+    .phase-upcoming .phase-handoff-only,
+    .phase-live .phase-upcoming-only,
+    .phase-live .phase-handoff-only,
+    .phase-handoff .phase-upcoming-only,
+    .phase-handoff .phase-live-only {
+      display: none;
+    }
+
+    @keyframes shimmer {
+      from { transform: translateX(-100%); }
+      to { transform: translateX(200%); }
+    }
+
+    @keyframes pulseGlow {
+      0%, 100% { text-shadow: 0 0 0 rgba(16, 163, 110, 0); }
+      50% { text-shadow: 0 0 18px rgba(16, 163, 110, 0.28); }
+    }
+
+    @keyframes orbitBreath {
+      0%, 100% { transform: translate(-50%, -50%) scale(1); }
+      50% { transform: translate(-50%, -50%) scale(1.08); }
+    }
+
+    @keyframes orbitPulse {
+      0% {
+        transform: scale(0.72);
+        opacity: 0.7;
+      }
+      100% {
+        transform: scale(1.28);
+        opacity: 0;
+      }
+    }
+
+    @keyframes waveSlide {
+      from { transform: translateX(-55%); }
+      to { transform: translateX(55%); }
+    }
+
+    @media (max-width: 980px) {
+      .hero,
+      .session-grid { grid-template-columns: 1fr; }
+      h1 { font-size: 38px; }
+    }
+
+    @media (max-width: 720px) {
+      .page {
+        width: min(100% - 18px, 1240px);
+        padding-top: 16px;
+      }
+
+      .hero-panel,
+      .controls-panel,
+      .concept,
+      .session-shell {
+        border-radius: 22px;
+      }
+
+      .hero-panel,
+      .controls-panel,
+      .concept,
+      .detail-preview,
+      .session-shell {
+        padding: 16px;
+      }
+
+      h1 { font-size: 31px; }
+
+      .concept-head,
+      .detail-header,
+      .dock-card {
+        display: grid;
+      }
+
+      .dock-side { text-align: left; }
+    }
+  </style>
+</head>
+<body class="phase-live">
+  <main class="page">
+    <section class="hero">
+      <div class="hero-panel">
+        <p class="eyebrow">Session countdown prototype</p>
+        <h1>Three reactive directions for the new session status bar</h1>
+        <p class="hero-copy">
+          The goal for MVP is a scheduled-window countdown that appears 15 minutes before start,
+          stays visible during the live session, then becomes the post-session handoff until that
+          handoff is done. This prototype only answers the UI question.
+        </p>
+
+        <div class="plan-list" aria-label="Plan">
+          <div class="plan-item">
+            <div class="plan-index">1</div>
+            <div>
+              <strong>Prototype the surfaces</strong>
+              <span>Compare three animated concepts in local HTML, with the same states we expect in app: upcoming, live, and handoff.</span>
+            </div>
+          </div>
+          <div class="plan-item">
+            <div class="plan-index">2</div>
+            <div>
+              <strong>Implement the chosen language in two places</strong>
+              <span>Full status bar on the session detail page, compact dock everywhere else, hidden when you are already on that session detail route.</span>
+            </div>
+          </div>
+          <div class="plan-item">
+            <div class="plan-index">3</div>
+            <div>
+              <strong>Wire real queue and countdown data</strong>
+              <span>Use the scheduled session window, current live session, handoff priority, and next upcoming session hint from shared store state.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <aside class="controls-panel">
+        <h2>Preview controls</h2>
+        <p>Flip the state to see how each design reacts without touching the app yet.</p>
+
+        <div class="controls-grid">
+          <div class="field">
+            <label>Session phase</label>
+            <div class="segmented" data-toggle="phase">
+              <button type="button" class="active" data-value="live">Live</button>
+              <button type="button" data-value="upcoming">15 min before</button>
+              <button type="button" data-value="handoff">Post-session</button>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Surface emphasis</label>
+            <div class="segmented" data-toggle="surface">
+              <button type="button" class="active" data-value="both">Both</button>
+              <button type="button" data-value="detail">Detail only</button>
+              <button type="button" data-value="dock">Bottom dock only</button>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Session mode</label>
+            <select id="mode-select">
+              <option value="online" selected>Online</option>
+              <option value="f2f">Face to face</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label>Queue hint</label>
+            <select id="queue-select">
+              <option value="next" selected>Show next session hint</option>
+              <option value="none">No next session hint</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="facts">
+          <div><strong>Clock rule:</strong> countdown is tied to the scheduled session window, not to arrival.</div>
+          <div><strong>MVP priority:</strong> current live session or handoff beats the next session in queue.</div>
+          <div><strong>Readiness later:</strong> hold-to-confirm can layer in after we like the countdown surface.</div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="concept-grid">
+      <article class="concept design-a">
+        <div class="concept-head">
+          <div>
+            <h3>Concept A: Pulse Rail</h3>
+            <p>Calm and premium. This feels closest to the current session detail redesign: one clear message, one timer, one progress rail, with a soft live pulse.</p>
+          </div>
+          <span class="concept-tag"><i class="bi bi-activity"></i> Best for clarity</span>
+        </div>
+
+        <div class="concept-preview">
+          <section class="detail-preview surface-detail">
+            <div class="detail-header">
+              <div class="person">
+                <div class="avatar">MR</div>
+                <div>
+                  <h4>Mara Reyes</h4>
+                  <p>Your tutor for Calculus 2</p>
+                </div>
+              </div>
+              <div class="detail-facts">
+                <span class="pill"><i class="bi bi-camera-video"></i> <span class="mode-label">Online</span></span>
+                <span class="pill phase-live-only"><i class="bi bi-broadcast"></i> Live now</span>
+                <span class="pill phase-upcoming-only"><i class="bi bi-clock-history"></i> Starts soon</span>
+                <span class="pill phase-handoff-only"><i class="bi bi-credit-card"></i> Payment handoff</span>
+              </div>
+            </div>
+
+            <div class="surface-title">Full session detail bar</div>
+            <div class="status-card">
+              <div class="status-topline">
+                <span class="status-kicker" data-kicker>A live session is in progress</span>
+                <span class="status-timer live" data-timer>00:53:14</span>
+              </div>
+              <h5 class="status-title" data-title>53 minutes left in your scheduled session</h5>
+              <p class="status-copy" data-copy>The timer ends at 3:30 PM, then this turns into the payment handoff.</p>
+              <div class="progress-shell">
+                <div class="progress-fill" style="--progress: 58%"></div>
+              </div>
+              <div class="meta-row">
+                <span data-meta-left><strong>Now:</strong> Stay in sync through chat</span>
+                <span data-meta-right><strong>Up next:</strong> Physics at 5:00 PM</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="dock-preview surface-dock">
+            <div class="surface-title">Global bottom dock</div>
+            <div class="dock-card">
+              <div class="dock-icon"><i class="bi bi-broadcast"></i></div>
+              <div class="dock-copy">
+                <strong data-dock-title>Calculus 2 is live</strong>
+                <span data-dock-copy>53 minutes left. Up next: Physics with Angela at 5:00 PM.</span>
+              </div>
+              <div class="dock-side">
+                <small data-dock-label>Remaining</small>
+                <strong data-dock-timer>00:53</strong>
+              </div>
+            </div>
+          </section>
+        </div>
+      </article>
+
+      <article class="concept design-b">
+        <div class="concept-head">
+          <div>
+            <h3>Concept B: Orbit Strip</h3>
+            <p>More animated and more obviously reactive. The timer bead travels across a segmented lane so the session feels alive even when nothing else is moving.</p>
+          </div>
+          <span class="concept-tag"><i class="bi bi-stars"></i> Best for motion</span>
+        </div>
+
+        <div class="concept-preview">
+          <section class="detail-preview surface-detail">
+            <div class="surface-title">Full session detail bar</div>
+            <div class="status-card">
+              <div class="status-topline">
+                <span class="status-kicker" data-kicker>A live session is in progress</span>
+                <span class="status-timer" data-timer>00:53:14</span>
+              </div>
+              <h5 class="status-title" data-title>53 minutes left in your scheduled session</h5>
+              <p class="status-copy" data-copy>The timer bead crosses four phases: join, settle in, deep work, and wrap.</p>
+              <div class="progress-shell">
+                <div class="orbit-track">
+                  <div class="orbit-segments">
+                    <span class="on"></span>
+                    <span class="on"></span>
+                    <span></span>
+                    <span></span>
+                  </div>
+                  <div class="orbit-dot" style="--progress: 58%"></div>
+                </div>
+              </div>
+              <div class="orbit-legend">
+                <span>Join</span>
+                <span>Settle</span>
+                <span>Deep work</span>
+                <span>Wrap</span>
+              </div>
+              <div class="motion-note">The bead glides as time moves, while the lit segments step forward as the session advances.</div>
+              <div class="meta-row">
+                <span data-meta-left><strong>Session mode:</strong> <span class="mode-label">Online</span></span>
+                <span data-meta-right><strong>Up next:</strong> Physics at 5:00 PM</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="dock-preview surface-dock">
+            <div class="surface-title">Global bottom dock</div>
+            <div class="dock-card">
+              <div class="dock-icon"><i class="bi bi-rocket-takeoff"></i></div>
+              <div class="dock-copy">
+                <strong data-dock-title>Calculus 2 is live</strong>
+                <span data-dock-copy>The current session stays pinned here until handoff is done.</span>
+              </div>
+              <div class="dock-side">
+                <small data-dock-label>Time left</small>
+                <strong data-dock-timer>00:53</strong>
+              </div>
+            </div>
+          </section>
+        </div>
+      </article>
+
+      <article class="concept design-c">
+        <div class="concept-head">
+          <div>
+            <h3>Concept C: Queue Wave</h3>
+            <p>More operational and more Grab-like. The current session owns the bar, while the next item in queue peeks through as a chip instead of competing for the whole surface.</p>
+          </div>
+          <span class="concept-tag"><i class="bi bi-stack"></i> Best for queue logic</span>
+        </div>
+
+        <div class="concept-preview">
+          <section class="detail-preview surface-detail">
+            <div class="surface-title">Full session detail bar</div>
+            <div class="status-card">
+              <div class="status-topline">
+                <span class="status-kicker" data-kicker>Current queue item</span>
+                <span class="status-timer" data-timer>00:53:14</span>
+              </div>
+              <h5 class="status-title" data-title>Current session: 53 minutes left</h5>
+              <p class="status-copy" data-copy>This surface can later absorb hold-to-ready without changing the countdown model.</p>
+              <div class="queue-row">
+                <span class="queue-chip primary"><i class="bi bi-broadcast"></i> <span>Current: Calculus 2 live</span></span>
+                <span class="queue-chip phase-live-only queue-next"><i class="bi bi-arrow-right-circle"></i> <span>Up next: Physics at 5:00 PM</span></span>
+                <span class="queue-chip phase-upcoming-only"><i class="bi bi-lightning-charge"></i> <span>Starts in 15 minutes</span></span>
+                <span class="queue-chip phase-handoff-only"><i class="bi bi-credit-card-2-front"></i> <span>Waiting for payment submission</span></span>
+              </div>
+              <div class="hold-row">
+                <div class="mini-wave"></div>
+                <span data-hold-copy>Later, this is where hold-to-confirm readiness can live without becoming the clock trigger.</span>
+              </div>
+              <div class="muted-note" data-meta-right>Queue hint stays small while the current session is more important.</div>
+            </div>
+          </section>
+
+          <section class="dock-preview surface-dock">
+            <div class="surface-title">Global bottom dock</div>
+            <div class="dock-card">
+              <div class="dock-icon"><i class="bi bi-list-task"></i></div>
+              <div class="dock-copy">
+                <strong data-dock-title>Current session: Calculus 2</strong>
+                <span data-dock-copy>53 minutes left. Physics stays queued until this session is done.</span>
+              </div>
+              <div class="dock-side">
+                <small data-dock-label>Queue front</small>
+                <strong data-dock-timer>00:53</strong>
+              </div>
+            </div>
+          </section>
+        </div>
+      </article>
+    </section>
+
+    <section class="session-shell">
+      <h2>Implementation plan after we choose a direction</h2>
+      <div class="session-grid">
+        <div class="session-box">
+          <strong>1. Shared session queue state</strong>
+          Build one store or composable that chooses whether the front item is live session, handoff, or next upcoming within 15 minutes.
+        </div>
+        <div class="session-box">
+          <strong>2. Two surfaces, one language</strong>
+          Render the same state in a full-width bar on session detail pages and a compact bottom dock everywhere else.
+        </div>
+        <div class="session-box">
+          <strong>3. Readiness as a separate layer</strong>
+          Add hold-to-confirm later as supporting state, never as the thing that starts or stops the official timer.
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const state = {
+      phase: 'live',
+      surface: 'both',
+      mode: 'online',
+      queue: 'next',
+      liveSeconds: 3194,
+      demoDirection: -1
+    };
+
+    const phaseData = {
+      upcoming: {
+        kicker: 'Starting soon',
+        timer: () => '00:14:32',
+        dockTimer: () => '14:32',
+        title: 'Your session starts in 14 minutes',
+        copy: (mode) => `${mode === 'online' ? 'Online session' : 'Face to face session'} is approaching. The official timer starts at 2:00 PM.`,
+        dockTitle: 'Calculus 2 starts soon',
+        dockCopy: (queue) => queue === 'next'
+          ? 'Starts in 14 minutes. This replaces the dock only when it becomes the front item.'
+          : 'Starts in 14 minutes.',
+        metaLeft: (mode) => `<strong>Mode:</strong> ${mode === 'online' ? 'Online' : 'Face to face'}`,
+        metaRight: (queue) => queue === 'next' ? '<strong>After this:</strong> Nothing else queued yet' : '',
+        progress: 18
+      },
+      live: {
+        kicker: 'A live session is in progress',
+        timer: (seconds) => formatLong(seconds),
+        dockTimer: (seconds) => formatShort(seconds),
+        title: (seconds) => `${Math.ceil(seconds / 60)} minutes left in your scheduled session`,
+        copy: () => 'The timer ends at 3:30 PM, then this turns into the payment handoff.',
+        dockTitle: 'Calculus 2 is live',
+        dockCopy: (queue) => queue === 'next'
+          ? '53 minutes left. Up next: Physics with Angela at 5:00 PM.'
+          : '53 minutes left.',
+        metaLeft: () => '<strong>Now:</strong> Stay in sync through chat',
+        metaRight: (queue) => queue === 'next' ? '<strong>Up next:</strong> Physics at 5:00 PM' : '',
+        progress: 58
+      },
+      handoff: {
+        kicker: 'Post-session handoff',
+        timer: () => 'Action needed',
+        dockTimer: () => 'Now',
+        title: 'Session ended. Submit payment to finish the handoff',
+        copy: () => 'The scheduled session is over. This remains the front item until payment and verification are done.',
+        dockTitle: 'Session ended: payment handoff',
+        dockCopy: (queue) => queue === 'next'
+          ? 'Submit payment first. Physics remains queued behind this.'
+          : 'Submit payment first.',
+        metaLeft: () => '<strong>Status:</strong> Waiting for tutee payment',
+        metaRight: (queue) => queue === 'next' ? '<strong>Queued:</strong> Physics at 5:00 PM' : '',
+        progress: 100
+      }
+    };
+
+    function formatLong(totalSeconds) {
+      const safe = Math.max(0, totalSeconds);
+      const hours = Math.floor(safe / 3600);
+      const minutes = Math.floor((safe % 3600) / 60);
+      const seconds = safe % 60;
+      return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }
+
+    function formatShort(totalSeconds) {
+      const safe = Math.max(0, totalSeconds);
+      const minutes = Math.floor(safe / 60);
+      const seconds = safe % 60;
+      return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }
+
+    function setActiveToggle(group, value) {
+      document.querySelectorAll(`[data-toggle="${group}"] button`).forEach((button) => {
+        button.classList.toggle('active', button.dataset.value === value);
+      });
+    }
+
+    function render() {
+      document.body.classList.remove('phase-upcoming', 'phase-live', 'phase-handoff');
+      document.body.classList.add(`phase-${state.phase}`);
+
+      const data = phaseData[state.phase];
+      const longTimer = data.timer(state.liveSeconds);
+      const shortTimer = data.dockTimer(state.liveSeconds);
+      const title = typeof data.title === 'function' ? data.title(state.liveSeconds) : data.title;
+      const copy = data.copy(state.mode);
+      const dockCopy = data.dockCopy(state.queue);
+      const metaLeft = data.metaLeft(state.mode);
+      const metaRight = data.metaRight(state.queue);
+
+      document.querySelectorAll('[data-kicker]').forEach((el) => { el.textContent = data.kicker; });
+      document.querySelectorAll('[data-timer]').forEach((el) => { el.textContent = longTimer; });
+      document.querySelectorAll('[data-title]').forEach((el) => { el.textContent = title; });
+      document.querySelectorAll('[data-copy]').forEach((el) => { el.textContent = copy; });
+      document.querySelectorAll('[data-meta-left]').forEach((el) => { el.innerHTML = metaLeft; });
+      document.querySelectorAll('[data-meta-right]').forEach((el) => { el.innerHTML = metaRight; });
+      document.querySelectorAll('[data-dock-title]').forEach((el) => { el.textContent = data.dockTitle; });
+      document.querySelectorAll('[data-dock-copy]').forEach((el) => { el.textContent = dockCopy; });
+      document.querySelectorAll('[data-dock-timer]').forEach((el) => { el.textContent = shortTimer; });
+      document.querySelectorAll('[data-dock-label]').forEach((el) => {
+        el.textContent = state.phase === 'handoff' ? 'Handoff' : state.phase === 'upcoming' ? 'Starts in' : 'Remaining';
+      });
+      document.querySelectorAll('.mode-label').forEach((el) => {
+        el.textContent = state.mode === 'online' ? 'Online' : 'Face to face';
+      });
+      document.querySelectorAll('.progress-fill').forEach((el) => {
+        el.style.setProperty('--progress', `${data.progress}%`);
+      });
+      document.querySelectorAll('.orbit-dot').forEach((el) => {
+        el.style.setProperty('--progress', `${data.progress}%`);
+      });
+      document.querySelectorAll('.orbit-segments').forEach((container) => {
+        const threshold = state.phase === 'upcoming' ? 1 : state.phase === 'live' ? 2 : 4;
+        Array.from(container.children).forEach((segment, index) => {
+          segment.classList.toggle('on', index < threshold);
+        });
+      });
+      document.querySelectorAll('.surface-detail').forEach((el) => {
+        el.style.display = state.surface === 'dock' ? 'none' : '';
+      });
+      document.querySelectorAll('.surface-dock').forEach((el) => {
+        el.style.display = state.surface === 'detail' ? 'none' : '';
+      });
+      document.querySelectorAll('.queue-next').forEach((el) => {
+        el.style.display = state.queue === 'next' ? '' : 'none';
+      });
+      document.querySelectorAll('[data-hold-copy]').forEach((el) => {
+        el.textContent = state.mode === 'online'
+          ? 'Later, hold-to-mark-ready can live here for online sessions without becoming the clock trigger.'
+          : 'Later, hold-to-confirm-arrival can live here for face to face sessions without becoming the clock trigger.';
+      });
+    }
+
+    document.querySelectorAll('[data-toggle="phase"] button').forEach((button) => {
+      button.addEventListener('click', () => {
+        state.phase = button.dataset.value;
+        setActiveToggle('phase', state.phase);
+        render();
+      });
+    });
+
+    document.querySelectorAll('[data-toggle="surface"] button').forEach((button) => {
+      button.addEventListener('click', () => {
+        state.surface = button.dataset.value;
+        setActiveToggle('surface', state.surface);
+        render();
+      });
+    });
+
+    document.getElementById('mode-select').addEventListener('change', (event) => {
+      state.mode = event.target.value;
+      render();
+    });
+
+    document.getElementById('queue-select').addEventListener('change', (event) => {
+      state.queue = event.target.value;
+      render();
+    });
+
+    window.setInterval(() => {
+      if (state.phase === 'live' && state.liveSeconds > 0) {
+        state.liveSeconds -= 1;
+        render();
+      }
+    }, 1000);
+
+    window.setInterval(() => {
+      if (state.phase !== 'live') {
+        return;
+      }
+
+      const nextProgress = phaseData.live.progress + state.demoDirection;
+
+      if (nextProgress >= 78 || nextProgress <= 26) {
+        state.demoDirection *= -1;
+      }
+
+      phaseData.live.progress += state.demoDirection;
+      render();
+    }, 900);
+
+    render();
+  </script>
+</body>
+</html>

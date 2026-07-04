@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Studybuddy Tutor Recommendation Algorithm — Explainer</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --card: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --accent: #388bfd;
+    --green: #2ea043;
+    --amber: #d29922;
+    --red: #f85149;
+    --purple: #a371f7;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    margin: 0;
+    padding: 32px;
+    line-height: 1.55;
+  }
+  .wrap { max-width: 1000px; margin: 0 auto; }
+  h1 { font-size: 28px; margin-bottom: 4px; }
+  .subtitle { color: var(--muted); margin-bottom: 28px; }
+  h2 {
+    font-size: 20px;
+    margin-top: 44px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 8px;
+  }
+  h3 { font-size: 16px; color: var(--accent); margin-top: 22px; }
+  p { color: #c9d1d9; }
+  code, .code {
+    font-family: "SF Mono", Consolas, monospace;
+    background: #0d1117;
+    border: 1px solid var(--border);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 13px;
+    color: #ffa657;
+  }
+  pre {
+    background: #0d1117;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    font-size: 13px;
+    color: #79c0ff;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+    margin-bottom: 16px;
+  }
+  .pill {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 9px;
+    border-radius: 999px;
+    margin-right: 6px;
+  }
+  .pill.cbf { background: rgba(56,139,253,0.15); color: var(--accent); border: 1px solid var(--accent); }
+  .pill.cf { background: rgba(163,113,247,0.15); color: var(--purple); border: 1px solid var(--purple); }
+  .pill.gate { background: rgba(248,81,73,0.15); color: var(--red); border: 1px solid var(--red); }
+  .pill.file { background: rgba(139,148,158,0.15); color: var(--muted); border: 1px solid var(--border); font-weight: 400; }
+
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+  th, td {
+    text-align: left;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+  }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; }
+  .weight-bar-row td { vertical-align: middle; }
+  .bar-track { background: #21262d; border-radius: 4px; height: 10px; width: 100%; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 4px; }
+
+  .pipeline {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+  .stage {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--accent);
+    border-radius: 8px;
+    padding: 14px 18px;
+    position: relative;
+  }
+  .stage.gate { border-left-color: var(--red); }
+  .stage.score { border-left-color: var(--purple); }
+  .stage-num {
+    font-size: 11px;
+    color: var(--muted);
+    font-weight: 700;
+    letter-spacing: 0.5px;
+  }
+  .stage-title { font-size: 15px; font-weight: 600; margin: 2px 0 6px; }
+  .stage-desc { color: var(--muted); font-size: 13.5px; }
+  .arrow {
+    text-align: center;
+    color: var(--muted);
+    font-size: 18px;
+    padding: 2px 0;
+  }
+
+  .formula-box {
+    background: #0d1117;
+    border: 1px solid var(--purple);
+    border-radius: 8px;
+    padding: 16px 20px;
+    font-family: "SF Mono", Consolas, monospace;
+    font-size: 15px;
+    color: #d2a8ff;
+    text-align: center;
+    margin: 16px 0;
+  }
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  @media (max-width: 720px) { .two-col { grid-template-columns: 1fr; } }
+
+  .field-tag {
+    display: inline-block;
+    background: #21262d;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 3px 9px;
+    font-size: 12.5px;
+    margin: 2px 4px 2px 0;
+    color: var(--text);
+  }
+  .callout {
+    border-left: 3px solid var(--amber);
+    background: rgba(210,153,34,0.08);
+    padding: 10px 14px;
+    border-radius: 0 6px 6px 0;
+    font-size: 13.5px;
+    color: #e3b341;
+    margin: 12px 0;
+  }
+  .toc {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .toc a {
+    color: var(--accent);
+    text-decoration: none;
+    font-size: 13px;
+    border: 1px solid var(--border);
+    padding: 4px 10px;
+    border-radius: 999px;
+  }
+  .toc a:hover { background: var(--card); }
+  .flowdiag {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>How the Tutor Recommendation Algorithm Works</h1>
+  <div class="subtitle">Studybuddy's hybrid recommender — every filter, weight, and formula, traced to source.</div>
+
+  <div class="toc">
+    <a href="#overview">Overview</a>
+    <a href="#entrypoints">Where it runs</a>
+    <a href="#pipeline">Full pipeline</a>
+    <a href="#hybrid">Hybrid formula</a>
+    <a href="#cbf">CBF (content-based)</a>
+    <a href="#cf">CF (collaborative)</a>
+    <a href="#caching">Caching</a>
+    <a href="#gotchas">Known gotchas</a>
+  </div>
+
+  <h2 id="overview">Overview</h2>
+  <div class="card">
+    <p>Studybuddy ranks tutors for a tutee using a <strong>hybrid recommender</strong>: a weighted blend of two independent scores.</p>
+    <p style="margin-top:8px;">
+      <span class="pill cbf">CBF — Content-Based Filtering</span> How well the tutor's subjects, expertise, course, year level, and teaching level match the tutee's profile.
+    </p>
+    <p>
+      <span class="pill cf">CF — Collaborative Filtering</span> Whether tutees with similar rating history rated this tutor well (Pearson correlation, k-nearest-neighbor).
+    </p>
+    <div class="formula-box">hybrid_score&nbsp; = &nbsp;0.7 × CBF&nbsp; + &nbsp;0.3 × (CF / 5)</div>
+    <p style="font-size:13px;color:var(--muted);">Source: <span class="pill file">backend/studybuddy/recommender/hybrid.py:31</span></p>
+    <div class="callout">Before either score is computed, a tutor has to survive several hard gates — institution match, subject match, mode/budget, and (for the search flow) date/time availability. Gates run first; scoring only ranks whoever is left.</div>
+  </div>
+
+  <h2 id="entrypoints">Where this shows up in the app</h2>
+  <div class="two-col">
+    <div class="card">
+      <h3>1. Dashboard "Recommended for you" widget</h3>
+      <p><span class="pill file">recommender/dashboard.py</span></p>
+      <p>Runs on dashboard load. Uses the tutee's saved <code>Preference</code> subjects (no specific date/time requested). Cached for 10 minutes per tutee.</p>
+      <p><span class="field-tag">get_dashboard_recommendations()</span></p>
+    </div>
+    <div class="card">
+      <h3>2. Booking flow — "Find Tutors" search</h3>
+      <p><span class="pill file">views.py — recommend_tutors_view</span></p>
+      <p>Runs when a tutee searches with a specific subject, date, time range, mode, and budget (the <code>FindTutors.vue</code> step). Not cached — always live.</p>
+      <p><span class="field-tag">POST /recommend-tutors/</span></p>
+    </div>
+  </div>
+  <p style="color:var(--muted);font-size:13px;">Both paths funnel into the same <code>recommend_tutors_hybrid()</code> scoring function — they only differ in how the <em>candidate pool</em> is built beforehand.</p>
+
+  <h2 id="pipeline">Full pipeline, gate by gate</h2>
+  <div class="pipeline">
+
+    <div class="stage gate">
+      <div class="stage-num">GATE 1 — HARD, NO EXCEPTIONS</div>
+      <div class="stage-title">Institution match</div>
+      <div class="stage-desc">
+        <code>filter_tutors_by_institution()</code> — <span class="pill file">recommender/utils.py:1</span><br>
+        Tutor's <code>profile.institution_id</code> must exactly equal the tutee's <code>institution_id</code>.
+        If the tutee has no institution assigned, they get <strong>zero</strong> results, not "everyone."
+        If a tutor's institution is <code>None</code>, they are invisible to every tutee, no matter how good a subject match they'd be.
+      </div>
+    </div>
+    <div class="arrow">↓</div>
+
+    <div class="stage gate">
+      <div class="stage-num">GATE 2</div>
+      <div class="stage-title">Subject match</div>
+      <div class="stage-desc">
+        Dashboard: candidate tutors must teach at least one subject in the tutee's saved <code>Preference</code>.<br>
+        Search: candidate tutors must teach the exact <code>subject_code</code> requested — <span class="pill file">views.py:3558</span> <code>tutorsubjects__subject__subject_code=subject</code>.
+      </div>
+    </div>
+    <div class="arrow">↓</div>
+
+    <div class="stage gate">
+      <div class="stage-num">GATE 3 — search flow only</div>
+      <div class="stage-title">Mode &amp; budget</div>
+      <div class="stage-desc">
+        <span class="field-tag">preferred_mode = "Online"</span> → tutor must have <code>can_online = True</code><br>
+        <span class="field-tag">preferred_mode = "Face-to-face"</span> → tutor must have <code>can_f2f = True</code><br>
+        <span class="field-tag">min_budget</span> → <code>hourly_rate &gt;= min_budget</code><br>
+        <span class="field-tag">max_budget</span> → <code>hourly_rate &lt;= max_budget</code>
+      </div>
+    </div>
+    <div class="arrow">↓</div>
+
+    <div class="stage gate">
+      <div class="stage-num">GATE 4 — search flow only, staged fallback</div>
+      <div class="stage-title">Date / time availability + booking conflicts</div>
+      <div class="stage-desc">
+        <span class="pill file">views.py:3547 get_recommendation_candidate_tutors()</span><br>
+        First, any tutor with a conflicting <strong>Booking</strong> (status in Pending / Confirmed / Awaiting Payment Verification / Completed) covering a requested slot, or a matching <strong>TutorAvailabilityOverride</strong> (full-day or slot-specific block), is excluded up front — this exclusion list applies to every stage below.
+        <br><br>
+        <strong>Stage 1 — exact match:</strong> tutor must have an <em>active</em> <code>TutorAvailability</code> row for every 30-minute slot in the requested range, on the matching weekday (<code>Mon..Sun</code> abbreviations). If any candidates pass, return them and stop.<br>
+        <strong>Stage 2 — date-only fallback:</strong> if stage 1 is empty, fall back to any tutor available <em>somewhere</em> that weekday.<br>
+        <strong>Stage 3 — broad fallback:</strong> if stage 2 is empty too, fall back to subject match only, ignoring date/time entirely.
+      </div>
+    </div>
+    <div class="arrow">↓</div>
+
+    <div class="stage score">
+      <div class="stage-num">SCORING</div>
+      <div class="stage-title">Hybrid ranking of whoever survived the gates</div>
+      <div class="stage-desc">Every remaining candidate gets a CBF score and a CF score, blended 70/30, then sorted descending. See below for both formulas.</div>
+    </div>
+  </div>
+
+  <h2 id="hybrid">Hybrid score formula</h2>
+  <div class="card">
+    <div class="formula-box">hybrid_score&nbsp; = &nbsp;(0.7 × cbf_score)&nbsp; + &nbsp;(0.3 × (cf_score / 5))</div>
+    <p>CBF score is already normalized to a 0–1 range. CF score is a predicted star rating (roughly 1–5), so it's divided by 5 before blending so both terms are on the same 0–1 scale.</p>
+    <p>If a tutee has no rating history at all (cold start — no <code>Rating</code> rows), <code>cf_score</code> defaults to <code>0</code>, so ranking degrades gracefully to pure CBF (content match) rather than crashing.</p>
+    <table>
+      <tr><th>Term</th><th>Weight</th><th>What it captures</th></tr>
+      <tr><td>CBF (content-based)</td><td><strong>70%</strong></td><td>Profile/subject/course fit — deterministic, always available</td></tr>
+      <tr><td>CF (collaborative)</td><td><strong>30%</strong></td><td>"Tutees like you rated this tutor well" — needs rating history to mean anything</td></tr>
+    </table>
+  </div>
+
+  <h2 id="cbf">CBF — Content-Based Filtering, weight by weight</h2>
+  <div class="card">
+    <p><span class="pill file">recommender/cbf.py — compute_cbf_score()</span></p>
+    <table>
+      <tr><th>Component</th><th>Constant</th><th>Weight</th><th></th></tr>
+      <tr class="weight-bar-row">
+        <td>Subject match (binary)</td><td><code>W_SUBJECT</code></td><td>0.35</td>
+        <td><div class="bar-track"><div class="bar-fill" style="width:35%;background:var(--accent);"></div></div></td>
+      </tr>
+      <tr class="weight-bar-row">
+        <td>Expertise level in that subject</td><td><code>W_EXPERTISE</code></td><td>0.20</td>
+        <td><div class="bar-track"><div class="bar-fill" style="width:20%;background:var(--accent);"></div></div></td>
+      </tr>
+      <tr class="weight-bar-row">
+        <td>Same course / strand</td><td><code>W_COURSE</code></td><td>0.20</td>
+        <td><div class="bar-track"><div class="bar-fill" style="width:20%;background:var(--accent);"></div></div></td>
+      </tr>
+      <tr class="weight-bar-row">
+        <td>Year-level closeness</td><td><code>W_YEAR</code></td><td>0.15</td>
+        <td><div class="bar-track"><div class="bar-fill" style="width:15%;background:var(--accent);"></div></div></td>
+      </tr>
+      <tr class="weight-bar-row">
+        <td>Teaching-level eligibility</td><td><code>W_LEVEL</code></td><td>0.10</td>
+        <td><div class="bar-track"><div class="bar-fill" style="width:10%;background:var(--accent);"></div></div></td>
+      </tr>
+    </table>
+
+    <h3>How each sub-score is computed</h3>
+    <table>
+      <tr><th>Sub-score</th><th>Formula</th></tr>
+      <tr><td><code>s_subject</code></td><td>1 if the tutor teaches any subject in the tutee's subject list (preferences + requested subject), else 0</td></tr>
+      <tr><td><code>s_expertise</code></td><td>average(tutor's expertise_level across matching subjects) / 5 &nbsp;(0 if no match)</td></tr>
+      <tr><td><code>s_course</code></td><td>1 if same course; 0.5 if different course but same strand; else 0</td></tr>
+      <tr><td><code>s_year</code></td><td>1 / (1 + |student_year − tutor_year|) &nbsp;— closer year levels score higher, decays smoothly</td></tr>
+      <tr><td><code>s_level</code></td><td>1 normally; forced to 0 if tutor's <code>teaching_level == "SHS"</code> but the tutee is college level (<code>year_level &gt; 12</code>)</td></tr>
+    </table>
+    <div class="formula-box" style="font-size:13px;">score = 0.35·s_subject + 0.20·s_expertise + 0.20·s_course + 0.15·s_year + 0.10·s_level</div>
+
+    <h3>Fields it reads</h3>
+    <div>
+      <span class="field-tag">UserProfile.course</span>
+      <span class="field-tag">UserProfile.year_level</span>
+      <span class="field-tag">Preference.subjects</span>
+      <span class="field-tag">Tutor.teaching_level</span>
+      <span class="field-tag">TutorSubjects.subject_code</span>
+      <span class="field-tag">TutorSubjects.expertise_level</span>
+      <span class="field-tag">Course.strand</span>
+    </div>
+  </div>
+
+  <h2 id="cf">CF — Collaborative Filtering (Pearson, k-nearest-neighbor)</h2>
+  <div class="card">
+    <p><span class="pill file">recommender/CF.py</span></p>
+    <p>Built from every <code>Rating</code> row in the system: a sparse matrix <code>{student_id: {tutor_id: rating_score}}</code>.</p>
+
+    <h3>1. Similarity between two tutees — Pearson correlation</h3>
+    <div class="formula-box" style="font-size:13px;">
+      sim(u,v) = Σ (r<sub>u,i</sub>−ū)(r<sub>v,i</sub>−v̄) &nbsp;/&nbsp; √Σ(r<sub>u,i</sub>−ū)² · √Σ(r<sub>v,i</sub>−v̄)²
+    </div>
+    <p>Computed only over tutors <em>both</em> tutees have rated in common (<code>common = ratings[u] ∩ ratings[v]</code>). Returns 0 if they've never rated any tutor in common.</p>
+
+    <h3>2. Top-k neighbors</h3>
+    <p><code>top_k(ratings, student_id, k=5)</code> — similarity against every other tutee with rating history, sorted descending, keep the top 5.</p>
+
+    <h3>3. Predicted rating for a candidate tutor</h3>
+    <div class="formula-box" style="font-size:13px;">
+      predicted = student_avg + &nbsp; Σ sim(u,neighbor)·(neighbor's rating − neighbor_avg) &nbsp;/&nbsp; Σ |sim(u,neighbor)|
+    </div>
+    <p>Only neighbors who actually rated this specific tutor contribute. If none of the top-5 neighbors rated this tutor, <code>compute_cf_score</code> returns <code>None</code> → treated as <code>0</code> in the hybrid blend.</p>
+
+    <div class="callout">Cold-start tutees (no <code>Rating</code> rows at all) skip CF entirely — <code>student_id not in ratings</code> short-circuits to <code>None</code>. This is why a brand-new tutee's dashboard is really a pure-CBF ranking, weighted as if CF were 0.</div>
+
+    <h3>Fields it reads</h3>
+    <div>
+      <span class="field-tag">Rating.student</span>
+      <span class="field-tag">Rating.tutor</span>
+      <span class="field-tag">Rating.rating_score</span>
+    </div>
+  </div>
+
+  <h2 id="caching">Caching (dashboard path only)</h2>
+  <div class="card">
+    <p><span class="pill file">recommender/dashboard.py</span></p>
+    <p>Dashboard recommendations are cached per-tutee for <strong>10 minutes</strong> (<code>CACHE_TTL_SECONDS = 600</code>), keyed as <code>dash_recs:v{version}:limit{n}:{tutee_id}</code>.</p>
+    <p>A global <strong>cache version</strong> counter is bumped (invalidating all cached dashboard results at once) whenever something that could change rankings happens:</p>
+    <div>
+      <span class="field-tag">tutee saves preferences</span>
+      <span class="field-tag">a rating is submitted</span>
+      <span class="field-tag">a tutor edits their profile</span>
+      <span class="field-tag">a tutor changes their subjects</span>
+    </div>
+    <p style="margin-top:10px;">If the cache backend (Redis) is down, reads/writes fail silently and the system falls through to a live recompute rather than erroring — degraded, not broken.</p>
+  </div>
+
+  <h2 id="gotchas">Known gotchas (from real cases)</h2>
+  <div class="card">
+    <table>
+      <tr><th>Symptom</th><th>Root cause</th></tr>
+      <tr><td>Tutor never appears for any tutee</td><td><code>profile.institution_id</code> is <code>None</code> — Gate 1 silently zeroes them out</td></tr>
+      <tr><td>Tutee sees zero recommendations</td><td>Tutee's own <code>institution_id</code> is unset — Gate 1 returns <code>.none()</code></td></tr>
+      <tr><td>Tutor doesn't show for one specific date/time</td><td>No <em>active</em> <code>TutorAvailability</code> row for that weekday+slot, or an existing booking/override blocks it (Gate 4)</td></tr>
+      <tr><td>Tutor ranks lower than expected</td><td>Low CBF sub-scores (different course/strand, big year gap) or no CF signal (no shared-rating neighbors)</td></tr>
+      <tr><td>Availability day filter looks "empty" when it isn't</td><td><code>TutorAvailability.day</code> stores 3-letter abbreviations (<code>"Thu"</code>), not full names (<code>"Thursday"</code>) — easy to query wrong</td></tr>
+    </table>
+  </div>
+
+  <p style="color:var(--muted);font-size:12px;margin-top:32px;">Generated from the current state of <code>backend/studybuddy/recommender/</code> and <code>backend/studybuddy/views.py</code> on 2026-07-04.</p>
+</div>
+</body>
+</html>

@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session Details Redesign — Options</title>
+<style>
+  :root {
+    --sb-primary: #00895A;
+    --sb-primary-hover: #007249;
+    --sb-dark: #0A1916;
+    --sb-bg: #F8F9FA;
+    --ink: #10241c;
+    --muted: #61756b;
+    --line: rgba(16, 36, 28, 0.1);
+    --shadow-soft: 0 12px 28px rgba(13, 28, 22, 0.08);
+    --shadow: 0 26px 70px rgba(13, 28, 22, 0.12);
+    --spring: cubic-bezier(0.2, 0.9, 0.2, 1);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    color: var(--ink);
+    font-family: "Avenir Next", "Segoe UI", sans-serif;
+    background:
+      radial-gradient(circle at top left, rgba(16, 163, 110, 0.12), transparent 32%),
+      radial-gradient(circle at top right, rgba(255, 190, 59, 0.16), transparent 28%),
+      linear-gradient(180deg, #f4fbf5, #fbf3e7);
+  }
+  .page { width: min(900px, calc(100% - 32px)); margin: 0 auto; padding: 28px 0 100px; }
+  h1 { font-size: 26px; margin: 0 0 4px; }
+  .lead { color: var(--muted); margin: 0 0 24px; font-size: 14px; line-height: 1.5; }
+  .switcher {
+    display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 28px;
+    position: sticky; top: 12px; z-index: 5;
+    background: rgba(255,255,255,0.85); backdrop-filter: blur(12px);
+    padding: 10px; border-radius: 16px; border: 1px solid var(--line); box-shadow: var(--shadow-soft);
+  }
+  .switcher button {
+    font: inherit; border: 1px solid var(--line); background: #fff; color: var(--ink);
+    padding: 9px 16px; border-radius: 999px; cursor: pointer; font-weight: 700; font-size: 13px;
+    transition: all 160ms var(--spring);
+  }
+  .switcher button.active { background: var(--sb-primary); border-color: var(--sb-primary); color: #fff; box-shadow: 0 10px 20px rgba(0,137,90,0.22); }
+  .switcher button:hover { transform: translateY(-1px); }
+
+  .frame {
+    border: 1px solid rgba(255,255,255,0.7);
+    border-radius: 28px;
+    background: rgba(255,255,255,0.6);
+    backdrop-filter: blur(18px);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    display: none;
+  }
+  .frame.active { display: block; }
+
+  /* ---- Hero (unchanged reference, for context) ---- */
+  .hero {
+    padding: 24px;
+    background: linear-gradient(135deg, color-mix(in srgb, var(--sb-dark) 96%, transparent), color-mix(in srgb, var(--sb-primary) 88%, var(--sb-dark)));
+    color: #fff;
+  }
+  .hero-top { display: flex; gap: 18px; align-items: flex-start; }
+  .avatar {
+    display: grid; place-items: center; width: 88px; height: 88px; border-radius: 999px;
+    border: 4px solid rgba(255,255,255,0.42); background: rgba(255,255,255,0.16);
+    font-size: 1.5rem; font-weight: 850; flex: none; box-shadow: 0 18px 36px rgba(0,0,0,0.18);
+  }
+  .hero-copy { flex: 1; min-width: 0; }
+  .hero-row { display: flex; gap: 8px; align-items: flex-start; justify-content: space-between; }
+  .hero h3 { margin: 0 0 2px; font-size: 1.9rem; font-weight: 850; line-height: 1.05; }
+  .hero p.meta { margin: 0; color: rgba(255,255,255,0.74); font-size: 0.86rem; }
+  .status-badge {
+    display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.24); background: rgba(255,255,255,0.14); color: #fff;
+    font-size: 0.72rem; font-weight: 850; white-space: nowrap;
+  }
+  .status-badge span { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .subject-pill {
+    display: inline-flex; margin-top: 10px; padding: 6px 12px; border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.24); background: rgba(255,255,255,0.14); color: #fff;
+    font-size: 0.76rem; font-weight: 800;
+  }
+
+  /* ---- Orbit countdown (Design B, handoff = static message per decision) ---- */
+  .countdown {
+    position: relative; padding: 24px 28px; overflow: hidden; color: #fff;
+    border-top: 1px solid rgba(255,255,255,0.14);
+    background:
+      radial-gradient(circle at 12% 18%, rgba(51,213,166,0.32), transparent 32%),
+      radial-gradient(circle at 88% 86%, rgba(255,204,111,0.2), transparent 32%),
+      linear-gradient(135deg, #061814, #10342c 58%, #1b2621);
+  }
+  .countdown-pill {
+    display: inline-flex; align-items: center; gap: 7px; margin-bottom: 10px;
+    border: 1px solid rgba(255,255,255,0.16); border-radius: 999px; background: rgba(255,255,255,0.12);
+    color: #dbfff3; padding: 5px 11px; font-size: 12px; font-weight: 800;
+  }
+  .countdown-pill span { width: 8px; height: 8px; border-radius: 50%; background: #52efbf; box-shadow: 0 0 14px rgba(82,239,191,0.82); }
+  .countdown h4 { margin: 0; font-size: 1.05rem; font-weight: 900; }
+  .countdown .action-line {
+    margin: 8px 0 0; display: inline-flex; align-items: center; gap: 8px;
+    font-size: 0.92rem; font-weight: 800; color: #ffe6a8;
+  }
+  .countdown .action-line i { font-size: 1rem; }
+  .orbit-track {
+    position: relative; height: 44px; margin-top: 16px; border-radius: 999px; overflow: hidden;
+    background: linear-gradient(90deg, rgba(255,255,255,0.05), rgba(255,255,255,0.12)),
+      linear-gradient(90deg, rgba(124,108,242,0.12), rgba(16,163,110,0.14), rgba(255,126,182,0.12));
+  }
+  .orbit-segments { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; padding: 6px 10px; }
+  .orbit-segments span { border-radius: 999px; background: rgba(255,255,255,0.08); }
+  .orbit-segments span.on { background: linear-gradient(90deg, rgba(124,108,242,0.42), rgba(125,240,194,0.46), rgba(255,126,182,0.42)); }
+  .orbit-dot {
+    position: absolute; top: 50%; left: 100%; width: 24px; height: 24px; border-radius: 50%;
+    background: linear-gradient(135deg, #fff7d8, #ffffff 38%, #baf4da 72%, #c7c0ff);
+    box-shadow: 0 0 0 6px rgba(16,163,110,0.14), 0 0 24px rgba(124,108,242,0.34), 0 0 44px rgba(255,126,182,0.18);
+    transform: translate(-50%, -50%);
+  }
+
+  /* ---- Session info: shared bits ---- */
+  .info-section { padding: 24px 28px; }
+  .info-title { margin: 0 0 16px; font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+
+  /* Option 1: Fact pills */
+  .facts-row { display: flex; flex-wrap: wrap; gap: 10px; }
+  .fact-pill {
+    display: inline-flex; align-items: center; gap: 8px; min-height: 40px;
+    border-radius: 999px; padding: 0 14px; background: rgba(16,163,110,0.07);
+    border: 1px solid rgba(16,163,110,0.14); font-size: 13px; color: var(--ink);
+  }
+  .fact-pill i { color: var(--sb-primary); font-size: 14px; }
+  .fact-pill strong { font-weight: 800; }
+  .fact-pill .fact-label { color: var(--muted); font-weight: 700; text-transform: uppercase; font-size: 11px; letter-spacing: 0.04em; margin-right: 2px; }
+  .fact-pill.status { background: linear-gradient(90deg, var(--sb-primary), #10a36e); color: #fff; border-color: transparent; }
+  .fact-pill.status i { color: #fff; }
+  .fact-pill.status .fact-label { color: rgba(255,255,255,0.8); }
+
+  /* Option 2: Glass card grid */
+  .card-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 14px; }
+  .info-card {
+    border-radius: 18px; padding: 16px; background: rgba(16,163,110,0.06);
+    border: 1px solid rgba(16,163,110,0.1); transition: transform 180ms var(--spring), box-shadow 180ms var(--spring);
+  }
+  .info-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-soft); }
+  .info-card .label { display: flex; align-items: center; gap: 7px; margin: 0 0 8px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+  .info-card .label i { color: var(--sb-primary); font-size: 13px; }
+  .info-card .value { font-size: 15px; font-weight: 800; color: var(--ink); line-height: 1.3; }
+  .info-card.status-card-cell { background: linear-gradient(135deg, rgba(16,163,110,0.12), rgba(16,163,110,0.04)); border-color: rgba(16,163,110,0.22); }
+
+  /* Option 3: Inline meta row (integrated into countdown card) */
+  .meta-inline {
+    display: flex; flex-wrap: wrap; gap: 18px; margin-top: 16px; padding-top: 16px;
+    border-top: 1px solid rgba(255,255,255,0.14); color: rgba(255,255,255,0.72); font-size: 13px;
+  }
+  .meta-inline .item strong { display: block; color: #fff; font-size: 14px; margin-top: 2px; }
+  .meta-inline .item span.k { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; }
+  .info-section.light { padding: 22px 28px; background: #fff; }
+
+  .note { margin-top: 10px; font-size: 12px; color: var(--muted); }
+  .badge-new { display: inline-block; margin-left: 6px; padding: 2px 8px; border-radius: 999px; background: rgba(255,190,59,0.18); color: #8a5a00; font-size: 10px; font-weight: 800; text-transform: uppercase; }
+</style>
+</head>
+<body>
+<main class="page">
+  <h1>Session Details — redesign options</h1>
+  <p class="lead">
+    Design direction: <strong>Concept B — Orbit Strip</strong>. The hero and countdown bar below already
+    match Design B (shipped). What's new: the handoff timer is now a static line (no more endless
+    "Ended HH:MM:SS ago" tick) <span class="badge-new">fix</span>, and three options for restyling
+    "Session information" to match this visual language instead of today's uneven bordered-box grid.
+  </p>
+
+  <div class="switcher" data-toggle="option">
+    <button type="button" class="active" data-value="pills">1 — Fact pills</button>
+    <button type="button" data-value="cards">2 — Glass card grid</button>
+    <button type="button" data-value="inline">3 — Inline in countdown card</button>
+  </div>
+
+  <!-- OPTION 1: Fact pills -->
+  <section class="frame active" data-option="pills">
+    <div class="hero">
+      <div class="hero-top">
+        <div class="avatar">RM</div>
+        <div class="hero-copy">
+          <div class="hero-row">
+            <div>
+              <h3>Reg Masangya</h3>
+              <p class="meta">Your tutor · BS Computer Science (CPU-CCS) · Rating 4.9</p>
+            </div>
+            <span class="status-badge"><span></span>Payment Required</span>
+          </div>
+          <span class="subject-pill">BS Computer Science (CPU-CCS)</span>
+        </div>
+      </div>
+    </div>
+    <div class="countdown">
+      <span class="countdown-pill"><span></span>Payment handoff</span>
+      <h4>BS Computer Science (CPU-CCS) needs follow-up</h4>
+      <p class="action-line"><i class="bi bi-exclamation-circle"></i>Action needed — submit your payment details</p>
+      <div class="orbit-track">
+        <div class="orbit-segments"><span class="on"></span><span class="on"></span><span class="on"></span><span class="on"></span></div>
+        <div class="orbit-dot"></div>
+      </div>
+    </div>
+    <div class="info-section">
+      <p class="info-title">Session information</p>
+      <div class="facts-row">
+        <span class="fact-pill"><i class="bi bi-mortarboard"></i><span class="fact-label">Subject</span> <strong>BS Computer Science (CPU-CCS)</strong></span>
+        <span class="fact-pill"><i class="bi bi-calendar3"></i><span class="fact-label">Date</span> <strong>Apr 20, 2026</strong></span>
+        <span class="fact-pill"><i class="bi bi-clock"></i><span class="fact-label">Time</span> <strong>7:00 AM – 8:30 AM</strong></span>
+        <span class="fact-pill"><i class="bi bi-camera-video"></i><span class="fact-label">Mode</span> <strong>Online</strong></span>
+        <span class="fact-pill"><i class="bi bi-geo-alt"></i><span class="fact-label">Location</span> <strong>Online</strong></span>
+        <span class="fact-pill status"><i class="bi bi-flag"></i><span class="fact-label">Status</span> <strong>Payment Required</strong></span>
+      </div>
+      <p class="note">Pills wrap naturally at any width — no empty grid cells, no lonely last row. Closest match to Design A/C's existing pill language elsewhere in the app.</p>
+    </div>
+  </section>
+
+  <!-- OPTION 2: Glass card grid -->
+  <section class="frame" data-option="cards">
+    <div class="hero">
+      <div class="hero-top">
+        <div class="avatar">RM</div>
+        <div class="hero-copy">
+          <div class="hero-row">
+            <div>
+              <h3>Reg Masangya</h3>
+              <p class="meta">Your tutor · BS Computer Science (CPU-CCS) · Rating 4.9</p>
+            </div>
+            <span class="status-badge"><span></span>Payment Required</span>
+          </div>
+          <span class="subject-pill">BS Computer Science (CPU-CCS)</span>
+        </div>
+      </div>
+    </div>
+    <div class="countdown">
+      <span class="countdown-pill"><span></span>Payment handoff</span>
+      <h4>BS Computer Science (CPU-CCS) needs follow-up</h4>
+      <p class="action-line"><i class="bi bi-exclamation-circle"></i>Action needed — submit your payment details</p>
+      <div class="orbit-track">
+        <div class="orbit-segments"><span class="on"></span><span class="on"></span><span class="on"></span><span class="on"></span></div>
+        <div class="orbit-dot"></div>
+      </div>
+    </div>
+    <div class="info-section">
+      <p class="info-title">Session information</p>
+      <div class="card-grid">
+        <div class="info-card"><p class="label"><i class="bi bi-mortarboard"></i>Subject</p><p class="value">BS Computer Science (CPU-CCS)</p></div>
+        <div class="info-card"><p class="label"><i class="bi bi-calendar3"></i>Date</p><p class="value">Apr 20, 2026</p></div>
+        <div class="info-card"><p class="label"><i class="bi bi-clock"></i>Time</p><p class="value">7:00 AM – 8:30 AM</p></div>
+        <div class="info-card"><p class="label"><i class="bi bi-camera-video"></i>Mode</p><p class="value">Online</p></div>
+        <div class="info-card"><p class="label"><i class="bi bi-geo-alt"></i>Location</p><p class="value">Online</p></div>
+        <div class="info-card status-card-cell"><p class="label"><i class="bi bi-flag"></i>Status</p><p class="value">Payment Required</p></div>
+      </div>
+      <p class="note">Uniform 3-column grid of equal-size cards — always symmetrical regardless of how many facts there are (2 rows of 3, never an odd single leftover box). Matches the "session-box" card pattern already used in the concepts prototype's own explainer section.</p>
+    </div>
+  </section>
+
+  <!-- OPTION 3: Inline in countdown card -->
+  <section class="frame" data-option="inline">
+    <div class="hero">
+      <div class="hero-top">
+        <div class="avatar">RM</div>
+        <div class="hero-copy">
+          <div class="hero-row">
+            <div>
+              <h3>Reg Masangya</h3>
+              <p class="meta">Your tutor · BS Computer Science (CPU-CCS) · Rating 4.9</p>
+            </div>
+            <span class="status-badge"><span></span>Payment Required</span>
+          </div>
+          <span class="subject-pill">BS Computer Science (CPU-CCS)</span>
+        </div>
+      </div>
+    </div>
+    <div class="countdown">
+      <span class="countdown-pill"><span></span>Payment handoff</span>
+      <h4>BS Computer Science (CPU-CCS) needs follow-up</h4>
+      <p class="action-line"><i class="bi bi-exclamation-circle"></i>Action needed — submit your payment details</p>
+      <div class="orbit-track">
+        <div class="orbit-segments"><span class="on"></span><span class="on"></span><span class="on"></span><span class="on"></span></div>
+        <div class="orbit-dot"></div>
+      </div>
+      <div class="meta-inline">
+        <div class="item"><span class="k">Date</span><strong>Apr 20, 2026</strong></div>
+        <div class="item"><span class="k">Time</span><strong>7:00 AM – 8:30 AM</strong></div>
+        <div class="item"><span class="k">Mode</span><strong>Online</strong></div>
+        <div class="item"><span class="k">Location</span><strong>Online</strong></div>
+      </div>
+    </div>
+    <div class="info-section light">
+      <p class="info-title">Session information</p>
+      <p class="note" style="margin-top:0;">Subject and Status already shown in the hero above, so this option folds Date/Time/Mode/Location directly into the dark countdown card as a meta row, and drops the separate "Session information" section entirely. Most compact, least repetition — but if subject/status ever need to move elsewhere, this option loses them.</p>
+    </div>
+  </section>
+</main>
+<script>
+  document.querySelectorAll('[data-toggle="option"] button').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('[data-toggle="option"] button').forEach((b) => b.classList.toggle('active', b === btn));
+      document.querySelectorAll('.frame').forEach((f) => f.classList.toggle('active', f.dataset.option === btn.dataset.value));
+    });
+  });
+</script>
+</body>
+</html>
