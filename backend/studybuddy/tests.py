@@ -193,6 +193,34 @@ class SuperAdminRedesignApiTests(APITestCase):
         self.assertEqual(self.target_profile.institution, self.inactive_institution)
         self.assertTrue(self.target_profile.is_domain_exempt)
 
+    def test_superadmin_can_patch_tutor_session_load_limit(self):
+        tutor_user = User.objects.create_user(
+            username="limit-tutor",
+            email="limit-tutor@cpu.edu.ph",
+            password="password",
+        )
+        tutor_profile = UserProfile.objects.create(
+            user=tutor_user,
+            fname="Limit",
+            mname="",
+            lname="Tutor",
+            role="Tutor",
+            institution=self.institution,
+            profile_completed=True,
+        )
+        tutor = Tutor.objects.create(profile=tutor_profile)
+
+        response = self.client.patch(
+            f"/api/admin/users/{tutor_profile.id}/",
+            {"session_load_limit": 14},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        tutor.refresh_from_db()
+        self.assertEqual(tutor.session_load_limit, 14)
+        self.assertEqual(response.data["tutor_session_load_limit"], 14)
+
     def test_admin_account_request_approval_promotes_target_user(self):
         request_obj = AdminAccountRequest.objects.create(
             requesting_admin=self.admin_profile,
@@ -3163,6 +3191,27 @@ class BookingVerificationGateTests(APITestCase):
             format="json",
         )
 
+    def create_accepted_booking_group(self, *, start_hour, group_id=None, request_id=None):
+        from .views import WEEKDAY_MAP
+
+        availability = TutorAvailability.objects.create(
+            tutor=self.tutor,
+            day=WEEKDAY_MAP[self.future_date.weekday()],
+            time_slot=time(start_hour, 0),
+            is_active=True,
+        )
+
+        return Booking.objects.create(
+            student=self.tutee_profile,
+            tutor=self.tutor,
+            availability=availability,
+            session_date=self.future_date,
+            session_mode="Online",
+            booking_request_id=request_id or uuid4(),
+            session_group_id=group_id or uuid4(),
+            status="Confirmed",
+        )
+
     @override_settings(**ENFORCED)
     def test_tutee_without_application_blocked_once_enforced(self):
         response = self.post_confirm_booking()
@@ -3241,6 +3290,34 @@ class BookingVerificationGateTests(APITestCase):
 
         self.assertEqual(response.status_code, 403)
         self.assertEqual(response.data.get("code"), "verification_required")
+        booking.refresh_from_db()
+        self.assertEqual(booking.status, "Pending")
+
+    @override_settings(**ENFORCED)
+    def test_tutor_acceptance_load_counts_session_groups_not_rows(self):
+        self.make_verified_application(TutorApplication, self.tutor_profile)
+        shared_group_id = uuid4()
+        self.create_accepted_booking_group(start_hour=14, group_id=shared_group_id)
+        self.create_accepted_booking_group(start_hour=15, group_id=shared_group_id)
+
+        self.assertEqual(self.tutor.accepted_session_load(), 1)
+
+    @override_settings(**ENFORCED)
+    def test_tutor_at_acceptance_limit_cannot_approve_new_booking(self):
+        self.make_verified_application(TutorApplication, self.tutor_profile)
+
+        for index in range(10):
+            self.create_accepted_booking_group(start_hour=8 + index)
+
+        booking = self.create_pending_booking()
+        self.client.force_authenticate(user=self.tutor_user)
+
+        response = self.client.post(f"/api/bookings/{booking.id}/approve/")
+
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.data.get("code"), "session_load_limit_reached")
+        self.assertEqual(response.data.get("accepted_session_load"), 10)
+        self.assertEqual(response.data.get("session_load_limit"), 10)
         booking.refresh_from_db()
         self.assertEqual(booking.status, "Pending")
 
@@ -4553,6 +4630,31 @@ class AlgorithmDemoToolTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         ids = {row["id"] for row in response.data["tutees"]}
         self.assertIn(self.tutee.id, ids)
+
+    def test_tutee_search_does_not_n_plus_one_on_subject_lookups(self):
+        # search_tutees fetches up to DEFAULT_TUTEE_SEARCH_LIMIT (500) tutees at
+        # once for the frontend's client-side searchable dropdown, so a
+        # per-tutee subject-preference query would silently scale to hundreds
+        # of queries. Query count must stay flat as tutee count grows.
+        for i in range(5):
+            user = User.objects.create_user(
+                username=f"algo-bulk-tutee-{i}@cpu.edu", email=f"algo-bulk-tutee-{i}@cpu.edu",
+                password="password",
+            )
+            tutee = UserProfile.objects.create(
+                user=user, fname=f"Bulk{i}", mname="", lname="Tutee", role="Tutee",
+                year_level=11, institution=self.institution,
+            )
+            pref, _ = Preference.objects.get_or_create(user=tutee)
+            pref.subjects.set([self.subject])
+
+        self.client.force_authenticate(user=self.super_user)
+
+        with CaptureQueriesContext(connection) as ctx:
+            response = self.client.get("/api/dev/algorithm-demo/tutees/?q=")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data["tutees"]), 6)
+        self.assertLess(len(ctx), 10)
 
     def test_recommend_requires_tutee_id(self):
         self.client.force_authenticate(user=self.super_user)

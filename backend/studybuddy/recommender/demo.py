@@ -2,7 +2,7 @@ import logging
 
 from django.db.models import Q
 
-from ..models import UserProfile
+from ..models import Preference, UserProfile
 from .cbf import get_student_subject_codes
 from .CF import build_rating_matrix, top_k
 from .hybrid import hybrid_prediction_breakdown, normalize_tutor_queryset
@@ -30,16 +30,33 @@ def search_tutees(query, institution_id=None, limit=DEFAULT_TUTEE_SEARCH_LIMIT):
     for word in query.split():
         tutees = tutees.filter(Q(fname__icontains=word) | Q(lname__icontains=word))
 
-    tutees = tutees.order_by("fname", "lname")[:limit]
+    tutees = list(tutees.order_by("fname", "lname")[:limit])
+    subjects_by_tutee_id = _bulk_student_subject_codes(tutees)
 
     return [
         {
             "id": tutee.id,
             "name": f"{tutee.fname} {tutee.lname}",
-            "subjects": get_student_subject_codes(tutee),
+            "subjects": subjects_by_tutee_id.get(tutee.id, []),
         }
         for tutee in tutees
     ]
+
+
+def _bulk_student_subject_codes(tutees):
+    """Same data as get_student_subject_codes, but for a whole list of tutees in
+    one query instead of one query pair per tutee — search_tutees can return up
+    to DEFAULT_TUTEE_SEARCH_LIMIT (500) rows, so a per-tutee lookup here was a
+    real N+1 (up to ~1000 extra queries per page load)."""
+    rows = Preference.objects.filter(user__in=tutees).values_list(
+        "user_id", "subjects__subject_code"
+    )
+    subjects_by_tutee_id = {}
+    for tutee_id, subject_code in rows:
+        if subject_code is None:
+            continue
+        subjects_by_tutee_id.setdefault(tutee_id, []).append(subject_code)
+    return subjects_by_tutee_id
 
 
 def _candidate_tutors(subject_codes, institution_id=None):
