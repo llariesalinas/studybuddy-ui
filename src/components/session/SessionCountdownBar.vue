@@ -25,7 +25,7 @@
           v-for="zone in 4"
           :key="zone"
           class="session-countdown-zone"
-          :class="{ active: presentation.zone >= zone }"
+          :class="{ active: presentation.zone >= zone, popped: poppedZone === zone }"
         >
           <i>{{ zone }}</i>
         </span>
@@ -41,11 +41,45 @@
 </template>
 
 <script setup>
-defineProps({
+import { onBeforeUnmount, ref, watch } from 'vue'
+
+const props = defineProps({
   presentation: {
     type: Object,
     required: true,
   },
+})
+
+const poppedZone = ref(0)
+const POP_MS = 600
+let popTimer = null
+
+const prefersReducedMotion = () =>
+  typeof window !== 'undefined' &&
+  window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+
+watch(
+  () => props.presentation?.zone,
+  (zone, previousZone) => {
+    if (!zone || !previousZone || zone <= previousZone || prefersReducedMotion()) {
+      return
+    }
+
+    poppedZone.value = zone
+
+    if (popTimer) {
+      window.clearTimeout(popTimer)
+    }
+    popTimer = window.setTimeout(() => {
+      poppedZone.value = 0
+    }, POP_MS)
+  },
+)
+
+onBeforeUnmount(() => {
+  if (popTimer) {
+    window.clearTimeout(popTimer)
+  }
 })
 </script>
 
@@ -148,10 +182,15 @@ defineProps({
   height: 10px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.14);
+  transition: background var(--sb-t-normal) var(--sb-spring);
 }
 
 .session-countdown-zone.active {
   background: rgba(109, 255, 214, 0.46);
+}
+
+.session-countdown-zone.popped {
+  animation: session-countdown-pop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .session-countdown-zone i {
@@ -173,8 +212,11 @@ defineProps({
   max-width: 100%;
   height: 3px;
   border-radius: 999px;
-  background: linear-gradient(90deg, #55efc2, #f8d27a);
+  background: linear-gradient(90deg, #55efc2, #f8d27a, #55efc2);
+  background-size: 200% 100%;
   transform: translateY(-50%);
+  transition: width 0.9s cubic-bezier(0.34, 1.4, 0.5, 1);
+  animation: session-countdown-flow 1.6s linear infinite;
 }
 
 .session-countdown-bead {
@@ -190,6 +232,20 @@ defineProps({
     0 0 0 7px rgba(85, 239, 194, 0.17),
     0 0 22px rgba(248, 210, 122, 0.58);
   transform: translate(-50%, -50%);
+  transition: left 0.9s cubic-bezier(0.34, 1.4, 0.5, 1);
+  animation: session-countdown-breathe 1.5s ease-in-out infinite;
+}
+
+.session-countdown-bead::before {
+  content: '';
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  width: 34px;
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, rgba(248, 210, 122, 0.7));
+  transform: translateY(-50%);
 }
 
 .session-countdown-meta {
@@ -204,6 +260,42 @@ defineProps({
 .session-countdown-meta strong {
   color: #ffffff;
   font-size: 0.86rem;
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes session-countdown-flow {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes session-countdown-breathe {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+
+  50% {
+    transform: translate(-50%, -50%) scale(1.18);
+    box-shadow:
+      0 0 0 11px rgba(85, 239, 194, 0.12),
+      0 0 30px rgba(248, 210, 122, 0.7);
+  }
+}
+
+@keyframes session-countdown-pop {
+  0% {
+    transform: scale(1);
+  }
+
+  40% {
+    transform: scale(1.3);
+    box-shadow: 0 0 16px rgba(109, 255, 214, 0.8);
+  }
+
+  100% {
+    transform: scale(1);
+  }
 }
 
 @media (max-width: 760px) {
@@ -218,6 +310,17 @@ defineProps({
   .session-countdown,
   .session-countdown::before {
     transition: none;
+  }
+
+  .session-countdown-fill,
+  .session-countdown-bead,
+  .session-countdown-zone {
+    transition: none;
+    animation: none;
+  }
+
+  .session-countdown-bead::before {
+    display: none;
   }
 }
 </style>

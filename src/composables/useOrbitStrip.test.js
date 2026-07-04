@@ -3,6 +3,7 @@ import {
   getOrbitPhase,
   getOrbitPresentation,
   normalizeOrbitSession,
+  ORBIT_HANDOFF_CAP_MS,
 } from './useOrbitStrip'
 
 const NOW = new Date('2026-07-03T05:48:00.000Z')
@@ -114,5 +115,27 @@ describe('useOrbitStrip helpers', () => {
     expect(presentation.progress).toBe(20)
     expect(presentation.zone).toBe(1)
     expect(presentation.upNextHint).toContain('Up next: Payment handoff - Physics')
+  })
+
+  it('caps the handoff elapsed text at the same window as the progress bar', () => {
+    // Regression: timerText used to keep counting the raw elapsed time
+    // forever (e.g. "410:31:35 ago") even though progress was already
+    // clamped to 100% past the 24h handoff cap.
+    const farPastEnd = new Date(NOW.getTime() - (ORBIT_HANDOFF_CAP_MS * 5))
+
+    const staleHandoff = getOrbitPresentation({
+      session: {
+        id: 99,
+        status: 'Payment Required',
+        date: farPastEnd.toISOString().slice(0, 10),
+        startTime: '13:00',
+        endTime: '13:30',
+      },
+      now: NOW,
+    })
+
+    expect(staleHandoff.progress).toBe(100)
+    expect(staleHandoff.timerText).toBe('Ended over 24:00:00 ago')
+    expect(staleHandoff.timerText).not.toMatch(/^Ended \d{3,}:/)
   })
 })

@@ -4655,22 +4655,44 @@ class SessionCheckInTests(APITestCase):
             can_f2f=True,
             teaching_level="SHS",
         )
+        # Ongoing right now, so the default fixture matches the "session is
+        # live" gate on the midpoint check-in endpoint without every test
+        # needing to reason about the clock.
+        now = timezone.localtime()
         self.availability = TutorAvailability.objects.create(
             tutor=self.tutor,
             day="Mon",
-            time_slot=time(14, 0),
+            time_slot=(now - timedelta(minutes=5)).time(),
             is_active=True,
         )
         self.booking = Booking.objects.create(
             student=self.student,
             tutor=self.tutor,
             availability=self.availability,
-            session_date=date(2026, 6, 15),
+            session_date=now.date(),
             session_mode="F2F",
             preferred_location="Library",
             status="Confirmed",
         )
         self.client.force_authenticate(user=self.student_user)
+
+    def _make_booking_with_window(self, *, start_offset_minutes, status="Confirmed"):
+        now = timezone.localtime()
+        availability = TutorAvailability.objects.create(
+            tutor=self.tutor,
+            day="Tue",
+            time_slot=(now + timedelta(minutes=start_offset_minutes)).time(),
+            is_active=True,
+        )
+        return Booking.objects.create(
+            student=self.student,
+            tutor=self.tutor,
+            availability=availability,
+            session_date=(now + timedelta(minutes=start_offset_minutes)).date(),
+            session_mode="F2F",
+            preferred_location="Library",
+            status=status,
+        )
 
     def test_tutee_can_record_venue_confirmation(self):
         response = self.client.post(
@@ -4740,6 +4762,34 @@ class SessionCheckInTests(APITestCase):
                 event_type=SessionCheckIn.EVENT_MIDPOINT_CHECKIN,
             ).count(),
             1,
+        )
+
+    def test_midpoint_check_in_rejected_when_session_is_upcoming(self):
+        booking = self._make_booking_with_window(start_offset_minutes=60)
+
+        response = self.client.post(
+            f"/api/bookings/{booking.id}/midpoint-check-in/",
+            {"response": "good"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertFalse(
+            SessionCheckIn.objects.filter(booking=booking).exists()
+        )
+
+    def test_midpoint_check_in_rejected_when_session_already_ended(self):
+        booking = self._make_booking_with_window(start_offset_minutes=-180)
+
+        response = self.client.post(
+            f"/api/bookings/{booking.id}/midpoint-check-in/",
+            {"response": "good"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertFalse(
+            SessionCheckIn.objects.filter(booking=booking).exists()
         )
 
     def test_booking_detail_includes_check_in_state(self):

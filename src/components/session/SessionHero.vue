@@ -147,12 +147,12 @@ const statusClass = computed(() => {
 }
 
 .session-hero {
-  min-height: 100%;
   padding: 24px;
+  /* Mode-invariant anchor: stays saturated green in light and dark themes. */
   background: linear-gradient(
     135deg,
     color-mix(in srgb, var(--sb-dark) 96%, transparent),
-    color-mix(in srgb, var(--sb-primary) 88%, var(--sb-dark))
+    color-mix(in srgb, var(--sb-green-anchor) 88%, var(--sb-dark))
   );
   color: #fff;
 }

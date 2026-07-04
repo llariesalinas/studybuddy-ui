@@ -1,15 +1,26 @@
 <template>
   <section class="session-card session-info-card">
     <h4>{{ title }}</h4>
-    <div class="session-info-grid">
+    <div class="session-info-stream">
       <article
-        v-for="(item, index) in items"
+        v-for="item in items"
         :key="item.label"
-        class="session-info-tile"
-        :class="`session-info-tile-${index % 6}`"
+        class="session-info-row"
       >
-        <span>{{ item.label }}</span>
-        <strong>{{ item.value || 'N/A' }}</strong>
+        <span class="session-info-label">{{ item.label }}</span>
+        <div class="session-info-content">
+          <strong>{{ item.value || 'N/A' }}</strong>
+          <p v-if="item.hint">{{ item.hint }}</p>
+          <div v-if="item.chips?.length" class="session-info-chips">
+            <span
+              v-for="chip in item.chips"
+              :key="`${item.label}-${chip}`"
+              class="session-info-chip"
+            >
+              {{ chip }}
+            </span>
+          </div>
+        </div>
       </article>
     </div>
   </section>
@@ -29,12 +40,7 @@ defineProps({
 </script>
 
 <style scoped>
-.session-card {
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-}
-
+/* Surface styling comes from the glass-segment class passed in by the parent view. */
 .session-card:hover {
   transform: none;
 }
@@ -51,78 +57,32 @@ defineProps({
   letter-spacing: 0;
 }
 
-.session-info-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+.session-info-stream {
   border-top: 1px solid var(--sb-card-border);
 }
 
-.session-info-tile {
-  position: relative;
+.session-info-row {
   display: grid;
-  align-content: center;
-  min-height: 92px;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
   min-width: 0;
-  overflow: hidden;
-  border-right: 1px solid var(--sb-card-border);
   border-bottom: 1px solid var(--sb-card-border);
-  border-radius: 0;
-  background: transparent;
-  padding: 18px 18px 18px 22px;
+  padding: 18px 0;
   transition:
     background-color var(--sb-t-normal) var(--sb-spring),
     transform var(--sb-t-normal) var(--sb-spring);
 }
 
-.session-info-tile:nth-child(2n) {
-  border-right: 0;
-}
-
-.session-info-tile:nth-last-child(-n + 2) {
+.session-info-row:last-child {
   border-bottom: 0;
 }
 
-.session-info-tile:hover {
-  background: color-mix(in srgb, var(--sb-primary) 5%, transparent);
+.session-info-row:hover {
   transform: translateX(3px);
 }
 
-.session-info-tile::before {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  width: 4px;
-  content: '';
-}
-
-.session-info-tile-0::before {
-  background: var(--sb-primary);
-}
-
-.session-info-tile-1::before {
-  background: var(--sb-pop-yellow);
-}
-
-.session-info-tile-2::before {
-  background: var(--sb-pop-pink);
-}
-
-.session-info-tile-3::before {
-  background: var(--sb-pop-orange);
-}
-
-.session-info-tile-4::before {
-  background: var(--sb-aurora-violet);
-}
-
-.session-info-tile-5::before {
-  background: var(--sb-primary-mid);
-}
-
-.session-info-tile span {
-  display: block;
-  margin-bottom: 4px;
+.session-info-label {
   color: var(--sb-text-subtle);
   font-size: 0.68rem;
   font-weight: 850;
@@ -130,7 +90,13 @@ defineProps({
   text-transform: uppercase;
 }
 
-.session-info-tile strong {
+.session-info-content {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.session-info-content strong {
   display: block;
   overflow-wrap: anywhere;
   color: var(--sb-text-dark);
@@ -138,25 +104,41 @@ defineProps({
   font-weight: 850;
 }
 
+.session-info-content p {
+  margin: 0;
+  color: var(--sb-text-muted);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.session-info-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.session-info-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--sb-card-bg) 70%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sb-card-border) 84%, transparent);
+  color: var(--sb-text-main);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
 @media (max-width: 575px) {
   .session-info-card {
     padding: 18px;
   }
 
-  .session-info-grid {
+  .session-info-row {
     grid-template-columns: 1fr;
-  }
-
-  .session-info-tile,
-  .session-info-tile:nth-child(2n),
-  .session-info-tile:nth-last-child(-n + 2) {
-    min-height: 76px;
-    border-right: 0;
-    border-bottom: 1px solid var(--sb-card-border);
-  }
-
-  .session-info-tile:last-child {
-    border-bottom: 0;
+    gap: 8px;
+    padding: 16px 0;
   }
 }
 

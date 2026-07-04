@@ -969,6 +969,9 @@ onMounted(() => {
   margin: 0 auto;
 }
 
+/* A global .glass-segment also lives in src/assets/main.css (same rules, kept in
+   sync manually) so the session detail pages can share this look. Scoped wins
+   here on specificity, but update both if this changes. */
 .glass-segment {
   background: color-mix(in srgb, var(--sb-card-bg) 84%, transparent);
   border: 1px solid color-mix(in srgb, var(--sb-card-border) 82%, transparent);
@@ -1108,6 +1111,9 @@ onMounted(() => {
   gap: 0.75rem;
 }
 
+/* .btn-soft and .btn-primary-action also exist globally in src/assets/main.css
+   for the session detail pages. Scoped wins here on specificity, but a rename
+   or restyle of either tier should be applied in both places. */
 .btn-soft,
 .btn-primary-action,
 .btn-discard,

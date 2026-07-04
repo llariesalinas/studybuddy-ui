@@ -908,6 +908,27 @@ def get_display_status(raw_status, session_date, start_time, end_time):
     return raw_status
 
 
+def get_current_display_status_for_booking(booking):
+    session_group_bookings = get_session_group_bookings(booking)
+    representative_booking = get_representative_booking(session_group_bookings)
+    first_booking = session_group_bookings[0]
+    last_booking = session_group_bookings[-1]
+
+    start_time = first_booking.availability.time_slot
+    end_time = (
+        datetime.combine(first_booking.session_date, last_booking.availability.time_slot)
+        + timedelta(minutes=SESSION_SLOT_MINUTES)
+    ).time()
+    session_date, start_time, end_time = apply_dev_live_override(
+        session_group_bookings,
+        representative_booking.session_date,
+        start_time,
+        end_time,
+    )
+
+    return get_display_status(representative_booking.status, session_date, start_time, end_time)
+
+
 def create_booking_status_notification(recipient, status_key, bookings, recipient_role=None, actor_role=None, reason=None):
     context = get_session_notification_context(bookings)
 
@@ -3141,6 +3162,12 @@ def record_midpoint_check_in(request, booking_id):
     booking, error_response = get_tutee_owned_booking_or_403(request, booking_id)
     if error_response:
         return error_response
+
+    if get_current_display_status_for_booking(booking).lower() != 'ongoing':
+        return Response(
+            {"error": "Mid-session check-ins are only available while the session is ongoing."},
+            status=409,
+        )
 
     response_value = str(request.data.get("response", "")).strip().lower()
     valid_responses = {

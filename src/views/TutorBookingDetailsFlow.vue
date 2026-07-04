@@ -20,29 +20,83 @@
           }"
         ></i>
       </div>
+      <SessionAurora />
 
       <div class="session-alive-stage">
         <div class="session-alive-grid">
           <div class="session-alive-column">
-            <SessionHero
-              :profile="counterpartProfile"
-              :subject="bookingDetailsStore.sessionInfo?.subject"
-              :status="normalizedStatus"
-              :status-label="bookingDetailsStore.sessionInfo?.status || 'Session'"
-              :is-ongoing="isOngoing"
-              :clock="heroClock"
-            />
+            <div class="session-anchor">
+              <SessionHero
+                :profile="counterpartProfile"
+                :subject="bookingDetailsStore.sessionInfo?.subject"
+                :status="normalizedStatus"
+                :status-label="bookingDetailsStore.sessionInfo?.status || 'Session'"
+                :is-ongoing="isOngoing"
+                :clock="heroClock"
+              />
 
-            <SessionCountdownBar
-              v-if="showDetailOrbit"
-              :presentation="detailOrbitPresentation"
-            />
+              <SessionCountdownBar
+                v-if="showDetailOrbit"
+                :presentation="detailOrbitPresentation"
+              />
+            </div>
 
-            <div class="session-detail-pair" :class="{ 'session-detail-pair-single': showDetailOrbit }">
-              <SessionInfoGrid :items="sessionInfoItems" />
+            <section v-if="isOngoing" class="session-progress-card glass-segment">
+              <div class="session-progress-head">
+                <div>
+                  <h4>Tutee progress pulse</h4>
+                  <p>Use this to check whether the learner is making progress while the session is still active.</p>
+                </div>
+                <span class="session-progress-chip">{{ heroClock.formattedElapsed }} elapsed</span>
+              </div>
+
+              <template v-if="midpointCheckIn">
+                <div class="session-progress-status" :class="`is-${midpointCheckIn.response || 'saved'}`">
+                  <strong>{{ midpointStatusTitle }}</strong>
+                  <span>{{ midpointStatusCopy }}</span>
+                </div>
+              </template>
+
+              <template v-else>
+                <button class="session-progress-button session-progress-button-good sb-btn" @click="handleTutorCheckInPrompt">
+                  <strong>Prompt progress check</strong>
+                  <span>Ask the tutee to answer the mid-session popup from their live session screen.</span>
+                </button>
+              </template>
+            </section>
+
+            <section v-if="isOngoing" class="session-action-card glass-segment">
+              <h4>Quick actions</h4>
+              <div class="session-quick-grid">
+                <button class="session-quick-button sb-btn" @click="handleTutorCheckInPrompt">
+                  <i class="bi bi-geo-alt"></i>
+                  Confirm venue
+                </button>
+                <button class="session-quick-button sb-btn" @click="handleLightAction(goToChat)">
+                  <i class="bi bi-chat-dots"></i>
+                  Message
+                </button>
+                <button class="session-quick-button sb-btn" @click="handleTutorCheckInPrompt">
+                  <i class="bi bi-activity"></i>
+                  Progress check
+                </button>
+                <button
+                  class="session-quick-button sb-btn"
+                  :disabled="!showDevReadyForPayment || isDevSubmitting"
+                  @click="handleMediumAction(handleDevReadyForPayment)"
+                >
+                  <i class="bi bi-stop-circle"></i>
+                  End
+                </button>
+              </div>
+            </section>
+
+            <div class="session-detail-pair">
+              <SessionInfoGrid class="glass-segment" :items="sessionInfoItems" />
 
               <SessionTimeline
                 v-if="!showDetailOrbit"
+                class="glass-segment"
                 :status="normalizedStatus"
                 :is-ongoing="isOngoing"
                 :date-label="formattedSessionDate"
@@ -52,8 +106,8 @@
             </div>
           </div>
 
-          <div class="session-alive-column">
-            <section class="session-action-card">
+          <div class="session-alive-column session-alive-rail">
+            <section class="session-action-card session-next-action glass-segment">
               <div class="session-action-head">
                 <h4>{{ actionTitle }}</h4>
                 <span v-if="isOngoing" class="session-live-pill">
@@ -64,12 +118,15 @@
 
               <template v-if="isOngoing">
                 <p>Session is live. Keep your tutee in sync, then end the session when it is ready for payment.</p>
-                <button class="session-action-button session-action-primary" @click="handleLightAction(goToChat)">
+                <button
+                  class="session-cta sb-btn btn-primary-action sb-elevated sb-elevated--brand"
+                  @click="handleLightAction(goToChat)"
+                >
                   <i class="bi bi-chat-dots"></i>
                   Open chat
                 </button>
                 <button
-                  class="session-action-button session-action-ink"
+                  class="session-cta sb-btn btn-soft"
                   :disabled="!showDevReadyForPayment || isDevSubmitting"
                   @click="handleMediumAction(handleDevReadyForPayment)"
                 >
@@ -96,7 +153,7 @@
                   <span class="summary-value">{{ bookingDetailsStore.paymentInfo?.status || 'Submitted' }}</span>
                 </div>
                 <button
-                  class="session-action-button session-action-primary"
+                  class="session-cta sb-btn btn-primary-action sb-elevated sb-elevated--brand"
                   :disabled="isSubmitting"
                   @click="handleCelebrationAction(handleComplete)"
                 >
@@ -108,7 +165,7 @@
               <template v-else-if="showDevReadyForPayment">
                 <p>Dev option: end this session now so the tutee can open the post-session payment flow.</p>
                 <button
-                  class="session-action-button session-action-yellow"
+                  class="session-cta sb-btn btn-soft"
                   :disabled="isDevSubmitting"
                   @click="handleMediumAction(handleDevReadyForPayment)"
                 >
@@ -118,12 +175,15 @@
 
               <template v-else-if="showCancelButton">
                 <p>Confirmed. Coordinate with your tutee or cancel 2+ days ahead.</p>
-                <button class="session-action-button session-action-primary" @click="handleLightAction(goToChat)">
+                <button
+                  class="session-cta sb-btn btn-primary-action sb-elevated sb-elevated--brand"
+                  @click="handleLightAction(goToChat)"
+                >
                   <i class="bi bi-chat-dots"></i>
                   Message tutee
                 </button>
                 <button
-                  class="session-action-button session-action-danger"
+                  class="session-cta sb-btn btn-danger-soft"
                   :disabled="isCancelling || !canCancel"
                   @click="handleLightAction(() => { isCancelModalOpen = true })"
                 >
@@ -150,7 +210,7 @@
               </template>
             </section>
 
-            <section v-if="bookingDetailsStore.paymentInfo?.receipt_image" class="session-action-card">
+            <section v-if="bookingDetailsStore.paymentInfo?.receipt_image" class="session-action-card glass-segment">
               <h4>Receipt image</h4>
               <img
                 :src="bookingDetailsStore.paymentInfo.receipt_image"
@@ -159,33 +219,7 @@
               />
             </section>
 
-            <section v-if="isOngoing" class="session-action-card">
-              <h4>Quick actions</h4>
-              <div class="session-quick-grid">
-                <button class="session-quick-button session-quick-hot" @click="handleTutorCheckInPrompt">
-                  <i class="bi bi-geo-alt"></i>
-                  Confirm venue
-                </button>
-                <button class="session-quick-button" @click="handleLightAction(goToChat)">
-                  <i class="bi bi-chat-dots"></i>
-                  Message
-                </button>
-                <button class="session-quick-button" @click="handleTutorCheckInPrompt">
-                  <i class="bi bi-clock-history"></i>
-                  Mid check-in
-                </button>
-                <button
-                  class="session-quick-button"
-                  :disabled="!showDevReadyForPayment || isDevSubmitting"
-                  @click="handleMediumAction(handleDevReadyForPayment)"
-                >
-                  <i class="bi bi-stop-circle"></i>
-                  End
-                </button>
-              </div>
-            </section>
-
-            <section v-if="hasCheckInResponses" class="session-action-card">
+            <section v-if="hasCheckInResponses" class="session-action-card glass-segment">
               <h4>Session check-ins</h4>
 
               <div v-if="venueCheckIn" class="check-in-row">
@@ -201,11 +235,11 @@
               </div>
             </section>
 
-            <section class="session-action-card">
+            <section class="session-action-card glass-segment">
               <h4>Support</h4>
               <p>Something off with this session?</p>
               <button
-                class="session-action-button session-action-danger"
+                class="session-cta sb-btn btn-danger-soft"
                 @click="handleLightAction(() => openSupport('Booking', bookingDetailsStore.booking?.id))"
               >
                 <i class="bi bi-exclamation-circle"></i>
@@ -313,6 +347,7 @@ import { useSessionClock } from '@/composables/useSessionClock'
 import DevSessionQaPanel from '@/components/DevSessionQaPanel.vue'
 import SupportModal from '@/components/SupportModal.vue'
 import SessionCountdownBar from '@/components/session/SessionCountdownBar.vue'
+import SessionAurora from '@/components/session/SessionAurora.vue'
 import SessionHero from '@/components/session/SessionHero.vue'
 import SessionInfoGrid from '@/components/session/SessionInfoGrid.vue'
 import SessionTimeline from '@/components/session/SessionTimeline.vue'
@@ -464,9 +499,25 @@ const sessionInfoItems = computed(() => [
   { label: 'Date', value: formattedSessionDate.value },
   { label: 'Time', value: formattedTimeRange.value },
   { label: 'Mode', value: sessionModeLabel.value },
-  { label: 'Location', value: sessionLocationValue.value },
+  ...(isOnlineSession.value ? [] : [{ label: 'Location', value: sessionLocationValue.value }]),
   { label: 'Status', value: bookingDetailsStore.sessionInfo?.status },
 ])
+
+const midpointStatusTitle = computed(() => {
+  if (midpointCheckIn.value?.response === 'issues') {
+    return 'Tutee flagged an issue during the session'
+  }
+
+  return 'Tutee progress check received'
+})
+
+const midpointStatusCopy = computed(() => {
+  if (midpointCheckIn.value?.response === 'issues') {
+    return 'Open chat or support now so the problem can be resolved before the session ends.'
+  }
+
+  return 'The learner confirmed the session is going well.'
+})
 
 const actionTitle = computed(() => {
   if (isOngoing.value) return 'Happening now'
@@ -506,6 +557,17 @@ watch(isCompleted, (completed, wasCompleted) => {
     fireConfetti()
   }
 })
+
+watch(
+  () => detailOrbitPresentation.value?.zone,
+  (zone, previousZone) => {
+    if (!zone || !previousZone || zone <= previousZone || !showDetailOrbit.value || prefersReducedMotion()) {
+      return
+    }
+
+    vibrate(patterns.medium)
+  },
+)
 
 const formatCheckInResponse = (response) => {
   const labels = {
@@ -649,80 +711,132 @@ onBeforeUnmount(() => {
 .session-alive-stage {
   position: relative;
   z-index: 1;
-  padding: 0;
+  padding: 20px;
 }
 
 .session-alive-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(300px, 0.38fr);
-  gap: 0;
+  gap: 16px;
+  align-items: start;
 }
 
 .session-alive-column {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 0;
+  gap: 16px;
 }
 
-.session-alive-column:first-child {
-  background: color-mix(in srgb, var(--sb-card-bg) 66%, transparent);
-}
-
-.session-alive-column:last-child {
-  border-left: 1px solid var(--sb-card-border);
-  background: color-mix(in srgb, var(--sb-primary-light) 38%, var(--sb-card-bg));
+/* Hero + countdown fused into the page's single saturated anchor. */
+.session-anchor {
+  overflow: hidden;
+  border-radius: 24px;
+  box-shadow: 0 18px 44px rgba(6, 24, 20, 0.28);
 }
 
 .session-detail-pair {
   display: grid;
-  grid-template-columns: minmax(0, 0.86fr) minmax(0, 1fr);
-  gap: 0;
-  border-top: 1px solid var(--sb-card-border);
-}
-
-.session-detail-pair > :first-child {
-  border-right: 1px solid var(--sb-card-border);
-}
-
-.session-detail-pair-single {
-  grid-template-columns: 1fr;
-}
-
-.session-detail-pair-single > :first-child {
-  border-right: 0;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
 }
 
 .session-action-card {
-  border: 0;
-  border-bottom: 1px solid var(--sb-card-border);
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-  padding: 24px;
-}
-
-.session-action-card:hover {
-  background: color-mix(in srgb, var(--sb-card-bg) 38%, transparent);
-}
-
-.session-alive-column > .session-action-card:first-child {
   display: grid;
-  gap: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 22px;
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--sb-dark) 94%, transparent),
-    color-mix(in srgb, var(--sb-primary) 84%, var(--sb-dark))
-  );
-  color: #fff;
-  margin: 24px;
-  padding: 18px;
+  align-content: start;
+  gap: 0;
 }
 
-.session-alive-column > .session-action-card:last-child {
-  border-bottom: 0;
+.session-progress-card {
+  display: grid;
+  gap: 14px;
+}
+
+.session-progress-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.session-progress-head h4 {
+  margin: 0 0 6px;
+  color: var(--sb-text-main);
+  font-size: 1rem;
+  font-weight: 850;
+}
+
+.session-progress-head p {
+  margin: 0;
+  color: var(--sb-text-muted);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.session-progress-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--sb-card-bg) 72%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sb-card-border) 84%, transparent);
+  color: var(--sb-text-main);
+  font-size: 0.74rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.session-progress-button,
+.session-progress-status {
+  position: relative;
+  display: grid;
+  gap: 5px;
+  padding: 16px 18px;
+  border-radius: 20px;
+  border: 1px solid color-mix(in srgb, var(--sb-card-border) 82%, transparent);
+  background: color-mix(in srgb, var(--sb-card-bg) 82%, transparent);
+}
+
+.session-progress-button {
+  text-align: left;
+  cursor: pointer;
+}
+
+.session-progress-button:hover {
+  box-shadow: 0 16px 30px rgba(15, 23, 42, 0.08);
+}
+
+.session-progress-button::after,
+.session-progress-status::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0;
+  height: 3px;
+  border-radius: 999px;
+}
+
+.session-progress-button-good::after,
+.session-progress-status.is-good::after {
+  background: linear-gradient(90deg, var(--sb-primary), var(--sb-primary-mid));
+}
+
+.session-progress-status.is-issues::after {
+  background: linear-gradient(90deg, var(--sb-pop-yellow), var(--sb-pop-orange));
+}
+
+.session-progress-button strong,
+.session-progress-status strong {
+  color: var(--sb-text-dark);
+  font-size: 0.94rem;
+  font-weight: 850;
+}
+
+.session-progress-button span,
+.session-progress-status span {
+  color: var(--sb-text-muted);
+  font-size: 0.8rem;
+  line-height: 1.45;
 }
 
 .session-action-head {
@@ -745,19 +859,11 @@ onBeforeUnmount(() => {
   margin: 0;
 }
 
-.session-alive-column > .session-action-card:first-child h4 {
-  color: #fff;
-}
-
 .session-action-card p {
   margin: 0 0 11px;
   color: var(--sb-text-muted);
   font-size: 0.8rem;
   line-height: 1.5;
-}
-
-.session-alive-column > .session-action-card:first-child p {
-  color: rgba(255, 255, 255, 0.78);
 }
 
 .session-note {
@@ -786,89 +892,21 @@ onBeforeUnmount(() => {
   animation: session-live-beat 1.1s ease-in-out infinite;
 }
 
-.session-action-button,
-.session-quick-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
+/* Layout-only helper: the shared sb-btn tiers own the visuals. */
+.session-cta {
   width: 100%;
-  border: 0;
-  border-radius: 12px;
-  padding: 11px;
-  font: inherit;
-  font-size: 0.83rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: transform var(--sb-t-quick) var(--sb-spring);
+  font-size: 0.86rem;
 }
 
-.session-action-button + .session-action-button {
+.session-cta + .session-cta {
   margin-top: 9px;
 }
 
-.session-action-button:hover:not(:disabled),
-.session-quick-button:hover:not(:disabled) {
-  transform: translateY(-3px);
-}
-
-.session-action-button:focus-visible,
-.session-quick-button:focus-visible {
+.session-cta:focus-visible {
   outline: 0;
   box-shadow:
     0 0 0 4px color-mix(in srgb, var(--sb-primary) 18%, transparent),
     0 10px 24px var(--sb-shadow-soft);
-}
-
-.session-action-button:active:not(:disabled),
-.session-quick-button:active:not(:disabled) {
-  transform: scale(0.96) translateY(0);
-}
-
-.session-action-button:disabled,
-.session-quick-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.48;
-}
-
-.session-action-primary {
-  background: var(--sb-primary);
-  color: var(--sb-primary-contrast);
-  box-shadow: 0 8px 20px var(--sb-shadow-primary);
-}
-
-.session-action-primary:hover:not(:disabled) {
-  background: var(--sb-primary-hover);
-  box-shadow: 0 14px 30px var(--sb-shadow-primary);
-}
-
-.session-action-yellow {
-  background: var(--sb-pop-yellow);
-  color: var(--sb-dark);
-}
-
-.session-action-yellow:hover:not(:disabled) {
-  box-shadow: 0 14px 30px color-mix(in srgb, var(--sb-pop-yellow) 36%, transparent);
-}
-
-.session-action-danger {
-  border: 1px solid color-mix(in srgb, var(--sb-danger) 24%, var(--sb-card-border));
-  background: var(--sb-card-bg);
-  color: var(--sb-danger);
-}
-
-.session-action-danger:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--sb-danger) 8%, var(--sb-card-bg));
-  border-color: color-mix(in srgb, var(--sb-danger) 42%, var(--sb-card-border));
-}
-
-.session-action-ink {
-  background: var(--sb-dark);
-  color: var(--sb-primary-contrast);
-}
-
-.session-action-ink:hover:not(:disabled) {
-  box-shadow: 0 14px 30px color-mix(in srgb, var(--sb-dark) 28%, transparent);
 }
 
 .session-quick-grid {
@@ -878,14 +916,29 @@ onBeforeUnmount(() => {
 }
 
 .session-quick-button {
-  min-height: 78px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex-direction: column;
+  gap: 7px;
+  width: 100%;
+  min-height: 78px;
+  border-radius: 12px;
+  padding: 11px;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
   border: 1px solid var(--sb-card-border);
   background: color-mix(in srgb, var(--sb-card-bg) 72%, transparent);
   color: var(--sb-text-secondary);
-  font-size: 0.72rem;
   line-height: 1.1;
-  box-shadow: none;
+}
+
+.session-quick-button:focus-visible {
+  outline: 0;
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--sb-primary) 18%, transparent),
+    0 10px 24px var(--sb-shadow-soft);
 }
 
 .session-quick-button:hover:not(:disabled) {
@@ -902,11 +955,6 @@ onBeforeUnmount(() => {
 
 .session-quick-button:hover:not(:disabled) i {
   transform: scale(1.12);
-}
-
-.session-quick-hot {
-  border-color: color-mix(in srgb, var(--sb-primary) 32%, var(--sb-card-border));
-  background: linear-gradient(180deg, var(--sb-live-hero-start), var(--sb-card-bg));
 }
 
 .summary-row {
@@ -998,27 +1046,15 @@ onBeforeUnmount(() => {
   .session-alive-grid {
     grid-template-columns: 1fr;
   }
-
-  .session-alive-column:last-child {
-    border-top: 1px solid var(--sb-card-border);
-    border-left: 0;
-  }
-}
-
-@media (max-width: 760px) {
-  .session-detail-pair {
-    grid-template-columns: 1fr;
-  }
-
-  .session-detail-pair > :first-child {
-    border-right: 0;
-    border-bottom: 1px solid var(--sb-card-border);
-  }
 }
 
 @media (max-width: 575px) {
   .session-quick-grid {
     grid-template-columns: 1fr;
+  }
+
+  .session-alive-stage {
+    padding: 12px;
   }
 }
 
@@ -1028,16 +1064,10 @@ onBeforeUnmount(() => {
     animation: none;
   }
 
-  .session-action-card,
-  .session-action-button,
-  .session-quick-button,
   .session-quick-button i {
     transition: none;
   }
 
-  .session-action-card:hover,
-  .session-action-button:hover:not(:disabled),
-  .session-quick-button:hover:not(:disabled),
   .session-quick-button:hover:not(:disabled) i {
     transform: none;
   }

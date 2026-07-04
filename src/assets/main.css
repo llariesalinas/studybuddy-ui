@@ -1,6 +1,7 @@
 :root {
   --sb-dark: #0A1916;
   --sb-primary: #00895A; /* Your exact Figma Green */
+  --sb-green-anchor: var(--sb-primary); /* mode-invariant brand green: the session hero/countdown anchor stays saturated in both themes */
   --sb-primary-dark: #0A7A51;
   --sb-primary-mid: #18A36C;
   --sb-primary-hover: #00704A; /* Slightly darker for button hovers */
@@ -263,6 +264,79 @@ body:not(.sb-landing-route) :where(button.rounded-pill, a.rounded-pill, [role='b
   .sb-elevated:hover::after {
     opacity: 1;
   }
+}
+
+/* --- Shared profile-style surface & button tiers ---
+   Canonical copies of the profile pages' glass-segment / button vocabulary,
+   promoted here so the session detail pages share one source. */
+.glass-segment,
+.sb-glass-segment {
+  background: color-mix(in srgb, var(--sb-card-bg) 84%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sb-card-border) 82%, transparent);
+  border-radius: 24px;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.1);
+  padding: 1.5rem;
+}
+
+.btn-primary-action,
+.btn-soft,
+.btn-danger-soft,
+.sb-btn-primary,
+.sb-btn-on-brand,
+.sb-btn-soft,
+.sb-btn-danger-soft {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: 42px;
+  border: 0;
+  border-radius: 999px;
+  padding: 0.72rem 1rem;
+  font-weight: 850;
+}
+
+.btn-primary-action,
+.sb-btn-primary {
+  background: var(--sb-primary);
+  color: #fff;
+  box-shadow: 0 16px 32px rgba(0, 137, 90, 0.2);
+}
+
+.btn-primary-action:hover,
+.sb-btn-primary:hover {
+  background: var(--sb-primary-hover);
+  color: #fff;
+}
+
+/* For CTAs sitting on the saturated green hero, where a green button would vanish. */
+.sb-btn-on-brand {
+  background: #fff;
+  color: #07543a;
+}
+
+.btn-soft,
+.sb-btn-soft {
+  border: 1px solid color-mix(in srgb, var(--sb-card-border) 90%, transparent);
+  background: color-mix(in srgb, var(--sb-text-main) 8%, transparent);
+  color: var(--sb-text-main);
+}
+
+.btn-soft:hover,
+.sb-btn-soft:hover {
+  background: color-mix(in srgb, var(--sb-text-main) 14%, transparent);
+}
+
+.btn-danger-soft,
+.sb-btn-danger-soft {
+  border: 1px solid color-mix(in srgb, var(--sb-danger) 30%, transparent);
+  background: color-mix(in srgb, var(--sb-danger) 12%, transparent);
+  color: var(--sb-danger);
+}
+
+.btn-danger-soft:hover,
+.sb-btn-danger-soft:hover {
+  background: color-mix(in srgb, var(--sb-danger) 18%, transparent);
 }
 
 .sb-field {

@@ -181,7 +181,13 @@ const getTimerAndProgress = ({ state, startAt, endAt, now }) => {
   const elapsedMs = endAt ? Math.max(0, nowMs - endAt.getTime()) : ORBIT_HANDOFF_CAP_MS
 
   return {
-    timerText: `Ended ${formatDuration(elapsedMs)} ago`,
+    // The progress bar is capped at the handoff window (below); the elapsed
+    // text must be capped the same way, or a handoff that sits unresolved
+    // for days keeps counting up past the cap (e.g. "410:31:35 ago") while
+    // the bar it's paired with is already pinned at 100%.
+    timerText: elapsedMs >= ORBIT_HANDOFF_CAP_MS
+      ? `Ended over ${formatDuration(ORBIT_HANDOFF_CAP_MS)} ago`
+      : `Ended ${formatDuration(elapsedMs)} ago`,
     progress: clamp((elapsedMs / ORBIT_HANDOFF_CAP_MS) * 100, 0, 100),
   }
 }
@@ -318,9 +324,13 @@ export function useOrbitStrip(options = {}) {
   const sourceSession = computed(() => (
     hasExplicitSession ? unref(options.session) : queueItem.value
   ))
-  const sourceState = computed(() => (
-    Object.prototype.hasOwnProperty.call(options, 'state') ? unref(options.state) : queueState.value
-  ))
+  const sourceState = computed(() => {
+    if (Object.prototype.hasOwnProperty.call(options, 'state')) {
+      return unref(options.state)
+    }
+
+    return hasExplicitSession ? null : queueState.value
+  })
   const sourceNextSession = computed(() => (
     Object.prototype.hasOwnProperty.call(options, 'nextSession') ? unref(options.nextSession) : nextQueueItem.value
   ))
