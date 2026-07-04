@@ -6,17 +6,26 @@ from ..models import UserProfile
 from .cbf import get_student_subject_codes
 from .CF import build_rating_matrix, top_k
 from .hybrid import hybrid_prediction_breakdown, normalize_tutor_queryset
-from .utils import filter_tutors_by_institution
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_TUTEE_SEARCH_LIMIT = 20
+DEFAULT_TUTEE_SEARCH_LIMIT = 500
 
 
-def search_tutees(query, limit=DEFAULT_TUTEE_SEARCH_LIMIT):
+def search_tutees(query, institution_id=None, limit=DEFAULT_TUTEE_SEARCH_LIMIT):
     """Real Tutee profiles for the demo tool's searchable picker, with their
-    registered subject preferences so the presenter can see who has data to show."""
+    registered subject preferences so the presenter can see who has data to show.
+    limit defaults high (not the old 20) because the frontend now fetches the
+    full roster once for a client-side searchable dropdown, rather than
+    re-querying per keystroke — see SuperAdminAlgorithmDemo.vue. Unscoped by
+    institution unless institution_id is given — see
+    build_algorithm_demo_recommendation for why the demo tool is unscoped by
+    default, and _candidate_tutors for the matching optional institution_id
+    filter on the tutor side."""
     tutees = UserProfile.objects.filter(role="Tutee")
+
+    if institution_id:
+        tutees = tutees.filter(institution_id=institution_id)
 
     for word in query.split():
         tutees = tutees.filter(Q(fname__icontains=word) | Q(lname__icontains=word))
@@ -33,11 +42,21 @@ def search_tutees(query, limit=DEFAULT_TUTEE_SEARCH_LIMIT):
     ]
 
 
-def _candidate_tutors(tutee, subject_codes):
-    candidate_qs = normalize_tutor_queryset().filter(
+def _candidate_tutors(subject_codes, institution_id=None):
+    """Unlike production matching (get_recommendation_candidate_tutors /
+    get_dashboard_recommendations), not institution-scoped by default — this is
+    a staff-only testing tool over seeded data, and a SuperAdmin needs to pair
+    any tutee with any subject-matching tutor regardless of institution. Pass
+    institution_id to scope the candidate pool down to one institution instead
+    (e.g. to demo matching within a single school)."""
+    candidates = normalize_tutor_queryset().filter(
         tutorsubjects__subject__subject_code__in=subject_codes
     ).distinct()
-    return filter_tutors_by_institution(candidate_qs, tutee)
+
+    if institution_id:
+        candidates = candidates.filter(profile__institution_id=institution_id)
+
+    return candidates
 
 
 def _neighbor_name_map(neighbor_ids):
@@ -45,18 +64,19 @@ def _neighbor_name_map(neighbor_ids):
     return {profile.id: f"{profile.fname} {profile.lname}" for profile in profiles}
 
 
-def build_algorithm_demo_recommendation(tutee):
+def build_algorithm_demo_recommendation(tutee, institution_id=None):
     """Runs the real hybrid recommender for a Tutee and returns every candidate
     Tutor's full Hybrid Score breakdown (CBF sub-scores, CF score + contributing
     Top-K Neighbors, Cold-Start flag) for the live panel demo tool. Mirrors
-    get_dashboard_recommendations' candidate pool (subject preference match +
-    institution filter) but returns the breakdown instead of a serialized list."""
+    get_dashboard_recommendations' subject-preference-match candidate pool, but
+    is unscoped by institution unless institution_id is given (see
+    _candidate_tutors)."""
     subject_codes = get_student_subject_codes(tutee)
 
     if not subject_codes:
         return {"reason": "no_preferences", "rows": []}
 
-    candidate_tutors = list(_candidate_tutors(tutee, subject_codes))
+    candidate_tutors = list(_candidate_tutors(subject_codes, institution_id))
     if not candidate_tutors:
         return {"reason": "no_candidates", "rows": []}
 

@@ -394,7 +394,8 @@ def algorithm_demo_search_tutees(request):
         return Response({"error": "Algorithm demo tools are disabled."}, status=403)
 
     query = request.query_params.get('q', '').strip()
-    return Response({"tutees": search_tutees(query)})
+    institution_id = request.query_params.get('institution_id') or None
+    return Response({"tutees": search_tutees(query, institution_id=institution_id)})
 
 
 @api_view(['GET'])
@@ -408,7 +409,8 @@ def algorithm_demo_recommend(request):
         return Response({"error": "tutee_id is required."}, status=400)
 
     tutee = get_object_or_404(UserProfile, id=tutee_id, role="Tutee")
-    result = build_algorithm_demo_recommendation(tutee)
+    institution_id = request.query_params.get('institution_id') or None
+    result = build_algorithm_demo_recommendation(tutee, institution_id=institution_id)
     return Response(result)
 
 

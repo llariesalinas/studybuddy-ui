@@ -4639,6 +4639,83 @@ class AlgorithmDemoToolTests(APITestCase):
         self.assertEqual(row["rating_average"], 0)
         self.assertEqual(row["total_sessions"], 0)
 
+    def test_recommend_includes_subject_matching_tutor_from_other_institution(self):
+        other_institution = PartnerInstitution.objects.create(
+            institution_name="Other University", school_email_domain="other.edu", is_active=True,
+        )
+        other_tutor_user = User.objects.create_user(
+            username="algo-tutor-other@other.edu", email="algo-tutor-other@other.edu",
+            password="password",
+        )
+        other_tutor_profile = UserProfile.objects.create(
+            user=other_tutor_user, fname="Dana", mname="", lname="Cross", role="Tutor",
+            year_level=12, institution=other_institution,
+        )
+        other_tutor = Tutor.objects.create(
+            profile=other_tutor_profile, hourly_rate=150, can_online=True, can_f2f=False,
+            teaching_level="College",
+        )
+        TutorSubjects.objects.create(tutor=other_tutor, subject=self.subject, expertise_level=3)
+
+        self.client.force_authenticate(user=self.super_user)
+        response = self.client.get(f"/api/dev/algorithm-demo/recommend/?tutee_id={self.tutee.id}")
+        self.assertEqual(response.status_code, 200)
+
+        tutor_ids = {row["tutor_id"] for row in response.data["rows"]}
+        self.assertIn(other_tutor.profile_id, tutor_ids)
+
+    def test_recommend_institution_id_filter_excludes_other_institution_tutor(self):
+        other_institution = PartnerInstitution.objects.create(
+            institution_name="Other University", school_email_domain="other.edu", is_active=True,
+        )
+        other_tutor_user = User.objects.create_user(
+            username="algo-tutor-scoped@other.edu", email="algo-tutor-scoped@other.edu",
+            password="password",
+        )
+        other_tutor_profile = UserProfile.objects.create(
+            user=other_tutor_user, fname="Ivy", mname="", lname="Scoped", role="Tutor",
+            year_level=12, institution=other_institution,
+        )
+        other_tutor = Tutor.objects.create(
+            profile=other_tutor_profile, hourly_rate=150, can_online=True, can_f2f=False,
+            teaching_level="College",
+        )
+        TutorSubjects.objects.create(tutor=other_tutor, subject=self.subject, expertise_level=3)
+
+        self.client.force_authenticate(user=self.super_user)
+        response = self.client.get(
+            f"/api/dev/algorithm-demo/recommend/?tutee_id={self.tutee.id}"
+            f"&institution_id={self.institution.id}"
+        )
+        self.assertEqual(response.status_code, 200)
+
+        tutor_ids = {row["tutor_id"] for row in response.data["rows"]}
+        self.assertIn(self.tutor.profile_id, tutor_ids)
+        self.assertNotIn(other_tutor.profile_id, tutor_ids)
+
+    def test_tutee_search_institution_id_filter_excludes_other_institution_tutee(self):
+        other_institution = PartnerInstitution.objects.create(
+            institution_name="Third University", school_email_domain="third.edu", is_active=True,
+        )
+        other_tutee_user = User.objects.create_user(
+            username="algo-tutee-scoped@third.edu", email="algo-tutee-scoped@third.edu",
+            password="password",
+        )
+        other_tutee = UserProfile.objects.create(
+            user=other_tutee_user, fname="Maria", mname="", lname="Scoped", role="Tutee",
+            year_level=11, institution=other_institution,
+        )
+
+        self.client.force_authenticate(user=self.super_user)
+        response = self.client.get(
+            f"/api/dev/algorithm-demo/tutees/?q=Maria&institution_id={self.institution.id}"
+        )
+        self.assertEqual(response.status_code, 200)
+
+        ids = {row["id"] for row in response.data["tutees"]}
+        self.assertIn(self.tutee.id, ids)
+        self.assertNotIn(other_tutee.id, ids)
+
 
 class SessionCheckInTests(APITestCase):
     def setUp(self):
