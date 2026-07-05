@@ -64,6 +64,21 @@ else:
     CORS_ALLOWED_ORIGINS = [
         o.strip() for o in os.getenv('CORS_ALLOWED_ORIGINS', '').split(',') if o.strip()
     ]
+    # Explicit defaults plus x-demo-auth, which carries the demo Basic Auth
+    # credential (see demo_basic_auth.py) and isn't in django-cors-headers'
+    # built-in default list.
+    CORS_ALLOW_HEADERS = [
+        "accept",
+        "accept-encoding",
+        "authorization",
+        "content-type",
+        "dnt",
+        "origin",
+        "user-agent",
+        "x-csrftoken",
+        "x-requested-with",
+        "x-demo-auth",
+    ]
     CSRF_TRUSTED_ORIGINS = [
         o.strip() for o in os.getenv('CSRF_TRUSTED_ORIGINS', '').split(',') if o.strip()
     ]

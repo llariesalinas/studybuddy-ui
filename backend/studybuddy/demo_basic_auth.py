@@ -11,13 +11,16 @@ class DemoBasicAuthMiddleware:
     are set (see settings.py), so this has no effect on local dev or real
     production. See ADR-0005 for why Basic Auth was chosen over Vercel's paid
     Password Protection add-on.
+
+    Credentials travel on X-Demo-Auth, not Authorization -- the app's own JWT
+    Bearer tokens already own that header, and the two can't share it.
     """
 
     def __init__(self, get_response):
         self.get_response = get_response
 
     def __call__(self, request):
-        # Browsers never attach Authorization to CORS preflight requests, so let
+        # Browsers never attach custom headers to CORS preflight requests, so let
         # OPTIONS through unauthenticated -- CorsMiddleware (which runs after this
         # one) handles the preflight response. The actual request that follows
         # still goes through the check below.
@@ -29,7 +32,7 @@ class DemoBasicAuthMiddleware:
         if request.path == '/healthz':
             return self.get_response(request)
 
-        header = request.META.get('HTTP_AUTHORIZATION', '')
+        header = request.META.get('HTTP_X_DEMO_AUTH', '')
         if header.startswith('Basic '):
             try:
                 decoded = base64.b64decode(header[6:]).decode('utf-8')
