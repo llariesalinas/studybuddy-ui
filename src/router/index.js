@@ -179,6 +179,12 @@ const router = createRouter({
       meta: { requiresAuth: true, role: 'Admin' }
     },
     {
+      path: '/admin/course-catalog',
+      name: 'admin-course-catalog',
+      component: () => import('@/views/AdminCourseCatalog.vue'),
+      meta: { requiresAuth: true, role: ['Admin', 'SuperAdmin'] }
+    },
+    {
       path: '/admin/tutor-applications',
       name: 'admin-tutor-applications',
       component: () => import('@/views/AdminTutorApplications.vue'),

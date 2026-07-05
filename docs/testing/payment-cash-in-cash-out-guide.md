@@ -31,6 +31,9 @@ This covers the tutor wallet flow at `/tch-wallet`:
    CASHOUT_MIN_PHP=500
    ```
 
+   Production startup now expects the callback secret to be present. Keep
+   `PAYMONGO_CASHOUT_MOCK=true` limited to local `DEBUG` runs only.
+
 2. Use a tutor account. The wallet endpoints return `403 Not a tutor` for non-tutor users.
 
 3. For local manual testing, run the frontend at `http://localhost:5173` and open `/tch-wallet`.

@@ -25,6 +25,7 @@ from .models import (
     Booking,
     Course,
     EmailOTPChallenge,
+    InstitutionCourseCatalog,
     InstitutionRequest,
     PartnerInstitution,
     Payment,
@@ -300,6 +301,184 @@ class SuperAdminRedesignApiTests(APITestCase):
         self.assertEqual(export_response.status_code, 200)
         self.assertEqual(export_response["Content-Type"], "text/csv")
         self.assertIn("date,institution,tutors,tutees,sessions,completion_rate,gross_revenue,commissions", export_response.content.decode())
+
+
+class InstitutionCourseCatalogTests(APITestCase):
+    def setUp(self):
+        self.cpu = PartnerInstitution.objects.create(
+            institution_name="Central Philippine University",
+            school_email_domain="cpu.edu.ph",
+            is_active=True,
+        )
+        self.north = PartnerInstitution.objects.create(
+            institution_name="North University",
+            school_email_domain="north.edu.ph",
+            is_active=True,
+        )
+        self.course = Course.objects.create(course_code="BSCS", course_name="Computer Science")
+        self.global_subject = Subjects.objects.create(
+            subject_code="CS101",
+            subject_name="Introduction to Computing",
+            department="Computer Science",
+            category="BSCS",
+        )
+        self.cpu_private_subject = Subjects.objects.create(
+            subject_code="CPU-AI",
+            subject_name="CPU Applied AI",
+            department="Computer Science",
+            category="BSCS",
+            owning_institution=self.cpu,
+        )
+        self.north_private_subject = Subjects.objects.create(
+            subject_code="NORTH-UX",
+            subject_name="North UX Lab",
+            department="Design",
+            category="BSCS",
+            owning_institution=self.north,
+        )
+
+        self.cpu_admin_user = User.objects.create_user(
+            username="cpu-admin",
+            email="admin@cpu.edu.ph",
+            password="password",
+        )
+        self.cpu_admin = UserProfile.objects.create(
+            user=self.cpu_admin_user,
+            fname="CPU",
+            mname="",
+            lname="Admin",
+            role="Admin",
+            institution=self.cpu,
+            profile_completed=True,
+        )
+        self.north_admin_user = User.objects.create_user(
+            username="north-admin",
+            email="admin@north.edu.ph",
+            password="password",
+        )
+        UserProfile.objects.create(
+            user=self.north_admin_user,
+            fname="North",
+            mname="",
+            lname="Admin",
+            role="Admin",
+            institution=self.north,
+            profile_completed=True,
+        )
+        self.super_user = User.objects.create_user(
+            username="super",
+            email="super@studybuddy.test",
+            password="password",
+        )
+        UserProfile.objects.create(
+            user=self.super_user,
+            fname="Super",
+            mname="",
+            lname="Admin",
+            role="SuperAdmin",
+            profile_completed=True,
+            is_domain_exempt=True,
+        )
+
+    def subject_codes(self, response):
+        return {item["subject_code"] for item in response.data}
+
+    def test_subject_list_shows_only_global_and_own_private_subjects(self):
+        self.client.force_authenticate(user=self.cpu_admin_user)
+
+        response = self.client.get("/api/subjects/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("CS101", self.subject_codes(response))
+        self.assertIn("CPU-AI", self.subject_codes(response))
+        self.assertNotIn("NORTH-UX", self.subject_codes(response))
+
+    def test_admin_can_create_custom_subject_for_own_institution(self):
+        self.client.force_authenticate(user=self.cpu_admin_user)
+
+        response = self.client.post(
+            "/api/admin/subjects/custom/",
+            {
+                "subject_code": "cpu-data",
+                "subject_name": "CPU Data Studio",
+                "department": "Computer Science",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        subject = Subjects.objects.get(subject_code="CPU-DATA")
+        self.assertEqual(subject.owning_institution, self.cpu)
+        self.assertEqual(response.data["owning_institution"], self.cpu.id)
+
+    def test_admin_can_add_and_remove_own_catalog_entry(self):
+        self.client.force_authenticate(user=self.cpu_admin_user)
+
+        create_response = self.client.post(
+            "/api/admin/course-catalog/",
+            {
+                "course": self.course.course_code,
+                "subject": self.cpu_private_subject.subject_code,
+            },
+            format="json",
+        )
+
+        self.assertEqual(create_response.status_code, 201)
+        self.assertEqual(InstitutionCourseCatalog.objects.count(), 1)
+        entry_id = create_response.data["id"]
+
+        list_response = self.client.get("/api/admin/course-catalog/", {"course": "BSCS"})
+        self.assertEqual(list_response.status_code, 200)
+        self.assertEqual(len(list_response.data), 1)
+        self.assertEqual(list_response.data[0]["subject_code"], "CPU-AI")
+
+        delete_response = self.client.delete(f"/api/admin/course-catalog/{entry_id}/")
+        self.assertEqual(delete_response.status_code, 204)
+        self.assertFalse(InstitutionCourseCatalog.objects.exists())
+
+    def test_admin_cannot_curate_another_institutions_private_subject(self):
+        self.client.force_authenticate(user=self.cpu_admin_user)
+
+        response = self.client.post(
+            "/api/admin/course-catalog/",
+            {
+                "course": self.course.course_code,
+                "subject": self.north_private_subject.subject_code,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(InstitutionCourseCatalog.objects.exists())
+
+    def test_admin_cannot_delete_another_institutions_entry(self):
+        entry = InstitutionCourseCatalog.objects.create(
+            institution=self.north,
+            course=self.course,
+            subject=self.global_subject,
+        )
+        self.client.force_authenticate(user=self.cpu_admin_user)
+
+        response = self.client.delete(f"/api/admin/course-catalog/{entry.id}/")
+
+        self.assertEqual(response.status_code, 404)
+        self.assertTrue(InstitutionCourseCatalog.objects.filter(pk=entry.id).exists())
+
+    def test_superadmin_can_target_institution(self):
+        self.client.force_authenticate(user=self.super_user)
+
+        response = self.client.post(
+            "/api/admin/course-catalog/",
+            {
+                "institution_id": self.north.id,
+                "course": self.course.course_code,
+                "subject": self.global_subject.subject_code,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["institution"], self.north.id)
 
 
 class RecommendTutorsViewTests(APITestCase):
@@ -1396,6 +1575,25 @@ class OnlinePaymentInitiationTests(APITestCase):
         self.assertEqual(response.data["error"], "Payment provider did not return a checkout URL.")
         self.assertFalse(Payment.objects.filter(booking=self.booking).exists())
 
+    @patch("studybuddy.views.requests.post")
+    def test_initiate_online_payment_returns_502_on_network_error(self, mock_post):
+        import requests
+
+        mock_post.side_effect = requests.RequestException("connection reset")
+
+        response = self.client.post(
+            "/api/payments/initiate/",
+            {"booking_id": self.booking.id},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 502)
+        self.assertEqual(
+            response.data["error"],
+            "Could not reach the payment provider. Please try again.",
+        )
+        self.assertFalse(Payment.objects.filter(booking=self.booking).exists())
+
     @patch("studybuddy.views.requests.get")
     def test_verify_online_payment_marks_paymongo_payment_paid(self, mock_get):
         payment = self.create_pending_paymongo_payment()
@@ -1412,6 +1610,23 @@ class OnlinePaymentInitiationTests(APITestCase):
         self.assertIsNotNone(payment.paid_at)
         self.assertEqual(self.booking.status, "Awaiting Payment Verification")
         self.assertTrue(self.booking.tutee_confirmed)
+
+    @patch("studybuddy.views.requests.get")
+    def test_verify_online_payment_returns_502_on_network_error(self, mock_get):
+        import requests
+
+        payment = self.create_pending_paymongo_payment()
+        mock_get.side_effect = requests.RequestException("gateway timeout")
+
+        response = self.client.post(f"/api/bookings/{self.booking.id}/verify-online-payment/")
+
+        payment.refresh_from_db()
+        self.assertEqual(response.status_code, 502)
+        self.assertEqual(
+            response.data["error"],
+            "Could not reach the payment provider. Please try again.",
+        )
+        self.assertEqual(payment.payment_status, "Pending")
 
     @patch("studybuddy.views.requests.get")
     def test_verify_online_payment_updates_all_booking_request_slots(self, mock_get):
@@ -1697,6 +1912,12 @@ class TutorCashOutTests(APITestCase):
         fields.update(overrides)
         return fields
 
+    def paymongo_response(self, status_code, payload):
+        response = Mock()
+        response.status_code = status_code
+        response.json.return_value = payload
+        return response
+
     def provider_result(self, status_value="pending", transaction_id="wt_test_123"):
         return {
             "id": transaction_id,
@@ -1772,6 +1993,43 @@ class TutorCashOutTests(APITestCase):
                 transaction_type="cashout_fee",
                 amount=Decimal("-10.00"),
             ).exists()
+        )
+
+    @patch("studybuddy.paymongo_money_movement.requests.post")
+    def test_cashout_sends_centavos_and_normalizes_provider_amounts(self, mock_post):
+        destination = self.destination_fields()
+        mock_post.return_value = self.paymongo_response(
+            201,
+            {
+                "data": {
+                    "id": "wt_test_live_123",
+                    "attributes": {
+                        "status": "pending",
+                        "provider": "paymongo",
+                        "reference_number": "PMO-LIVE-123",
+                        "fee": 1250,
+                        "net_amount": 48750,
+                    },
+                }
+            },
+        )
+
+        response = self.client.post(
+            "/api/wallet/cash-outs/",
+            {"amount": "500.00", **destination},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["provider_fee"], 12.5)
+        self.assertEqual(response.data["net_amount"], 487.5)
+        self.assertEqual(
+            mock_post.call_args.kwargs["json"]["data"]["attributes"]["amount"],
+            50000,
+        )
+        self.assertIn(
+            "/api/wallet/paymongo/callback/",
+            mock_post.call_args.kwargs["json"]["data"]["attributes"]["callback_url"],
         )
 
     @patch("studybuddy.views.create_wallet_transaction")

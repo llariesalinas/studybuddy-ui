@@ -251,7 +251,7 @@
 
 <script setup>
 
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/services/api/api'
 import { useCatalogStore } from '@/stores/catalog'
@@ -386,14 +386,32 @@ const card3Label = computed(() => {
   return ''
 })
 
+const recognizedCourseCode = computed(() => {
+  if (educationLevel.value === 'elementary') return 'ELEMENTARY'
+  if (educationLevel.value === 'jhs') return 'JUNIOR_HIGH'
+  if (educationLevel.value === 'shs') return selectedStrand.value || ''
+  if (educationLevel.value === 'college') return selectedCourse.value || ''
+  return ''
+})
+
+const loadSubjectsForSelection = async () => {
+  if (!recognizedCourseCode.value) {
+    subjects.value = []
+    return
+  }
+
+  subjects.value = await catalogStore.fetchSubjects({
+    force: true,
+    params: {
+      recognized_only: 1,
+      course_code: recognizedCourseCode.value,
+    },
+  })
+}
+
 onMounted(async () => {
   try {
-    const [subjectData, courseData] = await Promise.all([
-      catalogStore.fetchSubjects(),
-      catalogStore.fetchCourses(),
-    ])
-    subjects.value = subjectData
-    courses.value = courseData
+    courses.value = await catalogStore.fetchCourses()
   } catch (error) {
     console.error('Failed to load onboarding data:', error)
   }
@@ -452,6 +470,12 @@ const finish = async () => {
     isSubmitting.value = false
   }
 }
+
+watch(recognizedCourseCode, () => {
+  loadSubjectsForSelection().catch((error) => {
+    console.error('Failed to load recognized subjects:', error)
+  })
+})
 
 </script>
 

@@ -3,6 +3,7 @@ from datetime import timedelta
 
 from django.db import models
 from django.db.models import Q
+from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.contrib.auth.models import User
 from django.db.models.signals import post_save
@@ -671,9 +672,54 @@ class Subjects(models.Model):
     subject_name = models.CharField(max_length=100)
     department = models.CharField(max_length=100)
     category = models.CharField(max_length=100, null=True, blank=True)
+    owning_institution = models.ForeignKey(
+        PartnerInstitution,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='custom_subjects',
+    )
 
     def __str__(self):
         return f"{self.subject_code} - {self.subject_name}"
+
+
+class InstitutionCourseCatalog(models.Model):
+    institution = models.ForeignKey(
+        PartnerInstitution,
+        on_delete=models.CASCADE,
+        related_name='catalog_entries',
+    )
+    course = models.ForeignKey(
+        Course,
+        on_delete=models.CASCADE,
+        related_name='institution_catalog_entries',
+    )
+    subject = models.ForeignKey(
+        Subjects,
+        on_delete=models.CASCADE,
+        related_name='institution_catalog_entries',
+    )
+    added_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('institution', 'course', 'subject')
+        ordering = ['course__course_code', 'subject__subject_code']
+
+    def clean(self):
+        if (
+            self.subject_id
+            and self.institution_id
+            and self.subject.owning_institution_id
+            and self.subject.owning_institution_id != self.institution_id
+        ):
+            raise ValidationError(
+                "A private subject can only be curated into its owning institution's catalog."
+            )
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
 
 #Tutor Subjects Table
 

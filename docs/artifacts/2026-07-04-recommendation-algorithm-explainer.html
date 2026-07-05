@@ -333,6 +333,13 @@
     </table>
     <div class="formula-box" style="font-size:13px;">score = 0.35·s_subject + 0.20·s_expertise + 0.20·s_course + 0.15·s_year + 0.10·s_level</div>
 
+    <h3>Catalog-awareness: how <code>get_student_subject_codes</code> filters preferences</h3>
+    <p>Before matching, the CBF calls <code>recognized_subject_codes_for_profile(student_profile)</code> (<span class="pill file">subject_recognition.py</span>) to get the set of subjects the institution has recognized for the student's course via <code>InstitutionCourseCatalog</code>. Only preference subjects that appear in that recognized set are passed into the scoring loop.</p>
+    <div class="callout">
+      This means the Institution Course Catalog directly controls CBF matching. Adding a subject to a course's catalog makes it immediately scoreable; removing one silently drops it from the student's effective subject list — even if it is still saved in their <code>Preference</code> record.
+      Subjects a user <em>already</em> has in their profile remain visible in preference-editing UI (via <code>include_current=True</code>) so they can remove them, but they contribute <strong>zero</strong> to their CBF score once derecognized.
+    </div>
+
     <h3>Fields it reads</h3>
     <div>
       <span class="field-tag">UserProfile.course</span>
@@ -342,6 +349,7 @@
       <span class="field-tag">TutorSubjects.subject_code</span>
       <span class="field-tag">TutorSubjects.expertise_level</span>
       <span class="field-tag">Course.strand</span>
+      <span class="field-tag">InstitutionCourseCatalog (via recognized_subject_codes_for_profile)</span>
     </div>
   </div>
 
@@ -398,6 +406,8 @@
       <tr><td>Tutor doesn't show for one specific date/time</td><td>No <em>active</em> <code>TutorAvailability</code> row for that weekday+slot, or an existing booking/override blocks it (Gate 4)</td></tr>
       <tr><td>Tutor ranks lower than expected</td><td>Low CBF sub-scores (different course/strand, big year gap) or no CF signal (no shared-rating neighbors)</td></tr>
       <tr><td>Availability day filter looks "empty" when it isn't</td><td><code>TutorAvailability.day</code> stores 3-letter abbreviations (<code>"Thu"</code>), not full names (<code>"Thursday"</code>) — easy to query wrong</td></tr>
+      <tr><td>Subject is in tutee's preferences but doesn't contribute to matching</td><td>Subject was removed from the institution's <code>InstitutionCourseCatalog</code> for that course — <code>get_student_subject_codes</code> filters preferences through <code>recognized_subject_codes_for_profile</code>, so derecognized subjects score 0 even if still saved in <code>Preference</code></td></tr>
+      <tr><td>Tutee sees no subjects in PreferenceSetup or FindTutors</td><td>Institution's course catalog has no entries for the tutee's course — add subjects via the Admin Course Catalog screen; there is no fallback to global subjects</td></tr>
     </table>
   </div>
 

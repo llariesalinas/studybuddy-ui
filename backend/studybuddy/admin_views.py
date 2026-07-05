@@ -7,7 +7,8 @@ from rest_framework.response import Response
 from rest_framework import status, permissions
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
-from django.db import transaction
+from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
 from django.db.models import Avg, Count, Q, Sum
 from django.utils import timezone
 from django.utils.timesince import timesince
@@ -18,13 +19,15 @@ from .models import (
     PartnerInstitution, Wallet, Transaction, PlatformActivity,
     TutorApplication, TutorDocumentRenewalReview,
     TuteeApplication, TuteeDocumentRenewalReview, Payment,
+    InstitutionCourseCatalog,
     TutorSubjects, Subjects, SupportTicket
 )
 from .serializers import (
     AdminAccountRequestSerializer, InstitutionRequestSerializer,
     AdminWithdrawalSerializer, AdminUserSerializer,
+    InstitutionCourseCatalogSerializer,
     PartnerInstitutionSerializer, PlatformActivitySerializer,
-    TutorApplicationSerializer, TutorDocumentRenewalReviewSerializer,
+    SubjectSerializer, TutorApplicationSerializer, TutorDocumentRenewalReviewSerializer,
     TuteeApplicationSerializer, TuteeDocumentRenewalReviewSerializer
 )
 from django.conf import settings
@@ -69,6 +72,20 @@ class BaseAdminView(APIView):
             kwarg = "institution"
 
         return queryset.filter(**{kwarg: profile.institution})
+
+    def get_target_institution(self, request, required_for_superadmin=False):
+        profile = request.user.userprofile
+        if profile.role != 'SuperAdmin':
+            if not profile.institution_id:
+                return None
+            return profile.institution
+
+        institution_id = request.query_params.get('institution_id') or request.data.get('institution_id')
+        if not institution_id:
+            if required_for_superadmin:
+                return None
+            return None
+        return get_object_or_404(PartnerInstitution, pk=institution_id)
 
 class AdminStatsView(BaseAdminView):
     permission_classes = [permissions.IsAuthenticated, IsAdminUser]
@@ -597,6 +614,143 @@ class AdminInstitutionView(APIView):
 
         serializer = PartnerInstitutionSerializer(institution)
         return Response(serializer.data)
+
+
+class AdminCourseCatalogView(BaseAdminView):
+    permission_classes = [permissions.IsAuthenticated, IsAdminUser]
+
+    def get(self, request):
+        profile = request.user.userprofile
+        entries = InstitutionCourseCatalog.objects.select_related(
+            'institution',
+            'course',
+            'subject',
+        )
+
+        if profile.role == 'SuperAdmin':
+            institution = self.get_target_institution(request)
+            if institution:
+                entries = entries.filter(institution=institution)
+        else:
+            if not profile.institution_id:
+                return Response({'error': 'Admin account must belong to an institution.'}, status=400)
+            entries = entries.filter(institution=profile.institution)
+
+        course_code = request.query_params.get('course')
+        if course_code:
+            entries = entries.filter(course_id=course_code)
+
+        serializer = InstitutionCourseCatalogSerializer(entries, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        profile = request.user.userprofile
+        institution = self.get_target_institution(request, required_for_superadmin=True)
+        if not institution:
+            message = (
+                'SuperAdmin must pass institution_id.'
+                if profile.role == 'SuperAdmin'
+                else 'Admin account must belong to an institution.'
+            )
+            return Response({'error': message}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = InstitutionCourseCatalogSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        subject = serializer.validated_data['subject']
+        if subject.owning_institution_id and subject.owning_institution_id != institution.id:
+            return Response(
+                {'subject': "A private subject can only be curated by its owning institution."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            entry = serializer.save(institution=institution)
+        except ValidationError as exc:
+            return Response({'error': exc.messages}, status=status.HTTP_400_BAD_REQUEST)
+        except IntegrityError:
+            return Response(
+                {'error': 'This subject is already in that course catalog.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        subject = entry.subject
+        if not subject.category:
+            subject.category = entry.course_id
+            subject.save(update_fields=['category'])
+
+        PlatformActivity.objects.create(
+            activity_type='admin_action',
+            message=f"Course catalog updated for {institution.institution_name}",
+            institution=institution,
+        )
+        return Response(InstitutionCourseCatalogSerializer(entry).data, status=status.HTTP_201_CREATED)
+
+    def delete(self, request, pk=None):
+        profile = request.user.userprofile
+        entries = InstitutionCourseCatalog.objects.all()
+        if profile.role != 'SuperAdmin':
+            if not profile.institution_id:
+                return Response({'error': 'Admin account must belong to an institution.'}, status=400)
+            entries = entries.filter(institution=profile.institution)
+
+        entry = get_object_or_404(entries, pk=pk)
+        institution = entry.institution
+        entry.delete()
+        PlatformActivity.objects.create(
+            activity_type='admin_action',
+            message=f"Course catalog entry removed for {institution.institution_name}",
+            institution=institution,
+        )
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class AdminCustomSubjectView(BaseAdminView):
+    permission_classes = [permissions.IsAuthenticated, IsAdminUser]
+
+    def post(self, request):
+        profile = request.user.userprofile
+        institution = self.get_target_institution(request, required_for_superadmin=True)
+        if not institution:
+            message = (
+                'SuperAdmin must pass institution_id.'
+                if profile.role == 'SuperAdmin'
+                else 'Admin account must belong to an institution.'
+            )
+            return Response({'error': message}, status=status.HTTP_400_BAD_REQUEST)
+
+        subject_code = str(request.data.get('subject_code', '')).strip().upper()
+        subject_name = str(request.data.get('subject_name', '')).strip()
+        department = str(request.data.get('department', '')).strip()
+
+        if not subject_code or not subject_name or not department:
+            return Response(
+                {'error': 'subject_code, subject_name, and department are required.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        subject, created = Subjects.objects.get_or_create(
+            subject_code=subject_code,
+            defaults={
+                'subject_name': subject_name,
+                'department': department,
+                'category': request.data.get('category') or '',
+                'owning_institution': institution,
+            },
+        )
+        if not created:
+            return Response(
+                {'subject_code': 'A subject with this code already exists.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        PlatformActivity.objects.create(
+            activity_type='admin_action',
+            message=f"Custom subject added: {subject.subject_code}",
+            institution=institution,
+        )
+        return Response(SubjectSerializer(subject).data, status=status.HTTP_201_CREATED)
 
 
 class AdminPendingActionsView(APIView):

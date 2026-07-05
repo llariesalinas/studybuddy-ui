@@ -167,7 +167,8 @@ Cold-Start; the defining trait is absence of Rating rows, not account age)
 **Institution Course Catalog**:
 The list of course-subject pairings that a specific Partner Institution offers or recognizes inside
 Studybuddy. It is institution-scoped: one institution admin curates only their own institution's
-catalog, and their changes must not alter another institution's catalog.
+catalog, and their changes must not alter another institution's catalog. The Course and Subject in
+each pairing are chosen independently, not derived from the Subject's default category.
 _Avoid_: global subject list, shared institution catalog
 
 **Institution Catalog Entry**:
@@ -175,3 +176,9 @@ A single institution-scoped relationship that says one Subject belongs under one
 Partner Institution. This is a curation record, not a new global Subject definition.
 _Avoid_: subject creation (unless we truly mean adding a brand-new master Subject for every
 institution)
+
+**Custom Subject**:
+A Subject owned by one Partner Institution and visible only to users and admins acting within that
+institution. Custom Subjects can be curated into the owning institution's Institution Course
+Catalog, but cannot be curated by other institutions.
+_Avoid_: global subject, shared subject

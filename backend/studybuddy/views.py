@@ -61,6 +61,13 @@ from .recommender.dashboard import (
 )
 from .recommender.demo import build_algorithm_demo_recommendation, search_tutees
 from .permissions import IsSuperAdminUser
+from .subject_recognition import (
+    invalid_new_subject_codes,
+    recognized_subject_codes_for_profile,
+    subject_is_recognized_for_profile,
+    subject_selection_queryset_for_profile,
+    visible_subject_queryset_for_profile,
+)
 from django.core.cache import cache
 from . import _verification_dev
 from .models import Booking, Course, EmailOTPChallenge, Notification, PartnerInstitution, Payment, PaymentMethod, Preference, Rating, SessionCheckIn, Subjects, Tutor, TutorApplication, TutorAvailability, TutorAvailabilityOverride, TutorDocumentRenewalReview, TutorSubjects, Wallet, PlatformActivity, Transaction, TuteeApplication, TuteeDocumentRenewalReview
@@ -1843,6 +1850,11 @@ class SearchTutorsView(APIView):
             )
 
         student_profile = request.user.userprofile
+        if not subject_is_recognized_for_profile(student_profile, subject_code):
+            return Response(
+                {"error": "This subject is not recognized for your course catalog."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         tutors = filter_tutors_by_institution(
             Tutor.objects.filter(
                 tutorsubjects__subject__subject_code=subject_code
@@ -1855,8 +1867,46 @@ class SearchTutorsView(APIView):
 #Subject Serializer
 
 class SubjectListView(ListAPIView):
-    queryset = Subjects.objects.all()
     serializer_class = SubjectSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        if not user.is_authenticated or not hasattr(user, 'userprofile'):
+            return Subjects.objects.select_related('owning_institution').filter(
+                owning_institution__isnull=True
+            )
+
+        profile = user.userprofile
+        catalog_scope = self.request.query_params.get('catalog_scope')
+        course_code = self.request.query_params.get('course_code')
+        include_current = self.request.query_params.get('include_current') in {'1', 'true', 'True'}
+
+        if profile.role == 'SuperAdmin' and self.request.query_params.get('institution_id'):
+            profile = UserProfile(
+                institution=get_object_or_404(
+                    PartnerInstitution,
+                    pk=self.request.query_params.get('institution_id')
+                ),
+                course=profile.course,
+                role=profile.role,
+                user=profile.user,
+            )
+
+        if catalog_scope == 'all':
+            return visible_subject_queryset_for_profile(profile)
+
+        queryset, recognized_codes = subject_selection_queryset_for_profile(
+            profile,
+            course_code=course_code,
+            include_current=include_current,
+        )
+        self.recognized_codes = recognized_codes
+        return queryset
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['recognized_codes'] = getattr(self, 'recognized_codes', set())
+        return context
 
 
 
@@ -3544,7 +3594,17 @@ def save_preferences(request):
 
     subject_ids = request.data.get("subjects", [])
 
-    if subject_ids:
+    invalid_codes = invalid_new_subject_codes(profile, subject_ids)
+    if invalid_codes:
+        return Response(
+            {
+                "error": "Some subjects are no longer recognized for your course catalog.",
+                "invalid_subjects": sorted(invalid_codes),
+            },
+            status=400,
+        )
+
+    if "subjects" in request.data:
         pref.subjects.set(subject_ids)
 
     cache.delete(dashboard_recs_cache_key(profile))
@@ -3742,6 +3802,12 @@ def recommend_tutors_view(request):
             status=400
         )
 
+    if not subject_is_recognized_for_profile(student_profile, subject):
+        return Response(
+            {"error": "This subject is not recognized for your course catalog."},
+            status=400,
+        )
+
     ratings = build_rating_matrix()
     candidate_qs = get_recommendation_candidate_tutors(
         subject,
@@ -3840,6 +3906,17 @@ def update_tutee_profile(request):
 
     profile.year_level = request.data.get("year_level", profile.year_level)
     profile.bio = request.data.get("bio", profile.bio)
+
+    subject_ids = request.data.get("subjects", [])
+    invalid_codes = invalid_new_subject_codes(profile, subject_ids, course_code=profile.course_id)
+    if invalid_codes:
+        return Response(
+            {
+                "error": "Some subjects are no longer recognized for your course catalog.",
+                "invalid_subjects": sorted(invalid_codes),
+            },
+            status=400,
+        )
 
     profile.save()
 
@@ -3949,12 +4026,16 @@ def get_tutor_subjects(request):
     tutor = Tutor.objects.get(profile=profile)
 
     subjects = TutorSubjects.objects.filter(tutor=tutor).select_related('subject')
+    recognized_codes = recognized_subject_codes_for_profile(profile)
 
     data = [
         {
             "subject_code": ts.subject.subject_code,
             "subject_name": ts.subject.subject_name,
-            "description": ts.description or ''
+            "department": ts.subject.department,
+            "category": ts.subject.category,
+            "description": ts.description or '',
+            "is_recognized": ts.subject.subject_code in recognized_codes,
         }
         for ts in subjects
     ]
@@ -3975,6 +4056,12 @@ def add_tutor_subject(request):
         subject = Subjects.objects.get(subject_code=subject_code)
     except Subjects.DoesNotExist:
         return Response({"error": "Invalid subject"}, status=400)
+
+    if not subject_is_recognized_for_profile(profile, subject_code):
+        return Response(
+            {"error": "This subject is not recognized for your course catalog."},
+            status=400,
+        )
 
     tutor_subject, created = TutorSubjects.objects.get_or_create(
         tutor=tutor,
@@ -4757,7 +4844,12 @@ def initiate_online_payment(request):
     }
 
     try:
-        response = requests.post(url, json=payload, headers=get_paymongo_auth_headers())
+        response = requests.post(
+            url,
+            json=payload,
+            headers=get_paymongo_auth_headers(),
+            timeout=PAYMONGO_REQUEST_TIMEOUT,
+        )
         try:
             res_data = response.json()
         except ValueError:
@@ -4841,6 +4933,12 @@ def initiate_online_payment(request):
             error_response["provider_error"] = res_data
 
         return Response(error_response, status=response_status)
+    except requests.RequestException as exc:
+        logger.error("Payment initiation request failed: %s", exc)
+        return Response(
+            {"error": "Could not reach the payment provider. Please try again."},
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
     except Exception as e:
         logger.error(f"Payment Initiation Exception: {str(e)}")
         return Response({"error": "Internal server error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -4871,7 +4969,11 @@ def verify_online_payment(request, booking_id):
     url = f"https://api.paymongo.com/v1/checkout_sessions/{payment.transaction_reference}"
 
     try:
-        response = requests.get(url, headers=get_paymongo_auth_headers())
+        response = requests.get(
+            url,
+            headers=get_paymongo_auth_headers(),
+            timeout=PAYMONGO_REQUEST_TIMEOUT,
+        )
 
         try:
             res_data = response.json()
@@ -4939,6 +5041,12 @@ def verify_online_payment(request, booking_id):
         representative_booking.refresh_from_db()
         refreshed_group = get_booking_request_bookings(representative_booking)
         return Response(build_booking_detail_payload(refreshed_group))
+    except requests.RequestException as exc:
+        logger.error("Payment verification request failed: %s", exc)
+        return Response(
+            {"error": "Could not reach the payment provider. Please try again."},
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
     except Exception as e:
         logger.error(f"Payment Verification Exception: {str(e)}")
         return Response({"error": "Internal server error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

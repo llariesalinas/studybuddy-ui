@@ -171,8 +171,12 @@
                   v-for="subject in selectedSubjectObjects"
                   :key="subject.subject_code"
                   class="subject-pill"
+                  :class="{ 'subject-pill-stale': subject.is_recognized === false }"
                 >
                   {{ subject.subject_name }}
+                  <span v-if="subject.is_recognized === false" class="subject-pill-flag">
+                    Not recognized
+                  </span>
                   <button
                     type="button"
                     class="subject-pill-remove sb-btn"
@@ -401,13 +405,19 @@
                 :key="subject.subject_code"
                 type="button"
                 class="subject-option sb-btn"
-                :class="{ selected: isDraftSelected(subject.subject_code) }"
-                @click="toggleDraftSubject(subject.subject_code)"
+                :class="{
+                  selected: isDraftSelected(subject.subject_code),
+                  stale: subject.is_recognized === false,
+                }"
+                @click="toggleDraftSubject(subject)"
               >
                 <span class="subject-option-copy">
                   <span class="subject-option-name">{{ subject.subject_name }}</span>
                   <span class="subject-option-meta">
                     {{ subject.subject_code }} - {{ getSubjectGroup(subject) }}
+                  </span>
+                  <span v-if="subject.is_recognized === false" class="subject-option-state">
+                    No longer recognized for your course
                   </span>
                 </span>
                 <span class="subject-option-check" aria-hidden="true">
@@ -606,7 +616,6 @@ const {
   selectedSubjectObjects,
   getPreferredSubjectCategory,
   getSubjectGroup,
-  pruneSubjectsForCurrentLevel,
   refreshSubjectFilterForAcademicContext
 } = useSubjectCatalog({
   subjects,
@@ -751,8 +760,8 @@ function confirmAcademicSelection() {
   educationLevel.value = draftEducationLevel.value
   profile.value.year_level = draftYearLevel.value
   profile.value.course = draftShouldShowCourse.value ? draftCourse.value : ''
-  pruneSubjectsForCurrentLevel()
   refreshSubjectFilterForAcademicContext({ preferRecommended: true })
+  loadSubjects()
   closeAcademicModal()
 }
 
@@ -774,13 +783,21 @@ function isDraftSelected(subjectCode) {
   return draftSubjectCodes.value.includes(subjectCode)
 }
 
-function toggleDraftSubject(subjectCode) {
-  if (isDraftSelected(subjectCode)) {
-    draftSubjectCodes.value = draftSubjectCodes.value.filter(code => code !== subjectCode)
+function isSubjectRecognized(subject) {
+  return subject?.is_recognized !== false
+}
+
+function toggleDraftSubject(subject) {
+  if (isDraftSelected(subject.subject_code)) {
+    draftSubjectCodes.value = draftSubjectCodes.value.filter(code => code !== subject.subject_code)
     return
   }
 
-  draftSubjectCodes.value = [...draftSubjectCodes.value, subjectCode]
+  if (!isSubjectRecognized(subject)) {
+    return
+  }
+
+  draftSubjectCodes.value = [...draftSubjectCodes.value, subject.subject_code]
 }
 
 function confirmSubjectSelection() {
@@ -858,7 +875,14 @@ async function loadProfile() {
 async function loadSubjects() {
   try {
     isLoadingSubjects.value = true
-    subjects.value = await catalogStore.fetchSubjects()
+    subjects.value = await catalogStore.fetchSubjects({
+      force: true,
+      params: {
+        recognized_only: 1,
+        include_current: 1,
+        ...(profile.value.course ? { course_code: profile.value.course } : {}),
+      },
+    })
   } catch (error) {
     console.error('Failed to load subjects:', error)
     toastStore.push('Failed to load subjects.', 'error')

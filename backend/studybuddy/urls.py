@@ -28,6 +28,7 @@ from .views import(
                    )
 from .admin_views import (
     AdminAccountRequestView, AdminAnalyticsExportView,
+    AdminCourseCatalogView, AdminCustomSubjectView,
     AdminStatsView, AdminWithdrawalListView, AdminWithdrawalDetailView,
     AdminUserListView, AdminInstitutionView, AdminAnalyticsView,
     AdminPendingActionsView, InstitutionRequestView,
@@ -56,6 +57,9 @@ urlpatterns = [
     path('admin/users/', AdminUserListView.as_view()),
     path('admin/users/<int:pk>/', AdminUserListView.as_view()),
     path('admin/users/<int:pk>/verification-dev-tools/', AdminUserVerificationDevToolsView.as_view()),
+    path('admin/course-catalog/', AdminCourseCatalogView.as_view()),
+    path('admin/course-catalog/<int:pk>/', AdminCourseCatalogView.as_view()),
+    path('admin/subjects/custom/', AdminCustomSubjectView.as_view()),
     path('admin/institutions/', AdminInstitutionView.as_view()),
     path('admin/institutions/<int:pk>/', AdminInstitutionView.as_view()),
     path('admin/institutions/performance/', SuperAdminInstitutionPerformanceView.as_view()),

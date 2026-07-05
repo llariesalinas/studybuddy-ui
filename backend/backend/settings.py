@@ -373,6 +373,10 @@ if PAYMONGO_CASHOUT_MOCK and not DEBUG:
         "PAYMONGO_CASHOUT_MOCK is enabled with DEBUG=false. Cash-outs will be "
         "simulated as successful without moving real money."
     )
+if not DEBUG and not PAYMONGO_CASHOUT_CALLBACK_SECRET:
+    raise RuntimeError(
+        "PAYMONGO_CASHOUT_CALLBACK_SECRET env var is required when DEBUG=false."
+    )
 CASHOUT_PROVIDER_FEE_PHP = os.getenv("CASHOUT_PROVIDER_FEE_PHP", "10")
 CASHIN_MIN_PHP = os.getenv("CASHIN_MIN_PHP", "50")
 CASHOUT_MIN_PHP = os.getenv("CASHOUT_MIN_PHP", "50")

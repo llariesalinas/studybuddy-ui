@@ -1,6 +1,7 @@
 import logging
 
 from ..models import Preference, Tutor
+from ..subject_recognition import recognized_subject_codes_for_profile
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +18,12 @@ def get_student_subject_codes(student_profile):
     except Preference.DoesNotExist:
         return []
 
-    return list(pref.subjects.values_list("subject_code", flat=True))
+    recognized_codes = recognized_subject_codes_for_profile(student_profile)
+    return [
+        code
+        for code in pref.subjects.values_list("subject_code", flat=True)
+        if code in recognized_codes
+    ]
 
 
 def compute_cbf_breakdown(

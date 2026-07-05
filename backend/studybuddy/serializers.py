@@ -1,6 +1,8 @@
 from rest_framework import serializers
 from .models import (
     AdminAccountRequest,
+    Course,
+    InstitutionCourseCatalog,
     InstitutionRequest,
     Notification,
     PartnerInstitution,
@@ -255,9 +257,76 @@ class TutorSearchSerializer(serializers.ModelSerializer):
         ]
 
 class SubjectSerializer(serializers.ModelSerializer):
+    owning_institution_name = serializers.CharField(
+        source='owning_institution.institution_name',
+        read_only=True,
+    )
+    is_recognized = serializers.SerializerMethodField()
+
+    def get_is_recognized(self, obj):
+        recognized_codes = self.context.get('recognized_codes')
+        if recognized_codes is None:
+            return None
+        return obj.subject_code in recognized_codes
+
     class Meta:
         model = Subjects
-        fields = ['subject_code', 'subject_name', 'department', 'category']
+        fields = [
+            'subject_code',
+            'subject_name',
+            'department',
+            'category',
+            'owning_institution',
+            'owning_institution_name',
+            'is_recognized',
+        ]
+        read_only_fields = ['owning_institution', 'owning_institution_name', 'is_recognized']
+
+
+class InstitutionCourseCatalogSerializer(serializers.ModelSerializer):
+    institution_name = serializers.CharField(source='institution.institution_name', read_only=True)
+    course_code = serializers.CharField(source='course.course_code', read_only=True)
+    course_name = serializers.CharField(source='course.course_name', read_only=True)
+    subject_code = serializers.CharField(source='subject.subject_code', read_only=True)
+    subject_name = serializers.CharField(source='subject.subject_name', read_only=True)
+    subject_department = serializers.CharField(source='subject.department', read_only=True)
+    subject_is_custom = serializers.SerializerMethodField()
+
+    class Meta:
+        model = InstitutionCourseCatalog
+        fields = [
+            'id',
+            'institution',
+            'institution_name',
+            'course',
+            'course_code',
+            'course_name',
+            'subject',
+            'subject_code',
+            'subject_name',
+            'subject_department',
+            'subject_is_custom',
+            'added_at',
+        ]
+        read_only_fields = [
+            'institution',
+            'institution_name',
+            'course_code',
+            'course_name',
+            'subject_code',
+            'subject_name',
+            'subject_department',
+            'subject_is_custom',
+            'added_at',
+        ]
+
+    def get_subject_is_custom(self, obj):
+        return obj.subject.owning_institution_id is not None
+
+    def validate_course(self, value):
+        if not Course.objects.filter(pk=value.pk).exists():
+            raise serializers.ValidationError('Course does not exist.')
+        return value
 
 
 class PinnedReviewSerializer(serializers.ModelSerializer):

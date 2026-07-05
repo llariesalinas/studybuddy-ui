@@ -40,6 +40,7 @@ __screenshots__/
 .env
 .env.*
 !.env.example
+!backend/.env.example
 
 # Local handoff notes and plans
 PROJECT_HANDOFF_DUMP.md

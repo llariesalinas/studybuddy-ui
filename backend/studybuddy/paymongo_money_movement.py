@@ -6,6 +6,7 @@ from django.conf import settings
 
 
 PAYMONGO_API_BASE_URL = 'https://api.paymongo.com/v1'
+PAYMONGO_REQUEST_TIMEOUT = 20
 
 # Every Studybuddy cash-out moves through InstaPay (see ADR-0001) -- PESONet is no
 # longer a reachable code path.
@@ -49,6 +50,14 @@ def parse_decimal(value, default='0.00'):
     return decimal.Decimal(str(value))
 
 
+def to_centavos(amount):
+    return int((parse_decimal(amount) * decimal.Decimal('100')).quantize(decimal.Decimal('1')))
+
+
+def from_centavos(amount):
+    return (parse_decimal(amount) / decimal.Decimal('100')).quantize(decimal.Decimal('0.01'))
+
+
 def normalize_wallet_transaction(response_body):
     data = response_body.get('data') or {}
     attributes = data.get('attributes') or {}
@@ -65,18 +74,25 @@ def normalize_wallet_transaction(response_body):
             if isinstance(provider_error, dict)
             else str(provider_error or '')
         ),
-        'fee': parse_decimal(attributes.get('fee')),
-        'net_amount': parse_decimal(attributes.get('net_amount')),
+        'fee': from_centavos(attributes.get('fee')),
+        'net_amount': from_centavos(attributes.get('net_amount')),
         'raw': response_body,
     }
 
 
 def list_receiving_institutions():
-    response = requests.get(
-        f'{PAYMONGO_API_BASE_URL}/wallets/receiving_institutions',
-        params={'provider': INSTAPAY_PROVIDER},
-        headers=get_money_movement_headers(),
-    )
+    try:
+        response = requests.get(
+            f'{PAYMONGO_API_BASE_URL}/wallets/receiving_institutions',
+            params={'provider': INSTAPAY_PROVIDER},
+            headers=get_money_movement_headers(),
+            timeout=PAYMONGO_REQUEST_TIMEOUT,
+        )
+    except requests.RequestException as exc:
+        raise PayMongoCashOutError(
+            'Could not reach PayMongo.',
+            response_body={'error': str(exc)},
+        ) from exc
 
     try:
         response_body = response.json()
@@ -111,7 +127,7 @@ def create_wallet_transaction(wallet_id, payout_account, amount, callback_url, w
         raise PayMongoCashOutError('PayMongo wallet is not configured.')
 
     attributes = {
-        'amount': str(amount),
+        'amount': to_centavos(amount),
         'currency': 'PHP',
         'description': f'StudyBuddy tutor cash-out #{withdrawal_id}',
         'purpose': 'Tutor cash-out',
@@ -128,11 +144,18 @@ def create_wallet_transaction(wallet_id, payout_account, amount, callback_url, w
     if callback_url:
         attributes['callback_url'] = callback_url
 
-    response = requests.post(
-        f'{PAYMONGO_API_BASE_URL}/wallets/{wallet_id}/transactions',
-        json={'data': {'attributes': attributes}},
-        headers=get_money_movement_headers(),
-    )
+    try:
+        response = requests.post(
+            f'{PAYMONGO_API_BASE_URL}/wallets/{wallet_id}/transactions',
+            json={'data': {'attributes': attributes}},
+            headers=get_money_movement_headers(),
+            timeout=PAYMONGO_REQUEST_TIMEOUT,
+        )
+    except requests.RequestException as exc:
+        raise PayMongoCashOutError(
+            'Could not reach PayMongo.',
+            response_body={'error': str(exc)},
+        ) from exc
 
     try:
         response_body = response.json()

@@ -22,7 +22,7 @@ from django.utils import timezone
 from faker import Faker
 
 from studybuddy.models import (
-    Booking, Course, InstitutionRequest, PartnerInstitution, Payment,
+    Booking, Course, InstitutionCourseCatalog, InstitutionRequest, PartnerInstitution, Payment,
     PaymentMethod, PlatformActivity, Preference, Rating, Strand, Subjects,
     Transaction, Tutor, TutorApplication, TutorAvailability, TutorSubjects,
     TuteeApplication, UserProfile, Wallet, WalletTopUp, WithdrawalRequest,
@@ -90,6 +90,13 @@ COURSES = [
     ('BSIT', 'BS Information Technology (CCS)', 'STEM'),
     ('BSBA', 'BS Business Administration (CBA)', 'ABM'),
 ]
+
+COURSE_CATEGORY_ALIASES = {
+    'ABM': ('SHS-ABM',),
+    'HUMMS': ('SHS-HUMSS',),
+    'HUMSS': ('SHS-HUMSS',),
+    'STEM': ('SHS-STEM',),
+}
 
 BASIC_ED_CORE = [
     ('ENG', 'English'), ('MTH', 'Mathematics'), ('SCI', 'Science'),
@@ -297,6 +304,7 @@ class Command(BaseCommand):
         """Delete demo data; Admin/SuperAdmin users and catalog rows survive."""
         demo_users = User.objects.filter(userprofile__role__in=['Tutee', 'Tutor'])
         deleted, _ = demo_users.delete()  # cascades profiles, tutors, bookings, wallets, ...
+        InstitutionCourseCatalog.objects.all().delete()
         PlatformActivity.objects.all().delete()
         InstitutionRequest.objects.all().delete()
         self.stdout.write(f'  cleared: {deleted} rows cascaded from Tutee/Tutor users')
@@ -350,9 +358,59 @@ class Command(BaseCommand):
             )
             institutions[inst['domain']] = obj
 
+        self._seed_institution_course_catalog(institutions, subject_rows)
+
         self.summary.append(f'Subjects: {len(subject_rows)} across all tiers')
         self.stdout.write(f'  catalog: {len(subject_rows)} subjects, {len(INSTITUTIONS)} institutions')
         return institutions
+
+    def _seed_institution_course_catalog(self, institutions, subject_rows):
+        north = institutions['north.edu.ph']
+        subjects_by_code = {subject.subject_code: subject for subject in Subjects.objects.all()}
+        courses_by_code = {course.course_code: course for course in Course.objects.all()}
+        courses_by_subject_category = {}
+        for course_code, course in courses_by_code.items():
+            categories = {course_code, *COURSE_CATEGORY_ALIASES.get(course_code, ())}
+            for category in categories:
+                courses_by_subject_category.setdefault(category, []).append(course)
+
+        rows = []
+        for subject_code, _name, _dept, course_code in subject_rows:
+            subject = subjects_by_code.get(subject_code)
+            matching_courses = courses_by_subject_category.get(course_code, [])
+            if not matching_courses or not subject:
+                continue
+
+            for institution in institutions.values():
+                for course in matching_courses:
+                    rows.append(
+                        InstitutionCourseCatalog(
+                            institution=institution,
+                            course=course,
+                            subject=subject,
+                        )
+                    )
+
+        custom_subject, _ = Subjects.objects.update_or_create(
+            subject_code='NORTH-AI-LAB',
+            defaults={
+                'subject_name': 'North AI Lab',
+                'department': 'Computer Science',
+                'category': 'BSCS',
+                'owning_institution': north,
+            },
+        )
+        rows.append(
+            InstitutionCourseCatalog(
+                institution=north,
+                course=courses_by_code['BSCS'],
+                subject=custom_subject,
+            )
+        )
+
+        InstitutionCourseCatalog.objects.bulk_create(rows, ignore_conflicts=True)
+        self.summary.append(f'Institution course catalog entries: {len(rows)} seeded')
+        self.stdout.write(f'  institution catalogs: {len(rows)} course-subject entries seeded')
 
     def _ensure_admins(self, institutions):
         for admin in ADMINS:

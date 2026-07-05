@@ -265,7 +265,9 @@ const subjectGroups = computed(() => {
 // Load subjects from backend
 onMounted(async () => {
   try {
-    subjects.value = await catalogStore.fetchSubjects()
+    subjects.value = await catalogStore.fetchSubjects({
+      params: { recognized_only: 1 },
+    })
   } catch (error) {
     console.error('Failed to load subjects', error)
   }
