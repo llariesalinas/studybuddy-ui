@@ -435,3 +435,38 @@ CASHIN_MIN_PHP = os.getenv("CASHIN_MIN_PHP", "50")
 CASHOUT_MIN_PHP = os.getenv("CASHOUT_MIN_PHP", "50")
 # InstaPay's real per-transaction cap (see ADR-0001) -- every cash-out uses InstaPay now.
 CASHOUT_MAX_PHP = os.getenv("CASHOUT_MAX_PHP", "50000")
+
+# Logging. Without this, Django falls back to Python's "handler of last resort", which prints
+# only the bare message for unhandled exceptions (e.g. "Internal Server Error: /api/login/")
+# and drops the traceback entirely -- exactly what made the OTP email bug hard to diagnose from
+# Render's console. This sends full tracebacks (via exc_info) to stdout/stderr, which Render
+# captures as log output, so no separate log aggregator is needed for the demo.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": "{levelname} {asctime} {name} {message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "verbose",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": os.getenv("DJANGO_LOG_LEVEL", "INFO"),
+    },
+    "loggers": {
+        # Explicit entry so request-handling exceptions (unhandled 500s) always print with
+        # their traceback, regardless of the root logger's level.
+        "django.request": {
+            "handlers": ["console"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+    },
+}
