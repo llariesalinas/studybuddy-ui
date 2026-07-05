@@ -129,11 +129,13 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useSessionsStore } from '@/stores/completedSessions'
+import { useWalletStore } from '@/stores/wallet'
 import api from '@/services/api/api'
 
 const router = useRouter()
 const route = useRoute()
 const sessionsStore = useSessionsStore()
+const walletStore = useWalletStore()
 
 const totalSessions = ref(0)
 const avgRating = ref(0)
@@ -145,8 +147,18 @@ const isLoading = ref(false)
 const errorMessage = ref('')
 
 const nextBooking = computed(() => upcomingBookings.value[0] || null)
+const walletBalance = computed(() => Number(walletStore.balance || 0))
 
 const dashboardMetrics = computed(() => [
+  {
+    label: 'Wallet Balance',
+    value: formatCurrency(walletBalance.value),
+    note: walletBalance.value >= 0 ? 'Available to cash out' : 'Top up to settle deductions',
+    icon: 'bi-wallet2',
+    tone: walletBalance.value >= 0 ? 'green' : 'gold',
+    visual: 'bars',
+    bars: walletBalance.value >= 0 ? [28, 44, 60, 76, 88, 68] : [70, 54, 42, 34, 24, 18],
+  },
   {
     label: 'Total Sessions',
     value: totalSessions.value,
@@ -213,10 +225,12 @@ const loadTutorDashboard = async () => {
   errorMessage.value = ''
 
   try {
+    const walletLoad = walletStore.fetchWallet()
     const [, response] = await Promise.all([
       sessionsStore.fetchSessions(),
       api.get('tutor-dashboard/'),
     ])
+    await walletLoad.catch(() => {})
 
     totalSessions.value = response.data.total_sessions
     avgRating.value = response.data.rating_average

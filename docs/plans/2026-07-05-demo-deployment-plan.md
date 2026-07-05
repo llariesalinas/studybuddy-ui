@@ -1,0 +1,136 @@
+---
+title: Demo deployment plan
+date: 2026-07-05
+status: Approved
+spec:
+---
+
+# Demo deployment plan
+
+## Status/Progress Summary
+
+Resolved via grilling session on 2026-07-05 (see [ADR-0003](../adr/0003-deploy-before-live-paymongo-keys.md),
+[ADR-0004](../adr/0004-vercel-frontend-render-backend.md), [ADR-0005](../adr/0005-basic-auth-for-demo-protection.md)):
+- Database: **Supabase** (not Render-managed Postgres) — one dedicated project per environment.
+- Redis: **not needed for the demo** — Channels and cache both fall back to in-memory backends
+  when `REDIS_URL` is unset (`backend/backend/settings.py:323`, `:350-353`), which is fine for a
+  single-instance demo.
+- Demo access protection: **HTTP Basic Auth** on both the Vercel frontend and Render backend (one
+  shared credential, free on any plan) — not Vercel's built-in Password Protection, which needs a
+  paid add-on on Hobby/Pro.
+- CI: GitHub Actions runs `frontend` (lint/build/test) and `backend` (`manage.py test` against a
+  throwaway Postgres) jobs as required status checks on PRs into `develop`/`main`. Deploys
+  themselves stay native (Vercel/Render build off the branch directly).
+- Branch guidelines (naming, protection, hotfix reconciliation) are documented below under Steps 2.
+
+## Goal
+
+Ship a protected demo environment on Vercel, Render, and Supabase so the team can exercise the
+real cloud stack with seeded test data and sandbox PayMongo before opening a later production
+release.
+
+## Approach
+
+Use a simple branch model: feature branches land on `develop`, `develop` auto-deploys to a
+protected demo environment, and `main` stays reserved for production later. The demo environment
+should look and behave like production from the outside, but it will keep sandbox PayMongo, test
+data, and separate demo infrastructure so nothing in the demo can leak into the live release.
+
+The key decisions are:
+
+- Vercel hosts the frontend
+- Render hosts the Django backend and worker process
+- Supabase hosts the PostgreSQL database
+- Demo access is protected
+- Demo and production use separate environments and separate secrets
+- Production promotion happens by moving a proven `develop` state to `main`, not by changing the
+  deployment topology at the last minute
+
+Before the first deploy, we should also close the small production-safety gaps that already exist
+in the codebase, especially the PayMongo cash-out mock path.
+
+## Steps
+
+1. Write down the deployment matrix for demo and production.
+   - Frontend URLs
+   - Backend API URLs
+   - Database names and owners
+   - Email provider settings
+   - PayMongo key sets
+   - Redis / worker requirements
+
+2. Lock the branch strategy.
+   - `feature/*` branches merge into `develop`
+   - `develop` auto-deploys to the protected demo environment
+   - `main` is protected and only receives promotion-ready merges
+   - hotfixes branch from `main` if production ever needs an urgent fix
+
+3. Close the pre-deploy cleanup items.
+   - Make `PAYMONGO_CASHOUT_MOCK` impossible to enable in real production
+   - Keep the mock path available only for local development and the protected demo environment
+   - Fail fast or block the cash-out path if mock mode is requested while `DEBUG=False`
+   - Keep the callback secret required whenever `DEBUG=False`
+   - Keep `VERIFICATION_DEV_TOOLS_ENABLED` and `ALGORITHM_DEMO_TOOLS_ENABLED` off outside demo or
+     local dev
+   - Keep `DEBUG=False` for the demo so it exercises production-style security
+   - Verify `ALLOWED_HOSTS`, CORS, and CSRF origins are set from environment variables
+   - Confirm the current `backend/.env.example` matches the intended demo variables
+
+4. Provision the demo infrastructure.
+   - Create the Vercel project for the frontend
+   - Create the Render service for the backend
+   - Create the Supabase database for the demo environment
+   - Add any supporting Redis or worker service only if the demo needs it for real-time or queued
+     behavior
+
+5. Configure the demo environment variables.
+   - Use sandbox PayMongo keys
+   - Use demo-safe email settings
+   - Point the backend at the demo Supabase database
+   - Set the protected frontend and backend origins explicitly
+   - Keep demo-only toggles off unless the demo page actually needs them
+
+6. Seed the demo data.
+   - Load test users, tutors, institutions, and sample flows that are useful for review
+   - Keep the seed repeatable so the demo can be reset cleanly
+   - Make sure the demo data does not share records with production
+
+7. Wire the release checks.
+   - Run lint, build, and backend tests before each deploy
+   - Add a smoke-check list for login, browsing, booking, and cash-out simulation
+   - Verify the protected demo URL stays inaccessible without the chosen protection layer
+
+8. Prepare the production handoff.
+   - Promote the same code from `develop` to `main`
+   - Swap demo secrets for production secrets
+   - Use live PayMongo keys only after the demo has been signed off
+   - Run a live-transaction verification checklist before opening payments to real users
+
+## Risks
+
+- `PAYMONGO_CASHOUT_MOCK` leaking into production would fake payouts, so it needs a hard stop and
+  not just a warning.
+- The protected demo can still use the mock path, but only as a deliberate demo-only safety valve.
+- Demo and production can drift if the demo seed is not refreshed regularly.
+- If the demo needs websocket or cache parity, we will need a real Redis-backed worker setup on
+  Render rather than relying on in-memory defaults.
+- Sandbox PayMongo can hide issues that only appear with live keys, so the later production gate
+  still needs manual verification.
+
+## Checks to run
+
+- `npm run build`
+- `npm run lint`
+- `cd backend && python manage.py test`
+- `cd backend && python manage.py check`
+- Demo smoke test: login, browse tutors, open a booking flow, and confirm the cash-out path stays
+  in sandbox/demo mode
+- Access test: confirm the protected demo URL rejects anonymous access
+
+## Changelog
+
+- **2026-07-05** — Grilling session resolved the open infrastructure decisions this plan had left
+  implicit: database host (Supabase, superseding the Render-hosted-Postgres assumption in
+  ADR-0004), confirmed Redis is unnecessary for a single-instance demo, and settled on HTTP Basic
+  Auth (not Vercel's paid Password Protection) for the demo access gate. Status moved
+  Draft → Approved. See ADR-0003, ADR-0004, ADR-0005 for the full reasoning behind each call.
