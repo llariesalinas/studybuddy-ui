@@ -1,6 +1,6 @@
 <template>
-  <Transition name="dock-rise">
-    <div v-if="hasDock" class="ongoing-dock" role="status" aria-live="polite">
+  <Transition name="dock-rise" mode="out-in">
+    <div v-if="showFullDock" class="ongoing-dock" role="status" aria-live="polite">
       <div class="ongoing-dock-card" :class="`is-${presentation.state}`">
         <div class="ongoing-dock-copy">
           <div class="ongoing-dock-heading">
@@ -36,13 +36,35 @@
           <span>Open</span>
           <i class="bi bi-arrow-right" aria-hidden="true"></i>
         </button>
+
+        <button
+          type="button"
+          class="ongoing-dock-hide sb-btn"
+          :aria-label="`Hide ${presentation.stateLabel.toLowerCase()} dock`"
+          @click="hideDock"
+        >
+          <i class="bi bi-dash-lg" aria-hidden="true"></i>
+        </button>
       </div>
     </div>
+
+    <button
+      v-else-if="showRestoreChip"
+      type="button"
+      class="ongoing-dock-chip sb-btn"
+      @click="restoreDock"
+    >
+      <span class="ongoing-dock-chip-dot"></span>
+      <span class="ongoing-dock-chip-copy">
+        <strong>{{ presentation.stateLabel }}</strong>
+        <span>Restore handoff</span>
+      </span>
+    </button>
   </Transition>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useOrbitStrip } from '@/composables/useOrbitStrip'
@@ -50,6 +72,7 @@ import { useOrbitStrip } from '@/composables/useOrbitStrip'
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
+const hiddenDockId = ref(null)
 
 const role = computed(() => authStore.user?.role?.toLowerCase() || null)
 const isTutor = computed(() => role.value === 'tutor')
@@ -61,6 +84,29 @@ const isMatchingDetailRoute = computed(() => (
 ))
 
 const hasDock = computed(() => hasOrbit.value && !isMatchingDetailRoute.value)
+const showFullDock = computed(() => hasDock.value && hiddenDockId.value !== presentation.value.id)
+const showRestoreChip = computed(() => hasDock.value && hiddenDockId.value === presentation.value.id)
+
+watch(
+  () => presentation.value.id,
+  (id, previousId) => {
+    if (id !== previousId) {
+      hiddenDockId.value = null
+    }
+  },
+)
+
+const hideDock = () => {
+  if (presentation.value.id == null) {
+    return
+  }
+
+  hiddenDockId.value = presentation.value.id
+}
+
+const restoreDock = () => {
+  hiddenDockId.value = null
+}
 
 const openSession = () => {
   const id = presentation.value.id
@@ -91,7 +137,7 @@ const openSession = () => {
 .ongoing-dock-card {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(180px, 0.42fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 0.42fr) auto auto;
   align-items: center;
   gap: 14px;
   overflow: hidden;
@@ -242,6 +288,71 @@ const openSession = () => {
   font-weight: 800;
 }
 
+.ongoing-dock-hide {
+  position: relative;
+  z-index: 1;
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+.ongoing-dock-chip {
+  position: fixed;
+  right: 24px;
+  bottom: 20px;
+  z-index: 1150;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(8, 24, 19, 0.94);
+  box-shadow: 0 18px 44px rgba(6, 18, 14, 0.28);
+  color: #e8fff7;
+}
+
+.ongoing-dock-chip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #45f0bd;
+  box-shadow: 0 0 12px rgba(69, 240, 189, 0.8);
+  flex: none;
+}
+
+.ongoing-dock-chip-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  text-align: left;
+}
+
+.ongoing-dock-chip-copy strong,
+.ongoing-dock-chip-copy span {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ongoing-dock-chip-copy strong {
+  font-size: 11px;
+  font-weight: 800;
+  color: #d7fff1;
+}
+
+.ongoing-dock-chip-copy span {
+  color: rgba(214, 255, 239, 0.72);
+  font-size: 11px;
+}
+
 .dock-rise-enter-active,
 .dock-rise-leave-active {
   transition: transform 240ms ease, opacity 240ms ease;
@@ -262,9 +373,19 @@ const openSession = () => {
     width: 100%;
   }
 
+  .ongoing-dock-hide {
+    width: 100%;
+  }
+
   .ongoing-dock-heading {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .ongoing-dock-chip {
+    right: 16px;
+    bottom: 16px;
+    max-width: calc(100% - 32px);
   }
 }
 </style>
