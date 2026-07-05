@@ -638,6 +638,7 @@ class PlatformActivity(models.Model):
         ('booking_completed', 'Session Completed'),
         ('institution_added', 'New Institution Request'),
         ('withdrawal_failed', 'Withdrawal Failure'),
+        ('withdrawal_processed', 'Withdrawal Processed'),
         ('admin_action', 'Admin Action'),
         ('tutor_application', 'Tutor Application'),
         ('tutee_application', 'Tutee Application'),

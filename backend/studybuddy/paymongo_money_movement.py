@@ -12,6 +12,40 @@ PAYMONGO_REQUEST_TIMEOUT = 20
 # longer a reachable code path.
 INSTAPAY_PROVIDER = 'instapay'
 
+# Dev-only stub returned by list_receiving_institutions when PAYMONGO_CASHOUT_MOCK is on.
+# PayMongo test mode has no Money Movement product, so the live receiving-institutions
+# call is unreachable locally. Shape mirrors PayMongo's JSON:API response so the frontend
+# reads attributes.name/code unchanged; names match RECEIVING_INSTITUTION_LOGO_DOMAINS keys
+# in src/data/receivingInstitutionLogos.js so logos resolve in the demo.
+MOCK_RECEIVING_INSTITUTIONS = {
+    'data': [
+        {'id': 'mock_ri_gcash', 'type': 'receiving_institution',
+         'attributes': {'name': 'GCash', 'code': 'GCASH'}},
+        {'id': 'mock_ri_maya', 'type': 'receiving_institution',
+         'attributes': {'name': 'Maya', 'code': 'PAYMAYA'}},
+        {'id': 'mock_ri_bdo', 'type': 'receiving_institution',
+         'attributes': {'name': 'BDO Unibank', 'code': 'BDO'}},
+        {'id': 'mock_ri_bpi', 'type': 'receiving_institution',
+         'attributes': {'name': 'Bank of the Philippine Islands', 'code': 'BPI'}},
+        {'id': 'mock_ri_metrobank', 'type': 'receiving_institution',
+         'attributes': {'name': 'Metrobank', 'code': 'METROBANK'}},
+        {'id': 'mock_ri_landbank', 'type': 'receiving_institution',
+         'attributes': {'name': 'Landbank', 'code': 'LANDBANK'}},
+        {'id': 'mock_ri_pnb', 'type': 'receiving_institution',
+         'attributes': {'name': 'PNB', 'code': 'PNB'}},
+        {'id': 'mock_ri_rcbc', 'type': 'receiving_institution',
+         'attributes': {'name': 'RCBC', 'code': 'RCBC'}},
+        {'id': 'mock_ri_securitybank', 'type': 'receiving_institution',
+         'attributes': {'name': 'Security Bank', 'code': 'SECURITYBANK'}},
+        {'id': 'mock_ri_chinabank', 'type': 'receiving_institution',
+         'attributes': {'name': 'Chinabank', 'code': 'CHINABANK'}},
+        {'id': 'mock_ri_unionbank', 'type': 'receiving_institution',
+         'attributes': {'name': 'UnionBank', 'code': 'UNIONBANK'}},
+        {'id': 'mock_ri_eastwest', 'type': 'receiving_institution',
+         'attributes': {'name': 'EastWest Bank', 'code': 'EASTWEST'}},
+    ],
+}
+
 
 class PayMongoCashOutError(Exception):
     def __init__(self, message, status_code=None, response_body=None):
@@ -81,6 +115,9 @@ def normalize_wallet_transaction(response_body):
 
 
 def list_receiving_institutions():
+    if getattr(settings, 'PAYMONGO_CASHOUT_MOCK', False):
+        return MOCK_RECEIVING_INSTITUTIONS
+
     try:
         response = requests.get(
             f'{PAYMONGO_API_BASE_URL}/wallets/receiving_institutions',

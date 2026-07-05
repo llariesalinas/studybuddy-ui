@@ -4466,6 +4466,26 @@ def reverse_failed_cash_out(withdrawal):
         wallet.save(update_fields=['balance'])
 
 
+def log_cash_out_activity(withdrawal):
+    # Auto-processed cash-outs never pass through the admin review path, so record the
+    # terminal outcome here to keep the admin activity feed complete. Non-terminal
+    # (pending/processing) resolutions log nothing -- the later callback resolves them.
+    activity_type = {
+        'processed': 'withdrawal_processed',
+        'failed': 'withdrawal_failed',
+    }.get(withdrawal.status)
+    if not activity_type:
+        return
+
+    profile = withdrawal.tutor.profile
+    outcome = 'processed' if withdrawal.status == 'processed' else 'failed'
+    PlatformActivity.objects.create(
+        activity_type=activity_type,
+        message=f"Cash-out #{withdrawal.id} for {profile.fname} {outcome}",
+        institution=profile.institution,
+    )
+
+
 def apply_cash_out_provider_result(withdrawal, provider_data, callback_received=False):
     with transaction.atomic():
         locked_withdrawal = WithdrawalRequest.objects.select_for_update().get(pk=withdrawal.pk)
@@ -4483,6 +4503,7 @@ def apply_cash_out_provider_result(withdrawal, provider_data, callback_received=
             reverse_failed_cash_out(locked_withdrawal)
 
         locked_withdrawal.save()
+        log_cash_out_activity(locked_withdrawal)
         return locked_withdrawal
 
 @api_view(['GET'])

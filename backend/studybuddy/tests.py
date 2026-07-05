@@ -2221,6 +2221,35 @@ class TutorCashOutTests(APITestCase):
         self.assertEqual(withdrawal.provider_wallet_transaction_id, f"mock_wtx_{withdrawal.id}")
         mock_post.assert_not_called()
 
+    @override_settings(PAYMONGO_CASHOUT_MOCK=True)
+    @patch("studybuddy.paymongo_money_movement.requests.get")
+    def test_receiving_institutions_mock_mode_returns_list_without_http_call(self, mock_get):
+        response = self.client.get("/api/wallet/receiving-institutions/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(len(response.data) >= 1)
+        names = {item["attributes"]["name"] for item in response.data}
+        self.assertIn("GCash", names)
+        mock_get.assert_not_called()
+
+    @override_settings(PAYMONGO_WALLET_ID="", PAYMONGO_CASHOUT_MOCK=True)
+    @patch("studybuddy.paymongo_money_movement.requests.post")
+    def test_auto_processed_cashout_logs_platform_activity(self, mock_post):
+        destination = self.destination_fields()
+
+        response = self.client.post(
+            "/api/wallet/cash-outs/",
+            {"amount": "500.00", **destination},
+            format="json",
+        )
+
+        withdrawal = WithdrawalRequest.objects.get(id=response.data["id"])
+        activities = PlatformActivity.objects.filter(activity_type="withdrawal_processed")
+
+        self.assertEqual(withdrawal.status, "processed")
+        self.assertEqual(activities.count(), 1)
+        self.assertIn(str(withdrawal.id), activities.first().message)
+
 
 @override_settings(
     PAYMONGO_WALLET_ID="wallet_test",
