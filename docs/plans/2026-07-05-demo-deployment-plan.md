@@ -1,13 +1,29 @@
 ---
 title: Demo deployment plan
 date: 2026-07-05
-status: Approved
+status: In Progress
 spec:
 ---
 
 # Demo deployment plan
 
 ## Status/Progress Summary
+
+In progress as of 2026-07-06: Render backend and Vercel frontend are both provisioned and live
+(Render on `origin`'s `chore/deploy-debug`, Vercel on a fork — `RayDomD/studybuddy-ui` — pushed in
+parallel, needed only because Vercel's GitHub import can't see a personal repo you're a
+collaborator, not owner, on). Supabase is provisioned, migrated, and seeded via
+`reset_demo_data`. Fixed along the way: a migration file (`0041_recommendation_filter_indexes`)
+that was accidentally gitignored and never committed; a Linux case-sensitivity import bug
+(`@/stores/superAdmin` vs the real `superadmin.js`) that only broke Vercel's build, never local;
+Supabase's direct-connection host being IPv6-only (Render has no outbound IPv6) — switched to the
+Supavisor session pooler; and a structural conflict where the demo Basic Auth gate
+(`demo_basic_auth.py`) and the app's JWT both wanted the `Authorization` header — moved the demo
+gate to `X-Demo-Auth`. See
+[2026-07-06 handoff](../session-summaries/2026-07-06-demo-deployment-handoff-2.md) for full detail.
+Remaining: confirm the `X-Demo-Auth` fix actually resolves login on the live deploy, decide
+Render's Free vs. paid tier for defense day, run the smoke-test checklist, and switch both
+platforms off the throwaway fork/branch onto `develop` once stable.
 
 Resolved via grilling session on 2026-07-05 (see [ADR-0003](../adr/0003-deploy-before-live-paymongo-keys.md),
 [ADR-0004](../adr/0004-vercel-frontend-render-backend.md), [ADR-0005](../adr/0005-basic-auth-for-demo-protection.md)):
@@ -134,3 +150,8 @@ in the codebase, especially the PayMongo cash-out mock path.
   ADR-0004), confirmed Redis is unnecessary for a single-instance demo, and settled on HTTP Basic
   Auth (not Vercel's paid Password Protection) for the demo access gate. Status moved
   Draft → Approved. See ADR-0003, ADR-0004, ADR-0005 for the full reasoning behind each call.
+- **2026-07-06** — Status moved Approved → In Progress: actual Render/Vercel/Supabase provisioning
+  happened, plus five bugs found and fixed along the way (see Status/Progress Summary above for
+  detail): the gitignored migration file, the Linux-only case-sensitivity import bug, Supabase's
+  IPv6-only direct connection, and the `Authorization`-header collision between the demo Basic
+  Auth gate and JWT auth. Login on the live deploy not yet confirmed working after the last fix.
