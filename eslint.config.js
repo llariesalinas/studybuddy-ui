@@ -11,12 +11,30 @@ export default defineConfig([
     files: ['**/*.{vue,js,mjs,jsx}'],
   },
 
-  globalIgnores(['**/dist/**', '**/dist-ssr/**', '**/coverage/**', '**/backend/**', '**/venv/**']),
+  globalIgnores([
+    '**/dist/**',
+    '**/dist-ssr/**',
+    '**/coverage/**',
+    '**/backend/**',
+    '**/venv/**',
+    '**/.claude/worktrees/**',
+  ]),
 
   {
     languageOptions: {
       globals: {
         ...globals.browser,
+      },
+    },
+  },
+
+  {
+    // Vercel Edge Middleware runs outside the browser and exposes process.env
+    // for reading project env vars, even though it isn't full Node.
+    files: ['middleware.js'],
+    languageOptions: {
+      globals: {
+        process: 'readonly',
       },
     },
   },
