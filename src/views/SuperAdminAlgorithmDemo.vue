@@ -4,7 +4,7 @@ import SbSelectModal from '@/components/SbSelectModal.vue'
 import AlgorithmDemoRankedList from '@/components/algorithm-demo/AlgorithmDemoRankedList.vue'
 import AlgorithmDemoPairPicker from '@/components/algorithm-demo/AlgorithmDemoPairPicker.vue'
 import { searchAlgorithmDemoTutees } from '@/services/api/algorithmDemo'
-import { useSuperAdminStore } from '@/stores/superAdmin'
+import { useSuperAdminStore } from '@/stores/superadmin'
 
 const TABS = [
   { key: 'ranked', label: 'Ranked List' },
