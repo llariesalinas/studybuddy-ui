@@ -28,10 +28,12 @@ _Avoid_: Forwarded ticket, transferred ticket
 ### Payouts & cash-out
 
 **Payout Destination**:
-A tutor's saved place to receive cash-out funds — a GCash account or a bank account. Stored as
-`TutorPayoutAccount`.
-_Avoid_: Withdrawal method, payout account (use the model name only when referring to the row
-itself, not the concept)
+A tutor's saved place to receive cash-out funds — a GCash account or a bank account. The
+`TutorPayoutAccount` model that once stored this separately was removed (migration
+`0063_remove_tutorpayoutaccount.py`); the account details (`account_number`, `account_name`,
+`bank_name`, `receiving_institution_*`) now live directly on the `WithdrawalRequest` that used
+them, denormalized at request time rather than referenced from a standalone row.
+_Avoid_: Withdrawal method, `TutorPayoutAccount` (removed — do not reference as a live model)
 
 **Receiving Institution**:
 The bank or e-wallet provider a Payout Destination sends funds to (e.g. BDO, GCash). Identified
