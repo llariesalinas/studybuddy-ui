@@ -180,6 +180,13 @@ DEMO_BASIC_AUTH_PASSWORD = os.getenv('DEMO_BASIC_AUTH_PASSWORD', '')
 if DEMO_BASIC_AUTH_USER and DEMO_BASIC_AUTH_PASSWORD:
     MIDDLEWARE.insert(0, 'studybuddy.demo_basic_auth.DemoBasicAuthMiddleware')
 
+# Login OTP email can't be delivered on the demo deployment (Render blocks outbound SMTP;
+# see docs/plans/2026-07-05-demo-deployment-plan.md), and Resend's sandbox mode without a
+# verified domain can only send to one address. Reuses the demo Basic Auth flag as the
+# "is this the demo deployment" signal rather than adding a second env var -- same reasoning
+# as above, so local dev and real production keep the full OTP flow.
+LOGIN_OTP_DISABLED = bool(DEMO_BASIC_AUTH_USER and DEMO_BASIC_AUTH_PASSWORD)
+
 ROOT_URLCONF = 'backend.urls'
 
 TEMPLATES = [

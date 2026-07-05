@@ -1429,6 +1429,9 @@ def login_view(request):
             profile.institution = active_institution
             profile.save(update_fields=['institution', 'updated_at'])
 
+    if settings.LOGIN_OTP_DISABLED:
+        return Response(build_login_response_payload(user, profile))
+
     try:
         challenge = create_login_otp_challenge(user)
     except EmailRateLimitError:

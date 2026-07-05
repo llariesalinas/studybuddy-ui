@@ -31,6 +31,25 @@ new CORS regex env var is set on Render and login works from a fresh preview URL
 Free vs. paid tier for defense day, run the smoke-test checklist, and switch both platforms off the
 throwaway fork/branch onto `develop` once stable.
 
+A further blocker surfaced after the CORS fix: login OTP email delivery itself was failing.
+Forcing IPv4-only DNS resolution (to work around Render's missing outbound IPv6 route) changed
+the failure from an instant `Errno 101 Network is unreachable` to a `TimeoutError` connecting to
+`smtp.gmail.com:587` — evidence that Render blocks outbound raw SMTP outright, not just IPv6
+routing. Switching to an HTTPS-based email API (Resend, already supported via `django-anymail`)
+was the natural fix, but StudyBuddy has no owned domain to verify, and Resend's sandbox mode
+without domain verification only allows sending to the account's own signup email — unusable for
+multiple seeded demo personas.
+
+Resolved via grilling session on 2026-07-06: **disable login OTP entirely for the demo
+deployment**, since the OTP/2FA mechanism isn't part of what the thesis defense needs to
+demonstrate (the recommender system and core booking/wallet flows are). `LOGIN_OTP_DISABLED`
+(`backend/backend/settings.py:183-188`) reuses the existing `DEMO_BASIC_AUTH_USER`/
+`DEMO_BASIC_AUTH_PASSWORD` check as its signal (no new env var needed) so local dev and any future
+real production keep the full OTP flow unchanged and reviewable. `login_view`
+(`backend/studybuddy/views.py:1432-1433`) returns the normal token payload directly when the flag
+is set, skipping OTP challenge creation — no frontend changes needed, since `Login.vue` already
+falls through to a direct login when the response has no `requires_2fa` key.
+
 Resolved via grilling session on 2026-07-05 (see [ADR-0003](../adr/0003-deploy-before-live-paymongo-keys.md),
 [ADR-0004](../adr/0004-vercel-frontend-render-backend.md), [ADR-0005](../adr/0005-basic-auth-for-demo-protection.md)):
 - Database: **Supabase** (not Render-managed Postgres) — one dedicated project per environment.
@@ -147,6 +166,13 @@ in the codebase, especially the PayMongo cash-out mock path.
   narrowed (or removed in favor of only the stable aliased URL) before this settings file is reused
   for real production, per the "Demo and production use separate environments and separate
   secrets" principle above.
+- **Login OTP is disabled on the demo deployment** (`LOGIN_OTP_DISABLED`,
+  `backend/backend/settings.py:183-188`) because Render blocks outbound SMTP and StudyBuddy has no
+  domain to verify with an HTTPS email API. This is a deliberate, scoped reduction — gated on the
+  same flag as the demo Basic Auth gate, so it cannot accidentally apply to local dev or real
+  production — but it does mean the demo does not exercise the real 2FA path end-to-end. Full OTP
+  flow remains reviewable on localhost. Revisit once a domain is available (unblocks Resend) or
+  Render's SMTP restriction is confirmed/worked around another way.
 
 ## Checks to run
 
@@ -177,3 +203,19 @@ in the codebase, especially the PayMongo cash-out mock path.
   scoped to the user's Vercel project. Flagged as a **critical pre-production item** in Risks —
   it's broader than necessary (allows any deployment under that Vercel project scope) and must be
   narrowed or removed before this settings file is reused for real production.
+- **2026-07-06 (cont.)** — Chased the CORS fix further and found login OTP email itself was
+  failing: forcing IPv4-only DNS resolution (workaround for Render's missing outbound IPv6, same
+  class of fix as the earlier Supabase one) turned an instant `Errno 101 Network is unreachable`
+  into a `TimeoutError` connecting to `smtp.gmail.com:587` — confirming Render blocks outbound raw
+  SMTP outright, independent of IP version. Also added an explicit Django `LOGGING` config
+  (`backend/backend/settings.py`) since the default handler was swallowing tracebacks, which is
+  what let this be diagnosed at all. Investigated switching to Resend (already supported via
+  `django-anymail`), but StudyBuddy has no owned domain, and Resend's unverified-sandbox mode only
+  sends to the account's own signup address — not viable for multiple demo personas. Grilling
+  session concluded OTP/2FA isn't part of what the thesis defense needs to demonstrate, so the
+  simplest fix is disabling it for the demo only: added `LOGIN_OTP_DISABLED`
+  (`backend/backend/settings.py:183-188`), reusing the existing demo Basic Auth flag as its signal
+  rather than introducing a new env var. `login_view` returns the normal login payload directly
+  when set, skipping OTP challenge creation; no frontend changes needed since `Login.vue` already
+  handles a response without `requires_2fa`. Full OTP flow is untouched and still reviewable on
+  localhost.
