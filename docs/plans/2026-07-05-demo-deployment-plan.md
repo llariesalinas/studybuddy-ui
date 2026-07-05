@@ -21,9 +21,15 @@ Supavisor session pooler; and a structural conflict where the demo Basic Auth ga
 (`demo_basic_auth.py`) and the app's JWT both wanted the `Authorization` header — moved the demo
 gate to `X-Demo-Auth`. See
 [2026-07-06 handoff](../session-summaries/2026-07-06-demo-deployment-handoff-2.md) for full detail.
-Remaining: confirm the `X-Demo-Auth` fix actually resolves login on the live deploy, decide
-Render's Free vs. paid tier for defense day, run the smoke-test checklist, and switch both
-platforms off the throwaway fork/branch onto `develop` once stable.
+Also hit a CORS gap this session: Vercel's per-deployment preview URLs (a new hash on every push)
+aren't covered by the fixed-list `CORS_ALLOWED_ORIGINS`, so login failed with a CORS preflight
+error from those URLs. Worked around with a new `CORS_ALLOWED_ORIGIN_REGEXES` setting
+(`backend/backend/settings.py:67-73`) — flagged as a critical item to narrow before production
+(see Risks).
+Remaining: confirm the `X-Demo-Auth` fix actually resolves login on the live deploy, confirm the
+new CORS regex env var is set on Render and login works from a fresh preview URL, decide Render's
+Free vs. paid tier for defense day, run the smoke-test checklist, and switch both platforms off the
+throwaway fork/branch onto `develop` once stable.
 
 Resolved via grilling session on 2026-07-05 (see [ADR-0003](../adr/0003-deploy-before-live-paymongo-keys.md),
 [ADR-0004](../adr/0004-vercel-frontend-render-backend.md), [ADR-0005](../adr/0005-basic-auth-for-demo-protection.md)):
@@ -132,6 +138,15 @@ in the codebase, especially the PayMongo cash-out mock path.
   Render rather than relying on in-memory defaults.
 - Sandbox PayMongo can hide issues that only appear with live keys, so the later production gate
   still needs manual verification.
+- **CRITICAL — revisit before production promotion**: `CORS_ALLOWED_ORIGIN_REGEXES`
+  (`backend/backend/settings.py:67-73`) was added to work around Vercel minting a unique
+  per-deployment URL on every push. It's set on Render to a regex matching any
+  `studybuddy-*-raydom-dcruz-s-projects.vercel.app` URL, which means **any deployment created
+  under that Vercel project scope is automatically an allowed CORS origin** — broader than the
+  demo actually needs. Fine as a deliberate demo-only shortcut to unblock testing quickly; must be
+  narrowed (or removed in favor of only the stable aliased URL) before this settings file is reused
+  for real production, per the "Demo and production use separate environments and separate
+  secrets" principle above.
 
 ## Checks to run
 
@@ -155,3 +170,10 @@ in the codebase, especially the PayMongo cash-out mock path.
   detail): the gitignored migration file, the Linux-only case-sensitivity import bug, Supabase's
   IPv6-only direct connection, and the `Authorization`-header collision between the demo Basic
   Auth gate and JWT auth. Login on the live deploy not yet confirmed working after the last fix.
+- **2026-07-06 (cont.)** — Found a sixth issue while retesting: Vercel's per-deployment preview
+  URLs (unique hash per push) aren't in Render's fixed `CORS_ALLOWED_ORIGINS` list, so login from
+  those URLs fails CORS preflight. Added `CORS_ALLOWED_ORIGIN_REGEXES`
+  (`backend/backend/settings.py:67-73`) as a demo-only workaround, set on Render to a regex
+  scoped to the user's Vercel project. Flagged as a **critical pre-production item** in Risks —
+  it's broader than necessary (allows any deployment under that Vercel project scope) and must be
+  narrowed or removed before this settings file is reused for real production.

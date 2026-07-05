@@ -34,6 +34,23 @@ if not SECRET_KEY:
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env_bool('DEBUG', False)
 
+if not DEBUG:
+    # Render (this project's demo/production host) has no outbound IPv6 route at all.
+    # Already hit this once for the database (Supabase's direct-connection host is
+    # IPv6-only; worked around via the Supavisor pooler -- see DB_HOST/DB_USER below) and
+    # again for login OTP email (smtp.gmail.com publishes both A and AAAA records, and the
+    # IPv6 attempt fails with "Network is unreachable"). Rather than special-case every
+    # outbound host one at a time, force all DNS resolution in this process to IPv4-only.
+    # No effect on local dev, which isn't gated by this network limitation.
+    import socket
+
+    _original_getaddrinfo = socket.getaddrinfo
+
+    def _ipv4_only_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
+        return _original_getaddrinfo(host, port, socket.AF_INET, type, proto, flags)
+
+    socket.getaddrinfo = _ipv4_only_getaddrinfo
+
 _allowed_hosts_raw = os.getenv('ALLOWED_HOSTS', '')
 ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts_raw.split(',') if h.strip()]
 
@@ -63,6 +80,13 @@ else:
     CORS_ALLOW_ALL_ORIGINS = False
     CORS_ALLOWED_ORIGINS = [
         o.strip() for o in os.getenv('CORS_ALLOWED_ORIGINS', '').split(',') if o.strip()
+    ]
+    # Optional regex allowlist, for platforms like Vercel that mint a unique per-deployment
+    # URL every push -- CORS_ALLOWED_ORIGINS alone can't cover those without editing the env
+    # var on every deploy. Empty by default, so real production (which won't set this) is
+    # unaffected.
+    CORS_ALLOWED_ORIGIN_REGEXES = [
+        r.strip() for r in os.getenv('CORS_ALLOWED_ORIGIN_REGEXES', '').split(',') if r.strip()
     ]
     # Explicit defaults plus x-demo-auth, which carries the demo Basic Auth
     # credential (see demo_basic_auth.py) and isn't in django-cors-headers'
