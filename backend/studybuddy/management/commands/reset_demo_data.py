@@ -89,6 +89,9 @@ COURSES = [
     ('BSCS', 'BS Computer Science (CCS)', 'STEM'),
     ('BSIT', 'BS Information Technology (CCS)', 'STEM'),
     ('BSBA', 'BS Business Administration (CBA)', 'ABM'),
+    # Intentionally seeded with no subjects/catalog entries: the empty course used
+    # to demo the live "add subjects to a course" flow on the Admin Course Catalog.
+    ('BA-POLSCI', 'Political Science', 'HUMSS'),
 ]
 
 COURSE_CATEGORY_ALIASES = {
@@ -321,6 +324,14 @@ class Command(BaseCommand):
                 course_code=code,
                 defaults={'course_name': name, 'strand': Strand.objects.get(strand_code=strand)},
             )
+        # Drop stray courses from older/manual seeds (e.g. bare STEM/ABM/HUMMS duplicates)
+        # so the course picker only shows the defined set. UserProfile.course is SET_NULL and
+        # catalog entries CASCADE, so this never deletes users. Pruning before catalog seeding
+        # also prevents duplicate alias entries (bare STEM matching SHS-STEM subjects).
+        defined_course_codes = [c[0] for c in COURSES]
+        pruned_courses, _ = Course.objects.exclude(course_code__in=defined_course_codes).delete()
+        if pruned_courses:
+            self.stdout.write(f'  pruned {pruned_courses} stray course row(s)')
 
         subject_rows = []
         for grade in range(1, 7):
@@ -357,6 +368,19 @@ class Command(BaseCommand):
                           'contact_person': inst['contact']},
             )
             institutions[inst['domain']] = obj
+
+        # Drop stray test institutions (e.g. a.com/b.com) so no orphan institution lingers
+        # with an empty catalog. Only prune ones with no attached profiles, so a real
+        # Admin/SuperAdmin account is never left institution-less by mistake.
+        keep_domains = [inst['domain'] for inst in INSTITUTIONS]
+        stray_pks = list(
+            PartnerInstitution.objects.exclude(school_email_domain__in=keep_domains)
+            .filter(userprofile__isnull=True)
+            .values_list('pk', flat=True)
+        )
+        if stray_pks:
+            pruned_institutions, _ = PartnerInstitution.objects.filter(pk__in=stray_pks).delete()
+            self.stdout.write(f'  pruned {pruned_institutions} stray institution row(s)')
 
         self._seed_institution_course_catalog(institutions, subject_rows)
 
@@ -877,6 +901,9 @@ class Command(BaseCommand):
             (rated[3], Decimal('400'), 'flagged', 'Manual review: rapid successive requests'),
         ]
         wd_dates = {}
+        # Terminal (processed/failed) payouts also log a PlatformActivity, mirroring
+        # log_cash_out_activity (views.py), so auto-processed payouts show in the admin feed.
+        payout_activity, payout_activity_dates = [], []
         for tutor, amount, status_, reason in wd_specs:
             assert amount <= INSTAPAY_CAP
             wd = WithdrawalRequest.objects.create(
@@ -896,7 +923,17 @@ class Command(BaseCommand):
             elif status_ == 'pending':
                 wallet.pending_amount = amount
                 earnings[wallet.pk] = earnings.get(wallet.pk, Decimal('0')) - amount
+            if status_ in ('processed', 'failed'):
+                payout_activity.append(PlatformActivity(
+                    activity_type=f'withdrawal_{status_}',
+                    message=f'Cash-out #{wd.id} for {tutor.profile.fname} {status_}',
+                    institution=tutor.profile.institution))
+                payout_activity_dates.append(self._now() - timedelta(days=random.randint(1, 6)))
         self._backdate(WithdrawalRequest, wd_dates, field='requested_at')
+
+        created_payout_activity = PlatformActivity.objects.bulk_create(payout_activity)
+        self._backdate(PlatformActivity,
+                       {a.pk: d for a, d in zip(created_payout_activity, payout_activity_dates)})
 
         for wallet in wallets.values():
             wallet.balance = earnings.get(wallet.pk, Decimal('0'))
