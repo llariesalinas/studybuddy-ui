@@ -15,11 +15,21 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
+from django.http import HttpResponse
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 
+
+def healthz(request):
+    # Liveness check for Render (and similar platforms). No DB query, no auth --
+    # exempted from DemoBasicAuthMiddleware so the platform's health checker
+    # (which never sends Basic Auth credentials) doesn't get marked unhealthy.
+    return HttpResponse('ok')
+
+
 urlpatterns = [
+    path('healthz', healthz),
     path('admin/', admin.site.urls),
     path('api/', include('studybuddy.urls')),
 ]

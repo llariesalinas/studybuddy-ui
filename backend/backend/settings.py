@@ -134,6 +134,13 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
+# Demo-only shared-password gate (see ADR-0005). Only active when both env vars are
+# set, so local dev and real production (which don't set these) are unaffected.
+DEMO_BASIC_AUTH_USER = os.getenv('DEMO_BASIC_AUTH_USER', '')
+DEMO_BASIC_AUTH_PASSWORD = os.getenv('DEMO_BASIC_AUTH_PASSWORD', '')
+if DEMO_BASIC_AUTH_USER and DEMO_BASIC_AUTH_PASSWORD:
+    MIDDLEWARE.insert(0, 'studybuddy.demo_basic_auth.DemoBasicAuthMiddleware')
+
 ROOT_URLCONF = 'backend.urls'
 
 TEMPLATES = [
@@ -166,6 +173,10 @@ DATABASES = {
         "PASSWORD": os.getenv("DB_PASSWORD"),
         "HOST": os.getenv("DB_HOST"),
         "PORT": os.getenv("DB_PORT", "5432"),
+        # Supabase's external Postgres endpoint requires SSL; local Postgres does
+        # not, so this defaults to libpq's own default ("prefer") and only needs
+        # to be set to "require" via DB_SSLMODE for Supabase-backed environments.
+        "OPTIONS": {"sslmode": os.getenv("DB_SSLMODE", "prefer")},
     }
 }
 
@@ -365,13 +376,16 @@ PAYMONGO_CASHOUT_CALLBACK_URL = os.getenv("PAYMONGO_CASHOUT_CALLBACK_URL", "")
 PAYMONGO_CASHOUT_CALLBACK_SECRET = os.getenv("PAYMONGO_CASHOUT_CALLBACK_SECRET", "")
 # Dev-only: simulate a successful PayMongo wallet transaction instead of calling the
 # live Money Movement API. PayMongo test mode has no payouts product, so this is the
-# only way to exercise cash-out locally. Must never be enabled in production.
+# only way to exercise cash-out locally or in the demo environment (see ADR-0003).
+# Gated on the secret key's own mode (sk_live_ vs sk_test_) rather than DEBUG, since
+# the demo runs with DEBUG=False but still needs mock cash-outs on a sandbox key.
 PAYMONGO_CASHOUT_MOCK = os.getenv("PAYMONGO_CASHOUT_MOCK", "false").lower() in ("1", "true", "yes")
-if PAYMONGO_CASHOUT_MOCK and not DEBUG:
-    import logging
-    logging.getLogger(__name__).warning(
-        "PAYMONGO_CASHOUT_MOCK is enabled with DEBUG=false. Cash-outs will be "
-        "simulated as successful without moving real money."
+PAYMONGO_LIVE_MODE = PAYMONGO_SECRET_KEY.startswith("sk_live_")
+if PAYMONGO_CASHOUT_MOCK and PAYMONGO_LIVE_MODE:
+    raise RuntimeError(
+        "PAYMONGO_CASHOUT_MOCK cannot be enabled alongside a live PayMongo secret key "
+        "(sk_live_...). This would fake cash-out payouts while real money could be "
+        "moving elsewhere in the same environment."
     )
 if not DEBUG and not PAYMONGO_CASHOUT_CALLBACK_SECRET:
     raise RuntimeError(
