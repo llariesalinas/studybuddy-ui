@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install
+      - run: npm run lint
+      - run: npm run build
+      - run: npm run test
+
+  backend:
+    runs-on: ubuntu-latest
+    env:
+      DEBUG: 'true'
+      SECRET_KEY: ci-test-secret-key
+      DB_NAME: studybuddy
+      DB_USER: studybuddy
+      DB_PASSWORD: studybuddy
+      DB_HOST: localhost
+      DB_PORT: 5432
+      PAYMONGO_SECRET_KEY: sk_test_ci-placeholder
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: studybuddy
+          POSTGRES_USER: studybuddy
+          POSTGRES_PASSWORD: studybuddy
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U studybuddy"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r backend/requirements.txt
+      - run: python manage.py test
+        working-directory: backend
