@@ -161,3 +161,17 @@ reallocated to CBF when CF is unavailable), not a bug. Surfaced in the UI as a "
 with the subtext "CF unavailable — no rating history."
 _Avoid_: "new user" (too broad — a Tutee with bookings but no completed/rated ones is also
 Cold-Start; the defining trait is absence of Rating rows, not account age)
+
+### Institution catalog
+
+**Institution Course Catalog**:
+The list of course-subject pairings that a specific Partner Institution offers or recognizes inside
+Studybuddy. It is institution-scoped: one institution admin curates only their own institution's
+catalog, and their changes must not alter another institution's catalog.
+_Avoid_: global subject list, shared institution catalog
+
+**Institution Catalog Entry**:
+A single institution-scoped relationship that says one Subject belongs under one Course for one
+Partner Institution. This is a curation record, not a new global Subject definition.
+_Avoid_: subject creation (unless we truly mean adding a brand-new master Subject for every
+institution)
