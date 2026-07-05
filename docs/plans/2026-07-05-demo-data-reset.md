@@ -1,7 +1,7 @@
 ---
 title: Demo data reset (thesis defense seed)
 date: 2026-07-05
-status: Approved
+status: Done
 spec:
 ---
 
@@ -9,14 +9,22 @@ spec:
 
 <!-- LIVING SUMMARY: keep this section and the Changelog current on every edit -->
 
-**Status & Progress Summary** (2026-07-05): Approved, not yet started. Plan captures 19 decisions
-from a full grilling session (DB scope, targeted clear, multi-institution, booking-lifecycle
-coverage, named CBF/CF personas with engineered rating clusters, tutor rating/schedule coverage,
-scheduling load-limit demo, compensation/wallet data, activity feed, subject depth, and a
-growth-shaped ~60-day backdating scheme) plus technical gotchas found while reading the actual
-recommender/admin-dashboard code (day-of-week booking bug, `auto_now_add` backdating trap, CF
-Pearson math requiring ≥2 shared differentiated ratings, money reconciliation). No code written
-yet.
+**Status & Progress Summary** (2026-07-05): Done. `reset_demo_data.py` shipped on
+`feat/demo-data-reset`, ran clean against the local dev DB (446 users, 90 subjects, 6,580 slots,
+1,341 bookings, 940 ratings, Grace 10/10 / Paolo 8/10 load, Isabel's wallet reconciling to
+₱18,800 exactly), and all three recommender scenarios were verified via shell: Bea cold-start
+(CF None), Carlo agreement (Miguel 0.94), Diane CF-override (Elena 0.776 > Miguel 0.749 despite
+weaker CBF). One design bug found and fixed during verification: both clusters originally shared
+the same anchor rating pattern, making them inseparable by Pearson similarity — Cluster B's
+pattern is now inverted. Full backend suite: 259 tests, 14 failures + 2 errors — identical count
+to the documented pre-existing baseline (avatar upload, dashboard recommendation), confirmed
+unrelated since the test suite runs against a separate `test_postgres` database this command never
+touches. Discovered during implementation (not in original plan): tutors need approved
+applications with verified documents or `can_create_new_booking` blocks them; pending queue
+applications live on dedicated applicant accounts; a stale idle connection through the Supavisor
+pooler required `--keepdb` to run tests at all (unrelated to this work, a pre-existing local-env
+quirk). Testing guide at `docs/artifacts/2026-07-05-demo-data-testing-guide.md`. Summary at
+`docs/session-summaries/2026-07-05-demo-data-reset-summary.md`.
 
 ## Goal
 
@@ -232,3 +240,5 @@ step-by-step instructions for demonstrating each objective.
 | Date | Change |
 |------|--------|
 | 2026-07-05 | Created plan from a full grilling session (19 decisions) covering DB scope, multi-institution setup, booking-lifecycle coverage, named CBF/CF personas with engineered rating clusters, tutor rating/schedule coverage, scheduling load-limit demo, compensation/wallet data, activity feed, subject depth, and growth-shaped backdating. Status: Approved. |
+| 2026-07-05 | Implemented `reset_demo_data.py` on `feat/demo-data-reset`; ran against dev DB and empirically verified all three recommender scenarios via shell. Fixed a cluster-design bug found during verification (identical anchor patterns made clusters inseparable by Pearson — Cluster B inverted). Added implementation discoveries: approved applications required for tutors to accept bookings, pending queue applications on dedicated applicant accounts, legacy subject cleanup. Wrote the testing guide. Status: Approved → In Progress. |
+| 2026-07-05 | Ran full backend suite (259 tests, 14 failures + 2 errors, identical to documented pre-existing baseline and confirmed unrelated). Wrote session summary. Status: In Progress → Done. |
