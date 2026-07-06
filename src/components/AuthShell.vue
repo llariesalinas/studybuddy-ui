@@ -1,9 +1,9 @@
 <template>
   <div class="sb-auth-page">
-    <a class="sb-auth-brand" href="/" @click.prevent="router.push('/')">
+    <a class="sb-auth-brand" :href="backTo" @click.prevent="router.push(backTo)">
       <span class="sb-brand-mark" aria-hidden="true">S</span>
       <span>StudyBuddy</span>
-      <span class="sb-auth-back">← Back to home</span>
+      <span class="sb-auth-back">{{ backLabel }}</span>
     </a>
 
     <div class="sb-auth-theme-toggle">
@@ -28,6 +28,12 @@
 <script setup>
 import { useRouter } from 'vue-router'
 import SbThemeToggle from '@/components/SbThemeToggle.vue'
+
+defineProps({
+  backTo: { type: String, default: '/' },
+  backLabel: { type: String, default: '← Back to home' },
+})
+
 const router = useRouter()
 </script>
 

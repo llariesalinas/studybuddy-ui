@@ -1,5 +1,5 @@
 <template>
-  <AuthShell>
+  <AuthShell :back-to="profileRoute" back-label="← Back to profile">
     <template #icon>
       <i :class="statusIconClass"></i>
     </template>
@@ -207,6 +207,7 @@ import { computed, onMounted, ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/services/api/api'
 import { useAuthStore } from '@/stores/auth'
+import { useProfileStore } from '@/stores/profile'
 import AuthShell from '@/components/AuthShell.vue'
 import { MAX_DOCUMENT_UPLOAD_SIZE_BYTES } from '@/config'
 import {
@@ -217,8 +218,10 @@ import {
 
 const router = useRouter()
 const authStore = useAuthStore()
+const profileStore = useProfileStore()
 const isTutee = computed(() => authStore.userRole === 'tutee')
 const dashboardRoute = computed(() => (isTutee.value ? '/dashboard' : '/tch-dashboard'))
+const profileRoute = computed(() => (isTutee.value ? '/tutee-profile' : '/tutor-profile'))
 const loading = ref(true)
 const error = ref('')
 const application = ref(null)
@@ -419,6 +422,10 @@ const handleDocumentSubmit = async () => {
     }
 
     await fetchStatus()
+    // fetchStatus() only refreshes this page's local `application` state -- the profile page's
+    // VerificationStatusCard reads profileStore.applicationStatus/renewalStatus separately, which
+    // stays stale (profileStore.loaded is already true) unless explicitly re-fetched here too.
+    await profileStore.checkProfileStatus()
   } catch (err) {
     console.error('Document submission failed:', err)
     resubmitError.value =
