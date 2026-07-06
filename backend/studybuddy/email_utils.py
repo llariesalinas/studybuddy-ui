@@ -31,6 +31,9 @@ def _get_smtp_connection():
         return None
 
 def send_application_received_email(profile, role_label='tutor'):
+    if settings.IS_DEMO_DEPLOYMENT:
+        logger.info("Demo deployment: suppressing application received email to %s", profile.user.email)
+        return
     subject = f"Your StudyBuddy {role_label.capitalize()} Application"
     message = (
         f"Hi {profile.fname},\n\n"
@@ -55,6 +58,9 @@ def send_application_received_email(profile, role_label='tutor'):
         logger.exception("Failed to send application received email to %s", profile.user.email)
 
 def send_application_approved_email(profile, role_label='tutor'):
+    if settings.IS_DEMO_DEPLOYMENT:
+        logger.info("Demo deployment: suppressing application approved email to %s", profile.user.email)
+        return
     subject = f"Congratulations! Your StudyBuddy {role_label.capitalize()} Application was Approved"
     login_url = f"{settings.FRONTEND_URL.rstrip('/')}/login"
     message = (
@@ -81,6 +87,9 @@ def send_application_approved_email(profile, role_label='tutor'):
         logger.exception("Failed to send application approved email to %s", profile.user.email)
 
 def send_application_rejected_email(profile, reason, role_label='tutor'):
+    if settings.IS_DEMO_DEPLOYMENT:
+        logger.info("Demo deployment: suppressing application rejected email to %s", profile.user.email)
+        return
     subject = f"Update regarding your StudyBuddy {role_label.capitalize()} Application"
     status_url = f"{settings.FRONTEND_URL.rstrip('/')}/application-status"
     message = (
@@ -109,6 +118,9 @@ def send_application_rejected_email(profile, reason, role_label='tutor'):
         logger.exception("Failed to send application rejected email to %s", profile.user.email)
 
 def send_document_renewal_result_email(profile, role_label, new_status, reason=''):
+    if settings.IS_DEMO_DEPLOYMENT:
+        logger.info("Demo deployment: suppressing document renewal result email to %s", profile.user.email)
+        return
     status_url = f"{settings.FRONTEND_URL.rstrip('/')}/application-status"
     if new_status == 'approved':
         subject = f"Your StudyBuddy {role_label.capitalize()} Document Renewal was Approved"

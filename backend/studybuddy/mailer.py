@@ -118,6 +118,9 @@ def _password_reset_url(user):
 def send_login_otp(user, code):
     """Send the login OTP synchronously. Raises EmailRateLimitError if capped,
     or the underlying exception if delivery fails after retries."""
+    if settings.IS_DEMO_DEPLOYMENT:
+        logger.info("Demo deployment: suppressing login OTP email for user_id=%s", user.id)
+        return
     recipient = _recipient_for(user)
     if not is_send_allowed(recipient):
         raise EmailRateLimitError(recipient)
@@ -140,6 +143,9 @@ def send_login_otp(user, code):
 # here because Django-Q2 owns task-level retries (see Q_CLUSTER).
 
 def send_password_reset_email_task(user_id):
+    if settings.IS_DEMO_DEPLOYMENT:
+        logger.info("Demo deployment: suppressing password reset email for user_id=%s", user_id)
+        return
     user = User.objects.get(pk=user_id)
     text_body, html_body = _render(
         "password_reset", {"reset_url": _password_reset_url(user)}
@@ -156,6 +162,9 @@ def send_password_reset_email_task(user_id):
 
 
 def send_password_changed_email_task(user_id):
+    if settings.IS_DEMO_DEPLOYMENT:
+        logger.info("Demo deployment: suppressing password changed email for user_id=%s", user_id)
+        return
     user = User.objects.get(pk=user_id)
     text_body, html_body = _render("password_changed", {})
     _deliver(
@@ -170,6 +179,9 @@ def send_password_changed_email_task(user_id):
 
 
 def send_document_renewal_reminder_email_task(user_id, role_label, days_remaining, due_at_iso):
+    if settings.IS_DEMO_DEPLOYMENT:
+        logger.info("Demo deployment: suppressing document renewal reminder email for user_id=%s", user_id)
+        return
     user = User.objects.get(pk=user_id)
     status_url = f"{settings.FRONTEND_URL.rstrip('/')}/application-status"
     text_body, html_body = _render(
