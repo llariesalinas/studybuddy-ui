@@ -32,6 +32,14 @@ class DemoBasicAuthMiddleware:
         if request.path == '/healthz':
             return self.get_response(request)
 
+        # Media (avatars, enrollment-proof uploads, etc.) is rendered via plain <img>
+        # tags, which can't attach the custom X-Demo-Auth header -- so it would 401
+        # forever if gated here. Production already serves media without JWT auth for
+        # the same reason (see the "serve media files unconditionally" fix); the demo
+        # gate just needs the same carve-out.
+        if request.path.startswith('/media/'):
+            return self.get_response(request)
+
         header = request.META.get('HTTP_X_DEMO_AUTH', '')
         if header.startswith('Basic '):
             try:
