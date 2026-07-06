@@ -1,6 +1,5 @@
 from django.urls import path, include
 from django.conf.urls.static import static
-from django.conf import settings
 from rest_framework_simplejwt.views import TokenRefreshView
 from .views import(
                    cancel_booking,
@@ -150,6 +149,13 @@ urlpatterns = [
     path('bookings/<int:booking_id>/verify-online-payment/', views.verify_online_payment),
     path('dev/bookings/<int:booking_id>/force-live/', views.dev_force_booking_live),
     path('dev/bookings/<int:booking_id>/clear-force-live/', views.dev_clear_booking_live),
+    path(
+        'dev/bookings/<int:booking_id>/ready-for-payment/',
+        views.dev_mark_booking_ready_for_payment
+    ),
+    # Dev wallet fund tools (gated in-view by BOOKING_DEV_TOOLS_ENABLED, same as the booking ones above)
+    path('dev/wallet/add/', views.dev_add_wallet_funds),
+    path('dev/wallet/remove/', views.dev_remove_wallet_funds),
     # Self-service verification dev tools (gated in-view by VERIFICATION_DEV_TOOLS_ENABLED)
     path('dev/verification/', views.dev_verification_readout),
     path('dev/verification/set-state/', views.dev_verification_set_state),
@@ -161,13 +167,3 @@ urlpatterns = [
     path('recommend-tutors/', views.recommend_tutors_view),
     path('chat/', include('studybuddy.chat.urls')),
 ]
-
-if settings.DEBUG:
-    urlpatterns += [path('dev/wallet/add/', views.dev_add_wallet_funds)]
-    urlpatterns += [path('dev/wallet/remove/', views.dev_remove_wallet_funds)]
-    urlpatterns += [
-        path(
-            'dev/bookings/<int:booking_id>/ready-for-payment/',
-            views.dev_mark_booking_ready_for_payment
-        )
-    ]

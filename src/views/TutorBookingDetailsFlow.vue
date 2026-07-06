@@ -344,6 +344,7 @@ import { useToastStore } from '@/stores/toast'
 import { useHaptics } from '@/composables/useHaptics'
 import { useOrbitStrip } from '@/composables/useOrbitStrip'
 import { useSessionClock } from '@/composables/useSessionClock'
+import { BOOKING_DEV_TOOLS_ENABLED } from '@/config.js'
 import DevSessionQaPanel from '@/components/DevSessionQaPanel.vue'
 import SupportModal from '@/components/SupportModal.vue'
 import SessionCountdownBar from '@/components/session/SessionCountdownBar.vue'
@@ -367,7 +368,7 @@ const supportContextType = ref('Booking')
 const supportContextId = ref(null)
 const cancelReason = ref('')
 const showConfetti = ref(false)
-const isDev = import.meta.env.DEV
+const isDev = import.meta.env.DEV || BOOKING_DEV_TOOLS_ENABLED
 
 const confettiPieces = Array.from({ length: 26 }, (_, index) => index)
 const confettiColors = [

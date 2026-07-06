@@ -324,6 +324,13 @@ VERIFICATION_DEV_TOOLS_ENABLED = env_bool('VERIFICATION_DEV_TOOLS_ENABLED', Fals
 # before any work and 403 when it is off.
 ALGORITHM_DEMO_TOOLS_ENABLED = env_bool('ALGORITHM_DEMO_TOOLS_ENABLED', False)
 
+# Enables the dev booking/wallet tools (force a booking's session into a given live phase, mark
+# ready-for-payment, credit/debit a tutor wallet). Previously gated on DEBUG alone, which meant
+# they were unreachable on the demo deployment (DEBUG=False there by design). Defaults False so
+# real production stays inert; the demo sets this explicitly to let the panel force session/wallet
+# states for the thesis defense.
+BOOKING_DEV_TOOLS_ENABLED = env_bool('BOOKING_DEV_TOOLS_ENABLED', False)
+
 PASSWORD_RESET_TIMEOUT = 3600
 LOGIN_OTP_TTL_SECONDS = 600
 LOGIN_OTP_MAX_ATTEMPTS = 5

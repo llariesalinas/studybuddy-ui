@@ -12,6 +12,12 @@ export const LOGO_DEV_TOKEN = import.meta.env.VITE_LOGO_DEV_TOKEN || ''
 export const DEMO_BASIC_AUTH_USER = import.meta.env.VITE_DEMO_BASIC_AUTH_USER || ''
 export const DEMO_BASIC_AUTH_PASSWORD = import.meta.env.VITE_DEMO_BASIC_AUTH_PASSWORD || ''
 
+// Shows the dev booking/wallet panels (force a session's live phase, mark ready-for-payment,
+// credit/debit a tutor wallet) outside of `import.meta.env.DEV`. Mirrors the backend's
+// BOOKING_DEV_TOOLS_ENABLED flag -- only meaningful on the demo deployment, where it's set to
+// 'true' so the panel is reachable despite being a production build.
+export const BOOKING_DEV_TOOLS_ENABLED = import.meta.env.VITE_BOOKING_DEV_TOOLS_ENABLED === 'true'
+
 // Derive WebSocket server root from API_BASE_URL at runtime
 export function wsServerRoot() {
   const fallbackOrigin =

@@ -3424,7 +3424,7 @@ def complete_booking(request, booking_id):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def dev_force_booking_live(request, booking_id):
-    if not settings.DEBUG:
+    if not settings.BOOKING_DEV_TOOLS_ENABLED:
         return Response(status=404)
 
     profile = request.user.userprofile
@@ -3463,7 +3463,7 @@ def dev_force_booking_live(request, booking_id):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def dev_clear_booking_live(request, booking_id):
-    if not settings.DEBUG:
+    if not settings.BOOKING_DEV_TOOLS_ENABLED:
         return Response(status=404)
 
     profile = request.user.userprofile
@@ -3485,7 +3485,7 @@ def dev_clear_booking_live(request, booking_id):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def dev_mark_booking_ready_for_payment(request, booking_id):
-    if not settings.DEBUG:
+    if not settings.BOOKING_DEV_TOOLS_ENABLED:
         return Response(status=404)
 
     profile = request.user.userprofile
@@ -5282,7 +5282,7 @@ def verify_cash_in(request, topup_id):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def dev_add_wallet_funds(request):
-    if not settings.DEBUG:
+    if not settings.BOOKING_DEV_TOOLS_ENABLED:
         return Response(status=404)
     try:
         tutor = request.user.userprofile.tutor
@@ -5307,7 +5307,7 @@ def dev_add_wallet_funds(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def dev_remove_wallet_funds(request):
-    if not settings.DEBUG:
+    if not settings.BOOKING_DEV_TOOLS_ENABLED:
         return Response(status=404)
     try:
         tutor = request.user.userprofile.tutor

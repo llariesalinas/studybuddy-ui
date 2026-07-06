@@ -109,6 +109,7 @@ import { useSessionsStore } from '@/stores/completedSessions'
 import { useToastStore } from '@/stores/toast'
 import VenueConfirmModal from '@/components/VenueConfirmModal.vue'
 import SessionCheckInModal from '@/components/SessionCheckInModal.vue'
+import { BOOKING_DEV_TOOLS_ENABLED } from '@/config.js'
 
 const DEV_LIVE_REFRESH_KEY = 'studybuddy_dev_live_refresh'
 
@@ -124,7 +125,7 @@ const sessionsStore = useSessionsStore()
 const activeSession = useActiveSessionStore()
 const toastStore = useToastStore()
 
-const isDev = import.meta.env.DEV
+const isDev = import.meta.env.DEV || BOOKING_DEV_TOOLS_ENABLED
 const isSubmitting = ref(false)
 const isVenuePreviewOpen = ref(false)
 const isMidpointPreviewOpen = ref(false)
