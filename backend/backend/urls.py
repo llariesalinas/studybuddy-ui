@@ -34,5 +34,9 @@ urlpatterns = [
     path('api/', include('studybuddy.urls')),
 ]
 
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+# Serves uploaded media (avatars, application documents) unconditionally, not just under DEBUG.
+# Django's own docs discourage this for real production (no caching/CDN, single-process request
+# handling), but this app has no separate media host (S3, etc.) configured, and DEBUG=False on the
+# demo deployment for production-style security meant this block never ran there -- every image
+# 404'd. Revisit with a real media host before this settings file is reused for real production.
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
