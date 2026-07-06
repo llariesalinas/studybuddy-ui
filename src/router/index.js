@@ -4,6 +4,7 @@ import { useProfileStore } from '@/stores/profile'
 import { needsTutorApplicationLockout, needsTuteeVerificationBlock } from '@/services/tutorApplicationState'
 
 const TUTEE_BOOKING_FLOW_ROUTE_NAMES = ['book', 'tutors', 'tutor-details']
+const GUEST_ONLY_ROUTE_NAMES = ['login', 'register']
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -282,6 +283,16 @@ router.beforeEach(async (to, from, next) => {
   // 1️⃣ Protect routes requiring authentication
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     return next('/login')
+  }
+
+  // Keep already-authenticated users off guest-only pages (e.g. hitting /login via
+  // the browser back button after a push-based post-login redirect).
+  if (GUEST_ONLY_ROUTE_NAMES.includes(to.name) && authStore.isAuthenticated && authStore.token) {
+    if (normalizedUserRole === 'tutor') return next('/tch-dashboard')
+    if (normalizedUserRole === 'tutee') return next('/dashboard')
+    if (normalizedUserRole === 'admin') return next('/admin/dashboard')
+    if (normalizedUserRole === 'superadmin') return next('/superadmin/dashboard')
+    return next('/')
   }
 
   if (authStore.isAuthenticated) {
