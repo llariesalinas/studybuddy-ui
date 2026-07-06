@@ -97,10 +97,10 @@
                   <button 
                     class="btn btn-sm btn-outline-success rounded-circle d-flex align-items-center justify-content-center sb-btn" 
                     style="width: 42px; height: 42px;"
-                    :disabled="confirmingId === session.id" 
+                    :disabled="tutorRenewalRequired || confirmingId === session.id" 
                     @click="confirmSession(session.id)"
-                    title="Confirm Session"
-                    aria-label="Confirm Session"
+                    :title="tutorRenewalRequired ? 'Renew your verification to confirm sessions' : 'Confirm Session'"
+                    :aria-label="tutorRenewalRequired ? 'Renew your verification to confirm sessions' : 'Confirm Session'"
                   >
                     <span v-if="confirmingId === session.id" class="spinner-border spinner-border-sm" aria-hidden="true"></span>
                     <svg v-else xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-check-lg" viewBox="0 0 16 16">
@@ -206,6 +206,7 @@
 <script setup>
 import { ref, computed, onBeforeUnmount, onMounted } from 'vue'
 import { useSessionsStore } from '@/stores/completedSessions'
+import { useProfileStore } from '@/stores/profile'
 import api from '@/services/api/api'
 import * as bootstrap from 'bootstrap'
 import { useToastStore } from '@/stores/toast'
@@ -214,12 +215,14 @@ const toastStore = useToastStore()
 const confirmingId = ref(null)
 const rejectingId = ref(null)
 const sessionStore = useSessionsStore()
+const profileStore = useProfileStore()
 const highlightedRequestIds = ref([])
 const selectedDate = ref('')
 const actionError = ref('')
 const sessionLoadLimitModalOpen = ref(false)
 const sessionLoadLimitModalLoad = ref(0)
 const sessionLoadLimitModalLimit = ref(10)
+const tutorRenewalRequired = computed(() => Boolean(profileStore.tutorRenewalRequired))
 
 // Modal Refs
 const locationModalRef = ref(null)
@@ -330,6 +333,10 @@ const formatDisplayTime = (timeValue) => {
 }
 
 const confirmSession = async (id) => {
+  if (tutorRenewalRequired.value) {
+    return
+  }
+
   confirmingId.value = id
   actionError.value = ''
   closeSessionLoadLimitModal()

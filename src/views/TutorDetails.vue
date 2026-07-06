@@ -237,11 +237,19 @@
               <button
                 type="button"
                 class="btn confirm-booking-btn w-100 sb-btn"
-                :disabled="selectedSlots.length === 0 || isSubmittingBooking"
+                :disabled="isConfirmBookingDisabled"
                 @click="confirmBooking"
               >
-                {{ isSubmittingBooking ? 'Confirming...' : 'Confirm Booking' }}
+                {{ confirmBookingButtonLabel }}
               </button>
+
+              <router-link
+                v-if="isTuteeVerificationBlocked"
+                to="/application-status"
+                class="verify-booking-link"
+              >
+                Verify your account to book
+              </router-link>
             </section>
           </div>
         </aside>
@@ -259,7 +267,9 @@ import { useInitialBookingPrefsStore } from '@/stores/initialbookingprefs'
 import { useFindTutorsStore } from '@/stores/findTutors'
 import { usePaymentStore } from '@/stores/tuteePaymentDetails'
 import { useChatStore } from '@/stores/chat'
+import { useProfileStore } from '@/stores/profile'
 import { useToastStore } from '@/stores/toast'
+import { needsTuteeVerificationBlock } from '@/services/tutorApplicationState'
 import api from '@/services/api/api'
 
 const router = useRouter()
@@ -271,6 +281,7 @@ const initialBookingStore = useInitialBookingPrefsStore()
 const findTutorsStore = useFindTutorsStore()
 const paymentStore = usePaymentStore()
 const chatStore = useChatStore()
+const profileStore = useProfileStore()
 const toastStore = useToastStore()
 
 const tutorID = route.params.id
@@ -472,6 +483,36 @@ const sessionTimeRangeLabel = computed(() => {
   const last = effectiveSelectedSlots.value[effectiveSelectedSlots.value.length - 1]
 
   return formatTimeRangeLabel(first.session_date, first.time_slot, addThirtyMinutes(last.time_slot))
+})
+
+const tuteeVerificationSnapshot = computed(() => ({
+  application_status: profileStore.applicationStatus || null,
+  document_renewal_status: profileStore.renewalStatus || null,
+  tutee_verification_enforced: profileStore.tuteeVerificationEnforced,
+}))
+
+const isTuteeVerificationBlocked = computed(() =>
+  profileStore.loaded && needsTuteeVerificationBlock(tuteeVerificationSnapshot.value)
+)
+
+const isConfirmBookingDisabled = computed(() =>
+  isTuteeVerificationBlocked.value || selectedSlots.value.length === 0 || isSubmittingBooking.value
+)
+
+const confirmBookingButtonLabel = computed(() => {
+  if (isTuteeVerificationBlocked.value) {
+    return 'Verify to book'
+  }
+
+  if (isSubmittingBooking.value) {
+    return 'Confirming...'
+  }
+
+  if (selectedSlots.value.length === 0) {
+    return 'Select a slot first'
+  }
+
+  return 'Confirm Booking'
 })
 
 const backButton = () => {
@@ -750,7 +791,7 @@ function toggleSlot(day, week, slot) {
 }
 
 const confirmBooking = async () => {
-  if (selectedSlots.value.length === 0) {
+  if (isTuteeVerificationBlocked.value || selectedSlots.value.length === 0) {
     return
   }
 
@@ -1409,6 +1450,20 @@ onMounted(async () => {
 .confirm-booking-btn:disabled {
   background: #b8c5bf;
   color: #f8faf9;
+}
+
+.verify-booking-link {
+  display: inline-flex;
+  justify-content: center;
+  margin-top: 0.85rem;
+  color: #0a7a51;
+  font-size: 0.92rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.verify-booking-link:hover {
+  text-decoration: underline;
 }
 
 @media (max-width: 1199px) {

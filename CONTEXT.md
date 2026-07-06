@@ -162,6 +162,52 @@ with the subtext "CF unavailable — no rating history."
 _Avoid_: "new user" (too broad — a Tutee with bookings but no completed/rated ones is also
 Cold-Start; the defining trait is absence of Rating rows, not account age)
 
+### Verification & booking gates
+
+**Booking Gate**:
+The point in the booking flow where enrollment verification is actually enforced: a Tutee creating
+a new Booking (`POST bookings/confirm/`), or a Tutor accepting a pending Booking request
+(`POST bookings/<id>/approve/`). Enforcement is forward-only — it never touches existing Bookings,
+wallet, or dashboard access, only the two actions above.
+_Avoid_: "verification check" alone (too broad — doesn't distinguish which of the two gates below
+is doing the checking)
+
+**Reactive Gate**:
+The existing, authoritative enforcement at a Booking Gate: the server rejects the disallowed
+action with `403 {"code": "verification_required"}` only at the moment it's attempted, surfaced to
+the user via a generic toast after the fact (`TutorDetails.vue`'s `confirmBooking`,
+`TutorRequestedSessions.vue`'s `confirmSession`). This is the real source of truth — it cannot be
+bypassed by client-side state.
+_Avoid_: "the gate" alone once a Proactive UI Gate also exists for the same action — always say
+which one.
+
+**Proactive UI Gate**:
+A client-side mirror of a Reactive Gate's condition that disables the triggering control (a
+button) before the user can attempt the action at all, so they never reach the Reactive Gate's
+403 in the first place. UX-only — it must reproduce the Reactive Gate's exact condition, never
+invent a stricter or looser one, or the two will disagree (a wrongly-blocked control, or a
+control that lets the user click through to a reactive failure anyway).
+_Avoid_: calling this "the verification gate" as if it were authoritative — it is not; the
+Reactive Gate is.
+
+**Verification Enforcement** _(Tutee only)_:
+The platform-wide on/off switch for the Tutee Booking Gate, driven by
+`tutee_verification_enforced()` / `tuteeVerificationEnforced`. Unset/off means every Tutee is
+inside the grace period and the Booking Gate does not block them regardless of their own
+verification state. Tutors have no equivalent global switch — a Tutor's gating is entirely a
+function of their own Renewal Required state, never a platform-wide flag.
+_Avoid_: applying "enforcement" language to Tutors — their gate is always evaluated per-tutor, not
+gated behind a platform switch.
+
+**Renewal Required**:
+The state of a Tutor or Tutee who was approved at least once but whose `document_renewal_status()`
+has since lapsed to due, pending, or rejected. Distinct from *never-approved* (an Application
+still `pending`/`rejected` on its first submission), which is a more severe state — for Tutors,
+never-approved triggers a full-app lockout (`needsTutorApplicationLockout`), while Renewal Required
+only ever blocks the Booking Gate, never general app access.
+_Avoid_: "unverified" alone — always distinguish never-approved from Renewal Required, since they
+have different consequences.
+
 ### Institution catalog
 
 **Institution Course Catalog**:
