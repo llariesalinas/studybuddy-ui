@@ -263,7 +263,7 @@ const router = createRouter({
 /*
   GLOBAL NAVIGATION GUARD
 */
-router.beforeEach(async (to, from, next) => {
+router.beforeEach(async (to, from) => {
   // Clean up any lingering backdrops or modal styles
   document.querySelectorAll('.offcanvas-backdrop, .modal-backdrop').forEach(el => el.remove())
   document.body.classList.remove('modal-open', 'offcanvas-open')
@@ -281,24 +281,24 @@ router.beforeEach(async (to, from, next) => {
 
   // 1️⃣ Protect routes requiring authentication
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
-    return next('/login')
+    return '/login'
   }
 
   // Keep already-authenticated users off guest-only pages (e.g. hitting /login via
   // the browser back button after a push-based post-login redirect).
   if (GUEST_ONLY_ROUTE_NAMES.includes(to.name) && authStore.isAuthenticated && authStore.token) {
-    if (normalizedUserRole === 'tutor') return next('/tch-dashboard')
-    if (normalizedUserRole === 'tutee') return next('/dashboard')
-    if (normalizedUserRole === 'admin') return next('/admin/dashboard')
-    if (normalizedUserRole === 'superadmin') return next('/superadmin/dashboard')
-    return next('/')
+    if (normalizedUserRole === 'tutor') return '/tch-dashboard'
+    if (normalizedUserRole === 'tutee') return '/dashboard'
+    if (normalizedUserRole === 'admin') return '/admin/dashboard'
+    if (normalizedUserRole === 'superadmin') return '/superadmin/dashboard'
+    return '/'
   }
 
   if (authStore.isAuthenticated) {
 
     // Ensure token exists
     if (!authStore.token) {
-      return next('/login')
+      return '/login'
     }
 
     // 2️⃣ Load profile status
@@ -310,7 +310,7 @@ router.beforeEach(async (to, from, next) => {
         console.error("Profile check failed:", error)
 
         authStore.logout()
-        return next('/login')
+        return '/login'
       }
     }
 
@@ -331,7 +331,7 @@ router.beforeEach(async (to, from, next) => {
       needsTutorApplicationLockout(tutorApplicationSnapshot)
 
     if (hasTutorApplicationLockout && to.name !== 'tutor-application-status') {
-      return next('/application-status')
+      return '/application-status'
     }
 
     // 3️⃣ Profile completion guard
@@ -344,45 +344,45 @@ router.beforeEach(async (to, from, next) => {
         to.path === '/tutor-setup' ||
         to.path === '/application-status'
       ) {
-        return next()
+        return true
       }
 
       if (role === 'tutor') {
-        return next('/tutor-setup')
+        return '/tutor-setup'
       }
 
       if (role === 'admin' || role === 'superadmin') {
-        return next()
+        return true
       }
 
-      return next('/preferencesetup')
+      return '/preferencesetup'
     }
 
     // 4️⃣ Role protection
     if (normalizedRouteRoles.length && !normalizedRouteRoles.includes(normalizedUserRole)) {
 
       if (normalizedUserRole === 'tutor') {
-        return next('/tch-dashboard')
+        return '/tch-dashboard'
       }
 
       if (normalizedUserRole === 'tutee') {
-        return next('/dashboard')
+        return '/dashboard'
       }
 
       if (normalizedUserRole === 'admin') {
-        return next('/admin/dashboard')
+        return '/admin/dashboard'
       }
 
       if (normalizedUserRole === 'superadmin') {
-        return next('/superadmin/dashboard')
+        return '/superadmin/dashboard'
       }
 
-      return next('/')
+      return '/'
     }
 
   }
 
-  next()
+  return true
 
 })
 
