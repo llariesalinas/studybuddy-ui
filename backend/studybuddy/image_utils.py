@@ -17,6 +17,11 @@ AVATAR_MAX_SIZE = (512, 512)
 # WebP quality: 80 is visually near-lossless for photos at a fraction of the size.
 AVATAR_QUALITY = 80
 
+# Verification documents (school IDs, enrollment proofs) and payment receipts are reviewed by an
+# admin who needs to read small text, so bound them larger/higher-quality than a decorative avatar.
+DOCUMENT_MAX_SIZE = (1600, 1600)
+DOCUMENT_QUALITY = 85
+
 
 def compress_image(uploaded_file, max_size=AVATAR_MAX_SIZE, quality=AVATAR_QUALITY):
     """Resize, strip metadata, and re-encode an uploaded image to WebP.
@@ -58,3 +63,22 @@ def compress_image(uploaded_file, max_size=AVATAR_MAX_SIZE, quality=AVATAR_QUALI
     stem = os.path.splitext(os.path.basename(original_name))[0] or 'image'
 
     return ContentFile(buffer.read(), name=f'{stem}.webp')
+
+
+def compress_if_image(uploaded_file, max_size=DOCUMENT_MAX_SIZE, quality=DOCUMENT_QUALITY):
+    """Compress ``uploaded_file`` if it's an image; otherwise return it unchanged.
+
+    Verification uploads (school ID, enrollment proof) may be a photo or a PDF, and unlike
+    avatars there's no existing validation that rejects non-images here — so on any failure to
+    decode, fall back to storing the original file rather than raising, to avoid changing what
+    currently succeeds.
+    """
+    content_type = getattr(uploaded_file, 'content_type', '') or ''
+    if not content_type.startswith('image/'):
+        return uploaded_file
+
+    try:
+        return compress_image(uploaded_file, max_size=max_size, quality=quality)
+    except Exception:
+        uploaded_file.seek(0)
+        return uploaded_file

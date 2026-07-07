@@ -84,7 +84,7 @@ from .serializers import (
 )
 from .email_utils import send_application_received_email
 from .chat.services import create_booking_event
-from .image_utils import compress_image
+from .image_utils import compress_image, compress_if_image
 
 from .models import (
     UserProfile,
@@ -1283,6 +1283,9 @@ def register_user(request):
                 {"error": "Each uploaded file must be under 5 MB. Please compress your images and try again."},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+        school_id = compress_if_image(school_id)
+        enrollment_proof = compress_if_image(enrollment_proof)
 
         TutorApplication.objects.update_or_create(
             profile=profile,
@@ -3327,6 +3330,9 @@ def submit_session_payment(request, booking_id):
 
     if is_online_payment and not str(transaction_reference or '').strip():
         return Response({"error": "Transaction reference is required for online payments."}, status=400)
+
+    if receipt_image is not None:
+        receipt_image = compress_if_image(receipt_image)
 
     duration_hours = get_duration_hours_for_bookings(session_group_bookings)
     amount = round(float(representative_booking.tutor.hourly_rate or 0) * duration_hours, 2)
@@ -5579,6 +5585,9 @@ def tutor_application_resubmit(request):
             status=status.HTTP_400_BAD_REQUEST
         )
 
+    school_id = compress_if_image(school_id)
+    enrollment_proof = compress_if_image(enrollment_proof)
+
     if application.application_status == 'approved':
         return create_tutor_document_renewal_submission(
             request,
@@ -5638,6 +5647,9 @@ def tutor_document_renewal_submit(request):
             {"error": "Please provide both your School ID and updated Enrollment/RF document."},
             status=status.HTTP_400_BAD_REQUEST
         )
+
+    school_id = compress_if_image(school_id)
+    enrollment_proof = compress_if_image(enrollment_proof)
 
     return create_tutor_document_renewal_submission(
         request,
@@ -5720,6 +5732,9 @@ def tutee_application_resubmit(request):
             {"error": "Each uploaded file must be under 5 MB. Please compress your images and try again."},
             status=status.HTTP_400_BAD_REQUEST
         )
+
+    school_id = compress_if_image(school_id)
+    enrollment_proof = compress_if_image(enrollment_proof)
 
     # Unlike tutors (who submit documents at registration), tutees register free and submit
     # verification documents later — so this is also the first-time submission endpoint, not just
@@ -5808,6 +5823,9 @@ def tutee_document_renewal_submit(request):
             {"error": "Please provide both your School ID and updated Enrollment/RF document."},
             status=status.HTTP_400_BAD_REQUEST
         )
+
+    school_id = compress_if_image(school_id)
+    enrollment_proof = compress_if_image(enrollment_proof)
 
     return create_tutee_document_renewal_submission(
         request,
