@@ -12,3 +12,10 @@ export const getAlgorithmDemoRecommendation = (tuteeId, institutionId = null) =>
   api.get('dev/algorithm-demo/recommend/', {
     params: { tutee_id: tuteeId, institution_id: institutionId || undefined }
   })
+
+export const updateAlgorithmDemoRating = (studentId, tutorId, ratingScore) =>
+  api.patch('dev/algorithm-demo/rating/', {
+    student_id: studentId,
+    tutor_id: tutorId,
+    rating_score: ratingScore
+  })
