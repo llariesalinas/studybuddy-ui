@@ -7,7 +7,9 @@ spec: ../specs/2026-07-08-algorithm-demo-live-rating-edit-design.md
 
 # Algorithm Demo — Live Rating Edit Implementation Plan
 
-> **For agentic workers:** Use superpowers:subagent-driven-development to execute task-by-task.
+> **For agentic workers:** Handed off to Codex CLI for execution — see
+> [2026-07-08-algorithm-demo-live-rating-edit-codex-handoff.md](2026-07-08-algorithm-demo-live-rating-edit-codex-handoff.md)
+> for the self-contained, task-by-task version of this plan written for that handoff.
 
 **Goal:** Let a SuperAdmin edit a contributing neighbor's rating inline in the Algorithm Demo's Compare Pair tab and watch the CF/hybrid breakdown recompute live, without leaving the page.
 **Stack:** Vue 3, Pinia, Django REST, Bootstrap 5
@@ -16,12 +18,13 @@ spec: ../specs/2026-07-08-algorithm-demo-live-rating-edit-design.md
 
 ## Status / Progress Summary
 
-Plan approved from spec; about to begin execution via subagent-driven-development, starting with Task 1 (backend endpoint). No tasks completed yet.
+Plan approved from spec. In-session Claude subagent execution was started and then aborted in favor of handing the work to Codex CLI — the full task list was transcribed into a self-contained handoff doc (linked above) for Codex to execute directly. No tasks completed yet.
 
 ## Changelog
 
 - 2026-07-08: Plan created from the approved spec.
 - 2026-07-08: Marked In Progress — beginning Task 1.
+- 2026-07-08: Aborted in-session Claude subagent execution before any code was written; transcribed the plan into a self-contained Codex CLI handoff doc instead.
 
 ---
 
