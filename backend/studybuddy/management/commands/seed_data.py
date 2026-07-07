@@ -232,6 +232,7 @@ class Command(BaseCommand):
             
         # 7. Seed TutorSubjects
         all_seeded_subjects = list(Subjects.objects.all())
+        tutor_subjects_by_tutor = {}
 
         for tutor in tutors:
             assigned = fake.random_elements(all_seeded_subjects, length=fake.random_int(min=2, max=4), unique=True)
@@ -241,6 +242,7 @@ class Command(BaseCommand):
                     subject=subject,
                     defaults={'expertise_level': fake.random_int(min=1, max=3)}
                 )
+            tutor_subjects_by_tutor[tutor.pk] = list(assigned)
             self.stdout.write(f"  - Subjects assigned to {tutor.profile.fname}: {[s.subject_code for s in assigned]}")
 
         # 8. Seed TutorAvailability (contiguous 30-min blocks so multi-slot searches match)
@@ -315,12 +317,14 @@ class Command(BaseCommand):
                 continue
 
             session_mode = 'Online' if tutor.can_online else 'F2F'
+            subject = fake.random_element(tutor_subjects_by_tutor.get(tutor.pk) or [None])
 
             booking = Booking.objects.create(
                 student=tutee,
                 tutor=tutor,
                 availability=slot,
                 session_date=session_date,
+                subject=subject,
                 session_mode=session_mode,
                 status=status_choice,
                 tutee_confirmed=True,

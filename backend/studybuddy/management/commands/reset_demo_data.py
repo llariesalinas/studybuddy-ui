@@ -647,6 +647,9 @@ class Command(BaseCommand):
             pref_rows.append((personas['tutees'][key], [by_code[c] for c in spec['prefs']]))
 
         TutorSubjects.objects.bulk_create(ts_rows)
+        self.subjects_by_tutor = {}
+        for row in ts_rows:
+            self.subjects_by_tutor.setdefault(row.tutor_id, []).append(row.subject)
         prefs = Preference.objects.bulk_create([Preference(user=p) for p, _ in pref_rows])
         through = Preference.subjects.through
         for pref, (_, subjects) in zip(prefs, pref_rows):
@@ -686,8 +689,12 @@ class Command(BaseCommand):
 
     def _make_booking(self, tutee, tutor, slot, session_date, status, **extra):
         session_mode = extra.pop('session_mode', 'Online' if tutor.can_online else 'F2F')
+        subject = extra.pop('subject', None) or random.choice(
+            self.subjects_by_tutor.get(tutor.pk) or [None]
+        )
         return Booking(student=tutee, tutor=tutor, availability=slot,
                        session_date=session_date,
+                       subject=subject,
                        session_mode=session_mode,
                        status=status, session_group_id=uuid4(), booking_request_id=uuid4(),
                        tutee_confirmed=status in ('Confirmed', 'Completed'),
