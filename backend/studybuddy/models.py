@@ -856,6 +856,14 @@ class Booking(models.Model):
         related_name="bookings"
     )
 
+    subject = models.ForeignKey(
+        Subjects,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="bookings",
+    )
+
     session_date = models.DateField()
 
     session_mode = models.CharField(
