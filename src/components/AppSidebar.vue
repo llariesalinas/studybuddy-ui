@@ -93,7 +93,7 @@ const role = computed(() => user.value?.role?.toLowerCase() || null)
 const fullName = computed(() => {
   const first = user.value?.fname || ''
   const last = user.value?.lname || ''
-  return `${first} ${last}`.trim() || 'Studybuddy User'
+  return `${first} ${last}`.trim() || 'StudyBuddy User'
 })
 
 const initials = computed(() => {
@@ -120,7 +120,7 @@ const menuItems = computed(() => {
       { to: '/admin/withdrawals', label: 'Withdrawals', icon: 'bi-wallet2' },
       { to: '/admin/users', label: 'Users', icon: 'bi-people' },
       { to: '/admin/course-catalog', label: 'Course Catalog', icon: 'bi-journal-bookmark' },
-      { to: '/admin/tutor-applications', label: 'Tutor Applications', icon: 'bi-person-check' },
+      { to: '/admin/tutor-applications', label: 'Applications', icon: 'bi-person-check' },
       { to: '/admin/reports', label: 'Reports', icon: 'bi-bar-chart-line' },
       { to: '/admin/support', label: 'Support Desk', icon: 'bi-headset' },
     ]
@@ -132,7 +132,7 @@ const menuItems = computed(() => {
       { to: '/superadmin/institutions', label: 'Institutions', icon: 'bi-building' },
       { to: '/superadmin/users', label: 'All Users', icon: 'bi-people' },
       { to: '/admin/course-catalog', label: 'Course Catalog', icon: 'bi-journal-bookmark' },
-      { to: '/admin/tutor-applications', label: 'Tutor Applications', icon: 'bi-person-check' },
+      { to: '/admin/tutor-applications', label: 'Applications', icon: 'bi-person-check' },
       { to: '/superadmin/reports', label: 'Reports', icon: 'bi-bar-chart-line' },
       { to: '/superadmin/support', label: 'Support Desk', icon: 'bi-headset' },
       { to: '/superadmin/algorithm-demo', label: 'Algorithm Demo', icon: 'bi-diagram-3' },

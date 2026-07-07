@@ -168,8 +168,8 @@
           </div>
 
           <div v-if="route.path === '/admin/tutor-applications'">
-            <h2 class="fw-bold sb-text">Tutor Applications</h2>
-            <p class="sb-muted">Review submitted tutor screening documents.</p>
+            <h2 class="fw-bold sb-text">Applications</h2>
+            <p class="sb-muted">Review submitted tutor and tutee screening documents.</p>
           </div>
 
           <div v-if="route.path === '/admin/reports'">
