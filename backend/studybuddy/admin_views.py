@@ -38,6 +38,9 @@ from .email_utils import (
     send_application_approved_email,
     send_application_rejected_email,
     send_document_renewal_result_email,
+    enqueue_application_approved_email,
+    enqueue_application_rejected_email,
+    enqueue_document_renewal_result_email,
 )
 from .views import get_verification_application
 from . import _verification_dev
@@ -1234,9 +1237,26 @@ class AdminTutorApplicationListView(BaseAdminView):
 
     def get(self, request):
         status_filter = request.query_params.get('status')
+        # Prefetch renewal reviews for every row (not just the 'approved' filter branch below), so
+        # the serializer's repeated latest_document_renewal_review() calls hit renewal_reviews_cache
+        # instead of re-querying per application. .only() lists every field the serializer reads off
+        # a cached renewal (id/status/timestamps plus the file fields and rejection_reason it
+        # surfaces as latest_document_renewal_*), so accessing them doesn't trigger a deferred-field
+        # fetch per row either.
         application_queryset = self.get_queryset_for_user(
             request,
-            TutorApplication.objects.select_related('profile__user', 'profile__institution').all(),
+            TutorApplication.objects.select_related(
+                'profile__user', 'profile__institution'
+            ).prefetch_related(
+                Prefetch(
+                    'document_renewal_reviews',
+                    queryset=TutorDocumentRenewalReview.objects.only(
+                        'id', 'application_id', 'status', 'reviewed_at', 'submitted_at',
+                        'rejection_reason', 'school_id', 'enrollment_proof',
+                    ),
+                    to_attr='renewal_reviews_cache',
+                )
+            ).all(),
             user_path='profile'
         )
         renewal_queryset = self.get_queryset_for_user(
@@ -1258,16 +1278,6 @@ class AdminTutorApplicationListView(BaseAdminView):
                 # renewal sits pending/rejected/due — exclude those so "approved" only lists
                 # applications that are *currently* verified, not stale ones whose renewal
                 # already appears under the pending/rejected filter as its own row.
-                # Prefetch renewal reviews so document_renewal_status() doesn't re-query per app.
-                application_queryset = application_queryset.prefetch_related(
-                    Prefetch(
-                        'document_renewal_reviews',
-                        queryset=TutorDocumentRenewalReview.objects.only(
-                            'id', 'application_id', 'status', 'reviewed_at', 'submitted_at'
-                        ),
-                        to_attr='renewal_reviews_cache',
-                    )
-                )
                 application_queryset = [
                     app for app in application_queryset if app.document_renewal_status() == 'verified'
                 ]
@@ -1324,14 +1334,11 @@ class AdminTutorApplicationDetailView(BaseAdminView):
             institution=request.user.userprofile.institution
         )
 
-        # Send email notification
-        try:
-            if new_status == 'approved':
-                send_application_approved_email(application.profile, role_label='tutor')
-            else:
-                send_application_rejected_email(application.profile, rejection_reason, role_label='tutor')
-        except Exception:
-            logger.exception("Failed to send screening result email for application_id=%s", application.id)
+        # Send email notification (queued so the admin's request doesn't block on SMTP)
+        if new_status == 'approved':
+            enqueue_application_approved_email(application.profile, role_label='tutor')
+        else:
+            enqueue_application_rejected_email(application.profile, rejection_reason, role_label='tutor')
 
         return Response({"message": f"Application {new_status} successfully."})
 
@@ -1395,10 +1402,7 @@ class AdminTutorDocumentRenewalDetailView(BaseAdminView):
             institution=request.user.userprofile.institution
         )
 
-        try:
-            send_document_renewal_result_email(renewal.profile, 'tutor', new_status, rejection_reason)
-        except Exception:
-            logger.exception("Failed to send renewal result email for renewal_id=%s", renewal.id)
+        enqueue_document_renewal_result_email(renewal.profile, 'tutor', new_status, rejection_reason)
 
         return Response({"message": f"Document renewal {new_status} successfully."})
 
@@ -1408,9 +1412,26 @@ class AdminTuteeApplicationListView(BaseAdminView):
 
     def get(self, request):
         status_filter = request.query_params.get('status')
+        # Prefetch renewal reviews for every row (not just the 'approved' filter branch below), so
+        # the serializer's repeated latest_document_renewal_review() calls hit renewal_reviews_cache
+        # instead of re-querying per application. .only() lists every field the serializer reads off
+        # a cached renewal (id/status/timestamps plus the file fields and rejection_reason it
+        # surfaces as latest_document_renewal_*), so accessing them doesn't trigger a deferred-field
+        # fetch per row either.
         application_queryset = self.get_queryset_for_user(
             request,
-            TuteeApplication.objects.select_related('profile__user', 'profile__institution').all(),
+            TuteeApplication.objects.select_related(
+                'profile__user', 'profile__institution'
+            ).prefetch_related(
+                Prefetch(
+                    'document_renewal_reviews',
+                    queryset=TuteeDocumentRenewalReview.objects.only(
+                        'id', 'application_id', 'status', 'reviewed_at', 'submitted_at',
+                        'rejection_reason', 'school_id', 'enrollment_proof',
+                    ),
+                    to_attr='renewal_reviews_cache',
+                )
+            ).all(),
             user_path='profile'
         )
         renewal_queryset = self.get_queryset_for_user(
@@ -1431,16 +1452,6 @@ class AdminTuteeApplicationListView(BaseAdminView):
                 # Same staleness issue as the tutor list: application_status stays 'approved'
                 # forever, even while a later renewal sits pending/rejected/due. Exclude those so
                 # "approved" reflects who is currently clear to book, not a stale first approval.
-                # Prefetch renewal reviews so document_renewal_status() doesn't re-query per app.
-                application_queryset = application_queryset.prefetch_related(
-                    Prefetch(
-                        'document_renewal_reviews',
-                        queryset=TuteeDocumentRenewalReview.objects.only(
-                            'id', 'application_id', 'status', 'reviewed_at', 'submitted_at'
-                        ),
-                        to_attr='renewal_reviews_cache',
-                    )
-                )
                 application_queryset = [
                     app for app in application_queryset if app.document_renewal_status() == 'verified'
                 ]
@@ -1497,13 +1508,10 @@ class AdminTuteeApplicationDetailView(BaseAdminView):
             institution=request.user.userprofile.institution
         )
 
-        try:
-            if new_status == 'approved':
-                send_application_approved_email(application.profile, role_label='tutee')
-            else:
-                send_application_rejected_email(application.profile, rejection_reason, role_label='tutee')
-        except Exception:
-            logger.exception("Failed to send screening result email for application_id=%s", application.id)
+        if new_status == 'approved':
+            enqueue_application_approved_email(application.profile, role_label='tutee')
+        else:
+            enqueue_application_rejected_email(application.profile, rejection_reason, role_label='tutee')
 
         return Response({"message": f"Application {new_status} successfully."})
 
@@ -1566,9 +1574,6 @@ class AdminTuteeDocumentRenewalDetailView(BaseAdminView):
             institution=request.user.userprofile.institution
         )
 
-        try:
-            send_document_renewal_result_email(renewal.profile, 'tutee', new_status, rejection_reason)
-        except Exception:
-            logger.exception("Failed to send renewal result email for renewal_id=%s", renewal.id)
+        enqueue_document_renewal_result_email(renewal.profile, 'tutee', new_status, rejection_reason)
 
         return Response({"message": f"Document renewal {new_status} successfully."})

@@ -3992,6 +3992,46 @@ class TuteeVerificationPhase3Tests(APITestCase):
         self.assertEqual(len(response.data), 1)
         self.assertEqual(response.data[0]["applicant_name"], "Phase3 Tutee")
 
+    def test_admin_tutee_application_list_query_count_does_not_scale_with_n(self):
+        """Regression test for the N+1 in latest_document_renewal_review(): the list endpoint must
+        prefetch document_renewal_reviews for every row, not just the status=approved filter branch,
+        or query count grows linearly with the number of applications. See
+        docs/session-summaries/2026-07-08-tutee-application-admin-performance-summary.md."""
+
+        def make_application(n):
+            user = User.objects.create_user(
+                username=f"phase3-tutee{n}@cpu.edu",
+                email=f"phase3-tutee{n}@cpu.edu",
+                password="password",
+            )
+            profile = UserProfile.objects.create(
+                user=user, fname=f"Tutee{n}", mname="", lname="Test",
+                role="Tutee", institution=self.institution,
+            )
+            return TuteeApplication.objects.create(
+                profile=profile,
+                school_id=self.upload(f"id{n}.jpg", b"id", "image/jpeg"),
+                enrollment_proof=self.upload(f"rf{n}.pdf", b"rf", "application/pdf"),
+                application_status="pending",
+            )
+
+        make_application(1)
+        self.client.force_authenticate(user=self.admin_user)
+        with CaptureQueriesContext(connection) as one_app_queries:
+            self.client.get("/api/admin/tutee-applications/")
+
+        make_application(2)
+        make_application(3)
+        make_application(4)
+        make_application(5)
+        with CaptureQueriesContext(connection) as five_app_queries:
+            self.client.get("/api/admin/tutee-applications/")
+
+        self.assertLessEqual(
+            len(five_app_queries), len(one_app_queries) + 1,
+            "query count scales with number of applications (N+1)",
+        )
+
     def test_admin_can_approve_initial_tutee_application(self):
         application = TuteeApplication.objects.create(
             profile=self.tutee_profile,
@@ -6741,7 +6781,7 @@ class VerificationEmailWiringTests(APITestCase):
             application_status="pending",
         )
         self.client.force_authenticate(user=self.admin_user)
-        with patch("studybuddy.admin_views.send_application_approved_email") as mock_send:
+        with patch("studybuddy.admin_views.enqueue_application_approved_email") as mock_send:
             response = self.client.patch(
                 f"/api/admin/tutor-applications/{application.id}/",
                 {"application_status": "approved"},
@@ -6758,7 +6798,7 @@ class VerificationEmailWiringTests(APITestCase):
             application_status="pending",
         )
         self.client.force_authenticate(user=self.admin_user)
-        with patch("studybuddy.admin_views.send_application_rejected_email") as mock_send:
+        with patch("studybuddy.admin_views.enqueue_application_rejected_email") as mock_send:
             response = self.client.patch(
                 f"/api/admin/tutee-applications/{application.id}/",
                 {"application_status": "rejected", "rejection_reason": "Illegible ID."},
@@ -6782,7 +6822,7 @@ class VerificationEmailWiringTests(APITestCase):
             status="pending",
         )
         self.client.force_authenticate(user=self.admin_user)
-        with patch("studybuddy.admin_views.send_document_renewal_result_email") as mock_send:
+        with patch("studybuddy.admin_views.enqueue_document_renewal_result_email") as mock_send:
             response = self.client.patch(
                 f"/api/admin/tutor-document-renewals/{renewal.id}/",
                 {"application_status": "approved"},
@@ -6806,7 +6846,7 @@ class VerificationEmailWiringTests(APITestCase):
             status="pending",
         )
         self.client.force_authenticate(user=self.admin_user)
-        with patch("studybuddy.admin_views.send_document_renewal_result_email") as mock_send:
+        with patch("studybuddy.admin_views.enqueue_document_renewal_result_email") as mock_send:
             response = self.client.patch(
                 f"/api/admin/tutee-document-renewals/{renewal.id}/",
                 {"application_status": "rejected", "rejection_reason": "Expired ID."},
