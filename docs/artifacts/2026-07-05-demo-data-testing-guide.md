@@ -18,7 +18,7 @@ safe and produces the same personas (fixed random seed).
 
 | Role | Login | Notes |
 |---|---|---|
-| SuperAdmin | *your existing account* | Preserved untouched by the reset |
+| SuperAdmin | `superadmin@studybuddy.test` | Preserved untouched by the reset — verified valid as of 2026-07-08 |
 | Admin (CPU) | `demo.admin@cpu.edu.ph` | Scoped to Central Philippine University |
 | Admin (North) | `demo.admin@north.edu.ph` | Scoped to North University |
 
@@ -66,6 +66,15 @@ Use the SuperAdmin **Algorithm Demo** page (Ranked List / Compare Pair tabs). Se
    Mercado, are rated by every cluster member with inverted patterns (Cluster A: Ramon high /
    Cecilia low; Cluster B: the opposite). Pearson similarity needs at least 2 shared, non-identical
    ratings — the anchors provide exactly that, and the inversion is what separates the clusters.
+5. **Live rating edit (prove it updates in real time).** In Compare Pair, each contributing
+   Top-K Neighbor row now has an editable rating input (1–5) and a Save button — no Django admin
+   needed. With Diane Cruz → Elena Bautista selected, lower one neighbor's rating and Save: the
+   CF bar, CF score, and Hybrid Score re-animate to new values with no page reload, and the tutor
+   picker's score label updates too. Switch to Miguel Torres for the same tutee to show his
+   breakdown is untouched by the edit — proves the change is scoped to the exact (student, tutor)
+   pair, not a page-wide refresh. Gated by the same `ALGORITHM_DEMO_TOOLS_ENABLED` flag as the
+   rest of this page; see
+   [2026-07-08-algorithm-demo-live-rating-edit-design.md](../specs/2026-07-08-algorithm-demo-live-rating-edit-design.md).
 
 ## Objective 3 — Scheduling (availability, workloads, limits)
 
