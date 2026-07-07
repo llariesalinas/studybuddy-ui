@@ -469,6 +469,34 @@
       </p>
     </section>
 
+    <section aria-labelledby="seed-superadmin">
+      <h2 id="seed-superadmin">Seeding a SuperAdmin</h2>
+      <p class="note">
+        <code>reset_demo_data</code> never creates or overwrites a SuperAdmin — it must already
+        exist before you run it. To promote (or create) one, use
+        <code>make_superadmin</code> from <code>backend/</code>:
+      </p>
+      <p class="note" style="margin-top: 14px;">
+        <strong>If the account already exists</strong> (e.g. local dev's
+        <code>superadmin@studybuddy.test</code>, verified valid 2026-07-08), just promote it —
+        this never touches the password:
+        <br /><code>venv\Scripts\python.exe manage.py make_superadmin superadmin@studybuddy.test</code>
+      </p>
+      <p class="note" style="margin-top: 14px;">
+        <strong>If no account exists yet for that email</strong> (e.g. first-time setup on the
+        demo/production database), add <code>--create</code> — it prompts twice for a password via
+        hidden input (never logged or echoed):
+        <br /><code>venv\Scripts\python.exe manage.py make_superadmin superadmin@studybuddy.test --create --first-name Super --last-name Admin</code>
+      </p>
+      <p class="note" style="margin-top: 14px;">
+        To run either form against the demo/production database instead of local dev, point the
+        same session at the demo Supabase pooler first (see
+        <a href="demo-deployment.md">demo deployment cheat sheet</a>, "Running a one-off command
+        against the demo database") — never hardcode that database's password into a single
+        command; set it as a session env var and unset/close the terminal afterward.
+      </p>
+    </section>
+
     <footer>
       Source of truth: <a href="../artifacts/2026-07-05-demo-data-testing-guide.md">demo data testing guide</a>
       and <code>backend/studybuddy/management/commands/reset_demo_data.py</code>.
