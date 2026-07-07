@@ -9,7 +9,7 @@ from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
-from django.db.models import Avg, Count, Q, Sum
+from django.db.models import Avg, Count, Prefetch, Q, Sum
 from django.utils import timezone
 from django.utils.timesince import timesince
 from datetime import timedelta
@@ -20,7 +20,8 @@ from .models import (
     TutorApplication, TutorDocumentRenewalReview,
     TuteeApplication, TuteeDocumentRenewalReview, Payment,
     InstitutionCourseCatalog,
-    TutorSubjects, Subjects, SupportTicket
+    TutorSubjects, Subjects, SupportTicket,
+    TUTOR_ACCEPTED_SESSION_LOAD_STATUSES
 )
 from .serializers import (
     AdminAccountRequestSerializer, InstitutionRequestSerializer,
@@ -375,7 +376,19 @@ class AdminUserListView(BaseAdminView):
     permission_classes = [permissions.IsAuthenticated, IsAdminUser]
 
     def get(self, request):
-        queryset = self.get_queryset_for_user(request, UserProfile.objects.select_related('user', 'institution', 'tutor__wallet').all())
+        accepted_bookings_prefetch = Prefetch(
+            'tutor__tutor_bookings',
+            queryset=Booking.objects.filter(
+                status__in=TUTOR_ACCEPTED_SESSION_LOAD_STATUSES
+            ).only('id', 'booking_request_id', 'session_group_id', 'tutor_id'),
+            to_attr='accepted_bookings_cache',
+        )
+        queryset = self.get_queryset_for_user(
+            request,
+            UserProfile.objects.select_related('user', 'institution', 'tutor__wallet')
+            .prefetch_related(accepted_bookings_prefetch)
+            .all(),
+        )
         queryset = queryset.order_by('-created_at')
 
         # Only show Tutees and Tutors to normal Admins
@@ -1240,6 +1253,25 @@ class AdminTutorApplicationListView(BaseAdminView):
             application_queryset = application_queryset.filter(application_status=status_filter)
             renewal_queryset = renewal_queryset.filter(status=status_filter)
 
+            if status_filter == 'approved':
+                # application_status stays 'approved' forever once granted, even while a later
+                # renewal sits pending/rejected/due — exclude those so "approved" only lists
+                # applications that are *currently* verified, not stale ones whose renewal
+                # already appears under the pending/rejected filter as its own row.
+                # Prefetch renewal reviews so document_renewal_status() doesn't re-query per app.
+                application_queryset = application_queryset.prefetch_related(
+                    Prefetch(
+                        'document_renewal_reviews',
+                        queryset=TutorDocumentRenewalReview.objects.only(
+                            'id', 'application_id', 'status', 'reviewed_at', 'submitted_at'
+                        ),
+                        to_attr='renewal_reviews_cache',
+                    )
+                )
+                application_queryset = [
+                    app for app in application_queryset if app.document_renewal_status() == 'verified'
+                ]
+
         application_data = TutorApplicationSerializer(
             application_queryset,
             many=True,
@@ -1394,6 +1426,24 @@ class AdminTuteeApplicationListView(BaseAdminView):
         if status_filter:
             application_queryset = application_queryset.filter(application_status=status_filter)
             renewal_queryset = renewal_queryset.filter(status=status_filter)
+
+            if status_filter == 'approved':
+                # Same staleness issue as the tutor list: application_status stays 'approved'
+                # forever, even while a later renewal sits pending/rejected/due. Exclude those so
+                # "approved" reflects who is currently clear to book, not a stale first approval.
+                # Prefetch renewal reviews so document_renewal_status() doesn't re-query per app.
+                application_queryset = application_queryset.prefetch_related(
+                    Prefetch(
+                        'document_renewal_reviews',
+                        queryset=TuteeDocumentRenewalReview.objects.only(
+                            'id', 'application_id', 'status', 'reviewed_at', 'submitted_at'
+                        ),
+                        to_attr='renewal_reviews_cache',
+                    )
+                )
+                application_queryset = [
+                    app for app in application_queryset if app.document_renewal_status() == 'verified'
+                ]
 
         application_data = TuteeApplicationSerializer(
             application_queryset,

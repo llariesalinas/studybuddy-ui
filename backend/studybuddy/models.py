@@ -311,16 +311,25 @@ class Tutor(models.Model):
         super().save(*args, **kwargs)
 
     def accepted_session_load(self):
-        grouped_session_keys = set()
-        bookings = self.tutor_bookings.filter(
-            status__in=TUTOR_ACCEPTED_SESSION_LOAD_STATUSES
-        ).order_by('session_date', 'availability__time_slot', 'id')
+        if hasattr(self, '_accepted_session_load_cache'):
+            return self._accepted_session_load_cache
 
-        for booking in bookings.only('id', 'booking_request_id', 'session_group_id'):
-            group_key = booking.session_group_id or booking.booking_request_id or booking.id
-            grouped_session_keys.add(str(group_key))
+        # Use the prefetched list when a caller (e.g. AdminUserListView) has attached one via
+        # Prefetch(..., to_attr='accepted_bookings_cache'), so this doesn't re-query per tutor.
+        if hasattr(self, 'accepted_bookings_cache'):
+            bookings = self.accepted_bookings_cache
+        else:
+            bookings = self.tutor_bookings.filter(
+                status__in=TUTOR_ACCEPTED_SESSION_LOAD_STATUSES
+            ).only('id', 'booking_request_id', 'session_group_id')
 
-        return len(grouped_session_keys)
+        grouped_session_keys = {
+            str(booking.session_group_id or booking.booking_request_id or booking.id)
+            for booking in bookings
+        }
+
+        self._accepted_session_load_cache = len(grouped_session_keys)
+        return self._accepted_session_load_cache
 
     def accepted_session_load_remaining(self):
         return max(int(self.session_load_limit or 0) - self.accepted_session_load(), 0)
@@ -375,12 +384,24 @@ class ApplicationVerificationBase(models.Model):
         abstract = True
 
     def latest_approved_document_review_at(self):
-        latest_renewal = (
-            self.document_renewal_reviews
-            .filter(status='approved', reviewed_at__isnull=False)
-            .order_by('-reviewed_at', '-submitted_at')
-            .first()
-        )
+        # Use the prefetched list when a caller (e.g. AdminTutorApplicationListView) has attached
+        # one via Prefetch(..., to_attr='renewal_reviews_cache'), so this doesn't re-query per
+        # application — `.filter()` on a prefetched related manager always re-hits the DB.
+        if hasattr(self, 'renewal_reviews_cache'):
+            approved = [
+                review for review in self.renewal_reviews_cache
+                if review.status == 'approved' and review.reviewed_at is not None
+            ]
+            latest_renewal = max(
+                approved, key=lambda review: (review.reviewed_at, review.submitted_at), default=None
+            )
+        else:
+            latest_renewal = (
+                self.document_renewal_reviews
+                .filter(status='approved', reviewed_at__isnull=False)
+                .order_by('-reviewed_at', '-submitted_at')
+                .first()
+            )
         if latest_renewal:
             return latest_renewal.reviewed_at
         return self.reviewed_at
@@ -396,6 +417,10 @@ class ApplicationVerificationBase(models.Model):
         return approved_at + timedelta(days=self.DOCUMENT_RENEWAL_INTERVAL_DAYS)
 
     def latest_document_renewal_review(self):
+        if hasattr(self, 'renewal_reviews_cache'):
+            return max(
+                self.renewal_reviews_cache, key=lambda review: review.submitted_at, default=None
+            )
         return self.document_renewal_reviews.order_by('-submitted_at').first()
 
     def document_renewal_status(self):
