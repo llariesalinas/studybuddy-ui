@@ -208,6 +208,29 @@ only ever blocks the Booking Gate, never general app access.
 _Avoid_: "unverified" alone — always distinguish never-approved from Renewal Required, since they
 have different consequences.
 
+### Booking mode & location
+
+**Preferred Mode**:
+The Tutee's chosen session format for a booking search — `Online` or `Face-to-face`. Set via the
+pill buttons on `InitialBooking.vue` or the mode dropdown on `FindTutors.vue`'s refine-filters
+panel; both write to `store.selectedMode` (`stores/initialbookingprefs.js`).
+_Avoid_: "session type" (unused elsewhere in the glossary; keep "Preferred Mode")
+
+**Campus Location Type**:
+A required sub-choice of Preferred Mode = `Face-to-face`: `Inside Campus` or `Outside Campus`.
+Captured via a popup modal immediately after Face-to-face is chosen, before the existing free-text
+Preferred Location field is shown. Not sent to the backend — it only exists to decide whether the
+Off-Campus Liability Acknowledgment gate applies, and to label the Preferred Location field for
+the user's own reference (with a "Change" control to reopen the modal).
+_Avoid_: "location type", "venue type"
+
+**Off-Campus Liability Acknowledgment**:
+A confirmation modal shown when a Tutee picks Outside Campus, warning that off-campus sessions are
+not covered by Studybuddy. The Tutee must confirm before the Preferred Location field appears; if
+they decline or dismiss it, the flow returns to the Campus Location Type choice (not persisted —
+UI-only gate, no record kept of the acknowledgment; see ADR 0007).
+_Avoid_: "consent", "waiver" (implies a stored/legal record, which this explicitly is not)
+
 ### Institution catalog
 
 **Institution Course Catalog**:

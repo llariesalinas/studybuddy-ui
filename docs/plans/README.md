@@ -3,7 +3,13 @@
 Every finalized plan lives in this folder as its own dated file, created from [`_template.md`](_template.md).
 Status moves Draft â†’ Approved â†’ In Progress â†’ Done. When a plan is complete, its summary is linked below.
 
-**Status & Progress Summary** (2026-07-07): Re-enable cash payments + tutor debt banner is Done —
+**Status & Progress Summary** (2026-07-07): Face-to-face campus location modal is Approved — grilled
+end-to-end (9 decisions) via `/grill-with-docs`: selecting Face-to-face mode opens a popup modal for
+Inside/Outside Campus, Outside Campus gates behind a liability-acknowledgment confirm modal before the
+existing free-text location field appears, applies to both `InitialBooking.vue` and `FindTutors.vue`
+via one shared component; the acknowledgment is UI-only and not persisted (see ADR-0007); glossary
+updated with Preferred Mode, Campus Location Type, Off-Campus Liability Acknowledgment. Not yet
+implemented. Re-enable cash payments + tutor debt banner is Done —
 grilled end-to-end (16 decisions), implemented (Steps A–G), audited line-by-line against the plan,
 and fully verified against a real local database. Steps A–F all matched the plan exactly. The
 audit caught and fixed three real issues before anything ran: a hardcoded hex color in the new
@@ -30,6 +36,7 @@ BSCS-only subjects the backend rejects) was found and flagged as a separate foll
 
 | Date | Plan | Status | Summary |
 |------|------|--------|---------|
+| 2026-07-07 | [Face-to-face campus location modal](2026-07-07-face-to-face-campus-location-modal.md) | Approved | Grilled Inside/Outside Campus choice + off-campus liability confirm modal for `InitialBooking.vue` and `FindTutors.vue`; not yet implemented — [ADR-0007](../adr/0007-off-campus-liability-acknowledgment-not-persisted.md) |
 | 2026-07-07 | [Re-enable cash payments + tutor debt banner](2026-07-07-reenable-cash-payments.md) | Done | Implemented (Steps A–G), audited, and verified against local PostgreSQL (not Supabase); fixed a hardcoded color, a broken negative-balance demo persona, and a pre-existing test the new enforcement silently broke; 25/25 relevant tests pass, `reset_demo_data` confirmed Miguel lands at exactly PHP -75.00 — [Summary](../session-summaries/2026-07-07-reenable-cash-payments-summary.md) |
 | 2026-07-07 | [Seed data year_level scale fix](2026-07-07-seed-data-year-level-scale-fix.md) | Approved | Pending |
 | 2026-07-07 | [Onboarding guided-rail redesign](2026-07-07-onboarding-guided-rail-redesign.md) | Done | Guided-rail wizard redesign for `PreferenceSetup.vue`; emoji removed, real `--sb-*` tokens, verified live in light/dark and desktop/mobile |
@@ -146,3 +153,4 @@ Entries marked Done&ast; predate the session-summary convention; their status is
 | 2026-07-07 | Grilled re-enabling cash payments end-to-end (16 decisions: motivation, session_mode-derived payment method with server-side enforcement, CASH receipt-only requirement, folding in the PAYMONGO proof-of-payment gap fix, tutor debt banner design, demo-data scope); added the Approved plan |
 | 2026-07-07 | Implemented and audited re-enabling cash payments (Steps A–G); audit caught and fixed a hardcoded color, a broken negative-balance demo persona pick, and a pre-existing test silently broken by the new server-side enforcement; added 3 new test classes; moved plan Approved -> In Progress pending a local-vs-Supabase database decision before tests/migrations can actually be run |
 | 2026-07-07 | Resolved the local-database gap using the local PostgreSQL 18 server already on the machine (matching this project's CI config), `.env` never modified; ran the 8 new tests (1 self-inflicted test bug found and fixed), the 17 tests in the class containing the fixed pre-existing test, and the full 278-test suite (30 failures/5 errors, all pre-existing and unrelated); ran `migrate` then `reset_demo_data` end-to-end and empirically confirmed Miguel's wallet lands at exactly PHP -75.00 as designed; marked the plan Done |
+| 2026-07-07 | Grilled the Face-to-face campus location modal end-to-end (9 decisions) via `/grill-with-docs`; added the Approved plan, glossary terms Preferred Mode/Campus Location Type/Off-Campus Liability Acknowledgment, and ADR-0007 for the not-persisted acknowledgment decision |
