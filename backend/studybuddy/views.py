@@ -1065,7 +1065,18 @@ def get_wallet_transaction_description(wallet_transaction, student_name=None):
     return f"{base_description} - Student: {student_name}"
 
 
-def serialize_payment_summary(representative_booking):
+def build_absolute_media_url(request, field_file):
+    if not field_file:
+        return None
+
+    file_url = field_file.url
+    if request is None:
+        return file_url
+
+    return request.build_absolute_uri(file_url)
+
+
+def serialize_payment_summary(representative_booking, request=None):
     payment = getattr(representative_booking, 'payment', None)
 
     if not payment:
@@ -1100,7 +1111,7 @@ def serialize_payment_summary(representative_booking):
         "platform_fee": platform_fee,
         "transaction_fee": transaction_fee,
         "status": payment.payment_status,
-        "receipt_image": payment.receipt_image.url if payment.receipt_image else None,
+        "receipt_image": build_absolute_media_url(request, payment.receipt_image),
     }
 
 
@@ -3118,7 +3129,7 @@ def dismiss_dashboard_pill(request, booking_id):
     })
 
 
-def build_booking_detail_payload(session_group_bookings):
+def build_booking_detail_payload(session_group_bookings, request=None):
     representative_booking = get_representative_booking(session_group_bookings)
     first_booking = session_group_bookings[0]
     last_booking = session_group_bookings[-1]
@@ -3162,7 +3173,7 @@ def build_booking_detail_payload(session_group_bookings):
             "course": representative_booking.student.course.course_name if representative_booking.student.course else None,
             "year_level": representative_booking.student.year_level,
             "bio": representative_booking.student.bio,
-            "avatar": representative_booking.student.profile_picture.url if representative_booking.student.profile_picture else None,
+            "avatar": build_absolute_media_url(request, representative_booking.student.profile_picture),
         },
         "tutor": {
             "name": f"{representative_booking.tutor.profile.fname} {representative_booking.tutor.profile.lname}",
@@ -3170,7 +3181,7 @@ def build_booking_detail_payload(session_group_bookings):
             "course": representative_booking.tutor.profile.course.course_name if representative_booking.tutor.profile.course else None,
             "year_level": representative_booking.tutor.profile.year_level,
             "bio": representative_booking.tutor.profile.bio,
-            "avatar": representative_booking.tutor.profile.profile_picture.url if representative_booking.tutor.profile.profile_picture else None,
+            "avatar": build_absolute_media_url(request, representative_booking.tutor.profile.profile_picture),
             "rating": representative_booking.tutor.rating_average,
             "hourly_rate": float(representative_booking.tutor.hourly_rate or 0),
             "subjects_taught": list(
@@ -3192,7 +3203,7 @@ def build_booking_detail_payload(session_group_bookings):
             "session_mode": representative_booking.session_mode,
             "preferred_location": representative_booking.preferred_location,
         },
-        "payment": serialize_payment_summary(representative_booking),
+        "payment": serialize_payment_summary(representative_booking, request=request),
         "check_ins": serialize_session_check_ins(representative_booking),
     }
 
@@ -3218,7 +3229,7 @@ def booking_detail(request, booking_id):
         return Response({"error": "Unauthorized"}, status=403)
 
     session_group_bookings = get_booking_request_bookings(booking)
-    return Response(build_booking_detail_payload(session_group_bookings))
+    return Response(build_booking_detail_payload(session_group_bookings, request=request))
 
 
 @api_view(['POST'])
