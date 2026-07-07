@@ -1,5 +1,6 @@
 <script setup>
-import { reactive, ref, watch, onBeforeUnmount } from 'vue'
+import { onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { updateAlgorithmDemoRating } from '@/services/api/algorithmDemo'
 
 const props = defineProps({
   row: {
@@ -7,6 +8,8 @@ const props = defineProps({
     default: null
   }
 })
+
+const emit = defineEmits(['rating-updated'])
 
 const CBF_PARTS = [
   ['subject', 'Subject match'],
@@ -24,6 +27,9 @@ const cfBar = reactive({ widthPct: 0, label: '–' })
 const cfMessage = ref('')
 const hybridBar = reactive({ widthPct: 0 })
 const hybridFinal = ref('…')
+const neighborDrafts = reactive({})
+const neighborSaving = reactive({})
+const neighborError = reactive({})
 
 let timers = []
 
@@ -44,9 +50,30 @@ function resetBars() {
   hybridFinal.value = '…'
 }
 
+function syncNeighborState(row) {
+  const activeNeighborIds = new Set((row?.cf?.neighbors || []).map((neighbor) => neighbor.neighbor_id))
+
+  Object.keys(neighborDrafts).forEach((key) => {
+    if (!activeNeighborIds.has(Number(key))) delete neighborDrafts[key]
+  })
+  Object.keys(neighborSaving).forEach((key) => {
+    if (!activeNeighborIds.has(Number(key))) delete neighborSaving[key]
+  })
+  Object.keys(neighborError).forEach((key) => {
+    if (!activeNeighborIds.has(Number(key))) delete neighborError[key]
+  })
+
+  if (!row) return
+
+  row.cf.neighbors.forEach((neighbor) => {
+    neighborDrafts[neighbor.neighbor_id] = neighbor.rating
+  })
+}
+
 function animate(row) {
   clearTimers()
   resetBars()
+  syncNeighborState(row)
   if (!row) return
 
   const steps = []
@@ -84,6 +111,21 @@ function animate(row) {
   })
 }
 
+async function saveNeighborRating(neighbor) {
+  const draft = neighborDrafts[neighbor.neighbor_id]
+  neighborSaving[neighbor.neighbor_id] = true
+  neighborError[neighbor.neighbor_id] = ''
+  try {
+    await updateAlgorithmDemoRating(neighbor.neighbor_id, props.row.tutor_id, draft)
+    emit('rating-updated')
+  } catch (err) {
+    neighborError[neighbor.neighbor_id] =
+      err.response?.data?.error || 'Could not save this rating.'
+  } finally {
+    neighborSaving[neighbor.neighbor_id] = false
+  }
+}
+
 watch(() => props.row, animate, { immediate: true })
 onBeforeUnmount(clearTimers)
 </script>
@@ -117,9 +159,32 @@ onBeforeUnmount(clearTimers)
         </div>
         <div class="neighbor-list">
           <p v-if="cfMessage">{{ cfMessage }}</p>
-          <div v-for="neighbor in row.cf.neighbors" :key="neighbor.neighbor_id">
-            {{ neighbor.name }} — similarity {{ neighbor.similarity.toFixed(2) }}, rated this tutor
-            {{ neighbor.rating }}/5
+          <div v-for="neighbor in row.cf.neighbors" :key="neighbor.neighbor_id" class="neighbor-row">
+            <span>
+              {{ neighbor.name }} — similarity {{ neighbor.similarity.toFixed(2) }}, rated this
+              tutor
+            </span>
+            <input
+              v-model.number="neighborDrafts[neighbor.neighbor_id]"
+              type="number"
+              min="1"
+              max="5"
+              class="neighbor-rating-input"
+            />
+            <button
+              type="button"
+              class="neighbor-save-btn"
+              :disabled="
+                neighborSaving[neighbor.neighbor_id] ||
+                neighborDrafts[neighbor.neighbor_id] === neighbor.rating
+              "
+              @click="saveNeighborRating(neighbor)"
+            >
+              {{ neighborSaving[neighbor.neighbor_id] ? 'Saving…' : 'Save' }}
+            </button>
+            <span v-if="neighborError[neighbor.neighbor_id]" class="neighbor-error">
+              {{ neighborError[neighbor.neighbor_id] }}
+            </span>
           </div>
         </div>
       </div>
@@ -206,10 +271,51 @@ onBeforeUnmount(clearTimers)
   color: var(--sb-text-muted);
 }
 
-.neighbor-list p,
-.neighbor-list div {
+.neighbor-list p {
   padding: 3px 0;
   margin: 0;
+}
+
+.neighbor-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+}
+
+.neighbor-rating-input {
+  width: 56px;
+  border: 1px solid var(--sb-card-border);
+  border-radius: 8px;
+  padding: 4px 6px;
+  background: var(--sb-card-bg);
+  color: var(--sb-dark);
+}
+
+.neighbor-save-btn {
+  background: var(--sb-primary);
+  color: var(--sb-white, #fff);
+  border: none;
+  border-radius: 9999px;
+  padding: 5px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+
+.neighbor-save-btn:hover:not(:disabled) {
+  background: var(--sb-primary-hover, var(--sb-primary));
+}
+
+.neighbor-save-btn:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.neighbor-error {
+  color: var(--sb-danger);
+  font-size: 11px;
 }
 
 .sb-badge {
