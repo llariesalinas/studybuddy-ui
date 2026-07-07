@@ -874,7 +874,7 @@ def get_dev_live_cache_keys_for_booking(booking):
 
 
 def get_dev_live_override_for_bookings(bookings):
-    if not settings.DEBUG:
+    if not settings.BOOKING_DEV_TOOLS_ENABLED:
         return None
 
     for booking in sort_bookings_for_session_group(bookings):

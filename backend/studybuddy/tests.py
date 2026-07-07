@@ -5832,8 +5832,11 @@ class DevLiveSessionTests(APITestCase):
     def tearDown(self):
         cache.clear()
 
-    @override_settings(DEBUG=False)
-    def test_force_live_returns_404_when_debug_is_false(self):
+    @override_settings(BOOKING_DEV_TOOLS_ENABLED=False)
+    def test_force_live_returns_404_when_booking_dev_tools_disabled(self):
+        """The endpoint gate is BOOKING_DEV_TOOLS_ENABLED, not DEBUG -- real production has both
+        off, but the demo deployment runs DEBUG=False with this flag on (see
+        test_force_live_takes_effect_on_the_demo_deployment)."""
         response = self.client.post(
             f"/api/dev/bookings/{self.booking.id}/force-live/",
             {"phase": "start"},
@@ -5889,6 +5892,23 @@ class DevLiveSessionTests(APITestCase):
         self.assertEqual(str(booking_payload["date"]), response.data["session"]["date"])
         self.assertEqual(booking_payload["startTime"], response.data["session"]["start_time"])
         self.assertEqual(booking_payload["endTime"], response.data["session"]["end_time"])
+
+    @override_settings(DEBUG=False, BOOKING_DEV_TOOLS_ENABLED=True)
+    def test_force_live_takes_effect_on_the_demo_deployment(self):
+        """Reproduces the demo deployment's actual settings (DEBUG=False,
+        BOOKING_DEV_TOOLS_ENABLED=True) rather than local dev's (DEBUG=True). Regression test for
+        a bug where get_dev_live_override_for_bookings() independently gated on DEBUG instead of
+        BOOKING_DEV_TOOLS_ENABLED, so the endpoint returned 200 but the override it just wrote was
+        invisible to every read path under these settings -- the booking silently never went
+        Ongoing."""
+        response = self.client.post(
+            f"/api/dev/bookings/{self.booking.id}/force-live/",
+            {"phase": "midpoint"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["session"]["status"], "Ongoing")
 
     @override_settings(DEBUG=True)
     def test_tutor_can_force_and_clear_live_session(self):
