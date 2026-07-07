@@ -835,8 +835,8 @@ def get_session_notification_context(bookings):
         }
 
     subject = (
-        representative_booking.tutor.profile.course.course_name
-        if representative_booking.tutor.profile.course else "General"
+        representative_booking.subject.subject_name
+        if representative_booking.subject else "General"
     )
     date_label = representative_booking.session_date.strftime("%Y-%m-%d")
     tutor_name = f"{representative_booking.tutor.profile.fname} {representative_booking.tutor.profile.lname}"
@@ -2016,8 +2016,8 @@ def build_combined_block(group, profile=None):
         "rating_submitted": hasattr(representative_booking, "rating"),
 
         "subject": (
-            first.tutor.profile.course.course_name
-            if first.tutor.profile.course
+            first.subject.subject_name
+            if first.subject
             else "General"
         ),
         "startTime": start_time.strftime("%H:%M"),
@@ -2113,8 +2113,8 @@ def build_booking_request_block(group, profile=None):
         "rating": representative_booking.rating.rating_score if hasattr(representative_booking, "rating") else None,
         "rating_submitted": hasattr(representative_booking, "rating"),
         "subject": (
-            first_booking.tutor.profile.course.course_name
-            if first_booking.tutor.profile.course
+            first_booking.subject.subject_name
+            if first_booking.subject
             else "General"
         ),
         "startTime": primary_block["startTime"],
@@ -3229,7 +3229,7 @@ def build_booking_detail_payload(session_group_bookings, request=None):
             ),
         },
         "session": {
-            "subject": representative_booking.tutor.profile.course.course_name if representative_booking.tutor.profile.course else "General",
+            "subject": representative_booking.subject.subject_name if representative_booking.subject else "General",
             "date": session_date.strftime("%Y-%m-%d"),
             "start_time": start_time.strftime("%H:%M"),
             "end_time": end_time.strftime("%H:%M"),
