@@ -807,7 +807,8 @@ const confirmBooking = async () => {
     await api.post('bookings/confirm/', {
       tutor_id: tutorID,
       slots: effectiveSelectedSlots.value,
-      preferred_location: bookedSessionStore.bookedSessionLocation
+      preferred_location: bookedSessionStore.bookedSessionLocation,
+      subject: bookedSessionStore.bookedSessionSub
     })
 
     toastStore.push('Booking Confirmed!')
