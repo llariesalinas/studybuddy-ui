@@ -163,6 +163,7 @@ urlpatterns = [
     # Recommendation algorithm demo tool (gated in-view by ALGORITHM_DEMO_TOOLS_ENABLED + IsSuperAdminUser)
     path('dev/algorithm-demo/tutees/', views.algorithm_demo_search_tutees),
     path('dev/algorithm-demo/recommend/', views.algorithm_demo_recommend),
+    path('dev/algorithm-demo/rating/', views.algorithm_demo_update_rating),
     path('tutor/setup/', views.tutor_setup),
     path('recommend-tutors/', views.recommend_tutors_view),
     path('chat/', include('studybuddy.chat.urls')),

@@ -421,6 +421,33 @@ def algorithm_demo_recommend(request):
     return Response(result)
 
 
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated, IsSuperAdminUser])
+def algorithm_demo_update_rating(request):
+    if not settings.ALGORITHM_DEMO_TOOLS_ENABLED:
+        return Response({"error": "Algorithm demo tools are disabled."}, status=403)
+
+    student_id = request.data.get('student_id')
+    tutor_id = request.data.get('tutor_id')
+    try:
+        rating_score = int(request.data.get('rating_score'))
+    except (TypeError, ValueError):
+        return Response({"error": "A valid rating_score is required."}, status=400)
+    if rating_score < 1 or rating_score > 5:
+        return Response({"error": "rating_score must be between 1 and 5."}, status=400)
+
+    rating = Rating.objects.filter(
+        student_id=student_id, tutor_id=tutor_id
+    ).order_by('-id').first()
+    if rating is None:
+        return Response({"error": "No existing rating found for this pair."}, status=404)
+
+    rating.rating_score = rating_score
+    rating.save(update_fields=['rating_score'])
+    update_tutor_rating_average(rating.tutor)
+    return Response({"ok": True, "rating_score": rating.rating_score})
+
+
 def build_admin_profile_defaults(user):
     display_name = (
         user.get_full_name().strip()
