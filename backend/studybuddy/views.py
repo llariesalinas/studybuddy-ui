@@ -1343,10 +1343,17 @@ def profile_status(request):
         )
 
     document_context = get_role_document_review_context(profile)
+    wallet_negative = False
+    if profile.role == 'Tutor':
+        tutor = getattr(profile, 'tutor', None)
+        if tutor is not None:
+            wallet = Wallet.objects.filter(tutor=tutor).first()
+            wallet_negative = bool(wallet and wallet.balance < 0)
 
     return Response({
         "profile_completed": profile.profile_completed,
         "role": profile.role,
+        "wallet_negative": wallet_negative,
         "tutee_verification_enforced": tutee_verification_enforced(),
         **document_context
     })
@@ -2426,12 +2433,19 @@ def confirm_payment_and_book(request):
 
         receipt_image = request.FILES.get('receipt_image')
         transaction_reference = request.data.get('transaction_reference')
+        required_method_code = 'CASH' if is_f2f else 'PAYMONGO'
 
-        if method.code == 'online' and receipt_image is None:
+        if method.code != required_method_code:
+            return Response({"error": "Payment method does not match this session's mode."}, status=400)
+
+        if method.code == 'PAYMONGO' and receipt_image is None:
             return Response({"error": "Receipt image is required for online payments."}, status=400)
 
-        if method.code == 'online' and not str(transaction_reference or '').strip():
+        if method.code == 'PAYMONGO' and not str(transaction_reference or '').strip():
             return Response({"error": "Transaction reference is required for online payments."}, status=400)
+
+        if method.code == 'CASH' and receipt_image is None:
+            return Response({"error": "Receipt image is required for cash payments."}, status=400)
 
     tutor = get_object_or_404(Tutor, profile_id=tutor_id)
     normalized_slots = []
@@ -3322,14 +3336,19 @@ def submit_session_payment(request, booking_id):
 
     receipt_image = request.FILES.get('receipt_image')
     transaction_reference = request.data.get('transaction_reference')
+    required_method_code = 'CASH' if representative_booking.session_mode == 'F2F' else 'PAYMONGO'
 
-    is_online_payment = method.code == 'online'
+    if method.code != required_method_code:
+        return Response({"error": "Payment method does not match this session's mode."}, status=400)
 
-    if is_online_payment and receipt_image is None:
+    if method.code == 'PAYMONGO' and receipt_image is None:
         return Response({"error": "Receipt image is required for online payments."}, status=400)
 
-    if is_online_payment and not str(transaction_reference or '').strip():
+    if method.code == 'PAYMONGO' and not str(transaction_reference or '').strip():
         return Response({"error": "Transaction reference is required for online payments."}, status=400)
+
+    if method.code == 'CASH' and receipt_image is None:
+        return Response({"error": "Receipt image is required for cash payments."}, status=400)
 
     if receipt_image is not None:
         receipt_image = compress_if_image(receipt_image)

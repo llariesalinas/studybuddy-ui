@@ -1668,16 +1668,27 @@ class OnlinePaymentInitiationTests(APITestCase):
         _ = second_booking  # referenced to avoid unused-variable warning
 
     def test_manual_payment_submission_updates_all_session_group_slots(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        # CASH is only valid for F2F sessions now that payment method is derived from
+        # session_mode; this test's booking defaults to Online, so both slots are flipped
+        # to F2F to keep exercising the CASH path.
+        self.booking.session_mode = "F2F"
+        self.booking.save(update_fields=["session_mode"])
         second_booking = self.create_second_request_slot()
+        second_booking.session_mode = "F2F"
+        second_booking.save(update_fields=["session_mode"])
         method = PaymentMethod.objects.create(
             code="CASH",
             method_name="Cash",
             is_active=True,
         )
+        receipt = SimpleUploadedFile("receipt.jpg", b"receipt-bytes", content_type="image/jpeg")
 
         response = self.client.post(
             f"/api/bookings/{self.booking.id}/submit-payment/",
-            {"payment_method": method.method_id},
+            {"payment_method": method.method_id, "receipt_image": receipt},
+            format="multipart",
         )
 
         self.booking.refresh_from_db()
@@ -1866,6 +1877,223 @@ class PaymentMethodTests(APITestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(codes, ["CASH", "PAYMONGO"])
+
+
+class SessionModePaymentMethodEnforcementTests(APITestCase):
+    """Payment method must match the booking's session_mode (F2F->CASH, Online->PAYMONGO),
+    enforced server-side in both submit_session_payment and confirm_payment_and_book,
+    independent of whatever the client claims."""
+
+    def setUp(self):
+        self.tutee_user = User.objects.create_user(
+            username="mode-enforce-tutee",
+            email="mode-enforce-tutee@example.com",
+            password="password",
+        )
+        self.tutee_profile = UserProfile.objects.create(
+            user=self.tutee_user, fname="Mode", mname="", lname="Tutee", role="Tutee",
+        )
+        self.tutor_user = User.objects.create_user(
+            username="mode-enforce-tutor",
+            email="mode-enforce-tutor@example.com",
+            password="password",
+        )
+        self.tutor_profile = UserProfile.objects.create(
+            user=self.tutor_user, fname="Mode", mname="", lname="Tutor", role="Tutor",
+        )
+        self.tutor = Tutor.objects.create(
+            profile=self.tutor_profile,
+            hourly_rate=Decimal("280.00"),
+            can_online=True,
+            can_f2f=True,
+            teaching_level="SHS",
+        )
+        self.cash_method = PaymentMethod.objects.create(
+            code="CASH", method_name="Cash", is_active=True,
+        )
+        self.paymongo_method = PaymentMethod.objects.create(
+            code="PAYMONGO", method_name="Pay Online (GCash / Card)", is_active=True,
+        )
+        self.client.force_authenticate(user=self.tutee_user)
+
+    def make_confirmed_booking(self, session_mode):
+        availability = TutorAvailability.objects.create(
+            tutor=self.tutor, day="Mon", time_slot=time(14, 0), is_active=True,
+        )
+        return Booking.objects.create(
+            student=self.tutee_profile,
+            tutor=self.tutor,
+            availability=availability,
+            session_date=date(2026, 4, 12),
+            session_mode=session_mode,
+            booking_request_id=uuid4(),
+            status="Confirmed",
+        )
+
+    def test_submit_session_payment_rejects_cash_for_online_session(self):
+        booking = self.make_confirmed_booking("Online")
+
+        response = self.client.post(
+            f"/api/bookings/{booking.id}/submit-payment/",
+            {"payment_method": self.cash_method.method_id},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.data["error"], "Payment method does not match this session's mode."
+        )
+        self.assertFalse(hasattr(booking, "payment"))
+
+    def test_submit_session_payment_rejects_paymongo_for_f2f_session(self):
+        booking = self.make_confirmed_booking("F2F")
+
+        response = self.client.post(
+            f"/api/bookings/{booking.id}/submit-payment/",
+            {"payment_method": self.paymongo_method.method_id},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.data["error"], "Payment method does not match this session's mode."
+        )
+
+    def test_submit_session_payment_cash_requires_receipt_but_not_reference(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        booking = self.make_confirmed_booking("F2F")
+
+        no_receipt_response = self.client.post(
+            f"/api/bookings/{booking.id}/submit-payment/",
+            {"payment_method": self.cash_method.method_id},
+        )
+        self.assertEqual(no_receipt_response.status_code, 400)
+        self.assertEqual(
+            no_receipt_response.data["error"],
+            "Receipt image is required for cash payments.",
+        )
+
+        receipt = SimpleUploadedFile("receipt.jpg", b"receipt-bytes", content_type="image/jpeg")
+        success_response = self.client.post(
+            f"/api/bookings/{booking.id}/submit-payment/",
+            {"payment_method": self.cash_method.method_id, "receipt_image": receipt},
+            format="multipart",
+        )
+
+        self.assertEqual(success_response.status_code, 201)
+        booking.refresh_from_db()
+        self.assertEqual(booking.payment.method.code, "CASH")
+        self.assertTrue(bool(booking.payment.receipt_image))
+        self.assertIsNone(booking.payment.transaction_reference)
+
+    def test_submit_session_payment_paymongo_still_requires_receipt_and_reference(self):
+        booking = self.make_confirmed_booking("Online")
+
+        response = self.client.post(
+            f"/api/bookings/{booking.id}/submit-payment/",
+            {"payment_method": self.paymongo_method.method_id},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.data["error"], "Receipt image is required for online payments."
+        )
+
+    @override_settings(TUTEE_VERIFICATION_ENFORCEMENT_START_DATE=None)
+    def test_confirm_payment_and_book_rejects_mismatched_method(self):
+        # Not-yet-enforced verification, so the unrelated verification gate in
+        # confirm_payment_and_book doesn't 403 before this test's own check is exercised.
+        availability = TutorAvailability.objects.create(
+            tutor=self.tutor, day="Mon", time_slot=time(15, 0), is_active=True,
+        )
+        future_date = date.today() + timedelta(days=7)
+        while future_date.strftime("%a")[:3] != "Mon":
+            future_date += timedelta(days=1)
+
+        response = self.client.post(
+            "/api/bookings/confirm/",
+            {
+                "tutor_id": self.tutor_profile.id,
+                "slots": [{
+                    "availability_id": availability.id,
+                    "session_date": future_date.isoformat(),
+                    "session_mode": "Online",
+                }],
+                "payment_method": self.cash_method.method_id,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.data["error"], "Payment method does not match this session's mode."
+        )
+        self.assertFalse(Booking.objects.filter(tutor=self.tutor).exists())
+
+
+class ProfileStatusWalletNegativeTests(APITestCase):
+    """profile_status exposes wallet_negative (boolean only, never the balance) for tutors
+    whose Wallet.balance has gone negative -- the signal the tutor debt banner reads."""
+
+    def setUp(self):
+        self.tutor_user = User.objects.create_user(
+            username="wallet-negative-tutor",
+            email="wallet-negative-tutor@example.com",
+            password="password",
+        )
+        self.tutor_profile = UserProfile.objects.create(
+            user=self.tutor_user, fname="Debt", mname="", lname="Tutor", role="Tutor",
+            profile_completed=True,
+        )
+        self.tutor = Tutor.objects.create(
+            profile=self.tutor_profile,
+            hourly_rate=Decimal("280.00"),
+            can_online=True,
+            can_f2f=True,
+            teaching_level="SHS",
+        )
+        self.tutee_user = User.objects.create_user(
+            username="wallet-negative-tutee",
+            email="wallet-negative-tutee@example.com",
+            password="password",
+        )
+        self.tutee_profile = UserProfile.objects.create(
+            user=self.tutee_user, fname="Debt", mname="", lname="Tutee", role="Tutee",
+            profile_completed=True,
+        )
+
+    def test_wallet_negative_false_when_balance_zero_or_positive(self):
+        self.client.force_authenticate(user=self.tutor_user)
+
+        response = self.client.get("/api/profile/status/")
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.data["wallet_negative"])
+
+        wallet = Wallet.objects.get(tutor=self.tutor)
+        wallet.balance = Decimal("50.00")
+        wallet.save(update_fields=["balance"])
+
+        response = self.client.get("/api/profile/status/")
+        self.assertFalse(response.data["wallet_negative"])
+
+    def test_wallet_negative_true_when_balance_below_zero(self):
+        wallet = Wallet.objects.get(tutor=self.tutor)
+        wallet.balance = Decimal("-25.00")
+        wallet.save(update_fields=["balance"])
+        self.client.force_authenticate(user=self.tutor_user)
+
+        response = self.client.get("/api/profile/status/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["wallet_negative"])
+        self.assertNotIn("wallet_balance", response.data)
+
+    def test_wallet_negative_false_for_tutee(self):
+        self.client.force_authenticate(user=self.tutee_user)
+
+        response = self.client.get("/api/profile/status/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.data["wallet_negative"])
 
 
 @override_settings(

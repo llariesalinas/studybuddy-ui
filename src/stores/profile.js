@@ -12,6 +12,7 @@ export const useProfileStore = defineStore('profile', {
     renewalRequired: false,
     renewalDueAt: null,
     tuteeVerificationEnforced: false,
+    walletNegative: false,
     loaded: false
   }),
 
@@ -25,6 +26,7 @@ export const useProfileStore = defineStore('profile', {
       this.renewalRequired = false
       this.renewalDueAt = null
       this.tuteeVerificationEnforced = false
+      this.walletNegative = false
       this.loaded = false
     },
 
@@ -49,6 +51,7 @@ export const useProfileStore = defineStore('profile', {
       this.renewalRequired = Boolean(res.data.document_renewal_required)
       this.renewalDueAt = res.data.document_renewal_due_at || null
       this.tuteeVerificationEnforced = Boolean(res.data.tutee_verification_enforced)
+      this.walletNegative = Boolean(res.data.wallet_negative)
       this.loaded = true
 
       return res.data

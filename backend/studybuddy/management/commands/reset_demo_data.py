@@ -21,6 +21,7 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 from faker import Faker
 
+from ._year_level_scale import COLLEGE_YEAR_OFFSET, YEAR_RANGE_BY_COURSE, random_year_level
 from studybuddy.models import (
     Booking, Course, InstitutionCourseCatalog, InstitutionRequest, PartnerInstitution, Payment,
     PaymentMethod, PlatformActivity, Preference, Rating, Strand, Subjects,
@@ -54,13 +55,6 @@ TIER_SPLIT = [
     ('SHS-STEM', 7), ('SHS-ABM', 6), ('SHS-HUMSS', 6), ('SHS-GAS', 6),
     ('BSCS', 15), ('BSIT', 15), ('BSBA', 10),
 ]
-
-# year_level stays meaningful within each tier (grade for basic ed, year for college).
-YEAR_RANGE_BY_COURSE = {
-    'ELEMENTARY': (1, 6), 'JUNIOR_HIGH': (7, 10),
-    'SHS-STEM': (11, 12), 'SHS-ABM': (11, 12), 'SHS-HUMSS': (11, 12), 'SHS-GAS': (11, 12),
-    'BSCS': (1, 4), 'BSIT': (1, 4), 'BSBA': (1, 4),
-}
 
 # Subjects with tutee demand but deliberately zero tutor supply, so the admin
 # dashboard's subject-demand "gap" indicator has a real case to show.
@@ -161,47 +155,47 @@ AVAILABILITY_ARCHETYPES = [
 
 # --- Named personas (all CPU) -----------------------------------------------------------------
 PERSONA_TUTEES = {
-    'bea':   {'fname': 'Bea', 'lname': 'Santos', 'course': 'BSCS', 'year': 2,
+    'bea':   {'fname': 'Bea', 'lname': 'Santos', 'course': 'BSCS', 'year': 14,
               'prefs': ['CS-211', 'CS-212'],
               'story': 'Cold-Start Tutee: no rating history, Hybrid = 0.7 * CBF only'},
-    'carlo': {'fname': 'Carlo', 'lname': 'Reyes', 'course': 'BSCS', 'year': 3,
+    'carlo': {'fname': 'Carlo', 'lname': 'Reyes', 'course': 'BSCS', 'year': 15,
               'prefs': ['CS-211', 'CS-311'],
               'story': 'CBF and CF agree: both point at Miguel Torres'},
-    'diane': {'fname': 'Diane', 'lname': 'Cruz', 'course': 'BSCS', 'year': 2,
+    'diane': {'fname': 'Diane', 'lname': 'Cruz', 'course': 'BSCS', 'year': 14,
               'prefs': ['CS-211'],
               'story': 'CF overrides CBF: neighbors pull ranking to Elena Bautista'},
 }
 
 PERSONA_TUTORS = {
-    'miguel': {'fname': 'Miguel', 'lname': 'Torres', 'course': 'BSCS', 'year': 3,
+    'miguel': {'fname': 'Miguel', 'lname': 'Torres', 'course': 'BSCS', 'year': 15,
                'teaching_level': 'College', 'rate': 300,
                'subjects': [('CS-211', 5), ('CS-212', 4), ('CS-311', 4)],
                'story': 'Tutor Alpha: strongest CBF fit; loved by Cluster A, panned by Cluster B'},
-    'elena':  {'fname': 'Elena', 'lname': 'Bautista', 'course': 'BSIT', 'year': 3,
+    'elena':  {'fname': 'Elena', 'lname': 'Bautista', 'course': 'BSIT', 'year': 15,
                'teaching_level': 'College', 'rate': 280,
                'subjects': [('CS-211', 2), ('IT-221', 5), ('IT-212', 4)],
                'story': 'Tutor Beta: weaker CBF fit but beloved by Cluster B - the CF-override target'},
-    'anchor1': {'fname': 'Ramon', 'lname': 'Aquino', 'course': 'BSCS', 'year': 4,
+    'anchor1': {'fname': 'Ramon', 'lname': 'Aquino', 'course': 'BSCS', 'year': 16,
                 'teaching_level': 'College', 'rate': 250,
                 'subjects': [('CS-111', 4), ('CS-112', 4)],
                 'story': 'CF anchor: rated by every cluster member, creating the Pearson signal'},
-    'anchor2': {'fname': 'Cecilia', 'lname': 'Mercado', 'course': 'BSIT', 'year': 4,
+    'anchor2': {'fname': 'Cecilia', 'lname': 'Mercado', 'course': 'BSIT', 'year': 16,
                 'teaching_level': 'College', 'rate': 250,
                 'subjects': [('IT-111', 4), ('IT-112', 3)],
                 'story': 'CF anchor: the second shared rated tutor Pearson similarity needs'},
-    'nico':   {'fname': 'Nico', 'lname': 'Villareal', 'course': 'BSIT', 'year': 2,
+    'nico':   {'fname': 'Nico', 'lname': 'Villareal', 'course': 'BSIT', 'year': 14,
                'teaching_level': 'College', 'rate': 200,
                'subjects': [('IT-212', 3), ('IT-221', 3)],
                'story': 'Brand-new tutor: zero sessions, zero ratings (empty-state UI)'},
-    'grace':  {'fname': 'Grace', 'lname': 'Domingo', 'course': 'BSCS', 'year': 4,
+    'grace':  {'fname': 'Grace', 'lname': 'Domingo', 'course': 'BSCS', 'year': 16,
                'teaching_level': 'College', 'rate': 320,
                'subjects': [('CS-311', 5), ('CS-321', 4)],
                'story': 'Fully-booked: Accepted Session Load 10/10 - new accepts blocked'},
-    'paolo':  {'fname': 'Paolo', 'lname': 'Ramirez', 'course': 'BSIT', 'year': 4,
+    'paolo':  {'fname': 'Paolo', 'lname': 'Ramirez', 'course': 'BSIT', 'year': 16,
                'teaching_level': 'College', 'rate': 310,
                'subjects': [('IT-312', 5), ('IT-313', 4)],
                'story': 'Near-limit: Accepted Session Load 8/10 - still accepting'},
-    'isabel': {'fname': 'Isabel', 'lname': 'Fernandez', 'course': 'BSBA', 'year': 4,
+    'isabel': {'fname': 'Isabel', 'lname': 'Fernandez', 'course': 'BSBA', 'year': 16,
                'teaching_level': 'College', 'rate': 450,
                'subjects': [('ACC-101', 5), ('FIN-301', 5), ('BUS-201', 4)],
                'story': 'High-earner: heavy session history, top-ups, withdrawals in every state'},
@@ -357,7 +351,7 @@ class Command(BaseCommand):
         # referencing them was already cascade-deleted in the clear phase.
         Subjects.objects.exclude(subject_code__in=[r[0] for r in subject_rows]).delete()
 
-        for pm_code, pm_name in [('CASH', 'Cash Ledger'), ('online', 'PayMongo Online (GCash/Maya)')]:
+        for pm_code, pm_name in [('CASH', 'Cash Ledger'), ('PAYMONGO', 'PayMongo Online (GCash/Maya)')]:
             PaymentMethod.objects.get_or_create(code=pm_code, defaults={'method_name': pm_name, 'is_active': True})
 
         institutions = {}
@@ -452,8 +446,7 @@ class Command(BaseCommand):
             self.stdout.write(f"  admin ready: {admin['email']}{' (created)' if created else ''}")
 
     def _course_year(self, course_code):
-        lo, hi = YEAR_RANGE_BY_COURSE[course_code]
-        return random.randint(lo, hi)
+        return random_year_level(course_code)
 
     def _tier_assignments(self):
         out = []
@@ -600,8 +593,11 @@ class Command(BaseCommand):
         elif course in SHS_SUBJECTS:
             candidates = [s for s in all_subjects if s.category == course]
         else:
-            years = range(1, profile.year_level + 1) if for_tutor else \
-                    range(max(1, profile.year_level - 1), min(4, profile.year_level + 1) + 1)
+            # profile.year_level is on the app's unified scale (college = 13-16);
+            # COLLEGE_SUBJECTS is keyed by the plain 1-4 college year, so rebase it.
+            college_year = profile.year_level - COLLEGE_YEAR_OFFSET
+            years = range(1, college_year + 1) if for_tutor else \
+                    range(max(1, college_year - 1), min(4, college_year + 1) + 1)
             year_codes = {code for y in years for code, _ in COLLEGE_SUBJECTS[course].get(y, [])}
             candidates = [s for s in all_subjects if s.subject_code in year_codes]
         if for_tutor:
@@ -689,9 +685,10 @@ class Command(BaseCommand):
         self.stdout.write(f'  availability: {len(rows)} slots across varied archetypes')
 
     def _make_booking(self, tutee, tutor, slot, session_date, status, **extra):
+        session_mode = extra.pop('session_mode', 'Online' if tutor.can_online else 'F2F')
         return Booking(student=tutee, tutor=tutor, availability=slot,
                        session_date=session_date,
-                       session_mode='Online' if tutor.can_online else 'F2F',
+                       session_mode=session_mode,
                        status=status, session_group_id=uuid4(), booking_request_id=uuid4(),
                        tutee_confirmed=status in ('Confirmed', 'Completed'),
                        tutor_confirmed=status in ('Confirmed', 'Completed'), **extra)
@@ -831,7 +828,7 @@ class Command(BaseCommand):
                 bookings.append(self._make_booking(random.choice(cpu_tutees), tutor, slot, d, status))
         created = Booking.objects.bulk_create(bookings)
         Payment.objects.bulk_create([
-            Payment(booking=b, method=PaymentMethod.objects.get(code='online'),
+            Payment(booking=b, method=PaymentMethod.objects.get(code='PAYMONGO'),
                     amount=b.tutor.hourly_rate, payment_status='Pending')
             for b in created
         ])
@@ -859,22 +856,97 @@ class Command(BaseCommand):
         tx_rows, tx_dates = [], []
         wallets = {w.tutor_id: w for w in Wallet.objects.select_related('tutor')}
         earnings = {}
+        paymongo_method = PaymentMethod.objects.get(code='PAYMONGO')
+        cash_method = PaymentMethod.objects.get(code='CASH')
+
+        # Isabel is deliberately excluded here: she's the "high-earner" persona with a
+        # PHP 55,000 top-up and ~60 completed sessions (below), so a couple of PHP-30-45
+        # cash commissions would never make a dent. Miguel gets the visible cash
+        # bookings/receipts for the demo; his actual debt is guaranteed below rather than
+        # assumed, since he also picks up ~10 payments from _seed_cluster_scenarios with a
+        # random PAYMONGO/CASH split that this function has no visibility into in advance.
+        cash_demo_specs = [
+            ('miguel', 3),
+        ]
+        cash_bookings = []
+        for tutor_key, booking_count in cash_demo_specs:
+            tutor = personas['tutors'][tutor_key]
+            slots = list(self.slots_by_tutor[tutor.pk])
+            for _ in range(booking_count):
+                slot, d = self._pick_completed_date(slots, self.used_slot_dates)
+                if slot is None:
+                    break
+                cash_bookings.append(
+                    self._make_booking(
+                        random.choice(tutees),
+                        tutor,
+                        slot,
+                        d,
+                        'Completed',
+                        session_mode='F2F',
+                        preferred_location='CPU Main Library',
+                    )
+                )
+
+        created_cash_bookings = Booking.objects.bulk_create(cash_bookings)
+        Payment.objects.bulk_create([
+            Payment(
+                booking=booking,
+                method=cash_method,
+                amount=booking.tutor.hourly_rate,
+                payment_status='Paid',
+                paid_at=self._aware(booking.session_date, hour=19),
+                receipt_image=PLACEHOLDER_IMAGE,
+            )
+            for booking in created_cash_bookings
+        ])
+        self._backdate(
+            Booking,
+            {
+                booking.pk: self._aware(booking.session_date - timedelta(days=random.randint(1, 5)))
+                for booking in created_cash_bookings
+            },
+        )
+
         for p in Payment.objects.filter(payment_status='Paid').select_related('booking'):
             wallet = wallets[p.booking.tutor_id]
             amount = Decimal(p.amount)
             commission = (amount * COMMISSION_RATE).quantize(Decimal('0.01'))
             dt = self._aware(p.booking.session_date, hour=20)
-            tx_rows.append(Transaction(wallet=wallet, transaction_type='session_credit',
-                                       amount=amount, description=f'Session credit (booking {p.booking_id})',
-                                       reference_id=str(p.booking_id)))
-            tx_dates.append(dt)
-            tx_rows.append(Transaction(wallet=wallet, transaction_type='commission_deduction',
-                                       amount=-commission, description='Platform commission (10%)',
-                                       reference_id=str(p.booking_id)))
-            tx_dates.append(dt)
-            earnings[wallet.pk] = earnings.get(wallet.pk, Decimal('0')) + amount - commission
+            if p.method_id == paymongo_method.method_id:
+                tutor_share = amount - commission
+                tx_rows.append(Transaction(wallet=wallet, transaction_type='session_credit',
+                                           amount=tutor_share, description=f'Session credit (booking {p.booking_id})',
+                                           reference_id=str(p.booking_id)))
+                tx_dates.append(dt)
+                earnings[wallet.pk] = earnings.get(wallet.pk, Decimal('0')) + tutor_share
+            elif p.method_id == cash_method.method_id:
+                tx_rows.append(Transaction(wallet=wallet, transaction_type='commission_deduction',
+                                           amount=-commission, description='Platform commission (10%)',
+                                           reference_id=str(p.booking_id)))
+                tx_dates.append(dt)
+                earnings[wallet.pk] = earnings.get(wallet.pk, Decimal('0')) - commission
         created_tx = Transaction.objects.bulk_create(tx_rows)
         self._backdate(Transaction, {t.pk: d for t, d in zip(created_tx, tx_dates)})
+
+        # Guarantee Miguel actually lands negative for the wallet-debt-banner demo. His
+        # cluster-rating sessions (_seed_cluster_scenarios) use a random PAYMONGO/CASH split
+        # we don't control here, so his running total after the loop above could plausibly
+        # still be positive even with his 3 cash sessions counted. Rather than guessing at a
+        # session count that "should" work, force it: top up his cash-commission deduction
+        # just enough to cross zero, framed as one more settled cash session's commission.
+        miguel_wallet = wallets[personas['tutors']['miguel'].pk]
+        miguel_earnings = earnings.get(miguel_wallet.pk, Decimal('0'))
+        if miguel_earnings >= 0:
+            debt_amount = miguel_earnings + Decimal('75.00')
+            debt_tx = Transaction.objects.create(
+                wallet=miguel_wallet, transaction_type='commission_deduction',
+                amount=-debt_amount,
+                description='Platform commission (10%) - cash session settlement',
+                reference_id=f'DEBT-{miguel_wallet.pk}',
+            )
+            self._backdate(Transaction, {debt_tx.pk: self._now() - timedelta(days=1)})
+            earnings[miguel_wallet.pk] = miguel_earnings - debt_amount
 
         # Isabel: top-ups justify a near-cap cash-out that session earnings alone couldn't.
         isabel_wallet = wallets[isabel.pk]
@@ -940,7 +1012,8 @@ class Command(BaseCommand):
         Wallet.objects.bulk_update(wallets.values(), ['balance', 'pending_amount'])
         self.stdout.write(f'  compensation: {len(created_tx) + 1} transactions, '
                           f'{len(wd_specs)} withdrawals, Isabel balance '
-                          f'{earnings.get(isabel_wallet.pk)}')
+                          f'{earnings.get(isabel_wallet.pk)}, Miguel balance '
+                          f'{earnings.get(miguel_wallet.pk)} (must be negative for the debt banner demo)')
 
     def _recompute_tutor_aggregates(self):
         for tutor in Tutor.objects.all():
@@ -967,7 +1040,7 @@ class Command(BaseCommand):
                                            date_joined=now - timedelta(days=random.randint(0, 3)))
                 profile = UserProfile.objects.create(
                     user=user, fname=fname, lname=lname, role=role,
-                    course=courses['BSIT'], year_level=random.randint(1, 4),
+                    course=courses['BSIT'], year_level=random_year_level('BSIT'),
                     profile_completed=True, institution=institutions[domain], is_suspended=False)
                 model = TutorApplication if role == 'Tutor' else TuteeApplication
                 model.objects.create(profile=profile, application_status='pending',

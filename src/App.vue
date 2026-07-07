@@ -67,6 +67,7 @@
       :class="{ 'app-main-chat': route.name === 'chat' }"
     >
         <VerificationBanner @navigate="goToVerificationStatus" />
+        <WalletDebtBanner @navigate="goToWallet" />
         <header class="app-page-header d-flex justify-content-between align-items-center mb-3 pb-3 border-bottom border-sb">
           
           <div v-if="route.path === '/dashboard'">
@@ -312,6 +313,7 @@ import OngoingBookingBar from '@/components/OngoingBookingBar.vue'
 import VenueConfirmModal from '@/components/VenueConfirmModal.vue'
 import SessionCheckInModal from '@/components/SessionCheckInModal.vue'
 import VerificationBanner from '@/components/VerificationBanner.vue'
+import WalletDebtBanner from '@/components/WalletDebtBanner.vue'
 import { useChatStore } from '@/stores/chat'
 import router from './router'
 import { SESSION_POLL_INTERVAL_MS } from './config.js'
@@ -419,6 +421,10 @@ const openSupport = (type = 'Other', id = null) => {
 
 const goToVerificationStatus = async () => {
   await router.push('/application-status')
+}
+
+const goToWallet = async () => {
+  await router.push('/tch-wallet')
 }
 
 const handleBookSessionClick = async () => {
