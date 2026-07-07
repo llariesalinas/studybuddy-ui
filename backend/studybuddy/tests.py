@@ -3627,6 +3627,20 @@ class BookingVerificationGateTests(APITestCase):
             school_email_domain="cpu.edu",
             is_active=True,
         )
+        self.course = Course.objects.create(
+            course_code="GATE101",
+            course_name="Gatekeeping Studies",
+        )
+        self.subject = Subjects.objects.create(
+            subject_code="GATE-SUBJ",
+            subject_name="Catalog Approved Subject",
+            department="Gate",
+        )
+        InstitutionCourseCatalog.objects.create(
+            institution=self.institution,
+            course=self.course,
+            subject=self.subject,
+        )
         self.tutee_user = User.objects.create_user(
             username="gate-tutee@cpu.edu",
             email="gate-tutee@cpu.edu",
@@ -3639,6 +3653,7 @@ class BookingVerificationGateTests(APITestCase):
             lname="Tutee",
             role="Tutee",
             institution=self.institution,
+            course=self.course,
         )
         self.tutor_user = User.objects.create_user(
             username="gate-tutor@cpu.edu",
@@ -3652,6 +3667,7 @@ class BookingVerificationGateTests(APITestCase):
             lname="Tutor",
             role="Tutor",
             institution=self.institution,
+            course=self.course,
         )
         self.tutor = Tutor.objects.create(
             profile=self.tutor_profile,
@@ -3659,6 +3675,11 @@ class BookingVerificationGateTests(APITestCase):
             can_online=True,
             can_f2f=True,
             teaching_level="SHS",
+        )
+        TutorSubjects.objects.create(
+            tutor=self.tutor,
+            subject=self.subject,
+            expertise_level=5,
         )
         self.future_date = timezone.now().date() + timedelta(days=30)
         self.availability = TutorAvailability.objects.create(
@@ -3691,18 +3712,21 @@ class BookingVerificationGateTests(APITestCase):
             reviewed_at=timezone_now_minus_days(91),
         )
 
-    def post_confirm_booking(self):
+    def post_confirm_booking(self, *, subject=None):
         self.client.force_authenticate(user=self.tutee_user)
+        payload = {
+            "tutor_id": self.tutor_profile.id,
+            "slots": [{
+                "availability_id": self.availability.id,
+                "session_date": self.future_date.isoformat(),
+                "session_mode": "Online",
+            }],
+        }
+        if subject is not None:
+            payload["subject"] = subject
         return self.client.post(
             "/api/bookings/confirm/",
-            {
-                "tutor_id": self.tutor_profile.id,
-                "slots": [{
-                    "availability_id": self.availability.id,
-                    "session_date": self.future_date.isoformat(),
-                    "session_mode": "Online",
-                }],
-            },
+            payload,
             format="json",
         )
 
@@ -3753,6 +3777,32 @@ class BookingVerificationGateTests(APITestCase):
         response = self.post_confirm_booking()
 
         self.assertEqual(response.status_code, 200)
+
+    @override_settings(**NOT_YET_ENFORCED)
+    def test_confirm_booking_persists_subject(self):
+        response = self.post_confirm_booking(subject=self.subject.subject_code)
+
+        self.assertEqual(response.status_code, 200)
+        booking = Booking.objects.get(id=response.data["booking_ids"][0])
+        self.assertEqual(booking.subject.subject_code, self.subject.subject_code)
+
+    @override_settings(**NOT_YET_ENFORCED)
+    def test_confirm_booking_without_subject_still_succeeds(self):
+        response = self.post_confirm_booking()
+
+        self.assertEqual(response.status_code, 200)
+        booking = Booking.objects.get(id=response.data["booking_ids"][0])
+        self.assertIsNone(booking.subject)
+
+    @override_settings(**NOT_YET_ENFORCED)
+    def test_confirm_booking_rejects_unrecognized_subject(self):
+        response = self.post_confirm_booking(subject="NOT-RECOGNIZED")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.data["error"],
+            "This subject is not recognized for your course catalog.",
+        )
 
     @override_settings(**ENFORCED)
     def test_tutee_with_due_renewal_blocked(self):
@@ -5003,6 +5053,44 @@ class DashboardLoadPerformanceTests(APITestCase):
             ["2026-06-06", "2026-06-10"],
         )
 
+    def test_list_bookings_uses_booked_subject_for_combined_blocks(self):
+        booking = Booking.objects.create(
+            student=self.student,
+            tutor=self.tutor,
+            availability=self.availability,
+            session_date=date(2026, 6, 6),
+            session_mode="Online",
+            status="Completed",
+            subject=self.subject,
+        )
+        Rating.objects.create(
+            booking=booking,
+            student=self.student,
+            tutor=self.tutor,
+            rating_score=5,
+        )
+
+        response = self.client.get("/api/bookings/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data[0]["subject"], self.subject.subject_name)
+
+    def test_list_bookings_uses_booked_subject_for_pending_request_blocks(self):
+        Booking.objects.create(
+            student=self.student,
+            tutor=self.tutor,
+            availability=self.availability,
+            session_date=date(2026, 6, 6),
+            session_mode="Online",
+            status="Pending",
+            subject=self.subject,
+        )
+
+        response = self.client.get("/api/bookings/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data[0]["subject"], self.subject.subject_name)
+
     def test_student_can_hide_rejected_dashboard_pill_without_hiding_for_tutor(self):
         booking = Booking.objects.create(
             student=self.student,
@@ -5523,6 +5611,11 @@ class SessionCheckInTests(APITestCase):
             course_code="CHECK101",
             course_name="Session Checks",
         )
+        self.subject = Subjects.objects.create(
+            subject_code="CHECK-SUBJ",
+            subject_name="Checkpoint Subject",
+            department="Checks",
+        )
         self.student_user = User.objects.create_user(
             username="check-student",
             email="check-student@example.com",
@@ -5572,6 +5665,7 @@ class SessionCheckInTests(APITestCase):
             student=self.student,
             tutor=self.tutor,
             availability=self.availability,
+            subject=self.subject,
             session_date=now.date(),
             session_mode="F2F",
             preferred_location="Library",
@@ -5707,6 +5801,24 @@ class SessionCheckInTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["check_ins"]["venue_confirm"]["response"], "no")
         self.assertIsNone(response.data["check_ins"]["midpoint_checkin"])
+
+    def test_booking_detail_session_subject_reflects_booked_subject_not_course(self):
+        response = self.client.get(f"/api/bookings/{self.booking.id}/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.data["session"]["subject"],
+            self.subject.subject_name,
+        )
+
+    def test_booking_detail_session_subject_falls_back_to_general_when_null(self):
+        self.booking.subject = None
+        self.booking.save(update_fields=["subject"])
+
+        response = self.client.get(f"/api/bookings/{self.booking.id}/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["session"]["subject"], "General")
 
     def test_booking_detail_uses_absolute_receipt_media_url(self):
         from django.core.files.uploadedfile import SimpleUploadedFile
