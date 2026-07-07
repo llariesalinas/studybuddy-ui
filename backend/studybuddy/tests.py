@@ -4277,7 +4277,9 @@ class EmailAuthTests(APITestCase):
         output = StringIO()
         call_command("make_superadmin", target_user.email, stdout=output)
 
+        target_user.refresh_from_db()
         profile.refresh_from_db()
+        self.assertTrue(target_user.is_staff)
         self.assertEqual(profile.role, "SuperAdmin")
         self.assertTrue(profile.profile_completed)
         self.assertTrue(profile.is_domain_exempt)
@@ -4313,8 +4315,10 @@ class EmailAuthTests(APITestCase):
         output = StringIO()
         call_command("make_superadmin", login_user.email, stdout=output)
 
+        login_user.refresh_from_db()
         legacy_profile.refresh_from_db()
         login_profile.refresh_from_db()
+        self.assertTrue(login_user.is_staff)
         self.assertEqual(legacy_profile.role, "Admin")
         self.assertEqual(login_profile.role, "SuperAdmin")
         self.assertIn(f"Promoting login username match user_id={login_user.id}.", output.getvalue())
@@ -5525,6 +5529,33 @@ class SessionCheckInTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["check_ins"]["venue_confirm"]["response"], "no")
         self.assertIsNone(response.data["check_ins"]["midpoint_checkin"])
+
+    def test_booking_detail_uses_absolute_receipt_media_url(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        method = PaymentMethod.objects.create(
+            code="CASH",
+            method_name="Cash",
+            is_active=True,
+        )
+        Payment.objects.create(
+            booking=self.booking,
+            amount=Decimal("200.00"),
+            method=method,
+            payment_status="Pending",
+            receipt_image=SimpleUploadedFile(
+                "receipt.jpg",
+                b"receipt-bytes",
+                content_type="image/jpeg",
+            ),
+        )
+
+        response = self.client.get(f"/api/bookings/{self.booking.id}/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(
+            response.data["payment"]["receipt_image"].startswith("http://testserver/media/")
+        )
 
     def test_other_users_cannot_record_check_in(self):
         other_user = User.objects.create_user(
