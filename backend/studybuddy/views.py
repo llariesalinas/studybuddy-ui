@@ -2431,6 +2431,7 @@ def confirm_payment_and_book(request):
     tutor_id = request.data.get("tutor_id")
     slots = request.data.get("slots")
     method_id = request.data.get("payment_method")
+    subject_code = request.data.get("subject")
     preferred_location = request.data.get('preferred_location', '').strip()
 
     if isinstance(slots, str):
@@ -2486,6 +2487,14 @@ def confirm_payment_and_book(request):
             return Response({"error": "Receipt image is required for cash payments."}, status=400)
 
     tutor = get_object_or_404(Tutor, profile_id=tutor_id)
+    subject = None
+    if subject_code:
+        if not subject_is_recognized_for_profile(user_profile, subject_code):
+            return Response(
+                {"error": "This subject is not recognized for your course catalog."},
+                status=400,
+            )
+        subject = Subjects.objects.filter(subject_code=subject_code).first()
     normalized_slots = []
 
     with transaction.atomic():
@@ -2576,6 +2585,7 @@ def confirm_payment_and_book(request):
                     student=user_profile,
                     tutor=tutor,
                     availability=slot_request["availability"],
+                    subject=subject,
                     session_date=slot_request["session_date"],
                     session_mode=slot_request["session_mode"],
                     preferred_location=preferred_location,
