@@ -44,8 +44,19 @@
             </div>
           </div>
 
-          <div v-if="store.selectedMode === 'Face-to-face'" class="mb-3">
-            <label class="form-label fw-semibold small">Preferred Location</label>
+          <div v-if="store.selectedMode === 'Face-to-face' && campusLocationType" class="mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <label class="form-label fw-semibold small mb-0">
+                Location ({{ campusLocationType === 'inside' ? 'Inside Campus' : 'Outside Campus' }})
+              </label>
+              <button
+                type="button"
+                class="btn btn-link btn-sm p-0"
+                @click="showCampusModal = true"
+              >
+                Change
+              </button>
+            </div>
             <input
               type="text"
               v-model="store.selectedLocation"
@@ -101,6 +112,13 @@
               {{ isSubmitting ? 'Searching...' : 'Find Tutor' }}
             </button>
           </div>
+
+          <CampusLocationModal
+            v-model:open="showCampusModal"
+            anchor-selector=".booking-fields-card"
+            @select="onCampusTypeSelected"
+            @cancel="onCampusModalCancelled"
+          />
         </form>
       </div>
     </div>
@@ -113,6 +131,7 @@ import { useRouter } from 'vue-router'
 import BudgetRangeSlider from '@/components/BudgetRangeSlider.vue'
 import BookingDatePicker from '@/components/BookingDatePicker.vue'
 import BookingTimePicker from '@/components/BookingTimePicker.vue'
+import CampusLocationModal from '@/components/CampusLocationModal.vue'
 import SbSelectModal from '@/components/SbSelectModal.vue'
 import {
   INITIAL_BUDGET_MAX,
@@ -132,6 +151,8 @@ const toastStore = useToastStore()
 const isSubmitting = ref(false)
 const subjects = ref([])
 const endTimePickerRef = ref(null)
+const showCampusModal = ref(false)
+const campusLocationType = ref(null)
 
 const modes = [
   { label: 'Online', value: 'Online', icon: 'bi-camera-video-fill' },
@@ -189,9 +210,22 @@ const selectedSubjectModel = computed({
 const selectMode = (value) => {
   store.selectedMode = value
 
-  if (value !== 'Face-to-face') {
+  if (value === 'Face-to-face') {
+    showCampusModal.value = true
+  } else {
     store.selectedLocation = ''
+    campusLocationType.value = null
   }
+}
+
+const onCampusTypeSelected = (type) => {
+  campusLocationType.value = type
+}
+
+const onCampusModalCancelled = () => {
+  store.selectedMode = null
+  store.selectedLocation = ''
+  campusLocationType.value = null
 }
 
 const selectedDateModel = computed({
@@ -270,6 +304,10 @@ onMounted(async () => {
     })
   } catch (error) {
     console.error('Failed to load subjects', error)
+  }
+
+  if (store.selectedMode === 'Face-to-face' && campusLocationType.value === null) {
+    showCampusModal.value = true
   }
 })
 

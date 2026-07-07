@@ -33,8 +33,19 @@
         </div>
 
         <!-- Location -->
-        <div v-if="modeModel === 'Face-to-face'" class="col-lg-3 col-md-3">
-          <label class="form-label fw-semibold small sb-muted">Location</label>
+        <div v-if="modeModel === 'Face-to-face' && campusLocationType" class="col-lg-3 col-md-3">
+          <div class="d-flex justify-content-between align-items-center gap-2 mb-1 flex-wrap">
+            <label class="form-label fw-semibold small sb-muted mb-0">
+              Location ({{ campusLocationType === 'inside' ? 'Inside Campus' : 'Outside Campus' }})
+            </label>
+            <button
+              type="button"
+              class="btn btn-link btn-sm p-0"
+              @click="showCampusModal = true"
+            >
+              Change
+            </button>
+          </div>
           <input
             type="text"
             v-model="locationModel"
@@ -113,6 +124,12 @@
           </button>
         </div>
       </div>
+
+      <CampusLocationModal
+        v-model:open="showCampusModal"
+        @select="onCampusTypeSelected"
+        @cancel="onCampusModalCancelled"
+      />
     </form>
 
     <div v-if="isLoading" class="text-center py-5">
@@ -184,10 +201,11 @@
 <script setup>
 import { useRoute, useRouter, onBeforeRouteUpdate } from 'vue-router'
 import api from '@/services/api/api'
-import { computed, nextTick, ref, onMounted } from 'vue'
+import { computed, nextTick, ref, onMounted, watch } from 'vue'
 import BudgetRangeSlider from '@/components/BudgetRangeSlider.vue'
 import BookingDatePicker from '@/components/BookingDatePicker.vue'
 import BookingTimePicker from '@/components/BookingTimePicker.vue'
+import CampusLocationModal from '@/components/CampusLocationModal.vue'
 import SbSelectModal from '@/components/SbSelectModal.vue'
 
 import {
@@ -213,6 +231,8 @@ const isLoading = ref(true)
 const isSubmitting = ref(false)
 const showBudgetFilter = ref(false)
 const endTimePickerRef = ref(null)
+const showCampusModal = ref(false)
+const campusLocationType = ref(null)
 
 const subjects = ref([])
 const matchedTutors = computed(() => findTutorsStore.results)
@@ -334,6 +354,16 @@ const modeModel = computed({
   set: (value) => updateFindTutorsFilters({ mode: normalizeSelectValue(value) }),
 })
 
+watch(modeModel, (newMode, previousMode) => {
+  if (newMode === 'Face-to-face' && previousMode !== 'Face-to-face') {
+    showCampusModal.value = true
+  }
+
+  if (newMode !== 'Face-to-face') {
+    campusLocationType.value = null
+  }
+})
+
 const locationModel = computed({
   get: () => findTutorsStore.filters.location,
   set: (value) => updateFindTutorsFilters({ location: value }),
@@ -391,6 +421,16 @@ const endTimeModel = computed({
     updateFindTutorsFilters({ endTime: value })
   },
 })
+
+const onCampusTypeSelected = (type) => {
+  campusLocationType.value = type
+}
+
+const onCampusModalCancelled = () => {
+  modeModel.value = null
+  locationModel.value = ''
+  campusLocationType.value = null
+}
 
 const getSubjectGroupLabel = (subject) => {
   return subject?.department?.trim() || subject?.category?.trim() || 'Other Subjects'
@@ -568,6 +608,10 @@ onMounted(async () => {
     })
   } catch (error) {
     console.error('Failed to load subjects', error)
+  }
+
+  if (modeModel.value === 'Face-to-face' && campusLocationType.value === null) {
+    showCampusModal.value = true
   }
 
   if (canRunRecommendation()) {
