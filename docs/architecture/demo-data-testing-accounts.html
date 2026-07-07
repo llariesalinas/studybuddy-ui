@@ -340,7 +340,8 @@
               <td><span class="role tutor">Tutor</span></td>
               <td>Miguel Torres</td>
               <td><code>miguel.torres@cpu.edu.ph</code></td>
-              <td>Strongest CBF fit; loved by one cluster and panned by another.</td>
+              <td>Strongest CBF fit; loved by one cluster and panned by another. Also the
+                <strong>cash-payment / wallet-debt-banner</strong> persona — see below.</td>
             </tr>
             <tr>
               <td><span class="role tutor">Tutor</span></td>
@@ -382,7 +383,65 @@
               <td><span class="role tutor">Tutor</span></td>
               <td>Isabel Fernandez</td>
               <td><code>isabel.fernandez@cpu.edu.ph</code></td>
-              <td>High earner with top-ups and withdrawal states.</td>
+              <td>High earner with top-ups and withdrawal states. Her balance also lands
+                negative most reseeds (a large pending withdrawal near the InstaPay cap
+                against session earnings) &mdash; incidental, not the debt-banner demo persona.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section aria-labelledby="cash-payments">
+      <h2 id="cash-payments">Cash Payments &amp; Wallet Debt Banner (added 2026-07-07)</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Test case</th>
+              <th>Where to look</th>
+              <th>Expected result</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Payment method is derived, not user-picked</td>
+              <td>Any booking confirmation / <code>submit_session_payment</code></td>
+              <td>F2F session &rarr; method is forced to <code>CASH</code>. Online session &rarr;
+                method is forced to <code>PAYMONGO</code>. Enforced server-side in both
+                <code>confirm_payment_and_book</code> and <code>submit_session_payment</code>; a
+                mismatched method in the request is rejected.</td>
+            </tr>
+            <tr>
+              <td>Cash receipt requirement</td>
+              <td>Paying for an F2F booking as a tutee</td>
+              <td>CASH requires a receipt photo only &mdash; no transaction reference field
+                (unlike PAYMONGO, which requires both a receipt and a transaction reference).</td>
+            </tr>
+            <tr>
+              <td>Wallet debt banner</td>
+              <td>Log in as <code>miguel.torres@cpu.edu.ph</code> (any page, banner is global)</td>
+              <td>A non-dismissible banner appears because his wallet balance is forced negative
+                by the seed (guaranteed &lt; 0; a clean reseed typically lands exactly
+                <code>-75.00</code>). Sourced from a boolean-only <code>wallet_negative</code>
+                field on <code>profile_status</code> &mdash; the banner never shows the actual
+                amount. Links to the Wallet page.</td>
+            </tr>
+            <tr>
+              <td>Debt banner absence</td>
+              <td>Log in as any tutor whose wallet balance is non-negative</td>
+              <td>Banner does not render. Note that Isabel Fernandez incidentally lands negative
+                on most reseeds too (see her persona row above), so she is not a reliable
+                "absence" check &mdash; use a tutor persona other than Miguel or Isabel, or check
+                the balance first.</td>
+            </tr>
+            <tr>
+              <td>Cash-paid session history</td>
+              <td>Miguel Torres's Wallet / transaction history</td>
+              <td>3 completed F2F sessions paid via CASH with receipt images attached, each
+                producing a <code>commission_deduction</code> transaction (no
+                <code>session_credit</code>, since cash never touches the platform's PayMongo
+                balance).</td>
             </tr>
           </tbody>
         </table>
