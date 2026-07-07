@@ -82,6 +82,14 @@ class Command(BaseCommand):
                 )
             )
 
+        user_updates = []
+        if not user.is_staff:
+            user.is_staff = True
+            user_updates.append('is_staff')
+
+        if user_updates:
+            user.save(update_fields=user_updates)
+
         profile, created = UserProfile.objects.get_or_create(
             user=user,
             defaults=build_profile_defaults(user),
