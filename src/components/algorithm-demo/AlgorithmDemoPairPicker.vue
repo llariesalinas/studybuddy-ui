@@ -45,12 +45,16 @@ async function onTuteeChange(tuteeId) {
   rows.value = []
   reason.value = null
   errorMessage.value = ''
-
   if (!tuteeId) return
+  await refetchRows()
+}
 
+async function refetchRows() {
+  if (!selectedTuteeId.value) return
   loading.value = true
+  errorMessage.value = ''
   try {
-    const { data } = await getAlgorithmDemoRecommendation(tuteeId, props.institutionId)
+    const { data } = await getAlgorithmDemoRecommendation(selectedTuteeId.value, props.institutionId)
     rows.value = data.rows
     reason.value = data.reason
   } catch (err) {
@@ -58,6 +62,10 @@ async function onTuteeChange(tuteeId) {
   } finally {
     loading.value = false
   }
+}
+
+function onRatingUpdated() {
+  refetchRows()
 }
 
 watch(
@@ -164,7 +172,7 @@ watch(
         </div>
       </div>
 
-      <AlgorithmDemoBreakdown :row="selectedRow" />
+      <AlgorithmDemoBreakdown :row="selectedRow" @rating-updated="onRatingUpdated" />
     </template>
   </div>
 </template>
