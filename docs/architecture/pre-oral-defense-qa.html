@@ -1,0 +1,829 @@
+<style>
+  :root {
+    --accent: #00895a;
+    --accent-hover: #00704a;
+    --accent-soft: #edf7f3;
+    --accent-border: #b8dece;
+    --bg: #f8f9fa;
+    --surface: #ffffff;
+    --surface-border: #eaeaea;
+    --ink: #163127;
+    --ink-muted: #6b7280;
+    --good: #00895a;
+    --good-soft: #edf7f3;
+    --good-border: #b8dece;
+    --warn: #92650a;
+    --warn-soft: #fff6db;
+    --warn-border: #ecd48f;
+    --danger: #b3261e;
+    --danger-soft: #fdecec;
+    --danger-border: #f3c6c3;
+    --radius-card: 16px;
+    --radius-pill: 9999px;
+    --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    --font-mono: ui-monospace, 'SFMono-Regular', 'Consolas', 'Cascadia Code', monospace;
+    --shadow-rest: 0 6px 16px rgba(15, 23, 42, 0.06);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --accent: #86b7a3;
+      --accent-hover: #9cc8b8;
+      --accent-soft: #10231d;
+      --accent-border: #263c34;
+      --bg: #050807;
+      --surface: #0c1110;
+      --surface-border: #1b2a25;
+      --ink: #f3f7f5;
+      --ink-muted: #9aa8a1;
+      --good: #86b7a3;
+      --good-soft: #10291f;
+      --good-border: #263c34;
+      --warn: #f0c56a;
+      --warn-soft: #241d0d;
+      --warn-border: #4a3a17;
+      --danger: #f2938c;
+      --danger-soft: #2a1414;
+      --danger-border: #4a2320;
+      --shadow-rest: 0 6px 16px rgba(0, 0, 0, 0.3);
+    }
+  }
+  :root[data-theme='dark'] {
+    --accent: #86b7a3;
+    --accent-hover: #9cc8b8;
+    --accent-soft: #10231d;
+    --accent-border: #263c34;
+    --bg: #050807;
+    --surface: #0c1110;
+    --surface-border: #1b2a25;
+    --ink: #f3f7f5;
+    --ink-muted: #9aa8a1;
+    --good: #86b7a3;
+    --good-soft: #10291f;
+    --good-border: #263c34;
+    --warn: #f0c56a;
+    --warn-soft: #241d0d;
+    --warn-border: #4a3a17;
+    --danger: #f2938c;
+    --danger-soft: #2a1414;
+    --danger-border: #4a2320;
+    --shadow-rest: 0 6px 16px rgba(0, 0, 0, 0.3);
+  }
+  :root[data-theme='light'] {
+    --accent: #00895a;
+    --accent-hover: #00704a;
+    --accent-soft: #edf7f3;
+    --accent-border: #b8dece;
+    --bg: #f8f9fa;
+    --surface: #ffffff;
+    --surface-border: #eaeaea;
+    --ink: #163127;
+    --ink-muted: #6b7280;
+    --good: #00895a;
+    --good-soft: #edf7f3;
+    --good-border: #b8dece;
+    --warn: #92650a;
+    --warn-soft: #fff6db;
+    --warn-border: #ecd48f;
+    --danger: #b3261e;
+    --danger-soft: #fdecec;
+    --danger-border: #f3c6c3;
+    --shadow-rest: 0 6px 16px rgba(15, 23, 42, 0.06);
+  }
+
+  * { box-sizing: border-box; }
+
+  body { background: var(--bg); }
+
+  .doc {
+    font-family: var(--font-body);
+    color: var(--ink);
+    background: var(--bg);
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 40px 24px 96px;
+    line-height: 1.55;
+  }
+
+  .doc h1, .doc h2, .doc h3 { text-wrap: balance; }
+
+  /* ---------- Header ---------- */
+  .doc-header { margin-bottom: 20px; }
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12.5px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--accent);
+    background: var(--accent-soft);
+    border: 1px solid var(--accent-border);
+    border-radius: var(--radius-pill);
+    padding: 5px 14px;
+    margin-bottom: 16px;
+  }
+  .doc h1 {
+    font-size: 28px;
+    font-weight: 700;
+    margin: 0 0 8px;
+    letter-spacing: -0.01em;
+  }
+  .doc-sub {
+    color: var(--ink-muted);
+    font-size: 15px;
+    margin: 0 0 22px;
+    max-width: 62ch;
+  }
+  .meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 22px;
+    font-size: 13px;
+    color: var(--ink-muted);
+    padding-top: 16px;
+    border-top: 1px solid var(--surface-border);
+  }
+  .meta-row strong { color: var(--ink); font-weight: 600; }
+
+  /* ---------- Jump nav ---------- */
+  .jumpnav {
+    position: sticky;
+    top: 12px;
+    z-index: 5;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    background: color-mix(in srgb, var(--surface) 88%, transparent);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--surface-border);
+    border-radius: var(--radius-pill);
+    padding: 8px;
+    margin: 28px 0 34px;
+  }
+  .jumpnav a {
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--ink-muted);
+    text-decoration: none;
+    padding: 6px 12px;
+    border-radius: var(--radius-pill);
+    transition: background 0.15s ease, color 0.15s ease;
+    white-space: nowrap;
+  }
+  .jumpnav a:hover, .jumpnav a:focus-visible {
+    background: var(--accent-soft);
+    color: var(--accent);
+    outline: none;
+  }
+
+  /* ---------- Callout ---------- */
+  .callout {
+    border: 1px solid var(--warn-border);
+    background: var(--warn-soft);
+    border-radius: var(--radius-card);
+    padding: 20px 22px;
+    margin: 0 0 36px;
+  }
+  .callout h2 {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--warn);
+    margin: 0 0 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .callout ul { margin: 0; padding-left: 20px; }
+  .callout li { margin-bottom: 8px; font-size: 14.5px; }
+  .callout li:last-child { margin-bottom: 0; }
+  .callout code {
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    background: color-mix(in srgb, var(--ink) 8%, transparent);
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+
+  /* ---------- Section headings ---------- */
+  .section { margin-bottom: 44px; scroll-margin-top: 80px; }
+  .section-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 16px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--surface-border);
+  }
+  .section-head h2 {
+    font-size: 20px;
+    font-weight: 700;
+    margin: 0;
+  }
+  .section-head .section-note {
+    font-size: 12.5px;
+    color: var(--ink-muted);
+    white-space: nowrap;
+  }
+
+  /* ---------- Snapshot table ---------- */
+  .snapshot-wrap { overflow-x: auto; border: 1px solid var(--surface-border); border-radius: var(--radius-card); }
+  table.snapshot { width: 100%; border-collapse: collapse; font-size: 13.5px; min-width: 640px; }
+  table.snapshot th {
+    text-align: left;
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--ink-muted);
+    background: var(--surface);
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--surface-border);
+  }
+  table.snapshot td {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--surface-border);
+    background: var(--surface);
+    vertical-align: top;
+  }
+  table.snapshot tr:last-child td { border-bottom: none; }
+  table.snapshot td.gap { color: var(--ink-muted); }
+
+  /* ---------- Status pill ---------- */
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11.5px;
+    font-weight: 600;
+    padding: 4px 11px;
+    border-radius: var(--radius-pill);
+    white-space: nowrap;
+  }
+  .pill::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+  .pill-good { background: var(--good-soft); color: var(--good); border: 1px solid var(--good-border); }
+  .pill-warn { background: var(--warn-soft); color: var(--warn); border: 1px solid var(--warn-border); }
+
+  /* ---------- Objective card ---------- */
+  .obj-card {
+    background: var(--surface);
+    border: 1px solid var(--surface-border);
+    border-radius: var(--radius-card);
+    padding: 26px 26px 22px;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow-rest);
+  }
+  .obj-card-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 12px;
+  }
+  .obj-num {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+  .obj-quote {
+    margin: 4px 0 20px;
+    padding-left: 14px;
+    border-left: 3px solid var(--accent-border);
+    color: var(--ink-muted);
+    font-size: 14px;
+    font-style: italic;
+  }
+
+  .qa { margin-bottom: 18px; }
+  .qa:last-of-type { margin-bottom: 6px; }
+  .qa .q {
+    font-size: 14.5px;
+    font-weight: 600;
+    margin: 0 0 6px;
+    display: flex;
+    gap: 8px;
+  }
+  .qa .q::before { content: 'Q'; color: var(--accent); flex-shrink: 0; }
+  .qa .a {
+    font-size: 14.5px;
+    margin: 0;
+    padding-left: 20px;
+    color: var(--ink);
+  }
+
+  details.evidence {
+    margin: 8px 0 0 20px;
+    font-size: 12.5px;
+  }
+  details.evidence summary {
+    cursor: pointer;
+    color: var(--ink-muted);
+    font-weight: 500;
+    list-style: none;
+  }
+  details.evidence summary::-webkit-details-marker { display: none; }
+  details.evidence summary::before { content: '▸ '; }
+  details.evidence[open] summary::before { content: '▾ '; }
+  details.evidence .ev-body {
+    margin-top: 8px;
+    padding: 10px 14px;
+    background: var(--bg);
+    border: 1px solid var(--surface-border);
+    border-radius: 10px;
+    font-family: var(--font-mono);
+    color: var(--ink-muted);
+    line-height: 1.6;
+  }
+
+  /* ---------- General QA topics ---------- */
+  .topic { margin-bottom: 24px; }
+  .topic h3 {
+    font-size: 15.5px;
+    font-weight: 700;
+    margin: 0 0 12px;
+  }
+
+  a.footref { color: var(--accent); }
+
+  @media (max-width: 560px) {
+    .doc { padding: 28px 16px 72px; }
+    .obj-card { padding: 20px 18px 18px; }
+    table.snapshot { font-size: 12.5px; }
+  }
+</style>
+
+<div class="doc">
+
+  <div class="doc-header">
+    <span class="eyebrow">Pre-Oral Defense &middot; Prep Document</span>
+    <h1>StudyBuddy — System Q&amp;A and Current Scope</h1>
+    <p class="doc-sub">
+      A working reference for the pre-oral panel: what each specific objective looks like in the
+      running system today, and the straight answers to the questions most likely to follow.
+      Written from the actual codebase, not the proposal.
+    </p>
+    <div class="meta-row">
+      <span><strong>Stage:</strong> Pre-oral (before final defense)</span>
+      <span><strong>Prepared:</strong> 2026-07-07</span>
+      <span><strong>Branch:</strong> feat/demo-data-reset</span>
+      <span><strong>Reference commit:</strong> 142ca8f</span>
+    </div>
+  </div>
+
+  <nav class="jumpnav" aria-label="Section jump links">
+    <a href="#snapshot">Scope snapshot</a>
+    <a href="#obj1">1. Platform</a>
+    <a href="#obj2">2. Recommendation</a>
+    <a href="#obj3">3. Scheduling</a>
+    <a href="#obj4">4. Compensation</a>
+    <a href="#obj5">5. Reporting</a>
+    <a href="#safety">Student safety</a>
+    <a href="#architecture">Architecture</a>
+    <a href="#security">Security</a>
+    <a href="#testing">Testing</a>
+    <a href="#deployment">Demo deployment</a>
+    <a href="#roadmap">Limitations &amp; roadmap</a>
+  </nav>
+
+  <div class="callout">
+    <h2>Before you walk in</h2>
+    <ul>
+      <li>
+        <strong>Two commission-rate constants exist in the code</strong> — <code>credit_tutor_wallet</code>
+        (the function that actually moves wallet money) uses a flat <strong>10%</strong>. A separate
+        payment-summary/estimate helper elsewhere uses <strong>16%</strong>. Decide which one you intend
+        as the "real" rate and reconcile the stale one before a panelist compares the two screens — see
+        the Compensation section below.
+      </li>
+      <li>
+        <strong>Don't cite <code>plans and handoffs/phase2-features.md</code> as-is.</strong> It lists
+        email notifications and two-factor login as "not started," but both are already built and
+        working (they're just disabled specifically on the demo deployment for infra reasons — see
+        Security). If asked what's left, speak from this document, not that file.
+      </li>
+      <li>
+        <strong>Some bars on the tutor Sessions &amp; Reports screen are decorative placeholders</strong>,
+        not real earnings-over-time data. If a panelist points at that chart and asks about a trend
+        line, say so plainly rather than improvising a reading of it — see Objective 5.
+      </li>
+      <li>
+        <strong>There is no age verification or guardian consent for minors.</strong> Senior High
+        School tutees are plausibly under 18, but <code>UserProfile</code> has no birthdate field and
+        there's no parental-consent flow anywhere in the schema. If asked directly, say so — don't
+        imply a safeguard exists that doesn't. See Student Safety below.
+      </li>
+    </ul>
+  </div>
+
+  <div class="section" id="snapshot">
+    <div class="section-head">
+      <h2>Scope snapshot</h2>
+      <span class="section-note">what's real today, in one screen</span>
+    </div>
+    <div class="snapshot-wrap">
+      <table class="snapshot">
+        <thead>
+          <tr>
+            <th style="width:22%">Objective</th>
+            <th style="width:12%">Status</th>
+            <th style="width:36%">Core capability today</th>
+            <th style="width:30%">Biggest scoped-out gap</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1. Localized Platform</td>
+            <td><span class="pill pill-good">Built</span></td>
+            <td>Domain-locked registration + institution scoping enforced on every tutor-discovery surface (10 passing tests)</td>
+            <td class="gap">Only CPU is live; onboarding a new school is admin-manual, not self-service</td>
+          </tr>
+          <tr>
+            <td>2. Hybrid Recommendation</td>
+            <td><span class="pill pill-good">Built</span></td>
+            <td>0.7&times;CBF + 0.3&times;CF, both hand-implemented, with a live staff demo tool for the math</td>
+            <td class="gap">Weights are fixed constants, not tuned; CF is proven only against synthetic seeded ratings</td>
+          </tr>
+          <tr>
+            <td>3. Scheduling</td>
+            <td><span class="pill pill-warn">Partial</span></td>
+            <td>Weekly availability + date overrides; hard per-tutor workload cap enforced at the database level</td>
+            <td class="gap">Cap is a counter, not an optimizer; no real-time push, no calendar sync</td>
+          </tr>
+          <tr>
+            <td>4. Compensation</td>
+            <td><span class="pill pill-good">Built</span></td>
+            <td>Flat commission auto-applied on session completion; cash and online payment method derived from session mode (F2F/Online) and enforced server-side; InstaPay cash-out with admin review and reversal handling; a visible debt banner when a tutor's wallet goes negative</td>
+            <td class="gap">Cash-out payouts are simulated — PayMongo's sandbox has no live payouts product</td>
+          </tr>
+          <tr>
+            <td>5. Reporting &amp; Analytics</td>
+            <td><span class="pill pill-warn">Partial</span></td>
+            <td>Tutor sees totals, averages, and a filterable session list; admins get real backend-aggregated analytics</td>
+            <td class="gap">No backend analytics endpoint for tutors — every number is computed client-side, no export</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="section" id="obj1">
+    <div class="obj-card">
+      <div class="obj-card-top">
+        <span class="obj-num">Objective 1 &middot; Localized Peer Tutoring Platform</span>
+        <span class="pill pill-good">Fully built</span>
+      </div>
+      <p class="obj-quote">"To develop a Localized Peer Tutoring Platform Module for secondary and tertiary students to connect with peer tutors within their institution."</p>
+
+      <div class="qa">
+        <p class="q">How does the system keep matching localized to one institution?</p>
+        <p class="a">Registration requires picking a Partner Institution, and the backend rejects any email whose domain doesn't exactly match that institution's registered domain (e.g. cpu.edu.ph). Beyond that gate, every tutor-discovery surface — the recommender, the dashboard's "recommended for you" widget, and manual search — routes through one shared filter function, so a tutee can never see a tutor from another school. Ten automated tests cover this directly.</p>
+        <details class="evidence">
+          <summary>Evidence</summary>
+          <div class="ev-body">backend/studybuddy/models.py — PartnerInstitution, UserProfile.institution<br/>backend/studybuddy/views.py — register_user()<br/>backend/studybuddy/recommender/utils.py — filter_tutors_by_institution()<br/>backend/studybuddy/tests.py — InstitutionScopedMatchingTests (10 passing)</div>
+        </details>
+      </div>
+
+      <div class="qa">
+        <p class="q">Does this only work for CPU, or can other schools onboard?</p>
+        <p class="a">The schema already supports multiple institutions — each with its own course catalog and subject list — and a second institution exists in our test fixtures. In the live system CPU is the only active one; adding a new school today goes through a manual admin-approval request, not a self-service flow.</p>
+        <details class="evidence">
+          <summary>Evidence</summary>
+          <div class="ev-body">backend/studybuddy/models.py — InstitutionRequest, InstitutionCourseCatalog<br/>docs/plans/2026-06-26-institution-scoped-matching.md</div>
+        </details>
+      </div>
+
+      <div class="qa">
+        <p class="q">How do you handle the secondary vs. tertiary distinction?</p>
+        <p class="a">A tutor declares a teaching level, and the content-based recommender applies a matching penalty when a tertiary tutee is scored against an SHS-only tutor. That's a match-quality signal inside the recommendation score, not a hard access-control wall the way institution scoping is.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="section" id="obj2">
+    <div class="obj-card">
+      <div class="obj-card-top">
+        <span class="obj-num">Objective 2 &middot; Hybrid Recommendation Module</span>
+        <span class="pill pill-good">Fully built</span>
+      </div>
+      <p class="obj-quote">"To design a Hybrid Recommendation Module that uses Attribute-based and User-user collaborative filtering to match tutees with compatible peer tutors."</p>
+
+      <div class="qa">
+        <p class="q">Walk us through the hybrid score.</p>
+        <p class="a"><code style="font-family:var(--font-mono);font-size:13px;">hybrid_score = 0.7 &times; CBF_score + 0.3 &times; (CF_score / 5)</code>. CBF is a weighted sum of five sub-scores — subject match, tutor expertise, course match, year-level proximity, and teaching-level fit. CF is classic user-user collaborative filtering: Pearson correlation between tutees over co-rated tutors, top-5 neighbors, mean-centered weighted prediction.</p>
+        <details class="evidence">
+          <summary>Evidence</summary>
+          <div class="ev-body">backend/studybuddy/recommender/hybrid.py — hybrid_prediction()<br/>backend/studybuddy/recommender/cbf.py — compute_cbf_score()<br/>backend/studybuddy/recommender/CF.py — sim(), top_k(), compute_cf_score()<br/>CONTEXT.md — glossary definitions</div>
+        </details>
+      </div>
+
+      <div class="qa">
+        <p class="q">Why 70/30 — are those weights tuned or learned?</p>
+        <p class="a">They're fixed constants set by design judgment, not learned from data or A/B tested. We don't have enough real usage history yet to run that kind of tuning, and we're upfront that this is scoped as future work rather than a finished calibration.</p>
+      </div>
+
+      <div class="qa">
+        <p class="q">What happens for a brand-new tutee with no rating history?</p>
+        <p class="a">CF reports a cold-start state, and the hybrid formula treats that as zero rather than reallocating its 0.3 weight back into CBF — so a cold-start tutee's score caps at 0.7&times;CBF. That's an intentional, documented simplification.</p>
+      </div>
+
+      <div class="qa">
+        <p class="q">Did you use a machine-learning library for this?</p>
+        <p class="a">No — both CBF and CF are hand-written in plain Python; there's no numpy, pandas, or scikit-learn in the dependencies. That was a deliberate choice for transparency: we built a staff-only "Algorithm Demo" tool specifically to show the CBF sub-scores and the CF neighbor computation live, for a real tutee/tutor pair, on request.</p>
+        <details class="evidence">
+          <summary>Evidence</summary>
+          <div class="ev-body">backend/requirements.txt (no ML libraries)<br/>backend/studybuddy/recommender/demo.py<br/>src/views/SuperAdminAlgorithmDemo.vue</div>
+        </details>
+      </div>
+
+      <div class="qa">
+        <p class="q">How do you know the collaborative-filtering half actually works if the platform has no real usage yet?</p>
+        <p class="a">Honestly, we don't yet at production scale. The demo dataset's ratings are synthetically seeded, weighted toward 4 stars, so we can demonstrate the mechanism correctly — CF's real quality is bottlenecked by rating volume, which will only exist once real students start rating sessions.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="section" id="obj3">
+    <div class="obj-card">
+      <div class="obj-card-top">
+        <span class="obj-num">Objective 3 &middot; Scheduling Module</span>
+        <span class="pill pill-warn">Partially built</span>
+      </div>
+      <p class="obj-quote">"To develop a Scheduling Module that displays the tutor and tutee availability and assesses assigned workloads and limitations."</p>
+
+      <div class="qa">
+        <p class="q">How does a tutor set their availability?</p>
+        <p class="a">A recurring weekly grid of day + 30-minute slots, plus one-off overrides for a specific date — blocking the whole day or a single slot for something like a holiday or personal conflict. A tutee sees a real month calendar of a specific tutor's open slots, merged live from the recurring template, active bookings, and overrides.</p>
+        <details class="evidence">
+          <summary>Evidence</summary>
+          <div class="ev-body">backend/studybuddy/models.py — TutorAvailability, TutorAvailabilityOverride<br/>backend/studybuddy/views.py — tutor_availability()<br/>src/views/TutorSchedule.vue</div>
+        </details>
+      </div>
+
+      <div class="qa">
+        <p class="q">What does "assesses assigned workloads and limitations" actually mean in the running system?</p>
+        <p class="a">Every tutor has a session-load limit (default 10, admin-adjustable 1&ndash;20). We count their currently accepted or awaiting-payment sessions, one commitment per session group, and block them from accepting anything new once they hit that number. It's a hard counter-and-cap, not a load-balancing or optimization algorithm — we didn't build auto-suggestion of alternate tutors or predictive workload forecasting.</p>
+        <details class="evidence">
+          <summary>Evidence</summary>
+          <div class="ev-body">backend/studybuddy/models.py — Tutor.session_load_limit, accepted_session_load()<br/>backend/studybuddy/views.py — session_load_limit_reached check on accept</div>
+        </details>
+      </div>
+
+      <div class="qa">
+        <p class="q">What stops two tutees from double-booking the same slot?</p>
+        <p class="a">Two layers, in the order they actually fire. First, the booking-confirmation view takes a database row lock (<code style="font-family:var(--font-mono);font-size:13px;">select_for_update()</code>) on the specific availability slot inside a transaction — if two tutees submit near-simultaneous requests for the same slot, the second one blocks until the first commits, then correctly sees the slot as already taken and gets a clean error instead of creating a duplicate. Second, a database-level unique constraint on the availability/date pair is the backstop in case any other code path ever creates a booking without going through that locked view. It's important that tutor approval isn't the thing preventing this — by the time a tutor reviews a `Pending` request, that request has already won the race; tutor review is a business decision, not a concurrency mechanism.</p>
+        <details class="evidence">
+          <summary>Evidence</summary>
+          <div class="ev-body">backend/studybuddy/views.py — confirm_payment_and_book(), select_for_update()<br/>backend/studybuddy/models.py — Booking.Meta.constraints, unique_active_booking_per_slot_date<br/>docs/architecture/booking-realtime-and-concurrency.md</div>
+        </details>
+      </div>
+
+      <div class="qa">
+        <p class="q">Is any of this real-time — does a tutee see a slot disappear the instant it's booked?</p>
+        <p class="a">No — chat is the only real-time channel in the app (a Django Channels WebSocket); everything else, including availability and booking state, is pull-based: fetched on page load and re-fetched only after an explicit user action. That means a tutee's screen can show stale availability for a moment. It does not mean stale UI can produce a double-booking — the row lock above resolves that deterministically at the backend regardless of what any open tab happens to be displaying. We'd frame this precisely if asked: the UI isn't real-time, but the concurrency guarantee doesn't depend on it being real-time.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="section" id="obj4">
+    <div class="obj-card">
+      <div class="obj-card-top">
+        <span class="obj-num">Objective 4 &middot; Compensation Module</span>
+        <span class="pill pill-good">Fully built</span>
+      </div>
+      <p class="obj-quote">"To implement a Compensation Module that calculates payments based on the total number of completed peer tutoring sessions."</p>
+
+      <div class="qa">
+        <p class="q">How is a tutor's pay actually calculated?</p>
+        <p class="a">The moment a session is marked Completed, the system applies a flat 10% platform commission. For online-paid sessions, the tutor's wallet is credited the remaining 90% directly. For cash sessions — where the platform never touches the money — the same 10% is instead debited from the tutor's wallet balance, so the net effect matches either way.</p>
+        <details class="evidence">
+          <summary>Evidence</summary>
+          <div class="ev-body">backend/studybuddy/views.py — credit_tutor_wallet(), COMMISSION_RATE = Decimal('0.10')<br/>backend/studybuddy/models.py — Wallet, Transaction</div>
+        </details>
+      </div>
+
+      <div class="qa">
+        <p class="q">Can a tutee actually pay in cash — the Philippines is a cash-reliant market, so does the platform support that?</p>
+        <p class="a">Yes. Cash was briefly turned off platform-wide in favor of an online-only flow, then re-enabled specifically because cash reliance is a real market need here, not just a nice-to-have. The tutee doesn't pick a payment method by hand anymore — it's derived automatically from how the session was booked: face-to-face sessions use cash, online sessions use PayMongo, and that pairing is enforced on the backend, not just suggested in the UI, so a mismatched request is rejected outright regardless of what the client sends.</p>
+        <details class="evidence">
+          <summary>Evidence</summary>
+          <div class="ev-body">backend/studybuddy/migrations/0070_reactivate_cash_payment.py<br/>backend/studybuddy/views.py — submit_session_payment(), confirm_payment_and_book() (required_method_code derived from session_mode)<br/>src/views/PostSessionPaymentView.vue<br/>docs/plans/2026-07-07-reenable-cash-payments.md</div>
+        </details>
+      </div>
+
+      <div class="qa">
+        <p class="q">If it's cash, how do you verify the payment actually happened?</p>
+        <p class="a">The tutee attaches a photo of their proof of payment — required for cash, no exceptions — which the tutor sees and reviews before confirming the session. Unlike the online path, cash doesn't require a transaction reference number, since there's no real reference number behind a physical cash handoff; forcing one would just produce fabricated data. The receipt exists mainly for admin dispute resolution if something's contested later, not as a tutor-facing gate — the tutor's own accept/confirm action is the real-time check.</p>
+        <details class="evidence">
+          <summary>Evidence</summary>
+          <div class="ev-body">backend/studybuddy/views.py — submit_session_payment() (receipt required for CASH, no reference)<br/>src/views/TutorBookingDetailsFlow.vue — receipt image display</div>
+        </details>
+      </div>
+
+      <div class="qa">
+        <p class="q">Is the rate the same for every tutor?</p>
+        <p class="a">Yes — flat 10% across the board. No tiered or performance-based rate, no per-subject or per-institution rate. That's a deliberate simplicity choice for this version of the system.</p>
+      </div>
+
+      <div class="qa">
+        <p class="q">Since cash sessions debit commission straight from the tutor's wallet, can a tutor actually go into debt?</p>
+        <p class="a">Yes, and we don't hide it. If a tutor's wallet balance goes negative — most likely from cash-session commissions outpacing what they've earned — they're already blocked from accepting new bookings by an existing server-side check. What we added is a visible, honest signal for that state: a persistent banner shown to the tutor (not dismissible while the debt exists) explaining that their balance is negative and they need to settle it before accepting more work. It deliberately never shows the actual amount, only that the state exists and that it blocks bookings — settling it just means earning it back through online sessions or topping up.</p>
+        <details class="evidence">
+          <summary>Evidence</summary>
+          <div class="ev-body">backend/studybuddy/views.py — approve_booking() (existing negative-balance block), profile_status() (wallet_negative boolean)<br/>src/components/WalletDebtBanner.vue<br/>src/stores/profile.js</div>
+        </details>
+      </div>
+
+      <div class="qa">
+        <p class="q">How does a tutor get their money out, and is it real money?</p>
+        <p class="a">Wallet top-ups go through PayMongo's live checkout flow. Cash-out is via InstaPay, capped at InstaPay's real &#8369;50,000 per-transaction limit, and every withdrawal request is manually reviewed by an admin before payout; a failed withdrawal reverses cleanly without double-charging the tutor. Payouts themselves are currently simulated in our environment, because PayMongo's sandbox/test mode has no live payouts product to test against — that simulation flag is hard-blocked from ever running alongside a real production key.</p>
+        <details class="evidence">
+          <summary>Evidence</summary>
+          <div class="ev-body">backend/studybuddy/paymongo_money_movement.py<br/>backend/backend/settings.py — PAYMONGO_CASHOUT_MOCK, CASHOUT_MAX_PHP<br/>docs/adr/0001-instapay-only-cashouts.md</div>
+        </details>
+      </div>
+    </div>
+  </div>
+
+  <div class="section" id="obj5">
+    <div class="obj-card">
+      <div class="obj-card-top">
+        <span class="obj-num">Objective 5 &middot; Reporting and Analytics Module</span>
+        <span class="pill pill-warn">Partially built</span>
+      </div>
+      <p class="obj-quote">"To develop a Reporting and Analytics Module that provides a venue for peer tutors to review their historical session data and track their generated income."</p>
+
+      <div class="qa">
+        <p class="q">How does a tutor review their history and income today?</p>
+        <p class="a">A "Sessions &amp; Reports" screen shows total and completed sessions, total earnings, average rating, hours tutored, completion rate, and average earnings per hour and per session, with a filterable session list. A separate Wallet screen shows the full transaction ledger with gross, net, and deductions. Both genuinely trace back to real per-booking and per-transaction data.</p>
+        <details class="evidence">
+          <summary>Evidence</summary>
+          <div class="ev-body">src/views/TutorSessionsReports.vue<br/>src/stores/completedSessions.js<br/>src/stores/wallet.js</div>
+        </details>
+      </div>
+
+      <div class="qa">
+        <p class="q">Is that computed on the backend?</p>
+        <p class="a">No, and that's the honest gap in this module. Every number on the tutor's reports screen is aggregated client-side in the browser from the same generic booking and transaction lists the rest of the app already fetches — there's no dedicated backend reporting endpoint for tutors, no server-side date filtering, and no export. We did build a real backend-aggregated analytics endpoint with day-by-day trends and top-tutor rankings, but it's admin/institution-facing, not tutor-facing.</p>
+        <details class="evidence">
+          <summary>Evidence</summary>
+          <div class="ev-body">backend/studybuddy/admin_views.py — AdminAnalyticsView, AdminAnalyticsExportView<br/>src/views/SuperAdminReports.vue, AdminReports.vue</div>
+        </details>
+      </div>
+
+      <div class="qa">
+        <p class="q">Are the small bar charts on the tutor reports screen showing real trend data?</p>
+        <p class="a">No — some of those bar heights are hardcoded placeholder values used for visual polish, not a real earnings-over-time series. If asked to show an actual trend for one tutor, we'd point to the transaction ledger totals instead of that chart, and we'd say so plainly rather than reading a story into it.</p>
+      </div>
+
+      <div class="qa">
+        <p class="q">What's the natural next step for this module?</p>
+        <p class="a">A dedicated tutor-facing analytics endpoint with real date-bucketed earnings trends, server-side pagination for tutors with a long history, and a personal export — mirroring what already exists on the admin side.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="section" id="safety">
+    <div class="obj-card">
+      <div class="obj-card-top">
+        <span class="obj-num">Beyond the five objectives &middot; Student Safety &amp; Protection</span>
+        <span class="pill pill-warn">Built, but manual &amp; human-reviewed</span>
+      </div>
+      <p class="obj-quote">Not one of the five specific objectives, but a likely panel question on its own — especially since some tutees may be minors. The honest framing: StudyBuddy does <em>structured self-report, human-reviewed</em> safety, not automated real-time monitoring.</p>
+
+      <div class="qa">
+        <p class="q">What actually happens during a session to protect the tutee?</p>
+        <p class="a">A mid-session check-in fires automatically at the exact midpoint of the booked time window and pops up app-wide, wherever the tutee is in the app — they can't just navigate away from it. It asks one of two things, confirmed with a deliberate hold-to-confirm gesture so it can't be tapped by accident: "Everything is on track" or "Having issues." Answering "Having issues" immediately opens a Support ticket form pre-linked to that session, so the tutee doesn't have to hunt for how to report a problem.</p>
+        <details class="evidence">
+          <summary>Evidence</summary>
+          <div class="ev-body">src/composables/useMidpointCheckIn.js<br/>src/components/SessionCheckInModal.vue<br/>src/stores/activeSession.js — sessionMidpointAt, midpointDue<br/>backend/studybuddy/models.py — SessionCheckIn<br/>backend/studybuddy/views.py — record_midpoint_check_in()</div>
+        </details>
+      </div>
+
+      <div class="qa">
+        <p class="q">What about face-to-face sessions specifically — is there any location safeguard?</p>
+        <p class="a">Yes, two layers. First, a Face-to-Face booking cannot be confirmed at all without a disclosed meeting location — the backend rejects the booking outright if it's missing. Second, once an F2F session starts, a separate venue check-in asks the tutee "Are you already at &lt;location&gt;?" with a Yes/No; answering No surfaces the same "you can report a session issue" prompt and opens the Support form.</p>
+        <details class="evidence">
+          <summary>Evidence</summary>
+          <div class="ev-body">backend/studybuddy/views.py — "Preferred location is required for Face-to-face sessions."<br/>backend/studybuddy/models.py — Booking.session_mode, preferred_location<br/>src/components/VenueConfirmModal.vue</div>
+        </details>
+      </div>
+
+      <div class="qa">
+        <p class="q">Why is the location just a typed-in text field instead of an actual map — pinning a location, geocoding, showing it on Google Maps?</p>
+        <p class="a">Cost. A real map integration (Google Maps Platform, Mapbox, etc.) bills per API call for geocoding, map tile loads, and place lookups — real money for a student project with no revenue and no institutional budget for third-party API keys, especially once you're paying per request instead of a one-time cost. A free-text field solves the actual underlying need — the tutor and tutee both need to know and agree on where to meet, and the venue check-in needs something to display back to the tutee ("Are you already at &lt;location&gt;?") — without any recurring cost, any API key to manage, or any dependency on a third-party service staying available. It's a deliberate scope trade: we solved the requirement, not the more expensive version of the requirement.</p>
+        <details class="evidence">
+          <summary>Evidence</summary>
+          <div class="ev-body">backend/studybuddy/models.py — Booking.preferred_location (plain CharField, no coordinates/geocoding fields)<br/>src/views/TutorDetails.vue — free-text location input at booking time</div>
+        </details>
+      </div>
+
+      <div class="qa">
+        <p class="q">If a tutee flags "issues," does anyone get notified automatically?</p>
+        <p class="a">No — and this is the gap worth being upfront about. Both the midpoint and venue check-ins only open a Support ticket <em>form</em>; the tutee still has to type what happened and submit it themselves. There's no automatic email, push notification, or admin alert fired the moment "issues" is selected, and no flag written to the tutor's profile. If the tutee dismisses the modal without following through, nothing escalates on its own.</p>
+      </div>
+
+      <div class="qa">
+        <p class="q">What stops an unverified or fraudulent account from booking a session in the first place?</p>
+        <p class="a">Two gates before anyone can book: an institutional email-domain lock at registration (your email must match your school's registered domain), and a manually admin-reviewed School ID plus Proof of Enrollment upload for both tutors and tutees, with a periodic renewal requirement so an old verification can't stay valid forever. We recently added a client-side layer on top of this — the "Confirm Booking" and "Accept" buttons now visibly disable and relabel themselves for an unverified user, instead of only failing after the fact with a server error. The server-side check remains the real authority; the new UI just surfaces the block earlier.</p>
+        <details class="evidence">
+          <summary>Evidence</summary>
+          <div class="ev-body">backend/studybuddy/models.py — TutorApplication, TuteeApplication (school_id, enrollment_proof)<br/>backend/studybuddy/views.py — can_create_new_booking()<br/>docs/plans/2026-07-06-proactive-verification-ui-gates.md<br/>src/components/VerificationBanner.vue</div>
+        </details>
+      </div>
+
+      <div class="qa">
+        <p class="q">If something goes wrong after a session, or with a specific tutor, what can a student do?</p>
+        <p class="a">File a Support ticket under the "Tutee/Tutor Dispute" category, optionally pre-linked to the booking or payment in question. An admin claims it, can escalate it with a reason, and gets a dedicated chat room with the reporting student separate from normal tutor-tutee chat. There's no self-serve "block this tutor" button — the only lever a student has is this ticket, and the only account-level consequence (suspension) is a manual admin decision made afterward, not an automatic outcome of filing a report.</p>
+        <details class="evidence">
+          <summary>Evidence</summary>
+          <div class="ev-body">backend/studybuddy/models.py — SupportTicket, UserProfile.is_suspended<br/>src/components/SupportModal.vue<br/>src/views/AdminSupport.vue</div>
+        </details>
+      </div>
+
+      <div class="qa">
+        <p class="q">Is chat itself moderated?</p>
+        <p class="a">No automated moderation exists — no profanity filter, no keyword flagging, no per-message report button. The one safety-relevant distinction is that a Support ticket gets its own dedicated chat room, separate from the regular tutor-tutee conversation, so an admin can step into that specific thread once a dispute is filed. Day-to-day chat itself is not monitored or filtered.</p>
+      </div>
+
+      <div class="qa">
+        <p class="q">Given tutees can be Senior High School students, how do you handle minors?</p>
+        <p class="a">Candidly: we don't yet. There's no birthdate or age field anywhere in the user profile, and no parental or guardian consent flow. This is a genuine, clean gap rather than a partially-built feature, and it's worth naming directly if asked rather than implying age verification exists in some other form.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="section" id="architecture">
+    <div class="section-head"><h2>General system Q&amp;A</h2><span class="section-note">architecture, security, testing, deployment</span></div>
+
+    <div class="topic">
+      <h3>Architecture</h3>
+      <div class="qa">
+        <p class="q">What's the stack, end to end?</p>
+        <p class="a">Vue 3 + Vite + Pinia on the frontend, deployed to Vercel. Django 6 + DRF + Channels/Daphne on the backend (Channels only for the chat feature's WebSocket layer), deployed to Render. PostgreSQL is hosted on Supabase, reached through its session pooler because Supabase's direct-connection host is IPv6-only and Render has no outbound IPv6. Redis is used for caching and channel layers when configured, falling back to in-memory for a single-instance deployment like the demo.</p>
+      </div>
+
+      <div class="qa">
+        <p class="q">Is anything in the system actually real-time, and what stops two people from racing for the same thing?</p>
+        <p class="a">Only chat — a Django Channels WebSocket, which is the single push channel in the app. Everything else, including tutor availability and booking state, is pull-based: fetched once on page load and again only after an explicit action, not pushed live. That means a tutee's screen can briefly show stale availability. It does not mean two tutees can double-book the same slot: the booking-confirmation view takes a database row lock on the specific slot inside a transaction, so a second near-simultaneous request blocks until the first commits, then correctly sees the slot as taken. A database-level unique constraint backs that up in case any other code path ever bypasses the locked view. Tutor approval is not what prevents the race — by the time a tutor reviews a request, it has already won.</p>
+        <details class="evidence">
+          <summary>Evidence</summary>
+          <div class="ev-body">docs/architecture/booking-realtime-and-concurrency.md — full writeup with code references<br/>backend/studybuddy/chat/consumers.py, routing.py — the only WebSocket layer<br/>backend/studybuddy/views.py — confirm_payment_and_book(), select_for_update()<br/>backend/studybuddy/models.py — Booking.Meta.constraints</div>
+        </details>
+      </div>
+    </div>
+  </div>
+
+  <div class="section" id="security">
+    <div class="topic">
+      <h3>Security</h3>
+      <div class="qa">
+        <p class="q">How is authentication handled?</p>
+        <p class="a">JWT via SimpleJWT — 5-minute access tokens, 7-day refresh tokens, with rotation and blacklisting on every refresh. The frontend silently refreshes every 4 minutes, comfortably inside that window, and force-logs-out after 10 minutes of inactivity independent of token expiry. Registration is domain-locked to each institution's verified email domain.</p>
+      </div>
+      <div class="qa">
+        <p class="q">Do you have two-factor login?</p>
+        <p class="a">Yes — email-based OTP on login, rate-limited against brute force. It's disabled specifically on the demo deployment because Render blocks outbound raw SMTP and we don't yet have a verified domain for an HTTPS email API; the full flow is active locally and would be active in a real production deploy with email configured.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="section" id="testing">
+    <div class="topic">
+      <h3>Testing</h3>
+      <div class="qa">
+        <p class="q">What's actually covered by automated tests?</p>
+        <p class="a">35 backend test classes covering recommendation/matching, wallet and payments, verification and applications, chat, and auth — run against a real Postgres instance in CI on every pull request. On the frontend, 15 Vitest files cover stores, components, and composables, with lint and build also run in CI. There's no quantitative coverage percentage tool wired in, so we can speak to what's tested, not a coverage number.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="section" id="deployment">
+    <div class="topic">
+      <h3>Demo deployment</h3>
+      <div class="qa">
+        <p class="q">Is what we're demoing today production-representative?</p>
+        <p class="a">Mostly, with a few infrastructure-driven exceptions unique to the free-tier demo host: the whole demo site sits behind a shared Basic Auth gate (with uploaded media exempted so images still load), all outbound email is suppressed because Render blocks raw SMTP, and cash-out payouts are simulated because PayMongo's sandbox has no live payouts product. None of these are algorithmic or feature limitations — they're deployment-environment workarounds, and each is behind an explicit flag that can't leak into a real production deploy.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="section" id="roadmap">
+    <div class="topic">
+      <h3>Known limitations &amp; roadmap</h3>
+      <div class="qa">
+        <p class="q">What's explicitly out of scope for this version?</p>
+        <p class="a">Recurring/repeat bookings, file or material sharing inside chat, and dispute/refund handling are all genuinely not started. A built payment screen (<code style="font-family:var(--font-mono);font-size:13px;">PaymentScreenTutee.vue</code>) also isn't wired into the live booking flow, which currently confirms a booking without an intermediate payment step. We'd frame all of these as deliberate scope boundaries for this defense cycle, not oversights.</p>
+      </div>
+    </div>
+  </div>
+
+</div>
