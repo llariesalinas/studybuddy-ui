@@ -5125,6 +5125,20 @@ class AlgorithmDemoToolTests(APITestCase):
             teaching_level="College",
         )
         TutorSubjects.objects.create(tutor=self.tutor, subject=self.subject, expertise_level=4)
+        self.availability = TutorAvailability.objects.create(
+            tutor=self.tutor, day="Mon", time_slot=time(9, 0),
+        )
+
+    def _create_rating(self, student=None, rating_score=3, session_date=None):
+        student = student or self.tutee
+        session_date = session_date or date(2026, 1, 1)
+        booking = Booking.objects.create(
+            student=student, tutor=self.tutor, availability=self.availability,
+            session_date=session_date, session_mode="Online", status="Completed",
+        )
+        return Rating.objects.create(
+            booking=booking, student=student, tutor=self.tutor, rating_score=rating_score,
+        )
 
     def test_403_when_flag_disabled_even_for_superadmin(self):
         self.client.force_authenticate(user=self.super_user)
@@ -5337,6 +5351,130 @@ class AlgorithmDemoToolTests(APITestCase):
         ids = {row["id"] for row in response.data["tutees"]}
         self.assertIn(self.tutee.id, ids)
         self.assertNotIn(other_tutee.id, ids)
+
+    def test_algorithm_demo_update_rating_changes_score(self):
+        rating = self._create_rating(rating_score=3)
+
+        self.client.force_authenticate(user=self.super_user)
+        response = self.client.patch(
+            "/api/dev/algorithm-demo/rating/",
+            {
+                "student_id": self.tutee.id,
+                "tutor_id": self.tutor.pk,
+                "rating_score": 5,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data, {"ok": True, "rating_score": 5})
+        rating.refresh_from_db()
+        self.assertEqual(rating.rating_score, 5)
+
+    def test_algorithm_demo_update_rating_recomputes_tutor_average(self):
+        rating = self._create_rating(rating_score=3)
+        other_student_user = User.objects.create_user(
+            username="algo-peer@cpu.edu", email="algo-peer@cpu.edu", password="password",
+        )
+        other_student = UserProfile.objects.create(
+            user=other_student_user, fname="Peer", mname="", lname="Student", role="Tutee",
+            year_level=11, institution=self.institution,
+        )
+        self._create_rating(student=other_student, rating_score=4, session_date=date(2026, 1, 2))
+        self.tutor.rating_average = 3.5
+        self.tutor.save(update_fields=["rating_average"])
+
+        self.client.force_authenticate(user=self.super_user)
+        response = self.client.patch(
+            "/api/dev/algorithm-demo/rating/",
+            {
+                "student_id": self.tutee.id,
+                "tutor_id": self.tutor.pk,
+                "rating_score": 5,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        rating.refresh_from_db()
+        self.tutor.refresh_from_db()
+        self.assertEqual(rating.rating_score, 5)
+        self.assertEqual(self.tutor.rating_average, 4.5)
+
+    def test_algorithm_demo_update_rating_rejects_out_of_range_score(self):
+        self._create_rating(rating_score=3)
+        self.client.force_authenticate(user=self.super_user)
+
+        low_response = self.client.patch(
+            "/api/dev/algorithm-demo/rating/",
+            {
+                "student_id": self.tutee.id,
+                "tutor_id": self.tutor.pk,
+                "rating_score": 0,
+            },
+            format="json",
+        )
+        high_response = self.client.patch(
+            "/api/dev/algorithm-demo/rating/",
+            {
+                "student_id": self.tutee.id,
+                "tutor_id": self.tutor.pk,
+                "rating_score": 6,
+            },
+            format="json",
+        )
+
+        self.assertEqual(low_response.status_code, 400)
+        self.assertEqual(high_response.status_code, 400)
+
+    def test_algorithm_demo_update_rating_404_when_no_rating_exists(self):
+        self.client.force_authenticate(user=self.super_user)
+
+        self.assertEqual(
+            Rating.objects.filter(student_id=self.tutee.id, tutor_id=self.tutor.pk).count(), 0,
+        )
+        response = self.client.patch(
+            "/api/dev/algorithm-demo/rating/",
+            {
+                "student_id": self.tutee.id,
+                "tutor_id": self.tutor.pk,
+                "rating_score": 5,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(
+            Rating.objects.filter(student_id=self.tutee.id, tutor_id=self.tutor.pk).count(), 0,
+        )
+
+    def test_algorithm_demo_update_rating_requires_superadmin(self):
+        self._create_rating(rating_score=3)
+
+        self.client.force_authenticate(user=self.admin_user)
+        regular_admin_response = self.client.patch(
+            "/api/dev/algorithm-demo/rating/",
+            {
+                "student_id": self.tutee.id,
+                "tutor_id": self.tutor.pk,
+                "rating_score": 5,
+            },
+            format="json",
+        )
+        self.assertEqual(regular_admin_response.status_code, 403)
+
+        self.client.force_authenticate(user=self.super_user)
+        with override_settings(ALGORITHM_DEMO_TOOLS_ENABLED=False):
+            disabled_response = self.client.patch(
+                "/api/dev/algorithm-demo/rating/",
+                {
+                    "student_id": self.tutee.id,
+                    "tutor_id": self.tutor.pk,
+                    "rating_score": 5,
+                },
+                format="json",
+            )
+        self.assertEqual(disabled_response.status_code, 403)
 
 
 class SessionCheckInTests(APITestCase):
