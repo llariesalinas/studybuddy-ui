@@ -23,13 +23,14 @@ migration; `Admin` is removed from the role choices; admin permission checks tig
 
 **Model:** mid
 
-- [ ] Data migration converts every `UserProfile` with role `Admin` to `SuperAdmin`, then removes
-      `Admin` from the role field's valid choices.
-- [ ] Every endpoint/view that previously accepted either `Admin` or `SuperAdmin` now requires
-      `SuperAdmin` only.
-- [ ] `APITestCase` coverage: existing admin endpoints reject anything but `SuperAdmin`.
-- [ ] Migration test: no `UserProfile` retains role `Admin` after migration; previously-Admin rows
-      are `SuperAdmin`.
+- [x] Data migration converts every `UserProfile` with role `Admin` to `SuperAdmin`, then removes
+      `Admin` from the role field's valid choices. (migration 0072)
+- [x] Every endpoint/view that previously accepted either `Admin` or `SuperAdmin` now requires
+      `SuperAdmin` only. (`IsAdminUser` deleted; 17 views re-gated; role checks tightened)
+- [x] `APITestCase` coverage: existing admin endpoints reject anything but `SuperAdmin`.
+      (`AdminEndpointsRequireSuperAdminTests`)
+- [x] Migration test: no `UserProfile` retains role `Admin` after migration; previously-Admin rows
+      are `SuperAdmin`. (`AdminToSuperAdminMigrationTests`)
 
 ## Remove dead institution-scoping code from admin views
 

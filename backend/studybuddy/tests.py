@@ -181,7 +181,7 @@ class SuperAdminRedesignApiTests(APITestCase):
         response = self.client.patch(
             f"/api/admin/users/{self.target_profile.id}/",
             {
-                "role": "Admin",
+                "role": "Tutor",
                 "institution": self.inactive_institution.id,
                 "is_domain_exempt": True,
             },
@@ -190,7 +190,7 @@ class SuperAdminRedesignApiTests(APITestCase):
 
         self.assertEqual(response.status_code, 200)
         self.target_profile.refresh_from_db()
-        self.assertEqual(self.target_profile.role, "Admin")
+        self.assertEqual(self.target_profile.role, "Tutor")
         self.assertEqual(self.target_profile.institution, self.inactive_institution)
         self.assertTrue(self.target_profile.is_domain_exempt)
 
@@ -382,87 +382,6 @@ class InstitutionCourseCatalogTests(APITestCase):
 
     def subject_codes(self, response):
         return {item["subject_code"] for item in response.data}
-
-    def test_subject_list_shows_only_global_and_own_private_subjects(self):
-        self.client.force_authenticate(user=self.cpu_admin_user)
-
-        response = self.client.get("/api/subjects/")
-
-        self.assertEqual(response.status_code, 200)
-        self.assertIn("CS101", self.subject_codes(response))
-        self.assertIn("CPU-AI", self.subject_codes(response))
-        self.assertNotIn("NORTH-UX", self.subject_codes(response))
-
-    def test_admin_can_create_custom_subject_for_own_institution(self):
-        self.client.force_authenticate(user=self.cpu_admin_user)
-
-        response = self.client.post(
-            "/api/admin/subjects/custom/",
-            {
-                "subject_code": "cpu-data",
-                "subject_name": "CPU Data Studio",
-                "department": "Computer Science",
-            },
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, 201)
-        subject = Subjects.objects.get(subject_code="CPU-DATA")
-        self.assertEqual(subject.owning_institution, self.cpu)
-        self.assertEqual(response.data["owning_institution"], self.cpu.id)
-
-    def test_admin_can_add_and_remove_own_catalog_entry(self):
-        self.client.force_authenticate(user=self.cpu_admin_user)
-
-        create_response = self.client.post(
-            "/api/admin/course-catalog/",
-            {
-                "course": self.course.course_code,
-                "subject": self.cpu_private_subject.subject_code,
-            },
-            format="json",
-        )
-
-        self.assertEqual(create_response.status_code, 201)
-        self.assertEqual(InstitutionCourseCatalog.objects.count(), 1)
-        entry_id = create_response.data["id"]
-
-        list_response = self.client.get("/api/admin/course-catalog/", {"course": "BSCS"})
-        self.assertEqual(list_response.status_code, 200)
-        self.assertEqual(len(list_response.data), 1)
-        self.assertEqual(list_response.data[0]["subject_code"], "CPU-AI")
-
-        delete_response = self.client.delete(f"/api/admin/course-catalog/{entry_id}/")
-        self.assertEqual(delete_response.status_code, 204)
-        self.assertFalse(InstitutionCourseCatalog.objects.exists())
-
-    def test_admin_cannot_curate_another_institutions_private_subject(self):
-        self.client.force_authenticate(user=self.cpu_admin_user)
-
-        response = self.client.post(
-            "/api/admin/course-catalog/",
-            {
-                "course": self.course.course_code,
-                "subject": self.north_private_subject.subject_code,
-            },
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, 400)
-        self.assertFalse(InstitutionCourseCatalog.objects.exists())
-
-    def test_admin_cannot_delete_another_institutions_entry(self):
-        entry = InstitutionCourseCatalog.objects.create(
-            institution=self.north,
-            course=self.course,
-            subject=self.global_subject,
-        )
-        self.client.force_authenticate(user=self.cpu_admin_user)
-
-        response = self.client.delete(f"/api/admin/course-catalog/{entry.id}/")
-
-        self.assertEqual(response.status_code, 404)
-        self.assertTrue(InstitutionCourseCatalog.objects.filter(pk=entry.id).exists())
 
     def test_superadmin_can_target_institution(self):
         self.client.force_authenticate(user=self.super_user)
@@ -3310,21 +3229,8 @@ class TutorDocumentRenewalTests(APITestCase):
             fname="Admin",
             mname="",
             lname="User",
-            role="Admin",
+            role="SuperAdmin",
             institution=self.institution,
-        )
-        self.other_admin_user = User.objects.create_user(
-            username="admin@other.edu",
-            email="admin@other.edu",
-            password="password",
-        )
-        UserProfile.objects.create(
-            user=self.other_admin_user,
-            fname="Other",
-            mname="",
-            lname="Admin",
-            role="Admin",
-            institution=self.other_institution,
         )
 
     def upload(self, name, content, content_type):
@@ -3447,25 +3353,6 @@ class TutorDocumentRenewalTests(APITestCase):
         self.assertEqual(resubmit_response.status_code, 201)
         self.assertEqual(TutorDocumentRenewalReview.objects.filter(status="pending").count(), 1)
 
-    def test_admin_cannot_review_other_institution_document_renewal(self):
-        renewal = TutorDocumentRenewalReview.objects.create(
-            application=self.application,
-            profile=self.tutor_profile,
-            school_id=self.upload("pending-id.jpg", b"pending-id", "image/jpeg"),
-            enrollment_proof=self.upload("pending-rf.pdf", b"pending-rf", "application/pdf"),
-            status="pending",
-        )
-        self.client.force_authenticate(user=self.other_admin_user)
-
-        response = self.client.patch(
-            f"/api/admin/tutor-document-renewals/{renewal.id}/",
-            {"application_status": "approved"},
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, 404)
-        renewal.refresh_from_db()
-        self.assertEqual(renewal.status, "pending")
 
 
 class ApplicationVerificationSharedBaseTests(APITestCase):
@@ -3926,21 +3813,8 @@ class TuteeVerificationPhase3Tests(APITestCase):
             fname="Phase3",
             mname="",
             lname="Admin",
-            role="Admin",
+            role="SuperAdmin",
             institution=self.institution,
-        )
-        self.other_admin_user = User.objects.create_user(
-            username="phase3-admin@other.edu",
-            email="phase3-admin@other.edu",
-            password="password",
-        )
-        UserProfile.objects.create(
-            user=self.other_admin_user,
-            fname="Other",
-            mname="",
-            lname="Admin",
-            role="Admin",
-            institution=self.other_institution,
         )
 
     def upload(self, name, content, content_type):
@@ -4132,33 +4006,6 @@ class TuteeVerificationPhase3Tests(APITestCase):
         self.assertIsNone(application.reminder_7day_sent_at)
         self.assertIsNone(application.reminder_1day_sent_at)
 
-    def test_admin_cannot_review_other_institution_tutee_document_renewal(self):
-        application = TuteeApplication.objects.create(
-            profile=self.tutee_profile,
-            school_id=self.upload("id.jpg", b"id", "image/jpeg"),
-            enrollment_proof=self.upload("rf.pdf", b"rf", "application/pdf"),
-            application_status="approved",
-            reviewed_at=timezone_now_minus_days(91),
-        )
-        renewal = TuteeDocumentRenewalReview.objects.create(
-            application=application,
-            profile=self.tutee_profile,
-            school_id=self.upload("pending-id.jpg", b"pending-id", "image/jpeg"),
-            enrollment_proof=self.upload("pending-rf.pdf", b"pending-rf", "application/pdf"),
-            status="pending",
-        )
-        self.client.force_authenticate(user=self.other_admin_user)
-
-        response = self.client.patch(
-            f"/api/admin/tutee-document-renewals/{renewal.id}/",
-            {"application_status": "approved"},
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, 404)
-        renewal.refresh_from_db()
-        self.assertEqual(renewal.status, "pending")
-
     @override_settings(TUTEE_VERIFICATION_ENFORCEMENT_START_DATE='2020-01-01')
     def test_profile_status_dispatches_to_tutee_context_and_exposes_enforcement_flag(self):
         TuteeApplication.objects.create(
@@ -4290,7 +4137,7 @@ class EmailAuthTests(APITestCase):
         self.assertTrue(login_response.data["requires_2fa"])
 
         profile = UserProfile.objects.get(user=admin_user)
-        self.assertEqual(profile.role, "Admin")
+        self.assertEqual(profile.role, "SuperAdmin")
         self.assertTrue(profile.profile_completed)
         self.assertTrue(profile.is_domain_exempt)
 
@@ -4304,7 +4151,7 @@ class EmailAuthTests(APITestCase):
         )
 
         self.assertEqual(verify_response.status_code, 200)
-        self.assertEqual(verify_response.data["role"], "Admin")
+        self.assertEqual(verify_response.data["role"], "SuperAdmin")
         self.assertEqual(verify_response.data["email"], admin_user.email)
 
     def test_staff_user_with_superadmin_profile_keeps_superadmin_on_login(self):
@@ -4387,7 +4234,7 @@ class EmailAuthTests(APITestCase):
             fname="Legacy",
             mname="",
             lname="Admin",
-            role="Admin",
+            role="Tutee",
         )
         login_user = User.objects.create_user(
             username="duplicate@example.edu",
@@ -4399,7 +4246,7 @@ class EmailAuthTests(APITestCase):
             fname="Login",
             mname="",
             lname="Admin",
-            role="Admin",
+            role="Tutee",
         )
 
         output = StringIO()
@@ -4409,7 +4256,7 @@ class EmailAuthTests(APITestCase):
         legacy_profile.refresh_from_db()
         login_profile.refresh_from_db()
         self.assertTrue(login_user.is_staff)
-        self.assertEqual(legacy_profile.role, "Admin")
+        self.assertEqual(legacy_profile.role, "Tutee")
         self.assertEqual(login_profile.role, "SuperAdmin")
         self.assertIn(f"Promoting login username match user_id={login_user.id}.", output.getvalue())
 
@@ -4426,10 +4273,10 @@ class EmailAuthTests(APITestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.data["profile_completed"])
-        self.assertEqual(response.data["role"], "Admin")
+        self.assertEqual(response.data["role"], "SuperAdmin")
 
         profile = UserProfile.objects.get(user=admin_user)
-        self.assertEqual(profile.role, "Admin")
+        self.assertEqual(profile.role, "SuperAdmin")
         self.assertTrue(profile.is_domain_exempt)
 
     @patch("studybuddy.views.generate_otp_code", side_effect=["123456", "654321"])
@@ -6253,126 +6100,6 @@ class AvatarCompressionTests(APITestCase):
         self.assertEqual(response.status_code, 400)
 
 
-class AdminDashboardMetricsTests(APITestCase):
-    """Phase 1: institution-scoped /admin/stats metrics + operational queue."""
-
-    def setUp(self):
-        self.inst = PartnerInstitution.objects.create(
-            institution_name="College of Computer Studies",
-            school_email_domain="ccs.edu.ph",
-            is_active=True,
-        )
-        self.other_inst = PartnerInstitution.objects.create(
-            institution_name="Other College",
-            school_email_domain="other.edu.ph",
-            is_active=True,
-        )
-
-        admin_user = User.objects.create_user(
-            username="inst_admin", email="admin@ccs.edu.ph", password="password"
-        )
-        self.admin_profile = UserProfile.objects.create(
-            user=admin_user, fname="Inst", mname="", lname="Admin",
-            role="Admin", institution=self.inst, year_level=16,
-        )
-        self.client.force_authenticate(user=admin_user)
-
-        self.subject = Subjects.objects.create(
-            subject_code="CS101", subject_name="Data Structures", department="CS"
-        )
-
-        # Tutee in-institution with a subject preference (demand)
-        tutee_user = User.objects.create_user(
-            username="ccs_tutee", email="tutee@ccs.edu.ph", password="password"
-        )
-        tutee_profile = UserProfile.objects.create(
-            user=tutee_user, fname="Tess", mname="", lname="Tutee",
-            role="Tutee", institution=self.inst, year_level=14,
-        )
-        pref = Preference.objects.create(user=tutee_profile)
-        pref.subjects.add(self.subject)
-
-        # Tutor in-institution teaching the subject (supply) + completed sessions
-        tutor_user = User.objects.create_user(
-            username="ccs_tutor", email="tutor@ccs.edu.ph", password="password"
-        )
-        tutor_profile = UserProfile.objects.create(
-            user=tutor_user, fname="Tom", mname="", lname="Tutor",
-            role="Tutor", institution=self.inst, year_level=16,
-        )
-        self.tutor = Tutor.objects.create(
-            profile=tutor_profile, hourly_rate=200, teaching_level="College"
-        )
-        TutorSubjects.objects.create(tutor=self.tutor, subject=self.subject, expertise_level=5)
-
-        availability = TutorAvailability.objects.create(
-            tutor=self.tutor, day="Mon", time_slot=time(9, 0), is_active=True
-        )
-        # 1 completed + 1 cancelled this week -> completion_rate 50.0, sessions_this_week counts completed only via active_statuses
-        completed = Booking.objects.create(
-            student=tutee_profile, tutor=self.tutor, availability=availability,
-            session_date=date.today(), session_mode="Online", status="Completed",
-        )
-        Booking.objects.create(
-            student=tutee_profile, tutor=self.tutor, availability=availability,
-            session_date=date.today(), session_mode="Online", status="Cancelled",
-        )
-        Rating.objects.create(
-            booking=completed, student=tutee_profile, tutor=self.tutor, rating_score=5
-        )
-
-        # Operational queue items in-institution
-        WithdrawalRequest.objects.create(
-            tutor=self.tutor, amount=Decimal("500.00"), method="gcash", status="pending"
-        )
-        SupportTicket.objects.create(
-            user=tutee_profile, category="Technical", subject="Cannot log in",
-            description="help", status="Open",
-        )
-
-        # Out-of-institution noise that must be excluded by scoping
-        other_tutor_user = User.objects.create_user(
-            username="other_tutor", email="t@other.edu.ph", password="password"
-        )
-        other_tutor_profile = UserProfile.objects.create(
-            user=other_tutor_user, fname="Olive", mname="", lname="Other",
-            role="Tutor", institution=self.other_inst, year_level=16,
-        )
-        other_tutor = Tutor.objects.create(
-            profile=other_tutor_profile, hourly_rate=200, teaching_level="College"
-        )
-        WithdrawalRequest.objects.create(
-            tutor=other_tutor, amount=Decimal("999.00"), method="gcash", status="pending"
-        )
-
-    def test_stats_includes_institution_scoped_metrics(self):
-        response = self.client.get("/api/admin/stats")
-        self.assertEqual(response.status_code, 200)
-        data = response.data
-
-        self.assertEqual(data["institution_name"], "College of Computer Studies")
-        self.assertEqual(data["sessions_this_week"], 1)  # only the Completed one
-        self.assertEqual(data["completed_sessions"], 1)
-        self.assertEqual(data["cancelled_sessions"], 1)
-        self.assertEqual(data["completion_rate"], 50.0)
-
-        self.assertTrue(any(s["subject_name"] == "Data Structures" for s in data["subject_demand"]))
-        self.assertEqual(len(data["top_tutors"]), 1)
-        self.assertEqual(data["top_tutors"][0]["completed_sessions"], 1)
-        self.assertEqual(data["top_tutors"][0]["avg_rating"], 5.0)
-
-    def test_operational_queue_is_scoped(self):
-        response = self.client.get("/api/admin/operational-queue/")
-        self.assertEqual(response.status_code, 200)
-        data = response.data
-
-        # 1 withdrawal (own inst, not the other) + 1 open ticket = 2
-        self.assertEqual(data["count"], 2)
-        types = {item["type"] for item in data["items"]}
-        self.assertIn("withdrawal", types)
-        self.assertIn("support", types)
-
-
 class SupportTicketEscalationTests(APITestCase):
     def setUp(self):
         self.institution = PartnerInstitution.objects.create(
@@ -6465,9 +6192,6 @@ class SupportTicketEscalationTests(APITestCase):
                 content="This support ticket has been escalated to SuperAdmin support.",
             ).exists()
         )
-
-        admin_list = self.client.get("/api/admin/support/tickets/")
-        self.assertNotIn(self.ticket.id, [ticket["id"] for ticket in admin_list.data])
 
         self.client.force_authenticate(user=self.super_user)
         super_list = self.client.get("/api/admin/support/tickets/")
@@ -6851,7 +6575,7 @@ class VerificationEmailWiringTests(APITestCase):
             username="email-admin@cpu.edu", email="email-admin@cpu.edu", password="password",
         )
         UserProfile.objects.create(
-            user=self.admin_user, fname="Admin", mname="", lname="User", role="Admin",
+            user=self.admin_user, fname="Admin", mname="", lname="User", role="SuperAdmin",
             institution=self.institution,
         )
         self.tutor_profile = self._make_profile("email-tutor@cpu.edu", "Tutor")
@@ -7346,3 +7070,105 @@ class TutorDetailVerifiedBadgeTests(APITestCase):
         response = self.client.get(f"/api/tutors/{profile.id}/")
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.data["is_verified"])
+
+
+class AdminEndpointsRequireSuperAdminTests(APITestCase):
+    """Ticket: Admin role removed -> admin endpoints are SuperAdmin-only.
+
+    Representative admin endpoints must reject a Tutor (403), an unauthenticated
+    caller (401), and a directly-created role='Admin' profile (simulating an
+    unmigrated row, 403), while a SuperAdmin gets 200."""
+
+    ADMIN_ENDPOINTS = (
+        "/api/admin/stats/",
+        "/api/admin/users/",
+        "/api/admin/withdrawals/",
+        "/api/admin/analytics/",
+    )
+
+    def setUp(self):
+        self.institution = PartnerInstitution.objects.create(
+            institution_name="CPU", school_email_domain="cpu.edu.ph", is_active=True,
+        )
+        self.super_user = User.objects.create_user(
+            username="perm-super@cpu.edu.ph", email="perm-super@cpu.edu.ph", password="password",
+        )
+        UserProfile.objects.create(
+            user=self.super_user, fname="Perm", mname="", lname="Super", role="SuperAdmin",
+            profile_completed=True, is_domain_exempt=True,
+        )
+        self.tutor_user = User.objects.create_user(
+            username="perm-tutor@cpu.edu.ph", email="perm-tutor@cpu.edu.ph", password="password",
+        )
+        UserProfile.objects.create(
+            user=self.tutor_user, fname="Perm", mname="", lname="Tutor", role="Tutor",
+            institution=self.institution, profile_completed=True,
+        )
+        self.legacy_admin_user = User.objects.create_user(
+            username="perm-admin@cpu.edu.ph", email="perm-admin@cpu.edu.ph", password="password",
+        )
+        # Directly stamp the removed 'Admin' role to simulate an unmigrated row.
+        UserProfile.objects.create(
+            user=self.legacy_admin_user, fname="Perm", mname="", lname="Admin", role="Admin",
+            institution=self.institution, profile_completed=True,
+        )
+
+    def test_unauthenticated_gets_401(self):
+        for url in self.ADMIN_ENDPOINTS:
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 401, url)
+
+    def test_tutor_gets_403(self):
+        self.client.force_authenticate(user=self.tutor_user)
+        for url in self.ADMIN_ENDPOINTS:
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 403, url)
+
+    def test_legacy_admin_role_gets_403(self):
+        self.client.force_authenticate(user=self.legacy_admin_user)
+        for url in self.ADMIN_ENDPOINTS:
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 403, url)
+
+    def test_superadmin_gets_200(self):
+        self.client.force_authenticate(user=self.super_user)
+        for url in self.ADMIN_ENDPOINTS:
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 200, url)
+
+
+class AdminToSuperAdminMigrationTests(APITestCase):
+    """Ticket: 0072 data migration converts every role='Admin' row to 'SuperAdmin'."""
+
+    def _forward_function(self):
+        import importlib
+
+        module = importlib.import_module(
+            "studybuddy.migrations.0072_convert_admin_to_superadmin"
+        )
+        return module.convert_admin_to_superadmin
+
+    def test_migration_converts_admin_rows_to_superadmin(self):
+        from django.apps import apps as django_apps
+
+        admin_user = User.objects.create_user(
+            username="mig-admin@cpu.edu.ph", email="mig-admin@cpu.edu.ph", password="password",
+        )
+        # Directly stamp the removed 'Admin' role, bypassing model validation.
+        admin_profile = UserProfile.objects.create(
+            user=admin_user, fname="Mig", mname="", lname="Admin", role="Admin",
+        )
+        tutee_user = User.objects.create_user(
+            username="mig-tutee@cpu.edu.ph", email="mig-tutee@cpu.edu.ph", password="password",
+        )
+        tutee_profile = UserProfile.objects.create(
+            user=tutee_user, fname="Mig", mname="", lname="Tutee", role="Tutee",
+        )
+
+        self._forward_function()(django_apps, None)
+
+        admin_profile.refresh_from_db()
+        tutee_profile.refresh_from_db()
+        self.assertEqual(admin_profile.role, "SuperAdmin")
+        self.assertEqual(tutee_profile.role, "Tutee")
+        self.assertFalse(UserProfile.objects.filter(role="Admin").exists())

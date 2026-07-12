@@ -32,7 +32,7 @@ from .serializers import (
     TuteeApplicationSerializer, TuteeDocumentRenewalReviewSerializer
 )
 from django.conf import settings
-from .permissions import IsAdminUser, IsSuperAdminUser
+from .permissions import IsSuperAdminUser
 from .email_utils import (
     send_application_received_email,
     send_application_approved_email,
@@ -92,7 +92,7 @@ class BaseAdminView(APIView):
         return get_object_or_404(PartnerInstitution, pk=institution_id)
 
 class AdminStatsView(BaseAdminView):
-    permission_classes = [permissions.IsAuthenticated, IsAdminUser]
+    permission_classes = [permissions.IsAuthenticated, IsSuperAdminUser]
 
     def get(self, request):
         today = timezone.localtime(timezone.now()).date()
@@ -233,7 +233,7 @@ class AdminOperationalQueueView(BaseAdminView):
     tickets, tutor applications) into summary rows. Each row routes to the
     existing screen that resolves it; the dashboard performs no mutations.
     """
-    permission_classes = [permissions.IsAuthenticated, IsAdminUser]
+    permission_classes = [permissions.IsAuthenticated, IsSuperAdminUser]
 
     def get(self, request):
         profile = request.user.userprofile
@@ -286,7 +286,7 @@ class AdminOperationalQueueView(BaseAdminView):
 
 
 class AdminWithdrawalListView(BaseAdminView):
-    permission_classes = [permissions.IsAuthenticated, IsAdminUser]
+    permission_classes = [permissions.IsAuthenticated, IsSuperAdminUser]
 
     def get(self, request):
         queryset = self.get_queryset_for_user(request, WithdrawalRequest.objects.select_related('tutor__profile__user').all(), user_path='tutor__profile')
@@ -300,7 +300,7 @@ class AdminWithdrawalListView(BaseAdminView):
         return Response(serializer.data)
 
 class AdminWithdrawalDetailView(APIView):
-    permission_classes = [permissions.IsAuthenticated, IsAdminUser]
+    permission_classes = [permissions.IsAuthenticated, IsSuperAdminUser]
 
     def patch(self, request, pk):
         queryset = self.get_queryset_for_user(request, WithdrawalRequest.objects.all(), user_path='tutor__profile')
@@ -376,7 +376,7 @@ class AdminWithdrawalDetailView(APIView):
         return Response(serializer.data)
 
 class AdminUserListView(BaseAdminView):
-    permission_classes = [permissions.IsAuthenticated, IsAdminUser]
+    permission_classes = [permissions.IsAuthenticated, IsSuperAdminUser]
 
     def get(self, request):
         accepted_bookings_prefetch = Prefetch(
@@ -633,7 +633,7 @@ class AdminInstitutionView(APIView):
 
 
 class AdminCourseCatalogView(BaseAdminView):
-    permission_classes = [permissions.IsAuthenticated, IsAdminUser]
+    permission_classes = [permissions.IsAuthenticated, IsSuperAdminUser]
 
     def get(self, request):
         profile = request.user.userprofile
@@ -723,7 +723,7 @@ class AdminCourseCatalogView(BaseAdminView):
 
 
 class AdminCustomSubjectView(BaseAdminView):
-    permission_classes = [permissions.IsAuthenticated, IsAdminUser]
+    permission_classes = [permissions.IsAuthenticated, IsSuperAdminUser]
 
     def post(self, request):
         profile = request.user.userprofile
@@ -836,7 +836,7 @@ class AdminPendingActionsView(APIView):
 
 
 class InstitutionRequestView(APIView):
-    permission_classes = [permissions.IsAuthenticated, IsAdminUser]
+    permission_classes = [permissions.IsAuthenticated, IsSuperAdminUser]
 
     def get(self, request):
         if request.user.userprofile.role != 'SuperAdmin':
@@ -906,7 +906,7 @@ class InstitutionRequestView(APIView):
 
 
 class AdminAccountRequestView(APIView):
-    permission_classes = [permissions.IsAuthenticated, IsAdminUser]
+    permission_classes = [permissions.IsAuthenticated, IsSuperAdminUser]
 
     def get(self, request):
         if request.user.userprofile.role != 'SuperAdmin':
@@ -991,7 +991,7 @@ class AdminAccountRequestView(APIView):
 
 
 class AdminAnalyticsView(BaseAdminView):
-    permission_classes = [permissions.IsAuthenticated, IsAdminUser]
+    permission_classes = [permissions.IsAuthenticated, IsSuperAdminUser]
 
     def get(self, request):
         today = timezone.localtime(timezone.now()).date()
@@ -1103,7 +1103,7 @@ class AdminAnalyticsView(BaseAdminView):
 
 
 class AdminAnalyticsExportView(BaseAdminView):
-    permission_classes = [permissions.IsAuthenticated, IsAdminUser]
+    permission_classes = [permissions.IsAuthenticated, IsSuperAdminUser]
 
     def get(self, request):
         today = timezone.localtime(timezone.now()).date()
@@ -1233,7 +1233,7 @@ class SuperAdminInstitutionPerformanceView(APIView):
 
 
 class AdminTutorApplicationListView(BaseAdminView):
-    permission_classes = [permissions.IsAuthenticated, IsAdminUser]
+    permission_classes = [permissions.IsAuthenticated, IsSuperAdminUser]
 
     def get(self, request):
         status_filter = request.query_params.get('status')
@@ -1302,7 +1302,7 @@ class AdminTutorApplicationListView(BaseAdminView):
 
 
 class AdminTutorApplicationDetailView(BaseAdminView):
-    permission_classes = [permissions.IsAuthenticated, IsAdminUser]
+    permission_classes = [permissions.IsAuthenticated, IsSuperAdminUser]
 
     def get(self, request, pk):
         queryset = self.get_queryset_for_user(request, TutorApplication.objects.all(), user_path='profile')
@@ -1344,7 +1344,7 @@ class AdminTutorApplicationDetailView(BaseAdminView):
 
 
 class AdminTutorDocumentRenewalDetailView(BaseAdminView):
-    permission_classes = [permissions.IsAuthenticated, IsAdminUser]
+    permission_classes = [permissions.IsAuthenticated, IsSuperAdminUser]
 
     def get(self, request, pk):
         queryset = self.get_queryset_for_user(
@@ -1408,7 +1408,7 @@ class AdminTutorDocumentRenewalDetailView(BaseAdminView):
 
 
 class AdminTuteeApplicationListView(BaseAdminView):
-    permission_classes = [permissions.IsAuthenticated, IsAdminUser]
+    permission_classes = [permissions.IsAuthenticated, IsSuperAdminUser]
 
     def get(self, request):
         status_filter = request.query_params.get('status')
@@ -1476,7 +1476,7 @@ class AdminTuteeApplicationListView(BaseAdminView):
 
 
 class AdminTuteeApplicationDetailView(BaseAdminView):
-    permission_classes = [permissions.IsAuthenticated, IsAdminUser]
+    permission_classes = [permissions.IsAuthenticated, IsSuperAdminUser]
 
     def get(self, request, pk):
         queryset = self.get_queryset_for_user(request, TuteeApplication.objects.all(), user_path='profile')
@@ -1517,7 +1517,7 @@ class AdminTuteeApplicationDetailView(BaseAdminView):
 
 
 class AdminTuteeDocumentRenewalDetailView(BaseAdminView):
-    permission_classes = [permissions.IsAuthenticated, IsAdminUser]
+    permission_classes = [permissions.IsAuthenticated, IsSuperAdminUser]
 
     def get(self, request, pk):
         queryset = self.get_queryset_for_user(

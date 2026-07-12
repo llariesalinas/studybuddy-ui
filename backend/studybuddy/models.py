@@ -97,7 +97,6 @@ class UserProfile(models.Model):
     ROLE_CHOICES = [
         ('Tutee', 'Tutee'),
         ('Tutor', 'Tutor'),
-        ('Admin', 'Admin'),
         ('SuperAdmin', 'SuperAdmin'),
     ]
 

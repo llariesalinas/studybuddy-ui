@@ -465,7 +465,7 @@ def build_admin_profile_defaults(user):
         'fname': fname[:100],
         'mname': '',
         'lname': lname[:100],
-        'role': 'Admin',
+        'role': 'SuperAdmin',
         'profile_completed': True,
         'is_domain_exempt': True,
         'is_suspended': False,
@@ -487,8 +487,8 @@ def get_login_profile_for_user(user):
     if user.is_staff or user.is_superuser:
         updated_fields = []
 
-        if profile.role not in ('Admin', 'SuperAdmin'):
-            profile.role = 'Admin'
+        if profile.role != 'SuperAdmin':
+            profile.role = 'SuperAdmin'
             updated_fields.append('role')
 
         if not profile.profile_completed:
@@ -1445,7 +1445,7 @@ def login_view(request):
         except TutorApplication.DoesNotExist:
             pass
 
-    if not profile.is_domain_exempt and profile.role not in ['Admin', 'SuperAdmin']:
+    if not profile.is_domain_exempt and profile.role != 'SuperAdmin':
         email_domain = normalize_email_domain(email)
         active_institution = get_active_institution_by_domain(email_domain)
 
@@ -5433,7 +5433,7 @@ def create_support_ticket(request):
 @permission_classes([IsAuthenticated])
 def admin_claim_ticket(request, ticket_id):
     profile = request.user.userprofile
-    if profile.role not in ('Admin', 'SuperAdmin'):
+    if profile.role != 'SuperAdmin':
         return Response(status=403)
 
     from .models import SupportTicket
@@ -5543,7 +5543,7 @@ def list_my_tickets(request):
 @permission_classes([IsAuthenticated])
 def admin_list_tickets(request):
     profile = request.user.userprofile
-    if profile.role not in ('Admin', 'SuperAdmin'):
+    if profile.role != 'SuperAdmin':
         return Response(status=403)
 
     from .models import SupportTicket
@@ -5584,7 +5584,7 @@ def admin_list_tickets(request):
 @permission_classes([IsAuthenticated])
 def admin_resolve_ticket(request, ticket_id):
     profile = request.user.userprofile
-    if profile.role not in ('Admin', 'SuperAdmin'):
+    if profile.role != 'SuperAdmin':
         return Response(status=403)
 
     from .models import SupportTicket
