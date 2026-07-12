@@ -3,7 +3,13 @@
 Every finalized plan lives in this folder as its own dated file, created from [`_template.md`](_template.md).
 Status moves Draft â†’ Approved â†’ In Progress â†’ Done. When a plan is complete, its summary is linked below.
 
-**Status & Progress Summary** (2026-07-07): Face-to-face campus location modal is Approved — grilled
+**Status & Progress Summary** (2026-07-08): Booking subject persistence (Codex handoff) is
+Approved — root cause diagnosed via systematic debugging: `Booking` has no field for which
+`Subjects` row was actually booked, so session details and notifications fall back to showing
+the tutor's course/program instead. Fix adds a nullable `Booking.subject` FK, sends the tutee's
+chosen subject on `bookings/confirm/`, fixes the two display/notification call sites, and updates
+both `seed_data.py` and `reset_demo_data.py` to seed a real subject per booking. Handed off as a
+self-contained spec for Codex CLI; nothing implemented yet. Face-to-face campus location modal is Approved — grilled
 end-to-end (9 decisions) via `/grill-with-docs`: selecting Face-to-face mode opens a popup modal for
 Inside/Outside Campus, Outside Campus gates behind a liability-acknowledgment confirm modal before the
 existing free-text location field appears, applies to both `InitialBooking.vue` and `FindTutors.vue`
