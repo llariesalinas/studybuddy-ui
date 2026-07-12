@@ -132,6 +132,7 @@ PASSWORD_RESET_GENERIC_MESSAGE = (
     "If an account with that email exists, password reset instructions have been sent."
 )
 OTP_ERROR_MESSAGE = "Invalid or expired verification code."
+SUBJECT_NOT_RECOGNIZED_ERROR = "This subject is not recognized for your course catalog."
 
 
 def build_login_response_payload(user, profile):
@@ -809,6 +810,10 @@ def get_representative_booking(bookings):
     return None
 
 
+def booking_subject_label(booking):
+    return booking.subject.subject_name if booking.subject else "General"
+
+
 def get_dashboard_hidden_for_profile(bookings, profile):
     if not profile:
         return False
@@ -834,10 +839,7 @@ def get_session_notification_context(bookings):
             "tutee_name": "the tutee",
         }
 
-    subject = (
-        representative_booking.subject.subject_name
-        if representative_booking.subject else "General"
-    )
+    subject = booking_subject_label(representative_booking)
     date_label = representative_booking.session_date.strftime("%Y-%m-%d")
     tutor_name = f"{representative_booking.tutor.profile.fname} {representative_booking.tutor.profile.lname}"
     tutee_name = f"{representative_booking.student.fname} {representative_booking.student.lname}"
@@ -1903,7 +1905,7 @@ class SearchTutorsView(APIView):
         student_profile = request.user.userprofile
         if not subject_is_recognized_for_profile(student_profile, subject_code):
             return Response(
-                {"error": "This subject is not recognized for your course catalog."},
+                {"error": SUBJECT_NOT_RECOGNIZED_ERROR},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         tutors = filter_tutors_by_institution(
@@ -2015,11 +2017,7 @@ def build_combined_block(group, profile=None):
         "rating": representative_booking.rating.rating_score if hasattr(representative_booking, "rating") else None,
         "rating_submitted": hasattr(representative_booking, "rating"),
 
-        "subject": (
-            first.subject.subject_name
-            if first.subject
-            else "General"
-        ),
+        "subject": booking_subject_label(first),
         "startTime": start_time.strftime("%H:%M"),
         "endTime": end_time.strftime("%H:%M"),
         "duration_hours": duration,
@@ -2112,11 +2110,7 @@ def build_booking_request_block(group, profile=None):
         "tutor_confirmed": representative_booking.tutor_confirmed,
         "rating": representative_booking.rating.rating_score if hasattr(representative_booking, "rating") else None,
         "rating_submitted": hasattr(representative_booking, "rating"),
-        "subject": (
-            first_booking.subject.subject_name
-            if first_booking.subject
-            else "General"
-        ),
+        "subject": booking_subject_label(first_booking),
         "startTime": primary_block["startTime"],
         "endTime": primary_block["endTime"],
         "duration_hours": get_duration_hours_for_bookings(sorted_group),
@@ -2491,7 +2485,7 @@ def confirm_payment_and_book(request):
     if subject_code:
         if not subject_is_recognized_for_profile(user_profile, subject_code):
             return Response(
-                {"error": "This subject is not recognized for your course catalog."},
+                {"error": SUBJECT_NOT_RECOGNIZED_ERROR},
                 status=400,
             )
         subject = Subjects.objects.filter(subject_code=subject_code).first()
@@ -3229,7 +3223,7 @@ def build_booking_detail_payload(session_group_bookings, request=None):
             ),
         },
         "session": {
-            "subject": representative_booking.subject.subject_name if representative_booking.subject else "General",
+            "subject": booking_subject_label(representative_booking),
             "date": session_date.strftime("%Y-%m-%d"),
             "start_time": start_time.strftime("%H:%M"),
             "end_time": end_time.strftime("%H:%M"),
@@ -3880,7 +3874,7 @@ def recommend_tutors_view(request):
 
     if not subject_is_recognized_for_profile(student_profile, subject):
         return Response(
-            {"error": "This subject is not recognized for your course catalog."},
+            {"error": SUBJECT_NOT_RECOGNIZED_ERROR},
             status=400,
         )
 
@@ -4135,7 +4129,7 @@ def add_tutor_subject(request):
 
     if not subject_is_recognized_for_profile(profile, subject_code):
         return Response(
-            {"error": "This subject is not recognized for your course catalog."},
+            {"error": SUBJECT_NOT_RECOGNIZED_ERROR},
             status=400,
         )
 
