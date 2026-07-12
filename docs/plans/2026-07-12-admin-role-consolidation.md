@@ -1,7 +1,7 @@
 ---
 title: Admin role consolidation & SuperAdmin user analytics
 date: 2026-07-12
-status: Approved
+status: In Progress
 summary: Remove the institution-scoped Admin role (merge into SuperAdmin), make the subject/course catalog global, and add a per-tutor/per-tutee stats drill-down for SuperAdmin.
 spec: ../specs/2026-07-12-admin-role-consolidation-design.md
 ---
@@ -10,8 +10,8 @@ spec: ../specs/2026-07-12-admin-role-consolidation-design.md
 
 ## Status & Progress Summary
 
-**Status:** Approved — design confirmed via grilling session + `ui-preview` mockup; not yet split
-into tickets or implemented.
+**Status:** In Progress — tickets split (`docs/tickets.md`, mirrored to GitHub Issues #1-8 on the
+fork); orchestrated implementation run started 2026-07-13.
 
 ## Goal
 
@@ -87,3 +87,6 @@ removal work. Full rationale and every decision are recorded in the spec
 
 - 2026-07-12: Plan created and Approved after a grilling session + confirmed `ui-preview` mockup
   (spec at `docs/specs/2026-07-12-admin-role-consolidation-design.md`). Not yet implemented.
+- 2026-07-13: Status moved to In Progress — tickets split into `docs/tickets.md` (mirrored as
+  GitHub Issues #1-8 on the fork) and an `/orchestrate` run started on branch
+  `feat/admin-role-consolidation`.
