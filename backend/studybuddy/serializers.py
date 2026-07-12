@@ -1,8 +1,6 @@
 from rest_framework import serializers
 from .models import (
-    AdminAccountRequest,
     Course,
-    InstitutionCourseCatalog,
     InstitutionRequest,
     Notification,
     PartnerInstitution,
@@ -200,46 +198,6 @@ class InstitutionRequestSerializer(serializers.ModelSerializer):
         return full_name or obj.reviewed_by.email or obj.reviewed_by.username
 
 
-class AdminAccountRequestSerializer(serializers.ModelSerializer):
-    requesting_admin_name = serializers.SerializerMethodField()
-    institution_name = serializers.CharField(source='institution.institution_name', read_only=True)
-    target_user_name = serializers.SerializerMethodField()
-    target_user_email = serializers.EmailField(source='target_user.user.email', read_only=True)
-
-    class Meta:
-        model = AdminAccountRequest
-        fields = [
-            'id',
-            'requesting_admin',
-            'requesting_admin_name',
-            'institution',
-            'institution_name',
-            'target_user',
-            'target_user_name',
-            'target_user_email',
-            'note',
-            'status',
-            'created_at',
-            'reviewed_at',
-        ]
-        read_only_fields = [
-            'requesting_admin',
-            'requesting_admin_name',
-            'institution_name',
-            'target_user_name',
-            'target_user_email',
-            'created_at',
-            'reviewed_at',
-        ]
-
-    def get_requesting_admin_name(self, obj):
-        return f"{obj.requesting_admin.fname} {obj.requesting_admin.lname}".strip()
-
-    def get_target_user_name(self, obj):
-        if not obj.target_user:
-            return None
-        return f"{obj.target_user.fname} {obj.target_user.lname}".strip()
-
 class TutorSearchSerializer(serializers.ModelSerializer):
 
     fname = serializers.CharField(source='profile.fname')
@@ -257,10 +215,6 @@ class TutorSearchSerializer(serializers.ModelSerializer):
         ]
 
 class SubjectSerializer(serializers.ModelSerializer):
-    owning_institution_name = serializers.CharField(
-        source='owning_institution.institution_name',
-        read_only=True,
-    )
     is_recognized = serializers.SerializerMethodField()
 
     def get_is_recognized(self, obj):
@@ -276,57 +230,9 @@ class SubjectSerializer(serializers.ModelSerializer):
             'subject_name',
             'department',
             'category',
-            'owning_institution',
-            'owning_institution_name',
             'is_recognized',
         ]
-        read_only_fields = ['owning_institution', 'owning_institution_name', 'is_recognized']
-
-
-class InstitutionCourseCatalogSerializer(serializers.ModelSerializer):
-    institution_name = serializers.CharField(source='institution.institution_name', read_only=True)
-    course_code = serializers.CharField(source='course.course_code', read_only=True)
-    course_name = serializers.CharField(source='course.course_name', read_only=True)
-    subject_code = serializers.CharField(source='subject.subject_code', read_only=True)
-    subject_name = serializers.CharField(source='subject.subject_name', read_only=True)
-    subject_department = serializers.CharField(source='subject.department', read_only=True)
-    subject_is_custom = serializers.SerializerMethodField()
-
-    class Meta:
-        model = InstitutionCourseCatalog
-        fields = [
-            'id',
-            'institution',
-            'institution_name',
-            'course',
-            'course_code',
-            'course_name',
-            'subject',
-            'subject_code',
-            'subject_name',
-            'subject_department',
-            'subject_is_custom',
-            'added_at',
-        ]
-        read_only_fields = [
-            'institution',
-            'institution_name',
-            'course_code',
-            'course_name',
-            'subject_code',
-            'subject_name',
-            'subject_department',
-            'subject_is_custom',
-            'added_at',
-        ]
-
-    def get_subject_is_custom(self, obj):
-        return obj.subject.owning_institution_id is not None
-
-    def validate_course(self, value):
-        if not Course.objects.filter(pk=value.pk).exists():
-            raise serializers.ValidationError('Course does not exist.')
-        return value
+        read_only_fields = ['is_recognized']
 
 
 class PinnedReviewSerializer(serializers.ModelSerializer):

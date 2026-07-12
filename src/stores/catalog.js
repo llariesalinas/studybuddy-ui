@@ -47,41 +47,31 @@ export const useCatalogStore = defineStore('catalog', () => {
     return institutions.value
   }
 
-  async function fetchCourseCatalog({ course = null, institutionId = null } = {}) {
-    const params = {}
-    if (course) params.course = course
-    if (institutionId) params.institution_id = institutionId
-
-    const { data } = await api.get('/admin/course-catalog/', { params })
+  async function fetchCourseCatalog() {
+    const { data } = await api.get('/admin/course-catalog/')
     courseCatalog.value = Array.isArray(data) ? data : []
     return courseCatalog.value
   }
 
-  async function addCatalogEntry({ course, subject, institutionId = null }) {
-    const payload = { course, subject }
-    if (institutionId) payload.institution_id = institutionId
-
+  async function addCatalogSubject(payload) {
     const { data } = await api.post('/admin/course-catalog/', payload)
     courseCatalog.value = [...courseCatalog.value, data]
     return data
   }
 
-  async function removeCatalogEntry(entryId) {
-    await api.delete(`/admin/course-catalog/${entryId}/`)
-    courseCatalog.value = courseCatalog.value.filter((entry) => entry.id !== entryId)
+  async function updateCatalogSubject(subjectCode, payload) {
+    const { data } = await api.patch(`/admin/course-catalog/${subjectCode}/`, payload)
+    courseCatalog.value = courseCatalog.value.map((subject) =>
+      subject.subject_code === subjectCode ? data : subject,
+    )
+    return data
   }
 
-  async function addCustomSubject({ subjectCode, subjectName, department, institutionId = null }) {
-    const payload = {
-      subject_code: subjectCode,
-      subject_name: subjectName,
-      department,
-    }
-    if (institutionId) payload.institution_id = institutionId
-
-    const { data } = await api.post('/admin/subjects/custom/', payload)
-    subjects.value = [...subjects.value, data]
-    return data
+  async function removeCatalogSubject(subjectCode) {
+    await api.delete(`/admin/course-catalog/${subjectCode}/`)
+    courseCatalog.value = courseCatalog.value.filter(
+      (subject) => subject.subject_code !== subjectCode,
+    )
   }
 
   async function fetchPaymentMethods(options = {}) {
@@ -116,9 +106,9 @@ export const useCatalogStore = defineStore('catalog', () => {
     fetchCourses,
     fetchPartnerInstitutions,
     fetchCourseCatalog,
-    addCatalogEntry,
-    removeCatalogEntry,
-    addCustomSubject,
+    addCatalogSubject,
+    updateCatalogSubject,
+    removeCatalogSubject,
     fetchPaymentMethods,
     fetchReceivingInstitutions,
   }

@@ -21,11 +21,9 @@ from .chat.services import get_current_booking_context, get_current_booking_cont
 from .paymongo_money_movement import PayMongoCashOutError
 from .views import credit_tutor_wallet, dev_add_wallet_funds, dev_remove_wallet_funds
 from .models import (
-    AdminAccountRequest,
     Booking,
     Course,
     EmailOTPChallenge,
-    InstitutionCourseCatalog,
     InstitutionRequest,
     PartnerInstitution,
     Payment,
@@ -80,20 +78,6 @@ class SuperAdminRedesignApiTests(APITestCase):
             profile_completed=True,
             is_domain_exempt=True,
         )
-        self.admin_user = User.objects.create_user(
-            username="admin",
-            email="admin@cpu.edu.ph",
-            password="password",
-        )
-        self.admin_profile = UserProfile.objects.create(
-            user=self.admin_user,
-            fname="Inst",
-            mname="",
-            lname="Admin",
-            role="Admin",
-            institution=self.institution,
-            profile_completed=True,
-        )
         self.target_user = User.objects.create_user(
             username="target",
             email="target@cpu.edu.ph",
@@ -131,16 +115,10 @@ class SuperAdminRedesignApiTests(APITestCase):
             contact_person="WVSU Admin",
             contact_email="admin@wvsu.edu.ph",
         )
-        AdminAccountRequest.objects.create(
-            requesting_admin=self.admin_profile,
-            institution=self.institution,
-            note="Promote target user.",
-        )
-
         response = self.client.get("/api/admin/pending-actions/")
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data["count"], 4)
+        self.assertEqual(response.data["count"], 3)
         self.assertEqual(
             {
                 item["type"]
@@ -149,7 +127,6 @@ class SuperAdminRedesignApiTests(APITestCase):
             {
                 "institution_request",
                 "institution_activation",
-                "admin_account_request",
                 "domain_exemption",
             },
         )
@@ -222,24 +199,6 @@ class SuperAdminRedesignApiTests(APITestCase):
         self.assertEqual(tutor.session_load_limit, 14)
         self.assertEqual(response.data["tutor_session_load_limit"], 14)
 
-    def test_admin_account_request_approval_promotes_target_user(self):
-        request_obj = AdminAccountRequest.objects.create(
-            requesting_admin=self.admin_profile,
-            institution=self.institution,
-            note="Promote target user.",
-        )
-
-        response = self.client.patch(
-            f"/api/admin/admin-account-requests/{request_obj.id}/",
-            {"action": "approve", "target_user_id": self.target_profile.id},
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.target_profile.refresh_from_db()
-        self.assertEqual(self.target_profile.role, "Admin")
-        self.assertEqual(self.target_profile.institution, self.institution)
-
     def test_analytics_includes_completion_subject_popularity_and_csv(self):
         course = Course.objects.create(course_code="MATH", course_name="Mathematics")
         subject = Subjects.objects.create(
@@ -303,67 +262,14 @@ class SuperAdminRedesignApiTests(APITestCase):
         self.assertIn("date,institution,tutors,tutees,sessions,completion_rate,gross_revenue,commissions", export_response.content.decode())
 
 
-class InstitutionCourseCatalogTests(APITestCase):
+class GlobalSubjectCatalogTests(APITestCase):
     def setUp(self):
-        self.cpu = PartnerInstitution.objects.create(
-            institution_name="Central Philippine University",
-            school_email_domain="cpu.edu.ph",
-            is_active=True,
-        )
-        self.north = PartnerInstitution.objects.create(
-            institution_name="North University",
-            school_email_domain="north.edu.ph",
-            is_active=True,
-        )
         self.course = Course.objects.create(course_code="BSCS", course_name="Computer Science")
-        self.global_subject = Subjects.objects.create(
+        self.subject = Subjects.objects.create(
             subject_code="CS101",
             subject_name="Introduction to Computing",
             department="Computer Science",
             category="BSCS",
-        )
-        self.cpu_private_subject = Subjects.objects.create(
-            subject_code="CPU-AI",
-            subject_name="CPU Applied AI",
-            department="Computer Science",
-            category="BSCS",
-            owning_institution=self.cpu,
-        )
-        self.north_private_subject = Subjects.objects.create(
-            subject_code="NORTH-UX",
-            subject_name="North UX Lab",
-            department="Design",
-            category="BSCS",
-            owning_institution=self.north,
-        )
-
-        self.cpu_admin_user = User.objects.create_user(
-            username="cpu-admin",
-            email="admin@cpu.edu.ph",
-            password="password",
-        )
-        self.cpu_admin = UserProfile.objects.create(
-            user=self.cpu_admin_user,
-            fname="CPU",
-            mname="",
-            lname="Admin",
-            role="Admin",
-            institution=self.cpu,
-            profile_completed=True,
-        )
-        self.north_admin_user = User.objects.create_user(
-            username="north-admin",
-            email="admin@north.edu.ph",
-            password="password",
-        )
-        UserProfile.objects.create(
-            user=self.north_admin_user,
-            fname="North",
-            mname="",
-            lname="Admin",
-            role="Admin",
-            institution=self.north,
-            profile_completed=True,
         )
         self.super_user = User.objects.create_user(
             username="super",
@@ -379,25 +285,44 @@ class InstitutionCourseCatalogTests(APITestCase):
             profile_completed=True,
             is_domain_exempt=True,
         )
-
-    def subject_codes(self, response):
-        return {item["subject_code"] for item in response.data}
-
-    def test_superadmin_can_target_institution(self):
         self.client.force_authenticate(user=self.super_user)
 
-        response = self.client.post(
+    def test_catalog_is_global_subject_crud_without_institution_fields(self):
+        list_response = self.client.get("/api/admin/course-catalog/?institution_id=999")
+        self.assertEqual(list_response.status_code, 200)
+        self.assertEqual([item["subject_code"] for item in list_response.data], ["CS101"])
+        self.assertNotIn("institution", list_response.data[0])
+        self.assertNotIn("owning_institution", list_response.data[0])
+
+        create_response = self.client.post(
             "/api/admin/course-catalog/",
             {
-                "institution_id": self.north.id,
-                "course": self.course.course_code,
-                "subject": self.global_subject.subject_code,
+                "subject_code": "AI201",
+                "subject_name": "Applied Artificial Intelligence",
+                "department": "Computer Science",
+                "category": self.course.course_code,
             },
             format="json",
         )
+        self.assertEqual(create_response.status_code, 201)
 
-        self.assertEqual(response.status_code, 201)
-        self.assertEqual(response.data["institution"], self.north.id)
+        update_response = self.client.patch(
+            "/api/admin/course-catalog/AI201/",
+            {"subject_name": "Applied AI"},
+            format="json",
+        )
+        self.assertEqual(update_response.status_code, 200)
+        self.assertEqual(update_response.data["subject_name"], "Applied AI")
+
+        delete_response = self.client.delete("/api/admin/course-catalog/AI201/")
+        self.assertEqual(delete_response.status_code, 204)
+        self.assertFalse(Subjects.objects.filter(subject_code="AI201").exists())
+
+    def test_per_institution_catalog_model_is_removed(self):
+        from django.apps import apps
+
+        with self.assertRaises(LookupError):
+            apps.get_model('studybuddy', 'InstitutionCourseCatalog')
 
 
 class RecommendTutorsViewTests(APITestCase):
@@ -3522,11 +3447,7 @@ class BookingVerificationGateTests(APITestCase):
             subject_code="GATE-SUBJ",
             subject_name="Catalog Approved Subject",
             department="Gate",
-        )
-        InstitutionCourseCatalog.objects.create(
-            institution=self.institution,
-            course=self.course,
-            subject=self.subject,
+            category=self.course.course_code,
         )
         self.tutee_user = User.objects.create_user(
             username="gate-tutee@cpu.edu",

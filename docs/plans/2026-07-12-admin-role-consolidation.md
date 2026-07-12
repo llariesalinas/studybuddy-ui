@@ -10,9 +10,12 @@ spec: ../specs/2026-07-12-admin-role-consolidation-design.md
 
 ## Status & Progress Summary
 
-**Status:** In Progress — ticket 1 (Admin-to-SuperAdmin conversion, migration 0072, permission
-tightening) shipped and committed on `feat/admin-role-consolidation`; tickets 2-8 hand off to the
-Codex CLI per user direction. Frontier: tickets 2, 3, 4, 7. Run summary:
+**Status:** In Progress — ticket 1 shipped. Tickets 2, 3, and 4 (dead institution-scoping cleanup,
+admin-account-request deletion, global subject/course catalog) were batched into one Codex brief;
+Codex's run hit its usage limit mid-verification but left a complete, correct diff (migrations
+0073-0074), independently re-verified by Claude outside the sandbox — 289 backend tests at the
+28F/5E pre-existing baseline (no regressions), `npm run build`/`lint`/`test` all clean. Not yet
+committed. Frontier: tickets 5, 6, 7. Run summary:
 `docs/session-summaries/2026-07-13-admin-role-consolidation-run-summary.md`.
 
 ## Goal
@@ -97,3 +100,12 @@ removal work. Full rationale and every decision are recorded in the spec
   against the pre-existing baseline (289 tests, no new failures). Orchestrate run ended early by
   user direction; tickets 2-8 hand off to Codex. Run summary:
   `docs/session-summaries/2026-07-13-admin-role-consolidation-run-summary.md`.
+- 2026-07-13 (evening): Tickets 2, 3, 4 batched into one Codex brief
+  (`docs/briefs/2026-07-13-admin-role-consolidation-tickets-2-3-4.md`) and dispatched via
+  `codex exec`. Codex hit its usage limit mid final-verification but left a complete diff
+  (migrations 0073-0074 drop `AdminAccountRequest` and `InstitutionCourseCatalog`/
+  `Subjects.owning_institution`; admin views, serializers, and the frontend catalog/superadmin
+  views reworked to match). Claude reviewed the diff file-by-file and re-ran every check outside
+  Codex's sandbox: 289 backend tests at the 28F/5E pre-existing baseline (no regressions),
+  `npm run build`/`lint`/`test` all clean. Ticket boxes in `docs/tickets.md` and the brief ticked;
+  not yet committed. Frontier now: tickets 5, 6, 7.

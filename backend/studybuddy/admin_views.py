@@ -7,26 +7,23 @@ from rest_framework.response import Response
 from rest_framework import status, permissions
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
-from django.core.exceptions import ValidationError
-from django.db import IntegrityError, transaction
+from django.db import transaction
 from django.db.models import Avg, Count, Prefetch, Q, Sum
 from django.utils import timezone
 from django.utils.timesince import timesince
 from datetime import timedelta
 from .models import (
-    AdminAccountRequest, InstitutionRequest,
+    InstitutionRequest,
     UserProfile, Tutor, Booking, WithdrawalRequest,
     PartnerInstitution, Wallet, Transaction, PlatformActivity,
     TutorApplication, TutorDocumentRenewalReview,
     TuteeApplication, TuteeDocumentRenewalReview, Payment,
-    InstitutionCourseCatalog,
     TutorSubjects, Subjects, SupportTicket,
     TUTOR_ACCEPTED_SESSION_LOAD_STATUSES
 )
 from .serializers import (
-    AdminAccountRequestSerializer, InstitutionRequestSerializer,
+    InstitutionRequestSerializer,
     AdminWithdrawalSerializer, AdminUserSerializer,
-    InstitutionCourseCatalogSerializer,
     PartnerInstitutionSerializer, PlatformActivitySerializer,
     SubjectSerializer, TutorApplicationSerializer, TutorDocumentRenewalReviewSerializer,
     TuteeApplicationSerializer, TuteeDocumentRenewalReviewSerializer
@@ -63,35 +60,7 @@ def parse_bool(value):
         return value.strip().lower() in ('1', 'true', 'yes', 'on')
     return bool(value)
 
-class BaseAdminView(APIView):
-    def get_queryset_for_user(self, request, queryset, user_path=''):
-        profile = request.user.userprofile
-        if profile.role == 'SuperAdmin':
-            return queryset
-
-        # Build the filter kwarg dynamically
-        if user_path:
-            kwarg = f"{user_path}__institution"
-        else:
-            kwarg = "institution"
-
-        return queryset.filter(**{kwarg: profile.institution})
-
-    def get_target_institution(self, request, required_for_superadmin=False):
-        profile = request.user.userprofile
-        if profile.role != 'SuperAdmin':
-            if not profile.institution_id:
-                return None
-            return profile.institution
-
-        institution_id = request.query_params.get('institution_id') or request.data.get('institution_id')
-        if not institution_id:
-            if required_for_superadmin:
-                return None
-            return None
-        return get_object_or_404(PartnerInstitution, pk=institution_id)
-
-class AdminStatsView(BaseAdminView):
+class AdminStatsView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsSuperAdminUser]
 
     def get(self, request):
@@ -105,16 +74,6 @@ class AdminStatsView(BaseAdminView):
         qs_tutees = UserProfile.objects.filter(role='Tutee')
         qs_bookings = Booking.objects.filter(session_date=today, status='Confirmed')
         qs_withdrawals = WithdrawalRequest.objects.all()
-
-        profile = request.user.userprofile
-        if profile.role != 'SuperAdmin':
-            inst = profile.institution
-            qs_transactions = qs_transactions.filter(wallet__tutor__profile__institution=inst)
-            qs_activities = qs_activities.filter(institution=inst)
-            qs_tutors = qs_tutors.filter(profile__institution=inst)
-            qs_tutees = qs_tutees.filter(institution=inst)
-            qs_bookings = qs_bookings.filter(tutor__profile__institution=inst)
-            qs_withdrawals = qs_withdrawals.filter(tutor__profile__institution=inst)
 
         commissions = qs_transactions.filter(
             transaction_type='commission_deduction'
@@ -132,9 +91,6 @@ class AdminStatsView(BaseAdminView):
                 'new_tutees': qs_tutees.filter(user__date_joined__date=day).count(),
             })
 
-        # Institution-scoped dashboard metrics (None for SuperAdmin = platform-wide)
-        inst = None if profile.role == 'SuperAdmin' else profile.institution
-
         new_members_this_month = (
             qs_tutors.filter(profile__user__date_joined__date__gte=month_start).count()
             + qs_tutees.filter(user__date_joined__date__gte=month_start).count()
@@ -147,9 +103,6 @@ class AdminStatsView(BaseAdminView):
         active_statuses = ['Confirmed', 'Completed']
 
         qs_all_bookings = Booking.objects.all()
-        if inst:
-            qs_all_bookings = qs_all_bookings.filter(tutor__profile__institution=inst)
-
         sessions_this_week = qs_all_bookings.filter(
             session_date__gte=week_start, status__in=active_statuses
         ).count()
@@ -167,10 +120,6 @@ class AdminStatsView(BaseAdminView):
         # Subject demand (tutee preferences) vs supply (tutor subjects)
         demand_filter = Q(preference__user__role='Tutee')
         supply_filter = Q()
-        if inst:
-            demand_filter &= Q(preference__user__institution=inst)
-            supply_filter = Q(tutorsubjects__tutor__profile__institution=inst)
-
         demand_rows = (
             Subjects.objects.annotate(
                 demand=Count('preference', filter=demand_filter, distinct=True),
@@ -205,7 +154,7 @@ class AdminStatsView(BaseAdminView):
         ]
 
         stats = {
-            'institution_name': inst.institution_name if inst else 'All institutions',
+            'institution_name': 'All institutions',
             'total_tutors': qs_tutors.count(),
             'total_tutees': qs_tutees.count(),
             'active_sessions_today': qs_bookings.count(),
@@ -226,7 +175,7 @@ class AdminStatsView(BaseAdminView):
         return Response(stats)
 
 
-class AdminOperationalQueueView(BaseAdminView):
+class AdminOperationalQueueView(APIView):
     """Institution-scoped operational to-do feed for the Admin dashboard.
 
     Groups the items an institution admin must act on (withdrawals, support
@@ -236,17 +185,9 @@ class AdminOperationalQueueView(BaseAdminView):
     permission_classes = [permissions.IsAuthenticated, IsSuperAdminUser]
 
     def get(self, request):
-        profile = request.user.userprofile
-        inst = None if profile.role == 'SuperAdmin' else profile.institution
-
         withdrawals = WithdrawalRequest.objects.filter(status__in=['pending', 'failed'])
         tickets = SupportTicket.objects.filter(status__in=['Open', 'In_Progress'])
         applications = TutorApplication.objects.filter(application_status='pending')
-        if inst:
-            withdrawals = withdrawals.filter(tutor__profile__institution=inst)
-            tickets = tickets.filter(user__institution=inst)
-            applications = applications.filter(profile__institution=inst)
-
         items = []
 
         wd_count = withdrawals.count()
@@ -285,11 +226,11 @@ class AdminOperationalQueueView(BaseAdminView):
         return Response({'count': wd_count + ticket_count + app_count, 'items': items})
 
 
-class AdminWithdrawalListView(BaseAdminView):
+class AdminWithdrawalListView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsSuperAdminUser]
 
     def get(self, request):
-        queryset = self.get_queryset_for_user(request, WithdrawalRequest.objects.select_related('tutor__profile__user').all(), user_path='tutor__profile')
+        queryset = WithdrawalRequest.objects.select_related('tutor__profile__user').all()
         queryset = queryset.order_by('-requested_at')
 
         status_filter = request.query_params.get('status')
@@ -303,7 +244,7 @@ class AdminWithdrawalDetailView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsSuperAdminUser]
 
     def patch(self, request, pk):
-        queryset = self.get_queryset_for_user(request, WithdrawalRequest.objects.all(), user_path='tutor__profile')
+        queryset = WithdrawalRequest.objects.all()
         withdrawal = get_object_or_404(queryset, pk=pk)
         new_status = request.data.get('status')
         failure_reason = request.data.get('failure_reason', '')
@@ -375,7 +316,7 @@ class AdminWithdrawalDetailView(APIView):
         serializer = AdminWithdrawalSerializer(withdrawal)
         return Response(serializer.data)
 
-class AdminUserListView(BaseAdminView):
+class AdminUserListView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsSuperAdminUser]
 
     def get(self, request):
@@ -386,18 +327,12 @@ class AdminUserListView(BaseAdminView):
             ).only('id', 'booking_request_id', 'session_group_id', 'tutor_id'),
             to_attr='accepted_bookings_cache',
         )
-        queryset = self.get_queryset_for_user(
-            request,
+        queryset = (
             UserProfile.objects.select_related('user', 'institution', 'tutor__wallet')
             .prefetch_related(accepted_bookings_prefetch)
-            .all(),
+            .all()
         )
         queryset = queryset.order_by('-created_at')
-
-        # Only show Tutees and Tutors to normal Admins
-        profile = request.user.userprofile
-        if profile.role != 'SuperAdmin':
-            queryset = queryset.filter(role__in=['Tutee', 'Tutor'])
 
         search = request.query_params.get('search')
         if search:
@@ -421,7 +356,7 @@ class AdminUserListView(BaseAdminView):
         return Response(serializer.data)
 
     def patch(self, request, pk=None):
-        queryset = self.get_queryset_for_user(request, UserProfile.objects.all())
+        queryset = UserProfile.objects.all()
         profile = get_object_or_404(queryset, pk=pk)
         actor = request.user.userprofile
         changed_fields = []
@@ -434,9 +369,6 @@ class AdminUserListView(BaseAdminView):
             changed_fields.append('is_suspended')
 
         if 'role' in request.data:
-            if actor.role != 'SuperAdmin':
-                return Response({'error': 'Only SuperAdmin can change roles.'}, status=status.HTTP_403_FORBIDDEN)
-
             role = request.data.get('role')
             valid_roles = [choice[0] for choice in UserProfile.ROLE_CHOICES]
             if role not in valid_roles:
@@ -447,9 +379,6 @@ class AdminUserListView(BaseAdminView):
             changed_fields.append('role')
 
         if 'institution' in request.data:
-            if actor.role != 'SuperAdmin':
-                return Response({'error': 'Only SuperAdmin can change institutions.'}, status=status.HTTP_403_FORBIDDEN)
-
             institution_id = request.data.get('institution')
             if institution_id in ('', None):
                 profile.institution = None
@@ -459,9 +388,6 @@ class AdminUserListView(BaseAdminView):
             changed_fields.append('institution')
 
         if 'is_domain_exempt' in request.data:
-            if actor.role != 'SuperAdmin':
-                return Response({'error': 'Only SuperAdmin can change domain exemptions.'}, status=status.HTTP_403_FORBIDDEN)
-
             profile.is_domain_exempt = parse_bool(request.data.get('is_domain_exempt'))
             profile_update_fields.append('is_domain_exempt')
             changed_fields.append('is_domain_exempt')
@@ -496,7 +422,7 @@ class AdminUserListView(BaseAdminView):
         return Response(serializer.data)
 
     def delete(self, request, pk=None):
-        queryset = self.get_queryset_for_user(request, UserProfile.objects.all())
+        queryset = UserProfile.objects.all()
         profile = get_object_or_404(queryset, pk=pk)
         user = profile.user
 
@@ -510,7 +436,7 @@ class AdminUserListView(BaseAdminView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class AdminUserVerificationDevToolsView(BaseAdminView):
+class AdminUserVerificationDevToolsView(APIView):
     """SuperAdmin-only actions to demo verification emails/lapse without waiting out the real
     90-day/30-day windows. Gated server-side by settings.VERIFICATION_DEV_TOOLS_ENABLED (default
     False), checked before any query so it 403s even for a valid SuperAdmin token when the flag is
@@ -632,141 +558,46 @@ class AdminInstitutionView(APIView):
         return Response(serializer.data)
 
 
-class AdminCourseCatalogView(BaseAdminView):
+class AdminCourseCatalogView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsSuperAdminUser]
 
     def get(self, request):
-        profile = request.user.userprofile
-        entries = InstitutionCourseCatalog.objects.select_related(
-            'institution',
-            'course',
-            'subject',
-        )
-
-        if profile.role == 'SuperAdmin':
-            institution = self.get_target_institution(request)
-            if institution:
-                entries = entries.filter(institution=institution)
-        else:
-            if not profile.institution_id:
-                return Response({'error': 'Admin account must belong to an institution.'}, status=400)
-            entries = entries.filter(institution=profile.institution)
-
         course_code = request.query_params.get('course')
+        subjects = Subjects.objects.all().order_by('subject_code')
         if course_code:
-            entries = entries.filter(course_id=course_code)
+            subjects = subjects.filter(category=course_code)
 
-        serializer = InstitutionCourseCatalogSerializer(entries, many=True)
+        serializer = SubjectSerializer(subjects, many=True)
         return Response(serializer.data)
 
     def post(self, request):
-        profile = request.user.userprofile
-        institution = self.get_target_institution(request, required_for_superadmin=True)
-        if not institution:
-            message = (
-                'SuperAdmin must pass institution_id.'
-                if profile.role == 'SuperAdmin'
-                else 'Admin account must belong to an institution.'
-            )
-            return Response({'error': message}, status=status.HTTP_400_BAD_REQUEST)
-
-        serializer = InstitutionCourseCatalogSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-        subject = serializer.validated_data['subject']
-        if subject.owning_institution_id and subject.owning_institution_id != institution.id:
-            return Response(
-                {'subject': "A private subject can only be curated by its owning institution."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        try:
-            entry = serializer.save(institution=institution)
-        except ValidationError as exc:
-            return Response({'error': exc.messages}, status=status.HTTP_400_BAD_REQUEST)
-        except IntegrityError:
-            return Response(
-                {'error': 'This subject is already in that course catalog.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        subject = entry.subject
-        if not subject.category:
-            subject.category = entry.course_id
-            subject.save(update_fields=['category'])
-
+        serializer = SubjectSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        subject = serializer.save()
         PlatformActivity.objects.create(
             activity_type='admin_action',
-            message=f"Course catalog updated for {institution.institution_name}",
-            institution=institution,
+            message=f"Global subject added: {subject.subject_code}",
+            institution=request.user.userprofile.institution,
         )
-        return Response(InstitutionCourseCatalogSerializer(entry).data, status=status.HTTP_201_CREATED)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    def patch(self, request, pk=None):
+        subject = get_object_or_404(Subjects, pk=pk)
+        serializer = SubjectSerializer(subject, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
 
     def delete(self, request, pk=None):
-        profile = request.user.userprofile
-        entries = InstitutionCourseCatalog.objects.all()
-        if profile.role != 'SuperAdmin':
-            if not profile.institution_id:
-                return Response({'error': 'Admin account must belong to an institution.'}, status=400)
-            entries = entries.filter(institution=profile.institution)
-
-        entry = get_object_or_404(entries, pk=pk)
-        institution = entry.institution
-        entry.delete()
+        subject = get_object_or_404(Subjects, pk=pk)
+        subject_code = subject.subject_code
+        subject.delete()
         PlatformActivity.objects.create(
             activity_type='admin_action',
-            message=f"Course catalog entry removed for {institution.institution_name}",
-            institution=institution,
+            message=f"Global subject removed: {subject_code}",
+            institution=request.user.userprofile.institution,
         )
         return Response(status=status.HTTP_204_NO_CONTENT)
-
-
-class AdminCustomSubjectView(BaseAdminView):
-    permission_classes = [permissions.IsAuthenticated, IsSuperAdminUser]
-
-    def post(self, request):
-        profile = request.user.userprofile
-        institution = self.get_target_institution(request, required_for_superadmin=True)
-        if not institution:
-            message = (
-                'SuperAdmin must pass institution_id.'
-                if profile.role == 'SuperAdmin'
-                else 'Admin account must belong to an institution.'
-            )
-            return Response({'error': message}, status=status.HTTP_400_BAD_REQUEST)
-
-        subject_code = str(request.data.get('subject_code', '')).strip().upper()
-        subject_name = str(request.data.get('subject_name', '')).strip()
-        department = str(request.data.get('department', '')).strip()
-
-        if not subject_code or not subject_name or not department:
-            return Response(
-                {'error': 'subject_code, subject_name, and department are required.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        subject, created = Subjects.objects.get_or_create(
-            subject_code=subject_code,
-            defaults={
-                'subject_name': subject_name,
-                'department': department,
-                'category': request.data.get('category') or '',
-                'owning_institution': institution,
-            },
-        )
-        if not created:
-            return Response(
-                {'subject_code': 'A subject with this code already exists.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        PlatformActivity.objects.create(
-            activity_type='admin_action',
-            message=f"Custom subject added: {subject.subject_code}",
-            institution=institution,
-        )
-        return Response(SubjectSerializer(subject).data, status=status.HTTP_201_CREATED)
 
 
 class AdminPendingActionsView(APIView):
@@ -791,21 +622,6 @@ class AdminPendingActionsView(APIView):
                 'title': 'Institution pending activation',
                 'meta': f"{inst.institution_name} · added {timesince(inst.date_added)} ago",
                 'created_at': inst.date_added,
-            })
-
-        admin_requests = AdminAccountRequest.objects.filter(status='pending').select_related(
-            'institution',
-            'requesting_admin__user',
-            'target_user__user',
-        )
-        for req in admin_requests:
-            requester_email = req.requesting_admin.user.email
-            items.append({
-                'type': 'admin_account_request',
-                'id': req.id,
-                'title': 'Admin account request',
-                'meta': f"{req.institution.institution_name} · from {requester_email}",
-                'created_at': req.created_at,
             })
 
         partner_domains = {
@@ -839,9 +655,6 @@ class InstitutionRequestView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsSuperAdminUser]
 
     def get(self, request):
-        if request.user.userprofile.role != 'SuperAdmin':
-            return Response({'error': 'Only SuperAdmin can view institution requests.'}, status=status.HTTP_403_FORBIDDEN)
-
         queryset = InstitutionRequest.objects.all()
         status_filter = request.query_params.get('status')
         if status_filter:
@@ -863,9 +676,6 @@ class InstitutionRequestView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def patch(self, request, pk=None):
-        if request.user.userprofile.role != 'SuperAdmin':
-            return Response({'error': 'Only SuperAdmin can review institution requests.'}, status=status.HTTP_403_FORBIDDEN)
-
         institution_request = get_object_or_404(InstitutionRequest, pk=pk)
         action = str(request.data.get('action', '')).strip().lower()
         if action not in ('approve', 'reject'):
@@ -905,92 +715,7 @@ class InstitutionRequestView(APIView):
         return Response(serializer.data)
 
 
-class AdminAccountRequestView(APIView):
-    permission_classes = [permissions.IsAuthenticated, IsSuperAdminUser]
-
-    def get(self, request):
-        if request.user.userprofile.role != 'SuperAdmin':
-            return Response({'error': 'Only SuperAdmin can view admin account requests.'}, status=status.HTTP_403_FORBIDDEN)
-
-        queryset = AdminAccountRequest.objects.select_related(
-            'requesting_admin__user',
-            'institution',
-            'target_user__user',
-        ).all()
-        status_filter = request.query_params.get('status')
-        if status_filter:
-            queryset = queryset.filter(status=status_filter)
-
-        serializer = AdminAccountRequestSerializer(queryset, many=True)
-        return Response(serializer.data)
-
-    def post(self, request):
-        actor = request.user.userprofile
-        data = request.data.copy()
-
-        if actor.role == 'Admin':
-            if not actor.institution:
-                return Response({'error': 'Admin account must belong to an institution.'}, status=status.HTTP_400_BAD_REQUEST)
-            data['institution'] = actor.institution_id
-
-        serializer = AdminAccountRequestSerializer(data=data)
-        if serializer.is_valid():
-            serializer.save(requesting_admin=actor)
-            PlatformActivity.objects.create(
-                activity_type='admin_action',
-                message=f"Admin account request submitted for {serializer.instance.institution.institution_name}",
-                institution=serializer.instance.institution
-            )
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    def patch(self, request, pk=None):
-        if request.user.userprofile.role != 'SuperAdmin':
-            return Response({'error': 'Only SuperAdmin can review admin account requests.'}, status=status.HTTP_403_FORBIDDEN)
-
-        admin_request = get_object_or_404(
-            AdminAccountRequest.objects.select_related('institution', 'target_user'),
-            pk=pk
-        )
-        action = str(request.data.get('action', '')).strip().lower()
-        if action not in ('approve', 'reject'):
-            return Response({'error': "Action must be 'approve' or 'reject'."}, status=status.HTTP_400_BAD_REQUEST)
-
-        if admin_request.status != 'pending':
-            return Response({'error': 'Only pending requests can be reviewed.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        target_user_id = request.data.get('target_user_id') or request.data.get('target_user')
-        if target_user_id:
-            admin_request.target_user = get_object_or_404(UserProfile, pk=target_user_id)
-
-        if action == 'approve' and not admin_request.target_user:
-            return Response({'error': 'target_user_id is required to approve an admin request.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        with transaction.atomic():
-            admin_request.status = 'approved' if action == 'approve' else 'rejected'
-            admin_request.reviewed_at = timezone.now()
-            admin_request.save(update_fields=['status', 'target_user', 'reviewed_at'])
-
-            if action == 'approve':
-                target = admin_request.target_user
-                target.role = 'Admin'
-                target.institution = admin_request.institution
-                target.save(update_fields=['role', 'institution', 'updated_at'])
-                message = f"Admin account approved: {target.fname} {target.lname}"
-            else:
-                message = f"Admin account request rejected for {admin_request.institution.institution_name}"
-
-            PlatformActivity.objects.create(
-                activity_type='admin_action',
-                message=message[:255],
-                institution=admin_request.institution
-            )
-
-        serializer = AdminAccountRequestSerializer(admin_request)
-        return Response(serializer.data)
-
-
-class AdminAnalyticsView(BaseAdminView):
+class AdminAnalyticsView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsSuperAdminUser]
 
     def get(self, request):
@@ -1003,24 +728,18 @@ class AdminAnalyticsView(BaseAdminView):
         labels = []
         session_counts = []
 
-        profile = request.user.userprofile
         qs_bookings = Booking.objects.all()
         qs_tutors = Tutor.objects.all()
 
-        if profile.role != 'SuperAdmin':
-            inst = profile.institution
-            qs_bookings = qs_bookings.filter(tutor__profile__institution=inst)
-            qs_tutors = qs_tutors.filter(profile__institution=inst)
-        else:
-            # SuperAdmin can optionally filter by a specific institution
-            institution_id = request.query_params.get('institution_id')
-            if institution_id:
-                try:
-                    inst = PartnerInstitution.objects.get(pk=institution_id)
-                    qs_bookings = qs_bookings.filter(tutor__profile__institution=inst)
-                    qs_tutors = qs_tutors.filter(profile__institution=inst)
-                except PartnerInstitution.DoesNotExist:
-                    pass
+        # SuperAdmin can optionally filter by a specific institution.
+        institution_id = request.query_params.get('institution_id')
+        if institution_id:
+            try:
+                inst = PartnerInstitution.objects.get(pk=institution_id)
+                qs_bookings = qs_bookings.filter(tutor__profile__institution=inst)
+                qs_tutors = qs_tutors.filter(profile__institution=inst)
+            except PartnerInstitution.DoesNotExist:
+                pass
 
         if days is None:
             earliest = qs_bookings.order_by('session_date').values_list('session_date', flat=True).first()
@@ -1102,7 +821,7 @@ class AdminAnalyticsView(BaseAdminView):
         })
 
 
-class AdminAnalyticsExportView(BaseAdminView):
+class AdminAnalyticsExportView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsSuperAdminUser]
 
     def get(self, request):
@@ -1113,15 +832,11 @@ class AdminAnalyticsExportView(BaseAdminView):
 
         days = ANALYTICS_PERIODS[period]
         start_date = None if days is None else today - timedelta(days=days - 1)
-        profile = request.user.userprofile
         institutions = PartnerInstitution.objects.all().order_by('institution_name')
 
-        if profile.role != 'SuperAdmin':
-            institutions = institutions.filter(pk=profile.institution_id)
-        else:
-            institution_id = request.query_params.get('institution_id')
-            if institution_id:
-                institutions = institutions.filter(pk=institution_id)
+        institution_id = request.query_params.get('institution_id')
+        if institution_id:
+            institutions = institutions.filter(pk=institution_id)
 
         response = HttpResponse(content_type='text/csv')
         response['Content-Disposition'] = 'attachment; filename="studybuddy-analytics.csv"'
@@ -1232,7 +947,7 @@ class SuperAdminInstitutionPerformanceView(APIView):
         return Response(data)
 
 
-class AdminTutorApplicationListView(BaseAdminView):
+class AdminTutorApplicationListView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsSuperAdminUser]
 
     def get(self, request):
@@ -1243,8 +958,7 @@ class AdminTutorApplicationListView(BaseAdminView):
         # a cached renewal (id/status/timestamps plus the file fields and rejection_reason it
         # surfaces as latest_document_renewal_*), so accessing them doesn't trigger a deferred-field
         # fetch per row either.
-        application_queryset = self.get_queryset_for_user(
-            request,
+        application_queryset = (
             TutorApplication.objects.select_related(
                 'profile__user', 'profile__institution'
             ).prefetch_related(
@@ -1256,17 +970,14 @@ class AdminTutorApplicationListView(BaseAdminView):
                     ),
                     to_attr='renewal_reviews_cache',
                 )
-            ).all(),
-            user_path='profile'
+            ).all()
         )
-        renewal_queryset = self.get_queryset_for_user(
-            request,
+        renewal_queryset = (
             TutorDocumentRenewalReview.objects.select_related(
                 'profile__user',
                 'profile__institution',
                 'application',
-            ).all(),
-            user_path='profile'
+            ).all()
         )
 
         if status_filter:
@@ -1301,18 +1012,18 @@ class AdminTutorApplicationListView(BaseAdminView):
         return Response(combined)
 
 
-class AdminTutorApplicationDetailView(BaseAdminView):
+class AdminTutorApplicationDetailView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsSuperAdminUser]
 
     def get(self, request, pk):
-        queryset = self.get_queryset_for_user(request, TutorApplication.objects.all(), user_path='profile')
+        queryset = TutorApplication.objects.all()
         application = get_object_or_404(queryset, pk=pk)
         serializer = TutorApplicationSerializer(application, context={'request': request})
         return Response(serializer.data)
 
     @transaction.atomic
     def patch(self, request, pk):
-        queryset = self.get_queryset_for_user(request, TutorApplication.objects.all(), user_path='profile')
+        queryset = TutorApplication.objects.all()
         application = get_object_or_404(queryset.select_for_update(), pk=pk)
 
         new_status = request.data.get('application_status')
@@ -1343,18 +1054,16 @@ class AdminTutorApplicationDetailView(BaseAdminView):
         return Response({"message": f"Application {new_status} successfully."})
 
 
-class AdminTutorDocumentRenewalDetailView(BaseAdminView):
+class AdminTutorDocumentRenewalDetailView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsSuperAdminUser]
 
     def get(self, request, pk):
-        queryset = self.get_queryset_for_user(
-            request,
+        queryset = (
             TutorDocumentRenewalReview.objects.select_related(
                 'application',
                 'profile__user',
                 'profile__institution',
-            ).all(),
-            user_path='profile'
+            ).all()
         )
         renewal = get_object_or_404(queryset, pk=pk)
         serializer = TutorDocumentRenewalReviewSerializer(renewal, context={'request': request})
@@ -1362,11 +1071,7 @@ class AdminTutorDocumentRenewalDetailView(BaseAdminView):
 
     @transaction.atomic
     def patch(self, request, pk):
-        queryset = self.get_queryset_for_user(
-            request,
-            TutorDocumentRenewalReview.objects.select_related('application', 'profile').all(),
-            user_path='profile'
-        )
+        queryset = TutorDocumentRenewalReview.objects.select_related('application', 'profile').all()
         renewal = get_object_or_404(queryset.select_for_update(), pk=pk)
 
         new_status = request.data.get('application_status')
@@ -1407,7 +1112,7 @@ class AdminTutorDocumentRenewalDetailView(BaseAdminView):
         return Response({"message": f"Document renewal {new_status} successfully."})
 
 
-class AdminTuteeApplicationListView(BaseAdminView):
+class AdminTuteeApplicationListView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsSuperAdminUser]
 
     def get(self, request):
@@ -1418,8 +1123,7 @@ class AdminTuteeApplicationListView(BaseAdminView):
         # a cached renewal (id/status/timestamps plus the file fields and rejection_reason it
         # surfaces as latest_document_renewal_*), so accessing them doesn't trigger a deferred-field
         # fetch per row either.
-        application_queryset = self.get_queryset_for_user(
-            request,
+        application_queryset = (
             TuteeApplication.objects.select_related(
                 'profile__user', 'profile__institution'
             ).prefetch_related(
@@ -1431,17 +1135,14 @@ class AdminTuteeApplicationListView(BaseAdminView):
                     ),
                     to_attr='renewal_reviews_cache',
                 )
-            ).all(),
-            user_path='profile'
+            ).all()
         )
-        renewal_queryset = self.get_queryset_for_user(
-            request,
+        renewal_queryset = (
             TuteeDocumentRenewalReview.objects.select_related(
                 'profile__user',
                 'profile__institution',
                 'application',
-            ).all(),
-            user_path='profile'
+            ).all()
         )
 
         if status_filter:
@@ -1475,18 +1176,18 @@ class AdminTuteeApplicationListView(BaseAdminView):
         return Response(combined)
 
 
-class AdminTuteeApplicationDetailView(BaseAdminView):
+class AdminTuteeApplicationDetailView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsSuperAdminUser]
 
     def get(self, request, pk):
-        queryset = self.get_queryset_for_user(request, TuteeApplication.objects.all(), user_path='profile')
+        queryset = TuteeApplication.objects.all()
         application = get_object_or_404(queryset, pk=pk)
         serializer = TuteeApplicationSerializer(application, context={'request': request})
         return Response(serializer.data)
 
     @transaction.atomic
     def patch(self, request, pk):
-        queryset = self.get_queryset_for_user(request, TuteeApplication.objects.all(), user_path='profile')
+        queryset = TuteeApplication.objects.all()
         application = get_object_or_404(queryset.select_for_update(), pk=pk)
 
         new_status = request.data.get('application_status')
@@ -1516,18 +1217,16 @@ class AdminTuteeApplicationDetailView(BaseAdminView):
         return Response({"message": f"Application {new_status} successfully."})
 
 
-class AdminTuteeDocumentRenewalDetailView(BaseAdminView):
+class AdminTuteeDocumentRenewalDetailView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsSuperAdminUser]
 
     def get(self, request, pk):
-        queryset = self.get_queryset_for_user(
-            request,
+        queryset = (
             TuteeDocumentRenewalReview.objects.select_related(
                 'application',
                 'profile__user',
                 'profile__institution',
-            ).all(),
-            user_path='profile'
+            ).all()
         )
         renewal = get_object_or_404(queryset, pk=pk)
         serializer = TuteeDocumentRenewalReviewSerializer(renewal, context={'request': request})
@@ -1535,11 +1234,7 @@ class AdminTuteeDocumentRenewalDetailView(BaseAdminView):
 
     @transaction.atomic
     def patch(self, request, pk):
-        queryset = self.get_queryset_for_user(
-            request,
-            TuteeDocumentRenewalReview.objects.select_related('application', 'profile').all(),
-            user_path='profile'
-        )
+        queryset = TuteeDocumentRenewalReview.objects.select_related('application', 'profile').all()
         renewal = get_object_or_404(queryset.select_for_update(), pk=pk)
 
         new_status = request.data.get('application_status')

@@ -1,6 +1,4 @@
-from django.db.models import Q
-
-from .models import InstitutionCourseCatalog, Preference, Subjects, TutorSubjects
+from .models import Preference, Subjects, TutorSubjects
 
 COURSE_CODE_GROUPS = (
     {"STEM", "SHS-STEM"},
@@ -23,17 +21,12 @@ def equivalent_course_codes(course_code):
 
 
 def recognized_subject_codes_for_profile(profile, course_code=None):
-    institution = getattr(profile, "institution", None)
     course_codes = equivalent_course_codes(course_code or getattr(profile, "course_id", None))
-
-    if not institution or not course_codes:
+    if not course_codes:
         return set()
 
     return set(
-        InstitutionCourseCatalog.objects.filter(
-            institution=institution,
-            course__course_code__in=course_codes,
-        ).values_list("subject_id", flat=True)
+        Subjects.objects.filter(category__in=course_codes).values_list("subject_code", flat=True)
     )
 
 
@@ -55,15 +48,7 @@ def current_subject_codes_for_profile(profile):
 
 
 def visible_subject_queryset_for_profile(profile):
-    institution = getattr(profile, "institution", None)
-    queryset = Subjects.objects.select_related("owning_institution")
-
-    if institution is None:
-        return queryset.filter(owning_institution__isnull=True)
-
-    return queryset.filter(
-        Q(owning_institution__isnull=True) | Q(owning_institution=institution)
-    )
+    return Subjects.objects.all()
 
 
 def subject_selection_queryset_for_profile(profile, course_code=None, include_current=False):

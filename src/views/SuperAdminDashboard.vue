@@ -163,13 +163,11 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
 import { useHaptics } from '@/composables/useHaptics'
 import { useSuperAdminStore } from '@/stores/superadmin'
 import { useToastStore } from '@/stores/toast'
 
 const store = useSuperAdminStore()
-const router = useRouter()
 const toastStore = useToastStore()
 const { vibrate, patterns } = useHaptics()
 const actingKey = ref('')
@@ -268,10 +266,6 @@ async function handlePendingAction(item) {
       await store.toggleDomainExemption(item.id, true)
       toastStore.push('Domain exemption granted.')
       vibrate(patterns.medium)
-    } else if (item.type === 'admin_account_request') {
-      await store.fetchAdminAccountRequests(true)
-      router.push('/superadmin/users')
-      vibrate(patterns.medium)
     }
   } catch {
     toastStore.push('Unable to complete pending action.', 'error')
@@ -286,8 +280,6 @@ function getPendingMeta(type) {
       return { icon: 'bi-building-add', tone: 'pending-green', action: 'Approve' }
     case 'institution_activation':
       return { icon: 'bi-toggle-on', tone: 'pending-blue', action: 'Activate' }
-    case 'admin_account_request':
-      return { icon: 'bi-person-badge', tone: 'pending-purple', action: 'Assign' }
     case 'domain_exemption':
       return { icon: 'bi-shield-check', tone: 'pending-amber', action: 'Grant' }
     default:

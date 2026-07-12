@@ -10,7 +10,6 @@ export const useSuperAdminStore = defineStore('superadmin', () => {
   const analytics = ref(null)
   const pendingActions = ref({ count: 0, items: [] })
   const institutionRequests = ref([])
-  const adminAccountRequests = ref([])
 
   const loading = ref({
     stats: false,
@@ -20,7 +19,6 @@ export const useSuperAdminStore = defineStore('superadmin', () => {
     analytics: false,
     pendingActions: false,
     institutionRequests: false,
-    adminAccountRequests: false,
     export: false,
   })
 
@@ -32,7 +30,6 @@ export const useSuperAdminStore = defineStore('superadmin', () => {
     analytics: null,
     pendingActions: null,
     institutionRequests: null,
-    adminAccountRequests: null,
     export: null,
   })
 
@@ -268,52 +265,6 @@ export const useSuperAdminStore = defineStore('superadmin', () => {
     return res.data
   }
 
-  let adminAccountRequestsPromise = null
-  const fetchAdminAccountRequests = async (force = false) => {
-    if (adminAccountRequests.value.length && !force) return
-    if (adminAccountRequestsPromise) {
-      await adminAccountRequestsPromise
-      if (!force) return
-    }
-
-    loading.value.adminAccountRequests = true
-    error.value.adminAccountRequests = null
-
-    adminAccountRequestsPromise = (async () => {
-      try {
-        const res = await api.get('/admin/admin-account-requests/')
-        adminAccountRequests.value = res.data
-      } catch {
-        error.value.adminAccountRequests = 'Failed to load admin account requests.'
-      } finally {
-        loading.value.adminAccountRequests = false
-        adminAccountRequestsPromise = null
-      }
-    })()
-
-    return adminAccountRequestsPromise
-  }
-
-  const approveAdminAccountRequest = async (id, targetUserId) => {
-    const res = await api.patch(`/admin/admin-account-requests/${id}/`, {
-      action: 'approve',
-      target_user_id: targetUserId,
-    })
-    await Promise.all([
-      fetchAdminAccountRequests(true),
-      fetchPendingActions(true),
-      fetchUsers({}, true),
-      fetchStats(true),
-    ])
-    return res.data
-  }
-
-  const rejectAdminAccountRequest = async (id) => {
-    const res = await api.patch(`/admin/admin-account-requests/${id}/`, { action: 'reject' })
-    await Promise.all([fetchAdminAccountRequests(true), fetchPendingActions(true)])
-    return res.data
-  }
-
   const fetchAnalytics = async (institutionId = null, period = '30d') => {
     loading.value.analytics = true
     error.value.analytics = null
@@ -365,7 +316,6 @@ export const useSuperAdminStore = defineStore('superadmin', () => {
     analytics,
     pendingActions,
     institutionRequests,
-    adminAccountRequests,
     loading,
     error,
 
@@ -384,9 +334,6 @@ export const useSuperAdminStore = defineStore('superadmin', () => {
     fetchInstitutionRequests,
     approveInstitutionRequest,
     rejectInstitutionRequest,
-    fetchAdminAccountRequests,
-    approveAdminAccountRequest,
-    rejectAdminAccountRequest,
     fetchAnalytics,
     exportAnalyticsCsv,
   }

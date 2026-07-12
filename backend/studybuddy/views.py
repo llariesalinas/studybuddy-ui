@@ -1925,25 +1925,12 @@ class SubjectListView(ListAPIView):
     def get_queryset(self):
         user = self.request.user
         if not user.is_authenticated or not hasattr(user, 'userprofile'):
-            return Subjects.objects.select_related('owning_institution').filter(
-                owning_institution__isnull=True
-            )
+            return Subjects.objects.all()
 
         profile = user.userprofile
         catalog_scope = self.request.query_params.get('catalog_scope')
         course_code = self.request.query_params.get('course_code')
         include_current = self.request.query_params.get('include_current') in {'1', 'true', 'True'}
-
-        if profile.role == 'SuperAdmin' and self.request.query_params.get('institution_id'):
-            profile = UserProfile(
-                institution=get_object_or_404(
-                    PartnerInstitution,
-                    pk=self.request.query_params.get('institution_id')
-                ),
-                course=profile.course,
-                role=profile.role,
-                user=profile.user,
-            )
 
         if catalog_scope == 'all':
             return visible_subject_queryset_for_profile(profile)

@@ -5,8 +5,8 @@ subject/course catalog, and adds a per-tutor/per-tutee analytics drill-down to t
 list. Source spec: [`docs/specs/2026-07-12-admin-role-consolidation-design.md`](specs/2026-07-12-admin-role-consolidation-design.md).
 Also mirrored to GitHub Issues on the fork repo.
 
-Work the **frontier**: any ticket whose blockers are all done. After ticket 1 lands, the frontier
-opens to tickets 2, 3, 4, and 7 in parallel.
+Work the **frontier**: any ticket whose blockers are all done. Tickets 1, 2, 3, and 4 are done; the
+frontier is now tickets 5, 6 (both unblocked), and 7 (was already open).
 
 Mirrored to GitHub Issues on [RayDomD/studybuddy-ui](https://github.com/RayDomD/studybuddy-ui),
 labeled `ready-for-agent`, issue numbers noted per ticket below.
@@ -44,9 +44,9 @@ rebuilds those directly. Pure cleanup; no behavior change (`SuperAdmin` was alre
 
 **Model:** small
 
-- [ ] Institution-scoping helpers/branches removed from the admin view layer (excluding catalog
+- [x] Institution-scoping helpers/branches removed from the admin view layer (excluding catalog
       views).
-- [ ] Full existing admin test suite still green with no behavior change.
+- [x] Full existing admin test suite still green with no behavior change.
 
 ## Delete the admin-account-request workflow
 
@@ -60,9 +60,9 @@ untouched and still works.
 
 **Model:** small
 
-- [ ] Admin-account-request model, endpoint, and UI references deleted.
-- [ ] Institution-request workflow verified unchanged/still passing.
-- [ ] Any tests referencing the deleted workflow removed or updated.
+- [x] Admin-account-request model, endpoint, and UI references deleted.
+- [x] Institution-request workflow verified unchanged/still passing.
+- [x] Any tests referencing the deleted workflow removed or updated.
 
 ## Global subject/course catalog
 
@@ -76,13 +76,13 @@ institution picker.
 
 **Model:** mid
 
-- [ ] Migration drops the per-institution course-catalog table and the per-institution
+- [x] Migration drops the per-institution course-catalog table and the per-institution
       subject-ownership field.
-- [ ] Catalog management views reworked into a single global subject/course CRUD surface
+- [x] Catalog management views reworked into a single global subject/course CRUD surface
       (list/add/edit/remove), no institution selector.
-- [ ] `APITestCase` coverage: catalog endpoint has no institution scoping and the dropped table is
+- [x] `APITestCase` coverage: catalog endpoint has no institution scoping and the dropped table is
       gone.
-- [ ] Manual check: a subject previously private to one institution is now visible platform-wide.
+- [x] Manual check: a subject previously private to one institution is now visible platform-wide.
 
 ## Update demo-data reset for the new role/catalog model
 

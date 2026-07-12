@@ -26,8 +26,8 @@ from .views import(
                     get_tutor_profile
                    )
 from .admin_views import (
-    AdminAccountRequestView, AdminAnalyticsExportView,
-    AdminCourseCatalogView, AdminCustomSubjectView,
+    AdminAnalyticsExportView,
+    AdminCourseCatalogView,
     AdminStatsView, AdminWithdrawalListView, AdminWithdrawalDetailView,
     AdminUserListView, AdminInstitutionView, AdminAnalyticsView,
     AdminPendingActionsView, InstitutionRequestView,
@@ -57,8 +57,7 @@ urlpatterns = [
     path('admin/users/<int:pk>/', AdminUserListView.as_view()),
     path('admin/users/<int:pk>/verification-dev-tools/', AdminUserVerificationDevToolsView.as_view()),
     path('admin/course-catalog/', AdminCourseCatalogView.as_view()),
-    path('admin/course-catalog/<int:pk>/', AdminCourseCatalogView.as_view()),
-    path('admin/subjects/custom/', AdminCustomSubjectView.as_view()),
+    path('admin/course-catalog/<str:pk>/', AdminCourseCatalogView.as_view()),
     path('admin/institutions/', AdminInstitutionView.as_view()),
     path('admin/institutions/<int:pk>/', AdminInstitutionView.as_view()),
     path('admin/institutions/performance/', SuperAdminInstitutionPerformanceView.as_view()),
@@ -67,8 +66,6 @@ urlpatterns = [
     path('admin/pending-actions/', AdminPendingActionsView.as_view()),
     path('admin/institution-requests/', InstitutionRequestView.as_view()),
     path('admin/institution-requests/<int:pk>/', InstitutionRequestView.as_view()),
-    path('admin/admin-account-requests/', AdminAccountRequestView.as_view()),
-    path('admin/admin-account-requests/<int:pk>/', AdminAccountRequestView.as_view()),
     path('admin/support/tickets/', views.admin_list_tickets),
     path('admin/support/tickets/<int:ticket_id>/claim/', views.admin_claim_ticket),
     path('admin/support/tickets/<int:ticket_id>/escalate/', views.admin_escalate_ticket),
