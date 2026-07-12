@@ -10,8 +10,10 @@ spec: ../specs/2026-07-12-admin-role-consolidation-design.md
 
 ## Status & Progress Summary
 
-**Status:** In Progress — tickets split (`docs/tickets.md`, mirrored to GitHub Issues #1-8 on the
-fork); orchestrated implementation run started 2026-07-13.
+**Status:** In Progress — ticket 1 (Admin-to-SuperAdmin conversion, migration 0072, permission
+tightening) shipped and committed on `feat/admin-role-consolidation`; tickets 2-8 hand off to the
+Codex CLI per user direction. Frontier: tickets 2, 3, 4, 7. Run summary:
+`docs/session-summaries/2026-07-13-admin-role-consolidation-run-summary.md`.
 
 ## Goal
 
@@ -90,3 +92,8 @@ removal work. Full rationale and every decision are recorded in the spec
 - 2026-07-13: Status moved to In Progress — tickets split into `docs/tickets.md` (mirrored as
   GitHub Issues #1-8 on the fork) and an `/orchestrate` run started on branch
   `feat/admin-role-consolidation`.
+- 2026-07-13 (later): Ticket 1 shipped — migration 0072 converts Admin rows to SuperAdmin,
+  `IsAdminUser` deleted, 17 admin views re-gated, role checks tightened; full suite verified
+  against the pre-existing baseline (289 tests, no new failures). Orchestrate run ended early by
+  user direction; tickets 2-8 hand off to Codex. Run summary:
+  `docs/session-summaries/2026-07-13-admin-role-consolidation-run-summary.md`.
