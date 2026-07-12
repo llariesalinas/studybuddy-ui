@@ -58,6 +58,9 @@ PROJECT_HANDOFF_DUMP.md
 # graphify knowledge-graph output (regeneratable local cache/index)
 graphify-out/
 
+# ui-preview mockup sessions (working files; decided mockups are promoted to docs/mockups/)
+docs/mockups/sessions/
+
 # Specific local files to ignore
 Algorithm Improvements documentation.md
 src/views/*.zip
