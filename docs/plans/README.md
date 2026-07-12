@@ -3,13 +3,13 @@
 Every finalized plan lives in this folder as its own dated file, created from [`_template.md`](_template.md).
 Status moves Draft â†’ Approved â†’ In Progress â†’ Done. When a plan is complete, its summary is linked below.
 
-**Status & Progress Summary** (2026-07-08): Booking subject persistence (Codex handoff) is
-Approved — root cause diagnosed via systematic debugging: `Booking` has no field for which
-`Subjects` row was actually booked, so session details and notifications fall back to showing
-the tutor's course/program instead. Fix adds a nullable `Booking.subject` FK, sends the tutee's
-chosen subject on `bookings/confirm/`, fixes the two display/notification call sites, and updates
-both `seed_data.py` and `reset_demo_data.py` to seed a real subject per booking. Handed off as a
-self-contained spec for Codex CLI; nothing implemented yet. Face-to-face campus location modal is Approved — grilled
+**Status & Progress Summary** (2026-07-08): Booking subject persistence (Codex handoff) is Done —
+added a nullable protected `Booking.subject` FK, persisted and displayed the tutee's selected
+catalog subject across booking confirmation, notifications, dashboard/request payloads, and
+session details, covered the behavior with backend tests, and updated both seed commands to give
+demo bookings real tutor-taught subjects; the review follow-up centralized the shared error and
+fallback-label logic — [Summary](../session-summaries/2026-07-08-booking-subject-persistence-summary.md).
+Face-to-face campus location modal is Approved — grilled
 end-to-end (9 decisions) via `/grill-with-docs`: selecting Face-to-face mode opens a popup modal for
 Inside/Outside Campus, Outside Campus gates behind a liability-acknowledgment confirm modal before the
 existing free-text location field appears, applies to both `InitialBooking.vue` and `FindTutors.vue`
@@ -47,6 +47,7 @@ pattern); spec approved, implementation just starting.
 | Date | Plan | Status | Summary |
 |------|------|--------|---------|
 | 2026-07-08 | [Algorithm Demo — Live Rating Edit](2026-07-08-algorithm-demo-live-rating-edit.md) | In Progress | Dev-only inline rating edit in Compare Pair's neighbor list, new staff-only PATCH endpoint, refetch-and-reanimate on save — [Spec](../specs/2026-07-08-algorithm-demo-live-rating-edit-design.md) |
+| 2026-07-08 | [Codex Handoff — Persist the Booked Subject on Booking](2026-07-08-booking-subject-persistence-codex-handoff.md) | Done | Persists the selected catalog subject on each booking, displays it across session surfaces with a `General` fallback, and seeds realistic demo subjects; follow-up centralized duplicated error and label logic — [Summary](../session-summaries/2026-07-08-booking-subject-persistence-summary.md) |
 | 2026-07-07 | [Face-to-face campus location modal](2026-07-07-face-to-face-campus-location-modal.md) | Approved | Grilled Inside/Outside Campus choice + off-campus liability confirm modal for `InitialBooking.vue` and `FindTutors.vue`; not yet implemented — [ADR-0007](../adr/0007-off-campus-liability-acknowledgment-not-persisted.md) |
 | 2026-07-07 | [Re-enable cash payments + tutor debt banner](2026-07-07-reenable-cash-payments.md) | Done | Implemented (Steps A–G), audited, and verified against local PostgreSQL (not Supabase); fixed a hardcoded color, a broken negative-balance demo persona, and a pre-existing test the new enforcement silently broke; 25/25 relevant tests pass, `reset_demo_data` confirmed Miguel lands at exactly PHP -75.00 — [Summary](../session-summaries/2026-07-07-reenable-cash-payments-summary.md) |
 | 2026-07-07 | [Seed data year_level scale fix](2026-07-07-seed-data-year-level-scale-fix.md) | Approved | Pending |
@@ -132,6 +133,7 @@ Entries marked Done&ast; predate the session-summary convention; their status is
 
 | Date | Change |
 |------|--------|
+| 2026-07-08 | Completed booking-subject-persistence review follow-ups by extracting the shared subject error and display-label helper; added the session summary and marked the plan Done |
 | 2026-07-05 | Added institution course catalog plan (Approved) from spec `2026-07-05-institution-course-catalog-design.md` so the work can be tracked before implementation |`n| 2026-07-05 | Implemented institution course catalog; marked plan Done and linked summary |
 | 2026-07-05 | Grilled the demo data reset end-to-end (19 decisions, plus domain-modeling pass over CONTEXT.md and code cross-reference); added the Approved plan and corrected the stale Payout Destination/TutorPayoutAccount glossary entry |
 | 2026-07-05 | Implemented and verified the demo data reset; fixed a cluster-design bug found during manual verification; full backend suite matched the documented pre-existing baseline; marked the plan Done and linked the summary |

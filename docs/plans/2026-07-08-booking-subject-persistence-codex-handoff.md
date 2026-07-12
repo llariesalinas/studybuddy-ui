@@ -1,3 +1,10 @@
+---
+title: Codex Handoff — Persist the Booked Subject on Booking
+date: 2026-07-08
+status: Done
+summary: Persists the selected catalog subject on bookings and displays it across session surfaces, with realistic seeded subjects and centralized fallback/error logic.
+---
+
 # Codex Handoff — Persist the Booked Subject on Booking
 
 ## Status & Progress Summary
