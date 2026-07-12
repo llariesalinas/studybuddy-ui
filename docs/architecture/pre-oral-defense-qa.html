@@ -402,6 +402,7 @@
     <a href="#obj4">4. Compensation</a>
     <a href="#obj5">5. Reporting</a>
     <a href="#safety">Student safety</a>
+    <a href="#coding">Coding Q&amp;A</a>
     <a href="#architecture">Architecture</a>
     <a href="#security">Security</a>
     <a href="#testing">Testing</a>
@@ -854,6 +855,119 @@
         <p class="q">Given tutees can be Senior High School students, how do you handle minors?</p>
         <p class="a">Candidly: we don't yet. There's no birthdate or age field anywhere in the user profile, and no parental or guardian consent flow. This is a genuine, clean gap rather than a partially-built feature, and it's worth naming directly if asked rather than implying age verification exists in some other form.</p>
         <p class="a-short"><strong>30-second answer:</strong> We do not have a proper minors flow yet, and we should answer that honestly if asked.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="section" id="coding">
+    <div class="section-head">
+      <h2>Coding Questions &amp; Logic Deep-Dives</h2>
+      <span class="section-note">supplement &mdash; likely "explain this code" questions</span>
+    </div>
+
+    <div class="topic">
+      <h3>Hybrid recommender internals (Objective 2)</h3>
+
+      <div class="qa">
+        <p class="q">Do the five CBF sub-score weights actually add up to a usable total?</p>
+        <p class="a">Yes &mdash; <code style="font-family:var(--font-mono);font-size:13px;">W_SUBJECT (0.35) + W_EXPERTISE (0.20) + W_COURSE (0.20) + W_YEAR (0.15) + W_LEVEL (0.10) = 1.0</code>. Each sub-score is normalized into a 0&ndash;1 range before it's weighted (expertise, for example, is divided by 5, the max expertise level), so a tutor who is a perfect match on every dimension caps out at a CBF score of exactly 1.0, never higher.</p>
+        <p class="a-short"><strong>30-second answer:</strong> All five parts of the profile-match score add up to exactly 1, so a perfect match tops out at 1 and nothing can score above that.</p>
+        <details class="evidence">
+          <summary>Evidence</summary>
+          <div class="ev-body">backend/studybuddy/recommender/cbf.py &mdash; W_SUBJECT, W_EXPERTISE, W_COURSE, W_YEAR, W_LEVEL, compute_cbf_breakdown()</div>
+        </details>
+      </div>
+
+      <div class="qa">
+        <p class="q">Why does the year-level sub-score use 1 / (1 + year_diff) instead of a simpler rule?</p>
+        <p class="a">It's a smooth decay curve chosen by design judgment, not learned or tuned: same year level scores 1.0, one year apart scores 0.5, three years apart scores 0.25. It never hits exactly zero, so a big year gap still counts for a little rather than disqualifying a tutor outright. Like the 0.7/0.3 hybrid split, this is a fixed constant we chose deliberately, not a value derived from data.</p>
+        <p class="a-short"><strong>30-second answer:</strong> The closer two students' year levels are, the higher this part of the score. Same year is a perfect match, and it fades gradually the further apart they are.</p>
+        <details class="evidence">
+          <summary>Evidence</summary>
+          <div class="ev-body">backend/studybuddy/recommender/cbf.py &mdash; s_year = 1 / (1 + year_diff)</div>
+        </details>
+      </div>
+
+      <div class="qa">
+        <p class="q">Walk through what the Pearson similarity function returns for two students who never rated the same tutor, or who rate everything identically.</p>
+        <p class="a">Two guarded edge cases in <code style="font-family:var(--font-mono);font-size:13px;">sim()</code>. First: if the two students share no co-rated tutor, the intersection set is empty and the function returns 0 immediately, before attempting any average or division. Second: if a student rated every co-rated tutor exactly the same way, their ratings have zero variance from their own average, which would otherwise make the denominator zero &mdash; there's an explicit check that returns 0 in that case instead of raising a divide-by-zero error.</p>
+        <p class="a-short"><strong>30-second answer:</strong> If two students never rated any of the same tutors, or one of them rates everything identically, the system just says they're not measurably similar, instead of crashing or guessing.</p>
+        <details class="evidence">
+          <summary>Evidence</summary>
+          <div class="ev-body">backend/studybuddy/recommender/CF.py &mdash; sim(), the "if not common: return 0" and "if den1 * den2 == 0: return 0" guards</div>
+        </details>
+      </div>
+
+      <div class="qa">
+        <p class="q">What actually happens in the code when a brand-new tutee with zero ratings gets a recommendation?</p>
+        <p class="a"><code style="font-family:var(--font-mono);font-size:13px;">compute_cf_breakdown()</code> checks whether the student's ID exists in the ratings dictionary at all; if not, it returns a Cold-Start result with <code style="font-family:var(--font-mono);font-size:13px;">score: None</code>. Back in <code style="font-family:var(--font-mono);font-size:13px;">hybrid_prediction()</code>, that <code style="font-family:var(--font-mono);font-size:13px;">None</code> is coerced to 0 before the final formula runs, so the hybrid score for that student is mathematically capped at 0.7 &times; CBF score &mdash; the CF term contributes nothing rather than crashing or being skipped.</p>
+        <p class="a-short"><strong>30-second answer:</strong> A brand-new student without rating history still gets recommendations &mdash; the system just leans entirely on profile fit until they build up ratings.</p>
+        <details class="evidence">
+          <summary>Evidence</summary>
+          <div class="ev-body">backend/studybuddy/recommender/CF.py &mdash; compute_cf_breakdown() cold_start check<br/>backend/studybuddy/recommender/hybrid.py &mdash; "if cf_score is None: cf_score = 0"</div>
+        </details>
+      </div>
+    </div>
+
+    <div class="topic">
+      <h3>Scheduling &amp; session grouping (Objective 3)</h3>
+
+      <div class="qa">
+        <p class="q">How does the system decide which booked time slots count as one single session?</p>
+        <p class="a">When a tutee submits a booking, every slot in that submission is passed through <code style="font-family:var(--font-mono);font-size:13px;">group_slot_requests()</code>, which walks the slots in order and checks two things against the previous slot: same calendar date, and the previous slot's end time (start time + 30 minutes, the fixed slot length) exactly equals the next slot's start time. If both hold, the two slots are folded into the same run; if there's any gap, or it's a different date, a new group starts. Each resulting run is assigned its own <code style="font-family:var(--font-mono);font-size:13px;">session_group_id</code> (a UUID). That group, not the individual 30-minute row, is the unit the rest of the system treats as "one session": one card in the UI, one slot against the tutor's workload cap, one accept/reject decision, one wallet credit.</p>
+        <p class="a-short"><strong>30-second answer:</strong> If a student books several time slots back-to-back on the same day, the system automatically treats them as one combined session instead of separate ones &mdash; so a 2-hour booking made of four 30-minute slots still shows up, gets accepted, and gets paid as a single session.</p>
+        <details class="evidence">
+          <summary>Evidence</summary>
+          <div class="ev-body">backend/studybuddy/views.py &mdash; group_slot_requests(), SESSION_SLOT_MINUTES = 30, session_group_id = uuid4()<br/>backend/studybuddy/views.py &mdash; get_session_group_bookings()<br/>backend/studybuddy/models.py &mdash; Booking.session_group_id</div>
+        </details>
+      </div>
+
+      <div class="qa">
+        <p class="q">The bookings model has both a booking_request_id and a session_group_id &mdash; isn't that redundant?</p>
+        <p class="a">No, they answer different questions. <code style="font-family:var(--font-mono);font-size:13px;">booking_request_id</code> is one UUID assigned to everything a tutee picked in a single booking submission, even if it's spread across unrelated days (say, Monday and Thursday in one request). <code style="font-family:var(--font-mono);font-size:13px;">session_group_id</code> is assigned per contiguous run inside that request, via <code style="font-family:var(--font-mono);font-size:13px;">group_slot_requests()</code>. So one booking request can contain more than one session group &mdash; the request is "what the tutee submitted together," the session group is "which of those slots are actually one back-to-back session."</p>
+        <p class="a-short"><strong>30-second answer:</strong> One ID tracks everything the student submitted in one go; the other tracks which of those slots are actually back-to-back and count as a single session. A single submission can contain more than one session.</p>
+        <details class="evidence">
+          <summary>Evidence</summary>
+          <div class="ev-body">backend/studybuddy/views.py &mdash; booking_request_id = uuid4() (per submission) vs. session_group_id = uuid4() per grouped run inside group_slot_requests()<br/>backend/studybuddy/views.py &mdash; get_booking_request_bookings() falls back to get_session_group_bookings()</div>
+        </details>
+      </div>
+    </div>
+
+    <div class="topic">
+      <h3>Compensation math (Objective 4)</h3>
+
+      <div class="qa">
+        <p class="q">Trace both commission code paths &mdash; why do they land on different numbers?</p>
+        <p class="a"><code style="font-family:var(--font-mono);font-size:13px;">credit_tutor_wallet()</code> is the function that actually moves money into a tutor's wallet when a session is marked Completed; it applies <code style="font-family:var(--font-mono);font-size:13px;">COMMISSION_RATE = Decimal('0.10')</code>. Two other call sites, inside payment-summary/estimate views, independently compute <code style="font-family:var(--font-mono);font-size:13px;">platform_fee = amount * 0.16</code> using plain floats instead of Decimal. These are two different hardcoded literals in two different places, not one shared constant read twice &mdash; confirmed directly in the source. If a panelist opens both screens side by side, the numbers won't match, and there isn't yet a documented reason they should differ.</p>
+        <p class="a-short"><strong>30-second answer:</strong> The real payout math uses a 10% commission. A separate estimate screen elsewhere currently shows 16%. Those two don't agree yet, and it's a known cleanup item, not something we're trying to hide.</p>
+        <details class="evidence">
+          <summary>Evidence</summary>
+          <div class="ev-body">backend/studybuddy/views.py:5164 &mdash; credit_tutor_wallet(), COMMISSION_RATE = Decimal('0.10')<br/>backend/studybuddy/views.py:1124, 2159 &mdash; platform_fee = amount_paid * 0.16</div>
+        </details>
+      </div>
+
+      <div class="qa">
+        <p class="q">What stops a duplicate webhook or retry from crediting a tutor's wallet twice for the same session?</p>
+        <p class="a">Before creating a new wallet transaction, <code style="font-family:var(--font-mono);font-size:13px;">credit_tutor_wallet()</code> builds a reference ID tied to that specific booking group and checks whether a Transaction with that reference ID already exists; if it does, the function returns immediately without crediting anything again.</p>
+        <p class="a-short"><strong>30-second answer:</strong> Before paying out, the system checks whether that exact payment was already recorded, so an accidental repeat can't pay a tutor twice for the same session.</p>
+        <details class="evidence">
+          <summary>Evidence</summary>
+          <div class="ev-body">backend/studybuddy/views.py &mdash; credit_tutor_wallet(), "if Transaction.objects.filter(reference_id=ref_id).exists(): return"</div>
+        </details>
+      </div>
+    </div>
+
+    <div class="topic">
+      <h3>Booking concurrency (Objective 3 / cross-cutting)</h3>
+
+      <div class="qa">
+        <p class="q">Show the exact mechanism, line by line, that stops two tutees from booking the same slot at the same moment.</p>
+        <p class="a">Inside <code style="font-family:var(--font-mono);font-size:13px;">confirm_payment_and_book()</code>, the whole booking creation happens inside <code style="font-family:var(--font-mono);font-size:13px;">transaction.atomic()</code>. The very first thing it does is fetch the specific <code style="font-family:var(--font-mono);font-size:13px;">TutorAvailability</code> row with <code style="font-family:var(--font-mono);font-size:13px;">.select_for_update()</code>, which takes a database row lock. If a second request for that same slot arrives while the first transaction is still open, the database makes it wait rather than letting both proceed. Once the first transaction commits, the lock releases, the second request re-checks the row, sees it's already booked, and is rejected cleanly. A unique database constraint on the availability/date pair is a second, independent backstop in case some other code path ever creates a booking without going through this locked view.</p>
+        <p class="a-short"><strong>30-second answer:</strong> The moment someone starts booking a time slot, the system puts a temporary lock on it. If a second student clicks at nearly the same instant, they're made to wait, and then told the slot is already taken &mdash; so two people can never end up booked into the same slot.</p>
+        <details class="evidence">
+          <summary>Evidence</summary>
+          <div class="ev-body">backend/studybuddy/views.py &mdash; confirm_payment_and_book(), TutorAvailability.objects.select_for_update()<br/>backend/studybuddy/models.py &mdash; Booking.Meta.constraints, unique_active_booking_per_slot_date</div>
+        </details>
       </div>
     </div>
   </div>

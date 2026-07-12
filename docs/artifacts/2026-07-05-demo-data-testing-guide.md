@@ -38,6 +38,14 @@ safe and produces the same personas (fixed random seed).
 | Paolo Ramirez (Tutor) | `paolo.ramirez@cpu.edu.ph` | Accepted Session Load 8/10 — still accepting |
 | Isabel Fernandez (Tutor) | `isabel.fernandez@cpu.edu.ph` | High earner: top-ups + withdrawals in every state |
 
+### Additional test accounts
+
+| Persona | Login |
+|---|---|
+| Shelby Waller (Tutor) | `tutor.shelby.waller.cpu67@cpu.edu.ph` |
+| Grace Domingo (Tutor) | `grace.domingo@cpu.edu.ph` |
+| Paolo Ramirez (Tutor) | `paolo.ramirez@cpu.edu.ph` |
+
 ## Objective 1 — Localized platform (institution scoping)
 
 1. Log in as `demo.admin@cpu.edu.ph` → the Admin dashboard shows only CPU tutors/tutees/sessions
