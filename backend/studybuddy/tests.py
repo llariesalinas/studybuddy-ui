@@ -1,3 +1,4 @@
+import csv
 import re
 from io import StringIO
 from datetime import date, time, timedelta
@@ -260,6 +261,307 @@ class SuperAdminRedesignApiTests(APITestCase):
         self.assertEqual(export_response.status_code, 200)
         self.assertEqual(export_response["Content-Type"], "text/csv")
         self.assertIn("date,institution,tutors,tutees,sessions,completion_rate,gross_revenue,commissions", export_response.content.decode())
+
+
+class SuperAdminUserDetailApiTests(APITestCase):
+    def setUp(self):
+        self.super_user = User.objects.create_user(
+            username="detail-superadmin",
+            email="detail-superadmin@studybuddy.test",
+            password="password",
+        )
+        UserProfile.objects.create(
+            user=self.super_user,
+            fname="Detail",
+            mname="",
+            lname="Admin",
+            role="SuperAdmin",
+            profile_completed=True,
+        )
+        self.tutee_user = User.objects.create_user(
+            username="detail-tutee",
+            email="detail-tutee@studybuddy.test",
+            password="password",
+        )
+        self.tutee_profile = UserProfile.objects.create(
+            user=self.tutee_user,
+            fname="Taylor",
+            mname="",
+            lname="Tutee",
+            role="Tutee",
+            profile_completed=True,
+        )
+        tutor_user = User.objects.create_user(
+            username="detail-tutor",
+            email="detail-tutor@studybuddy.test",
+            password="password",
+        )
+        self.tutor_profile = UserProfile.objects.create(
+            user=tutor_user,
+            fname="Robin",
+            mname="",
+            lname="Tutor",
+            role="Tutor",
+            profile_completed=True,
+        )
+        self.tutor = Tutor.objects.create(profile=self.tutor_profile)
+        self.subject = Subjects.objects.create(
+            subject_code="DETAIL101",
+            subject_name="Detail Testing",
+            department="Quality",
+        )
+        self.morning_availability = TutorAvailability.objects.create(
+            tutor=self.tutor,
+            day="Mon",
+            time_slot=time(9, 0),
+            is_active=True,
+        )
+        self.afternoon_availability = TutorAvailability.objects.create(
+            tutor=self.tutor,
+            day="Tue",
+            time_slot=time(14, 0),
+            is_active=True,
+        )
+        self.bookings = []
+        for offset in range(12):
+            self.bookings.append(
+                Booking.objects.create(
+                    student=self.tutee_profile,
+                    tutor=self.tutor,
+                    availability=(
+                        self.afternoon_availability if offset == 11 else self.morning_availability
+                    ),
+                    subject=self.subject,
+                    session_date=date(2026, 7, 1) + timedelta(days=offset),
+                    session_mode="Online",
+                    status="Completed",
+                )
+            )
+        self.client.force_authenticate(user=self.super_user)
+
+    def test_bookings_returns_most_recent_page_with_both_party_names(self):
+        response = self.client.get(
+            f"/api/admin/users/{self.tutee_profile.id}/bookings/"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["total"], 12)
+        self.assertEqual(response.data["page"], 1)
+        self.assertEqual(response.data["page_size"], 10)
+        self.assertEqual(len(response.data["results"]), 10)
+        self.assertEqual(response.data["results"][0]["id"], self.bookings[-1].id)
+        self.assertEqual(response.data["results"][0]["tutor_name"], "Robin Tutor")
+        self.assertEqual(response.data["results"][0]["tutee_name"], "Taylor Tutee")
+
+    def test_bookings_filters_inclusively_and_rejects_invalid_ranges(self):
+        url = f"/api/admin/users/{self.tutor_profile.id}/bookings/"
+        response = self.client.get(
+            url,
+            {"date_from": "2026-07-03", "date_to": "2026-07-05"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["total"], 3)
+        self.assertEqual(
+            [row["date"] for row in response.data["results"]],
+            ["2026-07-05", "2026-07-04", "2026-07-03"],
+        )
+
+        invalid_date = self.client.get(url, {"date_from": "not-a-date"})
+        reversed_range = self.client.get(
+            url,
+            {"date_from": "2026-07-05", "date_to": "2026-07-03"},
+        )
+        self.assertEqual(invalid_date.status_code, 400)
+        self.assertEqual(reversed_range.status_code, 400)
+
+    def test_bookings_export_matches_the_json_filter(self):
+        params = {"date_from": "2026-07-03", "date_to": "2026-07-05"}
+        json_response = self.client.get(
+            f"/api/admin/users/{self.tutee_profile.id}/bookings/",
+            params,
+        )
+        export_response = self.client.get(
+            f"/api/admin/users/{self.tutee_profile.id}/bookings/export/",
+            params,
+        )
+        csv_rows = list(csv.reader(StringIO(export_response.content.decode())))
+
+        self.assertEqual(export_response.status_code, 200)
+        self.assertEqual(export_response["Content-Type"], "text/csv")
+        self.assertEqual(
+            csv_rows[0],
+            ["date", "time", "subject", "tutor name", "tutee name", "mode", "status"],
+        )
+        self.assertEqual(len(csv_rows) - 1, json_response.data["total"])
+        self.assertEqual(csv_rows[1][0], json_response.data["results"][0]["date"])
+
+    def test_bookings_endpoints_forbid_non_superadmin_users(self):
+        self.client.force_authenticate(user=self.tutee_user)
+
+        response = self.client.get(
+            f"/api/admin/users/{self.tutee_profile.id}/bookings/"
+        )
+        export_response = self.client.get(
+            f"/api/admin/users/{self.tutee_profile.id}/bookings/export/"
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(export_response.status_code, 403)
+
+    def test_availability_returns_all_slots_with_state_and_booking_id(self):
+        inactive = TutorAvailability.objects.create(
+            tutor=self.tutor,
+            day="Wed",
+            time_slot=time(10, 0),
+            is_active=False,
+            is_booked=False,
+        )
+        booked = TutorAvailability.objects.create(
+            tutor=self.tutor,
+            day="Thu",
+            time_slot=time(11, 0),
+            is_active=True,
+            is_booked=True,
+        )
+        linked_booking = Booking.objects.create(
+            student=self.tutee_profile,
+            tutor=self.tutor,
+            availability=booked,
+            subject=self.subject,
+            session_date=date(2026, 8, 1),
+            session_mode="F2F",
+            status="Confirmed",
+        )
+
+        response = self.client.get(
+            f"/api/admin/users/{self.tutor_profile.id}/availability/"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        rows_by_id = {row["id"]: row for row in response.data}
+        self.assertEqual(len(rows_by_id), 4)
+        self.assertEqual(rows_by_id[self.morning_availability.id]["state"], "open")
+        self.assertEqual(rows_by_id[inactive.id]["state"], "inactive")
+        self.assertEqual(rows_by_id[booked.id]["state"], "booked")
+        self.assertEqual(rows_by_id[booked.id]["booking_id"], linked_booking.id)
+
+    def test_availability_rejects_tutees_and_exports_matching_rows(self):
+        tutee_response = self.client.get(
+            f"/api/admin/users/{self.tutee_profile.id}/availability/"
+        )
+        json_response = self.client.get(
+            f"/api/admin/users/{self.tutor_profile.id}/availability/"
+        )
+        export_response = self.client.get(
+            f"/api/admin/users/{self.tutor_profile.id}/availability/export/"
+        )
+        csv_rows = list(csv.reader(StringIO(export_response.content.decode())))
+
+        self.assertEqual(tutee_response.status_code, 400)
+        self.assertEqual(export_response.status_code, 200)
+        self.assertEqual(export_response["Content-Type"], "text/csv")
+        self.assertEqual(csv_rows[0], ["day", "time slot", "state", "booking id"])
+        self.assertEqual(len(csv_rows) - 1, len(json_response.data))
+
+    def test_tutor_stats_computes_ratings_subjects_cancellations_and_counterparts(self):
+        TutorSubjects.objects.create(
+            tutor=self.tutor,
+            subject=self.subject,
+            expertise_level=4,
+        )
+        for booking, score in zip(self.bookings[:5], [1, 3, 5, 5, 5]):
+            Rating.objects.create(
+                booking=booking,
+                student=self.tutee_profile,
+                tutor=self.tutor,
+                rating_score=score,
+                comment=f"Review {score}",
+            )
+
+        alpha_profile = self._create_tutee("Alpha", "Learner")
+        beta_profile = self._create_tutee("Beta", "Learner")
+        for profile, count in [(alpha_profile, 3), (beta_profile, 3)]:
+            for offset in range(count):
+                Booking.objects.create(
+                    student=profile,
+                    tutor=self.tutor,
+                    availability=self.morning_availability,
+                    subject=self.subject,
+                    session_date=date(2026, 9, 1) + timedelta(days=offset),
+                    session_mode="Online",
+                    status="Cancelled",
+                    cancelled_by_role="tutor" if offset == 0 else "tutee",
+                )
+
+        response = self.client.get(
+            f"/api/admin/users/{self.tutor_profile.id}/stats/"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(sum(response.data["rating_distribution"].values()), 5)
+        self.assertEqual(response.data["rating_distribution"]["5"], 3)
+        self.assertEqual(response.data["recent_reviews"][0]["reviewer_name"], "Taylor Tutee")
+        self.assertEqual(response.data["subjects"], [{"name": "Detail Testing", "expertise_level": 4}])
+        self.assertEqual(response.data["cancellations"], {"by_user": 2, "by_counterpart": 4})
+        self.assertEqual(
+            response.data["top_counterparts"],
+            [
+                {"name": "Taylor Tutee", "session_count": 12},
+                {"name": "Alpha Learner", "session_count": 3},
+                {"name": "Beta Learner", "session_count": 3},
+            ],
+        )
+
+    def test_tutee_stats_omits_tutor_only_rating_keys(self):
+        response = self.client.get(
+            f"/api/admin/users/{self.tutee_profile.id}/stats/"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("rating_distribution", response.data)
+        self.assertNotIn("recent_reviews", response.data)
+        self.assertEqual(response.data["subjects"], [{"name": "Detail Testing"}])
+        self.assertEqual(
+            response.data["top_counterparts"],
+            [{"name": "Robin Tutor", "session_count": 12}],
+        )
+
+    def test_stats_export_flattens_computed_values(self):
+        Rating.objects.create(
+            booking=self.bookings[0],
+            student=self.tutee_profile,
+            tutor=self.tutor,
+            rating_score=5,
+            comment="Clear explanation",
+        )
+
+        export_response = self.client.get(
+            f"/api/admin/users/{self.tutor_profile.id}/stats/export/"
+        )
+        csv_rows = list(csv.reader(StringIO(export_response.content.decode())))
+
+        self.assertEqual(export_response.status_code, 200)
+        self.assertEqual(export_response["Content-Type"], "text/csv")
+        self.assertEqual(csv_rows[0], ["stat name", "value"])
+        self.assertIn(["rating 5 stars", "1"], csv_rows)
+        self.assertIn(["counterpart 1", "Taylor Tutee (12 sessions)"], csv_rows)
+
+    def _create_tutee(self, first_name, last_name):
+        username = f"{first_name.lower()}-{last_name.lower()}"
+        user = User.objects.create_user(
+            username=username,
+            email=f"{username}@studybuddy.test",
+            password="password",
+        )
+        return UserProfile.objects.create(
+            user=user,
+            fname=first_name,
+            mname="",
+            lname=last_name,
+            role="Tutee",
+            profile_completed=True,
+        )
 
 
 class GlobalSubjectCatalogTests(APITestCase):

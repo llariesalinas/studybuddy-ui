@@ -8,8 +8,9 @@ from rest_framework import status, permissions
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.db import transaction
-from django.db.models import Avg, Count, Prefetch, Q, Sum
+from django.db.models import Avg, Count, OuterRef, Prefetch, Q, Subquery, Sum
 from django.utils import timezone
+from django.utils.dateparse import parse_date
 from django.utils.timesince import timesince
 from datetime import timedelta
 from .models import (
@@ -18,7 +19,7 @@ from .models import (
     PartnerInstitution, Wallet, Transaction, PlatformActivity,
     TutorApplication, TutorDocumentRenewalReview,
     TuteeApplication, TuteeDocumentRenewalReview, Payment,
-    TutorSubjects, Subjects, SupportTicket,
+    TutorSubjects, TutorAvailability, Rating, Subjects, SupportTicket,
     TUTOR_ACCEPTED_SESSION_LOAD_STATUSES
 )
 from .serializers import (
@@ -434,6 +435,326 @@ class AdminUserListView(APIView):
 
         user.delete() # This cascades to UserProfile
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+USER_BOOKINGS_PAGE_SIZE = 10
+USER_BOOKINGS_CSV_HEADERS = [
+    'date',
+    'time',
+    'subject',
+    'tutor name',
+    'tutee name',
+    'mode',
+    'status',
+]
+
+
+def _filtered_user_bookings(request, profile):
+    date_from_value = request.query_params.get('date_from')
+    date_to_value = request.query_params.get('date_to')
+    date_from = parse_date(date_from_value) if date_from_value else None
+    date_to = parse_date(date_to_value) if date_to_value else None
+
+    if (date_from_value and date_from is None) or (date_to_value and date_to is None):
+        return None, Response(
+            {'error': 'Dates must use YYYY-MM-DD format.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if date_from and date_to and date_from > date_to:
+        return None, Response(
+            {'error': 'date_from cannot be after date_to.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    bookings = (
+        Booking.objects.filter(Q(student=profile) | Q(tutor__profile=profile))
+        .select_related('availability', 'subject', 'student', 'tutor__profile')
+        .order_by('-session_date', '-availability__time_slot', '-id')
+    )
+    if date_from:
+        bookings = bookings.filter(session_date__gte=date_from)
+    if date_to:
+        bookings = bookings.filter(session_date__lte=date_to)
+    return bookings, None
+
+
+def _user_booking_row(booking):
+    return {
+        'id': booking.id,
+        'date': booking.session_date.isoformat(),
+        'time': booking.availability.time_slot.strftime('%H:%M'),
+        'subject': booking.subject.subject_name if booking.subject else 'General',
+        'tutor_name': f'{booking.tutor.profile.fname} {booking.tutor.profile.lname}'.strip(),
+        'tutee_name': f'{booking.student.fname} {booking.student.lname}'.strip(),
+        'mode': booking.session_mode,
+        'status': booking.status,
+    }
+
+
+class AdminUserBookingsView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsSuperAdminUser]
+
+    def get(self, request, pk):
+        profile = get_object_or_404(UserProfile, pk=pk)
+        bookings, error_response = _filtered_user_bookings(request, profile)
+        if error_response:
+            return error_response
+
+        try:
+            page = int(request.query_params.get('page', 1))
+        except (TypeError, ValueError):
+            return Response(
+                {'error': 'page must be a positive integer.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if page < 1:
+            return Response(
+                {'error': 'page must be a positive integer.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        total = bookings.count()
+        start = (page - 1) * USER_BOOKINGS_PAGE_SIZE
+        page_bookings = bookings[start:start + USER_BOOKINGS_PAGE_SIZE]
+        return Response({
+            'results': [_user_booking_row(booking) for booking in page_bookings],
+            'total': total,
+            'page': page,
+            'page_size': USER_BOOKINGS_PAGE_SIZE,
+        })
+
+
+class AdminUserBookingsExportView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsSuperAdminUser]
+
+    def get(self, request, pk):
+        profile = get_object_or_404(UserProfile, pk=pk)
+        bookings, error_response = _filtered_user_bookings(request, profile)
+        if error_response:
+            return error_response
+
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="bookings-{profile.id}.csv"'
+        writer = csv.writer(response)
+        writer.writerow(USER_BOOKINGS_CSV_HEADERS)
+        for booking in bookings:
+            row = _user_booking_row(booking)
+            writer.writerow([
+                row['date'],
+                row['time'],
+                row['subject'],
+                row['tutor_name'],
+                row['tutee_name'],
+                row['mode'],
+                row['status'],
+            ])
+        return response
+
+
+USER_AVAILABILITY_CSV_HEADERS = ['day', 'time slot', 'state', 'booking id']
+
+
+def _user_tutor_availability(profile):
+    if profile.role != 'Tutor':
+        return None, Response(
+            {'error': 'Availability is only available for tutors.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    tutor = get_object_or_404(Tutor, profile=profile)
+    booking_id = Booking.objects.filter(availability=OuterRef('pk')).order_by(
+        '-session_date', '-id'
+    ).values('id')[:1]
+    availability = (
+        TutorAvailability.objects.filter(tutor=tutor)
+        .annotate(linked_booking_id=Subquery(booking_id))
+        .order_by('time_slot', 'day', 'id')
+    )
+    return availability, None
+
+
+def _user_availability_row(slot):
+    if slot.is_active and slot.is_booked:
+        slot_state = 'booked'
+    elif not slot.is_active:
+        slot_state = 'inactive'
+    else:
+        slot_state = 'open'
+    return {
+        'id': slot.id,
+        'day': slot.day,
+        'time_slot': slot.time_slot.strftime('%H:%M'),
+        'state': slot_state,
+        'booking_id': slot.linked_booking_id if slot_state == 'booked' else None,
+    }
+
+
+class AdminUserAvailabilityView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsSuperAdminUser]
+
+    def get(self, request, pk):
+        profile = get_object_or_404(UserProfile, pk=pk)
+        availability, error_response = _user_tutor_availability(profile)
+        if error_response:
+            return error_response
+        return Response([_user_availability_row(slot) for slot in availability])
+
+
+class AdminUserAvailabilityExportView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsSuperAdminUser]
+
+    def get(self, request, pk):
+        profile = get_object_or_404(UserProfile, pk=pk)
+        availability, error_response = _user_tutor_availability(profile)
+        if error_response:
+            return error_response
+
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="availability-{profile.id}.csv"'
+        writer = csv.writer(response)
+        writer.writerow(USER_AVAILABILITY_CSV_HEADERS)
+        for slot in availability:
+            row = _user_availability_row(slot)
+            writer.writerow([
+                row['day'],
+                row['time_slot'],
+                row['state'],
+                row['booking_id'] or '',
+            ])
+        return response
+
+
+def _user_stats(profile):
+    if profile.role not in ('Tutor', 'Tutee'):
+        return None, Response(
+            {'error': 'Stats are only available for tutors and tutees.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    is_tutor = profile.role == 'Tutor'
+    if is_tutor:
+        tutor = get_object_or_404(Tutor, profile=profile)
+        bookings = Booking.objects.filter(tutor=tutor).select_related('student')
+        subjects = [
+            {
+                'name': tutor_subject.subject.subject_name,
+                'expertise_level': tutor_subject.expertise_level,
+            }
+            for tutor_subject in TutorSubjects.objects.filter(tutor=tutor)
+            .select_related('subject')
+            .order_by('subject__subject_name')
+        ]
+        counterpart_key = lambda booking: (
+            booking.student_id,
+            f'{booking.student.fname} {booking.student.lname}'.strip(),
+        )
+    else:
+        bookings = Booking.objects.filter(student=profile).select_related('tutor__profile')
+        subjects = [
+            {'name': name}
+            for name in bookings.exclude(subject=None)
+            .values_list('subject__subject_name', flat=True)
+            .distinct()
+            .order_by('subject__subject_name')
+        ]
+        counterpart_key = lambda booking: (
+            booking.tutor_id,
+            f'{booking.tutor.profile.fname} {booking.tutor.profile.lname}'.strip(),
+        )
+
+    user_role = profile.role.lower()
+    cancelled = bookings.filter(status='Cancelled')
+    cancellations = {
+        'by_user': cancelled.filter(cancelled_by_role=user_role).count(),
+        'by_counterpart': cancelled.exclude(cancelled_by_role=user_role).count(),
+    }
+
+    counterpart_counts = {}
+    for booking in bookings:
+        counterpart_id, counterpart_name = counterpart_key(booking)
+        count_key = (counterpart_id, counterpart_name)
+        counterpart_counts[count_key] = counterpart_counts.get(count_key, 0) + 1
+    top_counterparts = [
+        {'name': key[1], 'session_count': session_count}
+        for key, session_count in sorted(
+            counterpart_counts.items(),
+            key=lambda item: (-item[1], item[0][1].casefold()),
+        )[:3]
+    ]
+
+    data = {
+        'subjects': subjects,
+        'cancellations': cancellations,
+        'top_counterparts': top_counterparts,
+    }
+    if is_tutor:
+        rating_counts = {
+            item['rating_score']: item['count']
+            for item in Rating.objects.filter(tutor=tutor)
+            .values('rating_score')
+            .annotate(count=Count('id'))
+        }
+        data['rating_distribution'] = {
+            str(score): rating_counts.get(score, 0)
+            for score in range(1, 6)
+        }
+        data['recent_reviews'] = [
+            {
+                'score': rating.rating_score,
+                'comment': rating.comment,
+                'reviewer_name': f'{rating.student.fname} {rating.student.lname}'.strip(),
+            }
+            for rating in Rating.objects.filter(tutor=tutor)
+            .select_related('student')
+            .order_by('-created_at', '-id')[:5]
+        ]
+    return data, None
+
+
+class AdminUserStatsView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsSuperAdminUser]
+
+    def get(self, request, pk):
+        profile = get_object_or_404(UserProfile, pk=pk)
+        data, error_response = _user_stats(profile)
+        if error_response:
+            return error_response
+        return Response(data)
+
+
+class AdminUserStatsExportView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsSuperAdminUser]
+
+    def get(self, request, pk):
+        profile = get_object_or_404(UserProfile, pk=pk)
+        data, error_response = _user_stats(profile)
+        if error_response:
+            return error_response
+
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="stats-{profile.id}.csv"'
+        writer = csv.writer(response)
+        writer.writerow(['stat name', 'value'])
+        for subject in data['subjects']:
+            value = subject['name']
+            if 'expertise_level' in subject:
+                value = f"{value} (expertise {subject['expertise_level']})"
+            writer.writerow(['subject', value])
+        writer.writerow(['cancellations by user', data['cancellations']['by_user']])
+        writer.writerow(['cancellations by counterpart', data['cancellations']['by_counterpart']])
+        for index, counterpart in enumerate(data['top_counterparts'], start=1):
+            writer.writerow([
+                f'counterpart {index}',
+                f"{counterpart['name']} ({counterpart['session_count']} sessions)",
+            ])
+        for score, count in data.get('rating_distribution', {}).items():
+            writer.writerow([f'rating {score} stars', count])
+        for index, review in enumerate(data.get('recent_reviews', []), start=1):
+            writer.writerow([
+                f'recent review {index}',
+                f"{review['score']} stars - {review['reviewer_name']}: {review['comment']}",
+            ])
+        return response
 
 
 class AdminUserVerificationDevToolsView(APIView):
