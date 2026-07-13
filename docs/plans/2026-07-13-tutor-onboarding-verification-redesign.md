@@ -1,7 +1,7 @@
 ---
 title: Tutor onboarding & verification redesign
 date: 2026-07-13
-status: Approved
+status: In Progress
 summary: Removes the tutor route-lockout in favor of a tutee-style search-visibility gate, folds verification into one guided onboarding sequence with a skip option, and lets tutors propose subjects missing from the catalog for admin review alongside their application.
 spec: ../mockups/2026-07-13-tutor-onboarding-verification-redesign.html
 ---
@@ -12,19 +12,21 @@ spec: ../mockups/2026-07-13-tutor-onboarding-verification-redesign.html
 
 ## Status & Progress Summary
 
-**Status (2026-07-13): Approved — handed off for implementation.** Grilled end-to-end (13
-decisions) via `/grill-with-docs`, with an interactive HTML explainer (catalog-first + propose-new
-subject picker walkthrough) reviewed alongside the team. All gating, onboarding-sequence, and
-subject-proposal decisions are final. Both onboarding screens' visual design is now also decided —
+**Status (2026-07-14): In Progress — dispatched to Codex CLI.** Grilled end-to-end (13 decisions)
+via `/grill-with-docs`, with an interactive HTML explainer (catalog-first + propose-new subject
+picker walkthrough) reviewed alongside the team. All gating, onboarding-sequence, and
+subject-proposal decisions are final. Both onboarding screens' visual design is also decided —
 `ui-preview` mocked 3 directions each on the real Guided Rail shell/tokens: Step 2 (Subjects)
 picked **Direction B** (inline picker, no modal — separate from the existing `TutorProfile.vue`
 "Choose Subjects" modal, which is untouched), Step 3 (Verification) picked **Direction C**
 ("explain, then choose"). Both promoted to
-`docs/mockups/2026-07-13-tutor-onboarding-verification-redesign.html`. Also discovered during this
-pass: the reminder banner needs no new component — `src/components/VerificationBanner.vue` already
-handles this exact dismissible/tone-based pattern for two other cases, so this becomes a third
-content variant, not new UI. Only remaining open item: the banner's exact copy/tone (see Out of
-Scope). No code written yet.
+`docs/mockups/2026-07-13-tutor-onboarding-verification-redesign.html`. Also discovered: the
+reminder banner needs no new component — `src/components/VerificationBanner.vue` already handles
+this exact dismissible/tone-based pattern for two other cases, so this becomes a third content
+variant. Compiled into `docs/briefs/2026-07-14-tutor-onboarding-verification-redesign.md` for
+Codex CLI dispatch on a dedicated branch (`feat/tutor-onboarding-verification-redesign`); the brief
+instructs Codex to skip the full backend test suite (long-running) and run only its own new/targeted
+tests, leaving full-suite verification to `/codex-review`.
 
 ## Problem Statement
 
@@ -287,3 +289,10 @@ Design references:
   Direction B (inline, no modal) picked and added to the same promoted mockup file alongside Step 3.
   Onboarding screen visual design is now fully decided — only the reminder banner's exact copy/tone
   remains open.
+- 2026-07-14: Created dedicated branch `feat/tutor-onboarding-verification-redesign` (previous work
+  was sitting uncommitted on the unrelated `feat/admin-role-consolidation` branch) and committed the
+  plan/mockup docs there. Compiled the full spec into
+  `docs/briefs/2026-07-14-tutor-onboarding-verification-redesign.md` via `/codex-brief` for Codex
+  CLI dispatch, per user instruction explicitly telling Codex to skip the long-running full backend
+  test suite and only run its own new/targeted tests — full-suite verification deferred to
+  `/codex-review`. Status: In Progress.
