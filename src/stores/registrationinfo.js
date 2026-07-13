@@ -9,8 +9,6 @@ export const useRegistrationInfoStore = defineStore('newUserInfo', () => {
   const newUserPassword = ref('')
   const newUserType = ref('')
   const selectedInstitutionId = ref('')
-  const schoolIdFile = ref(null)
-  const enrollmentProofFile = ref(null)
 
   const reset = () => {
     newUserFname.value = ''
@@ -20,8 +18,6 @@ export const useRegistrationInfoStore = defineStore('newUserInfo', () => {
     newUserPassword.value = ''
     newUserType.value = ''
     selectedInstitutionId.value = ''
-    schoolIdFile.value = null
-    enrollmentProofFile.value = null
   }
 
   return {
@@ -32,8 +28,6 @@ export const useRegistrationInfoStore = defineStore('newUserInfo', () => {
     newUserPassword,
     newUserType,
     selectedInstitutionId,
-    schoolIdFile,
-    enrollmentProofFile,
     reset,
   }
 })

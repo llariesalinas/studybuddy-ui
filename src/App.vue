@@ -419,8 +419,8 @@ const openSupport = (type = 'Other', id = null) => {
   isSupportModalOpen.value = true
 }
 
-const goToVerificationStatus = async () => {
-  await router.push('/application-status')
+const goToVerificationStatus = async (destination = '/application-status') => {
+  await router.push(destination)
 }
 
 const goToWallet = async () => {
@@ -645,7 +645,9 @@ const isPublicRoute = computed(() => {
     'reset-password',
     'password-reset-confirm',
     'preferencesetup',
-    'tutorpreferencesetup'
+    'tutorpreferencesetup',
+    'tutor-subjects-setup',
+    'tutor-verification-setup'
   ].includes(route.name)
 })
 

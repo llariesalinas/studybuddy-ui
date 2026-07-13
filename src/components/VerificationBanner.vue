@@ -22,7 +22,7 @@
       <button
         type="button"
         class="verification-banner__cta sb-btn"
-        @click="emit('navigate')"
+        @click="emit('navigate', bannerContent.navigateTo)"
       >
         {{ bannerContent.cta }}
       </button>
@@ -73,6 +73,13 @@ const showTutorBanner = computed(() =>
   Boolean(profileStore.tutorRenewalRequired)
 )
 
+const showTutorInitialVerificationBanner = computed(() =>
+  profileStore.loaded &&
+  normalizedUserRole.value === 'tutor' &&
+  Boolean(profileStore.tutorOnboardingSkippedAt) &&
+  (!profileStore.applicationStatus || profileStore.applicationStatus === 'rejected')
+)
+
 const bannerContent = computed(() => {
   if (showTuteeBanner.value) {
     return {
@@ -82,6 +89,20 @@ const bannerContent = computed(() => {
       title: 'Verify your enrollment before you book a session.',
       text: 'You can keep browsing tutors, but booking stays locked until your account is verified.',
       cta: 'Verify Now',
+      navigateTo: '/application-status',
+    }
+  }
+
+  if (showTutorInitialVerificationBanner.value) {
+    return {
+      tone: 'tutor',
+      icon: 'bi bi-arrow-repeat',
+      eyebrow: 'Verification required',
+      title: 'Verify your account to appear in tutee search.',
+      text:
+        "Your dashboard stays available, but tutees can't find or book you until your documents are approved.",
+      cta: 'Verify Now',
+      navigateTo: '/tutor-setup/verification',
     }
   }
 
@@ -93,6 +114,7 @@ const bannerContent = computed(() => {
       title: 'Renew your verification before you accept new sessions.',
       text: 'Your dashboard stays available, but session acceptance is locked until your renewal is approved.',
       cta: 'Renew Now',
+      navigateTo: '/application-status',
     }
   }
 

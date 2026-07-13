@@ -121,7 +121,7 @@ const handleCompleteSetup = async () => {
     // update profile guard state
     profileStore.profileCompleted = true
 
-    router.push({ name: 'tch-dashboard' })
+    router.push({ name: 'tutor-subjects-setup' })
 
   } catch (error) {
 

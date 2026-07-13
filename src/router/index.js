@@ -1,7 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useProfileStore } from '@/stores/profile'
-import { needsTutorApplicationLockout } from '@/services/tutorApplicationState'
 
 const GUEST_ONLY_ROUTE_NAMES = ['login', 'register']
 
@@ -109,6 +108,18 @@ const router = createRouter({
       name: 'tutorpreferencesetup',
       component: () => import('@/views/TutorPreferenceSetup.vue'),
       meta: { requiresAuth: true }
+    },
+    {
+      path: '/tutor-setup/subjects',
+      name: 'tutor-subjects-setup',
+      component: () => import('@/views/TutorSubjectSetup.vue'),
+      meta: { requiresAuth: true, role: 'Tutor' }
+    },
+    {
+      path: '/tutor-setup/verification',
+      name: 'tutor-verification-setup',
+      component: () => import('@/views/TutorVerificationSetup.vue'),
+      meta: { requiresAuth: true, role: 'Tutor' }
     },
     {
       path: '/application-status',
@@ -263,7 +274,7 @@ const router = createRouter({
 /*
   GLOBAL NAVIGATION GUARD
 */
-router.beforeEach(async (to, from) => {
+router.beforeEach(async (to) => {
   // Clean up any lingering backdrops or modal styles
   document.querySelectorAll('.offcanvas-backdrop, .modal-backdrop').forEach(el => el.remove())
   document.body.classList.remove('modal-open', 'offcanvas-open')
@@ -314,26 +325,15 @@ router.beforeEach(async (to, from) => {
       }
     }
 
-    const tutorApplicationSnapshot = {
-      application_status: profileStore.applicationStatus || authStore.user?.application_status || null,
-      tutor_renewal_status: profileStore.loaded
-        ? profileStore.tutorRenewalStatus
-        : authStore.user?.tutor_renewal_status || null,
-      tutor_renewal_required: profileStore.loaded
-        ? profileStore.tutorRenewalRequired
-        : authStore.user?.tutor_renewal_required || false,
-    }
-    // Global lockout applies only to never-approved tutors. A renewal-due/pending/rejected tutor
-    // is forward-only (blocked only at booking/accept surfaces, enforced server-side) — see
-    // docs/plans/2026-07-01-tutee-verification-phase2-gate.md.
-    const hasTutorApplicationLockout =
-      normalizedUserRole === 'tutor' &&
-      needsTutorApplicationLockout(tutorApplicationSnapshot)
+    if (normalizedUserRole === 'tutor' && !profileStore.tutorOnboardingComplete) {
+      const nextOnboardingRoute = !profileStore.profileCompleted
+        ? 'tutorpreferencesetup'
+        : !profileStore.tutorSubjectsCompleted
+          ? 'tutor-subjects-setup'
+          : 'tutor-verification-setup'
 
-    if (hasTutorApplicationLockout && to.name !== 'tutor-application-status') {
-      return '/application-status'
+      if (to.name !== nextOnboardingRoute) return { name: nextOnboardingRoute }
     }
-
     // 3️⃣ Profile completion guard
     if (!profileStore.profileCompleted) {
 
