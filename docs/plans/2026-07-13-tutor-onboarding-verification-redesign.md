@@ -1,7 +1,7 @@
 ---
 title: Tutor onboarding & verification redesign
 date: 2026-07-13
-status: In Progress
+status: Done
 summary: Removes the tutor route-lockout in favor of a tutee-style search-visibility gate, folds verification into one guided onboarding sequence with a skip option, and lets tutors propose subjects missing from the catalog for admin review alongside their application.
 spec: ../mockups/2026-07-13-tutor-onboarding-verification-redesign.html
 ---
@@ -12,21 +12,20 @@ spec: ../mockups/2026-07-13-tutor-onboarding-verification-redesign.html
 
 ## Status & Progress Summary
 
-**Status (2026-07-14): In Progress — dispatched to Codex CLI.** Grilled end-to-end (13 decisions)
-via `/grill-with-docs`, with an interactive HTML explainer (catalog-first + propose-new subject
-picker walkthrough) reviewed alongside the team. All gating, onboarding-sequence, and
-subject-proposal decisions are final. Both onboarding screens' visual design is also decided —
-`ui-preview` mocked 3 directions each on the real Guided Rail shell/tokens: Step 2 (Subjects)
-picked **Direction B** (inline picker, no modal — separate from the existing `TutorProfile.vue`
-"Choose Subjects" modal, which is untouched), Step 3 (Verification) picked **Direction C**
-("explain, then choose"). Both promoted to
-`docs/mockups/2026-07-13-tutor-onboarding-verification-redesign.html`. Also discovered: the
-reminder banner needs no new component — `src/components/VerificationBanner.vue` already handles
-this exact dismissible/tone-based pattern for two other cases, so this becomes a third content
-variant. Compiled into `docs/briefs/2026-07-14-tutor-onboarding-verification-redesign.md` for
-Codex CLI dispatch on a dedicated branch (`feat/tutor-onboarding-verification-redesign`); the brief
-instructs Codex to skip the full backend test suite (long-running) and run only its own new/targeted
-tests, leaving full-suite verification to `/codex-review`.
+**Status (2026-07-14): Done — implemented, reviewed, and verified.** Grilled end-to-end (13
+decisions) via `/grill-with-docs`, both onboarding screens mocked and chosen via `ui-preview`
+(Step 2: Direction B, inline picker; Step 3: Direction C, explain-then-choose), compiled into
+`docs/briefs/2026-07-14-tutor-onboarding-verification-redesign.md` and dispatched to Codex CLI on
+`feat/tutor-onboarding-verification-redesign`. `/codex-review` verified independently: reran
+Codex's 4 new test classes (17/17 pass) plus the full backend suite on a fresh database (315
+tests, 28 failures + 5 errors, all confirmed pre-existing/unrelated by root-cause tracing — same
+count as yesterday's documented baseline), `npm run build`/`npm run test` (67/67) green. One
+disclosed, justified, well-tested deviation: tutor registration became account-only (matching
+tutees) since the brief's Setup→Subjects→Verify sequence was unreachable under the old
+documents-at-registration flow; document upload moved to the new Step 3. Cleaned up two pieces of
+dead code the deviation left behind (`TutorScreeningModal.vue`, two unused store fields). No fix
+round needed. Committed in three stops (backend, frontend onboarding, frontend admin review); full
+report in `docs/session-summaries/2026-07-14-tutor-onboarding-verification-redesign-summary.md`.
 
 ## Problem Statement
 
@@ -296,3 +295,16 @@ Design references:
   CLI dispatch, per user instruction explicitly telling Codex to skip the long-running full backend
   test suite and only run its own new/targeted tests — full-suite verification deferred to
   `/codex-review`. Status: In Progress.
+- 2026-07-14: `/codex-review` verified independently — reran Codex's 4 new test classes (17/17
+  pass) plus the full backend suite on a genuinely fresh database (315 tests, 28 failures + 5
+  errors), root-cause-traced every failure cluster to confirm all are pre-existing and unrelated
+  (a `subject_is_recognized_for_profile` course-requirement issue in untouched code, plus
+  payment/avatar/dev-tools tests in untouched files) rather than assuming from the failure count
+  alone. `npm run build` and `npm run test` (67/67) green. Reviewed the full diff against every
+  checklist item; found Codex's one disclosed deviation (account-only tutor registration, moving
+  document upload to Step 3) justified and well-tested. Cleaned up two pieces of dead code the
+  deviation left behind (`TutorScreeningModal.vue`, two unused store fields) directly rather than
+  a Codex fix round. Committed in three logical stops (backend; frontend onboarding sequence;
+  frontend admin review UI). Session summary at
+  `docs/session-summaries/2026-07-14-tutor-onboarding-verification-redesign-summary.md`. Status:
+  Done. Remaining, not yet run: the final whole-branch `/code-review` against the spec.
