@@ -1306,7 +1306,6 @@ def register_user(request):
         # Handle TutorApplication (Update or Create)
         school_id = request.FILES.get('school_id')
         enrollment_proof = request.FILES.get('enrollment_proof')
-        reason_to_tutor = request.data.get('reason_to_tutor', '')
 
         if not school_id or not enrollment_proof:
             # We need to make sure we don't block if they provided these in a previous application,
@@ -1333,7 +1332,6 @@ def register_user(request):
                 'application_status': 'pending',
                 'school_id': school_id,
                 'enrollment_proof': enrollment_proof,
-                'reason_to_tutor': reason_to_tutor,
                 'submitted_at': timezone.now()
             }
         )
@@ -5654,7 +5652,6 @@ def tutor_application_resubmit(request):
     # Update application
     application.school_id = school_id
     application.enrollment_proof = enrollment_proof
-    application.reason_to_tutor = reason_to_tutor
     application.application_status = 'pending'
     application.rejection_reason = ''
     application.reviewed_at = None
@@ -5792,7 +5789,6 @@ def tutee_application_resubmit(request):
         defaults={
             'school_id': school_id,
             'enrollment_proof': enrollment_proof,
-            'reason_to_tutor': reason_to_tutor,
             'application_status': 'pending',
         }
     )
@@ -5829,7 +5825,6 @@ def tutee_application_resubmit(request):
 
     application.school_id = school_id
     application.enrollment_proof = enrollment_proof
-    application.reason_to_tutor = reason_to_tutor
     application.application_status = 'pending'
     application.rejection_reason = ''
     application.reviewed_at = None

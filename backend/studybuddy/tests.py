@@ -3758,7 +3758,6 @@ class TuteeVerificationPhase3Tests(APITestCase):
             {
                 "school_id": self.upload("id.jpg", b"id", "image/jpeg"),
                 "enrollment_proof": self.upload("rf.pdf", b"rf", "application/pdf"),
-                "reason_to_tutor": "First time submitting",
             },
             format="multipart",
         )
@@ -3785,7 +3784,6 @@ class TuteeVerificationPhase3Tests(APITestCase):
             {
                 "school_id": self.upload("new-id.jpg", b"new-id", "image/jpeg"),
                 "enrollment_proof": self.upload("new-rf.pdf", b"new-rf", "application/pdf"),
-                "reason_to_tutor": "Resubmitting",
             },
             format="multipart",
         )
@@ -6521,7 +6519,6 @@ class VerificationEmailWiringTests(APITestCase):
                 {
                     "school_id": self.upload("id.jpg", b"id", "image/jpeg"),
                     "enrollment_proof": self.upload("rf.pdf", b"rf", "application/pdf"),
-                    "reason_to_tutor": "",
                 },
                 format="multipart",
             )
@@ -6543,7 +6540,6 @@ class VerificationEmailWiringTests(APITestCase):
                 {
                     "school_id": self.upload("new-id.jpg", b"new-id", "image/jpeg"),
                     "enrollment_proof": self.upload("new-rf.pdf", b"new-rf", "application/pdf"),
-                    "reason_to_tutor": "",
                 },
                 format="multipart",
             )

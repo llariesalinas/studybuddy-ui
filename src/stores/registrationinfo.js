@@ -11,7 +11,6 @@ export const useRegistrationInfoStore = defineStore('newUserInfo', () => {
   const selectedInstitutionId = ref('')
   const schoolIdFile = ref(null)
   const enrollmentProofFile = ref(null)
-  const reasonToTutor = ref('')
 
   const reset = () => {
     newUserFname.value = ''
@@ -23,7 +22,6 @@ export const useRegistrationInfoStore = defineStore('newUserInfo', () => {
     selectedInstitutionId.value = ''
     schoolIdFile.value = null
     enrollmentProofFile.value = null
-    reasonToTutor.value = ''
   }
 
   return {
@@ -36,7 +34,6 @@ export const useRegistrationInfoStore = defineStore('newUserInfo', () => {
     selectedInstitutionId,
     schoolIdFile,
     enrollmentProofFile,
-    reasonToTutor,
     reset,
   }
 })

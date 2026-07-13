@@ -230,7 +230,6 @@ const buildRegistrationPayload = () => {
   formData.append('institution_id', store.selectedInstitutionId)
   formData.append('school_id', store.schoolIdFile)
   formData.append('enrollment_proof', store.enrollmentProofFile)
-  formData.append('reason_to_tutor', store.reasonToTutor)
 
   return {
     payload: formData,

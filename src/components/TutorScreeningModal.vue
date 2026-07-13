@@ -38,16 +38,6 @@
               accept="image/*,application/pdf"
             />
           </div>
-
-          <div class="sb-auth-field">
-            <label class="sb-auth-label">Why do you want to become a tutor? (Optional)</label>
-            <textarea
-              v-model="localReason"
-              class="sb-auth-input sb-auth-textarea sb-field"
-              placeholder="Tell us about your motivation..."
-              rows="3"
-            ></textarea>
-          </div>
         </div>
 
         <div class="sb-modal-actions">
@@ -75,7 +65,6 @@ const props = defineProps({
 const emit = defineEmits(['close', 'submit'])
 const store = useRegistrationInfoStore()
 
-const localReason = ref(store.reasonToTutor)
 const localError = ref('')
 
 const handleFileChange = (event, type) => {
@@ -108,7 +97,6 @@ const submit = async () => {
     return
   }
 
-  store.reasonToTutor = localReason.value
   await emit('submit')
 }
 </script>

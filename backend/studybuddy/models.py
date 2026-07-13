@@ -319,13 +319,6 @@ class ApplicationVerificationBase(models.Model):
         ('rejected', 'Rejected'),
     ]
 
-    # Optional Motivation. Kept as `reason_to_tutor` for both roles rather than renamed generically —
-    # see Phase 1 plan's "naming decision" note.
-    reason_to_tutor = models.TextField(
-        blank=True,
-        help_text="Why do you want to become a tutor?"
-    )
-
     # Screening Status
     application_status = models.CharField(
         max_length=20,

@@ -454,7 +454,7 @@ class TutorApplicationSerializer(serializers.ModelSerializer):
         model = TutorApplication
         fields = [
             'id', 'review_type', 'applicant_name', 'email', 'institution_name',
-            'reason_to_tutor', 'application_status',
+            'application_status',
             'school_id_url', 'enrollment_proof_url',
             'rejection_reason', 'submitted_at', 'reviewed_at',
             'document_renewal_status', 'document_renewal_due_at',
@@ -604,7 +604,7 @@ class TuteeApplicationSerializer(serializers.ModelSerializer):
         model = TuteeApplication
         fields = [
             'id', 'review_type', 'applicant_name', 'email', 'institution_name',
-            'reason_to_tutor', 'application_status',
+            'application_status',
             'school_id_url', 'enrollment_proof_url',
             'rejection_reason', 'submitted_at', 'reviewed_at',
             'document_renewal_status', 'document_renewal_due_at',

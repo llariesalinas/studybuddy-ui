@@ -314,9 +314,7 @@ const selectedReviewNote = computed(() => {
   ])
 })
 
-const selectedReviewNoteLabel = computed(() =>
-  selectedReviewType.value === 'renewal' ? 'Renewal Note' : 'Motivation'
-)
+const selectedReviewNoteLabel = 'Renewal Note'
 
 const viewDetails = (app) => {
   selectedApp.value = app

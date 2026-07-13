@@ -521,8 +521,7 @@ class Command(BaseCommand):
         TutorApplication.objects.bulk_create([
             TutorApplication(profile=p, application_status='approved',
                              reviewed_at=reviewed_at(p), school_id=PLACEHOLDER_IMAGE,
-                             enrollment_proof=PLACEHOLDER_IMAGE,
-                             reason_to_tutor=self.fake.sentence(nb_words=10))
+                             enrollment_proof=PLACEHOLDER_IMAGE)
             for p in tutor_profiles
         ])
         TuteeApplication.objects.bulk_create([
@@ -1051,8 +1050,7 @@ class Command(BaseCommand):
                     profile_completed=True, institution=institutions[domain], is_suspended=False)
                 model = TutorApplication if role == 'Tutor' else TuteeApplication
                 model.objects.create(profile=profile, application_status='pending',
-                                     school_id=PLACEHOLDER_IMAGE, enrollment_proof=PLACEHOLDER_IMAGE,
-                                     reason_to_tutor=self.fake.sentence(nb_words=8))
+                                     school_id=PLACEHOLDER_IMAGE, enrollment_proof=PLACEHOLDER_IMAGE)
         InstitutionRequest.objects.create(
             institution_name='Western Visayas College', school_email_domain='wvc.edu.ph',
             contact_person='Registrar - L. Hervias', contact_email='registrar@wvc.edu.ph',

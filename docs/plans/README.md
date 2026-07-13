@@ -38,6 +38,11 @@ visual directions were mocked live against the app's real design tokens, Guided 
 and implemented in `PreferenceSetup.vue` (template/CSS only, no logic changes), verified live in
 light/dark and desktop/mobile; a pre-existing unrelated bug (BSIT subject filter admitting
 BSCS-only subjects the backend rejects) was found and flagged as a separate follow-up.
+Remove Motivation field from Tutor/Tutee application flows is Done — grilled end-to-end;
+removed `reason_to_tutor` entirely (model column, serializers, views, tests, demo data, all
+frontend surfaces) while preserving the unrelated document-renewal "note" field. Full backend
+suite (289 tests) plus 26 targeted application/renewal/verification tests pass, lint and build
+clean, two-axis (Standards/Spec) review found zero hard findings on either axis.
 Algorithm Demo live rating edit is In Progress — a dev-only feature letting a SuperAdmin
 inline-edit a contributing neighbor's rating in Compare Pair's breakdown (new staff-only PATCH
 endpoint, refetch-and-reanimate on save via `AlgorithmDemoPairPicker.vue`'s existing fetch
@@ -46,6 +51,7 @@ pattern); spec approved, implementation just starting.
 
 | Date | Plan | Status | Summary |
 |------|------|--------|---------|
+| 2026-07-13 | [Remove Motivation field from Tutor/Tutee application flows](2026-07-13-remove-motivation-field.md) | Done | Removed `reason_to_tutor` ("Motivation") entirely — model, serializers, views, tests, demo data, and every frontend surface — while preserving the unrelated document-renewal "note" field it shared UI/variable names with; full backend suite + 26 targeted tests pass, lint/build clean, two-axis review clean — [Summary](../session-summaries/2026-07-13-remove-motivation-field-summary.md) |
 | 2026-07-08 | [Algorithm Demo — Live Rating Edit](2026-07-08-algorithm-demo-live-rating-edit.md) | In Progress | Dev-only inline rating edit in Compare Pair's neighbor list, new staff-only PATCH endpoint, refetch-and-reanimate on save — [Spec](../specs/2026-07-08-algorithm-demo-live-rating-edit-design.md) |
 | 2026-07-08 | [Codex Handoff — Persist the Booked Subject on Booking](2026-07-08-booking-subject-persistence-codex-handoff.md) | Done | Persists the selected catalog subject on each booking, displays it across session surfaces with a `General` fallback, and seeds realistic demo subjects; follow-up centralized duplicated error and label logic — [Summary](../session-summaries/2026-07-08-booking-subject-persistence-summary.md) |
 | 2026-07-07 | [Face-to-face campus location modal](2026-07-07-face-to-face-campus-location-modal.md) | Approved | Grilled Inside/Outside Campus choice + off-campus liability confirm modal for `InitialBooking.vue` and `FindTutors.vue`; not yet implemented — [ADR-0007](../adr/0007-off-campus-liability-acknowledgment-not-persisted.md) |
@@ -133,6 +139,8 @@ Entries marked Done&ast; predate the session-summary convention; their status is
 
 | Date | Change |
 |------|--------|
+| 2026-07-13 | Grilled removing the Motivation field end-to-end (scope expanded twice: also drop the backend column, also touch the Tutee-verification endpoints it's wired into); added the Approved plan |
+| 2026-07-13 | Implemented the Motivation field removal (8 steps), applied migration 0075, ran full backend suite + 26 targeted tests (all pass), lint/build clean, two-axis review clean; marked Done and linked summary |
 | 2026-07-08 | Completed booking-subject-persistence review follow-ups by extracting the shared subject error and display-label helper; added the session summary and marked the plan Done |
 | 2026-07-05 | Added institution course catalog plan (Approved) from spec `2026-07-05-institution-course-catalog-design.md` so the work can be tracked before implementation |`n| 2026-07-05 | Implemented institution course catalog; marked plan Done and linked summary |
 | 2026-07-05 | Grilled the demo data reset end-to-end (19 decisions, plus domain-modeling pass over CONTEXT.md and code cross-reference); added the Approved plan and corrected the stale Payout Destination/TutorPayoutAccount glossary entry |
