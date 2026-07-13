@@ -7291,6 +7291,404 @@ class TutorDetailVerifiedBadgeTests(APITestCase):
         self.assertFalse(response.data["is_verified"])
 
 
+class TutorOnboardingSearchVisibilityTests(APITestCase):
+    def setUp(self):
+        self.institution = PartnerInstitution.objects.create(
+            institution_name="CPU", school_email_domain="cpu.edu.ph", is_active=True,
+        )
+        self.course = Course.objects.create(
+            course_code="ONBOARD", course_name="Onboarding Course",
+        )
+        self.subject = Subjects.objects.create(
+            subject_code="ONBOARD101", subject_name="Onboarding Search", department="Education",
+            category=self.course.course_code,
+        )
+        tutee_user = User.objects.create_user(
+            username="onboarding-tutee@cpu.edu.ph", email="onboarding-tutee@cpu.edu.ph",
+            password="password",
+        )
+        self.tutee = UserProfile.objects.create(
+            user=tutee_user, fname="Search", mname="", lname="Tutee", role="Tutee",
+            institution=self.institution, course=self.course,
+        )
+
+    def upload(self, name, content_type):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        return SimpleUploadedFile(name, b"document", content_type=content_type)
+
+    def make_tutor(self, label, application_status=None, renewal_due=False):
+        user = User.objects.create_user(
+            username=f"{label}@cpu.edu.ph", email=f"{label}@cpu.edu.ph", password="password",
+        )
+        profile = UserProfile.objects.create(
+            user=user, fname=label.title(), mname="", lname="Tutor", role="Tutor",
+            institution=self.institution,
+        )
+        tutor = Tutor.objects.create(
+            profile=profile, hourly_rate=200, can_online=True, teaching_level="College",
+        )
+        TutorSubjects.objects.create(tutor=tutor, subject=self.subject, expertise_level=3)
+        if application_status:
+            reviewed_at = None
+            if renewal_due:
+                reviewed_at = timezone.now() - timedelta(
+                    days=TutorApplication.DOCUMENT_RENEWAL_INTERVAL_DAYS + 1
+                )
+            TutorApplication.objects.create(
+                profile=profile,
+                school_id=self.upload(f"{label}-id.jpg", "image/jpeg"),
+                enrollment_proof=self.upload(f"{label}-proof.pdf", "application/pdf"),
+                application_status=application_status,
+                reviewed_at=reviewed_at,
+            )
+        return tutor
+
+    def test_recommendations_only_include_approved_initial_applications(self):
+        no_application = self.make_tutor("no-application")
+        pending = self.make_tutor("pending", "pending")
+        rejected = self.make_tutor("rejected", "rejected")
+        approved = self.make_tutor("approved", "approved")
+        renewal_due = self.make_tutor("renewal-due", "approved", renewal_due=True)
+        self.client.force_authenticate(user=self.tutee.user)
+
+        response = self.client.post(
+            "/api/recommend-tutors/", {"subject": self.subject.subject_code}, format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        tutor_ids = {row["id"] for row in response.data}
+        self.assertNotIn(no_application.profile_id, tutor_ids)
+        self.assertNotIn(pending.profile_id, tutor_ids)
+        self.assertNotIn(rejected.profile_id, tutor_ids)
+        self.assertIn(approved.profile_id, tutor_ids)
+        self.assertIn(renewal_due.profile_id, tutor_ids)
+
+
+class TutorOnboardingStateTests(APITestCase):
+    def setUp(self):
+        self.institution = PartnerInstitution.objects.create(
+            institution_name="CPU", school_email_domain="cpu.edu.ph", is_active=True,
+        )
+        self.tutor_user = User.objects.create_user(
+            username="state-tutor@cpu.edu.ph", email="state-tutor@cpu.edu.ph", password="password",
+        )
+        self.tutor_profile = UserProfile.objects.create(
+            user=self.tutor_user, fname="State", mname="", lname="Tutor", role="Tutor",
+            institution=self.institution,
+        )
+        self.tutor = Tutor.objects.create(profile=self.tutor_profile)
+        self.tutee_user = User.objects.create_user(
+            username="state-tutee@cpu.edu.ph", email="state-tutee@cpu.edu.ph", password="password",
+        )
+        UserProfile.objects.create(
+            user=self.tutee_user, fname="State", mname="", lname="Tutee", role="Tutee",
+            institution=self.institution,
+        )
+
+    def upload(self, name, content_type):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        return SimpleUploadedFile(name, b"document", content_type=content_type)
+
+    def test_profile_status_exposes_initial_onboarding_state(self):
+        self.client.force_authenticate(user=self.tutor_user)
+
+        response = self.client.get("/api/profile/status/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.data["tutor_onboarding_skipped_at"])
+        self.assertFalse(response.data["tutor_onboarding_complete"])
+        self.assertEqual(response.data["tutor_subject_count"], 0)
+        self.assertFalse(response.data["tutor_subjects_completed"])
+
+    def test_tutor_can_skip_initial_verification(self):
+        self.client.force_authenticate(user=self.tutor_user)
+
+        response = self.client.post("/api/tutor/onboarding/skip-verification/")
+
+        self.assertEqual(response.status_code, 200)
+        self.tutor_profile.refresh_from_db()
+        self.assertIsNotNone(self.tutor_profile.tutor_onboarding_skipped_at)
+        self.assertTrue(response.data["tutor_onboarding_complete"])
+
+    def test_non_tutor_cannot_skip_tutor_verification(self):
+        self.client.force_authenticate(user=self.tutee_user)
+
+        response = self.client.post("/api/tutor/onboarding/skip-verification/")
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_initial_submission_creates_pending_application(self):
+        self.client.force_authenticate(user=self.tutor_user)
+
+        response = self.client.post(
+            "/api/tutor-application/submit/",
+            {
+                "school_id": self.upload("id.jpg", "image/jpeg"),
+                "enrollment_proof": self.upload("proof.pdf", "application/pdf"),
+            },
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        application = TutorApplication.objects.get(profile=self.tutor_profile)
+        self.assertEqual(application.application_status, "pending")
+        self.tutor_profile.refresh_from_db()
+        self.assertIsNone(self.tutor_profile.tutor_onboarding_skipped_at)
+
+    def test_initial_submission_attaches_pre_application_subject_proposals(self):
+        subject = Subjects.objects.create(
+            subject_code="BEFORE-VERIFY",
+            subject_name="Before Verify",
+            department="Education",
+            status="pending",
+            proposed_by_tutor=self.tutor,
+        )
+        TutorSubjects.objects.create(tutor=self.tutor, subject=subject, expertise_level=3)
+        self.client.force_authenticate(user=self.tutor_user)
+
+        response = self.client.post(
+            "/api/tutor-application/submit/",
+            {
+                "school_id": self.upload("id.jpg", "image/jpeg"),
+                "enrollment_proof": self.upload("proof.pdf", "application/pdf"),
+            },
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        subject.refresh_from_db()
+        self.assertEqual(subject.proposed_application.profile, self.tutor_profile)
+
+    @override_settings(LOGIN_OTP_DISABLED=True)
+    def test_pending_tutor_application_does_not_block_login(self):
+        TutorApplication.objects.create(
+            profile=self.tutor_profile,
+            school_id="tutor_applications/school_ids/id.jpg",
+            enrollment_proof="tutor_applications/enrollment_proofs/proof.pdf",
+            application_status="pending",
+        )
+
+        response = self.client.post(
+            "/api/login/",
+            {"email": self.tutor_user.email, "password": "password"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_tutor_registration_creates_account_without_application(self):
+        self.client.force_authenticate(user=None)
+
+        response = self.client.post(
+            "/api/register/",
+            {
+                "fname": "New",
+                "mname": "",
+                "lname": "Tutor",
+                "email": "new-tutor@cpu.edu.ph",
+                "password": "StrongPassword123!",
+                "role": "Tutor",
+                "institution_id": self.institution.id,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        profile = UserProfile.objects.get(user__email="new-tutor@cpu.edu.ph")
+        self.assertTrue(Tutor.objects.filter(profile=profile).exists())
+        self.assertFalse(TutorApplication.objects.filter(profile=profile).exists())
+
+
+class TutorSubjectProposalTests(APITestCase):
+    def setUp(self):
+        self.institution = PartnerInstitution.objects.create(
+            institution_name="CPU", school_email_domain="cpu.edu.ph", is_active=True,
+        )
+        self.catalog_subject = Subjects.objects.create(
+            subject_code="MATH101", subject_name="College Algebra", department="Mathematics",
+            category="PROPOSAL",
+        )
+        self.course = Course.objects.create(course_code="PROPOSAL", course_name="Proposal Course")
+        self.tutor_user = User.objects.create_user(
+            username="proposal-tutor@cpu.edu.ph", email="proposal-tutor@cpu.edu.ph",
+            password="password",
+        )
+        self.tutor_profile = UserProfile.objects.create(
+            user=self.tutor_user, fname="Proposal", mname="", lname="Tutor", role="Tutor",
+            institution=self.institution, course=self.course,
+        )
+        self.tutor = Tutor.objects.create(profile=self.tutor_profile)
+        self.application = TutorApplication.objects.create(
+            profile=self.tutor_profile,
+            school_id="tutor_applications/school_ids/id.jpg",
+            enrollment_proof="tutor_applications/enrollment_proofs/proof.pdf",
+        )
+        self.client.force_authenticate(user=self.tutor_user)
+
+    def propose(self, subject_name="Educational Data Visualization", department="Mathematics"):
+        return self.client.post(
+            "/api/tutor/subjects/propose/",
+            {
+                "subject_name": subject_name,
+                "department": department,
+                "description": "A proposed specialty.",
+            },
+            format="json",
+        )
+
+    def test_proposal_creates_pending_subject_and_tutor_link(self):
+        with patch("studybuddy.views.subject_is_recognized_for_profile") as recognition_check:
+            response = self.propose()
+
+        self.assertEqual(response.status_code, 201)
+        recognition_check.assert_not_called()
+        subject = Subjects.objects.get(subject_code="EDUCATIONAL-DATA-VIS")
+        self.assertEqual(subject.status, "pending")
+        self.assertEqual(subject.proposed_by_tutor, self.tutor)
+        self.assertEqual(subject.proposed_application, self.application)
+        self.assertTrue(TutorSubjects.objects.filter(tutor=self.tutor, subject=subject).exists())
+
+    def test_proposal_rejects_unknown_department(self):
+        response = self.propose(department="Invented Department")
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_proposal_enforces_eight_subject_cap_across_statuses(self):
+        for index in range(8):
+            subject = Subjects.objects.create(
+                subject_code=f"CAP{index}", subject_name=f"Cap Subject {index}",
+                department="Mathematics", status="pending" if index % 2 else "approved",
+            )
+            TutorSubjects.objects.create(tutor=self.tutor, subject=subject, expertise_level=3)
+
+        response = self.propose()
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("8 subjects", response.data["error"])
+
+    def test_generated_codes_dedupe_collisions(self):
+        first = self.propose(subject_name="Special Topics")
+        second = self.propose(subject_name="Special Topics")
+
+        self.assertEqual(first.status_code, 201)
+        self.assertEqual(second.status_code, 201)
+        self.assertTrue(Subjects.objects.filter(subject_code="SPECIAL-TOPICS").exists())
+        self.assertTrue(Subjects.objects.filter(subject_code="SPECIAL-TOPICS-2").exists())
+
+    def test_pending_subject_is_hidden_from_catalog(self):
+        proposal = self.propose()
+        self.assertEqual(proposal.status_code, 201)
+
+        response = self.client.get("/api/subjects/", {"catalog_scope": "all"})
+
+        self.assertEqual(response.status_code, 200)
+        codes = {row["subject_code"] for row in response.data}
+        self.assertIn(self.catalog_subject.subject_code, codes)
+        self.assertNotIn(proposal.data["subject_code"], codes)
+
+    def test_catalog_search_is_server_filtered_and_course_scoped(self):
+        Subjects.objects.create(
+            subject_code="OTHER101", subject_name="College Writing", department="Languages",
+            category="OTHER",
+        )
+
+        response = self.client.get("/api/subjects/", {"search": "College"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [row["subject_code"] for row in response.data],
+            [self.catalog_subject.subject_code],
+        )
+
+
+class AdminProposedSubjectReviewTests(APITestCase):
+    def setUp(self):
+        self.institution = PartnerInstitution.objects.create(
+            institution_name="CPU", school_email_domain="cpu.edu.ph", is_active=True,
+        )
+        self.admin_user = User.objects.create_user(
+            username="proposal-admin@cpu.edu.ph", email="proposal-admin@cpu.edu.ph",
+            password="password",
+        )
+        UserProfile.objects.create(
+            user=self.admin_user, fname="Proposal", mname="", lname="Admin", role="SuperAdmin",
+            institution=self.institution,
+        )
+        tutor_user = User.objects.create_user(
+            username="review-tutor@cpu.edu.ph",
+            email="review-tutor@cpu.edu.ph",
+            password="password",
+        )
+        tutor_profile = UserProfile.objects.create(
+            user=tutor_user, fname="Review", mname="", lname="Tutor", role="Tutor",
+            institution=self.institution,
+        )
+        self.tutor = Tutor.objects.create(profile=tutor_profile)
+        self.application = TutorApplication.objects.create(
+            profile=tutor_profile,
+            school_id="tutor_applications/school_ids/id.jpg",
+            enrollment_proof="tutor_applications/enrollment_proofs/proof.pdf",
+            application_status="rejected",
+        )
+        self.client.force_authenticate(user=self.admin_user)
+
+    def make_proposal(self, code):
+        subject = Subjects.objects.create(
+            subject_code=code, subject_name=f"Proposal {code}", department="Mathematics",
+            status="pending", proposed_by_tutor=self.tutor,
+            proposed_application=self.application,
+        )
+        TutorSubjects.objects.create(tutor=self.tutor, subject=subject, expertise_level=3)
+        return subject
+
+    def test_application_detail_includes_pending_proposed_subjects(self):
+        proposal = self.make_proposal("DETAIL-PROP")
+
+        response = self.client.get(f"/api/admin/tutor-applications/{self.application.id}/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.data["proposed_subjects"][0]["subject_code"],
+            proposal.subject_code,
+        )
+
+    def test_approve_subject_keeps_tutor_link_regardless_of_application_status(self):
+        proposal = self.make_proposal("APPROVE-PROP")
+
+        response = self.client.patch(
+            f"/api/admin/tutor-applications/{self.application.id}/subjects/"
+            f"{proposal.subject_code}/",
+            {"action": "approve"}, format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        proposal.refresh_from_db()
+        self.assertEqual(proposal.status, "approved")
+        self.assertTrue(TutorSubjects.objects.filter(tutor=self.tutor, subject=proposal).exists())
+        self.application.refresh_from_db()
+        self.assertEqual(self.application.application_status, "rejected")
+
+    def test_reject_subject_deletes_subject_and_tutor_link(self):
+        proposal = self.make_proposal("REJECT-PROP")
+
+        response = self.client.patch(
+            f"/api/admin/tutor-applications/{self.application.id}/subjects/"
+            f"{proposal.subject_code}/",
+            {"action": "reject"}, format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Subjects.objects.filter(subject_code=proposal.subject_code).exists())
+        self.assertFalse(
+            TutorSubjects.objects.filter(
+                tutor=self.tutor,
+                subject_id=proposal.subject_code,
+            ).exists()
+        )
+
+
 class AdminEndpointsRequireSuperAdminTests(APITestCase):
     """Ticket: Admin role removed -> admin endpoints are SuperAdmin-only.
 

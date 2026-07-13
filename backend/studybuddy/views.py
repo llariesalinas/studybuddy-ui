@@ -19,6 +19,7 @@ from django.utils.timezone import now
 from django.utils.crypto import constant_time_compare
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+from django.utils.text import slugify
 from django.db import transaction, IntegrityError
 from datetime import datetime,timedelta, date
 from calendar import monthrange
@@ -95,6 +96,8 @@ from .models import (
 )
 
 logger = logging.getLogger(__name__)
+TUTOR_SUBJECT_LIMIT = 8
+DEFAULT_TUTOR_SUBJECT_EXPERTISE_LEVEL = 3
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
@@ -135,6 +138,21 @@ OTP_ERROR_MESSAGE = "Invalid or expired verification code."
 SUBJECT_NOT_RECOGNIZED_ERROR = "This subject is not recognized for your course catalog."
 
 
+def get_tutor_onboarding_context(profile):
+    tutor_onboarding_skipped_at = profile.tutor_onboarding_skipped_at
+    tutor_onboarding_complete = bool(
+        tutor_onboarding_skipped_at is not None
+        or (profile.role == 'Tutor' and TutorApplication.objects.filter(profile=profile).exists())
+    )
+
+    return {
+        "tutor_onboarding_skipped_at": (
+            tutor_onboarding_skipped_at.isoformat() if tutor_onboarding_skipped_at else None
+        ),
+        "tutor_onboarding_complete": tutor_onboarding_complete,
+    }
+
+
 def build_login_response_payload(user, profile):
     refresh = RefreshToken.for_user(user)
     tutor_document_context = get_tutor_document_review_context(profile)
@@ -148,6 +166,7 @@ def build_login_response_payload(user, profile):
         "email": user.email,
         "fname": profile.fname,
         "lname": profile.lname,
+        **get_tutor_onboarding_context(profile),
         **tutor_document_context,
     }
 
@@ -1247,22 +1266,10 @@ def register_user(request):
     existing_user = User.objects.filter(username=email).first()
 
     if existing_user and hasattr(existing_user, 'userprofile'):
-        profile = existing_user.userprofile
-        is_rejected_tutor = False
-        if profile.role == 'Tutor':
-            try:
-                application = profile.tutor_application
-                if application.application_status == 'rejected':
-                    is_rejected_tutor = True
-            except TutorApplication.DoesNotExist:
-                pass
-
-        if not is_rejected_tutor:
-            return Response(
-                {"error": "User already exists"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        # If is_rejected_tutor is True, proceed to update profile/application
+        return Response(
+            {"error": "User already exists"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
     if existing_user:
         logger.warning(
@@ -1301,51 +1308,7 @@ def register_user(request):
 
     # 🔥 Create/Update Tutor record if role is Tutor
     if role == "Tutor":
-        tutor, _ = Tutor.objects.get_or_create(profile=profile)
-
-        # Handle TutorApplication (Update or Create)
-        school_id = request.FILES.get('school_id')
-        enrollment_proof = request.FILES.get('enrollment_proof')
-
-        if not school_id or not enrollment_proof:
-            # We need to make sure we don't block if they provided these in a previous application,
-            # but if this is a NEW registration/re-application, they must be here.
-            # Assuming they must upload new docs for a new application.
-            return Response(
-                {"error": "Tutor applicants must provide a School ID and Proof of Enrollment."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        if (school_id.size > settings.MAX_DOCUMENT_UPLOAD_SIZE
-                or enrollment_proof.size > settings.MAX_DOCUMENT_UPLOAD_SIZE):
-            return Response(
-                {"error": "Each uploaded file must be under 5 MB. Please compress your images and try again."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        school_id = compress_if_image(school_id)
-        enrollment_proof = compress_if_image(enrollment_proof)
-
-        TutorApplication.objects.update_or_create(
-            profile=profile,
-            defaults={
-                'application_status': 'pending',
-                'school_id': school_id,
-                'enrollment_proof': enrollment_proof,
-                'submitted_at': timezone.now()
-            }
-        )
-
-        # Send confirmation email after the transaction commits so the DB write is
-        # guaranteed to be visible and the email send does not block/extend the lock.
-        def _send_confirmation():
-            try:
-                send_application_received_email(profile)
-            except Exception:
-                logger.exception(
-                    "Failed to send tutor application received email for profile_id=%s", profile.id
-                )
-        transaction.on_commit(_send_confirmation)
+        Tutor.objects.get_or_create(profile=profile)
 
     PlatformActivity.objects.create(
         activity_type='registration',
@@ -1382,17 +1345,22 @@ def profile_status(request):
 
     document_context = get_role_document_review_context(profile)
     wallet_negative = False
+    tutor_subject_count = 0
     if profile.role == 'Tutor':
         tutor = getattr(profile, 'tutor', None)
         if tutor is not None:
             wallet = Wallet.objects.filter(tutor=tutor).first()
             wallet_negative = bool(wallet and wallet.balance < 0)
+            tutor_subject_count = TutorSubjects.objects.filter(tutor=tutor).count()
 
     return Response({
         "profile_completed": profile.profile_completed,
         "role": profile.role,
         "wallet_negative": wallet_negative,
         "tutee_verification_enforced": tutee_verification_enforced(),
+        **get_tutor_onboarding_context(profile),
+        "tutor_subject_count": tutor_subject_count,
+        "tutor_subjects_completed": tutor_subject_count > 0,
         **document_context
     })
 
@@ -1431,17 +1399,6 @@ def login_view(request):
             {"error": "Your account has been suspended. Please contact administration for more details."},
             status=status.HTTP_403_FORBIDDEN
         )
-
-    # Block login if tutor application is still pending
-    if profile.role == 'Tutor':
-        try:
-            if hasattr(profile, 'tutor_application') and profile.tutor_application.application_status == 'pending':
-                return Response(
-                    {"error": "Your application is still being processed. We will email you once it is approved."},
-                    status=status.HTTP_403_FORBIDDEN
-                )
-        except TutorApplication.DoesNotExist:
-            pass
 
     if not profile.is_domain_exempt and profile.role != 'SuperAdmin':
         email_domain = normalize_email_domain(email)
@@ -1921,9 +1878,16 @@ class SubjectListView(ListAPIView):
     serializer_class = SubjectSerializer
 
     def get_queryset(self):
+        search_query = self.request.query_params.get('search', '').strip()
         user = self.request.user
         if not user.is_authenticated or not hasattr(user, 'userprofile'):
-            return Subjects.objects.all()
+            queryset = Subjects.objects.filter(status='approved')
+            if search_query:
+                queryset = queryset.filter(
+                    Q(subject_name__icontains=search_query)
+                    | Q(subject_code__icontains=search_query)
+                )
+            return queryset
 
         profile = user.userprofile
         catalog_scope = self.request.query_params.get('catalog_scope')
@@ -1931,7 +1895,13 @@ class SubjectListView(ListAPIView):
         include_current = self.request.query_params.get('include_current') in {'1', 'true', 'True'}
 
         if catalog_scope == 'all':
-            return visible_subject_queryset_for_profile(profile)
+            queryset = visible_subject_queryset_for_profile(profile).filter(status='approved')
+            if search_query:
+                queryset = queryset.filter(
+                    Q(subject_name__icontains=search_query)
+                    | Q(subject_code__icontains=search_query)
+                )
+            return queryset
 
         queryset, recognized_codes = subject_selection_queryset_for_profile(
             profile,
@@ -1939,6 +1909,12 @@ class SubjectListView(ListAPIView):
             include_current=include_current,
         )
         self.recognized_codes = recognized_codes
+        queryset = queryset.filter(status='approved')
+        if search_query:
+            queryset = queryset.filter(
+                Q(subject_name__icontains=search_query)
+                | Q(subject_code__icontains=search_query)
+            )
         return queryset
 
     def get_serializer_context(self):
@@ -3741,7 +3717,8 @@ def get_recommendation_candidate_tutors(
 ):
     base_candidates = filter_tutors_by_institution(
         Tutor.objects.filter(
-            tutorsubjects__subject__subject_code=subject
+            tutorsubjects__subject__subject_code=subject,
+            profile__tutor_application__application_status='approved',
         ),
         student_profile,
     )
@@ -4090,12 +4067,93 @@ def get_tutor_subjects(request):
             "department": ts.subject.department,
             "category": ts.subject.category,
             "description": ts.description or '',
+            "status": ts.subject.status,
             "is_recognized": ts.subject.subject_code in recognized_codes,
         }
         for ts in subjects
     ]
 
     return Response(data)
+
+
+def generate_proposed_subject_code(subject_name):
+    max_length = Subjects._meta.get_field('subject_code').max_length
+    base_code = slugify(subject_name).upper() or 'SUBJECT'
+    base_code = base_code[:max_length]
+    candidate = base_code
+    suffix = 2
+
+    while Subjects.objects.filter(subject_code=candidate).exists():
+        suffix_text = f'-{suffix}'
+        candidate = f'{base_code[:max_length - len(suffix_text)]}{suffix_text}'
+        suffix += 1
+
+    return candidate
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@transaction.atomic
+def propose_tutor_subject(request):
+    profile = request.user.userprofile
+    if profile.role != 'Tutor':
+        return Response({"error": "Only tutors can propose subjects."}, status=403)
+
+    tutor = get_object_or_404(Tutor, profile=profile)
+    if TutorSubjects.objects.filter(tutor=tutor).count() >= TUTOR_SUBJECT_LIMIT:
+        return Response(
+            {"error": f"You can add up to {TUTOR_SUBJECT_LIMIT} subjects only."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    subject_name = str(request.data.get('subject_name') or '').strip()
+    department = str(request.data.get('department') or '').strip()
+    description = str(request.data.get('description') or '').strip()
+
+    if not subject_name or not department:
+        return Response(
+            {"error": "Subject name and department are required."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    valid_departments = set(
+        Subjects.objects.filter(status='approved')
+        .exclude(department='')
+        .values_list('department', flat=True)
+        .distinct()
+    )
+    if department not in valid_departments:
+        return Response(
+            {"error": "Select a department from the existing catalog."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    application = TutorApplication.objects.filter(profile=profile).first()
+    subject = Subjects.objects.create(
+        subject_code=generate_proposed_subject_code(subject_name),
+        subject_name=subject_name,
+        department=department,
+        status='pending',
+        proposed_by_tutor=tutor,
+        proposed_application=application,
+    )
+    TutorSubjects.objects.create(
+        tutor=tutor,
+        subject=subject,
+        expertise_level=DEFAULT_TUTOR_SUBJECT_EXPERTISE_LEVEL,
+        description=description,
+    )
+
+    return Response(
+        {
+            "subject_code": subject.subject_code,
+            "subject_name": subject.subject_name,
+            "department": subject.department,
+            "description": description,
+            "status": subject.status,
+        },
+        status=status.HTTP_201_CREATED,
+    )
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -4159,10 +4217,18 @@ def remove_tutor_subject(request, subject_code):
     profile = request.user.userprofile
     tutor = Tutor.objects.get(profile=profile)
 
+    subject = Subjects.objects.filter(
+        subject_code=subject_code,
+        proposed_by_tutor=tutor,
+        status='pending',
+    ).first()
     deleted_count, _ = TutorSubjects.objects.filter(
         tutor=tutor,
         subject__subject_code=subject_code
     ).delete()
+
+    if deleted_count and subject is not None:
+        subject.delete()
 
     if deleted_count:
         bump_dashboard_recs_cache_version()
@@ -5603,6 +5669,85 @@ def tutor_application_status(request):
         return Response(serializer.data)
     except TutorApplication.DoesNotExist:
         return Response({"error": "No application found for this user."}, status=status.HTTP_404_NOT_FOUND)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def skip_tutor_onboarding_verification(request):
+    profile = request.user.userprofile
+    if profile.role != 'Tutor':
+        return Response({"error": "Only tutors can skip tutor verification."}, status=403)
+
+    profile.tutor_onboarding_skipped_at = timezone.now()
+    profile.save(update_fields=['tutor_onboarding_skipped_at', 'updated_at'])
+    return Response({
+        "tutor_onboarding_skipped_at": profile.tutor_onboarding_skipped_at.isoformat(),
+        "tutor_onboarding_complete": True,
+    })
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@transaction.atomic
+def tutor_application_submit(request):
+    profile = request.user.userprofile
+    if profile.role != 'Tutor':
+        return Response({"error": "Only tutors can submit tutor verification."}, status=403)
+    if TutorApplication.objects.filter(profile=profile).exists():
+        return Response(
+            {"error": "A tutor application already exists."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    school_id = request.FILES.get('school_id')
+    enrollment_proof = request.FILES.get('enrollment_proof')
+    if not school_id or not enrollment_proof:
+        return Response(
+            {"error": "Please provide both your School ID and Proof of Enrollment."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if (
+        school_id.size > settings.MAX_DOCUMENT_UPLOAD_SIZE
+        or enrollment_proof.size > settings.MAX_DOCUMENT_UPLOAD_SIZE
+    ):
+        return Response(
+            {
+                "error": (
+                    "Each uploaded file must be under 5 MB. "
+                    "Please compress your images and try again."
+                )
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    school_id = compress_if_image(school_id)
+    enrollment_proof = compress_if_image(enrollment_proof)
+    application = TutorApplication.objects.create(
+        profile=profile,
+        school_id=school_id,
+        enrollment_proof=enrollment_proof,
+        application_status='pending',
+        submitted_at=timezone.now(),
+    )
+    Subjects.objects.filter(
+        proposed_by_tutor__profile=profile,
+        proposed_application__isnull=True,
+        status='pending',
+    ).update(proposed_application=application)
+
+    def _send_confirmation():
+        try:
+            send_application_received_email(profile)
+        except Exception:
+            logger.exception(
+                "Failed to send tutor application received email for profile_id=%s", profile.id
+            )
+
+    transaction.on_commit(_send_confirmation)
+    return Response(
+        TutorApplicationSerializer(application, context={'request': request}).data,
+        status=status.HTTP_201_CREATED,
+    )
 
 
 @api_view(['POST'])

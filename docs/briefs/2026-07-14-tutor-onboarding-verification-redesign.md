@@ -289,9 +289,37 @@ Submit/Skip actions.
 
 ## Test evidence
 
-(Codex fills this in — targeted backend test output only, plus `npm run lint` / `npm run build`
-output. Do not include full-suite output.)
+- `python manage.py makemigrations studybuddy`
+  - Created `studybuddy/migrations/0076_subjects_proposed_application_and_more.py`.
+- `python manage.py migrate`
+  - Applied `studybuddy.0076_subjects_proposed_application_and_more` successfully.
+- `python manage.py test --keepdb --noinput studybuddy.tests.TutorOnboardingSearchVisibilityTests studybuddy.tests.TutorOnboardingStateTests studybuddy.tests.TutorSubjectProposalTests studybuddy.tests.AdminProposedSubjectReviewTests`
+  - Found 17 tests; all passed (`OK`) in 47.066s. The existing `test_postgres` database was
+    preserved because the first non-interactive run found it already present.
+- `python manage.py makemigrations --check --dry-run`
+  - No model changes were missing from migrations.
+- `python manage.py check`
+  - System check identified no issues.
+- `npm run lint`
+  - Oxlint: 0 warnings, 0 errors. ESLint completed successfully.
+- `npm run build`
+  - Vite transformed 324 modules and completed the production build successfully in 2.88s.
+- `graphify update .`
+  - Rebuilt the local code graph with 5,197 nodes and 10,120 edges.
+- The full backend suite was not run, per this brief.
 
 ## Deviations
 
-(Codex fills this in.)
+- Tutor registration previously required documents and created a pending `TutorApplication`, which
+  made the specified Setup → Subjects → Verify sequence unreachable for a brand-new tutor. The
+  smallest coherent change was to make tutor registration account-only, move the same initial
+  document validation/compression/application creation to authenticated Step 3, and allow pending
+  tutors to log back in. Rejected applications still use the existing resubmit endpoint.
+- Step 2 occurs before a `TutorApplication` exists, while the proposal FK is nullable and admin
+  review is application-scoped. Proposals therefore link to an existing application immediately
+  when one exists; otherwise they remain tutor-linked and are attached atomically when Step 3
+  creates the application. Both paths have targeted API coverage.
+- Manual in-app browser verification could not run because this session exposed no browser instance
+  (`available browsers: []`). The browser-control instructions prohibited switching to an unrelated
+  automation backend. The new views were still checked through the required lint/build commands and
+  a source-level review of token usage and responsive rules; no browser-render claim is made.

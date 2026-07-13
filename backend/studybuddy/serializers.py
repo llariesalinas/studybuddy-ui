@@ -13,6 +13,7 @@ from .models import (
     TutorAvailability,
     TutorAvailabilityOverride,
     TutorDocumentRenewalReview,
+    TutorSubjects,
     TuteeApplication,
     TuteeDocumentRenewalReview,
     UserProfile,
@@ -449,6 +450,7 @@ class TutorApplicationSerializer(serializers.ModelSerializer):
     latest_document_renewal_reviewed_at = serializers.SerializerMethodField()
     latest_document_renewal_school_id_url = serializers.SerializerMethodField()
     latest_document_renewal_enrollment_proof_url = serializers.SerializerMethodField()
+    proposed_subjects = serializers.SerializerMethodField()
 
     class Meta:
         model = TutorApplication
@@ -464,6 +466,7 @@ class TutorApplicationSerializer(serializers.ModelSerializer):
             'latest_document_renewal_reviewed_at',
             'latest_document_renewal_school_id_url',
             'latest_document_renewal_enrollment_proof_url',
+            'proposed_subjects',
         ]
 
     def get_review_type(self, obj):
@@ -471,6 +474,26 @@ class TutorApplicationSerializer(serializers.ModelSerializer):
         if obj.application_status == 'approved' and renewal and renewal.status in ['pending', 'rejected']:
             return 'document_renewal'
         return 'initial'
+
+    def get_proposed_subjects(self, obj):
+        subjects = list(obj.proposed_subjects.filter(status='pending'))
+        descriptions = {
+            tutor_subject.subject_id: tutor_subject.description
+            for tutor_subject in TutorSubjects.objects.filter(
+                tutor__profile=obj.profile,
+                subject_id__in=[subject.subject_code for subject in subjects],
+            )
+        }
+        return [
+            {
+                'subject_code': subject.subject_code,
+                'subject_name': subject.subject_name,
+                'department': subject.department,
+                'description': descriptions.get(subject.subject_code, ''),
+                'status': subject.status,
+            }
+            for subject in subjects
+        ]
 
     def get_applicant_name(self, obj):
         return f"{obj.profile.fname} {obj.profile.lname}"

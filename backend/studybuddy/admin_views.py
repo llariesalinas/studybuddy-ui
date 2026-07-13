@@ -1375,6 +1375,39 @@ class AdminTutorApplicationDetailView(APIView):
         return Response({"message": f"Application {new_status} successfully."})
 
 
+class AdminTutorProposedSubjectDetailView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsSuperAdminUser]
+
+    @transaction.atomic
+    def patch(self, request, pk, subject_code):
+        application = get_object_or_404(TutorApplication, pk=pk)
+        subject = get_object_or_404(
+            Subjects.objects.select_for_update(),
+            subject_code=subject_code,
+            proposed_application=application,
+            status='pending',
+        )
+        action = request.data.get('action')
+
+        if action == 'approve':
+            subject.status = 'approved'
+            subject.save(update_fields=['status'])
+            return Response({"message": "Proposed subject approved."})
+
+        if action == 'reject':
+            TutorSubjects.objects.filter(
+                tutor=subject.proposed_by_tutor,
+                subject=subject,
+            ).delete()
+            subject.delete()
+            return Response({"message": "Proposed subject rejected."})
+
+        return Response(
+            {"error": "Invalid action. Must be 'approve' or 'reject'."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+
 class AdminTutorDocumentRenewalDetailView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsSuperAdminUser]
 

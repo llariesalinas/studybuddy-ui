@@ -93,6 +93,7 @@ class UserProfile(models.Model):
     )
 
     is_domain_exempt = models.BooleanField(default=False)
+    tutor_onboarding_skipped_at = models.DateTimeField(null=True, blank=True)
 
     ROLE_CHOICES = [
         ('Tutee', 'Tutee'),
@@ -654,10 +655,26 @@ def create_tutor_wallet(sender, instance, created, **kwargs):
 
 #Subjects Table
 class Subjects(models.Model):
+    STATUS_CHOICES = [
+        ('approved', 'Approved'),
+        ('pending', 'Pending'),
+    ]
+
     subject_code = models.CharField(max_length=20, primary_key=True)
     subject_name = models.CharField(max_length=100)
     department = models.CharField(max_length=100)
     category = models.CharField(max_length=100, null=True, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='approved')
+    proposed_by_tutor = models.ForeignKey(
+        'Tutor', on_delete=models.SET_NULL, null=True, blank=True,
+    )
+    proposed_application = models.ForeignKey(
+        'TutorApplication',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='proposed_subjects',
+    )
 
     def __str__(self):
         return f"{self.subject_code} - {self.subject_name}"
