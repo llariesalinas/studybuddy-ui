@@ -1,7 +1,7 @@
 ---
 title: SuperAdmin tutor/tutee stats, schedule & bookings
 date: 2026-07-13
-status: Approved
+status: Done
 summary: Add Schedule and Bookings tabs plus expanded stats to SuperAdminUserModal, with per-tab CSV export.
 spec: ../mockups/2026-07-13-superadmin-tutor-tutee-stats.html
 ---
@@ -10,9 +10,15 @@ spec: ../mockups/2026-07-13-superadmin-tutor-tutee-stats.html
 
 ## Status & Progress Summary
 
-Spec approved via `/grill-with-docs` + `/to-spec` on 2026-07-13. Design decisions locked (tabs
-layout, Option B profile cards, live computation, lazy per-tab loading, per-tab CSV export). No
-implementation started yet — next step is `/to-tickets` or `/implement`.
+Shipped 2026-07-13. Codex implemented the full brief; `/codex-review` verified independently
+(backend: reran the new 9-test class plus the full 298-test suite — all 33 pre-existing
+failures/errors are unrelated to this work, none newly introduced; frontend: `npm run build`
+green, `npm run lint:eslint` clean, aggregate `npm run lint` blocked only by pre-existing unrelated
+issues). Found and fixed two defects Codex's own checks didn't catch: `formatTime`/`formatDateShort`
+were called in the template but never defined (Schedule/Bookings tabs would have thrown at
+runtime), and the new CSV export actions reused the store's existing `loading.export`/`error.export`
+keys already bound to unrelated buttons on `SuperAdminReports.vue`/`SuperAdminUsers.vue` (fixed by
+giving them their own `userExport` key). Committed in three logical stops (backend, frontend, docs).
 
 ## Problem Statement
 
@@ -195,3 +201,9 @@ that was not carried forward).
 
 - 2026-07-13: Spec created from `/grill-with-docs` interview + `/to-spec` synthesis. Mockup saved
   to `docs/mockups/2026-07-13-superadmin-tutor-tutee-stats.html`. Status: Approved.
+- 2026-07-13: Compiled into `docs/briefs/2026-07-13-superadmin-tutor-tutee-stats.md` for Codex CLI
+  dispatch (full spec, no tickets split). Status: In Progress.
+- 2026-07-13: `/codex-review` verified the implementation, fixed two defects (missing
+  `formatTime`/`formatDateShort`, colliding export loading-state key), committed in three stops.
+  Session summary at `docs/session-summaries/2026-07-13-superadmin-tutor-tutee-stats-summary.md`.
+  Status: Done.
