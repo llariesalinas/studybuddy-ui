@@ -20,6 +20,7 @@ export const useSuperAdminStore = defineStore('superadmin', () => {
     pendingActions: false,
     institutionRequests: false,
     export: false,
+    userExport: false,
   })
 
   const error = ref({
@@ -31,6 +32,7 @@ export const useSuperAdminStore = defineStore('superadmin', () => {
     pendingActions: null,
     institutionRequests: null,
     export: null,
+    userExport: null,
   })
 
   const replaceUser = (updatedUser) => {
@@ -308,6 +310,72 @@ export const useSuperAdminStore = defineStore('superadmin', () => {
     }
   }
 
+  const fetchUserBookings = async (
+    userId,
+    { page = 1, dateFrom = null, dateTo = null } = {},
+  ) => {
+    const params = { page }
+    if (dateFrom) params.date_from = dateFrom
+    if (dateTo) params.date_to = dateTo
+    const res = await api.get(`/admin/users/${userId}/bookings/`, { params })
+    return res.data
+  }
+
+  const exportUserCsv = async (endpoint, filename, params = {}) => {
+    loading.value.userExport = true
+    error.value.userExport = null
+
+    try {
+      const res = await api.get(endpoint, { params, responseType: 'blob' })
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'text/csv' }))
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+    } catch {
+      error.value.userExport = 'Failed to export user data.'
+      throw new Error(error.value.userExport)
+    } finally {
+      loading.value.userExport = false
+    }
+  }
+
+  const exportUserBookingsCsv = async (
+    userId,
+    { dateFrom = null, dateTo = null } = {},
+  ) => {
+    const params = {}
+    if (dateFrom) params.date_from = dateFrom
+    if (dateTo) params.date_to = dateTo
+    return exportUserCsv(
+      `/admin/users/${userId}/bookings/export/`,
+      `bookings-${userId}.csv`,
+      params,
+    )
+  }
+
+  const fetchUserAvailability = async (userId) => {
+    const res = await api.get(`/admin/users/${userId}/availability/`)
+    return res.data
+  }
+
+  const exportUserAvailabilityCsv = async (userId) =>
+    exportUserCsv(
+      `/admin/users/${userId}/availability/export/`,
+      `availability-${userId}.csv`,
+    )
+
+  const fetchUserStats = async (userId) => {
+    const res = await api.get(`/admin/users/${userId}/stats/`)
+    return res.data
+  }
+
+  const exportUserStatsCsv = async (userId) =>
+    exportUserCsv(`/admin/users/${userId}/stats/export/`, `stats-${userId}.csv`)
+
   return {
     stats,
     users,
@@ -336,5 +404,11 @@ export const useSuperAdminStore = defineStore('superadmin', () => {
     rejectInstitutionRequest,
     fetchAnalytics,
     exportAnalyticsCsv,
+    fetchUserBookings,
+    exportUserBookingsCsv,
+    fetchUserAvailability,
+    exportUserAvailabilityCsv,
+    fetchUserStats,
+    exportUserStatsCsv,
   }
 })

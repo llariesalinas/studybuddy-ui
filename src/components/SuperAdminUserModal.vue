@@ -39,6 +39,27 @@
             Profile
           </button>
           <button
+            v-if="user?.role === 'Tutor'"
+            type="button"
+            class="tab-button sb-pill"
+            :class="{ active: activeTab === 'schedule' }"
+            role="tab"
+            :aria-selected="activeTab === 'schedule'"
+            @click="switchTab('schedule')"
+          >
+            Schedule
+          </button>
+          <button
+            type="button"
+            class="tab-button sb-pill"
+            :class="{ active: activeTab === 'bookings' }"
+            role="tab"
+            :aria-selected="activeTab === 'bookings'"
+            @click="switchTab('bookings')"
+          >
+            Bookings
+          </button>
+          <button
             type="button"
             class="tab-button sb-pill"
             :class="{ active: activeTab === 'actions' }"
@@ -51,6 +72,18 @@
         </nav>
 
         <div v-if="activeTab === 'profile'" class="modal-section">
+          <div class="section-heading first-heading">
+            <h3>Profile overview</h3>
+            <button
+              v-if="hasDetailStats"
+              type="button"
+              class="secondary-action compact"
+              :disabled="exporting"
+              @click="exportStats"
+            >
+              Export CSV
+            </button>
+          </div>
           <dl class="detail-grid">
             <div>
               <dt>Institution</dt>
@@ -81,9 +114,164 @@
               <dd>{{ Number(user?.tutor_avg_rating || 0).toFixed(1) }}</dd>
             </div>
           </dl>
+
+          <div v-if="hasDetailStats" class="profile-stats">
+            <p v-if="statsLoading" class="empty-state">Loading profile statistics...</p>
+            <template v-else-if="userStats">
+              <template v-if="user?.role === 'Tutor'">
+                <div class="section-heading"><h3>Rating breakdown</h3></div>
+                <article class="stats-card rating-card">
+                  <div v-for="score in ratingScores" :key="score" class="rating-row">
+                    <span>{{ score }} star</span>
+                    <span class="rating-track" aria-hidden="true">
+                      <span :style="{ width: ratingPercentage(score) + '%' }"></span>
+                    </span>
+                    <strong>{{ userStats.rating_distribution?.[score] || 0 }}</strong>
+                  </div>
+                </article>
+
+                <div class="section-heading"><h3>Recent reviews</h3></div>
+                <article class="stats-card review-list">
+                  <div v-for="(review, index) in userStats.recent_reviews" :key="index" class="review-row">
+                    <div><strong>{{ review.reviewer_name }}</strong><span>{{ review.score }} star</span></div>
+                    <p>{{ review.comment || 'No written comment.' }}</p>
+                  </div>
+                  <p v-if="!userStats.recent_reviews?.length" class="empty-state">No reviews yet.</p>
+                </article>
+              </template>
+
+              <div class="section-heading">
+                <h3>{{ user?.role === 'Tutor' ? 'Subjects taught' : 'Subjects learned' }}</h3>
+              </div>
+              <article class="stats-card chip-list">
+                <span v-for="subject in userStats.subjects" :key="subject.name" class="subject-chip">
+                  {{ subject.name }}
+                  <small v-if="subject.expertise_level != null">Level {{ subject.expertise_level }}</small>
+                </span>
+                <p v-if="!userStats.subjects?.length" class="empty-state">No subjects recorded.</p>
+              </article>
+
+              <div class="section-heading"><h3>Cancellations</h3></div>
+              <article class="stats-card cancellation-grid">
+                <div><strong>{{ userStats.cancellations.by_user }}</strong><span>By user</span></div>
+                <div><strong>{{ userStats.cancellations.by_counterpart }}</strong><span>By counterpart</span></div>
+              </article>
+
+              <div class="section-heading">
+                <h3>Most frequent {{ user?.role === 'Tutor' ? 'students' : 'tutors' }}</h3>
+              </div>
+              <article class="stats-card counterpart-list">
+                <div v-for="counterpart in userStats.top_counterparts" :key="counterpart.name">
+                  <strong>{{ counterpart.name }}</strong>
+                  <span>{{ counterpart.session_count }} sessions</span>
+                </div>
+                <p v-if="!userStats.top_counterparts?.length" class="empty-state">No bookings recorded.</p>
+              </article>
+            </template>
+          </div>
         </div>
 
-        <div v-else class="modal-section">
+        <div v-else-if="activeTab === 'schedule'" class="modal-section">
+          <div class="section-heading first-heading">
+            <h3>Weekly availability</h3>
+            <button type="button" class="secondary-action compact" :disabled="exporting" @click="exportAvailability">
+              Export CSV
+            </button>
+          </div>
+          <p v-if="availabilityLoading" class="empty-state">Loading schedule...</p>
+          <template v-else>
+            <div class="schedule-legend" aria-label="Schedule state legend">
+              <span><i class="legend-swatch is-open"></i>Open</span>
+              <span><i class="legend-swatch is-booked"></i>Booked</span>
+              <span><i class="legend-swatch is-inactive"></i>Inactive</span>
+            </div>
+            <div v-if="availabilityData?.length" class="schedule-grid">
+              <span class="schedule-corner"></span>
+              <strong v-for="day in scheduleDays" :key="day.value">{{ day.label }}</strong>
+              <template v-for="timeSlot in scheduleTimes" :key="timeSlot">
+                <span class="schedule-time">{{ formatTime(timeSlot) }}</span>
+                <template v-for="day in scheduleDays" :key="`${day.value}-${timeSlot}`">
+                  <button
+                    v-if="scheduleSlot(day.value, timeSlot)"
+                    type="button"
+                    class="schedule-cell"
+                    :class="`is-${scheduleSlot(day.value, timeSlot).state}`"
+                    :aria-label="`${day.label} ${formatTime(timeSlot)}: ${scheduleSlot(day.value, timeSlot).state}`"
+                    :disabled="scheduleSlot(day.value, timeSlot).state !== 'booked'"
+                    @click="jumpToBooking(scheduleSlot(day.value, timeSlot).booking_id)"
+                  >
+                    <i v-if="scheduleSlot(day.value, timeSlot).state === 'booked'" class="bi bi-check-lg"></i>
+                  </button>
+                  <span v-else class="schedule-cell is-empty"></span>
+                </template>
+              </template>
+            </div>
+            <p v-else class="empty-state">No weekly availability recorded.</p>
+            <p class="schedule-help">Click a booked cell to jump to it in Bookings.</p>
+          </template>
+        </div>
+
+        <div v-else-if="activeTab === 'bookings'" class="modal-section">
+          <div class="section-heading first-heading">
+            <h3>Booking history</h3>
+            <button type="button" class="secondary-action compact" :disabled="exporting" @click="exportBookings">
+              Export CSV
+            </button>
+          </div>
+          <div class="booking-filters" aria-label="Booking date filters">
+            <button
+              v-for="preset in bookingPresets"
+              :key="preset.value"
+              type="button"
+              class="filter-button"
+              :class="{ active: bookingFilter === preset.value }"
+              @click="setBookingPreset(preset.value)"
+            >
+              {{ preset.label }}
+            </button>
+          </div>
+          <div v-if="bookingFilter === 'custom'" class="custom-date-row">
+            <label>From<input v-model="customDateFrom" type="date"></label>
+            <label>To<input v-model="customDateTo" type="date"></label>
+            <button type="button" class="secondary-action compact" @click="applyCustomDates">Apply</button>
+          </div>
+          <p v-if="bookingsLoading" class="empty-state">Loading bookings...</p>
+          <div v-else class="booking-table-wrap">
+            <table class="booking-table">
+              <thead>
+                <tr>
+                  <th>Date</th><th>Time</th><th>Subject</th><th>Tutor</th><th>Tutee</th><th>Mode</th><th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="booking in bookingsData?.results"
+                  :key="booking.id"
+                  :ref="(element) => setBookingRowRef(booking.id, element)"
+                  :class="{ 'is-highlighted': highlightedBookingId === booking.id }"
+                >
+                  <td>{{ formatDateShort(booking.date) }}</td>
+                  <td>{{ formatTime(booking.time) }}</td>
+                  <td>{{ booking.subject }}</td>
+                  <td>{{ booking.tutor_name }}</td>
+                  <td>{{ booking.tutee_name }}</td>
+                  <td>{{ booking.mode }}</td>
+                  <td><span class="booking-status">{{ booking.status }}</span></td>
+                </tr>
+                <tr v-if="!bookingsData?.results?.length"><td colspan="7" class="empty-state">No bookings found.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div v-if="bookingsData?.total" class="pagination-row">
+            <span>Page {{ bookingsData.page }} of {{ bookingPageCount }}</span>
+            <div>
+              <button type="button" class="secondary-action compact" :disabled="bookingsData.page <= 1" @click="changeBookingPage(-1)">Previous</button>
+              <button type="button" class="secondary-action compact" :disabled="bookingsData.page >= bookingPageCount" @click="changeBookingPage(1)">Next</button>
+            </div>
+          </div>
+        </div>
+
+        <div v-else-if="activeTab === 'actions'" class="modal-section">
           <div class="action-grid">
             <label class="action-field">
               <span>Role</span>
@@ -178,7 +366,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import SbSelectModal from '@/components/SbSelectModal.vue'
 import { useHaptics } from '@/composables/useHaptics'
 import { useSuperAdminStore } from '@/stores/superadmin'
@@ -206,6 +394,41 @@ const busy = ref(false)
 const suspendConfirm = ref(false)
 const draftRole = ref('')
 const draftInstitution = ref('')
+const userStats = ref(null)
+const statsLoaded = ref(false)
+const statsLoading = ref(false)
+const availabilityData = ref(null)
+const availabilityLoaded = ref(false)
+const availabilityLoading = ref(false)
+const bookingsData = ref(null)
+const bookingsLoaded = ref(false)
+const bookingsLoading = ref(false)
+const bookingPage = ref(1)
+const bookingFilter = ref('all')
+const bookingDateFrom = ref(null)
+const bookingDateTo = ref(null)
+const customDateFrom = ref('')
+const customDateTo = ref('')
+const highlightedBookingId = ref(null)
+const bookingRowRefs = new Map()
+
+const ratingScores = [5, 4, 3, 2, 1]
+const scheduleDays = [
+  { value: 'Mon', label: 'Mon' },
+  { value: 'Tue', label: 'Tue' },
+  { value: 'Wed', label: 'Wed' },
+  { value: 'Thu', label: 'Thu' },
+  { value: 'Fri', label: 'Fri' },
+  { value: 'Sat', label: 'Sat' },
+  { value: 'Sun', label: 'Sun' },
+]
+const bookingPresets = [
+  { value: 'all', label: 'All time' },
+  { value: '7', label: 'Last 7 days' },
+  { value: '30', label: 'Last 30 days' },
+  { value: '90', label: 'Last 90 days' },
+  { value: 'custom', label: 'Custom' },
+]
 
 const roleOptions = [
   { label: 'Tutee', value: 'Tutee' },
@@ -247,22 +470,240 @@ const hasDirtyFields = computed(() =>
   String(draftInstitution.value || '') !== String(props.user?.institution || '')
 )
 
+const hasDetailStats = computed(() => ['Tutor', 'Tutee'].includes(props.user?.role))
+const exporting = computed(() => store.loading.userExport)
+const ratingTotal = computed(() =>
+  Object.values(userStats.value?.rating_distribution || {}).reduce(
+    (total, count) => total + Number(count),
+    0,
+  ),
+)
+const scheduleTimes = computed(() =>
+  [...new Set((availabilityData.value || []).map((slot) => slot.time_slot))].sort(),
+)
+const scheduleSlotMap = computed(() =>
+  new Map(
+    (availabilityData.value || []).map((slot) => [`${slot.day}-${slot.time_slot}`, slot]),
+  ),
+)
+const bookingPageCount = computed(() =>
+  Math.max(1, Math.ceil((bookingsData.value?.total || 0) / (bookingsData.value?.page_size || 10))),
+)
+
 watch(
-  () => props.user,
-  (user) => {
+  () => props.user?.id,
+  () => {
+    const user = props.user
     draftRole.value = user?.role || ''
     draftInstitution.value = user?.institution || ''
     activeTab.value = 'profile'
     suspendConfirm.value = false
+    userStats.value = null
+    statsLoaded.value = false
+    availabilityData.value = null
+    availabilityLoaded.value = false
+    bookingsData.value = null
+    bookingsLoaded.value = false
+    bookingPage.value = 1
+    bookingFilter.value = 'all'
+    bookingDateFrom.value = null
+    bookingDateTo.value = null
+    customDateFrom.value = ''
+    customDateTo.value = ''
+    highlightedBookingId.value = null
+    bookingRowRefs.clear()
     vibrate(patterns.light)
+    if (hasDetailStats.value) loadStats()
   },
   { immediate: true }
 )
 
-function switchTab(tab) {
+async function switchTab(tab) {
   activeTab.value = tab
   suspendConfirm.value = false
   vibrate(patterns.light)
+  if (tab === 'profile') await loadStats()
+  if (tab === 'schedule') await loadAvailability()
+  if (tab === 'bookings') await loadBookings()
+}
+
+async function loadStats() {
+  if (!props.user || !hasDetailStats.value || statsLoaded.value || statsLoading.value) return
+  const userId = props.user.id
+  statsLoading.value = true
+  try {
+    const data = await store.fetchUserStats(userId)
+    if (props.user?.id === userId) {
+      userStats.value = data
+      statsLoaded.value = true
+    }
+  } catch (error) {
+    toastStore.push(error.response?.data?.error || 'Failed to load user statistics.', 'error')
+  } finally {
+    statsLoading.value = false
+  }
+}
+
+async function loadAvailability() {
+  if (!props.user || availabilityLoaded.value || availabilityLoading.value) return
+  const userId = props.user.id
+  availabilityLoading.value = true
+  try {
+    const data = await store.fetchUserAvailability(userId)
+    if (props.user?.id === userId) {
+      availabilityData.value = data
+      availabilityLoaded.value = true
+    }
+  } catch (error) {
+    toastStore.push(error.response?.data?.error || 'Failed to load tutor availability.', 'error')
+  } finally {
+    availabilityLoading.value = false
+  }
+}
+
+async function loadBookings(force = false, page = bookingPage.value) {
+  if (!props.user || (!force && bookingsLoaded.value) || bookingsLoading.value) return
+  const userId = props.user.id
+  bookingsLoading.value = true
+  bookingRowRefs.clear()
+  try {
+    const data = await store.fetchUserBookings(userId, {
+      page,
+      dateFrom: bookingDateFrom.value,
+      dateTo: bookingDateTo.value,
+    })
+    if (props.user?.id === userId) {
+      bookingsData.value = data
+      bookingPage.value = page
+      bookingsLoaded.value = true
+    }
+  } catch (error) {
+    toastStore.push(error.response?.data?.error || 'Failed to load booking history.', 'error')
+  } finally {
+    bookingsLoading.value = false
+  }
+}
+
+function ratingPercentage(score) {
+  if (!ratingTotal.value) return 0
+  return (Number(userStats.value?.rating_distribution?.[score] || 0) / ratingTotal.value) * 100
+}
+
+function scheduleSlot(day, timeSlot) {
+  return scheduleSlotMap.value.get(`${day}-${timeSlot}`)
+}
+
+function toIsoDate(value) {
+  const year = value.getFullYear()
+  const month = String(value.getMonth() + 1).padStart(2, '0')
+  const day = String(value.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+async function setBookingPreset(preset) {
+  bookingFilter.value = preset
+  highlightedBookingId.value = null
+  if (preset === 'custom') return
+
+  bookingDateTo.value = null
+  bookingDateFrom.value = null
+  if (preset !== 'all') {
+    const today = new Date()
+    const start = new Date(today)
+    start.setDate(start.getDate() - Number(preset) + 1)
+    bookingDateFrom.value = toIsoDate(start)
+    bookingDateTo.value = toIsoDate(today)
+  }
+  bookingPage.value = 1
+  await loadBookings(true, 1)
+}
+
+async function applyCustomDates() {
+  if (customDateFrom.value && customDateTo.value && customDateFrom.value > customDateTo.value) {
+    toastStore.push('The start date must be on or before the end date.', 'error')
+    return
+  }
+  bookingDateFrom.value = customDateFrom.value || null
+  bookingDateTo.value = customDateTo.value || null
+  bookingPage.value = 1
+  highlightedBookingId.value = null
+  await loadBookings(true, 1)
+}
+
+async function changeBookingPage(direction) {
+  const nextPage = bookingPage.value + direction
+  if (nextPage < 1 || nextPage > bookingPageCount.value) return
+  highlightedBookingId.value = null
+  await loadBookings(true, nextPage)
+}
+
+function setBookingRowRef(bookingId, element) {
+  if (element) bookingRowRefs.set(bookingId, element)
+  else bookingRowRefs.delete(bookingId)
+}
+
+async function jumpToBooking(bookingId) {
+  if (!bookingId) return
+  activeTab.value = 'bookings'
+  bookingFilter.value = 'all'
+  bookingDateFrom.value = null
+  bookingDateTo.value = null
+  highlightedBookingId.value = bookingId
+
+  await loadBookings(true, 1)
+  let page = 1
+  const pageCount = bookingPageCount.value
+  while (!bookingsData.value?.results?.some((booking) => booking.id === bookingId) && page < pageCount) {
+    page += 1
+    await loadBookings(true, page)
+  }
+  await nextTick()
+  bookingRowRefs.get(bookingId)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+}
+
+async function exportStats() {
+  try {
+    await store.exportUserStatsCsv(props.user.id)
+  } catch {
+    toastStore.push('Failed to export profile statistics.', 'error')
+  }
+}
+
+async function exportAvailability() {
+  try {
+    await store.exportUserAvailabilityCsv(props.user.id)
+  } catch {
+    toastStore.push('Failed to export tutor availability.', 'error')
+  }
+}
+
+async function exportBookings() {
+  try {
+    await store.exportUserBookingsCsv(props.user.id, {
+      dateFrom: bookingDateFrom.value,
+      dateTo: bookingDateTo.value,
+    })
+  } catch {
+    toastStore.push('Failed to export booking history.', 'error')
+  }
+}
+
+function formatTime(timeString) {
+  if (!timeString) return ''
+  return new Intl.DateTimeFormat('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  }).format(new Date(`1970-01-01T${timeString}:00`))
+}
+
+function formatDateShort(dateString) {
+  if (!dateString) return ''
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(new Date(`${dateString}T00:00:00`))
 }
 
 function close() {
@@ -506,6 +947,330 @@ h2 {
 
 .modal-section {
   padding: 22px 24px;
+}
+
+.section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 24px 0 10px;
+}
+
+.section-heading.first-heading {
+  margin-top: 0;
+}
+
+.section-heading h3 {
+  margin: 0;
+  color: var(--sb-text-main);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.profile-stats {
+  margin-top: 24px;
+}
+
+.stats-card {
+  border: 1px solid var(--sb-card-border);
+  border-radius: 14px;
+  padding: 16px;
+  background: var(--sb-card-bg);
+}
+
+.rating-card,
+.review-list,
+.counterpart-list {
+  display: grid;
+  gap: 12px;
+}
+
+.rating-row {
+  display: grid;
+  grid-template-columns: 52px 1fr 28px;
+  align-items: center;
+  gap: 10px;
+  color: var(--sb-text-muted);
+  font-size: 12px;
+}
+
+.rating-row strong {
+  color: var(--sb-text-main);
+  text-align: right;
+}
+
+.rating-track {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--sb-card-border) 75%, transparent);
+}
+
+.rating-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--sb-primary);
+}
+
+.review-row + .review-row,
+.counterpart-list div + div {
+  border-top: 1px solid var(--sb-card-border);
+  padding-top: 12px;
+}
+
+.review-row div,
+.counterpart-list div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.review-row span,
+.counterpart-list span {
+  color: var(--sb-text-muted);
+  font-size: 12px;
+}
+
+.review-row p {
+  margin: 6px 0 0;
+  color: var(--sb-text-muted);
+  font-size: 13px;
+}
+
+.chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.subject-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid color-mix(in srgb, var(--sb-primary) 25%, var(--sb-card-border));
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: color-mix(in srgb, var(--sb-primary) 8%, var(--sb-card-bg));
+  color: var(--sb-primary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.subject-chip small {
+  color: var(--sb-text-muted);
+}
+
+.cancellation-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.cancellation-grid div {
+  display: grid;
+  gap: 2px;
+  text-align: center;
+}
+
+.cancellation-grid strong {
+  color: var(--sb-text-main);
+  font-size: 24px;
+}
+
+.cancellation-grid span {
+  color: var(--sb-text-muted);
+  font-size: 12px;
+}
+
+.empty-state {
+  margin: 0;
+  padding: 16px;
+  color: var(--sb-text-muted);
+  text-align: center;
+}
+
+.schedule-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 14px;
+  color: var(--sb-text-muted);
+  font-size: 12px;
+}
+
+.legend-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 5px;
+  border-radius: 3px;
+  vertical-align: -1px;
+}
+
+.legend-swatch.is-open,
+.schedule-cell.is-open {
+  border-color: color-mix(in srgb, var(--sb-primary) 35%, var(--sb-card-border));
+  background: color-mix(in srgb, var(--sb-primary) 10%, var(--sb-card-bg));
+}
+
+.legend-swatch.is-booked,
+.schedule-cell.is-booked {
+  border-color: var(--sb-primary);
+  background: var(--sb-primary);
+  color: var(--sb-card-bg);
+}
+
+.legend-swatch.is-inactive,
+.schedule-cell.is-inactive {
+  border-color: var(--sb-card-border);
+  background: color-mix(in srgb, var(--sb-card-border) 55%, var(--sb-card-bg));
+}
+
+.schedule-grid {
+  display: grid;
+  grid-template-columns: 64px repeat(7, minmax(50px, 1fr));
+  gap: 5px;
+  min-width: 520px;
+  overflow-x: auto;
+  align-items: center;
+}
+
+.schedule-grid > strong,
+.schedule-time {
+  color: var(--sb-text-muted);
+  font-size: 11px;
+  text-align: center;
+}
+
+.schedule-cell {
+  min-height: 34px;
+  border: 1px solid var(--sb-card-border);
+  border-radius: 7px;
+}
+
+.schedule-cell:disabled {
+  cursor: default;
+}
+
+.schedule-cell.is-empty {
+  background: transparent;
+  border-style: dashed;
+  opacity: 0.45;
+}
+
+.schedule-help {
+  margin: 10px 0 0;
+  color: var(--sb-text-muted);
+  font-size: 12px;
+}
+
+.booking-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-bottom: 14px;
+}
+
+.filter-button {
+  border: 1px solid var(--sb-card-border);
+  border-radius: 999px;
+  padding: 7px 12px;
+  background: var(--sb-card-bg);
+  color: var(--sb-text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.filter-button.active {
+  border-color: var(--sb-primary);
+  background: color-mix(in srgb, var(--sb-primary) 9%, var(--sb-card-bg));
+  color: var(--sb-primary);
+}
+
+.custom-date-row {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.custom-date-row label {
+  display: grid;
+  gap: 4px;
+  color: var(--sb-text-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.custom-date-row input {
+  border: 1px solid var(--sb-card-border);
+  border-radius: 9px;
+  padding: 8px;
+  background: var(--sb-card-bg);
+  color: var(--sb-text-main);
+}
+
+.booking-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--sb-card-border);
+  border-radius: 12px;
+}
+
+.booking-table {
+  width: 100%;
+  min-width: 820px;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.booking-table th,
+.booking-table td {
+  padding: 11px 10px;
+  border-bottom: 1px solid var(--sb-card-border);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.booking-table th {
+  color: var(--sb-text-muted);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.booking-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.booking-table tr.is-highlighted {
+  background: color-mix(in srgb, var(--sb-primary) 13%, var(--sb-card-bg));
+  outline: 2px solid var(--sb-primary);
+  outline-offset: -2px;
+}
+
+.booking-status {
+  display: inline-flex;
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: color-mix(in srgb, var(--sb-primary) 8%, var(--sb-card-bg));
+  color: var(--sb-text-main);
+  font-weight: 700;
+}
+
+.pagination-row,
+.pagination-row div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pagination-row {
+  justify-content: space-between;
+  margin-top: 14px;
+  color: var(--sb-text-muted);
+  font-size: 12px;
 }
 
 .detail-grid,
