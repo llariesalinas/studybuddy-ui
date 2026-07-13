@@ -168,6 +168,36 @@
           </div>
         </div>
 
+        <div v-if="proposedSubjects.length" class="mb-4">
+          <label class="text-muted small text-uppercase fw-bold mb-2">Proposed Subjects</label>
+          <div
+            v-for="subject in proposedSubjects"
+            :key="subject.subject_code"
+            class="proposed-subject-row"
+          >
+            <div>
+              <div class="fw-bold">{{ subject.subject_name }}</div>
+              <div class="small text-muted">{{ subject.department }}</div>
+            </div>
+            <div class="d-flex gap-2">
+              <button
+                class="btn btn-sm btn-success rounded-pill"
+                :disabled="processingSubject === subject.subject_code"
+                @click="handleSubjectReview(subject, 'approved')"
+              >
+                Approve
+              </button>
+              <button
+                class="btn btn-sm btn-outline-danger rounded-pill"
+                :disabled="processingSubject === subject.subject_code"
+                @click="handleSubjectReview(subject, 'rejected')"
+              >
+                Reject
+              </button>
+            </div>
+          </div>
+        </div>
+
         <div v-if="isPendingReview(selectedApp)" class="mt-5 pt-3 border-top">
           <div v-if="rejectionMode">
             <label class="form-label fw-bold small">Reason for Rejection</label>
@@ -232,6 +262,7 @@ const selectedApp = ref(null)
 const rejectionMode = ref(false)
 const rejectionReason = ref('')
 const processing = ref(false)
+const processingSubject = ref('')
 let offcanvas = null
 
 const pageTitle = computed(() => (filters.role === 'tutee' ? 'Tutee Applications' : 'Tutor Applications'))
@@ -265,6 +296,11 @@ const selectedReviewType = computed(() =>
 const selectedReviewTypeLabel = computed(() =>
   selectedReviewType.value === 'renewal' ? 'Renewal Submission' : 'Application'
 )
+
+const proposedSubjects = computed(() => {
+  if (filters.role !== 'tutor' || selectedReviewType.value !== 'initial') return []
+  return selectedApp.value?.proposed_subjects || []
+})
 
 const approveButtonLabel = computed(() =>
   selectedReviewType.value === 'renewal' ? 'Approve Renewal' : 'Approve Applicant'
@@ -347,6 +383,24 @@ const handleStatusUpdate = async (status) => {
     console.error('Status update failed:', err)
   } finally {
     processing.value = false
+  }
+}
+
+const handleSubjectReview = async (subject, status) => {
+  processingSubject.value = subject.subject_code
+  try {
+    await adminStore.reviewTutorProposedSubject(
+      selectedApp.value.id,
+      subject.subject_code,
+      status,
+    )
+    selectedApp.value.proposed_subjects = proposedSubjects.value.filter(
+      (item) => item.subject_code !== subject.subject_code,
+    )
+  } catch (err) {
+    console.error('Subject review failed:', err)
+  } finally {
+    processingSubject.value = ''
   }
 }
 
@@ -458,6 +512,15 @@ onMounted(() => {
 .doc-preview:hover {
   border-color: var(--sb-primary);
   box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.proposed-subject-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 0;
+  border-bottom: 1px solid var(--sb-card-border);
 }
 
 .fade-enter-active,

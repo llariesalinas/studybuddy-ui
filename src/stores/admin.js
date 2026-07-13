@@ -1,4 +1,7 @@
 import api from "@/services/api/api";
+import {
+  reviewTutorProposedSubject as reviewProposedSubjectRequest,
+} from '@/services/adminTutorApplications'
 import { defineStore } from "pinia";
 import { ref } from "vue";
 
@@ -382,6 +385,9 @@ export const useAdminStore = defineStore(
       }
     }
 
+    const reviewTutorProposedSubject = (applicationId, subjectCode, status) =>
+      reviewProposedSubjectRequest(applicationId, subjectCode, status)
+
     let tuteeApplicationsPromise = null
     const fetchTuteeApplications = async (status = null, force = false, options = {}) => {
       const params = {
@@ -475,6 +481,7 @@ export const useAdminStore = defineStore(
 
       fetchTutorApplications,
       updateTutorApplicationStatus,
+      reviewTutorProposedSubject,
 
       fetchTuteeApplications,
       updateTuteeApplicationStatus
