@@ -3,7 +3,10 @@
 Every finalized plan lives in this folder as its own dated file, created from [`_template.md`](_template.md).
 Status moves Draft â†’ Approved â†’ In Progress â†’ Done. When a plan is complete, its summary is linked below.
 
-**Status & Progress Summary** (2026-07-15): Instant Booking is Approved — grilled end-to-end (11
+**Status & Progress Summary** (2026-07-15): Merged `origin/main` into
+`feat/tutor-onboarding-verification-redesign`; main's "Remove Applicant Review from Super Admin"
+work is superseded on this branch by the Admin-into-SuperAdmin role consolidation (its plan row
+below is annotated accordingly), while main's migration-dependency fix was kept. Instant Booking is Approved — grilled end-to-end (11
 decisions) via `/grill-with-docs` from panel feedback: Instant Booking becomes the only booking
 model (request-to-book, approve/reject endpoints, and `TutorRequestedSessions.vue` removed);
 tutor protection moves to a symmetric 12h Grace Cutoff with self-serve Late Cancellations that
@@ -100,6 +103,7 @@ three stops. Done.
 | 2026-07-04 | [Recommendation algorithm live demo tool](2026-07-04-recommendation-algorithm-demo-tool.md) | Done | Staff-only debug endpoints + standalone HTML tool replaying the real Hybrid Score (CBF+CF) breakdown live; fixed a multi-word tutee-search bug and a mislabeled CF "no signal" state found during manual verification â€” [Summary](../session-summaries/2026-07-04-recommendation-algorithm-demo-tool-summary.md) |
 | 2026-07-04 | [Session details redesign (profile feel + animated status bar + pulse)](2026-07-04-session-details-profile-redesign.md) | Done | Two-column glass layout, saturated green hero, Level 3 animated Orbit Strip, accessible hold-to-confirm mid-session pulse, and profile-style action tiers for both tutee/tutor detail pages - [Summary](../session-summaries/2026-07-04-session-details-profile-redesign-summary.md) |
 | 2026-07-03 | [Session countdown implementation (Orbit Strip)](2026-07-03-session-countdown-prototype-plan.md) | Done | Verified all 13 decisions against real data; fixed a Decision 8 bug (detail bar leaking global queue state) and a pre-existing `SessionHero.vue` layout bug â€” [Summary](../session-summaries/2026-07-03-session-countdown-summary.md) |
+| 2026-07-03 | [Remove Applicant Review from Super Admin](2026-07-03-remove-superadmin-applicant-review.md) | Done | Superseded on this branch by the 2026-07-13 tutor onboarding redesign, which consolidates the institutional Admin role into SuperAdmin — [Summary](../session-summaries/2026-07-03-remove-superadmin-applicant-review-summary.md) |
 | 2026-07-02 | [Verification dev tools (self-service profile panel)](2026-07-02-verification-dev-tools.md) | Approved | Pending |
 | 2026-07-02 | [Full-system integration merge](2026-07-02-full-system-integration-merge.md) | Done | [Summary](../session-summaries/2026-07-02-full-system-integration-merge-summary.md) |
 | 2026-07-01 | [Tutee verification â€” overview](2026-07-01-tutee-verification-overview.md) | In Progress | Pending |
@@ -216,3 +220,4 @@ Entries marked Done&ast; predate the session-summary convention; their status is
 | 2026-07-14 | Created dedicated `feat/tutor-onboarding-verification-redesign` branch and committed the plan/mockup docs (previously uncommitted on the unrelated `feat/admin-role-consolidation` branch); compiled the plan into a Codex brief via `/codex-brief`, instructed per user request to skip the long-running full backend test suite; moved plan Approved -> In Progress |
 | 2026-07-15 | Grilled Instant Booking end-to-end (11 decisions) via `/grill-with-docs` from panel feedback ("cut the manual tutor confirmation layer"); added the Approved plan, ADR-0008 (instant booking replaces request-to-book), and glossary terms Instant Booking, Grace Cutoff, Late Cancellation, Counted Strike, Monthly Strike Cap, Booking Horizon, Meeting Link (plus a Support Ticket amendment for system-opened tickets) |
 | 2026-07-14 | `/codex-review` verified the implementation independently (targeted + full-suite backend tests on a fresh database, root-cause-traced all 33 pre-existing failures rather than assuming, frontend build/test green); reviewed and accepted Codex's one disclosed deviation; cleaned up two pieces of dead code directly; committed in three stops; added the session summary and moved the plan In Progress -> Done |
+| 2026-07-15 | Merged `origin/main` (5 commits) into `feat/tutor-onboarding-verification-redesign` ahead of the PR; resolved 4 conflicts in favor of this branch's Admin-into-SuperAdmin consolidation (main's SuperAdmin applicant-review ban and its tests dropped as superseded), kept main's 0057 migration-dependency fix, restored SuperAdmin access to `/admin/tutor-applications`, and annotated main's plan row as superseded |
