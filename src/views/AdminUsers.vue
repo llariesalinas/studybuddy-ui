@@ -150,6 +150,35 @@
           </div>
         </div>
 
+        <div v-if="selectedUser.role === 'Tutor'" class="card border-0 bg-light rounded-4 p-3 mt-3">
+          <h6 class="fw-bold mb-3 small text-muted">ACCEPTED SESSION LOAD</h6>
+          <p class="small text-muted mb-1">Current load</p>
+          <p class="fw-semibold mb-3">
+            {{ selectedUser.tutor_accepted_session_load || 0 }} / {{ selectedUser.tutor_session_load_limit || 10 }}
+          </p>
+          <label class="small text-muted mb-1">Session load limit</label>
+          <div class="d-flex gap-2 align-items-center">
+            <input
+              v-model="draftSessionLoadLimit"
+              type="number"
+              min="1"
+              max="20"
+              class="form-control form-control-sm sb-field"
+              style="max-width: 112px;"
+            >
+            <button
+              type="button"
+              class="btn btn-sm btn-primary rounded-pill px-3 sb-btn"
+              :disabled="savingSessionLoadLimit || !canSaveSessionLoadLimit"
+              @click="saveTutorSessionLoadLimit"
+            >
+              <span v-if="savingSessionLoadLimit" class="spinner-border spinner-border-sm me-1"></span>
+              {{ savingSessionLoadLimit ? 'Saving...' : 'Save limit' }}
+            </button>
+          </div>
+          <p class="small text-muted mb-0 mt-2">Allowed range: 1 to 20 session groups.</p>
+        </div>
+
         <div class="mt-4 pt-4 border-top">
           <button
             @click="toggleSuspension(selectedUser)"
@@ -184,6 +213,8 @@ import { useToastStore } from '@/stores/toast'
 const store = useAdminStore()
 const toastStore = useToastStore()
 const selectedUser = ref(null)
+const draftSessionLoadLimit = ref(10)
+const savingSessionLoadLimit = ref(false)
 
 const filters = reactive({
   search: '',
@@ -231,7 +262,21 @@ const formatDateFull = (dateStr) => {
 
 const openDetail = (user) => {
   selectedUser.value = user
+  draftSessionLoadLimit.value = Number(user?.tutor_session_load_limit ?? 10)
 }
+
+const canSaveSessionLoadLimit = computed(() => {
+  const current = Number(selectedUser.value?.tutor_session_load_limit ?? 10)
+  const next = Number(draftSessionLoadLimit.value)
+
+  return (
+    selectedUser.value?.role === 'Tutor' &&
+    Number.isFinite(next) &&
+    next >= 1 &&
+    next <= 20 &&
+    next !== current
+  )
+})
 
 const suspending = ref(false)
 
@@ -264,6 +309,25 @@ const deleteUser = async (user) => {
     } finally {
       deleting.value = false
     }
+  }
+}
+
+const saveTutorSessionLoadLimit = async () => {
+  if (!selectedUser.value || !canSaveSessionLoadLimit.value) return
+
+  savingSessionLoadLimit.value = true
+  try {
+    const updated = await store.updateUserTutorSessionLoadLimit(
+      selectedUser.value.id,
+      Number(draftSessionLoadLimit.value)
+    )
+    selectedUser.value = updated
+    draftSessionLoadLimit.value = Number(updated.tutor_session_load_limit ?? draftSessionLoadLimit.value)
+    toastStore.push('Tutor load limit updated.')
+  } catch {
+    toastStore.push('Failed to update tutor load limit.', 'error')
+  } finally {
+    savingSessionLoadLimit.value = false
   }
 }
 </script>

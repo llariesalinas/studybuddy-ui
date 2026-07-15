@@ -129,22 +129,36 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useSessionsStore } from '@/stores/completedSessions'
+import { useWalletStore } from '@/stores/wallet'
 import api from '@/services/api/api'
 
 const router = useRouter()
 const route = useRoute()
 const sessionsStore = useSessionsStore()
+const walletStore = useWalletStore()
 
 const totalSessions = ref(0)
 const avgRating = ref(0)
 const earnings = ref(0)
+const acceptedSessionLoad = ref(0)
+const sessionLoadLimit = ref(10)
 const upcomingBookings = ref([])
 const isLoading = ref(false)
 const errorMessage = ref('')
 
 const nextBooking = computed(() => upcomingBookings.value[0] || null)
+const walletBalance = computed(() => Number(walletStore.balance || 0))
 
 const dashboardMetrics = computed(() => [
+  {
+    label: 'Wallet Balance',
+    value: formatCurrency(walletBalance.value),
+    note: walletBalance.value >= 0 ? 'Available to cash out' : 'Top up to settle deductions',
+    icon: 'bi-wallet2',
+    tone: walletBalance.value >= 0 ? 'green' : 'gold',
+    visual: 'bars',
+    bars: walletBalance.value >= 0 ? [28, 44, 60, 76, 88, 68] : [70, 54, 42, 34, 24, 18],
+  },
   {
     label: 'Total Sessions',
     value: totalSessions.value,
@@ -173,6 +187,20 @@ const dashboardMetrics = computed(() => [
     bars: [34, 52, 72, 92, 64, 44],
   },
   {
+    label: 'Accepted Sessions',
+    value: `${acceptedSessionLoad.value} / ${sessionLoadLimit.value}`,
+    note:
+      acceptedSessionLoad.value >= sessionLoadLimit.value
+        ? 'At capacity for new accepts'
+        : `${Math.max(sessionLoadLimit.value - acceptedSessionLoad.value, 0)} slots left`,
+    icon: 'bi-clipboard-check',
+    tone: acceptedSessionLoad.value >= sessionLoadLimit.value ? 'gold' : 'blue',
+    visual: 'ring',
+    progress: sessionLoadLimit.value
+      ? Math.min(Math.round((acceptedSessionLoad.value / sessionLoadLimit.value) * 100), 100)
+      : 0,
+  },
+  {
     label: 'Next Session',
     value: nextBooking.value ? formatDate(nextBooking.value.date, 'short') : 'None',
     note: nextBooking.value
@@ -197,14 +225,18 @@ const loadTutorDashboard = async () => {
   errorMessage.value = ''
 
   try {
+    const walletLoad = walletStore.fetchWallet()
     const [, response] = await Promise.all([
       sessionsStore.fetchSessions(),
       api.get('tutor-dashboard/'),
     ])
+    await walletLoad.catch(() => {})
 
     totalSessions.value = response.data.total_sessions
     avgRating.value = response.data.rating_average
     earnings.value = response.data.total_earnings
+    acceptedSessionLoad.value = response.data.accepted_session_load ?? 0
+    sessionLoadLimit.value = response.data.session_load_limit ?? 10
 
     const apiBookings = response.data.upcoming_bookings || []
     const fallbackBookings = sessionsStore.upcomingSessions || []
@@ -362,7 +394,7 @@ watch(
 
 .metric-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 1rem;
   position: relative;
   z-index: 1;

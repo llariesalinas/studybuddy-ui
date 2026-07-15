@@ -1,9 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useProfileStore } from '@/stores/profile'
-import { needsTutorApplicationLockout, needsTuteeVerificationBlock } from '@/services/tutorApplicationState'
 
-const TUTEE_BOOKING_FLOW_ROUTE_NAMES = ['book', 'tutors', 'tutor-details']
+const GUEST_ONLY_ROUTE_NAMES = ['login', 'register']
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -111,6 +110,18 @@ const router = createRouter({
       meta: { requiresAuth: true }
     },
     {
+      path: '/tutor-setup/subjects',
+      name: 'tutor-subjects-setup',
+      component: () => import('@/views/TutorSubjectSetup.vue'),
+      meta: { requiresAuth: true, role: 'Tutor' }
+    },
+    {
+      path: '/tutor-setup/verification',
+      name: 'tutor-verification-setup',
+      component: () => import('@/views/TutorVerificationSetup.vue'),
+      meta: { requiresAuth: true, role: 'Tutor' }
+    },
+    {
       path: '/application-status',
       name: 'tutor-application-status',
       component: () => import('@/views/TutorApplicationStatus.vue'),
@@ -179,10 +190,16 @@ const router = createRouter({
       meta: { requiresAuth: true, role: 'Admin' }
     },
     {
+      path: '/admin/course-catalog',
+      name: 'admin-course-catalog',
+      component: () => import('@/views/AdminCourseCatalog.vue'),
+      meta: { requiresAuth: true, role: ['Admin', 'SuperAdmin'] }
+    },
+    {
       path: '/admin/tutor-applications',
       name: 'admin-tutor-applications',
       component: () => import('@/views/AdminTutorApplications.vue'),
-      meta: { requiresAuth: true, role: 'Admin' }
+      meta: { requiresAuth: true, role: ['Admin', 'SuperAdmin'] }
     },
     {
       path: '/superadmin/institutions',
@@ -229,6 +246,12 @@ const router = createRouter({
       component: () => import('@/views/AdminSupport.vue'),
       meta: { requiresAuth: true, role: 'SuperAdmin' }
     },
+    {
+      path: '/superadmin/algorithm-demo',
+      name: 'superadmin-algorithm-demo',
+      component: () => import('@/views/SuperAdminAlgorithmDemo.vue'),
+      meta: { requiresAuth: true, role: 'SuperAdmin' }
+    },
 
     // ---------- SHARED ROUTES ----------
     {
@@ -251,7 +274,7 @@ const router = createRouter({
 /*
   GLOBAL NAVIGATION GUARD
 */
-router.beforeEach(async (to, from, next) => {
+router.beforeEach(async (to) => {
   // Clean up any lingering backdrops or modal styles
   document.querySelectorAll('.offcanvas-backdrop, .modal-backdrop').forEach(el => el.remove())
   document.body.classList.remove('modal-open', 'offcanvas-open')
@@ -269,14 +292,24 @@ router.beforeEach(async (to, from, next) => {
 
   // 1️⃣ Protect routes requiring authentication
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
-    return next('/login')
+    return '/login'
+  }
+
+  // Keep already-authenticated users off guest-only pages (e.g. hitting /login via
+  // the browser back button after a push-based post-login redirect).
+  if (GUEST_ONLY_ROUTE_NAMES.includes(to.name) && authStore.isAuthenticated && authStore.token) {
+    if (normalizedUserRole === 'tutor') return '/tch-dashboard'
+    if (normalizedUserRole === 'tutee') return '/dashboard'
+    if (normalizedUserRole === 'admin') return '/admin/dashboard'
+    if (normalizedUserRole === 'superadmin') return '/superadmin/dashboard'
+    return '/'
   }
 
   if (authStore.isAuthenticated) {
 
     // Ensure token exists
     if (!authStore.token) {
-      return next('/login')
+      return '/login'
     }
 
     // 2️⃣ Load profile status
@@ -288,47 +321,19 @@ router.beforeEach(async (to, from, next) => {
         console.error("Profile check failed:", error)
 
         authStore.logout()
-        return next('/login')
+        return '/login'
       }
     }
 
-    const tutorApplicationSnapshot = {
-      application_status: profileStore.applicationStatus || authStore.user?.application_status || null,
-      tutor_renewal_status: profileStore.loaded
-        ? profileStore.tutorRenewalStatus
-        : authStore.user?.tutor_renewal_status || null,
-      tutor_renewal_required: profileStore.loaded
-        ? profileStore.tutorRenewalRequired
-        : authStore.user?.tutor_renewal_required || false,
-    }
-    // Global lockout applies only to never-approved tutors. A renewal-due/pending/rejected tutor
-    // is forward-only (blocked only at booking/accept surfaces, enforced server-side) — see
-    // docs/plans/2026-07-01-tutee-verification-phase2-gate.md.
-    const hasTutorApplicationLockout =
-      normalizedUserRole === 'tutor' &&
-      needsTutorApplicationLockout(tutorApplicationSnapshot)
+    if (normalizedUserRole === 'tutor' && !profileStore.tutorOnboardingComplete) {
+      const nextOnboardingRoute = !profileStore.profileCompleted
+        ? 'tutorpreferencesetup'
+        : !profileStore.tutorSubjectsCompleted
+          ? 'tutor-subjects-setup'
+          : 'tutor-verification-setup'
 
-    if (hasTutorApplicationLockout && to.name !== 'tutor-application-status') {
-      return next('/application-status')
+      if (to.name !== nextOnboardingRoute) return { name: nextOnboardingRoute }
     }
-
-    // Tutee booking-flow gate: forward-only, only blocks the booking-creation routes, and only once
-    // the server-side grace period has actually ended — see
-    // docs/plans/2026-07-01-tutee-verification-phase3-ui.md.
-    const tuteeApplicationSnapshot = {
-      application_status: profileStore.applicationStatus || null,
-      document_renewal_status: profileStore.renewalStatus || null,
-      tutee_verification_enforced: profileStore.tuteeVerificationEnforced,
-    }
-    const hasTuteeVerificationBlock =
-      normalizedUserRole === 'tutee' &&
-      TUTEE_BOOKING_FLOW_ROUTE_NAMES.includes(to.name) &&
-      needsTuteeVerificationBlock(tuteeApplicationSnapshot)
-
-    if (hasTuteeVerificationBlock) {
-      return next('/application-status')
-    }
-
     // 3️⃣ Profile completion guard
     if (!profileStore.profileCompleted) {
 
@@ -339,45 +344,45 @@ router.beforeEach(async (to, from, next) => {
         to.path === '/tutor-setup' ||
         to.path === '/application-status'
       ) {
-        return next()
+        return true
       }
 
       if (role === 'tutor') {
-        return next('/tutor-setup')
+        return '/tutor-setup'
       }
 
       if (role === 'admin' || role === 'superadmin') {
-        return next()
+        return true
       }
 
-      return next('/preferencesetup')
+      return '/preferencesetup'
     }
 
     // 4️⃣ Role protection
     if (normalizedRouteRoles.length && !normalizedRouteRoles.includes(normalizedUserRole)) {
 
       if (normalizedUserRole === 'tutor') {
-        return next('/tch-dashboard')
+        return '/tch-dashboard'
       }
 
       if (normalizedUserRole === 'tutee') {
-        return next('/dashboard')
+        return '/dashboard'
       }
 
       if (normalizedUserRole === 'admin') {
-        return next('/admin/dashboard')
+        return '/admin/dashboard'
       }
 
       if (normalizedUserRole === 'superadmin') {
-        return next('/superadmin/dashboard')
+        return '/superadmin/dashboard'
       }
 
-      return next('/')
+      return '/'
     }
 
   }
 
-  next()
+  return true
 
 })
 

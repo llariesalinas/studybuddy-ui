@@ -1,0 +1,538 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>StudyBuddy Demo Data Testing Accounts</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #17211b;
+      --muted: #637067;
+      --paper: #fbfaf4;
+      --card: #ffffff;
+      --line: #dce5dc;
+      --leaf: #246b45;
+      --leaf-dark: #154b30;
+      --gold: #f3b233;
+      --blue: #2f6f9f;
+      --shadow: 0 22px 70px rgba(23, 33, 27, 0.14);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      font-family: "Segoe UI", "Trebuchet MS", sans-serif;
+      background:
+        radial-gradient(circle at 12% 8%, rgba(243, 178, 51, 0.22), transparent 28rem),
+        radial-gradient(circle at 88% 0%, rgba(47, 111, 159, 0.14), transparent 24rem),
+        linear-gradient(135deg, #fffdf6 0%, var(--paper) 45%, #eef7ee 100%);
+    }
+
+    main {
+      width: min(1120px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 56px 0;
+    }
+
+    header {
+      display: grid;
+      gap: 20px;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: end;
+      margin-bottom: 26px;
+    }
+
+    .eyebrow {
+      margin: 0 0 10px;
+      color: var(--leaf);
+      font-size: 0.78rem;
+      font-weight: 800;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      max-width: 760px;
+      font-size: clamp(2.2rem, 4.8vw, 4.7rem);
+      line-height: 0.94;
+      letter-spacing: -0.065em;
+    }
+
+    .summary {
+      max-width: 700px;
+      margin: 18px 0 0;
+      color: var(--muted);
+      font-size: 1.05rem;
+      line-height: 1.65;
+    }
+
+    .password-card {
+      min-width: 260px;
+      padding: 20px;
+      border: 1px solid rgba(36, 107, 69, 0.18);
+      border-radius: 26px;
+      background: linear-gradient(145deg, #fff 0%, #f4fff6 100%);
+      box-shadow: var(--shadow);
+    }
+
+    .password-card span {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--muted);
+      font-size: 0.8rem;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    code {
+      padding: 0.18em 0.45em;
+      border-radius: 0.45em;
+      color: var(--leaf-dark);
+      background: rgba(36, 107, 69, 0.09);
+      font-family: "Cascadia Mono", "Consolas", monospace;
+      font-size: 0.95em;
+      font-weight: 700;
+    }
+
+    .password-card code {
+      font-size: 1.32rem;
+    }
+
+    .grid {
+      display: grid;
+      gap: 18px;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      margin: 26px 0;
+    }
+
+    .panel {
+      padding: 24px;
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      background: rgba(255, 255, 255, 0.84);
+      box-shadow: 0 14px 40px rgba(23, 33, 27, 0.08);
+    }
+
+    .panel h2 {
+      margin: 0 0 8px;
+      font-size: 1rem;
+    }
+
+    .panel p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    section {
+      margin-top: 28px;
+      padding: 28px;
+      border: 1px solid var(--line);
+      border-radius: 34px;
+      background: rgba(255, 255, 255, 0.92);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    section h2 {
+      margin: 0 0 18px;
+      font-size: 1.45rem;
+      letter-spacing: -0.03em;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 720px;
+    }
+
+    th,
+    td {
+      padding: 15px 14px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      color: var(--leaf-dark);
+      background: #f5faf5;
+      font-size: 0.78rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .role {
+      display: inline-flex;
+      align-items: center;
+      min-width: 84px;
+      justify-content: center;
+      padding: 0.32rem 0.58rem;
+      border-radius: 999px;
+      color: #fff;
+      background: var(--leaf);
+      font-size: 0.76rem;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .role.tutee {
+      background: var(--blue);
+    }
+
+    .role.tutor {
+      background: #7b5422;
+    }
+
+    .note {
+      padding: 18px 20px;
+      border-left: 5px solid var(--gold);
+      border-radius: 18px;
+      background: #fff8e8;
+      color: #5d4518;
+      line-height: 1.6;
+    }
+
+    footer {
+      margin-top: 24px;
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.6;
+    }
+
+    footer a {
+      color: var(--leaf-dark);
+      font-weight: 800;
+    }
+
+    @media (max-width: 860px) {
+      header,
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      main {
+        padding: 34px 0;
+      }
+
+      section {
+        padding: 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <p class="eyebrow">Architecture reference / Local demo data</p>
+        <h1>Demo Data Testing Accounts</h1>
+        <p class="summary">
+          Use these seeded accounts after running the local demo reset command. The accounts are
+          intentionally institution-scoped so admin flows can be tested for CPU and North University
+          without cross-institution bleed.
+        </p>
+      </div>
+      <aside class="password-card" aria-label="Shared demo password">
+        <span>Shared password</span>
+        <code>studybuddy123</code>
+      </aside>
+    </header>
+
+    <div class="grid" aria-label="Testing account rules">
+      <article class="panel">
+        <h2>Scope</h2>
+        <p>CPU and North admin accounts only see their own institution's data.</p>
+      </article>
+      <article class="panel">
+        <h2>Reset behavior</h2>
+        <p><code>reset_demo_data</code> preserves Admin and SuperAdmin logins while reseeding demo users.</p>
+      </article>
+      <article class="panel">
+        <h2>SuperAdmin</h2>
+        <p>Local dev: <code>superadmin@studybuddy.test</code> (verified valid 2026-07-08). The reset command never creates or overwrites this account — it must already exist.</p>
+      </article>
+      <article class="panel">
+        <h2>Course catalog</h2>
+        <p><code>reset_demo_data</code> also seeds <code>InstitutionCourseCatalog</code> entries for both CPU and North University. Only catalogued subjects appear in tutee/tutor subject flows — there is no fallback to global subjects.</p>
+      </article>
+    </div>
+
+    <section aria-labelledby="admin-logins">
+      <h2 id="admin-logins">Institution Admin Logins</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Role</th>
+              <th>Login</th>
+              <th>Institution Scope</th>
+              <th>Use For</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="role">Admin</span></td>
+              <td><code>demo.admin@cpu.edu.ph</code></td>
+              <td>Central Philippine University</td>
+              <td>CPU-scoped admin dashboard, course catalog, tutor/tutee/session data.</td>
+            </tr>
+            <tr>
+              <td><span class="role">Admin</span></td>
+              <td><code>demo.admin@north.edu.ph</code></td>
+              <td>North University</td>
+              <td>North-scoped admin dashboard and institution-specific course catalog behavior.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section aria-labelledby="persona-logins">
+      <h2 id="persona-logins">Named CPU Personas</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Role</th>
+              <th>Persona</th>
+              <th>Login</th>
+              <th>Scenario</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="role tutee">Tutee</span></td>
+              <td>Bea Santos</td>
+              <td><code>bea.santos@cpu.edu.ph</code></td>
+              <td>Cold-start recommendation case with no rating history.</td>
+            </tr>
+            <tr>
+              <td><span class="role tutee">Tutee</span></td>
+              <td>Carlo Reyes</td>
+              <td><code>carlo.reyes@cpu.edu.ph</code></td>
+              <td>CBF and CF agree on Miguel Torres.</td>
+            </tr>
+            <tr>
+              <td><span class="role tutee">Tutee</span></td>
+              <td>Diane Cruz</td>
+              <td><code>diane.cruz@cpu.edu.ph</code></td>
+              <td>Collaborative filtering overrides CBF, lifting Elena Bautista.</td>
+            </tr>
+            <tr>
+              <td><span class="role tutor">Tutor</span></td>
+              <td>Miguel Torres</td>
+              <td><code>miguel.torres@cpu.edu.ph</code></td>
+              <td>Strongest CBF fit; loved by one cluster and panned by another. Also the
+                <strong>cash-payment / wallet-debt-banner</strong> persona — see below.</td>
+            </tr>
+            <tr>
+              <td><span class="role tutor">Tutor</span></td>
+              <td>Elena Bautista</td>
+              <td><code>elena.bautista@cpu.edu.ph</code></td>
+              <td>Weaker CBF fit but favorite of the CF override cluster.</td>
+            </tr>
+            <tr>
+              <td><span class="role tutor">Tutor</span></td>
+              <td>Ramon Aquino</td>
+              <td><code>ramon.aquino@cpu.edu.ph</code></td>
+              <td>Collaborative-filtering anchor tutor.</td>
+            </tr>
+            <tr>
+              <td><span class="role tutor">Tutor</span></td>
+              <td>Cecilia Mercado</td>
+              <td><code>cecilia.mercado@cpu.edu.ph</code></td>
+              <td>Second CF anchor for Pearson similarity.</td>
+            </tr>
+            <tr>
+              <td><span class="role tutor">Tutor</span></td>
+              <td>Nico Villareal</td>
+              <td><code>nico.villareal@cpu.edu.ph</code></td>
+              <td>Brand-new tutor with zero sessions and zero ratings.</td>
+            </tr>
+            <tr>
+              <td><span class="role tutor">Tutor</span></td>
+              <td>Grace Domingo</td>
+              <td><code>grace.domingo@cpu.edu.ph</code></td>
+              <td>Fully booked at accepted session load 10/10.</td>
+            </tr>
+            <tr>
+              <td><span class="role tutor">Tutor</span></td>
+              <td>Paolo Ramirez</td>
+              <td><code>paolo.ramirez@cpu.edu.ph</code></td>
+              <td>Near load limit at 8/10 while still accepting.</td>
+            </tr>
+            <tr>
+              <td><span class="role tutor">Tutor</span></td>
+              <td>Isabel Fernandez</td>
+              <td><code>isabel.fernandez@cpu.edu.ph</code></td>
+              <td>High earner with top-ups and withdrawal states. Her balance also lands
+                negative most reseeds (a large pending withdrawal near the InstaPay cap
+                against session earnings) &mdash; incidental, not the debt-banner demo persona.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section aria-labelledby="additional-accounts">
+      <h2 id="additional-accounts">Additional Test Accounts</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Role</th>
+              <th>Persona</th>
+              <th>Login</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="role tutor">Tutor</span></td>
+              <td>Shelby Waller</td>
+              <td><code>tutor.shelby.waller.cpu67@cpu.edu.ph</code></td>
+            </tr>
+            <tr>
+              <td><span class="role tutor">Tutor</span></td>
+              <td>Grace Domingo</td>
+              <td><code>grace.domingo@cpu.edu.ph</code></td>
+            </tr>
+            <tr>
+              <td><span class="role tutor">Tutor</span></td>
+              <td>Paolo Ramirez</td>
+              <td><code>paolo.ramirez@cpu.edu.ph</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section aria-labelledby="cash-payments">
+      <h2 id="cash-payments">Cash Payments &amp; Wallet Debt Banner (added 2026-07-07)</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Test case</th>
+              <th>Where to look</th>
+              <th>Expected result</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Payment method is derived, not user-picked</td>
+              <td>Any booking confirmation / <code>submit_session_payment</code></td>
+              <td>F2F session &rarr; method is forced to <code>CASH</code>. Online session &rarr;
+                method is forced to <code>PAYMONGO</code>. Enforced server-side in both
+                <code>confirm_payment_and_book</code> and <code>submit_session_payment</code>; a
+                mismatched method in the request is rejected.</td>
+            </tr>
+            <tr>
+              <td>Cash receipt requirement</td>
+              <td>Paying for an F2F booking as a tutee</td>
+              <td>CASH requires a receipt photo only &mdash; no transaction reference field
+                (unlike PAYMONGO, which requires both a receipt and a transaction reference).</td>
+            </tr>
+            <tr>
+              <td>Wallet debt banner</td>
+              <td>Log in as <code>miguel.torres@cpu.edu.ph</code> (any page, banner is global)</td>
+              <td>A non-dismissible banner appears because his wallet balance is forced negative
+                by the seed (guaranteed &lt; 0; a clean reseed typically lands exactly
+                <code>-75.00</code>). Sourced from a boolean-only <code>wallet_negative</code>
+                field on <code>profile_status</code> &mdash; the banner never shows the actual
+                amount. Links to the Wallet page.</td>
+            </tr>
+            <tr>
+              <td>Debt banner absence</td>
+              <td>Log in as any tutor whose wallet balance is non-negative</td>
+              <td>Banner does not render. Note that Isabel Fernandez incidentally lands negative
+                on most reseeds too (see her persona row above), so she is not a reliable
+                "absence" check &mdash; use a tutor persona other than Miguel or Isabel, or check
+                the balance first.</td>
+            </tr>
+            <tr>
+              <td>Cash-paid session history</td>
+              <td>Miguel Torres's Wallet / transaction history</td>
+              <td>3 completed F2F sessions paid via CASH with receipt images attached, each
+                producing a <code>commission_deduction</code> transaction (no
+                <code>session_credit</code>, since cash never touches the platform's PayMongo
+                balance).</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section aria-labelledby="reset-command">
+      <h2 id="reset-command">Reset Command</h2>
+      <p class="note">
+        Local/dev only: from <code>backend/</code>, run
+        <code>venv\Scripts\python.exe manage.py reset_demo_data</code>. The command deletes
+        reseedable tutee/tutor demo data, preserves Admin and SuperAdmin logins, and recreates the
+        named scenarios with the shared password above. It also reseeds all
+        <code>InstitutionCourseCatalog</code> entries for CPU and North University so subject
+        visibility works correctly in every demo flow.
+      </p>
+      <p class="note" style="margin-top: 14px;">
+        <strong>Catalog-only update</strong> — if you only need to populate the
+        <code>InstitutionCourseCatalog</code> without wiping tutee/tutor accounts, run
+        <code>venv\Scripts\python.exe manage.py populate_course_catalog</code> instead. This
+        matches each subject's <code>category</code> field to the corresponding course code and
+        creates catalog entries for every institution. Requires subjects to already have
+        <code>category</code> set (i.e. <code>reset_demo_data</code> must have been run at least
+        once, since <code>seed_data</code> does not set <code>category</code>).
+      </p>
+    </section>
+
+    <section aria-labelledby="seed-superadmin">
+      <h2 id="seed-superadmin">Seeding a SuperAdmin</h2>
+      <p class="note">
+        <code>reset_demo_data</code> never creates or overwrites a SuperAdmin — it must already
+        exist before you run it. To promote (or create) one, use
+        <code>make_superadmin</code> from <code>backend/</code>:
+      </p>
+      <p class="note" style="margin-top: 14px;">
+        <strong>If the account already exists</strong> (e.g. local dev's
+        <code>superadmin@studybuddy.test</code>, verified valid 2026-07-08), just promote it —
+        this never touches the password:
+        <br /><code>venv\Scripts\python.exe manage.py make_superadmin superadmin@studybuddy.test</code>
+      </p>
+      <p class="note" style="margin-top: 14px;">
+        <strong>If no account exists yet for that email</strong> (e.g. first-time setup on the
+        demo/production database), add <code>--create</code> — it prompts twice for a password via
+        hidden input (never logged or echoed):
+        <br /><code>venv\Scripts\python.exe manage.py make_superadmin superadmin@studybuddy.test --create --first-name Super --last-name Admin</code>
+      </p>
+      <p class="note" style="margin-top: 14px;">
+        To run either form against the demo/production database instead of local dev, point the
+        same session at the demo Supabase pooler first (see
+        <a href="demo-deployment.md">demo deployment cheat sheet</a>, "Running a one-off command
+        against the demo database") — never hardcode that database's password into a single
+        command; set it as a session env var and unset/close the terminal afterward.
+      </p>
+    </section>
+
+    <footer>
+      Source of truth: <a href="../artifacts/2026-07-05-demo-data-testing-guide.md">demo data testing guide</a>
+      and <code>backend/studybuddy/management/commands/reset_demo_data.py</code>.
+    </footer>
+  </main>
+</body>
+</html>

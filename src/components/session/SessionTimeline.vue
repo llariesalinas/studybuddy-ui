@@ -86,19 +86,22 @@ const steps = computed(() => [
       : [props.dateLabel, props.timeLabel].filter(Boolean).join(' · ') || 'Scheduled',
   },
   {
-    title: normalizedStatus.value === 'payment required' ? 'Payment needed' : 'Completed',
-    caption: normalizedStatus.value === 'awaiting verification' ? 'Payment under review' : 'Paid and wrapped',
+    title: normalizedStatus.value === 'payment required' ? 'Payment needed' : 'Payment handoff',
+    caption: normalizedStatus.value === 'awaiting verification'
+      ? 'Payment under review'
+      : normalizedStatus.value === 'payment required'
+        ? 'Post-session payment required'
+        : 'Payment resolved',
+  },
+  {
+    title: 'Completed',
+    caption: normalizedStatus.value === 'completed' ? 'Finished and wrapped' : 'Final step',
   },
 ])
 </script>
 
 <style scoped>
-.session-card {
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-}
-
+/* Surface styling comes from the glass-segment class passed in by the parent view. */
 .session-card:hover {
   transform: none;
 }

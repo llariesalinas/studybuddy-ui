@@ -66,10 +66,25 @@
       class="app-main app-main-surface flex-grow-1 overflow-auto p-5 position-relative"
       :class="{ 'app-main-chat': route.name === 'chat' }"
     >
+        <VerificationBanner @navigate="goToVerificationStatus" />
+        <WalletDebtBanner @navigate="goToWallet" />
         <header class="app-page-header d-flex justify-content-between align-items-center mb-3 pb-3 border-bottom border-sb">
           
           <div v-if="route.path === '/dashboard'">
-            <h2 class="fw-bold sb-text">Welcome back, {{ userFname }}!</h2>
+            <div class="app-page-header__title-row">
+              <h2 class="fw-bold sb-text">Welcome back, {{ userFname }}!</h2>
+              <router-link
+                v-if="dashboardVerificationBadge"
+                to="/application-status"
+                class="dashboard-status-badge"
+                :class="dashboardVerificationBadge.tone"
+                :title="dashboardVerificationBadge.tooltip"
+                :aria-label="`${dashboardVerificationBadge.label}. ${dashboardVerificationBadge.tooltip}. View application status.`"
+              >
+                <i :class="dashboardVerificationBadge.icon" aria-hidden="true"></i>
+                <span>{{ dashboardVerificationBadge.label }}</span>
+              </router-link>
+            </div>
             <p class="sb-muted">Here's your tutoring overview for today.</p>
           </div>
 
@@ -101,7 +116,20 @@
           </div>
 
           <div v-if="route.path === '/tch-dashboard'">
-            <h2 class="fw-bold sb-text">Welcome back, {{ userFname }}!</h2>
+            <div class="app-page-header__title-row">
+              <h2 class="fw-bold sb-text">Welcome back, {{ userFname }}!</h2>
+              <router-link
+                v-if="dashboardVerificationBadge"
+                to="/application-status"
+                class="dashboard-status-badge"
+                :class="dashboardVerificationBadge.tone"
+                :title="dashboardVerificationBadge.tooltip"
+                :aria-label="`${dashboardVerificationBadge.label}. ${dashboardVerificationBadge.tooltip}. View application status.`"
+              >
+                <i :class="dashboardVerificationBadge.icon" aria-hidden="true"></i>
+                <span>{{ dashboardVerificationBadge.label }}</span>
+              </router-link>
+            </div>
             <p class="sb-muted">Here's your tutoring overview for today.</p>
           </div>
 
@@ -141,8 +169,8 @@
           </div>
 
           <div v-if="route.path === '/admin/tutor-applications'">
-            <h2 class="fw-bold sb-text">Tutor Applications</h2>
-            <p class="sb-muted">Review submitted tutor screening documents.</p>
+            <h2 class="fw-bold sb-text">Applications</h2>
+            <p class="sb-muted">Review submitted tutor and tutee screening documents.</p>
           </div>
 
           <div v-if="route.path === '/admin/reports'">
@@ -191,9 +219,14 @@
           </div>
 
           <div class="d-flex gap-3 align-items-center ms-auto">
-            <router-link v-if="userRole === 'tutee' && route.path !== '/book'" to="/book" class="btn bg-sb-primary text-white px-4 py-2 rounded-3 fw-semibold sb-btn sb-elevated sb-elevated--brand">
+            <button
+              v-if="userRole === 'tutee' && route.path !== '/book'"
+              type="button"
+              class="btn bg-sb-primary text-white px-4 py-2 rounded-3 fw-semibold sb-btn sb-elevated sb-elevated--brand"
+              @click="handleBookSessionClick"
+            >
               Book Session
-            </router-link>
+            </button>
 
             <router-link
               v-if="userRole === 'tutor' && route.path !== '/tch-requestedSessions'"
@@ -244,7 +277,7 @@
   </div>
 
   <template v-if="authStore.isAuthenticated && !isPublicRoute">
-    <OngoingBookingBar v-if="!hideOngoingBookingBar" />
+    <OngoingBookingBar />
 
     <template v-if="userRole === 'tutee'">
       <VenueConfirmModal
@@ -270,6 +303,7 @@
 import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth' // Import auth store
+import { useProfileStore } from '@/stores/profile'
 import { useSessionsStore } from '@/stores/completedSessions'
 import { useActiveSessionStore } from '@/stores/activeSession'
 import { useToastStore } from '@/stores/toast'
@@ -278,6 +312,8 @@ import RatingReminderBanner from '@/components/RatingReminderBanner.vue'
 import OngoingBookingBar from '@/components/OngoingBookingBar.vue'
 import VenueConfirmModal from '@/components/VenueConfirmModal.vue'
 import SessionCheckInModal from '@/components/SessionCheckInModal.vue'
+import VerificationBanner from '@/components/VerificationBanner.vue'
+import WalletDebtBanner from '@/components/WalletDebtBanner.vue'
 import { useChatStore } from '@/stores/chat'
 import router from './router'
 import { SESSION_POLL_INTERVAL_MS } from './config.js'
@@ -289,6 +325,7 @@ const DEV_LIVE_REFRESH_KEY = 'studybuddy_dev_live_refresh'
 
 const route = useRoute()
 const authStore = useAuthStore()
+const profileStore = useProfileStore()
 const chatStore = useChatStore()
 const sessionStore = useSessionsStore()
 const activeSession = useActiveSessionStore()
@@ -381,6 +418,162 @@ const openSupport = (type = 'Other', id = null) => {
   supportContextId.value = id
   isSupportModalOpen.value = true
 }
+
+const goToVerificationStatus = async (destination = '/application-status') => {
+  await router.push(destination)
+}
+
+const goToWallet = async () => {
+  await router.push('/tch-wallet')
+}
+
+const handleBookSessionClick = async () => {
+  await router.push('/book')
+}
+
+const normalizeStatus = (value) => String(value || '').trim().toLowerCase().replace(/\s+/g, '_')
+
+const dashboardVerificationBadge = computed(() => {
+  if (!profileStore.loaded || !userRole.value) {
+    return null
+  }
+
+  if (userRole.value === 'tutee') {
+    const applicationStatus = normalizeStatus(profileStore.applicationStatus)
+    const renewalStatus = normalizeStatus(profileStore.renewalStatus)
+    const isVerified = applicationStatus === 'approved' && renewalStatus === 'verified'
+
+    if (isVerified) {
+      return {
+        label: 'Verified',
+        tone: 'is-verified',
+        icon: 'bi bi-patch-check-fill',
+        tooltip: 'You are verified',
+      }
+    }
+
+    if (renewalStatus === 'due') {
+      return {
+        label: 'Unverified',
+        tone: 'is-unverified',
+        icon: 'bi bi-shield-exclamation',
+        tooltip: 'Renewal required',
+      }
+    }
+
+    if (renewalStatus === 'pending') {
+      return {
+        label: 'Unverified',
+        tone: 'is-unverified',
+        icon: 'bi bi-hourglass-split',
+        tooltip: 'Renewal pending',
+      }
+    }
+
+    if (renewalStatus === 'rejected') {
+      return {
+        label: 'Unverified',
+        tone: 'is-unverified',
+        icon: 'bi bi-exclamation-circle',
+        tooltip: 'Renewal rejected',
+      }
+    }
+
+    if (applicationStatus === 'pending') {
+      return {
+        label: 'Unverified',
+        tone: 'is-unverified',
+        icon: 'bi bi-hourglass-split',
+        tooltip: 'Application pending',
+      }
+    }
+
+    if (applicationStatus === 'rejected') {
+      return {
+        label: 'Unverified',
+        tone: 'is-unverified',
+        icon: 'bi bi-exclamation-circle',
+        tooltip: 'Application rejected',
+      }
+    }
+
+    return {
+      label: 'Unverified',
+      tone: 'is-unverified',
+      icon: 'bi bi-shield',
+      tooltip: 'Verification needed',
+    }
+  }
+
+  if (userRole.value === 'tutor') {
+    const applicationStatus = normalizeStatus(profileStore.applicationStatus)
+    const renewalStatus = normalizeStatus(profileStore.tutorRenewalStatus)
+    const isVerified = applicationStatus === 'approved' && renewalStatus === 'verified'
+
+    if (isVerified) {
+      return {
+        label: 'Verified',
+        tone: 'is-verified',
+        icon: 'bi bi-patch-check-fill',
+        tooltip: 'You are verified',
+      }
+    }
+
+    if (renewalStatus === 'due') {
+      return {
+        label: 'Unverified',
+        tone: 'is-unverified',
+        icon: 'bi bi-arrow-repeat',
+        tooltip: 'Renewal required',
+      }
+    }
+
+    if (renewalStatus === 'pending') {
+      return {
+        label: 'Unverified',
+        tone: 'is-unverified',
+        icon: 'bi bi-hourglass-split',
+        tooltip: 'Renewal pending',
+      }
+    }
+
+    if (renewalStatus === 'rejected') {
+      return {
+        label: 'Unverified',
+        tone: 'is-unverified',
+        icon: 'bi bi-exclamation-circle',
+        tooltip: 'Renewal rejected',
+      }
+    }
+
+    if (applicationStatus === 'pending') {
+      return {
+        label: 'Unverified',
+        tone: 'is-unverified',
+        icon: 'bi bi-hourglass-split',
+        tooltip: 'Application pending',
+      }
+    }
+
+    if (applicationStatus === 'rejected') {
+      return {
+        label: 'Unverified',
+        tone: 'is-unverified',
+        icon: 'bi bi-exclamation-circle',
+        tooltip: 'Application rejected',
+      }
+    }
+
+    return {
+      label: 'Unverified',
+      tone: 'is-unverified',
+      icon: 'bi bi-shield',
+      tooltip: 'Verification needed',
+    }
+  }
+
+  return null
+})
 let pendingSessionsRefreshId = null
 let startupIdleId = null
 let startupTimeoutId = null
@@ -452,13 +645,11 @@ const isPublicRoute = computed(() => {
     'reset-password',
     'password-reset-confirm',
     'preferencesetup',
-    'tutorpreferencesetup'
+    'tutorpreferencesetup',
+    'tutor-subjects-setup',
+    'tutor-verification-setup'
   ].includes(route.name)
 })
-
-const hideOngoingBookingBar = computed(() => (
-  ['tuteeSessionDetails', 'booking-details'].includes(route.name)
-))
 
 // Get the role from the store to control the sidebar links
 const userRole = computed(() => authStore.user?.role?.toLowerCase() || null)
@@ -602,6 +793,48 @@ onBeforeUnmount(() => {
 
 .app-page-header {
   min-height: var(--sb-topbar-height);
+}
+
+.app-page-header__title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+}
+
+.app-page-header__title-row h2 {
+  margin-bottom: 0;
+}
+
+.dashboard-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 0.8rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-decoration: none;
+  transition:
+    transform var(--sb-t-normal) var(--sb-spring),
+    box-shadow var(--sb-t-normal) var(--sb-spring);
+}
+
+.dashboard-status-badge:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
+}
+
+.dashboard-status-badge.is-verified {
+  background: #e8f7f1;
+  color: #0a7a51;
+  border: 1px solid rgba(0, 137, 90, 0.18);
+}
+
+.dashboard-status-badge.is-unverified {
+  background: #f3f4f6;
+  color: #52606d;
+  border: 1px solid #dce3e8;
 }
 
 .logout-modal {

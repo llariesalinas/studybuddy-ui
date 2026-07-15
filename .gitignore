@@ -40,6 +40,7 @@ __screenshots__/
 .env
 .env.*
 !.env.example
+!backend/.env.example
 
 # Local handoff notes and plans
 PROJECT_HANDOFF_DUMP.md
@@ -54,10 +55,14 @@ PROJECT_HANDOFF_DUMP.md
 # Added by code-review-graph
 .code-review-graph/
 
+# graphify knowledge-graph output (regeneratable local cache/index)
+graphify-out/
+
+# ui-preview mockup sessions (working files; decided mockups are promoted to docs/mockups/)
+docs/mockups/sessions/
+
 # Specific local files to ignore
 Algorithm Improvements documentation.md
-backend/studybuddy/migrations/0041_recommendation_filter_indexes.py
-tatusQ
 src/views/*.zip
 *.log
 *.err.log

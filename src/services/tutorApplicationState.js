@@ -106,9 +106,13 @@ export const getApplicationReviewKind = (application) => {
 
   if (
     ['renewal', 'document_renewal', 'reverification', 're_verification'].includes(type) ||
-    readBoolean(application, ['is_renewal', 'is_renewal_submission']) ||
-    getTutorRenewalStatus(application)
+    readBoolean(application, ['is_renewal', 'is_renewal_submission'])
   ) {
+    return 'renewal'
+  }
+
+  const renewalStatus = getTutorRenewalStatus(application)
+  if (['due', 'pending', 'rejected'].includes(renewalStatus)) {
     return 'renewal'
   }
 

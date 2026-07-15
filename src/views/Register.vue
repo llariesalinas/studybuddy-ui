@@ -97,12 +97,6 @@
       </button>
     </form>
 
-    <TutorScreeningModal
-      :is-open="showScreeningModal"
-      :is-submitting="isSubmitting"
-      @close="showScreeningModal = false"
-      @submit="handleTutorScreeningSubmit"
-    />
   </AuthShell>
 </template>
 
@@ -114,14 +108,12 @@ import api from '@/services/api/api'
 import { useCatalogStore } from '@/stores/catalog'
 import AuthShell from '@/components/AuthShell.vue'
 import SbSelectModal from '@/components/SbSelectModal.vue'
-import TutorScreeningModal from '@/components/TutorScreeningModal.vue'
 
 const router = useRouter()
 const store = useRegistrationInfoStore()
 const catalogStore = useCatalogStore()
 
 const isSubmitting = ref(false)
-const showScreeningModal = ref(false)
 const institutions = ref([])
 
 const generalError = ref('')
@@ -203,40 +195,14 @@ const validateBaseRegistration = () => {
 }
 
 const buildRegistrationPayload = () => {
-  const role = store.newUserType
-
-  if (role !== 'Tutor') {
-    return {
-      payload: {
-        fname: store.newUserFname,
-        mname: store.newUserMname,
-        lname: store.newUserLname,
-        email: store.newUserEmail,
-        password: store.newUserPassword,
-        role,
-        institution_id: store.selectedInstitutionId,
-      },
-      config: undefined,
-    }
-  }
-
-  const formData = new FormData()
-  formData.append('fname', store.newUserFname)
-  formData.append('mname', store.newUserMname)
-  formData.append('lname', store.newUserLname)
-  formData.append('email', store.newUserEmail)
-  formData.append('password', store.newUserPassword)
-  formData.append('role', role)
-  formData.append('institution_id', store.selectedInstitutionId)
-  formData.append('school_id', store.schoolIdFile)
-  formData.append('enrollment_proof', store.enrollmentProofFile)
-  formData.append('reason_to_tutor', store.reasonToTutor)
-
   return {
-    payload: formData,
-    config: {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    },
+    fname: store.newUserFname,
+    mname: store.newUserMname,
+    lname: store.newUserLname,
+    email: store.newUserEmail,
+    password: store.newUserPassword,
+    role: store.newUserType,
+    institution_id: store.selectedInstitutionId,
   }
 }
 
@@ -245,17 +211,16 @@ const submitRegistration = async () => {
 
   try {
     const email = store.newUserEmail
-    const role = store.newUserType
-    const { payload, config } = buildRegistrationPayload()
+    const payload = buildRegistrationPayload()
 
-    await api.post('register/', payload, config)
+    await api.post('register/', payload)
 
     store.reset()
 
     await router.push({
-      name: role === 'Tutor' ? 'tutor-application-submitted' : 'login',
+      name: 'login',
       query: {
-        ...(role !== 'Tutor' ? { registered: 'success' } : {}),
+        registered: 'success',
         email,
       },
     })
@@ -283,21 +248,7 @@ const submitRegistration = async () => {
 const handleRegister = async () => {
   if (!validateBaseRegistration()) return
 
-  if (store.newUserType === 'Tutor') {
-    showScreeningModal.value = true
-    return
-  }
-
   await submitRegistration()
-}
-
-const handleTutorScreeningSubmit = async () => {
-  generalError.value = ''
-
-  const success = await submitRegistration()
-  if (!success) {
-    showScreeningModal.value = false
-  }
 }
 
 onMounted(() => {

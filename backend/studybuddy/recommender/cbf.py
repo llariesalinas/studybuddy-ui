@@ -1,6 +1,7 @@
 import logging
 
 from ..models import Preference, Tutor
+from ..subject_recognition import recognized_subject_codes_for_profile
 
 logger = logging.getLogger(__name__)
 
@@ -17,16 +18,24 @@ def get_student_subject_codes(student_profile):
     except Preference.DoesNotExist:
         return []
 
-    return list(pref.subjects.values_list("subject_code", flat=True))
+    recognized_codes = recognized_subject_codes_for_profile(student_profile)
+    return [
+        code
+        for code in pref.subjects.values_list("subject_code", flat=True)
+        if code in recognized_codes
+    ]
 
 
-def compute_cbf_score(
+def compute_cbf_breakdown(
     student_profile,
     tutor,
     requested_subject,
     student_subjects=None,
     tutor_subjects=None,
 ):
+    """Same computation as compute_cbf_score, but returns each weighted sub-score
+    alongside the total. Used by compute_cbf_score and by the algorithm demo tool
+    (recommender/demo.py) to show the CBF formula's components, not just the total."""
     student_course = student_profile.course
     student_year = student_profile.year_level
     subject_codes = (
@@ -84,23 +93,46 @@ def compute_cbf_score(
     if tutor_level == "SHS" and student_year is not None and int(student_year) > 12:
         s_level = 0
 
-    score = (
-        W_SUBJECT * s_subject +
-        W_EXPERTISE * s_expertise +
-        W_COURSE * s_course +
-        W_YEAR * s_year +
-        W_LEVEL * s_level
-    )
+    sub_scores = {
+        "subject": (W_SUBJECT, s_subject),
+        "expertise": (W_EXPERTISE, s_expertise),
+        "course": (W_COURSE, s_course),
+        "year": (W_YEAR, s_year),
+        "level": (W_LEVEL, s_level),
+    }
+
+    breakdown = {
+        name: {"weight": weight, "value": value, "contribution": weight * value}
+        for name, (weight, value) in sub_scores.items()
+    }
+    breakdown["score"] = sum(part["contribution"] for part in breakdown.values())
+    breakdown["tutor_subject_codes"] = tutor_subject_codes
 
     logger.debug(
         "CBF score for tutor %s: %.3f (student subjects=%s, tutor subjects=%s)",
         tutor.profile_id,
-        score,
+        breakdown["score"],
         subject_codes,
         tutor_subject_codes,
     )
 
-    return score
+    return breakdown
+
+
+def compute_cbf_score(
+    student_profile,
+    tutor,
+    requested_subject,
+    student_subjects=None,
+    tutor_subjects=None,
+):
+    return compute_cbf_breakdown(
+        student_profile,
+        tutor,
+        requested_subject,
+        student_subjects=student_subjects,
+        tutor_subjects=tutor_subjects,
+    )["score"]
 
 
 def recommend_tutors(student_profile, subject=None, preferred_mode=None):

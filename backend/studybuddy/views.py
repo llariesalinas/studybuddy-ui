@@ -19,6 +19,7 @@ from django.utils.timezone import now
 from django.utils.crypto import constant_time_compare
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+from django.utils.text import slugify
 from django.db import transaction, IntegrityError
 from datetime import datetime,timedelta, date
 from calendar import monthrange
@@ -59,6 +60,15 @@ from .recommender.dashboard import (
     dashboard_recs_cache_key,
     get_dashboard_recommendations,
 )
+from .recommender.demo import build_algorithm_demo_recommendation, search_tutees
+from .permissions import IsSuperAdminUser
+from .subject_recognition import (
+    invalid_new_subject_codes,
+    recognized_subject_codes_for_profile,
+    subject_is_recognized_for_profile,
+    subject_selection_queryset_for_profile,
+    visible_subject_queryset_for_profile,
+)
 from django.core.cache import cache
 from . import _verification_dev
 from .models import Booking, Course, EmailOTPChallenge, Notification, PartnerInstitution, Payment, PaymentMethod, Preference, Rating, SessionCheckIn, Subjects, Tutor, TutorApplication, TutorAvailability, TutorAvailabilityOverride, TutorDocumentRenewalReview, TutorSubjects, Wallet, PlatformActivity, Transaction, TuteeApplication, TuteeDocumentRenewalReview
@@ -75,7 +85,7 @@ from .serializers import (
 )
 from .email_utils import send_application_received_email
 from .chat.services import create_booking_event
-from .image_utils import compress_image
+from .image_utils import compress_image, compress_if_image
 
 from .models import (
     UserProfile,
@@ -86,6 +96,8 @@ from .models import (
 )
 
 logger = logging.getLogger(__name__)
+TUTOR_SUBJECT_LIMIT = 8
+DEFAULT_TUTOR_SUBJECT_EXPERTISE_LEVEL = 3
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
@@ -123,6 +135,22 @@ PASSWORD_RESET_GENERIC_MESSAGE = (
     "If an account with that email exists, password reset instructions have been sent."
 )
 OTP_ERROR_MESSAGE = "Invalid or expired verification code."
+SUBJECT_NOT_RECOGNIZED_ERROR = "This subject is not recognized for your course catalog."
+
+
+def get_tutor_onboarding_context(profile):
+    tutor_onboarding_skipped_at = profile.tutor_onboarding_skipped_at
+    tutor_onboarding_complete = bool(
+        tutor_onboarding_skipped_at is not None
+        or (profile.role == 'Tutor' and TutorApplication.objects.filter(profile=profile).exists())
+    )
+
+    return {
+        "tutor_onboarding_skipped_at": (
+            tutor_onboarding_skipped_at.isoformat() if tutor_onboarding_skipped_at else None
+        ),
+        "tutor_onboarding_complete": tutor_onboarding_complete,
+    }
 
 
 def build_login_response_payload(user, profile):
@@ -138,6 +166,7 @@ def build_login_response_payload(user, profile):
         "email": user.email,
         "fname": profile.fname,
         "lname": profile.lname,
+        **get_tutor_onboarding_context(profile),
         **tutor_document_context,
     }
 
@@ -377,6 +406,68 @@ def dev_verification_set_enforcement(request):
     return Response(_verification_dev_readout(request.user.userprofile))
 
 
+# --- Recommendation algorithm demo tool (staff-only) ------------------------------------------
+# Gated by settings.ALGORITHM_DEMO_TOOLS_ENABLED, checked first in each view (403 when off), plus
+# IsSuperAdminUser (not the looser IsAdminUser) since this reads other users' names and rating
+# history — mirrors AdminUserVerificationDevToolsView, which restricts to SuperAdmin for the same
+# reason. Backs the standalone HTML demo tool at
+# docs/artifacts/2026-07-04-recommendation-algorithm-live-demo.html.
+# See docs/plans/2026-07-04-recommendation-algorithm-demo-tool.md.
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsSuperAdminUser])
+def algorithm_demo_search_tutees(request):
+    if not settings.ALGORITHM_DEMO_TOOLS_ENABLED:
+        return Response({"error": "Algorithm demo tools are disabled."}, status=403)
+
+    query = request.query_params.get('q', '').strip()
+    institution_id = request.query_params.get('institution_id') or None
+    return Response({"tutees": search_tutees(query, institution_id=institution_id)})
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsSuperAdminUser])
+def algorithm_demo_recommend(request):
+    if not settings.ALGORITHM_DEMO_TOOLS_ENABLED:
+        return Response({"error": "Algorithm demo tools are disabled."}, status=403)
+
+    tutee_id = request.query_params.get('tutee_id')
+    if not tutee_id:
+        return Response({"error": "tutee_id is required."}, status=400)
+
+    tutee = get_object_or_404(UserProfile, id=tutee_id, role="Tutee")
+    institution_id = request.query_params.get('institution_id') or None
+    result = build_algorithm_demo_recommendation(tutee, institution_id=institution_id)
+    return Response(result)
+
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated, IsSuperAdminUser])
+def algorithm_demo_update_rating(request):
+    if not settings.ALGORITHM_DEMO_TOOLS_ENABLED:
+        return Response({"error": "Algorithm demo tools are disabled."}, status=403)
+
+    student_id = request.data.get('student_id')
+    tutor_id = request.data.get('tutor_id')
+    try:
+        rating_score = int(request.data.get('rating_score'))
+    except (TypeError, ValueError):
+        return Response({"error": "A valid rating_score is required."}, status=400)
+    if rating_score < 1 or rating_score > 5:
+        return Response({"error": "rating_score must be between 1 and 5."}, status=400)
+
+    rating = Rating.objects.filter(
+        student_id=student_id, tutor_id=tutor_id
+    ).order_by('-id').first()
+    if rating is None:
+        return Response({"error": "No existing rating found for this pair."}, status=404)
+
+    rating.rating_score = rating_score
+    rating.save(update_fields=['rating_score'])
+    update_tutor_rating_average(rating.tutor)
+    return Response({"ok": True, "rating_score": rating.rating_score})
+
+
 def build_admin_profile_defaults(user):
     display_name = (
         user.get_full_name().strip()
@@ -393,7 +484,7 @@ def build_admin_profile_defaults(user):
         'fname': fname[:100],
         'mname': '',
         'lname': lname[:100],
-        'role': 'Admin',
+        'role': 'SuperAdmin',
         'profile_completed': True,
         'is_domain_exempt': True,
         'is_suspended': False,
@@ -415,8 +506,8 @@ def get_login_profile_for_user(user):
     if user.is_staff or user.is_superuser:
         updated_fields = []
 
-        if profile.role not in ('Admin', 'SuperAdmin'):
-            profile.role = 'Admin'
+        if profile.role != 'SuperAdmin':
+            profile.role = 'SuperAdmin'
             updated_fields.append('role')
 
         if not profile.profile_completed:
@@ -663,6 +754,16 @@ def get_session_group_bookings(booking):
     return sort_bookings_for_session_group(booking_group)
 
 
+def get_tutor_acceptance_load_snapshot(tutor):
+    accepted_session_load = tutor.accepted_session_load()
+    session_load_limit = int(tutor.session_load_limit or 0)
+    return {
+        "accepted_session_load": accepted_session_load,
+        "session_load_limit": session_load_limit,
+        "session_load_remaining": max(session_load_limit - accepted_session_load, 0),
+    }
+
+
 def get_booking_request_bookings(booking):
     if booking.booking_request_id is None:
         return get_session_group_bookings(booking)
@@ -728,6 +829,10 @@ def get_representative_booking(bookings):
     return None
 
 
+def booking_subject_label(booking):
+    return booking.subject.subject_name if booking.subject else "General"
+
+
 def get_dashboard_hidden_for_profile(bookings, profile):
     if not profile:
         return False
@@ -753,10 +858,7 @@ def get_session_notification_context(bookings):
             "tutee_name": "the tutee",
         }
 
-    subject = (
-        representative_booking.tutor.profile.course.course_name
-        if representative_booking.tutor.profile.course else "General"
-    )
+    subject = booking_subject_label(representative_booking)
     date_label = representative_booking.session_date.strftime("%Y-%m-%d")
     tutor_name = f"{representative_booking.tutor.profile.fname} {representative_booking.tutor.profile.lname}"
     tutee_name = f"{representative_booking.student.fname} {representative_booking.student.lname}"
@@ -770,9 +872,11 @@ def get_session_notification_context(bookings):
 
 
 DEV_LIVE_PHASES = {
+    'upcoming': (12, 72),
     'start': (-5, 55),
     'midpoint': (-30, 30),
     'ending': (-55, 5),
+    'handoff': (-70, -10),
 }
 DEV_LIVE_CACHE_TIMEOUT_SECONDS = 60 * 60 * 6
 
@@ -791,7 +895,7 @@ def get_dev_live_cache_keys_for_booking(booking):
 
 
 def get_dev_live_override_for_bookings(bookings):
-    if not settings.DEBUG:
+    if not settings.BOOKING_DEV_TOOLS_ENABLED:
         return None
 
     for booking in sort_bookings_for_session_group(bookings):
@@ -869,6 +973,27 @@ def get_display_status(raw_status, session_date, start_time, end_time):
         return 'Awaiting Verification'
 
     return raw_status
+
+
+def get_current_display_status_for_booking(booking):
+    session_group_bookings = get_session_group_bookings(booking)
+    representative_booking = get_representative_booking(session_group_bookings)
+    first_booking = session_group_bookings[0]
+    last_booking = session_group_bookings[-1]
+
+    start_time = first_booking.availability.time_slot
+    end_time = (
+        datetime.combine(first_booking.session_date, last_booking.availability.time_slot)
+        + timedelta(minutes=SESSION_SLOT_MINUTES)
+    ).time()
+    session_date, start_time, end_time = apply_dev_live_override(
+        session_group_bookings,
+        representative_booking.session_date,
+        start_time,
+        end_time,
+    )
+
+    return get_display_status(representative_booking.status, session_date, start_time, end_time)
 
 
 def create_booking_status_notification(recipient, status_key, bookings, recipient_role=None, actor_role=None, reason=None):
@@ -988,7 +1113,18 @@ def get_wallet_transaction_description(wallet_transaction, student_name=None):
     return f"{base_description} - Student: {student_name}"
 
 
-def serialize_payment_summary(representative_booking):
+def build_absolute_media_url(request, field_file):
+    if not field_file:
+        return None
+
+    file_url = field_file.url
+    if request is None:
+        return file_url
+
+    return request.build_absolute_uri(file_url)
+
+
+def serialize_payment_summary(representative_booking, request=None):
     payment = getattr(representative_booking, 'payment', None)
 
     if not payment:
@@ -1023,7 +1159,7 @@ def serialize_payment_summary(representative_booking):
         "platform_fee": platform_fee,
         "transaction_fee": transaction_fee,
         "status": payment.payment_status,
-        "receipt_image": payment.receipt_image.url if payment.receipt_image else None,
+        "receipt_image": build_absolute_media_url(request, payment.receipt_image),
     }
 
 
@@ -1130,22 +1266,10 @@ def register_user(request):
     existing_user = User.objects.filter(username=email).first()
 
     if existing_user and hasattr(existing_user, 'userprofile'):
-        profile = existing_user.userprofile
-        is_rejected_tutor = False
-        if profile.role == 'Tutor':
-            try:
-                application = profile.tutor_application
-                if application.application_status == 'rejected':
-                    is_rejected_tutor = True
-            except TutorApplication.DoesNotExist:
-                pass
-
-        if not is_rejected_tutor:
-            return Response(
-                {"error": "User already exists"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        # If is_rejected_tutor is True, proceed to update profile/application
+        return Response(
+            {"error": "User already exists"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
     if existing_user:
         logger.warning(
@@ -1184,50 +1308,7 @@ def register_user(request):
 
     # 🔥 Create/Update Tutor record if role is Tutor
     if role == "Tutor":
-        tutor, _ = Tutor.objects.get_or_create(profile=profile)
-
-        # Handle TutorApplication (Update or Create)
-        school_id = request.FILES.get('school_id')
-        enrollment_proof = request.FILES.get('enrollment_proof')
-        reason_to_tutor = request.data.get('reason_to_tutor', '')
-
-        if not school_id or not enrollment_proof:
-            # We need to make sure we don't block if they provided these in a previous application,
-            # but if this is a NEW registration/re-application, they must be here.
-            # Assuming they must upload new docs for a new application.
-            return Response(
-                {"error": "Tutor applicants must provide a School ID and Proof of Enrollment."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        if (school_id.size > settings.MAX_DOCUMENT_UPLOAD_SIZE
-                or enrollment_proof.size > settings.MAX_DOCUMENT_UPLOAD_SIZE):
-            return Response(
-                {"error": "Each uploaded file must be under 5 MB. Please compress your images and try again."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        TutorApplication.objects.update_or_create(
-            profile=profile,
-            defaults={
-                'application_status': 'pending',
-                'school_id': school_id,
-                'enrollment_proof': enrollment_proof,
-                'reason_to_tutor': reason_to_tutor,
-                'submitted_at': timezone.now()
-            }
-        )
-
-        # Send confirmation email after the transaction commits so the DB write is
-        # guaranteed to be visible and the email send does not block/extend the lock.
-        def _send_confirmation():
-            try:
-                send_application_received_email(profile)
-            except Exception:
-                logger.exception(
-                    "Failed to send tutor application received email for profile_id=%s", profile.id
-                )
-        transaction.on_commit(_send_confirmation)
+        Tutor.objects.get_or_create(profile=profile)
 
     PlatformActivity.objects.create(
         activity_type='registration',
@@ -1263,11 +1344,23 @@ def profile_status(request):
         )
 
     document_context = get_role_document_review_context(profile)
+    wallet_negative = False
+    tutor_subject_count = 0
+    if profile.role == 'Tutor':
+        tutor = getattr(profile, 'tutor', None)
+        if tutor is not None:
+            wallet = Wallet.objects.filter(tutor=tutor).first()
+            wallet_negative = bool(wallet and wallet.balance < 0)
+            tutor_subject_count = TutorSubjects.objects.filter(tutor=tutor).count()
 
     return Response({
         "profile_completed": profile.profile_completed,
         "role": profile.role,
+        "wallet_negative": wallet_negative,
         "tutee_verification_enforced": tutee_verification_enforced(),
+        **get_tutor_onboarding_context(profile),
+        "tutor_subject_count": tutor_subject_count,
+        "tutor_subjects_completed": tutor_subject_count > 0,
         **document_context
     })
 
@@ -1307,18 +1400,7 @@ def login_view(request):
             status=status.HTTP_403_FORBIDDEN
         )
 
-    # Block login if tutor application is still pending
-    if profile.role == 'Tutor':
-        try:
-            if hasattr(profile, 'tutor_application') and profile.tutor_application.application_status == 'pending':
-                return Response(
-                    {"error": "Your application is still being processed. We will email you once it is approved."},
-                    status=status.HTTP_403_FORBIDDEN
-                )
-        except TutorApplication.DoesNotExist:
-            pass
-
-    if not profile.is_domain_exempt and profile.role not in ['Admin', 'SuperAdmin']:
+    if not profile.is_domain_exempt and profile.role != 'SuperAdmin':
         email_domain = normalize_email_domain(email)
         active_institution = get_active_institution_by_domain(email_domain)
 
@@ -1351,6 +1433,9 @@ def login_view(request):
         if profile.institution_id != active_institution.id:
             profile.institution = active_institution
             profile.save(update_fields=['institution', 'updated_at'])
+
+    if settings.LOGIN_OTP_DISABLED:
+        return Response(build_login_response_payload(user, profile))
 
     try:
         challenge = create_login_otp_challenge(user)
@@ -1773,6 +1858,11 @@ class SearchTutorsView(APIView):
             )
 
         student_profile = request.user.userprofile
+        if not subject_is_recognized_for_profile(student_profile, subject_code):
+            return Response(
+                {"error": SUBJECT_NOT_RECOGNIZED_ERROR},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         tutors = filter_tutors_by_institution(
             Tutor.objects.filter(
                 tutorsubjects__subject__subject_code=subject_code
@@ -1785,8 +1875,52 @@ class SearchTutorsView(APIView):
 #Subject Serializer
 
 class SubjectListView(ListAPIView):
-    queryset = Subjects.objects.all()
     serializer_class = SubjectSerializer
+
+    def get_queryset(self):
+        search_query = self.request.query_params.get('search', '').strip()
+        user = self.request.user
+        if not user.is_authenticated or not hasattr(user, 'userprofile'):
+            queryset = Subjects.objects.filter(status='approved')
+            if search_query:
+                queryset = queryset.filter(
+                    Q(subject_name__icontains=search_query)
+                    | Q(subject_code__icontains=search_query)
+                )
+            return queryset
+
+        profile = user.userprofile
+        catalog_scope = self.request.query_params.get('catalog_scope')
+        course_code = self.request.query_params.get('course_code')
+        include_current = self.request.query_params.get('include_current') in {'1', 'true', 'True'}
+
+        if catalog_scope == 'all':
+            queryset = visible_subject_queryset_for_profile(profile).filter(status='approved')
+            if search_query:
+                queryset = queryset.filter(
+                    Q(subject_name__icontains=search_query)
+                    | Q(subject_code__icontains=search_query)
+                )
+            return queryset
+
+        queryset, recognized_codes = subject_selection_queryset_for_profile(
+            profile,
+            course_code=course_code,
+            include_current=include_current,
+        )
+        self.recognized_codes = recognized_codes
+        queryset = queryset.filter(status='approved')
+        if search_query:
+            queryset = queryset.filter(
+                Q(subject_name__icontains=search_query)
+                | Q(subject_code__icontains=search_query)
+            )
+        return queryset
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['recognized_codes'] = getattr(self, 'recognized_codes', set())
+        return context
 
 
 
@@ -1844,11 +1978,7 @@ def build_combined_block(group, profile=None):
         "rating": representative_booking.rating.rating_score if hasattr(representative_booking, "rating") else None,
         "rating_submitted": hasattr(representative_booking, "rating"),
 
-        "subject": (
-            first.tutor.profile.course.course_name
-            if first.tutor.profile.course
-            else "General"
-        ),
+        "subject": booking_subject_label(first),
         "startTime": start_time.strftime("%H:%M"),
         "endTime": end_time.strftime("%H:%M"),
         "duration_hours": duration,
@@ -1941,11 +2071,7 @@ def build_booking_request_block(group, profile=None):
         "tutor_confirmed": representative_booking.tutor_confirmed,
         "rating": representative_booking.rating.rating_score if hasattr(representative_booking, "rating") else None,
         "rating_submitted": hasattr(representative_booking, "rating"),
-        "subject": (
-            first_booking.tutor.profile.course.course_name
-            if first_booking.tutor.profile.course
-            else "General"
-        ),
+        "subject": booking_subject_label(first_booking),
         "startTime": primary_block["startTime"],
         "endTime": primary_block["endTime"],
         "duration_hours": get_duration_hours_for_bookings(sorted_group),
@@ -1968,6 +2094,8 @@ def tutor_dashboard(request):
         tutor = Tutor.objects.get(profile=profile)
     except Tutor.DoesNotExist:
         return Response({"error": "Tutor not found"}, status=404)
+
+    load_snapshot = get_tutor_acceptance_load_snapshot(tutor)
 
     # 📌 Completed sessions for earnings
     completed_bookings = Booking.objects.filter(
@@ -2043,6 +2171,9 @@ def tutor_dashboard(request):
         "rating_average": tutor.rating_average,
         "hourly_rate": tutor.hourly_rate,
         "total_earnings": round(total_earnings, 2),
+        "session_load_limit": load_snapshot["session_load_limit"],
+        "accepted_session_load": load_snapshot["accepted_session_load"],
+        "session_load_remaining": load_snapshot["session_load_remaining"],
         "upcoming_bookings": bookings_data
     })
 
@@ -2255,6 +2386,7 @@ def confirm_payment_and_book(request):
     tutor_id = request.data.get("tutor_id")
     slots = request.data.get("slots")
     method_id = request.data.get("payment_method")
+    subject_code = request.data.get("subject")
     preferred_location = request.data.get('preferred_location', '').strip()
 
     if isinstance(slots, str):
@@ -2295,14 +2427,29 @@ def confirm_payment_and_book(request):
 
         receipt_image = request.FILES.get('receipt_image')
         transaction_reference = request.data.get('transaction_reference')
+        required_method_code = 'CASH' if is_f2f else 'PAYMONGO'
 
-        if method.code == 'online' and receipt_image is None:
+        if method.code != required_method_code:
+            return Response({"error": "Payment method does not match this session's mode."}, status=400)
+
+        if method.code == 'PAYMONGO' and receipt_image is None:
             return Response({"error": "Receipt image is required for online payments."}, status=400)
 
-        if method.code == 'online' and not str(transaction_reference or '').strip():
+        if method.code == 'PAYMONGO' and not str(transaction_reference or '').strip():
             return Response({"error": "Transaction reference is required for online payments."}, status=400)
 
+        if method.code == 'CASH' and receipt_image is None:
+            return Response({"error": "Receipt image is required for cash payments."}, status=400)
+
     tutor = get_object_or_404(Tutor, profile_id=tutor_id)
+    subject = None
+    if subject_code:
+        if not subject_is_recognized_for_profile(user_profile, subject_code):
+            return Response(
+                {"error": SUBJECT_NOT_RECOGNIZED_ERROR},
+                status=400,
+            )
+        subject = Subjects.objects.filter(subject_code=subject_code).first()
     normalized_slots = []
 
     with transaction.atomic():
@@ -2393,6 +2540,7 @@ def confirm_payment_and_book(request):
                     student=user_profile,
                     tutor=tutor,
                     availability=slot_request["availability"],
+                    subject=subject,
                     session_date=slot_request["session_date"],
                     session_mode=slot_request["session_mode"],
                     preferred_location=preferred_location,
@@ -2658,57 +2806,75 @@ def delete_availability_override(request, override_id):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def approve_booking(request, booking_id):
-
-    booking = get_object_or_404(Booking, id=booking_id)
-    session_group_bookings = get_booking_request_bookings(booking) if booking.status == "Pending" else get_session_group_bookings(booking)
-
-    # Ensure tutor owns booking
-    if request.user.userprofile != booking.tutor.profile:
-        return Response({"error": "Unauthorized"}, status=403)
-
-    if not can_create_new_booking(request.user.userprofile):
-        return Response(
-            {
-                "error": "Please complete your enrollment verification before accepting new bookings.",
-                "code": "verification_required",
-            },
-            status=403,
+    with transaction.atomic():
+        booking = get_object_or_404(Booking.objects.select_for_update(), id=booking_id)
+        session_group_bookings = (
+            get_booking_request_bookings(booking)
+            if booking.status == "Pending"
+            else get_session_group_bookings(booking)
         )
 
-    wallet, _ = Wallet.objects.get_or_create(tutor=booking.tutor)
-    if wallet.balance < 0:
-        return Response(
-            {"error": "You cannot accept bookings while your wallet balance is negative."},
-            status=400
+        # Ensure tutor owns booking
+        if request.user.userprofile != booking.tutor.profile:
+            return Response({"error": "Unauthorized"}, status=403)
+
+        if not can_create_new_booking(request.user.userprofile):
+            return Response(
+                {
+                    "error": "Please complete your enrollment verification before accepting new bookings.",
+                    "code": "verification_required",
+                },
+                status=403,
+            )
+
+        wallet, _ = Wallet.objects.get_or_create(tutor=booking.tutor)
+        if wallet.balance < 0:
+            return Response(
+                {"error": "You cannot accept bookings while your wallet balance is negative."},
+                status=400
+            )
+
+        if booking.status == "Confirmed":
+            return Response({"message": "Booking is already confirmed."})
+
+        if booking.status != "Pending":
+            return Response({"error": "Only pending bookings can be approved."}, status=400)
+
+        load_snapshot = get_tutor_acceptance_load_snapshot(booking.tutor)
+        if load_snapshot["accepted_session_load"] >= load_snapshot["session_load_limit"]:
+            return Response(
+                {
+                    "error": (
+                        "You have reached your accepted session limit. "
+                        "Please clear some accepted sessions before approving more."
+                    ),
+                    "code": "session_load_limit_reached",
+                    **load_snapshot,
+                },
+                status=409,
+            )
+
+        Booking.objects.filter(id__in=[group_booking.id for group_booking in session_group_bookings]).update(
+            status="Confirmed",
+            tutee_confirmed=False,
+            tutor_confirmed=False,
         )
 
-    if booking.status == "Confirmed":
-        return Response({"message": "Booking is already confirmed."})
+        create_booking_status_notification(
+            booking.student,
+            "confirmed",
+            session_group_bookings
+        )
 
-    if booking.status != "Pending":
-        return Response({"error": "Only pending bookings can be approved."}, status=400)
+        booking.refresh_from_db()
+        create_booking_event(
+            booking,
+            request.user,
+            "Booking request approved.",
+            "booking_approved"
+        )
 
-    Booking.objects.filter(id__in=[group_booking.id for group_booking in session_group_bookings]).update(
-        status="Confirmed",
-        tutee_confirmed=False,
-        tutor_confirmed=False,
-    )
-
-    create_booking_status_notification(
-        booking.student,
-        "confirmed",
-        session_group_bookings
-    )
-
-    booking.refresh_from_db()
-    create_booking_event(
-        booking,
-        request.user,
-        "Booking request approved.",
-        "booking_approved"
-    )
-
-    return Response({"message": "Booking confirmed successfully."})
+        return Response({"message": "Booking confirmed successfully."})
 
 #Reject booking
 @api_view(['POST'])
@@ -2955,7 +3121,7 @@ def dismiss_dashboard_pill(request, booking_id):
     })
 
 
-def build_booking_detail_payload(session_group_bookings):
+def build_booking_detail_payload(session_group_bookings, request=None):
     representative_booking = get_representative_booking(session_group_bookings)
     first_booking = session_group_bookings[0]
     last_booking = session_group_bookings[-1]
@@ -2999,7 +3165,7 @@ def build_booking_detail_payload(session_group_bookings):
             "course": representative_booking.student.course.course_name if representative_booking.student.course else None,
             "year_level": representative_booking.student.year_level,
             "bio": representative_booking.student.bio,
-            "avatar": representative_booking.student.profile_picture.url if representative_booking.student.profile_picture else None,
+            "avatar": build_absolute_media_url(request, representative_booking.student.profile_picture),
         },
         "tutor": {
             "name": f"{representative_booking.tutor.profile.fname} {representative_booking.tutor.profile.lname}",
@@ -3007,7 +3173,7 @@ def build_booking_detail_payload(session_group_bookings):
             "course": representative_booking.tutor.profile.course.course_name if representative_booking.tutor.profile.course else None,
             "year_level": representative_booking.tutor.profile.year_level,
             "bio": representative_booking.tutor.profile.bio,
-            "avatar": representative_booking.tutor.profile.profile_picture.url if representative_booking.tutor.profile.profile_picture else None,
+            "avatar": build_absolute_media_url(request, representative_booking.tutor.profile.profile_picture),
             "rating": representative_booking.tutor.rating_average,
             "hourly_rate": float(representative_booking.tutor.hourly_rate or 0),
             "subjects_taught": list(
@@ -3018,7 +3184,7 @@ def build_booking_detail_payload(session_group_bookings):
             ),
         },
         "session": {
-            "subject": representative_booking.tutor.profile.course.course_name if representative_booking.tutor.profile.course else "General",
+            "subject": booking_subject_label(representative_booking),
             "date": session_date.strftime("%Y-%m-%d"),
             "start_time": start_time.strftime("%H:%M"),
             "end_time": end_time.strftime("%H:%M"),
@@ -3029,7 +3195,7 @@ def build_booking_detail_payload(session_group_bookings):
             "session_mode": representative_booking.session_mode,
             "preferred_location": representative_booking.preferred_location,
         },
-        "payment": serialize_payment_summary(representative_booking),
+        "payment": serialize_payment_summary(representative_booking, request=request),
         "check_ins": serialize_session_check_ins(representative_booking),
     }
 
@@ -3055,7 +3221,7 @@ def booking_detail(request, booking_id):
         return Response({"error": "Unauthorized"}, status=403)
 
     session_group_bookings = get_booking_request_bookings(booking)
-    return Response(build_booking_detail_payload(session_group_bookings))
+    return Response(build_booking_detail_payload(session_group_bookings, request=request))
 
 
 @api_view(['POST'])
@@ -3104,6 +3270,12 @@ def record_midpoint_check_in(request, booking_id):
     booking, error_response = get_tutee_owned_booking_or_403(request, booking_id)
     if error_response:
         return error_response
+
+    if get_current_display_status_for_booking(booking).lower() != 'ongoing':
+        return Response(
+            {"error": "Mid-session check-ins are only available while the session is ongoing."},
+            status=409,
+        )
 
     response_value = str(request.data.get("response", "")).strip().lower()
     valid_responses = {
@@ -3167,14 +3339,22 @@ def submit_session_payment(request, booking_id):
 
     receipt_image = request.FILES.get('receipt_image')
     transaction_reference = request.data.get('transaction_reference')
+    required_method_code = 'CASH' if representative_booking.session_mode == 'F2F' else 'PAYMONGO'
 
-    is_online_payment = method.code == 'online'
+    if method.code != required_method_code:
+        return Response({"error": "Payment method does not match this session's mode."}, status=400)
 
-    if is_online_payment and receipt_image is None:
+    if method.code == 'PAYMONGO' and receipt_image is None:
         return Response({"error": "Receipt image is required for online payments."}, status=400)
 
-    if is_online_payment and not str(transaction_reference or '').strip():
+    if method.code == 'PAYMONGO' and not str(transaction_reference or '').strip():
         return Response({"error": "Transaction reference is required for online payments."}, status=400)
+
+    if method.code == 'CASH' and receipt_image is None:
+        return Response({"error": "Receipt image is required for cash payments."}, status=400)
+
+    if receipt_image is not None:
+        receipt_image = compress_if_image(receipt_image)
 
     duration_hours = get_duration_hours_for_bookings(session_group_bookings)
     amount = round(float(representative_booking.tutor.hourly_rate or 0) * duration_hours, 2)
@@ -3272,7 +3452,7 @@ def complete_booking(request, booking_id):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def dev_force_booking_live(request, booking_id):
-    if not settings.DEBUG:
+    if not settings.BOOKING_DEV_TOOLS_ENABLED:
         return Response(status=404)
 
     profile = request.user.userprofile
@@ -3295,7 +3475,7 @@ def dev_force_booking_live(request, booking_id):
     phase = str(request.data.get("phase", "start")).strip().lower()
     if phase not in DEV_LIVE_PHASES:
         return Response(
-            {"error": "Phase must be 'start', 'midpoint', or 'ending'."},
+            {"error": "Phase must be 'upcoming', 'start', 'midpoint', 'ending', or 'handoff'."},
             status=400,
         )
 
@@ -3311,7 +3491,7 @@ def dev_force_booking_live(request, booking_id):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def dev_clear_booking_live(request, booking_id):
-    if not settings.DEBUG:
+    if not settings.BOOKING_DEV_TOOLS_ENABLED:
         return Response(status=404)
 
     profile = request.user.userprofile
@@ -3333,7 +3513,7 @@ def dev_clear_booking_live(request, booking_id):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def dev_mark_booking_ready_for_payment(request, booking_id):
-    if not settings.DEBUG:
+    if not settings.BOOKING_DEV_TOOLS_ENABLED:
         return Response(status=404)
 
     profile = request.user.userprofile
@@ -3445,7 +3625,17 @@ def save_preferences(request):
 
     subject_ids = request.data.get("subjects", [])
 
-    if subject_ids:
+    invalid_codes = invalid_new_subject_codes(profile, subject_ids)
+    if invalid_codes:
+        return Response(
+            {
+                "error": "Some subjects are no longer recognized for your course catalog.",
+                "invalid_subjects": sorted(invalid_codes),
+            },
+            status=400,
+        )
+
+    if "subjects" in request.data:
         pref.subjects.set(subject_ids)
 
     cache.delete(dashboard_recs_cache_key(profile))
@@ -3527,7 +3717,8 @@ def get_recommendation_candidate_tutors(
 ):
     base_candidates = filter_tutors_by_institution(
         Tutor.objects.filter(
-            tutorsubjects__subject__subject_code=subject
+            tutorsubjects__subject__subject_code=subject,
+            profile__tutor_application__application_status='approved',
         ),
         student_profile,
     )
@@ -3643,6 +3834,12 @@ def recommend_tutors_view(request):
             status=400
         )
 
+    if not subject_is_recognized_for_profile(student_profile, subject):
+        return Response(
+            {"error": SUBJECT_NOT_RECOGNIZED_ERROR},
+            status=400,
+        )
+
     ratings = build_rating_matrix()
     candidate_qs = get_recommendation_candidate_tutors(
         subject,
@@ -3741,6 +3938,17 @@ def update_tutee_profile(request):
 
     profile.year_level = request.data.get("year_level", profile.year_level)
     profile.bio = request.data.get("bio", profile.bio)
+
+    subject_ids = request.data.get("subjects", [])
+    invalid_codes = invalid_new_subject_codes(profile, subject_ids, course_code=profile.course_id)
+    if invalid_codes:
+        return Response(
+            {
+                "error": "Some subjects are no longer recognized for your course catalog.",
+                "invalid_subjects": sorted(invalid_codes),
+            },
+            status=400,
+        )
 
     profile.save()
 
@@ -3850,17 +4058,102 @@ def get_tutor_subjects(request):
     tutor = Tutor.objects.get(profile=profile)
 
     subjects = TutorSubjects.objects.filter(tutor=tutor).select_related('subject')
+    recognized_codes = recognized_subject_codes_for_profile(profile)
 
     data = [
         {
             "subject_code": ts.subject.subject_code,
             "subject_name": ts.subject.subject_name,
-            "description": ts.description or ''
+            "department": ts.subject.department,
+            "category": ts.subject.category,
+            "description": ts.description or '',
+            "status": ts.subject.status,
+            "is_recognized": ts.subject.subject_code in recognized_codes,
         }
         for ts in subjects
     ]
 
     return Response(data)
+
+
+def generate_proposed_subject_code(subject_name):
+    max_length = Subjects._meta.get_field('subject_code').max_length
+    base_code = slugify(subject_name).upper() or 'SUBJECT'
+    base_code = base_code[:max_length]
+    candidate = base_code
+    suffix = 2
+
+    while Subjects.objects.filter(subject_code=candidate).exists():
+        suffix_text = f'-{suffix}'
+        candidate = f'{base_code[:max_length - len(suffix_text)]}{suffix_text}'
+        suffix += 1
+
+    return candidate
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@transaction.atomic
+def propose_tutor_subject(request):
+    profile = request.user.userprofile
+    if profile.role != 'Tutor':
+        return Response({"error": "Only tutors can propose subjects."}, status=403)
+
+    tutor = get_object_or_404(Tutor, profile=profile)
+    if TutorSubjects.objects.filter(tutor=tutor).count() >= TUTOR_SUBJECT_LIMIT:
+        return Response(
+            {"error": f"You can add up to {TUTOR_SUBJECT_LIMIT} subjects only."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    subject_name = str(request.data.get('subject_name') or '').strip()
+    department = str(request.data.get('department') or '').strip()
+    description = str(request.data.get('description') or '').strip()
+
+    if not subject_name or not department:
+        return Response(
+            {"error": "Subject name and department are required."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    valid_departments = set(
+        Subjects.objects.filter(status='approved')
+        .exclude(department='')
+        .values_list('department', flat=True)
+        .distinct()
+    )
+    if department not in valid_departments:
+        return Response(
+            {"error": "Select a department from the existing catalog."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    application = TutorApplication.objects.filter(profile=profile).first()
+    subject = Subjects.objects.create(
+        subject_code=generate_proposed_subject_code(subject_name),
+        subject_name=subject_name,
+        department=department,
+        status='pending',
+        proposed_by_tutor=tutor,
+        proposed_application=application,
+    )
+    TutorSubjects.objects.create(
+        tutor=tutor,
+        subject=subject,
+        expertise_level=DEFAULT_TUTOR_SUBJECT_EXPERTISE_LEVEL,
+        description=description,
+    )
+
+    return Response(
+        {
+            "subject_code": subject.subject_code,
+            "subject_name": subject.subject_name,
+            "department": subject.department,
+            "description": description,
+            "status": subject.status,
+        },
+        status=status.HTTP_201_CREATED,
+    )
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -3876,6 +4169,12 @@ def add_tutor_subject(request):
         subject = Subjects.objects.get(subject_code=subject_code)
     except Subjects.DoesNotExist:
         return Response({"error": "Invalid subject"}, status=400)
+
+    if not subject_is_recognized_for_profile(profile, subject_code):
+        return Response(
+            {"error": SUBJECT_NOT_RECOGNIZED_ERROR},
+            status=400,
+        )
 
     tutor_subject, created = TutorSubjects.objects.get_or_create(
         tutor=tutor,
@@ -3918,10 +4217,18 @@ def remove_tutor_subject(request, subject_code):
     profile = request.user.userprofile
     tutor = Tutor.objects.get(profile=profile)
 
+    subject = Subjects.objects.filter(
+        subject_code=subject_code,
+        proposed_by_tutor=tutor,
+        status='pending',
+    ).first()
     deleted_count, _ = TutorSubjects.objects.filter(
         tutor=tutor,
         subject__subject_code=subject_code
     ).delete()
+
+    if deleted_count and subject is not None:
+        subject.delete()
 
     if deleted_count:
         bump_dashboard_recs_cache_version()
@@ -4280,6 +4587,26 @@ def reverse_failed_cash_out(withdrawal):
         wallet.save(update_fields=['balance'])
 
 
+def log_cash_out_activity(withdrawal):
+    # Auto-processed cash-outs never pass through the admin review path, so record the
+    # terminal outcome here to keep the admin activity feed complete. Non-terminal
+    # (pending/processing) resolutions log nothing -- the later callback resolves them.
+    activity_type = {
+        'processed': 'withdrawal_processed',
+        'failed': 'withdrawal_failed',
+    }.get(withdrawal.status)
+    if not activity_type:
+        return
+
+    profile = withdrawal.tutor.profile
+    outcome = 'processed' if withdrawal.status == 'processed' else 'failed'
+    PlatformActivity.objects.create(
+        activity_type=activity_type,
+        message=f"Cash-out #{withdrawal.id} for {profile.fname} {outcome}",
+        institution=profile.institution,
+    )
+
+
 def apply_cash_out_provider_result(withdrawal, provider_data, callback_received=False):
     with transaction.atomic():
         locked_withdrawal = WithdrawalRequest.objects.select_for_update().get(pk=withdrawal.pk)
@@ -4297,6 +4624,7 @@ def apply_cash_out_provider_result(withdrawal, provider_data, callback_received=
             reverse_failed_cash_out(locked_withdrawal)
 
         locked_withdrawal.save()
+        log_cash_out_activity(locked_withdrawal)
         return locked_withdrawal
 
 @api_view(['GET'])
@@ -4658,7 +4986,12 @@ def initiate_online_payment(request):
     }
 
     try:
-        response = requests.post(url, json=payload, headers=get_paymongo_auth_headers())
+        response = requests.post(
+            url,
+            json=payload,
+            headers=get_paymongo_auth_headers(),
+            timeout=PAYMONGO_REQUEST_TIMEOUT,
+        )
         try:
             res_data = response.json()
         except ValueError:
@@ -4742,6 +5075,12 @@ def initiate_online_payment(request):
             error_response["provider_error"] = res_data
 
         return Response(error_response, status=response_status)
+    except requests.RequestException as exc:
+        logger.error("Payment initiation request failed: %s", exc)
+        return Response(
+            {"error": "Could not reach the payment provider. Please try again."},
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
     except Exception as e:
         logger.error(f"Payment Initiation Exception: {str(e)}")
         return Response({"error": "Internal server error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -4772,7 +5111,11 @@ def verify_online_payment(request, booking_id):
     url = f"https://api.paymongo.com/v1/checkout_sessions/{payment.transaction_reference}"
 
     try:
-        response = requests.get(url, headers=get_paymongo_auth_headers())
+        response = requests.get(
+            url,
+            headers=get_paymongo_auth_headers(),
+            timeout=PAYMONGO_REQUEST_TIMEOUT,
+        )
 
         try:
             res_data = response.json()
@@ -4840,6 +5183,12 @@ def verify_online_payment(request, booking_id):
         representative_booking.refresh_from_db()
         refreshed_group = get_booking_request_bookings(representative_booking)
         return Response(build_booking_detail_payload(refreshed_group))
+    except requests.RequestException as exc:
+        logger.error("Payment verification request failed: %s", exc)
+        return Response(
+            {"error": "Could not reach the payment provider. Please try again."},
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
     except Exception as e:
         logger.error(f"Payment Verification Exception: {str(e)}")
         return Response({"error": "Internal server error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -5051,7 +5400,7 @@ def verify_cash_in(request, topup_id):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def dev_add_wallet_funds(request):
-    if not settings.DEBUG:
+    if not settings.BOOKING_DEV_TOOLS_ENABLED:
         return Response(status=404)
     try:
         tutor = request.user.userprofile.tutor
@@ -5076,7 +5425,7 @@ def dev_add_wallet_funds(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def dev_remove_wallet_funds(request):
-    if not settings.DEBUG:
+    if not settings.BOOKING_DEV_TOOLS_ENABLED:
         return Response(status=404)
     try:
         tutor = request.user.userprofile.tutor
@@ -5135,7 +5484,7 @@ def create_support_ticket(request):
 @permission_classes([IsAuthenticated])
 def admin_claim_ticket(request, ticket_id):
     profile = request.user.userprofile
-    if profile.role not in ('Admin', 'SuperAdmin'):
+    if profile.role != 'SuperAdmin':
         return Response(status=403)
 
     from .models import SupportTicket
@@ -5245,7 +5594,7 @@ def list_my_tickets(request):
 @permission_classes([IsAuthenticated])
 def admin_list_tickets(request):
     profile = request.user.userprofile
-    if profile.role not in ('Admin', 'SuperAdmin'):
+    if profile.role != 'SuperAdmin':
         return Response(status=403)
 
     from .models import SupportTicket
@@ -5286,7 +5635,7 @@ def admin_list_tickets(request):
 @permission_classes([IsAuthenticated])
 def admin_resolve_ticket(request, ticket_id):
     profile = request.user.userprofile
-    if profile.role not in ('Admin', 'SuperAdmin'):
+    if profile.role != 'SuperAdmin':
         return Response(status=403)
 
     from .models import SupportTicket
@@ -5324,6 +5673,85 @@ def tutor_application_status(request):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
+def skip_tutor_onboarding_verification(request):
+    profile = request.user.userprofile
+    if profile.role != 'Tutor':
+        return Response({"error": "Only tutors can skip tutor verification."}, status=403)
+
+    profile.tutor_onboarding_skipped_at = timezone.now()
+    profile.save(update_fields=['tutor_onboarding_skipped_at', 'updated_at'])
+    return Response({
+        "tutor_onboarding_skipped_at": profile.tutor_onboarding_skipped_at.isoformat(),
+        "tutor_onboarding_complete": True,
+    })
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@transaction.atomic
+def tutor_application_submit(request):
+    profile = request.user.userprofile
+    if profile.role != 'Tutor':
+        return Response({"error": "Only tutors can submit tutor verification."}, status=403)
+    if TutorApplication.objects.filter(profile=profile).exists():
+        return Response(
+            {"error": "A tutor application already exists."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    school_id = request.FILES.get('school_id')
+    enrollment_proof = request.FILES.get('enrollment_proof')
+    if not school_id or not enrollment_proof:
+        return Response(
+            {"error": "Please provide both your School ID and Proof of Enrollment."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if (
+        school_id.size > settings.MAX_DOCUMENT_UPLOAD_SIZE
+        or enrollment_proof.size > settings.MAX_DOCUMENT_UPLOAD_SIZE
+    ):
+        return Response(
+            {
+                "error": (
+                    "Each uploaded file must be under 5 MB. "
+                    "Please compress your images and try again."
+                )
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    school_id = compress_if_image(school_id)
+    enrollment_proof = compress_if_image(enrollment_proof)
+    application = TutorApplication.objects.create(
+        profile=profile,
+        school_id=school_id,
+        enrollment_proof=enrollment_proof,
+        application_status='pending',
+        submitted_at=timezone.now(),
+    )
+    Subjects.objects.filter(
+        proposed_by_tutor__profile=profile,
+        proposed_application__isnull=True,
+        status='pending',
+    ).update(proposed_application=application)
+
+    def _send_confirmation():
+        try:
+            send_application_received_email(profile)
+        except Exception:
+            logger.exception(
+                "Failed to send tutor application received email for profile_id=%s", profile.id
+            )
+
+    transaction.on_commit(_send_confirmation)
+    return Response(
+        TutorApplicationSerializer(application, context={'request': request}).data,
+        status=status.HTTP_201_CREATED,
+    )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
 @transaction.atomic
 def tutor_application_resubmit(request):
     try:
@@ -5348,6 +5776,9 @@ def tutor_application_resubmit(request):
             status=status.HTTP_400_BAD_REQUEST
         )
 
+    school_id = compress_if_image(school_id)
+    enrollment_proof = compress_if_image(enrollment_proof)
+
     if application.application_status == 'approved':
         return create_tutor_document_renewal_submission(
             request,
@@ -5366,7 +5797,6 @@ def tutor_application_resubmit(request):
     # Update application
     application.school_id = school_id
     application.enrollment_proof = enrollment_proof
-    application.reason_to_tutor = reason_to_tutor
     application.application_status = 'pending'
     application.rejection_reason = ''
     application.reviewed_at = None
@@ -5407,6 +5837,9 @@ def tutor_document_renewal_submit(request):
             {"error": "Please provide both your School ID and updated Enrollment/RF document."},
             status=status.HTTP_400_BAD_REQUEST
         )
+
+    school_id = compress_if_image(school_id)
+    enrollment_proof = compress_if_image(enrollment_proof)
 
     return create_tutor_document_renewal_submission(
         request,
@@ -5490,6 +5923,9 @@ def tutee_application_resubmit(request):
             status=status.HTTP_400_BAD_REQUEST
         )
 
+    school_id = compress_if_image(school_id)
+    enrollment_proof = compress_if_image(enrollment_proof)
+
     # Unlike tutors (who submit documents at registration), tutees register free and submit
     # verification documents later — so this is also the first-time submission endpoint, not just
     # resubmission. See docs/plans/2026-07-01-tutee-verification-phase3-ui.md.
@@ -5498,7 +5934,6 @@ def tutee_application_resubmit(request):
         defaults={
             'school_id': school_id,
             'enrollment_proof': enrollment_proof,
-            'reason_to_tutor': reason_to_tutor,
             'application_status': 'pending',
         }
     )
@@ -5535,7 +5970,6 @@ def tutee_application_resubmit(request):
 
     application.school_id = school_id
     application.enrollment_proof = enrollment_proof
-    application.reason_to_tutor = reason_to_tutor
     application.application_status = 'pending'
     application.rejection_reason = ''
     application.reviewed_at = None
@@ -5577,6 +6011,9 @@ def tutee_document_renewal_submit(request):
             {"error": "Please provide both your School ID and updated Enrollment/RF document."},
             status=status.HTTP_400_BAD_REQUEST
         )
+
+    school_id = compress_if_image(school_id)
+    enrollment_proof = compress_if_image(enrollment_proof)
 
     return create_tutee_document_renewal_submission(
         request,

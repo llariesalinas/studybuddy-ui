@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SuperAdmin user drill-down — decided mockup</title>
+<style>
+  :root {
+    --p: #00895A; --p-hover: #027a4f; --bg: #F8F9FA; --card: #ffffff;
+    --border: #EAEAEA; --text: #163127; --muted: #6B7280; --sec: #495057;
+    --warn: #C77700; --danger: #C0392B; --ok: #1F8A4C;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --p: #86B7A3; --p-hover: #9dc6b4; --bg: #050807; --card: #0C1110;
+      --border: #1B2A25; --text: #F3F7F5; --muted: #9AA8A1; --sec: #BAC8C1;
+      --warn: #E0A94D; --danger: #E27A6E; --ok: #6FCF97;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--bg); color: var(--text); padding: 32px;
+  }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  .meta { color: var(--muted); font-size: 13px; margin-bottom: 24px; }
+  .meta code { background: color-mix(in srgb, var(--text) 8%, transparent); padding: 1px 5px; border-radius: 4px; }
+
+  .tbl-wrap {
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    overflow: hidden; position: relative; max-width: 1000px;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; padding: 10px 14px; color: var(--muted); font-weight: 600;
+    text-transform: uppercase; font-size: 11px; letter-spacing: .04em; border-bottom: 1px solid var(--border); }
+  td { padding: 10px 14px; color: var(--text); border-bottom: 1px solid var(--border); }
+  tr.row-hover { cursor: pointer; }
+  .pill { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+  .pill.tutor { background: color-mix(in srgb, var(--p) 18%, transparent); color: var(--p); }
+  .pill.tutee { background: color-mix(in srgb, #6B7280 18%, transparent); color: var(--sec); }
+  .avatar { width: 26px; height: 26px; border-radius: 50%; background: var(--p);
+    color: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; margin-right: 8px; }
+  .name-cell { display: flex; align-items: center; }
+
+  .panel { position: absolute; top: 0; right: 0; bottom: 0; width: 46%;
+    background: var(--card); border-left: 1px solid var(--border); box-shadow: -8px 0 24px rgba(0,0,0,.12);
+    display: flex; flex-direction: column; }
+  .panel-head { display: flex; align-items: center; gap: 12px; padding: 16px 18px; border-bottom: 1px solid var(--border); }
+  .avatar-lg { width: 42px; height: 42px; border-radius: 50%; background: var(--p);
+    color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px; flex-shrink:0; }
+  .panel-head .who { flex: 1; }
+  .panel-head .who .nm { color: var(--text); font-weight: 700; font-size: 15px; }
+  .panel-head .who .role { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .panel-head .x { color: var(--muted); font-size: 18px; cursor: pointer; }
+  .panel-body { padding: 16px 18px; overflow: auto; }
+
+  .section-label { font-size: 11px; text-transform: uppercase; letter-spacing: .05em;
+    color: var(--muted); font-weight: 700; margin: 14px 0 8px; }
+  .section-label:first-child { margin-top: 0; }
+
+  .status-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .status-tile { background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
+    padding: 8px 6px; text-align: center; }
+  .status-tile .n { font-size: 17px; font-weight: 800; color: var(--text); }
+  .status-tile .l { font-size: 10px; color: var(--muted); margin-top: 2px; text-transform: uppercase; }
+  .status-tile.completed .n { color: var(--ok); }
+  .status-tile.cancelled .n { color: var(--danger); }
+  .status-tile.pending .n { color: var(--warn); }
+
+  .kpi-row { display: flex; gap: 8px; }
+  .kpi { flex: 1; background: color-mix(in srgb, var(--p) 10%, transparent);
+    border-radius: 10px; padding: 10px 12px; }
+  .kpi .n { font-size: 16px; font-weight: 800; color: var(--p); }
+  .kpi .l { font-size: 10px; color: var(--sec); margin-top: 2px; }
+
+  .chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { background: var(--bg); border: 1px solid var(--border); border-radius: 999px;
+    padding: 3px 10px; font-size: 11px; color: var(--sec); }
+
+  .list-row { display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 0; border-bottom: 1px dashed var(--border); font-size: 12px; }
+  .list-row:last-child { border-bottom: none; }
+  .list-row .nm { color: var(--text); font-weight: 600; }
+  .list-row .sub { color: var(--muted); font-size: 11px; }
+  .stars { color: var(--warn); font-size: 12px; }
+
+  .tutee-ref { max-width: 1000px; margin-top: 28px; }
+  .tutee-ref .panel-title { font-size: 12px; font-weight: 700; color: var(--muted);
+    text-transform: uppercase; letter-spacing: .04em; margin-bottom: 8px; }
+  .tutee-ref .panel { position: static; width: 46%; box-shadow: 0 8px 24px rgba(0,0,0,.08); border-radius: 14px; border: 1px solid var(--border); }
+</style>
+</head>
+<body>
+  <h1>SuperAdmin user list &rarr; drill-down slide-over</h1>
+  <p class="meta">Decided 2026-07-12 &middot; entry point: click a row in <code>SuperAdminUsers.vue</code> &middot; pattern: slide-over panel (list stays visible, panel opens right, all-time stats, no period toggle/export in v1)</p>
+
+  <div class="tbl-wrap" style="height:280px;">
+    <table>
+      <tr><th>Name</th><th>Role</th><th>Institution</th></tr>
+      <tr class="row-hover"><td class="name-cell"><span class="avatar">JD</span>Juan Dela Cruz</td><td><span class="pill tutor">Tutor</span></td><td>CPU</td></tr>
+      <tr class="row-hover" style="background:color-mix(in srgb, var(--p) 10%, transparent);"><td class="name-cell"><span class="avatar">JD</span>Juan Dela Cruz</td><td><span class="pill tutor">Tutor</span></td><td>CPU</td></tr>
+      <tr class="row-hover"><td class="name-cell"><span class="avatar">RT</span>Rico Tan</td><td><span class="pill tutor">Tutor</span></td><td>CPU</td></tr>
+      <tr class="row-hover"><td class="name-cell"><span class="avatar">AC</span>Angela Cruz</td><td><span class="pill tutee">Tutee</span></td><td>CPU</td></tr>
+    </table>
+
+    <div class="panel">
+      <div class="panel-head">
+        <div class="avatar-lg">JD</div>
+        <div class="who">
+          <div class="nm">Juan Dela Cruz</div>
+          <div class="role">Tutor &middot; CPU &middot; joined Feb 2026</div>
+        </div>
+        <div class="x">&times;</div>
+      </div>
+      <div class="panel-body">
+        <div class="section-label">Sessions by status</div>
+        <div class="status-grid">
+          <div class="status-tile"><div class="n">32</div><div class="l">Total</div></div>
+          <div class="status-tile completed"><div class="n">26</div><div class="l">Completed</div></div>
+          <div class="status-tile cancelled"><div class="n">3</div><div class="l">Cancelled</div></div>
+          <div class="status-tile pending"><div class="n">3</div><div class="l">Pending</div></div>
+        </div>
+
+        <div class="section-label">Rating &amp; earnings</div>
+        <div class="kpi-row">
+          <div class="kpi"><div class="n">4.8 &#9733;</div><div class="l">Avg. rating</div></div>
+          <div class="kpi"><div class="n">&#8369;9,600</div><div class="l">Total earnings</div></div>
+        </div>
+
+        <div class="section-label">Subjects taught</div>
+        <div class="chip-row">
+          <span class="chip">Calculus</span>
+          <span class="chip">Statistics</span>
+          <span class="chip">Physics 101</span>
+        </div>
+
+        <div class="section-label">Students (5)</div>
+        <div class="list-row"><span class="nm">Maria Santos</span><span class="sub">6 sessions</span></div>
+        <div class="list-row"><span class="nm">Rico Tan</span><span class="sub">4 sessions</span></div>
+        <div class="list-row"><span class="nm">Angela Cruz</span><span class="sub">3 sessions</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tutee-ref">
+    <div class="panel-title">Same panel component, tutee data shape (for reference)</div>
+    <div class="panel">
+      <div class="panel-head">
+        <div class="avatar-lg">MS</div>
+        <div class="who">
+          <div class="nm">Maria Santos</div>
+          <div class="role">Tutee &middot; CPU &middot; joined Jan 2026</div>
+        </div>
+        <div class="x">&times;</div>
+      </div>
+      <div class="panel-body">
+        <div class="section-label">Sessions by status</div>
+        <div class="status-grid">
+          <div class="status-tile"><div class="n">18</div><div class="l">Total</div></div>
+          <div class="status-tile completed"><div class="n">14</div><div class="l">Completed</div></div>
+          <div class="status-tile cancelled"><div class="n">1</div><div class="l">Cancelled</div></div>
+          <div class="status-tile pending"><div class="n">3</div><div class="l">Pending</div></div>
+        </div>
+
+        <div class="section-label">Spend</div>
+        <div class="kpi-row">
+          <div class="kpi" style="flex:0 0 100%;"><div class="n">&#8369;4,200</div><div class="l">Total amount spent</div></div>
+        </div>
+
+        <div class="section-label">Subjects booked</div>
+        <div class="chip-row">
+          <span class="chip">Calculus</span>
+          <span class="chip">Physics 101</span>
+        </div>
+
+        <div class="section-label">Tutors booked (3)</div>
+        <div class="list-row"><span class="nm">Juan Dela Cruz</span><span class="sub">6 sessions</span></div>
+        <div class="list-row"><span class="nm">Rico Tan</span><span class="sub">5 sessions</span></div>
+
+        <div class="section-label">Ratings given</div>
+        <div class="list-row"><span class="nm">Juan Dela Cruz</span><span class="stars">5 &#9733;</span></div>
+        <div class="list-row"><span class="nm">Rico Tan</span><span class="stars">4 &#9733;</span></div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

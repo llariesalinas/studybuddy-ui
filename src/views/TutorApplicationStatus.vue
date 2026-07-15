@@ -1,5 +1,5 @@
 <template>
-  <AuthShell>
+  <AuthShell :back-to="profileRoute" back-label="← Back to profile">
     <template #icon>
       <i :class="statusIconClass"></i>
     </template>
@@ -118,12 +118,12 @@
             />
           </div>
 
-          <div class="sb-auth-field">
-            <label class="sb-auth-label">{{ notesLabel }}</label>
+          <div v-if="flow.kind === 'renewal'" class="sb-auth-field">
+            <label class="sb-auth-label">Note to Reviewer (Optional)</label>
             <textarea
               v-model="resubmitData.reasonToTutor"
               class="sb-auth-input sb-field"
-              :placeholder="notesPlaceholder"
+              placeholder="Add any context about your updated enrollment documents..."
               rows="3"
             ></textarea>
           </div>
@@ -178,16 +178,6 @@
           />
         </div>
 
-        <div class="sb-auth-field">
-          <label class="sb-auth-label">Motivation (Optional)</label>
-          <textarea
-            v-model="resubmitData.reasonToTutor"
-            class="sb-auth-input"
-            placeholder="Tell us about your motivation..."
-            rows="3"
-          ></textarea>
-        </div>
-
         <button type="submit" class="sb-btn-pill" :disabled="isResubmitting">
           <span v-if="isResubmitting" class="sb-spinner me-2"></span>
           {{ isResubmitting ? 'Submitting...' : 'Submit Documents' }}
@@ -207,6 +197,7 @@ import { computed, onMounted, ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/services/api/api'
 import { useAuthStore } from '@/stores/auth'
+import { useProfileStore } from '@/stores/profile'
 import AuthShell from '@/components/AuthShell.vue'
 import { MAX_DOCUMENT_UPLOAD_SIZE_BYTES } from '@/config'
 import {
@@ -217,8 +208,10 @@ import {
 
 const router = useRouter()
 const authStore = useAuthStore()
+const profileStore = useProfileStore()
 const isTutee = computed(() => authStore.userRole === 'tutee')
 const dashboardRoute = computed(() => (isTutee.value ? '/dashboard' : '/tch-dashboard'))
+const profileRoute = computed(() => (isTutee.value ? '/tutee-profile' : '/tutor-profile'))
 const loading = ref(true)
 const error = ref('')
 const application = ref(null)
@@ -251,10 +244,7 @@ const fetchStatus = async () => {
     const endpoint = isTutee.value ? 'tutee-application/status/' : 'tutor-application/status/'
     const response = await api.get(endpoint)
     application.value = response.data
-    resubmitData.reasonToTutor =
-      application.value.renewal_note ||
-      application.value.reason_to_tutor ||
-      ''
+    resubmitData.reasonToTutor = application.value.renewal_note || ''
   } catch (err) {
     console.error('Failed to fetch status:', err)
     if (err.response?.status === 401) {
@@ -349,16 +339,6 @@ const uploadPrompt = computed(() => {
   return "Don't worry, you can re-apply by updating and resubmitting your documents below."
 })
 
-const notesLabel = computed(() =>
-  flow.value.kind === 'renewal' ? 'Note to Reviewer (Optional)' : 'Updated Motivation (Optional)'
-)
-
-const notesPlaceholder = computed(() =>
-  flow.value.kind === 'renewal'
-    ? 'Add any context about your updated enrollment documents...'
-    : 'Tell us about your motivation...'
-)
-
 const submitButtonLabel = computed(() => {
   if (isResubmitting.value) {
     return flow.value.kind === 'renewal' ? 'Submitting Renewal...' : 'Resubmitting...'
@@ -403,11 +383,11 @@ const handleDocumentSubmit = async () => {
     const formData = new FormData()
     formData.append('school_id', resubmitData.schoolId)
     formData.append('enrollment_proof', resubmitData.enrollmentProof)
-    formData.append('reason_to_tutor', resubmitData.reasonToTutor)
 
     const prefix = isTutee.value ? 'tutee-application' : 'tutor-application'
 
     if (flow.value.kind === 'renewal') {
+      formData.append('reason_to_tutor', resubmitData.reasonToTutor)
       formData.append('renewal_note', resubmitData.reasonToTutor)
       await api.post(`${prefix}/renewal/`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
@@ -419,6 +399,10 @@ const handleDocumentSubmit = async () => {
     }
 
     await fetchStatus()
+    // fetchStatus() only refreshes this page's local `application` state -- the profile page's
+    // VerificationStatusCard reads profileStore.applicationStatus/renewalStatus separately, which
+    // stays stale (profileStore.loaded is already true) unless explicitly re-fetched here too.
+    await profileStore.checkProfileStatus()
   } catch (err) {
     console.error('Document submission failed:', err)
     resubmitError.value =

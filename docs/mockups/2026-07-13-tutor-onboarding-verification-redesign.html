@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Tutor onboarding — Steps 2 &amp; 3 (chosen directions)</title>
+<style>
+  :root {
+    --sb-primary: #00895A;
+    --sb-primary-hover: #00704A;
+    --sb-primary-contrast: #ffffff;
+    --sb-bg: #F8F9FA;
+    --sb-card-bg: #ffffff;
+    --sb-card-border: #EAEAEA;
+    --sb-text-main: #163127;
+    --sb-text-muted: #6B7280;
+    --sb-warn: #946200;
+    --sb-warn-tint: #fdf3e0;
+    --sb-t-normal: 180ms;
+  }
+  [data-sb-theme="dark"] {
+    --sb-primary: #86B7A3;
+    --sb-primary-hover: #9CC8B8;
+    --sb-primary-contrast: #071310;
+    --sb-bg: #050807;
+    --sb-card-bg: #0C1110;
+    --sb-card-border: #1B2A25;
+    --sb-text-main: #F3F7F5;
+    --sb-text-muted: #9AA8A1;
+    --sb-warn: #d9a441;
+    --sb-warn-tint: #2c2413;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--sb-bg);
+    color: var(--sb-text-main);
+    font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+    line-height: 1.55;
+  }
+  .wrap { max-width: 820px; margin: 0 auto; padding: 2.5rem 1.25rem 5rem; }
+
+  .toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.75rem; }
+  .toolbar h1 { font-size: 1.15rem; margin: 0 0 0.2rem; }
+  .toolbar p { margin: 0; color: var(--sb-text-muted); font-size: 0.85rem; }
+  .theme-btn {
+    border: 1px solid var(--sb-card-border); background: var(--sb-card-bg); color: var(--sb-text-main);
+    border-radius: 999px; padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 600; cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .screen-block { margin-bottom: 3rem; }
+  .screen-block:last-child { margin-bottom: 0; }
+
+  .decided-tag {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: color-mix(in srgb, var(--sb-primary) 12%, var(--sb-card-bg));
+    color: var(--sb-primary);
+    border-radius: 999px; padding: 4px 12px; font-size: 0.72rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.6rem;
+  }
+  .screen-title { font-size: 1.05rem; margin: 0 0 0.9rem; }
+
+  .onboarding-shell {
+    display: flex; background: var(--sb-card-bg); border: 1px solid var(--sb-card-border);
+    border-radius: 18px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.05); overflow: hidden;
+  }
+  .onboarding-rail {
+    width: 160px; flex-shrink: 0; background: color-mix(in srgb, var(--sb-primary) 8%, var(--sb-card-bg));
+    border-right: 1px solid var(--sb-card-border); padding: 28px 16px;
+  }
+  .rail-step { display: flex; align-items: center; gap: 10px; margin-bottom: 24px; font-size: 13px; color: var(--sb-text-muted); }
+  .rail-num {
+    width: 24px; height: 24px; border-radius: 50%; border: 1.5px solid var(--sb-card-border); background: var(--sb-card-bg);
+    display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 11px; flex-shrink: 0;
+  }
+  .rail-step-active { color: var(--sb-text-main); font-weight: 700; }
+  .rail-step-active .rail-num { background: var(--sb-primary); border-color: var(--sb-primary); color: var(--sb-primary-contrast); }
+  .rail-step-done .rail-num { background: var(--sb-primary); border-color: var(--sb-primary); }
+  .rail-step-done .rail-num::after { content: "\2713"; color: var(--sb-primary-contrast); font-size: 12px; }
+  .rail-step-done span:last-child { color: var(--sb-text-muted); }
+
+  .onboarding-main { flex: 1; min-width: 0; padding: 32px 32px 30px; }
+  .onboarding-main h3 { font-weight: 800; margin: 0 0 0.2rem; font-size: 1.15rem; }
+  .onboarding-main .muted { color: var(--sb-text-muted); margin: 0 0 1.25rem; font-size: 0.92rem; }
+
+  .field-label { font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--sb-text-muted); margin-bottom: 8px; }
+  .upload-row {
+    display: flex; align-items: center; gap: 12px; border: 1.5px dashed var(--sb-card-border); border-radius: 12px;
+    padding: 14px 16px; margin-bottom: 14px; font-size: 0.88rem; color: var(--sb-text-muted); cursor: pointer;
+    transition: border-color var(--sb-t-normal) ease;
+  }
+  .upload-row:hover { border-color: var(--sb-primary); }
+  .upload-row i { color: var(--sb-primary); font-size: 1.2rem; }
+
+  .btn-primary-pill { background: var(--sb-primary); color: var(--sb-primary-contrast); border: none; border-radius: 999px; padding: 11px 24px; font-weight: 700; font-size: 13.5px; cursor: pointer; }
+  .btn-primary-pill:hover { background: var(--sb-primary-hover); }
+  .btn-outline-pill { background: transparent; border: 1px solid var(--sb-card-border); color: var(--sb-text-main); border-radius: 999px; padding: 11px 24px; font-weight: 600; font-size: 13.5px; cursor: pointer; }
+  .btn-outline-pill:hover { border-color: var(--sb-primary); color: var(--sb-primary); }
+
+  .why-strip {
+    display: flex; gap: 10px; align-items: flex-start; background: color-mix(in srgb, var(--sb-primary) 6%, var(--sb-card-bg));
+    border: 1px solid var(--sb-card-border); border-radius: 12px; padding: 12px 14px; margin-bottom: 18px; font-size: 0.83rem; color: var(--sb-text-muted);
+  }
+  .why-strip i { color: var(--sb-primary); margin-top: 2px; }
+  .why-strip strong { color: var(--sb-text-main); }
+
+  .stack-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
+
+  /* Step 2 specific */
+  .subject-counter { font-size: 0.78rem; font-weight: 700; color: var(--sb-text-muted); float: right; }
+  .subject-pill-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 1rem; }
+  .subject-pill {
+    display: inline-flex; align-items: center; gap: 6px; padding: 6px 11px; border-radius: 999px;
+    border: 1px solid var(--sb-card-border); font-size: 0.82rem; font-weight: 600;
+    background: color-mix(in srgb, var(--sb-primary) 6%, var(--sb-card-bg));
+  }
+  .subject-pill.pending { border-color: var(--sb-warn); background: var(--sb-warn-tint); color: var(--sb-warn); }
+  .subject-pill i { font-size: 0.72rem; opacity: 0.6; }
+
+  .mini-input {
+    width: 100%; padding: 10px 12px; border: 1.5px solid var(--sb-primary); border-radius: 10px;
+    font-size: 0.9rem; background: var(--sb-bg); color: var(--sb-text-main); font-family: inherit;
+  }
+  .dropdown-preview { margin-top: 8px; border: 1px solid var(--sb-card-border); border-radius: 10px; overflow: hidden; }
+  .dropdown-row { display: flex; justify-content: space-between; padding: 9px 12px; font-size: 0.85rem; border-bottom: 1px solid var(--sb-card-border); }
+  .dropdown-row:last-child { border-bottom: none; }
+  .dropdown-row mark { background: color-mix(in srgb, var(--sb-primary) 22%, transparent); color: var(--sb-primary); border-radius: 3px; padding: 0 2px; }
+  .dropdown-row .meta { color: var(--sb-text-muted); font-size: 0.76rem; }
+  .dropdown-empty { padding: 10px 12px; font-size: 0.83rem; color: var(--sb-text-muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="toolbar">
+    <div>
+      <h1>Tutor onboarding &mdash; chosen screens</h1>
+      <p>Mocked 2026-07-13, 3 directions each. See <a href="../plans/2026-07-13-tutor-onboarding-verification-redesign.md">the plan</a> for the full spec.</p>
+    </div>
+    <button class="theme-btn" id="themeBtn">Toggle dark mode</button>
+  </div>
+
+  <div class="screen-block">
+    <span class="decided-tag">Decided &mdash; Direction B</span>
+    <h2 class="screen-title">Step 2: Subjects &mdash; inline picker, no modal</h2>
+    <div class="onboarding-shell">
+      <aside class="onboarding-rail">
+        <div class="rail-step rail-step-done"><span class="rail-num"></span><span>Preferences</span></div>
+        <div class="rail-step rail-step-active"><span class="rail-num">2</span><span>Subjects</span></div>
+        <div class="rail-step"><span class="rail-num">3</span><span>Verify</span></div>
+      </aside>
+      <div class="onboarding-main">
+        <h3>Add your subjects<span class="subject-counter">3/8</span></h3>
+        <p class="muted">Search the catalog, or propose one that's missing.</p>
+
+        <div class="subject-pill-row">
+          <span class="subject-pill">Statistics I <i class="bi bi-x"></i></span>
+          <span class="subject-pill">Applied Statistics <i class="bi bi-x"></i></span>
+          <span class="subject-pill pending">Educational Data Viz <i class="bi bi-x"></i></span>
+        </div>
+
+        <div class="field-label">Search subjects</div>
+        <input class="mini-input" value="statis" readonly>
+        <div class="dropdown-preview">
+          <div class="dropdown-row"><span><mark>Statis</mark>tics I</span><span class="meta">Mathematics</span></div>
+          <div class="dropdown-row"><span>Applied <mark>Statis</mark>tics</span><span class="meta">Mathematics</span></div>
+        </div>
+
+        <div style="margin-top:14px;">
+          <button class="btn-outline-pill">+ Propose new subject</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="screen-block">
+    <span class="decided-tag">Decided &mdash; Direction C</span>
+    <h2 class="screen-title">Step 3: Verification &mdash; explain, then choose</h2>
+    <div class="onboarding-shell">
+      <aside class="onboarding-rail">
+        <div class="rail-step rail-step-done"><span class="rail-num"></span><span>Preferences</span></div>
+        <div class="rail-step rail-step-done"><span class="rail-num"></span><span>Subjects</span></div>
+        <div class="rail-step rail-step-active"><span class="rail-num">3</span><span>Verify</span></div>
+      </aside>
+      <div class="onboarding-main">
+        <h3>Last step: verification</h3>
+        <p class="muted">Upload your documents now, or finish later.</p>
+
+        <div class="why-strip">
+          <i class="bi bi-info-circle"></i>
+          <span><strong>Verified tutors appear in tutee search.</strong> Until an admin approves your documents, tutees can't find or book you &mdash; but you can still use the rest of the app.</span>
+        </div>
+
+        <div class="field-label">School ID</div>
+        <div class="upload-row"><i class="bi bi-file-earmark-arrow-up"></i> Click to upload</div>
+
+        <div class="field-label">Enrollment proof</div>
+        <div class="upload-row"><i class="bi bi-file-earmark-arrow-up"></i> Click to upload</div>
+
+        <div class="stack-actions">
+          <button class="btn-primary-pill">Submit &amp; Finish Onboarding</button>
+          <button class="btn-outline-pill">Skip for Now</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script>
+  document.getElementById('themeBtn').addEventListener('click', function () {
+    var root = document.documentElement;
+    if (root.getAttribute('data-sb-theme') === 'dark') { root.removeAttribute('data-sb-theme'); }
+    else { root.setAttribute('data-sb-theme', 'dark'); }
+  });
+</script>
+</body>
+</html>

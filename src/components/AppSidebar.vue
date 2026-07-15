@@ -93,7 +93,7 @@ const role = computed(() => user.value?.role?.toLowerCase() || null)
 const fullName = computed(() => {
   const first = user.value?.fname || ''
   const last = user.value?.lname || ''
-  return `${first} ${last}`.trim() || 'Studybuddy User'
+  return `${first} ${last}`.trim() || 'StudyBuddy User'
 })
 
 const initials = computed(() => {
@@ -119,7 +119,8 @@ const menuItems = computed(() => {
       { to: '/admin/dashboard', label: 'Dashboard', icon: 'bi-grid-1x2' },
       { to: '/admin/withdrawals', label: 'Withdrawals', icon: 'bi-wallet2' },
       { to: '/admin/users', label: 'Users', icon: 'bi-people' },
-      { to: '/admin/tutor-applications', label: 'Tutor Applications', icon: 'bi-person-check' },
+      { to: '/admin/course-catalog', label: 'Course Catalog', icon: 'bi-journal-bookmark' },
+      { to: '/admin/tutor-applications', label: 'Applications', icon: 'bi-person-check' },
       { to: '/admin/reports', label: 'Reports', icon: 'bi-bar-chart-line' },
       { to: '/admin/support', label: 'Support Desk', icon: 'bi-headset' },
     ]
@@ -130,14 +131,18 @@ const menuItems = computed(() => {
       { to: '/superadmin/dashboard', label: 'Dashboard', icon: 'bi-grid-1x2' },
       { to: '/superadmin/institutions', label: 'Institutions', icon: 'bi-building' },
       { to: '/superadmin/users', label: 'All Users', icon: 'bi-people' },
+      { to: '/admin/course-catalog', label: 'Course Catalog', icon: 'bi-journal-bookmark' },
+      { to: '/admin/tutor-applications', label: 'Applications', icon: 'bi-person-check' },
       { to: '/superadmin/reports', label: 'Reports', icon: 'bi-bar-chart-line' },
       { to: '/superadmin/support', label: 'Support Desk', icon: 'bi-headset' },
+      { to: '/superadmin/algorithm-demo', label: 'Algorithm Demo', icon: 'bi-diagram-3' },
     ]
   }
 
   if (role.value === 'tutor') {
     return [
       { to: '/tch-dashboard', label: 'Dashboard', icon: 'bi-grid-1x2' },
+      { to: '/tch-requestedSessions', label: 'Requested Sessions', icon: 'bi-inboxes' },
       { to: '/tutor-profile', label: 'Profile', icon: 'bi-person' },
       { to: '/tch-availability', label: 'Schedule', icon: 'bi-calendar3' },
       { to: '/reports', label: 'Sessions & Reports', icon: 'bi-file-earmark-text' },

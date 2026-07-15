@@ -165,6 +165,26 @@ describe('completed sessions store', () => {
     expect(result.session.status).toBe('Ongoing')
   })
 
+  it('forces upcoming and handoff countdown states through the dev endpoint', async () => {
+    apiPost
+      .mockResolvedValueOnce({ data: { session: { status: 'Upcoming' } } })
+      .mockResolvedValueOnce({ data: { session: { status: 'Payment Required' } } })
+    apiGet
+      .mockResolvedValueOnce({ data: [] })
+      .mockResolvedValueOnce({ data: [] })
+
+    const store = useSessionsStore()
+    await store.devForceUpcoming(42)
+    await store.devForceHandoff(42)
+
+    expect(apiPost).toHaveBeenNthCalledWith(1, '/dev/bookings/42/force-live/', {
+      phase: 'upcoming',
+    })
+    expect(apiPost).toHaveBeenNthCalledWith(2, '/dev/bookings/42/force-live/', {
+      phase: 'handoff',
+    })
+  })
+
   it('clears a forced live session through the dev endpoint and refreshes sessions', async () => {
     apiPost.mockResolvedValueOnce({
       data: {

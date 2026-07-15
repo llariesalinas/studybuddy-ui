@@ -52,31 +52,6 @@
       />
     </section>
 
-    <section v-if="store.adminAccountRequests.length" class="request-panel">
-      <div>
-        <p class="eyebrow">Admin account requests</p>
-        <h2>{{ store.adminAccountRequests.length }} pending request{{ store.adminAccountRequests.length === 1 ? '' : 's' }}</h2>
-      </div>
-      <div class="request-list">
-        <button
-          v-for="request in store.adminAccountRequests"
-          :key="request.id"
-          type="button"
-          class="request-chip"
-          :class="{ active: activeAdminRequest?.id === request.id }"
-          @click="selectAdminRequest(request)"
-        >
-          <i class="bi bi-person-badge"></i>
-          <span>{{ request.institution_name }}</span>
-          <small>{{ request.requesting_admin_name }}</small>
-        </button>
-      </div>
-      <button v-if="activeAdminRequest" type="button" class="clear-request" @click="activeAdminRequest = null">
-        <i class="bi bi-x-circle"></i>
-        Clear assignment mode
-      </button>
-    </section>
-
     <section class="users-table-panel">
       <Transition name="fade" mode="out-in">
         <div v-if="store.loading.users && !store.users.length" class="table-responsive">
@@ -139,16 +114,7 @@
                 </td>
                 <td>{{ formatDate(user.created_at) }}</td>
                 <td class="text-end">
-                  <button
-                    v-if="activeAdminRequest"
-                    type="button"
-                    class="assign-button"
-                    :disabled="assigningUserId === user.id"
-                    @click="assignAdminRequest(user)"
-                  >
-                    Assign
-                  </button>
-                  <button v-else type="button" class="icon-action" aria-label="View user details" @click="openDetail(user)">
+                  <button type="button" class="icon-action" aria-label="View user details" @click="openDetail(user)">
                     <i class="bi bi-eye"></i>
                   </button>
                 </td>
@@ -187,8 +153,6 @@ const toastStore = useToastStore()
 const { vibrate, patterns } = useHaptics()
 
 const selectedUser = ref(null)
-const activeAdminRequest = ref(null)
-const assigningUserId = ref(null)
 const filters = reactive({ search: '', role: '', institution: '', status: '' })
 
 const roleFilterOptions = [
@@ -233,7 +197,6 @@ const filteredUsers = computed(() => {
 onMounted(() => {
   store.fetchUsers({}, true)
   store.fetchInstitutions()
-  store.fetchAdminAccountRequests(true)
 })
 
 function openDetail(user) {
@@ -243,30 +206,6 @@ function openDetail(user) {
 
 function handleUserUpdated(updatedUser) {
   selectedUser.value = updatedUser
-}
-
-function selectAdminRequest(request) {
-  activeAdminRequest.value = request
-  filters.role = ''
-  filters.institution = request.institution || ''
-  vibrate(patterns.light)
-}
-
-async function assignAdminRequest(user) {
-  if (!activeAdminRequest.value) return
-
-  assigningUserId.value = user.id
-  vibrate(patterns.medium)
-
-  try {
-    await store.approveAdminAccountRequest(activeAdminRequest.value.id, user.id)
-    toastStore.push(`${user.full_name} is now an institution admin.`)
-    activeAdminRequest.value = null
-  } catch {
-    toastStore.push('Failed to approve admin account request.', 'error')
-  } finally {
-    assigningUserId.value = null
-  }
 }
 
 async function exportUsers() {
@@ -366,9 +305,7 @@ h2 {
   box-shadow: 0 0 0 3px rgba(0, 137, 90, 0.12);
 }
 
-.export-button,
-.assign-button,
-.clear-request {
+.export-button {
   border: 0;
   border-radius: 999px;
   background: var(--sb-primary);
@@ -390,57 +327,11 @@ h2 {
   border-radius: 999px;
 }
 
-.request-panel,
 .users-table-panel {
   background: rgba(255, 255, 255, 0.92);
   border: 1px solid var(--sb-card-border);
   border-radius: 18px;
   box-shadow: 0 12px 32px rgba(10, 25, 22, 0.06);
-}
-
-.request-panel {
-  display: grid;
-  grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1.2fr) auto;
-  align-items: center;
-  gap: 14px;
-  padding: 16px;
-  margin-bottom: 16px;
-}
-
-.request-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.request-chip {
-  border: 1px solid var(--sb-card-border);
-  background: #fff;
-  color: var(--sb-text-main);
-  border-radius: 999px;
-  padding: 8px 12px;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.request-chip small {
-  color: var(--sb-text-muted);
-  font-weight: 600;
-}
-
-.request-chip.active {
-  border-color: var(--sb-primary);
-  background: #edf6f1;
-  color: var(--sb-primary);
-}
-
-.clear-request {
-  background: #fff;
-  border: 1px solid var(--sb-card-border);
-  color: var(--sb-text-main);
 }
 
 .users-table-panel {
@@ -523,7 +414,6 @@ h2 {
   color: var(--sb-text-main);
 }
 
-.assign-button:disabled,
 .export-button:disabled {
   opacity: 0.65;
 }
@@ -542,8 +432,7 @@ h2 {
 }
 
 @media (max-width: 980px) {
-  .users-header,
-  .request-panel {
+  .users-header {
     grid-template-columns: 1fr;
     display: grid;
   }

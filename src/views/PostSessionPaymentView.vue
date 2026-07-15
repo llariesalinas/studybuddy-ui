@@ -52,23 +52,23 @@
 
           <div class="mb-4">
             <h5 class="fw-bold mb-3">Payment Method</h5>
-            <div class="payment-method-grid">
-              <button
-                v-for="method in paymentMethods"
-                :key="method.id"
-                type="button"
-                class="payment-method-card sb-btn"
-                :class="{ selected: paymentStore.selectedMethod === method.id }"
-                @click="chooseMethod(method.id)"
-              >
-                <i :class="['bi', method.icon, 'payment-method-icon']"></i>
-                <span>{{ method.label }}</span>
-              </button>
+            <div class="payment-method-card payment-method-card--fixed">
+              <i :class="['bi', paymentMethodIcon, 'payment-method-icon']"></i>
+              <div>
+                <div class="fw-semibold">{{ paymentMethodLabel }}</div>
+                <div class="text-muted small">{{ paymentMethodDescription }}</div>
+              </div>
             </div>
           </div>
 
           <div class="card border-sb rounded-4 p-3">
-            <template v-if="selectedMethod?.code === 'PAYMONGO'">
+            <template v-if="paymentMethodUnavailableMessage">
+              <div class="alert alert-danger mb-0">
+                {{ paymentMethodUnavailableMessage }}
+              </div>
+            </template>
+
+            <template v-else-if="requiredMethodCode === 'PAYMONGO'">
               <div class="alert alert-info mb-3 small">
                 <i class="bi bi-shield-check me-2"></i>
                 You will be redirected to a secure payment page. Accepted: GCash, Maya, Visa, Mastercard.
@@ -82,18 +82,11 @@
               </button>
             </template>
 
-            <template v-else-if="selectedMethod">
-              <div class="mb-3">
-                <label class="form-label">Transaction Reference</label>
-                <input
-                  type="text"
-                  class="form-control sb-field"
-                  v-model="transactionReference"
-                  placeholder="Enter the transfer reference"
-                />
-                <div class="form-text">Enter the reference from your online transfer.</div>
+            <template v-else-if="requiredMethodCode === 'CASH'">
+              <div class="alert alert-info mb-3 small">
+                <i class="bi bi-cash-coin me-2"></i>
+                This face-to-face session uses cash payment. Attach a photo of your proof of payment so the tutor and admins can verify it.
               </div>
-
               <div class="mb-3">
                 <label class="form-label">Receipt Image</label>
                 <input
@@ -102,12 +95,12 @@
                   accept="image/*"
                   @change="handleReceiptChange"
                 />
-                <div class="form-text">A receipt image is required for online payments.</div>
+                <div class="form-text">A receipt image is required for cash payments.</div>
               </div>
 
               <button
                 class="btn bg-sb-primary text-white w-100 sb-btn"
-                :disabled="isSubmitting || !canSubmitOnlinePayment"
+                :disabled="isSubmitting || !canSubmitCashPayment"
                 @click="submitPayment"
               >
                 {{ isSubmitting ? 'Submitting...' : 'Submit Payment Receipt' }}
@@ -116,7 +109,7 @@
 
             <template v-else>
               <p class="text-muted text-center mb-0">
-                Select a payment method to continue.
+                Payment details are unavailable for this session.
               </p>
             </template>
           </div>
@@ -149,16 +142,51 @@ const bookingDetail = ref(null)
 const paymentMethods = ref([])
 const loading = ref(true)
 const isSubmitting = ref(false)
-const transactionReference = ref('')
 const showSuccess = ref(false)
 
-const selectedMethod = computed(() => {
-  return paymentMethods.value.find(method => method.id === paymentStore.selectedMethod) || null
+const sessionMode = computed(() =>
+  String(bookingDetail.value?.session?.session_mode || bookingDetail.value?.session_mode || '').trim()
+)
+
+const requiredMethodCode = computed(() =>
+  sessionMode.value === 'F2F' ? 'CASH' : 'PAYMONGO'
+)
+
+const requiredMethod = computed(() =>
+  paymentMethods.value.find(method => method.code === requiredMethodCode.value) || null
+)
+
+const paymentMethodUnavailableMessage = computed(() => {
+  if (!bookingDetail.value) {
+    return ''
+  }
+
+  if (requiredMethod.value) {
+    return ''
+  }
+
+  if (requiredMethodCode.value === 'CASH') {
+    return "Cash payment isn't available right now. Please contact support or try again later."
+  }
+
+  return "Online payment isn't available right now. Please contact support or try again later."
 })
 
-const canSubmitOnlinePayment = computed(() =>
-  Boolean(paymentStore.receiptImage) && Boolean(transactionReference.value.trim())
+const paymentMethodLabel = computed(() =>
+  requiredMethodCode.value === 'CASH' ? 'Cash Payment' : 'PayMongo Online'
 )
+
+const paymentMethodDescription = computed(() =>
+  requiredMethodCode.value === 'CASH'
+    ? 'Required for face-to-face sessions'
+    : 'Required for online sessions'
+)
+
+const paymentMethodIcon = computed(() =>
+  requiredMethodCode.value === 'CASH' ? 'bi-cash-coin' : 'bi-phone'
+)
+
+const canSubmitCashPayment = computed(() => Boolean(paymentStore.receiptImage))
 
 const totalAmount = computed(() => {
   if (!bookingDetail.value) {
@@ -173,10 +201,6 @@ const totalAmount = computed(() => {
 const backButton = () => {
   paymentStore.reset()
   router.push(`/tuteeSessionDetails/${bookingId}`)
-}
-
-const chooseMethod = (methodId) => {
-  paymentStore.selectedMethod = methodId
 }
 
 const handleReceiptChange = (event) => {
@@ -196,22 +220,18 @@ const initiateOnlinePayment = async () => {
 }
 
 const submitPayment = async () => {
-  if (!paymentStore.selectedMethod) {
-    toastStore.push('Please select a payment method.', 'warning')
+  if (!requiredMethod.value) {
+    toastStore.push(paymentMethodUnavailableMessage.value || 'Payment method unavailable.', 'warning')
     return
   }
 
-  if (selectedMethod.value?.code === 'online' && !canSubmitOnlinePayment.value) {
-    toastStore.push('Please attach a receipt and enter the transaction reference.', 'warning')
+  if (requiredMethodCode.value === 'CASH' && !canSubmitCashPayment.value) {
+    toastStore.push('Please attach a receipt image.', 'warning')
     return
   }
 
   const formData = new FormData()
-  formData.append('payment_method', paymentStore.selectedMethod)
-
-  if (transactionReference.value.trim()) {
-    formData.append('transaction_reference', transactionReference.value.trim())
-  }
+  formData.append('payment_method', requiredMethod.value.id)
 
   if (paymentStore.receiptImage) {
     formData.append('receipt_image', paymentStore.receiptImage)
@@ -249,8 +269,11 @@ onMounted(async () => {
       id: method.id,
       label: method.name,
       code: method.code,
-      icon: method.code === 'PAYMONGO' ? 'bi-phone' : 'bi-credit-card'
+      icon: method.code === 'PAYMONGO' ? 'bi-phone' : 'bi-cash-coin'
     }))
+    paymentStore.selectedMethod = paymentMethods.value.find(
+      method => method.code === requiredMethodCode.value
+    )?.id || null
   } catch (error) {
     console.error('Failed to load payment page:', error)
   } finally {
@@ -291,31 +314,25 @@ onMounted(async () => {
   color: var(--sb-primary);
 }
 
-.payment-method-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 12px;
-}
-
 .payment-method-card {
   border: 1px solid var(--sb-card-border);
   background: #ffffff;
   border-radius: 16px;
   padding: 16px 14px;
-  display: grid;
-  gap: 8px;
-  justify-items: center;
+  display: flex;
+  align-items: center;
+  gap: 12px;
   color: #1f2937;
 }
 
-.payment-method-card.selected {
-  border-color: var(--sb-primary);
-  background: rgba(0, 137, 90, 0.08);
-  color: var(--sb-primary);
+.payment-method-card--fixed {
+  background: rgba(0, 137, 90, 0.05);
+  border-color: rgba(0, 137, 90, 0.18);
 }
 
 .payment-method-icon {
   font-size: 1.5rem;
+  color: var(--sb-primary);
 }
 
 .success-icon-overlay {

@@ -399,7 +399,7 @@ import CashInModal from '@/components/CashInModal.vue'
 import { useWalletStore } from '@/stores/wallet'
 import { useToastStore } from '@/stores/toast'
 import { getReceivingInstitutionLogoUrl } from '@/data/receivingInstitutionLogos'
-import { LOGO_DEV_TOKEN } from '@/config'
+import { LOGO_DEV_TOKEN, BOOKING_DEV_TOOLS_ENABLED } from '@/config'
 
 const route = useRoute()
 const router = useRouter()
@@ -408,7 +408,7 @@ const walletStore = useWalletStore()
 const showCashinModal = ref(false)
 const showCashoutModal = ref(false)
 const isSubmitting = ref(false)
-const isDev = import.meta.env.DEV
+const isDev = import.meta.env.DEV || BOOKING_DEV_TOOLS_ENABLED
 const devAmount = ref(500)
 
 const cashoutForm = reactive({

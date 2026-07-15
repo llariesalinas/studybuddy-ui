@@ -2,9 +2,12 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { useSessionsStore } from '@/stores/completedSessions'
 import { SESSION_POLL_INTERVAL_MS } from '@/config.js'
+import { parseSessionDateTime } from '@/composables/useSessionClock'
 
 const DISMISSED_KEY = 'studybuddy_dismissed_checkins'
 const ACTIVE_STATUSES = ['ongoing', 'upcoming']
+const HANDOFF_STATUSES = ['payment required', 'awaiting verification']
+const UPCOMING_WINDOW_MS = 15 * 60 * 1000
 
 const loadDismissed = () => {
   if (typeof window === 'undefined') {
@@ -35,10 +38,18 @@ const parseDateTime = (dateValue, timeValue) => {
     return null
   }
 
-  const normalizedTime = String(timeValue).length === 5 ? `${timeValue}:00` : timeValue
-  const parsed = new Date(`${dateValue}T${normalizedTime}`)
+  const parsed = parseSessionDateTime(dateValue, timeValue)
 
-  return Number.isNaN(parsed.getTime()) ? null : parsed
+  return parsed && !Number.isNaN(parsed.getTime()) ? parsed : null
+}
+
+const normalizeStatus = (status) => String(status || '').toLowerCase()
+
+const getSessionWindow = (session) => {
+  const startAt = parseDateTime(session?.date, session?.startTime)
+  const endAt = parseDateTime(session?.date, session?.endTime)
+
+  return { startAt, endAt }
 }
 
 export const useActiveSessionStore = defineStore('activeSession', () => {
@@ -71,6 +82,58 @@ export const useActiveSessionStore = defineStore('activeSession', () => {
 
     return candidates[0] || null
   })
+
+  const queueCandidates = computed(() => {
+    const now = currentTime.value.getTime()
+    const live = []
+    const handoff = []
+    const upcoming = []
+
+    sessionsStore.sessions.forEach((session) => {
+      const status = normalizeStatus(session.status)
+      const { startAt, endAt } = getSessionWindow(session)
+
+      if (!startAt || !endAt) {
+        return
+      }
+
+      if (HANDOFF_STATUSES.includes(status)) {
+        handoff.push({ session, state: 'handoff', startAt, endAt })
+        return
+      }
+
+      if (
+        ACTIVE_STATUSES.includes(status)
+        && now >= startAt.getTime()
+        && now < endAt.getTime()
+      ) {
+        live.push({ session, state: 'live', startAt, endAt })
+        return
+      }
+
+      const msUntilStart = startAt.getTime() - now
+      if (
+        status === 'upcoming'
+        && msUntilStart > 0
+        && msUntilStart <= UPCOMING_WINDOW_MS
+      ) {
+        upcoming.push({ session, state: 'upcoming', startAt, endAt })
+      }
+    })
+
+    live.sort((left, right) => left.startAt - right.startAt)
+    handoff.sort((left, right) => left.endAt - right.endAt)
+    upcoming.sort((left, right) => left.startAt - right.startAt)
+
+    return [...live, ...handoff, ...upcoming]
+  })
+
+  const queueEntry = computed(() => queueCandidates.value[0] || null)
+  const queueItem = computed(() => queueEntry.value?.session || null)
+  const queueState = computed(() => queueEntry.value?.state || null)
+  const nextQueueEntry = computed(() => queueCandidates.value[1] || null)
+  const nextQueueItem = computed(() => nextQueueEntry.value?.session || null)
+  const nextQueueState = computed(() => nextQueueEntry.value?.state || null)
 
   const detailSession = computed(() => activeDetail.value?.session || null)
   const sessionStartAt = computed(() => parseDateTime(detailSession.value?.date, detailSession.value?.start_time))
@@ -227,6 +290,11 @@ export const useActiveSessionStore = defineStore('activeSession', () => {
     currentTime,
     activeDetail,
     activeBooking,
+    queueCandidates,
+    queueItem,
+    queueState,
+    nextQueueItem,
+    nextQueueState,
     dueCheckIn,
     sessionPhase,
     sessionStartAt,

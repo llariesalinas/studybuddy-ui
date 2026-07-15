@@ -51,6 +51,16 @@ describe('tutor application state helpers', () => {
     expect(getReviewStatus(application)).toBe('approved')
   })
 
+  it('keeps fully verified approved applications in the initial review bucket', () => {
+    const application = {
+      application_status: 'approved',
+      document_renewal_status: 'verified',
+    }
+
+    expect(getApplicationReviewKind(application)).toBe('initial')
+    expect(getReviewStatus(application)).toBe('approved')
+  })
+
   it('treats pending renewal review as attention-worthy without requesting another upload', () => {
     const application = {
       application_status: 'approved',

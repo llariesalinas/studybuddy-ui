@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SuperAdmin — Algorithm Demo (mockup)</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+<style>
+  :root {
+    --sb-dark: #0A1916;
+    --sb-primary: #00895A;
+    --sb-primary-soft: #E3F3EA;
+    --sb-bg: #F8F9FA;
+    --sb-card-bg: #ffffff;
+    --sb-card-border: #EAEAEA;
+    --sb-muted: #6b7c76;
+    --sb-purple: #7C5CFC;
+    --sb-amber: #C77E00;
+    --sb-red: #D64545;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--sb-bg);
+    color: var(--sb-dark);
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    padding: 32px;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; }
+  .banner {
+    background: #FFF8E6;
+    border: 1px solid #F0DCA0;
+    color: #6b5300;
+    border-radius: 10px;
+    padding: 10px 16px;
+    font-size: 13px;
+    margin-bottom: 20px;
+  }
+
+  .eyebrow { text-transform: uppercase; letter-spacing: .08em; font-size: 11px; font-weight: 700; color: var(--sb-primary); margin: 0 0 4px; }
+  h1 { font-size: 24px; margin: 0 0 4px; font-weight: 700; }
+  .subtitle { color: var(--sb-muted); font-size: 13px; margin: 0 0 20px; }
+
+  .sb-card {
+    background: var(--sb-card-bg);
+    border: 1px solid var(--sb-card-border);
+    border-radius: 14px;
+    padding: 20px 22px;
+    box-shadow: 0 1px 3px rgba(10, 25, 22, 0.04);
+  }
+
+  .tab-toggle {
+    display: inline-flex;
+    background: #EFF3F1;
+    border-radius: 999px;
+    padding: 4px;
+    margin-bottom: 20px;
+    gap: 2px;
+  }
+  .tab-toggle button {
+    border: none;
+    background: transparent;
+    padding: 8px 18px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--sb-muted);
+    cursor: pointer;
+  }
+  .tab-toggle button.active {
+    background: var(--sb-dark);
+    color: #fff;
+  }
+
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* ---- Ranked list tab ---- */
+  .search-row { position: relative; margin-bottom: 18px; }
+  .search-row input {
+    width: 100%;
+    max-width: 420px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--sb-card-border);
+    font-size: 14px;
+  }
+  .search-row input:focus { outline: 2px solid var(--sb-primary-soft); border-color: var(--sb-primary); }
+
+  .split { display: grid; grid-template-columns: 320px 1fr; gap: 18px; }
+  .list-pane { display: flex; flex-direction: column; gap: 8px; }
+  .tutor-row {
+    background: var(--sb-card-bg);
+    border: 1px solid var(--sb-card-border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    cursor: pointer;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .tutor-row:hover { border-color: var(--sb-primary); }
+  .tutor-row.selected { border-color: var(--sb-primary); background: var(--sb-primary-soft); }
+  .tutor-row .rank { color: var(--sb-muted); font-size: 11px; margin-right: 6px; }
+  .tutor-row .score { font-weight: 700; color: var(--sb-primary); }
+  .sb-badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 999px;
+    margin-left: 6px;
+  }
+  .sb-badge.cold { background: #FBE9E9; color: var(--sb-red); }
+
+  .detail-pane { min-height: 360px; }
+  .detail-pane h2 { margin: 0 0 2px; font-size: 18px; }
+  .final-score { font-size: 13px; color: var(--sb-muted); margin-bottom: 18px; }
+  .final-score b { color: var(--sb-primary); font-size: 22px; }
+
+  .bar-row { margin-bottom: 14px; }
+  .bar-label { display: flex; justify-content: space-between; font-size: 12px; color: var(--sb-muted); margin-bottom: 4px; }
+  .bar-track { background: #EFF3F1; border-radius: 5px; height: 10px; width: 100%; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 5px; width: 0%; background: var(--sb-primary); transition: width 0.5s ease; }
+  .bar-fill.cf { background: var(--sb-purple); }
+  .bar-fill.hybrid { background: var(--sb-dark); }
+  .neighbor-list { margin-top: 8px; font-size: 12px; color: var(--sb-muted); }
+  .neighbor-list div { padding: 3px 0; }
+  .empty-state { color: var(--sb-muted); font-size: 14px; text-align: center; padding: 60px 0; }
+
+  /* ---- Compare pair tab ---- */
+  .picker-row { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 20px; }
+  .picker-field label { display: block; font-size: 12px; font-weight: 600; color: var(--sb-muted); margin-bottom: 6px; }
+  .picker-field select {
+    width: 100%;
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--sb-card-border);
+    font-size: 14px;
+    background: #fff;
+  }
+  .picker-field select:disabled { color: var(--sb-muted); background: #F5F6F5; }
+  .picker-hint { font-size: 11px; color: var(--sb-muted); margin-top: 4px; }
+
+  .stat-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 20px; }
+  .stat-card { border: 1px solid var(--sb-card-border); border-radius: 12px; padding: 16px 18px; }
+  .stat-card .role-tag { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--sb-primary); }
+  .stat-card h3 { margin: 4px 0 10px; font-size: 16px; }
+  .stat-line { display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0; border-top: 1px dashed var(--sb-card-border); }
+  .stat-line:first-of-type { border-top: none; }
+  .stat-line .v { font-weight: 600; }
+  .subject-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .subject-pill { background: var(--sb-primary-soft); color: var(--sb-primary); font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 999px; }
+  .subject-pill.expertise-3 { background: #E3F3EA; }
+  .subject-pill.expertise-2 { background: #FEF6E6; color: var(--sb-amber); }
+  .subject-pill.expertise-1 { background: #F3F1FB; color: var(--sb-purple); }
+  .stars { color: var(--sb-amber); font-size: 13px; }
+
+  .placeholder-note { color: var(--sb-muted); font-size: 13px; text-align: center; padding: 40px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="banner"><i class="bi bi-info-circle"></i> Static mockup — dummy data only, no live API calls. For layout/flow review before implementation.</div>
+
+  <p class="eyebrow">Recommender Testing</p>
+  <h1>Algorithm Demo</h1>
+  <p class="subtitle">Runs the real hybrid recommender (CBF + CF) against seeded data. Staff-only, gated by ALGORITHM_DEMO_TOOLS_ENABLED.</p>
+
+  <div class="tab-toggle">
+    <button class="active" data-tab="ranked">Ranked List</button>
+    <button data-tab="pair">Compare Pair</button>
+  </div>
+
+  <!-- ================= RANKED LIST TAB ================= -->
+  <div class="panel active" id="panel-ranked">
+    <div class="sb-card">
+      <div class="picker-field" style="max-width:420px;margin-bottom:18px;">
+        <label>Tutee</label>
+        <select id="ranked-tutee-select">
+          <option value="">Select a tutee…</option>
+        </select>
+      </div>
+
+      <div class="split">
+        <div class="list-pane" id="ranked-list"></div>
+        <div class="sb-card detail-pane" id="ranked-detail"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= COMPARE PAIR TAB ================= -->
+  <div class="panel" id="panel-pair">
+    <div class="sb-card">
+      <div class="picker-row">
+        <div class="picker-field">
+          <label>Tutee</label>
+          <select id="pair-tutee-select">
+            <option value="">Select a tutee…</option>
+          </select>
+        </div>
+        <div class="picker-field">
+          <label>Tutor</label>
+          <select id="pair-tutor-select" disabled>
+            <option value="">Select a tutee first…</option>
+          </select>
+          <div class="picker-hint">Only tutors matching this tutee's subjects &amp; institution appear here.</div>
+        </div>
+      </div>
+
+      <div id="pair-body">
+        <div class="placeholder-note">Select a tutee, then a tutor, to see their stats and calculate the match.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ---- Dummy data mirroring the real breakdown shape from demo.py / hybrid_prediction_breakdown ----
+var TUTEES = [
+  { id: 1, name: "Maria Santos", subjects: ["CS101", "MATH201"] },
+  { id: 2, name: "Jake Villanueva", subjects: ["ENG102"] },
+  { id: 3, name: "Anna Reyes", subjects: [] },
+];
+
+var CANDIDATES = {
+  1: [
+    { tutor_id: 10, name: "Carlo Dizon", hybrid_score: 0.86, cold_start: false,
+      rating_average: 4.8, total_sessions: 41,
+      tutor_subjects: [{code:"CS101", level:3},{code:"MATH201", level:2}],
+      cbf: {
+        subject: { weight: 0.30, value: 1.00 },
+        expertise: { weight: 0.20, value: 0.90 },
+        course: { weight: 0.20, value: 0.80 },
+        year: { weight: 0.15, value: 0.70 },
+        level: { weight: 0.15, value: 0.85 },
+      },
+      cf: { score: 4.5, neighbors: [
+        { name: "Liam Cruz", similarity: 0.82, rating: 5 },
+        { name: "Sofia Ramos", similarity: 0.74, rating: 4 },
+      ]},
+    },
+    { tutor_id: 11, name: "Bea Fernandez", hybrid_score: 0.71, cold_start: true,
+      rating_average: 0, total_sessions: 0,
+      tutor_subjects: [{code:"CS101", level:2}],
+      cbf: {
+        subject: { weight: 0.30, value: 0.90 },
+        expertise: { weight: 0.20, value: 0.60 },
+        course: { weight: 0.20, value: 0.50 },
+        year: { weight: 0.15, value: 0.60 },
+        level: { weight: 0.15, value: 0.55 },
+      },
+      cf: { score: null, neighbors: [] },
+    },
+  ],
+  2: [
+    { tutor_id: 12, name: "Ramon Cruz", hybrid_score: 0.64, cold_start: false,
+      rating_average: 4.2, total_sessions: 15,
+      tutor_subjects: [{code:"ENG102", level:3}],
+      cbf: {
+        subject: { weight: 0.30, value: 0.85 },
+        expertise: { weight: 0.20, value: 0.70 },
+        course: { weight: 0.20, value: 0.60 },
+        year: { weight: 0.15, value: 0.55 },
+        level: { weight: 0.15, value: 0.65 },
+      },
+      cf: { score: 3.8, neighbors: [ { name: "Noel Tan", similarity: 0.61, rating: 4 } ] },
+    },
+  ],
+  3: [],
+};
+
+var CBF_PARTS = [
+  ["subject", "Subject match"],
+  ["expertise", "Expertise"],
+  ["course", "Course match"],
+  ["year", "Year proximity"],
+  ["level", "Teaching level"],
+];
+var STAGGER_MS = 220;
+
+// ---- Tabs ----
+document.querySelectorAll(".tab-toggle button").forEach(function (btn) {
+  btn.addEventListener("click", function () {
+    document.querySelectorAll(".tab-toggle button").forEach(function (b) { b.classList.remove("active"); });
+    document.querySelectorAll(".panel").forEach(function (p) { p.classList.remove("active"); });
+    btn.classList.add("active");
+    document.getElementById("panel-" + btn.dataset.tab).classList.add("active");
+  });
+});
+
+// ---- Ranked list tab ----
+var rankedTuteeSelect = document.getElementById("ranked-tutee-select");
+
+TUTEES.forEach(function (t) {
+  var opt = document.createElement("option");
+  opt.value = t.id;
+  opt.textContent = t.name;
+  rankedTuteeSelect.appendChild(opt);
+});
+
+rankedTuteeSelect.addEventListener("change", function () {
+  renderRankedList(Number(rankedTuteeSelect.value));
+});
+
+function renderRankedList(tuteeId) {
+  var pane = document.getElementById("ranked-list");
+  var detail = document.getElementById("ranked-detail");
+  detail.innerHTML = '<div class="empty-state">Select a tutor from the ranked list to see the calculation.</div>';
+
+  if (!tuteeId) {
+    pane.innerHTML = '<div class="empty-state">Select a tutee above to load their candidate tutors.</div>';
+    return;
+  }
+
+  var rows = CANDIDATES[tuteeId] || [];
+  pane.innerHTML = "";
+
+  if (!rows.length) {
+    pane.innerHTML = '<div class="empty-state">No candidate tutors match this tutee\'s institution and subjects.</div>';
+    return;
+  }
+
+  rows.forEach(function (row, i) {
+    var el = document.createElement("div");
+    el.className = "tutor-row";
+    el.dataset.tutorId = row.tutor_id;
+    el.innerHTML = '<span><span class="rank">' + (i + 1) + '.</span>' + row.name +
+      (row.cold_start ? '<span class="sb-badge cold">Cold Start</span>' : '') + '</span>' +
+      '<span class="score">' + row.hybrid_score.toFixed(2) + '</span>';
+    el.addEventListener("click", function () {
+      document.querySelectorAll("#ranked-list .tutor-row").forEach(function (r) { r.classList.remove("selected"); });
+      el.classList.add("selected");
+      animateBreakdown(detail, row);
+    });
+    pane.appendChild(el);
+  });
+
+  document.querySelector("#ranked-list .tutor-row").classList.add("selected");
+  animateBreakdown(detail, rows[0]);
+}
+renderRankedList(null);
+
+// ---- Compare Pair tab ----
+var tuteeSelect = document.getElementById("pair-tutee-select");
+var tutorSelect = document.getElementById("pair-tutor-select");
+var pairBody = document.getElementById("pair-body");
+
+TUTEES.forEach(function (t) {
+  var opt = document.createElement("option");
+  opt.value = t.id;
+  opt.textContent = t.name;
+  tuteeSelect.appendChild(opt);
+});
+
+tuteeSelect.addEventListener("change", function () {
+  var tuteeId = Number(tuteeSelect.value);
+  tutorSelect.innerHTML = "";
+  pairBody.innerHTML = '<div class="placeholder-note">Select a tutee, then a tutor, to see their stats and calculate the match.</div>';
+
+  if (!tuteeId) {
+    tutorSelect.disabled = true;
+    tutorSelect.innerHTML = '<option value="">Select a tutee first…</option>';
+    return;
+  }
+
+  var rows = CANDIDATES[tuteeId] || [];
+  if (!rows.length) {
+    tutorSelect.disabled = true;
+    tutorSelect.innerHTML = '<option value="">No candidate tutors for this tutee</option>';
+    pairBody.innerHTML = '<div class="placeholder-note">This tutee has no subject-matching candidate tutors at their institution.</div>';
+    return;
+  }
+
+  tutorSelect.disabled = false;
+  tutorSelect.innerHTML = '<option value="">Select a tutor…</option>';
+  rows.forEach(function (row) {
+    var opt = document.createElement("option");
+    opt.value = row.tutor_id;
+    opt.textContent = row.name + " (score " + row.hybrid_score.toFixed(2) + ")";
+    tutorSelect.appendChild(opt);
+  });
+});
+
+tutorSelect.addEventListener("change", function () {
+  var tuteeId = Number(tuteeSelect.value);
+  var tutorId = Number(tutorSelect.value);
+  if (!tutorId) {
+    pairBody.innerHTML = '<div class="placeholder-note">Select a tutee, then a tutor, to see their stats and calculate the match.</div>';
+    return;
+  }
+  var tutee = TUTEES.find(function (t) { return t.id === tuteeId; });
+  var row = (CANDIDATES[tuteeId] || []).find(function (r) { return r.tutor_id === tutorId; });
+  renderPairBody(tutee, row);
+});
+
+function renderPairBody(tutee, row) {
+  var html = '<div class="stat-cards">';
+
+  html += '<div class="stat-card"><span class="role-tag">Tutee</span><h3>' + tutee.name + '</h3>';
+  html += '<div class="subject-pills">' + (tutee.subjects.length
+    ? tutee.subjects.map(function (s) { return '<span class="subject-pill">' + s + '</span>'; }).join('')
+    : '<span style="color:var(--sb-muted);font-size:12px;">No subject preferences set</span>') + '</div></div>';
+
+  html += '<div class="stat-card"><span class="role-tag">Tutor</span><h3>' + row.name +
+    (row.cold_start ? '<span class="sb-badge cold">Cold Start</span>' : '') + '</h3>';
+  html += '<div class="stat-line"><span>Avg. rating</span><span class="v stars">' +
+    (row.rating_average ? row.rating_average.toFixed(1) + ' ★' : 'No ratings yet') + '</span></div>';
+  html += '<div class="stat-line"><span>Sessions completed</span><span class="v">' + row.total_sessions + '</span></div>';
+  html += '<div class="subject-pills">' + row.tutor_subjects.map(function (s) {
+    return '<span class="subject-pill expertise-' + s.level + '">' + s.code + '</span>';
+  }).join('') + '</div></div>';
+
+  html += '</div>';
+  html += '<div class="sb-card detail-pane" id="pair-detail"></div>';
+  pairBody.innerHTML = html;
+
+  animateBreakdown(document.getElementById("pair-detail"), row);
+}
+
+// ---- Shared calculation animation (ported from the standalone live-demo tool) ----
+function animateBreakdown(pane, row) {
+  var html = '<h2>' + row.name + '</h2><div class="final-score">Hybrid Score <b id="hybrid-final">…</b></div>';
+
+  CBF_PARTS.forEach(function (part) {
+    var key = part[0];
+    var sub = row.cbf[key];
+    html += '<div class="bar-row" data-bar="' + key + '">' +
+      '<div class="bar-label"><span>' + part[1] + ' (weight ' + sub.weight.toFixed(2) + ')</span><span class="bar-value">–</span></div>' +
+      '<div class="bar-track"><div class="bar-fill" id="bar-' + key + '-' + row.tutor_id + '"></div></div></div>';
+  });
+
+  html += '<div class="bar-row" data-bar="cf">' +
+    '<div class="bar-label"><span>CF (peer ratings)</span><span class="bar-value" id="cf-value-' + row.tutor_id + '">–</span></div>' +
+    '<div class="bar-track"><div class="bar-fill cf" id="bar-cf-' + row.tutor_id + '"></div></div>' +
+    '<div class="neighbor-list" id="cf-neighbors-' + row.tutor_id + '"></div></div>';
+
+  html += '<div class="bar-row" data-bar="hybrid">' +
+    '<div class="bar-label"><span>Hybrid Score = 0.7×CBF + 0.3×(CF/5)</span></div>' +
+    '<div class="bar-track"><div class="bar-fill hybrid" id="bar-hybrid-' + row.tutor_id + '"></div></div></div>';
+
+  pane.innerHTML = html;
+
+  var steps = [];
+  CBF_PARTS.forEach(function (part) {
+    steps.push(function () {
+      fillBar(part[0] + '-' + row.tutor_id, row.cbf[part[0]].value, row.cbf[part[0]].value.toFixed(2));
+    });
+  });
+  steps.push(function () {
+    if (row.cold_start) {
+      document.getElementById('cf-value-' + row.tutor_id).textContent = 'unavailable';
+      document.getElementById('cf-neighbors-' + row.tutor_id).textContent = 'CF unavailable — no rating history.';
+    } else if (row.cf.score === null) {
+      document.getElementById('cf-value-' + row.tutor_id).textContent = 'no signal';
+      document.getElementById('cf-neighbors-' + row.tutor_id).textContent = 'None of this tutee\'s similar peers have rated this tutor yet.';
+      fillBar('cf-' + row.tutor_id, 0, null);
+    } else {
+      fillBar('cf-' + row.tutor_id, Math.max(0, Math.min(1, row.cf.score / 5)), row.cf.score.toFixed(2));
+      var list = document.getElementById('cf-neighbors-' + row.tutor_id);
+      row.cf.neighbors.forEach(function (n) {
+        var line = document.createElement('div');
+        line.textContent = n.name + ' — similarity ' + n.similarity.toFixed(2) + ', rated this tutor ' + n.rating + '/5';
+        list.appendChild(line);
+      });
+    }
+  });
+  steps.push(function () {
+    fillBar('hybrid-' + row.tutor_id, Math.max(0, Math.min(1, row.hybrid_score)), null);
+    document.getElementById('hybrid-final').textContent = row.hybrid_score.toFixed(3);
+  });
+
+  steps.forEach(function (step, i) { setTimeout(step, i * STAGGER_MS); });
+}
+
+function fillBar(key, fraction, label) {
+  var bar = document.getElementById('bar-' + key);
+  if (!bar) return;
+  bar.style.width = Math.round(fraction * 100) + '%';
+  var row = bar.closest('.bar-row').querySelector('.bar-value');
+  if (row && label !== null) row.textContent = label;
+}
+</script>
+</body>
+</html>

@@ -292,6 +292,10 @@ export const useSessionsStore = defineStore('sessions', () => {
     return response.data
   }
 
+  const devForceUpcoming = async (id) => devForceLive(id, 'upcoming')
+
+  const devForceHandoff = async (id) => devForceLive(id, 'handoff')
+
   const devClearForceLive = async (id) => {
     const response = await api.post(`/dev/bookings/${id}/clear-force-live/`)
     await fetchSessions({ force: true })
@@ -394,6 +398,8 @@ export const useSessionsStore = defineStore('sessions', () => {
     confirmVenue,
     submitMidpointCheckIn,
     devForceLive,
+    devForceUpcoming,
+    devForceHandoff,
     devClearForceLive,
   }
 })

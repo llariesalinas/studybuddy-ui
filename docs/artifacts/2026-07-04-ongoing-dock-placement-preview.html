@@ -1,0 +1,1370 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ongoing Dock Placement Preview</title>
+<style>
+  :root {
+    --sb-primary: #00895a;
+    --sb-primary-hover: #00704a;
+    --sb-dark: #0a1916;
+    --sb-canvas: #ffffff;
+    --sb-parchment: #f5f5f7;
+    --sb-ink: #1d1d1f;
+    --sb-muted: #6e6e73;
+    --sb-green-tint: #edf7f3;
+    --sb-green-border: #b8dece;
+    --sb-shadow: 0 18px 48px rgba(10, 25, 22, 0.18);
+    --spring: cubic-bezier(0.22, 1, 0.36, 1);
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    color: var(--sb-ink);
+    background:
+      radial-gradient(circle at top left, rgba(0, 137, 90, 0.1), transparent 32%),
+      radial-gradient(circle at top right, rgba(244, 171, 60, 0.14), transparent 28%),
+      linear-gradient(180deg, #faf7f0 0%, #f3f8f4 52%, #eef5f1 100%);
+  }
+
+  .page {
+    width: min(1220px, calc(100% - 32px));
+    margin: 0 auto;
+    padding: 28px 0 44px;
+  }
+
+  .intro {
+    margin-bottom: 24px;
+  }
+
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: var(--sb-green-tint);
+    border: 1px solid var(--sb-green-border);
+    color: var(--sb-primary);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  h1 {
+    margin: 12px 0 8px;
+    font-size: clamp(34px, 4vw, 54px);
+    line-height: 0.96;
+    letter-spacing: -0.03em;
+  }
+
+  .lead {
+    max-width: 760px;
+    margin: 0;
+    color: var(--sb-muted);
+    font-size: 16px;
+    line-height: 1.55;
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 290px minmax(0, 1fr);
+    gap: 24px;
+    align-items: start;
+  }
+
+  .controls,
+  .stage {
+    border: 1px solid rgba(10, 25, 22, 0.08);
+    border-radius: 28px;
+    background: rgba(255, 255, 255, 0.82);
+    box-shadow: 0 14px 34px rgba(10, 25, 22, 0.08);
+  }
+
+  .controls {
+    padding: 18px;
+    position: sticky;
+    top: 20px;
+  }
+
+  .controls h2 {
+    margin: 0 0 10px;
+    font-size: 22px;
+  }
+
+  .controls p {
+    margin: 0 0 16px;
+    color: var(--sb-muted);
+    font-size: 14px;
+    line-height: 1.55;
+  }
+
+  .variant-list {
+    display: grid;
+    gap: 10px;
+  }
+
+  .variant-btn {
+    width: 100%;
+    text-align: left;
+    border: 1px solid rgba(10, 25, 22, 0.1);
+    border-radius: 18px;
+    background: #fff;
+    padding: 14px 14px 13px;
+    cursor: pointer;
+    transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+  }
+
+  .variant-btn:hover {
+    transform: translateY(-1px);
+    border-color: rgba(0, 137, 90, 0.24);
+  }
+
+  .variant-btn.active {
+    border-color: rgba(0, 137, 90, 0.34);
+    box-shadow: 0 0 0 3px rgba(0, 137, 90, 0.1);
+  }
+
+  .variant-btn strong,
+  .variant-btn span {
+    display: block;
+  }
+
+  .variant-btn strong {
+    font-size: 14px;
+  }
+
+  .variant-btn span {
+    margin-top: 4px;
+    color: var(--sb-muted);
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  .summary {
+    margin-top: 16px;
+    padding: 14px;
+    border-radius: 18px;
+    background: var(--sb-parchment);
+  }
+
+  .summary strong {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 13px;
+  }
+
+  .summary span {
+    color: var(--sb-muted);
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  .stage {
+    overflow: hidden;
+    min-height: 760px;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0.44)),
+      linear-gradient(135deg, #eef6f1, #fffaf2);
+  }
+
+  .demo-toast {
+    position: fixed;
+    top: 18px;
+    right: 18px;
+    z-index: 20;
+    max-width: 340px;
+    padding: 12px 14px;
+    border-radius: 18px;
+    background: rgba(8, 24, 19, 0.94);
+    color: #e9fff7;
+    box-shadow: 0 18px 34px rgba(10, 25, 22, 0.2);
+    opacity: 0;
+    transform: translateY(-10px);
+    pointer-events: none;
+    transition: opacity 180ms ease, transform 180ms ease;
+  }
+
+  .demo-toast[data-visible="true"] {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .demo-toast strong,
+  .demo-toast span {
+    display: block;
+  }
+
+  .demo-toast strong {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #9dedd0;
+  }
+
+  .demo-toast span {
+    margin-top: 4px;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .mock-app {
+    position: relative;
+    min-height: 760px;
+    padding: 26px 26px 150px;
+  }
+
+  .app-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 18px;
+  }
+
+  .app-header h3 {
+    margin: 0;
+    font-size: 26px;
+  }
+
+  .app-header p {
+    margin: 6px 0 0;
+    color: var(--sb-muted);
+    font-size: 14px;
+  }
+
+  .header-actions {
+    display: flex;
+    gap: 12px;
+  }
+
+  .header-pill {
+    width: 42px;
+    height: 42px;
+    border-radius: 16px;
+    background: #ffffff;
+    border: 1px solid rgba(10, 25, 22, 0.08);
+    box-shadow: 0 10px 20px rgba(15, 23, 42, 0.06);
+  }
+
+  .hero-card {
+    padding: 22px;
+    border-radius: 28px;
+    background: linear-gradient(135deg, #0b1e19, #14352d 58%, #10241d);
+    color: #fff;
+    box-shadow: 0 22px 40px rgba(10, 25, 22, 0.2);
+  }
+
+  .hero-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: center;
+  }
+
+  .hero-card h4 {
+    margin: 0 0 5px;
+    font-size: 24px;
+  }
+
+  .hero-card p {
+    margin: 0;
+    color: rgba(255, 255, 255, 0.74);
+    font-size: 13px;
+  }
+
+  .hero-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    font-size: 11px;
+    font-weight: 800;
+  }
+
+  .hero-tag::before,
+  .dock-pill::before,
+  .rail-tab::before,
+  .peek-tab::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #45f0bd;
+    box-shadow: 0 0 12px rgba(69, 240, 189, 0.82);
+  }
+
+  .content-grid {
+    display: grid;
+    grid-template-columns: 1.2fr 0.8fr;
+    gap: 18px;
+    margin-top: 18px;
+  }
+
+  .panel,
+  .bottom-actions {
+    border: 1px solid rgba(10, 25, 22, 0.08);
+    background: rgba(255, 255, 255, 0.88);
+    border-radius: 22px;
+  }
+
+  .panel {
+    padding: 18px;
+    min-height: 260px;
+  }
+
+  .panel h5,
+  .bottom-actions h5 {
+    margin: 0 0 8px;
+    font-size: 15px;
+  }
+
+  .panel p,
+  .bottom-actions p {
+    margin: 0;
+    color: var(--sb-muted);
+    font-size: 13px;
+    line-height: 1.55;
+  }
+
+  .bottom-actions {
+    position: absolute;
+    left: 26px;
+    right: 26px;
+    bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 18px;
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 0 12px 28px rgba(10, 25, 22, 0.08);
+  }
+
+  .bottom-actions .actions {
+    display: flex;
+    gap: 10px;
+  }
+
+  .ghost-btn,
+  .primary-btn,
+  .dock-open,
+  .dock-toggle,
+  .peek-tab {
+    border: 0;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .ghost-btn,
+  .primary-btn {
+    padding: 11px 16px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .ghost-btn {
+    background: #eef4f0;
+    color: #173227;
+  }
+
+  .primary-btn {
+    background: var(--sb-primary);
+    color: #fff;
+  }
+
+  .dock-shell {
+    position: absolute;
+  }
+
+  .dock-shell button:focus-visible,
+  .dock button:focus-visible {
+    outline: 2px solid rgba(95, 240, 194, 0.9);
+    outline-offset: 2px;
+  }
+
+  .dock {
+    overflow: hidden;
+    border-radius: 22px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    background:
+      radial-gradient(circle at 18% 0%, rgba(21, 184, 143, 0.32), transparent 34%),
+      radial-gradient(circle at 86% 100%, rgba(244, 171, 60, 0.22), transparent 30%),
+      linear-gradient(135deg, #071914, #0f2f28 54%, #13201d);
+    box-shadow: var(--sb-shadow);
+    color: #fff;
+  }
+
+  .dock-top {
+    display: grid;
+    align-items: center;
+    gap: 14px;
+    padding: 15px 16px;
+  }
+
+  .dock-copy {
+    min-width: 0;
+  }
+
+  .dock-heading {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 5px;
+    min-width: 0;
+  }
+
+  .dock-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.12);
+    color: #d9fff2;
+    font-size: 11px;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+
+  .dock-heading strong {
+    font-size: 13px;
+    white-space: nowrap;
+  }
+
+  .dock-title,
+  .dock-subtitle {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .dock-title {
+    color: rgba(255, 255, 255, 0.88);
+    font-size: 14px;
+  }
+
+  .dock-subtitle {
+    margin-top: 3px;
+    color: rgba(206, 255, 237, 0.72);
+    font-size: 11px;
+  }
+
+  .dock-orbit {
+    position: relative;
+    height: 24px;
+  }
+
+  .orbit-track,
+  .orbit-fill {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    border-radius: 999px;
+  }
+
+  .orbit-track {
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: rgba(255, 255, 255, 0.12);
+  }
+
+  .orbit-fill {
+    left: 0;
+    width: 84%;
+    height: 2px;
+    background: linear-gradient(90deg, #5ff0c2, #f8d47a);
+  }
+
+  .orbit-zones {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    align-items: center;
+  }
+
+  .orbit-zones span {
+    height: 6px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.14);
+  }
+
+  .orbit-zones span.active {
+    background: rgba(118, 255, 213, 0.5);
+  }
+
+  .orbit-bead {
+    position: absolute;
+    left: 84%;
+    top: 50%;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #f9fefb;
+    border: 2px solid rgba(255, 255, 255, 0.82);
+    box-shadow:
+      0 0 0 5px rgba(95, 240, 194, 0.16),
+      0 0 18px rgba(248, 212, 122, 0.55);
+    transform: translate(-50%, -50%);
+  }
+
+  .dock-open {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 16px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.96);
+    color: #10231d;
+    font-size: 13px;
+    font-weight: 800;
+  }
+
+  .dock-toggle {
+    display: inline-grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+    font-size: 18px;
+  }
+
+  .hide-chip {
+    border: 0;
+    cursor: pointer;
+  }
+
+  .interaction-note {
+    margin-top: 10px;
+    color: rgba(10, 25, 22, 0.58);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+
+  .variant-card {
+    display: none;
+  }
+
+  .variant-card.active {
+    display: block;
+  }
+
+  .variant-bottom .dock-shell {
+    left: 26px;
+    right: 26px;
+    bottom: 100px;
+  }
+
+  .variant-bottom .dock-top {
+    grid-template-columns: minmax(0, 1fr) minmax(150px, 210px) auto auto;
+  }
+
+  .variant-bottom .hide-strip {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 10px;
+  }
+
+  .variant-bottom .dock-shell[data-hidden="true"] .dock {
+    opacity: 0;
+    transform: translateY(14px);
+    pointer-events: none;
+  }
+
+  .variant-bottom .dock-shell[data-hidden="false"] .hide-strip {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(10px);
+  }
+
+  .variant-bottom .dock-shell[data-hidden="true"] .hide-strip {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+  }
+
+  .variant-bottom .hide-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 12px;
+    border-radius: 999px;
+    background: rgba(8, 24, 19, 0.92);
+    color: #d7fff1;
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  .variant-bottom .dock,
+  .variant-bottom .hide-strip {
+    transition: opacity 220ms var(--spring), transform 220ms var(--spring);
+  }
+
+  .variant-bottom .hide-chip::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #45f0bd;
+    box-shadow: 0 0 12px rgba(69, 240, 189, 0.82);
+  }
+
+  .variant-chip .dock-shell {
+    right: 26px;
+    bottom: 100px;
+    width: 332px;
+  }
+
+  .variant-chip .dock {
+    border-radius: 999px;
+    transition: border-radius 220ms var(--spring), width 220ms var(--spring), box-shadow 220ms var(--spring);
+  }
+
+  .variant-chip .dock[data-expanded="true"] {
+    border-radius: 22px;
+  }
+
+  .variant-chip .dock-top {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+    padding: 12px 14px;
+  }
+
+  .variant-chip .dock-text {
+    min-width: 0;
+  }
+
+  .variant-chip .dock-title {
+    font-size: 12px;
+  }
+
+  .variant-chip .dock-subtitle,
+  .variant-chip .dock-orbit,
+  .variant-chip .dock-open {
+    display: none;
+  }
+
+  .variant-chip .dock[data-expanded="true"] .dock-top {
+    grid-template-columns: minmax(0, 1fr) minmax(150px, 210px) auto auto;
+    gap: 14px;
+    padding: 15px 16px;
+  }
+
+  .variant-chip .dock[data-expanded="true"] .dock-subtitle,
+  .variant-chip .dock[data-expanded="true"] .dock-orbit,
+  .variant-chip .dock[data-expanded="true"] .dock-open {
+    display: initial;
+  }
+
+  .variant-chip .dock[data-expanded="true"] .dock-open {
+    display: inline-flex;
+  }
+
+  .variant-chip .dock-extra {
+    display: none;
+  }
+
+  .variant-chip .dock[data-expanded="true"] .dock-extra {
+    display: block;
+    padding: 0 16px 16px;
+  }
+
+  .variant-chip .dock[data-expanded="false"] {
+    width: 288px;
+    cursor: pointer;
+  }
+
+  .variant-chip .dock[data-expanded="false"] .dock-heading strong {
+    display: none;
+  }
+
+  .variant-chip .dock-note {
+    border-radius: 16px;
+    padding: 14px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.84);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .variant-rail .dock-shell {
+    top: 152px;
+    right: 20px;
+    width: min(410px, calc(100% - 40px));
+  }
+
+  .variant-rail .peek-tab {
+    position: absolute;
+    right: calc(100% + 10px);
+    top: 18px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 11px 13px;
+    border-radius: 18px 0 0 18px;
+    background: rgba(8, 24, 19, 0.94);
+    color: #d7fff1;
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    box-shadow: 0 12px 24px rgba(10, 25, 22, 0.18);
+  }
+
+  .variant-rail .rail-tab {
+    position: absolute;
+    right: 100%;
+    top: 20px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 12px;
+    border-radius: 18px 0 0 18px;
+    background: rgba(8, 24, 19, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-right: 0;
+    color: #d7fff1;
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  .variant-rail .dock-top {
+    grid-template-columns: 1fr;
+  }
+
+  .variant-rail .dock-actions {
+    display: flex;
+    gap: 10px;
+  }
+
+  .variant-rail .dock-actions .dock-open,
+  .variant-rail .dock-actions .dock-toggle {
+    flex: 1;
+  }
+
+  .variant-rail .dock-extra {
+    padding: 0 16px 16px;
+  }
+
+  .variant-rail .dock[data-expanded="false"] .dock-extra {
+    display: none;
+  }
+
+  .variant-rail .dock[data-expanded="false"] .dock-subtitle,
+  .variant-rail .dock[data-expanded="false"] .dock-orbit {
+    display: none;
+  }
+
+  .variant-rail .dock[data-expanded="false"] .dock-actions .dock-open {
+    display: none;
+  }
+
+  .variant-rail .dock[data-expanded="false"] .dock {
+    border-radius: 22px 22px 22px 18px;
+  }
+
+  .variant-rail .dock-note {
+    border-radius: 16px;
+    padding: 14px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.84);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .variant-rail .dock-shell[data-hidden="true"] {
+    transform: translateX(calc(100% + 22px));
+  }
+
+  .variant-rail .dock-shell[data-hidden="false"] {
+    transform: translateX(0);
+  }
+
+  .variant-rail .dock-shell {
+    transition: transform 240ms var(--spring);
+  }
+
+  .variant-rail .dock-shell[data-hidden="false"] .peek-tab {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .variant-rail .dock {
+    transition: border-radius 220ms var(--spring), box-shadow 220ms var(--spring);
+  }
+
+  @media (max-width: 980px) {
+    .layout {
+      grid-template-columns: 1fr;
+    }
+
+    .controls {
+      position: static;
+    }
+  }
+
+  @media (max-width: 760px) {
+    .page {
+      width: min(100%, calc(100% - 20px));
+      padding-top: 18px;
+    }
+
+    .mock-app {
+      padding: 18px 18px 154px;
+    }
+
+    .content-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .bottom-actions {
+      left: 18px;
+      right: 18px;
+      bottom: 16px;
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .bottom-actions .actions {
+      width: 100%;
+      justify-content: stretch;
+    }
+
+    .bottom-actions .actions button {
+      flex: 1;
+    }
+
+    .variant-bottom .dock-shell,
+    .variant-chip .dock-shell {
+      left: 18px;
+      right: 18px;
+      width: auto;
+      bottom: 108px;
+    }
+
+    .variant-rail .dock-shell {
+      right: 14px;
+      left: 14px;
+      width: auto;
+      top: auto;
+      bottom: 108px;
+    }
+
+    .dock-top,
+    .variant-bottom .dock-top,
+    .variant-chip .dock[data-expanded="true"] .dock-top {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="demo-toast" data-visible="false" aria-live="polite">
+  <strong>Preview action</strong>
+  <span id="demo-toast-copy">The prototype will show interactions here.</span>
+</div>
+<main class="page">
+  <section class="intro">
+    <div class="eyebrow">Focused UI proposal</div>
+    <h1>Hideable ongoing dock directions</h1>
+    <p class="lead">
+      These previews answer the conflict in the current bottom-centered bar by either giving it a real hidden
+      state or moving it out of the bottom action lane entirely.
+    </p>
+  </section>
+
+  <div class="layout">
+    <aside class="controls">
+      <h2>Choose a direction</h2>
+      <p>
+        Each concept keeps the current StudyBuddy visual language, but changes how much space the dock permanently occupies.
+      </p>
+
+      <div class="variant-list">
+        <button type="button" class="variant-btn active" data-variant="bottom">
+          <strong>Bottom dock with hide chip</strong>
+          <span>Smallest behavior change. The dock stays familiar, but can collapse into a slim hidden marker.</span>
+        </button>
+        <button type="button" class="variant-btn" data-variant="chip">
+          <strong>Mini chip that expands</strong>
+          <span>Best when the dock should feel ambient most of the time and only open when needed.</span>
+        </button>
+        <button type="button" class="variant-btn" data-variant="rail">
+          <strong>Right-side rail</strong>
+          <span>Best when the real conflict is with bottom bars, sticky actions, or overlays.</span>
+        </button>
+      </div>
+
+      <div class="summary">
+        <strong id="choice-title">Recommended first test</strong>
+        <span id="choice-copy">
+          The right-side rail is the strongest match when the issue is direct collision with bottom-aligned UI elements.
+        </span>
+      </div>
+    </aside>
+
+    <section class="stage">
+      <div class="variant-card variant-bottom active">
+        <div class="mock-app">
+          <div class="app-header">
+            <div>
+              <h3>Session details</h3>
+              <p>Primary content and fixed bottom actions stay visible in this mock layout.</p>
+            </div>
+            <div class="header-actions">
+              <div class="header-pill"></div>
+              <div class="header-pill"></div>
+            </div>
+          </div>
+
+          <div class="hero-card">
+            <div class="hero-row">
+              <div>
+                <h4>BS Information Technology (CPU-CCS)</h4>
+                <p>Follow-up is still pending after the scheduled session ended.</p>
+              </div>
+              <span class="hero-tag">Payment required</span>
+            </div>
+          </div>
+
+          <div class="content-grid">
+            <article class="panel">
+              <h5>Why this works</h5>
+              <p>
+                It preserves the current mental model. The only new behavior is a clear hide action that turns the dock
+                into a light marker, so the bottom action bar gets breathing room.
+              </p>
+            </article>
+            <article class="panel">
+              <h5>Tradeoff</h5>
+              <p>
+                The dock still belongs to the bottom zone, so it reduces collision but does not completely remove that shared lane.
+              </p>
+            </article>
+          </div>
+
+          <div class="dock-shell" data-hidden="false">
+            <div class="dock">
+              <div class="dock-top">
+                <div class="dock-copy">
+                  <div class="dock-heading">
+                    <span class="dock-pill">Payment handoff</span>
+                    <strong>Ended over 24:00:00 ago</strong>
+                  </div>
+                  <span class="dock-title">BS Information Technology (CPU-CCS) needs follow-up</span>
+                  <span class="dock-subtitle">Up next: Payment handoff - Physics with Angela 8 min ago</span>
+                </div>
+                <div class="dock-orbit" aria-hidden="true">
+                  <div class="orbit-track"></div>
+                  <div class="orbit-fill"></div>
+                  <div class="orbit-zones">
+                    <span class="active"></span>
+                    <span class="active"></span>
+                    <span class="active"></span>
+                    <span class="active"></span>
+                  </div>
+                  <div class="orbit-bead"></div>
+                </div>
+                <button type="button" class="dock-open">Open -></button>
+                <button type="button" class="dock-toggle" aria-label="Hide dock" data-action="hide-bottom">-</button>
+              </div>
+            </div>
+            <div class="hide-strip">
+              <button type="button" class="hide-chip" data-action="show-bottom">Restore handoff</button>
+            </div>
+            <div class="interaction-note">Click hide to collapse. Click restore to bring it back.</div>
+          </div>
+
+          <div class="bottom-actions">
+            <div>
+              <h5>Fixed bottom actions</h5>
+              <p>This represents the part of the page the current dock is colliding with.</p>
+            </div>
+            <div class="actions">
+              <button type="button" class="ghost-btn">Secondary</button>
+              <button type="button" class="primary-btn">Primary action</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="variant-card variant-chip">
+        <div class="mock-app">
+          <div class="app-header">
+            <div>
+              <h3>Session details</h3>
+              <p>The dock becomes a quiet signal first, then expands when the user wants more.</p>
+            </div>
+            <div class="header-actions">
+              <div class="header-pill"></div>
+              <div class="header-pill"></div>
+            </div>
+          </div>
+
+          <div class="hero-card">
+            <div class="hero-row">
+              <div>
+                <h4>BS Information Technology (CPU-CCS)</h4>
+                <p>This direction reduces visual weight during long browsing sessions.</p>
+              </div>
+              <span class="hero-tag">Payment required</span>
+            </div>
+          </div>
+
+          <div class="content-grid">
+            <article class="panel">
+              <h5>Why this works</h5>
+              <p>
+                The floating surface shrinks into a compact chip, which makes it much less likely to fight with persistent bottom UI.
+              </p>
+            </article>
+            <article class="panel">
+              <h5>Tradeoff</h5>
+              <p>
+                The timer and orbit become secondary, so this is calmer but slightly less informative at a glance.
+              </p>
+            </article>
+          </div>
+
+          <div class="dock-shell">
+            <div class="dock" data-expanded="false" role="button" tabindex="0" aria-expanded="false">
+              <div class="dock-top">
+                <div class="dock-copy">
+                  <div class="dock-heading">
+                    <span class="dock-pill">Payment handoff</span>
+                    <strong>Ended over 24:00:00 ago</strong>
+                  </div>
+                  <div class="dock-text">
+                    <span class="dock-title">Needs follow-up</span>
+                    <span class="dock-subtitle">Expands when the user taps the chip</span>
+                  </div>
+                </div>
+                <div class="dock-orbit" aria-hidden="true">
+                  <div class="orbit-track"></div>
+                  <div class="orbit-fill"></div>
+                  <div class="orbit-zones">
+                    <span class="active"></span>
+                    <span class="active"></span>
+                    <span class="active"></span>
+                    <span class="active"></span>
+                  </div>
+                  <div class="orbit-bead"></div>
+                </div>
+                <button type="button" class="dock-open">Open -></button>
+                <button type="button" class="dock-toggle" aria-label="Toggle mini chip" data-action="toggle-chip">+</button>
+              </div>
+              <div class="dock-extra">
+                <div class="dock-note">
+                  Use this if we want the bar to feel closer to a notification chip than a permanent control strip.
+                </div>
+              </div>
+            </div>
+            <div class="interaction-note">Click the chip to expand it, then collapse it again when you're done.</div>
+          </div>
+
+          <div class="bottom-actions">
+            <div>
+              <h5>Fixed bottom actions</h5>
+              <p>The chip keeps more space open than the current full-width dock.</p>
+            </div>
+            <div class="actions">
+              <button type="button" class="ghost-btn">Secondary</button>
+              <button type="button" class="primary-btn">Primary action</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="variant-card variant-rail">
+        <div class="mock-app">
+          <div class="app-header">
+            <div>
+              <h3>Session details</h3>
+              <p>The bottom lane remains fully clear because the dock becomes a side priority tray.</p>
+            </div>
+            <div class="header-actions">
+              <div class="header-pill"></div>
+              <div class="header-pill"></div>
+            </div>
+          </div>
+
+          <div class="hero-card">
+            <div class="hero-row">
+              <div>
+                <h4>BS Information Technology (CPU-CCS)</h4>
+                <p>The session queue is visible, but no longer occupies the center-bottom action zone.</p>
+              </div>
+              <span class="hero-tag">Payment required</span>
+            </div>
+          </div>
+
+          <div class="content-grid">
+            <article class="panel">
+              <h5>Why this works</h5>
+              <p>
+                This is the cleanest fix for bottom collisions. It turns the dock into a side tray with a real hidden state,
+                while keeping the session signal visible and easy to reopen.
+              </p>
+            </article>
+            <article class="panel">
+              <h5>Tradeoff</h5>
+              <p>
+                It is the biggest layout change, so it will need a bit more responsive tuning than the other two options.
+              </p>
+            </article>
+          </div>
+
+          <div class="dock-shell" data-hidden="false">
+            <button type="button" class="peek-tab" data-action="show-rail">Show queue</button>
+            <div class="dock" data-expanded="true">
+              <span class="rail-tab">Session queue</span>
+              <div class="dock-top">
+                <div class="dock-copy">
+                  <div class="dock-heading">
+                    <span class="dock-pill">Payment handoff</span>
+                    <strong>Priority item</strong>
+                  </div>
+                  <span class="dock-title">BS Information Technology (CPU-CCS) needs follow-up</span>
+                  <span class="dock-subtitle">Moved away from the bottom stack to avoid collisions.</span>
+                </div>
+                <div class="dock-orbit" aria-hidden="true">
+                  <div class="orbit-track"></div>
+                  <div class="orbit-fill"></div>
+                  <div class="orbit-zones">
+                    <span class="active"></span>
+                    <span class="active"></span>
+                    <span class="active"></span>
+                    <span class="active"></span>
+                  </div>
+                  <div class="orbit-bead"></div>
+                </div>
+                <div class="dock-actions">
+                  <button type="button" class="dock-open" data-action="expand-rail">Open -></button>
+                  <button type="button" class="dock-toggle" aria-label="Hide side rail" data-action="toggle-rail">&lt;</button>
+                </div>
+              </div>
+              <div class="dock-extra">
+                <div class="dock-note">
+                  This is the one I would test first if the issue is direct overlap with sticky footers, bottom nav, action rows, or centered overlays.
+                </div>
+              </div>
+            </div>
+            <div class="interaction-note">Hide the tray completely, then use the side tab to reveal it again.</div>
+          </div>
+
+          <div class="bottom-actions">
+            <div>
+              <h5>Fixed bottom actions</h5>
+              <p>Nothing is competing for this lane in the side-rail version.</p>
+            </div>
+            <div class="actions">
+              <button type="button" class="ghost-btn">Secondary</button>
+              <button type="button" class="primary-btn">Primary action</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<script>
+  const meta = {
+    bottom: {
+      title: "Safest incremental change",
+      copy: "Keep the current dock at the bottom, but let users hide it into a slim marker when it starts competing with page actions.",
+    },
+    chip: {
+      title: "Calmest visual presence",
+      copy: "Best when we want the dock to feel ambient most of the time and only restore the full surface on demand.",
+    },
+    rail: {
+      title: "Recommended first test",
+      copy: "Best fit for your screenshot because it removes the dock from the exact area where bottom-aligned UI tends to collide.",
+    },
+  };
+
+  const titleNode = document.getElementById("choice-title");
+  const copyNode = document.getElementById("choice-copy");
+  const toastNode = document.querySelector(".demo-toast");
+  const toastCopyNode = document.getElementById("demo-toast-copy");
+  const bottomShell = document.querySelector(".variant-bottom .dock-shell");
+  const chipDock = document.querySelector(".variant-chip .dock");
+  const railShell = document.querySelector(".variant-rail .dock-shell");
+  const railDock = railShell?.querySelector(".dock");
+  let toastTimeoutId = null;
+
+  const showToast = (message) => {
+    toastCopyNode.textContent = message;
+    toastNode.dataset.visible = "true";
+
+    if (toastTimeoutId) {
+      window.clearTimeout(toastTimeoutId);
+    }
+
+    toastTimeoutId = window.setTimeout(() => {
+      toastNode.dataset.visible = "false";
+      toastTimeoutId = null;
+    }, 1800);
+  };
+
+  const setBottomHidden = (hidden) => {
+    bottomShell.dataset.hidden = hidden ? "true" : "false";
+  };
+
+  const setChipExpanded = (expanded) => {
+    chipDock.dataset.expanded = expanded ? "true" : "false";
+    chipDock.setAttribute("aria-expanded", expanded ? "true" : "false");
+    const toggle = chipDock.querySelector("[data-action='toggle-chip']");
+    if (toggle) {
+      toggle.textContent = expanded ? "^" : "+";
+    }
+  };
+
+  const setRailState = ({ hidden = false, expanded = true } = {}) => {
+    railShell.dataset.hidden = hidden ? "true" : "false";
+    railDock.dataset.expanded = expanded ? "true" : "false";
+    const hideToggle = railDock.querySelector("[data-action='toggle-rail']");
+    const expandButton = railDock.querySelector("[data-action='expand-rail']");
+
+    if (hideToggle) {
+      hideToggle.textContent = hidden ? ">" : expanded ? "<" : ">";
+      hideToggle.setAttribute(
+        "aria-label",
+        hidden ? "Show side rail" : expanded ? "Hide side rail" : "Expand side rail"
+      );
+    }
+
+    if (expandButton) {
+      expandButton.textContent = expanded ? "Open ->" : "Expand";
+    }
+  };
+
+  setBottomHidden(false);
+  setChipExpanded(false);
+  setRailState({ hidden: false, expanded: true });
+
+  document.querySelectorAll(".variant-btn").forEach((button) => {
+    button.addEventListener("click", () => {
+      const variant = button.dataset.variant;
+
+      document.querySelectorAll(".variant-btn").forEach((node) => {
+        node.classList.toggle("active", node === button);
+      });
+
+      document.querySelectorAll(".variant-card").forEach((card) => {
+        card.classList.toggle("active", card.classList.contains(`variant-${variant}`));
+      });
+
+      titleNode.textContent = meta[variant].title;
+      copyNode.textContent = meta[variant].copy;
+    });
+  });
+
+  document.querySelector("[data-action='hide-bottom']")?.addEventListener("click", () => {
+    setBottomHidden(true);
+    showToast("Bottom dock hidden. The slim restore chip keeps the handoff reachable without sitting on the action bar.");
+  });
+
+  document.querySelector("[data-action='show-bottom']")?.addEventListener("click", () => {
+    setBottomHidden(false);
+    showToast("Bottom dock restored. This brings the full session bar back into the page.");
+  });
+
+  chipDock?.addEventListener("click", (event) => {
+    if (event.target.closest(".dock-open")) {
+      return;
+    }
+    setChipExpanded(chipDock.dataset.expanded !== "true");
+  });
+
+  chipDock?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      setChipExpanded(chipDock.dataset.expanded !== "true");
+    }
+  });
+
+  chipDock?.querySelector("[data-action='toggle-chip']")?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    setChipExpanded(chipDock.dataset.expanded !== "true");
+  });
+
+  railShell?.querySelector("[data-action='show-rail']")?.addEventListener("click", () => {
+    setRailState({ hidden: false, expanded: true });
+    showToast("Side rail revealed again. The bottom lane stays clear while the queue returns on the edge.");
+  });
+
+  railDock?.querySelector("[data-action='toggle-rail']")?.addEventListener("click", () => {
+    if (railShell.dataset.hidden === "true") {
+      setRailState({ hidden: false, expanded: true });
+      showToast("Side rail reopened from its hidden state.");
+      return;
+    }
+
+    if (railDock.dataset.expanded === "true") {
+      setRailState({ hidden: true, expanded: false });
+      showToast("Side rail hidden. Only the small edge control remains visible.");
+      return;
+    }
+
+    setRailState({ hidden: false, expanded: true });
+    showToast("Side rail expanded back to its full queue state.");
+  });
+
+  railDock?.querySelector("[data-action='expand-rail']")?.addEventListener("click", () => {
+    if (railDock.dataset.expanded === "true") {
+      showToast("In the app, this would route the user straight into the active session details.");
+      return;
+    }
+
+    setRailState({ hidden: false, expanded: true });
+    showToast("Side rail expanded. The tray now shows its full supporting context.");
+  });
+
+  document.querySelectorAll(".dock-open").forEach((button) => {
+    if (button.dataset.action === "expand-rail") {
+      return;
+    }
+
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      showToast("In the real app, this button would open the matching session details view.");
+    });
+  });
+
+  chipDock?.addEventListener("click", () => {
+    showToast(
+      chipDock.dataset.expanded === "true"
+        ? "Mini chip expanded. The full timer and context return on demand."
+        : "Mini chip collapsed. It stays present without competing with the main page."
+    );
+  });
+</script>
+</body>
+</html>

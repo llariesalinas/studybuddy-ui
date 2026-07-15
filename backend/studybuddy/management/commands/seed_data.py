@@ -1,6 +1,8 @@
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand
 from faker import Faker
+
+from ._year_level_scale import YEAR_RANGE_BY_COURSE, random_year_level
 from studybuddy.models import (
     Strand, Course, PartnerInstitution, Subjects,
     UserProfile, Tutor, TutorSubjects, TutorAvailability,
@@ -141,8 +143,7 @@ class Command(BaseCommand):
             
         # 5. Seed Users + UserProfiles with Bounded Security Rules
         cpu = PartnerInstitution.objects.get(school_email_domain='cpu.edu.ph')
-        courses = list(Course.objects.all())
-        year_levels_pool = [1, 2, 3, 4]
+        courses = list(Course.objects.filter(course_code__in=YEAR_RANGE_BY_COURSE))
 
         TUTEE_COUNT = 20
         TUTOR_COUNT = 10
@@ -163,14 +164,15 @@ class Command(BaseCommand):
                 user.set_password('studybuddy123')
                 user.save()
 
+            course = fake.random_element(courses)
             profile, _ = UserProfile.objects.get_or_create(
                 user=user,
                 defaults={
                     'fname': fname,
                     'lname': lname,
                     'role': 'Tutee',
-                    'course': fake.random_element(courses),
-                    'year_level': fake.random_element(year_levels_pool),
+                    'course': course,
+                    'year_level': random_year_level(course.course_code),
                     'bio': fake.sentence(nb_words=12),
                     'profile_completed': True,
                     'institution': cpu,
@@ -193,14 +195,15 @@ class Command(BaseCommand):
                 user.set_password('studybuddy123')
                 user.save()
 
+            course = fake.random_element(courses)
             profile, _ = UserProfile.objects.get_or_create(
                 user=user,
                 defaults={
                     'fname': fname,
                     'lname': lname,
                     'role': 'Tutor',
-                    'course': fake.random_element(courses),
-                    'year_level': fake.random_element(year_levels_pool),
+                    'course': course,
+                    'year_level': random_year_level(course.course_code),
                     'bio': fake.sentence(nb_words=12),
                     'profile_completed': True,
                     'institution': cpu,
@@ -229,6 +232,7 @@ class Command(BaseCommand):
             
         # 7. Seed TutorSubjects
         all_seeded_subjects = list(Subjects.objects.all())
+        tutor_subjects_by_tutor = {}
 
         for tutor in tutors:
             assigned = fake.random_elements(all_seeded_subjects, length=fake.random_int(min=2, max=4), unique=True)
@@ -238,6 +242,7 @@ class Command(BaseCommand):
                     subject=subject,
                     defaults={'expertise_level': fake.random_int(min=1, max=3)}
                 )
+            tutor_subjects_by_tutor[tutor.pk] = list(assigned)
             self.stdout.write(f"  - Subjects assigned to {tutor.profile.fname}: {[s.subject_code for s in assigned]}")
 
         # 8. Seed TutorAvailability (contiguous 30-min blocks so multi-slot searches match)
@@ -273,7 +278,7 @@ class Command(BaseCommand):
         # 9. Seed PaymentMethods
         payment_methods_data = [
             {'code': 'CASH', 'name': 'Cash Ledger'},
-            {'code': 'online', 'name': 'PayMongo Online Framework (GCash/Maya)'},
+            {'code': 'PAYMONGO', 'name': 'PayMongo Online Framework (GCash/Maya)'},
         ]
 
         for pm in payment_methods_data:
@@ -312,12 +317,14 @@ class Command(BaseCommand):
                 continue
 
             session_mode = 'Online' if tutor.can_online else 'F2F'
+            subject = fake.random_element(tutor_subjects_by_tutor.get(tutor.pk) or [None])
 
             booking = Booking.objects.create(
                 student=tutee,
                 tutor=tutor,
                 availability=slot,
                 session_date=session_date,
+                subject=subject,
                 session_mode=session_mode,
                 status=status_choice,
                 tutee_confirmed=True,

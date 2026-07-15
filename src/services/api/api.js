@@ -1,7 +1,7 @@
 import axios from 'axios'
 import { useAuthStore } from '@/stores/auth'
 import router from '@/router'
-import { API_BASE_URL } from '../../config.js'
+import { API_BASE_URL, DEMO_BASIC_AUTH_USER, DEMO_BASIC_AUTH_PASSWORD } from '../../config.js'
 
 const isNgrok = API_BASE_URL.includes('ngrok')
 const PUBLIC_ENDPOINTS = [
@@ -17,10 +17,18 @@ const PUBLIC_ENDPOINTS = [
   'subjects/',
 ]
 
+const demoAuthHeader =
+  DEMO_BASIC_AUTH_USER && DEMO_BASIC_AUTH_PASSWORD
+    ? `Basic ${btoa(`${DEMO_BASIC_AUTH_USER}:${DEMO_BASIC_AUTH_PASSWORD}`)}`
+    : ''
+
 const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 30000,
-  headers: isNgrok ? { 'ngrok-skip-browser-warning': 'true' } : {},
+  headers: {
+    ...(isNgrok ? { 'ngrok-skip-browser-warning': 'true' } : {}),
+    ...(demoAuthHeader ? { 'X-Demo-Auth': demoAuthHeader } : {}),
+  },
 })
 
 let refreshPromise = null

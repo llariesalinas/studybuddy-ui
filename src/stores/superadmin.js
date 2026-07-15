@@ -10,7 +10,6 @@ export const useSuperAdminStore = defineStore('superadmin', () => {
   const analytics = ref(null)
   const pendingActions = ref({ count: 0, items: [] })
   const institutionRequests = ref([])
-  const adminAccountRequests = ref([])
 
   const loading = ref({
     stats: false,
@@ -20,8 +19,8 @@ export const useSuperAdminStore = defineStore('superadmin', () => {
     analytics: false,
     pendingActions: false,
     institutionRequests: false,
-    adminAccountRequests: false,
     export: false,
+    userExport: false,
   })
 
   const error = ref({
@@ -32,8 +31,8 @@ export const useSuperAdminStore = defineStore('superadmin', () => {
     analytics: null,
     pendingActions: null,
     institutionRequests: null,
-    adminAccountRequests: null,
     export: null,
+    userExport: null,
   })
 
   const replaceUser = (updatedUser) => {
@@ -268,52 +267,6 @@ export const useSuperAdminStore = defineStore('superadmin', () => {
     return res.data
   }
 
-  let adminAccountRequestsPromise = null
-  const fetchAdminAccountRequests = async (force = false) => {
-    if (adminAccountRequests.value.length && !force) return
-    if (adminAccountRequestsPromise) {
-      await adminAccountRequestsPromise
-      if (!force) return
-    }
-
-    loading.value.adminAccountRequests = true
-    error.value.adminAccountRequests = null
-
-    adminAccountRequestsPromise = (async () => {
-      try {
-        const res = await api.get('/admin/admin-account-requests/')
-        adminAccountRequests.value = res.data
-      } catch {
-        error.value.adminAccountRequests = 'Failed to load admin account requests.'
-      } finally {
-        loading.value.adminAccountRequests = false
-        adminAccountRequestsPromise = null
-      }
-    })()
-
-    return adminAccountRequestsPromise
-  }
-
-  const approveAdminAccountRequest = async (id, targetUserId) => {
-    const res = await api.patch(`/admin/admin-account-requests/${id}/`, {
-      action: 'approve',
-      target_user_id: targetUserId,
-    })
-    await Promise.all([
-      fetchAdminAccountRequests(true),
-      fetchPendingActions(true),
-      fetchUsers({}, true),
-      fetchStats(true),
-    ])
-    return res.data
-  }
-
-  const rejectAdminAccountRequest = async (id) => {
-    const res = await api.patch(`/admin/admin-account-requests/${id}/`, { action: 'reject' })
-    await Promise.all([fetchAdminAccountRequests(true), fetchPendingActions(true)])
-    return res.data
-  }
-
   const fetchAnalytics = async (institutionId = null, period = '30d') => {
     loading.value.analytics = true
     error.value.analytics = null
@@ -357,6 +310,72 @@ export const useSuperAdminStore = defineStore('superadmin', () => {
     }
   }
 
+  const fetchUserBookings = async (
+    userId,
+    { page = 1, dateFrom = null, dateTo = null } = {},
+  ) => {
+    const params = { page }
+    if (dateFrom) params.date_from = dateFrom
+    if (dateTo) params.date_to = dateTo
+    const res = await api.get(`/admin/users/${userId}/bookings/`, { params })
+    return res.data
+  }
+
+  const exportUserCsv = async (endpoint, filename, params = {}) => {
+    loading.value.userExport = true
+    error.value.userExport = null
+
+    try {
+      const res = await api.get(endpoint, { params, responseType: 'blob' })
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'text/csv' }))
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+    } catch {
+      error.value.userExport = 'Failed to export user data.'
+      throw new Error(error.value.userExport)
+    } finally {
+      loading.value.userExport = false
+    }
+  }
+
+  const exportUserBookingsCsv = async (
+    userId,
+    { dateFrom = null, dateTo = null } = {},
+  ) => {
+    const params = {}
+    if (dateFrom) params.date_from = dateFrom
+    if (dateTo) params.date_to = dateTo
+    return exportUserCsv(
+      `/admin/users/${userId}/bookings/export/`,
+      `bookings-${userId}.csv`,
+      params,
+    )
+  }
+
+  const fetchUserAvailability = async (userId) => {
+    const res = await api.get(`/admin/users/${userId}/availability/`)
+    return res.data
+  }
+
+  const exportUserAvailabilityCsv = async (userId) =>
+    exportUserCsv(
+      `/admin/users/${userId}/availability/export/`,
+      `availability-${userId}.csv`,
+    )
+
+  const fetchUserStats = async (userId) => {
+    const res = await api.get(`/admin/users/${userId}/stats/`)
+    return res.data
+  }
+
+  const exportUserStatsCsv = async (userId) =>
+    exportUserCsv(`/admin/users/${userId}/stats/export/`, `stats-${userId}.csv`)
+
   return {
     stats,
     users,
@@ -365,7 +384,6 @@ export const useSuperAdminStore = defineStore('superadmin', () => {
     analytics,
     pendingActions,
     institutionRequests,
-    adminAccountRequests,
     loading,
     error,
 
@@ -384,10 +402,13 @@ export const useSuperAdminStore = defineStore('superadmin', () => {
     fetchInstitutionRequests,
     approveInstitutionRequest,
     rejectInstitutionRequest,
-    fetchAdminAccountRequests,
-    approveAdminAccountRequest,
-    rejectAdminAccountRequest,
     fetchAnalytics,
     exportAnalyticsCsv,
+    fetchUserBookings,
+    exportUserBookingsCsv,
+    fetchUserAvailability,
+    exportUserAvailabilityCsv,
+    fetchUserStats,
+    exportUserStatsCsv,
   }
 })

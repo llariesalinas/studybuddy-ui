@@ -1,6 +1,5 @@
 from django.urls import path, include
 from django.conf.urls.static import static
-from django.conf import settings
 from rest_framework_simplejwt.views import TokenRefreshView
 from .views import(
                    cancel_booking,
@@ -27,11 +26,16 @@ from .views import(
                     get_tutor_profile
                    )
 from .admin_views import (
-    AdminAccountRequestView, AdminAnalyticsExportView,
+    AdminAnalyticsExportView,
+    AdminCourseCatalogView,
     AdminStatsView, AdminWithdrawalListView, AdminWithdrawalDetailView,
     AdminUserListView, AdminInstitutionView, AdminAnalyticsView,
+    AdminUserBookingsView, AdminUserBookingsExportView,
+    AdminUserAvailabilityView, AdminUserAvailabilityExportView,
+    AdminUserStatsView, AdminUserStatsExportView,
     AdminPendingActionsView, InstitutionRequestView,
     AdminTutorApplicationListView, AdminTutorApplicationDetailView,
+    AdminTutorProposedSubjectDetailView,
     AdminTutorDocumentRenewalDetailView, SuperAdminInstitutionPerformanceView,
     AdminTuteeApplicationListView, AdminTuteeApplicationDetailView,
     AdminTuteeDocumentRenewalDetailView, AdminOperationalQueueView,
@@ -49,13 +53,25 @@ urlpatterns = [
     path('admin/withdrawals/<int:pk>/', AdminWithdrawalDetailView.as_view()),
     path('admin/tutor-applications/', AdminTutorApplicationListView.as_view()),
     path('admin/tutor-applications/<int:pk>/', AdminTutorApplicationDetailView.as_view()),
+    path(
+        'admin/tutor-applications/<int:pk>/subjects/<str:subject_code>/',
+        AdminTutorProposedSubjectDetailView.as_view(),
+    ),
     path('admin/tutor-document-renewals/<int:pk>/', AdminTutorDocumentRenewalDetailView.as_view()),
     path('admin/tutee-applications/', AdminTuteeApplicationListView.as_view()),
     path('admin/tutee-applications/<int:pk>/', AdminTuteeApplicationDetailView.as_view()),
     path('admin/tutee-document-renewals/<int:pk>/', AdminTuteeDocumentRenewalDetailView.as_view()),
     path('admin/users/', AdminUserListView.as_view()),
     path('admin/users/<int:pk>/', AdminUserListView.as_view()),
+    path('admin/users/<int:pk>/bookings/', AdminUserBookingsView.as_view()),
+    path('admin/users/<int:pk>/bookings/export/', AdminUserBookingsExportView.as_view()),
+    path('admin/users/<int:pk>/availability/', AdminUserAvailabilityView.as_view()),
+    path('admin/users/<int:pk>/availability/export/', AdminUserAvailabilityExportView.as_view()),
+    path('admin/users/<int:pk>/stats/', AdminUserStatsView.as_view()),
+    path('admin/users/<int:pk>/stats/export/', AdminUserStatsExportView.as_view()),
     path('admin/users/<int:pk>/verification-dev-tools/', AdminUserVerificationDevToolsView.as_view()),
+    path('admin/course-catalog/', AdminCourseCatalogView.as_view()),
+    path('admin/course-catalog/<str:pk>/', AdminCourseCatalogView.as_view()),
     path('admin/institutions/', AdminInstitutionView.as_view()),
     path('admin/institutions/<int:pk>/', AdminInstitutionView.as_view()),
     path('admin/institutions/performance/', SuperAdminInstitutionPerformanceView.as_view()),
@@ -64,8 +80,6 @@ urlpatterns = [
     path('admin/pending-actions/', AdminPendingActionsView.as_view()),
     path('admin/institution-requests/', InstitutionRequestView.as_view()),
     path('admin/institution-requests/<int:pk>/', InstitutionRequestView.as_view()),
-    path('admin/admin-account-requests/', AdminAccountRequestView.as_view()),
-    path('admin/admin-account-requests/<int:pk>/', AdminAccountRequestView.as_view()),
     path('admin/support/tickets/', views.admin_list_tickets),
     path('admin/support/tickets/<int:ticket_id>/claim/', views.admin_claim_ticket),
     path('admin/support/tickets/<int:ticket_id>/escalate/', views.admin_escalate_ticket),
@@ -83,6 +97,7 @@ urlpatterns = [
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('profile/status/', views.profile_status),
     path('tutor-application/status/', views.tutor_application_status),
+    path('tutor-application/submit/', views.tutor_application_submit),
     path('tutor-application/resubmit/', views.tutor_application_resubmit),
     path('tutor-application/renewal/', views.tutor_document_renewal_submit),
     path('tutee-application/status/', views.tutee_application_status),
@@ -99,6 +114,7 @@ urlpatterns = [
     path('tutor/profile/avatar/', views.upload_tutor_avatar),
     path('tutor/subjects/', views.get_tutor_subjects),
     path('tutor/subjects/add/', views.add_tutor_subject),
+    path('tutor/subjects/propose/', views.propose_tutor_subject),
     path('tutor/subjects/update/<str:subject_code>/', views.update_tutor_subject),
     path('tutor/subjects/remove/<str:subject_code>/', views.remove_tutor_subject),
     path('search-tutors/', SearchTutorsView.as_view(), name='search-tutors'),
@@ -146,21 +162,26 @@ urlpatterns = [
     path('bookings/<int:booking_id>/verify-online-payment/', views.verify_online_payment),
     path('dev/bookings/<int:booking_id>/force-live/', views.dev_force_booking_live),
     path('dev/bookings/<int:booking_id>/clear-force-live/', views.dev_clear_booking_live),
+    path(
+        'dev/bookings/<int:booking_id>/ready-for-payment/',
+        views.dev_mark_booking_ready_for_payment
+    ),
+    # Dev wallet fund tools (gated in-view by BOOKING_DEV_TOOLS_ENABLED, same as the booking ones above)
+    path('dev/wallet/add/', views.dev_add_wallet_funds),
+    path('dev/wallet/remove/', views.dev_remove_wallet_funds),
     # Self-service verification dev tools (gated in-view by VERIFICATION_DEV_TOOLS_ENABLED)
     path('dev/verification/', views.dev_verification_readout),
     path('dev/verification/set-state/', views.dev_verification_set_state),
     path('dev/verification/enforcement/', views.dev_verification_set_enforcement),
+    # Recommendation algorithm demo tool (gated in-view by ALGORITHM_DEMO_TOOLS_ENABLED + IsSuperAdminUser)
+    path('dev/algorithm-demo/tutees/', views.algorithm_demo_search_tutees),
+    path('dev/algorithm-demo/recommend/', views.algorithm_demo_recommend),
+    path('dev/algorithm-demo/rating/', views.algorithm_demo_update_rating),
     path('tutor/setup/', views.tutor_setup),
+    path(
+        'tutor/onboarding/skip-verification/',
+        views.skip_tutor_onboarding_verification,
+    ),
     path('recommend-tutors/', views.recommend_tutors_view),
     path('chat/', include('studybuddy.chat.urls')),
 ]
-
-if settings.DEBUG:
-    urlpatterns += [path('dev/wallet/add/', views.dev_add_wallet_funds)]
-    urlpatterns += [path('dev/wallet/remove/', views.dev_remove_wallet_funds)]
-    urlpatterns += [
-        path(
-            'dev/bookings/<int:booking_id>/ready-for-payment/',
-            views.dev_mark_booking_ready_for_payment
-        )
-    ]

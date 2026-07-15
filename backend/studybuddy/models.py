@@ -3,6 +3,8 @@ from datetime import timedelta
 
 from django.db import models
 from django.db.models import Q
+from django.core.exceptions import ValidationError
+from django.core.validators import MinValueValidator, MaxValueValidator
 from django.contrib.auth.models import User
 from django.db.models.signals import post_save
 from django.dispatch import receiver
@@ -10,6 +12,11 @@ from django.utils import timezone
 
 
 # Create your models here.
+
+TUTOR_ACCEPTED_SESSION_LOAD_STATUSES = (
+    'Confirmed',
+    'Awaiting Payment Verification',
+)
 
 class Strand(models.Model):
 
@@ -86,11 +93,11 @@ class UserProfile(models.Model):
     )
 
     is_domain_exempt = models.BooleanField(default=False)
+    tutor_onboarding_skipped_at = models.DateTimeField(null=True, blank=True)
 
     ROLE_CHOICES = [
         ('Tutee', 'Tutee'),
         ('Tutor', 'Tutor'),
-        ('Admin', 'Admin'),
         ('SuperAdmin', 'SuperAdmin'),
     ]
 
@@ -131,38 +138,6 @@ class InstitutionRequest(models.Model):
 
     def __str__(self):
         return f"{self.institution_name} ({self.status})"
-
-
-class AdminAccountRequest(models.Model):
-    STATUS_CHOICES = [
-        ('pending', 'Pending'),
-        ('approved', 'Approved'),
-        ('rejected', 'Rejected'),
-    ]
-
-    requesting_admin = models.ForeignKey(
-        UserProfile,
-        on_delete=models.CASCADE,
-        related_name='admin_requests_sent'
-    )
-    institution = models.ForeignKey(PartnerInstitution, on_delete=models.CASCADE)
-    target_user = models.ForeignKey(
-        UserProfile,
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
-        related_name='admin_requests_received'
-    )
-    note = models.TextField(blank=True)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
-    created_at = models.DateTimeField(auto_now_add=True)
-    reviewed_at = models.DateTimeField(null=True, blank=True)
-
-    class Meta:
-        ordering = ['created_at']
-
-    def __str__(self):
-        return f"Admin request for {self.institution.institution_name} ({self.status})"
 
 
 class EmailOTPChallenge(models.Model):
@@ -292,11 +267,40 @@ class Tutor(models.Model):
 
     total_sessions = models.IntegerField(default=0)
 
+    session_load_limit = models.PositiveSmallIntegerField(
+        default=10,
+        validators=[MinValueValidator(1), MaxValueValidator(20)],
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     def save(self, *args, **kwargs):
         self.response_time_label = self.RESPONSE_TIME_LABELS.get(self.response_time)
         super().save(*args, **kwargs)
+
+    def accepted_session_load(self):
+        if hasattr(self, '_accepted_session_load_cache'):
+            return self._accepted_session_load_cache
+
+        # Use the prefetched list when a caller (e.g. AdminUserListView) has attached one via
+        # Prefetch(..., to_attr='accepted_bookings_cache'), so this doesn't re-query per tutor.
+        if hasattr(self, 'accepted_bookings_cache'):
+            bookings = self.accepted_bookings_cache
+        else:
+            bookings = self.tutor_bookings.filter(
+                status__in=TUTOR_ACCEPTED_SESSION_LOAD_STATUSES
+            ).only('id', 'booking_request_id', 'session_group_id')
+
+        grouped_session_keys = {
+            str(booking.session_group_id or booking.booking_request_id or booking.id)
+            for booking in bookings
+        }
+
+        self._accepted_session_load_cache = len(grouped_session_keys)
+        return self._accepted_session_load_cache
+
+    def accepted_session_load_remaining(self):
+        return max(int(self.session_load_limit or 0) - self.accepted_session_load(), 0)
 
     def __str__(self):
         return f"Tutor: {self.profile.fname} {self.profile.lname}"
@@ -315,13 +319,6 @@ class ApplicationVerificationBase(models.Model):
         ('approved', 'Approved'),
         ('rejected', 'Rejected'),
     ]
-
-    # Optional Motivation. Kept as `reason_to_tutor` for both roles rather than renamed generically —
-    # see Phase 1 plan's "naming decision" note.
-    reason_to_tutor = models.TextField(
-        blank=True,
-        help_text="Why do you want to become a tutor?"
-    )
 
     # Screening Status
     application_status = models.CharField(
@@ -348,12 +345,24 @@ class ApplicationVerificationBase(models.Model):
         abstract = True
 
     def latest_approved_document_review_at(self):
-        latest_renewal = (
-            self.document_renewal_reviews
-            .filter(status='approved', reviewed_at__isnull=False)
-            .order_by('-reviewed_at', '-submitted_at')
-            .first()
-        )
+        # Use the prefetched list when a caller (e.g. AdminTutorApplicationListView) has attached
+        # one via Prefetch(..., to_attr='renewal_reviews_cache'), so this doesn't re-query per
+        # application — `.filter()` on a prefetched related manager always re-hits the DB.
+        if hasattr(self, 'renewal_reviews_cache'):
+            approved = [
+                review for review in self.renewal_reviews_cache
+                if review.status == 'approved' and review.reviewed_at is not None
+            ]
+            latest_renewal = max(
+                approved, key=lambda review: (review.reviewed_at, review.submitted_at), default=None
+            )
+        else:
+            latest_renewal = (
+                self.document_renewal_reviews
+                .filter(status='approved', reviewed_at__isnull=False)
+                .order_by('-reviewed_at', '-submitted_at')
+                .first()
+            )
         if latest_renewal:
             return latest_renewal.reviewed_at
         return self.reviewed_at
@@ -369,6 +378,10 @@ class ApplicationVerificationBase(models.Model):
         return approved_at + timedelta(days=self.DOCUMENT_RENEWAL_INTERVAL_DAYS)
 
     def latest_document_renewal_review(self):
+        if hasattr(self, 'renewal_reviews_cache'):
+            return max(
+                self.renewal_reviews_cache, key=lambda review: review.submitted_at, default=None
+            )
         return self.document_renewal_reviews.order_by('-submitted_at').first()
 
     def document_renewal_status(self):
@@ -611,6 +624,7 @@ class PlatformActivity(models.Model):
         ('booking_completed', 'Session Completed'),
         ('institution_added', 'New Institution Request'),
         ('withdrawal_failed', 'Withdrawal Failure'),
+        ('withdrawal_processed', 'Withdrawal Processed'),
         ('admin_action', 'Admin Action'),
         ('tutor_application', 'Tutor Application'),
         ('tutee_application', 'Tutee Application'),
@@ -641,13 +655,30 @@ def create_tutor_wallet(sender, instance, created, **kwargs):
 
 #Subjects Table
 class Subjects(models.Model):
+    STATUS_CHOICES = [
+        ('approved', 'Approved'),
+        ('pending', 'Pending'),
+    ]
+
     subject_code = models.CharField(max_length=20, primary_key=True)
     subject_name = models.CharField(max_length=100)
     department = models.CharField(max_length=100)
     category = models.CharField(max_length=100, null=True, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='approved')
+    proposed_by_tutor = models.ForeignKey(
+        'Tutor', on_delete=models.SET_NULL, null=True, blank=True,
+    )
+    proposed_application = models.ForeignKey(
+        'TutorApplication',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='proposed_subjects',
+    )
 
     def __str__(self):
         return f"{self.subject_code} - {self.subject_name}"
+
 
 #Tutor Subjects Table
 
@@ -756,6 +787,14 @@ class Booking(models.Model):
         TutorAvailability,
         on_delete=models.CASCADE,
         related_name="bookings"
+    )
+
+    subject = models.ForeignKey(
+        Subjects,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="bookings",
     )
 
     session_date = models.DateField()

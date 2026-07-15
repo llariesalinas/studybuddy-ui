@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en" data-sb-theme="light">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>StudyBuddy logo concepts</title>
+<style>
+  :root {
+    --sb-primary: #00895A;
+    --sb-primary-mid: #18A36C;
+    --sb-pop-yellow: #FFC94D;
+    --sb-pop-orange: #FF8A5C;
+    --sb-pop-pink: #FF8FA3;
+    --sb-aurora-violet: #8E7CF4;
+    --sb-aurora-wash-start: #F1FAF6;
+    --sb-aurora-wash-end: #FDF9F1;
+    --sb-bg: #F8F9FA;
+    --sb-card-bg: #ffffff;
+    --sb-card-border: #EAEAEA;
+    --sb-text-main: #163127;
+    --sb-text-secondary: #495057;
+    --sb-text-muted: #6B7280;
+    --sb-wash-blob-1:
+      radial-gradient(42% 58% at 28% 52%, color-mix(in srgb, var(--sb-primary) 18%, transparent), transparent 70%),
+      radial-gradient(36% 52% at 55% 44%, color-mix(in srgb, var(--sb-primary-mid) 15%, transparent), transparent 70%),
+      radial-gradient(30% 50% at 78% 56%, color-mix(in srgb, var(--sb-pop-yellow) 13%, transparent), transparent 70%);
+    --sb-wash-blob-2:
+      radial-gradient(40% 55% at 35% 50%, color-mix(in srgb, var(--sb-aurora-violet) 11%, transparent), transparent 70%),
+      radial-gradient(34% 52% at 62% 46%, color-mix(in srgb, var(--sb-pop-pink) 13%, transparent), transparent 70%);
+    --sb-wash-blob-3:
+      radial-gradient(40% 55% at 30% 50%, color-mix(in srgb, var(--sb-pop-orange) 11%, transparent), transparent 70%),
+      radial-gradient(38% 55% at 64% 46%, color-mix(in srgb, var(--sb-primary) 14%, transparent), transparent 70%);
+  }
+
+  html[data-sb-theme="dark"] {
+    --sb-primary: #86B7A3;
+    --sb-primary-mid: #9BC8B6;
+    --sb-pop-yellow: #8F742F;
+    --sb-pop-orange: #8B4C38;
+    --sb-pop-pink: #8C5662;
+    --sb-aurora-violet: #6155A8;
+    --sb-aurora-wash-start: #071310;
+    --sb-aurora-wash-end: #0B0F0E;
+    --sb-bg: #050807;
+    --sb-card-bg: #0C1110;
+    --sb-card-border: #1B2A25;
+    --sb-text-main: #F3F7F5;
+    --sb-text-secondary: #BAC8C1;
+    --sb-text-muted: #9AA8A1;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: var(--sb-text-main);
+    background: var(--sb-bg);
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  /* Matches src/components/SbBgWash.vue - the app's shared aurora background */
+  .sb-bg-wash {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    overflow: hidden;
+    background: linear-gradient(180deg, var(--sb-aurora-wash-start) 0%, var(--sb-bg) 42%, var(--sb-aurora-wash-end) 100%);
+  }
+
+  .sb-bg-wash__blob {
+    position: absolute;
+    display: block;
+  }
+
+  .sb-bg-wash__blob--1 {
+    left: -25vw;
+    top: -14vh;
+    width: 150vw;
+    height: 58vh;
+    background: var(--sb-wash-blob-1);
+  }
+
+  .sb-bg-wash__blob--2 {
+    right: -30vw;
+    top: 20vh;
+    width: 135vw;
+    height: 50vh;
+    background: var(--sb-wash-blob-2);
+  }
+
+  .sb-bg-wash__blob--3 {
+    left: -22vw;
+    bottom: -18vh;
+    width: 145vw;
+    height: 52vh;
+    background: var(--sb-wash-blob-3);
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 3rem 1.5rem 4rem;
+  }
+
+  header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1.5rem;
+    margin-bottom: 2.5rem;
+  }
+
+  h1 {
+    font-size: 1.7rem;
+    font-weight: 700;
+    margin: 0 0 0.4rem;
+  }
+
+  header p {
+    margin: 0;
+    color: var(--sb-text-secondary);
+    max-width: 46ch;
+  }
+
+  .toggle {
+    flex-shrink: 0;
+    border: 1px solid var(--sb-card-border);
+    background: var(--sb-card-bg);
+    color: var(--sb-text-main);
+    border-radius: 999px;
+    padding: 0.55rem 1.1rem;
+    font-size: 0.85rem;
+    cursor: pointer;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+  }
+
+  .grid--single {
+    grid-template-columns: minmax(0, 340px);
+    justify-content: center;
+  }
+
+  .card {
+    background: var(--sb-card-bg);
+    border: 1px solid var(--sb-card-border);
+    border-radius: 20px;
+    padding: 2.2rem 1.5rem 1.6rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    text-align: center;
+  }
+
+  .card--feature {
+    padding: 3rem 2rem 2rem;
+  }
+
+  .mark {
+    width: 96px;
+    height: 96px;
+    overflow: visible;
+  }
+
+  .mark--large {
+    width: 160px;
+    height: 160px;
+  }
+
+  .wordmark {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--sb-primary);
+  }
+
+  .caption {
+    font-size: 0.85rem;
+    color: var(--sb-text-muted);
+  }
+
+  @media (max-width: 720px) {
+    .grid { grid-template-columns: 1fr; }
+    header { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+  <div class="sb-bg-wash" aria-hidden="true">
+    <i class="sb-bg-wash__blob sb-bg-wash__blob--1"></i>
+    <i class="sb-bg-wash__blob sb-bg-wash__blob--2"></i>
+    <i class="sb-bg-wash__blob sb-bg-wash__blob--3"></i>
+  </div>
+
+  <div class="page">
+    <header>
+      <div>
+        <h1>StudyBuddy logo concepts</h1>
+        <p>Focused on one direction: an abstract S ribbon swept through the app's aurora palette, on the real SbBgWash background.</p>
+      </div>
+      <button class="toggle" id="themeToggle" type="button">Switch to dark</button>
+    </header>
+
+    <div class="grid grid--single">
+      <div class="card card--feature">
+        <svg class="mark mark--large" viewBox="0 0 120 120" role="img" aria-label="Abstract aurora S: a flowing ribbon swept through the aurora color palette">
+          <defs>
+            <linearGradient id="auroraSweep" x1="5%" y1="100%" x2="95%" y2="0%">
+              <stop offset="0%" stop-color="#00895A"/>
+              <stop offset="25%" stop-color="#FFC94D"/>
+              <stop offset="50%" stop-color="#FF8A5C"/>
+              <stop offset="75%" stop-color="#FF8FA3"/>
+              <stop offset="100%" stop-color="#8E7CF4"/>
+            </linearGradient>
+          </defs>
+          <path d="M86,34 C64,16 40,28 40,47 C40,66 78,58 78,76 C78,94 55,104 32,86"
+                fill="none" stroke="url(#auroraSweep)" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"
+                style="filter: drop-shadow(0 8px 10px rgba(20,20,30,0.35))"/>
+          <path d="M86,34 C64,16 40,28 40,47 C40,66 78,58 78,76 C78,94 55,104 32,86"
+                fill="none" stroke="#ffffff" stroke-opacity="0.32" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="86" cy="34" r="7.5" fill="#8E7CF4" style="filter: drop-shadow(0 3px 4px rgba(80,60,140,0.45))"/>
+          <circle cx="32" cy="86" r="7.5" fill="#00895A" style="filter: drop-shadow(0 3px 4px rgba(0,60,40,0.45))"/>
+        </svg>
+        <div class="wordmark">StudyBuddy</div>
+        <div class="caption">Abstract aurora S</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const root = document.documentElement
+    const btn = document.getElementById('themeToggle')
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+    root.setAttribute('data-sb-theme', prefersDark ? 'dark' : 'light')
+    btn.textContent = prefersDark ? 'Switch to light' : 'Switch to dark'
+
+    btn.addEventListener('click', () => {
+      const isDark = root.getAttribute('data-sb-theme') === 'dark'
+      root.setAttribute('data-sb-theme', isDark ? 'light' : 'dark')
+      btn.textContent = isDark ? 'Switch to dark' : 'Switch to light'
+    })
+  </script>
+</body>
+</html>

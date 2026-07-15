@@ -1,0 +1,3 @@
+# HTTP Basic Auth to protect the demo environment
+
+Vercel's built-in Password Protection (a single shared password, the simplest option for a small team/panel to access a protected demo) is not available on the free Hobby plan — it requires a $150 Advanced Deployment Protection add-on on Pro, or Enterprise. The free Hobby-tier alternative, Vercel Authentication, requires every visitor to have a Vercel account added to the team, which is more friction than needed for occasional reviewers (e.g. a thesis panel). We chose HTTP Basic Auth instead: one shared username/password, no account creation for anyone, free on any plan, and — unlike Vercel's own protection, which only covers the frontend — it can be applied to both the Vercel frontend and the Render backend.

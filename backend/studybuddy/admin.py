@@ -2,7 +2,6 @@ from django.contrib import admin
 from .models import (
     Booking,
     Course,
-    AdminAccountRequest,
     InstitutionRequest,
     Notification,
     PartnerInstitution,
@@ -37,7 +36,6 @@ admin.site.register(Preference)
 admin.site.register(Strand)
 admin.site.register(Course)
 admin.site.register(InstitutionRequest)
-admin.site.register(AdminAccountRequest)
 
 
 admin.site.register(Wallet)

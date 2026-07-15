@@ -1,4 +1,7 @@
 import api from "@/services/api/api";
+import {
+  reviewTutorProposedSubject as reviewProposedSubjectRequest,
+} from '@/services/adminTutorApplications'
 import { defineStore } from "pinia";
 import { ref } from "vue";
 
@@ -146,6 +149,29 @@ export const useAdminStore = defineStore(
 
       } catch (err) {
         console.error('Failed to update user status:', err)
+        throw err
+      }
+    }
+
+    const updateUserTutorSessionLoadLimit = async (userId, sessionLoadLimit) => {
+      try {
+        const response = await api.patch(`/admin/users/${userId}/`, {
+          session_load_limit: sessionLoadLimit,
+        })
+
+        const user = users.value.find(u => u.id === userId)
+        if (user) {
+          Object.assign(user, response.data)
+        }
+
+        Promise.all([
+          fetchUsers({}, true),
+          fetchStats(true)
+        ])
+
+        return response.data
+      } catch (err) {
+        console.error('Failed to update tutor session load limit:', err)
         throw err
       }
     }
@@ -359,6 +385,9 @@ export const useAdminStore = defineStore(
       }
     }
 
+    const reviewTutorProposedSubject = (applicationId, subjectCode, status) =>
+      reviewProposedSubjectRequest(applicationId, subjectCode, status)
+
     let tuteeApplicationsPromise = null
     const fetchTuteeApplications = async (status = null, force = false, options = {}) => {
       const params = {
@@ -438,6 +467,7 @@ export const useAdminStore = defineStore(
       fetchOperationalQueue,
       fetchUsers,
       updateUserStatus,
+      updateUserTutorSessionLoadLimit,
       deleteUser,
 
       fetchWithdrawals,
@@ -451,6 +481,7 @@ export const useAdminStore = defineStore(
 
       fetchTutorApplications,
       updateTutorApplicationStatus,
+      reviewTutorProposedSubject,
 
       fetchTuteeApplications,
       updateTuteeApplicationStatus

@@ -6,7 +6,7 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('studybuddy', '0056_sessioncheckin'),
+        ('studybuddy', '0041_recommendation_filter_indexes'),
         ('studybuddy', '0056_tutordocumentrenewalreview'),
     ]
 

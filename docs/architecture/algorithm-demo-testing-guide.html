@@ -1,0 +1,545 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>StudyBuddy Algorithm Demo Testing Guide</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #17211b;
+      --muted: #637067;
+      --paper: #fbfaf4;
+      --card: #ffffff;
+      --line: #dce5dc;
+      --leaf: #246b45;
+      --leaf-dark: #154b30;
+      --gold: #f3b233;
+      --blue: #2f6f9f;
+      --red: #b0392f;
+      --shadow: 0 22px 70px rgba(23, 33, 27, 0.14);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      font-family: "Segoe UI", "Trebuchet MS", sans-serif;
+      background:
+        radial-gradient(circle at 12% 8%, rgba(243, 178, 51, 0.22), transparent 28rem),
+        radial-gradient(circle at 88% 0%, rgba(47, 111, 159, 0.14), transparent 24rem),
+        linear-gradient(135deg, #fffdf6 0%, var(--paper) 45%, #eef7ee 100%);
+    }
+
+    main {
+      width: min(1120px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 56px 0;
+    }
+
+    header {
+      display: grid;
+      gap: 20px;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: end;
+      margin-bottom: 26px;
+    }
+
+    .eyebrow {
+      margin: 0 0 10px;
+      color: var(--leaf);
+      font-size: 0.78rem;
+      font-weight: 800;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      max-width: 760px;
+      font-size: clamp(2.2rem, 4.8vw, 4.7rem);
+      line-height: 0.94;
+      letter-spacing: -0.065em;
+    }
+
+    .summary {
+      max-width: 700px;
+      margin: 18px 0 0;
+      color: var(--muted);
+      font-size: 1.05rem;
+      line-height: 1.65;
+    }
+
+    .password-card {
+      min-width: 260px;
+      padding: 20px;
+      border: 1px solid rgba(36, 107, 69, 0.18);
+      border-radius: 26px;
+      background: linear-gradient(145deg, #fff 0%, #f4fff6 100%);
+      box-shadow: var(--shadow);
+    }
+
+    .password-card span {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--muted);
+      font-size: 0.8rem;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    code {
+      padding: 0.18em 0.45em;
+      border-radius: 0.45em;
+      color: var(--leaf-dark);
+      background: rgba(36, 107, 69, 0.09);
+      font-family: "Cascadia Mono", "Consolas", monospace;
+      font-size: 0.95em;
+      font-weight: 700;
+    }
+
+    .password-card code {
+      font-size: 1.32rem;
+    }
+
+    .grid {
+      display: grid;
+      gap: 18px;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      margin: 26px 0;
+    }
+
+    .panel {
+      padding: 24px;
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      background: rgba(255, 255, 255, 0.84);
+      box-shadow: 0 14px 40px rgba(23, 33, 27, 0.08);
+    }
+
+    .panel h2 {
+      margin: 0 0 8px;
+      font-size: 1rem;
+    }
+
+    .panel p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    section {
+      margin-top: 28px;
+      padding: 28px;
+      border: 1px solid var(--line);
+      border-radius: 34px;
+      background: rgba(255, 255, 255, 0.92);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    section h2 {
+      margin: 0 0 18px;
+      font-size: 1.45rem;
+      letter-spacing: -0.03em;
+    }
+
+    section h3 {
+      margin: 22px 0 10px;
+      font-size: 1.05rem;
+      color: var(--leaf-dark);
+    }
+
+    section p {
+      line-height: 1.65;
+    }
+
+    ol, ul {
+      margin: 0;
+      padding-left: 1.3em;
+      line-height: 1.7;
+    }
+
+    ol li + li,
+    ul li + li {
+      margin-top: 6px;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 720px;
+    }
+
+    th,
+    td {
+      padding: 15px 14px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      color: var(--leaf-dark);
+      background: #f5faf5;
+      font-size: 0.78rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .role {
+      display: inline-flex;
+      align-items: center;
+      min-width: 84px;
+      justify-content: center;
+      padding: 0.32rem 0.58rem;
+      border-radius: 999px;
+      color: #fff;
+      background: var(--leaf);
+      font-size: 0.76rem;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .role.tutee {
+      background: var(--blue);
+    }
+
+    .role.tutor {
+      background: #7b5422;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.28rem 0.6rem;
+      border-radius: 999px;
+      font-size: 0.76rem;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+    }
+
+    .badge.on {
+      color: #0f5132;
+      background: #d9f3e2;
+    }
+
+    .badge.off {
+      color: #7a1f18;
+      background: #fbe3e0;
+    }
+
+    .note {
+      padding: 18px 20px;
+      border-left: 5px solid var(--gold);
+      border-radius: 18px;
+      background: #fff8e8;
+      color: #5d4518;
+      line-height: 1.6;
+    }
+
+    .note.danger {
+      border-left-color: var(--red);
+      background: #fdece9;
+      color: #5c1f18;
+    }
+
+    .note + .note {
+      margin-top: 14px;
+    }
+
+    .steps {
+      counter-reset: step;
+      list-style: none;
+      padding-left: 0;
+    }
+
+    .steps li {
+      position: relative;
+      padding-left: 46px;
+      margin-bottom: 14px;
+      line-height: 1.6;
+    }
+
+    .steps li::before {
+      counter-increment: step;
+      content: counter(step);
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 30px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      background: var(--leaf);
+      color: #fff;
+      font-weight: 800;
+      font-size: 0.9rem;
+    }
+
+    footer {
+      margin-top: 24px;
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.6;
+    }
+
+    footer a {
+      color: var(--leaf-dark);
+      font-weight: 800;
+    }
+
+    @media (max-width: 860px) {
+      header,
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      main {
+        padding: 34px 0;
+      }
+
+      section {
+        padding: 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <p class="eyebrow">Architecture reference / Recommender testing</p>
+        <h1>Algorithm Demo Testing Guide</h1>
+        <p class="summary">
+          How to enable, log into, and exercise the SuperAdmin Algorithm Demo page — the tool that
+          runs the real hybrid recommender (CBF + CF) against seeded data, and shows the tutees and
+          tutors whose scenarios prove each part of the scoring.
+        </p>
+      </div>
+      <aside class="password-card" aria-label="Shared demo password">
+        <span>Shared password</span>
+        <code>studybuddy123</code>
+      </aside>
+    </header>
+
+    <div class="grid" aria-label="Quick facts">
+      <article class="panel">
+        <h2>Where</h2>
+        <p>SuperAdmin panel → <code>/superadmin/algorithm-demo</code>. Ranked List and Compare Pair tabs.</p>
+      </article>
+      <article class="panel">
+        <h2>Gate</h2>
+        <p><code>IsAuthenticated + IsSuperAdminUser</code>, plus the <code>ALGORITHM_DEMO_TOOLS_ENABLED</code> flag — checked first, 403 when off.</p>
+      </article>
+      <article class="panel">
+        <h2>Data</h2>
+        <p>Runs the real <code>hybrid.py</code> recommender against whatever is currently seeded — not a mock or a fixture.</p>
+      </article>
+      <article class="panel">
+        <h2>Scope</h2>
+        <p>Unscoped by institution by default (any subject-matching tutor). An optional institution filter narrows it.</p>
+      </article>
+    </div>
+
+    <section aria-labelledby="enabling">
+      <h2 id="enabling">Enabling the tool</h2>
+      <p>The flag defaults to <span class="badge off">OFF</span> everywhere. It must be explicitly turned on per
+      environment.</p>
+
+      <h3>Local dev</h3>
+      <ol class="steps">
+        <li>In <code>backend/.env</code>, set <code>ALGORITHM_DEMO_TOOLS_ENABLED=true</code>.</li>
+        <li>Restart the Django server so the setting reloads:
+          <code>cd backend &amp;&amp; venv\Scripts\python.exe manage.py runserver</code>.</li>
+        <li>Log in as a SuperAdmin (<code>superadmin@studybuddy.test</code>, password
+          <code>studybuddy123</code>) and open <code>/superadmin/algorithm-demo</code>.</li>
+      </ol>
+
+      <h3>Demo deployment (Render)</h3>
+      <p class="note danger">
+        Render env vars are <strong>not</strong> read from any <code>.env</code> file — they live in the
+        Render dashboard only. If the page shows "Algorithm demo tools are disabled on this backend,"
+        the var was never added there.
+      </p>
+      <ol class="steps">
+        <li>Render dashboard → <code>studybuddy-demo-backend</code> service → <strong>Environment</strong> tab.</li>
+        <li>Add <code>ALGORITHM_DEMO_TOOLS_ENABLED</code> = <code>true</code>.</li>
+        <li>Save — Render auto-redeploys on env var changes.</li>
+        <li>Once redeployed, log in on the demo frontend as a promoted SuperAdmin and revisit the page.</li>
+      </ol>
+      <p class="note">
+        Per the <a href="../plans/2026-07-05-demo-deployment-plan.md">demo deployment plan</a>, this flag
+        should stay <span class="badge on">ON</span> for the protected demo environment (defense/testing)
+        and <span class="badge off">OFF</span> for any future real production deployment.
+      </p>
+    </section>
+
+    <section aria-labelledby="setup">
+      <h2 id="setup">Before you start: reset the demo data</h2>
+      <p class="note">
+        From <code>backend/</code>, run <code>venv\Scripts\python.exe manage.py reset_demo_data</code>.
+        Local/dev only, destructive: wipes all Tutee/Tutor users and reseeds the named personas below
+        with a fixed random seed (same result every run). Admin and SuperAdmin logins are never touched.
+      </p>
+    </section>
+
+    <section aria-labelledby="personas">
+      <h2 id="personas">Tutees and tutors involved</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Role</th>
+              <th>Persona</th>
+              <th>Login</th>
+              <th>What they prove</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="role tutee">Tutee</span></td>
+              <td>Bea Santos</td>
+              <td><code>bea.santos@cpu.edu.ph</code></td>
+              <td>Cold-start: no rating history, so hybrid = 0.7 × CBF only (CF's 0.3 weight is never
+                reallocated). Top pick is Miguel Torres on pure CBF (hybrid 0.63).</td>
+            </tr>
+            <tr>
+              <td><span class="role tutee">Tutee</span></td>
+              <td>Carlo Reyes</td>
+              <td><code>carlo.reyes@cpu.edu.ph</code></td>
+              <td>CBF and CF agree: Miguel Torres tops both halves (CBF 0.98, CF 4.2 → hybrid 0.94).</td>
+            </tr>
+            <tr>
+              <td><span class="role tutee">Tutee</span></td>
+              <td>Diane Cruz</td>
+              <td><code>diane.cruz@cpu.edu.ph</code></td>
+              <td>CF override: Elena Bautista ranks #1 (hybrid 0.776) despite weaker CBF (0.705 vs
+                Miguel's 0.925), because Diane's Top-K Neighbors rated Elena 4.7 and Miguel 1.7.</td>
+            </tr>
+            <tr>
+              <td><span class="role tutor">Tutor</span></td>
+              <td>Miguel Torres</td>
+              <td><code>miguel.torres@cpu.edu.ph</code></td>
+              <td>Strongest CBF fit; loved by Cluster A, panned by Cluster B.</td>
+            </tr>
+            <tr>
+              <td><span class="role tutor">Tutor</span></td>
+              <td>Elena Bautista</td>
+              <td><code>elena.bautista@cpu.edu.ph</code></td>
+              <td>Weaker CBF fit, but Cluster B's favorite — the CF-override target.</td>
+            </tr>
+            <tr>
+              <td><span class="role tutor">Tutor</span></td>
+              <td>Ramon Aquino</td>
+              <td><code>ramon.aquino@cpu.edu.ph</code></td>
+              <td>CF anchor #1 — creates the Pearson signal alongside Cecilia.</td>
+            </tr>
+            <tr>
+              <td><span class="role tutor">Tutor</span></td>
+              <td>Cecilia Mercado</td>
+              <td><code>cecilia.mercado@cpu.edu.ph</code></td>
+              <td>CF anchor #2 (Pearson similarity needs ≥ 2 shared, non-identical ratings).</td>
+            </tr>
+            <tr>
+              <td><span class="role tutor">Tutor</span></td>
+              <td>Nico Villareal</td>
+              <td><code>nico.villareal@cpu.edu.ph</code></td>
+              <td>Brand-new tutor: zero sessions and zero ratings — the empty-state case.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">
+        Not part of the algorithm scoring, but seeded for the same demo suite: <strong>Grace Domingo</strong>
+        (10/10 accepted session load, load-limit demo) and <strong>Paolo Ramirez</strong> (8/10, still
+        accepting). See the
+        <a href="demo-data-testing-accounts.html">full testing accounts reference</a> for those and
+        every other persona (wallet, compensation, admin logins).
+      </p>
+    </section>
+
+    <section aria-labelledby="how-signal">
+      <h2 id="how-signal">How the CF signal was built</h2>
+      <p>
+        Ramon Aquino and Cecilia Mercado are rated by every cluster member with inverted patterns:
+        Cluster A rates Ramon high / Cecilia low; Cluster B rates the opposite. Pearson similarity needs
+        at least 2 shared, non-identical ratings to compute — the two anchors provide exactly that, and
+        the inversion is what separates the clusters and lets Diane Cruz's neighborhood outvote raw CBF.
+      </p>
+    </section>
+
+    <section aria-labelledby="walkthrough">
+      <h2 id="walkthrough">Walkthrough</h2>
+      <h3>Ranked List tab</h3>
+      <ol class="steps">
+        <li>Pick a tutee (e.g. Bea Santos) from the searchable dropdown.</li>
+        <li>See every subject-matching tutor ranked by Hybrid Score.</li>
+        <li>Click any row to animate its CBF/CF breakdown.</li>
+      </ol>
+
+      <h3>Compare Pair tab</h3>
+      <ol class="steps">
+        <li>Pick a tutee, then a tutor (e.g. Diane Cruz → Miguel Torres, then Diane Cruz → Elena Bautista).</li>
+        <li>See stat cards for both sides: subject preferences/expertise and tutor rating history.</li>
+        <li>Watch the same animated CBF/CF/Hybrid breakdown, side by side.</li>
+      </ol>
+
+      <h3>Live rating edit (added 2026-07-08)</h3>
+      <p>
+        In Compare Pair, each contributing Top-K Neighbor row has an editable rating input (1–5) and a
+        Save button — no Django admin tab needed.
+      </p>
+      <ol class="steps">
+        <li>Select Diane Cruz → Elena Bautista.</li>
+        <li>Lower one neighbor's rating and click Save.</li>
+        <li>The CF bar, CF score, and Hybrid Score re-animate live — no page reload — and the tutor
+          picker's score label updates too.</li>
+        <li>Switch to Miguel Torres for the same tutee: his breakdown is untouched, proving the edit is
+          scoped to the exact (tutee, tutor) pair, not a page-wide refresh.</li>
+      </ol>
+      <p class="note">
+        Gated by the same <code>ALGORITHM_DEMO_TOOLS_ENABLED</code> flag as the rest of the page. See the
+        <a href="../specs/2026-07-08-algorithm-demo-live-rating-edit-design.md">live rating edit design doc</a>.
+      </p>
+    </section>
+
+    <section aria-labelledby="gotchas">
+      <h2 id="gotchas">Things to know</h2>
+      <ul>
+        <li>The candidate pool is <strong>unscoped by institution by default</strong> — any
+          subject-matching tutor, any institution. An institution filter (defaulting to "All
+          institutions") narrows both the tutee picker and the tutor candidate pool.</li>
+        <li>Changing the institution filter while a tutee is selected clears that selection, since it
+          may no longer be valid under the new scope.</li>
+        <li><code>CS-211</code>/<code>CS-212</code> are reserved to Miguel and Elena (no filler tutor
+          teaches them) so these scenarios stay top-ranked.</li>
+        <li>~30 tutors (15% of the pool) deliberately have zero sessions and zero ratings, matching
+          Nico Villareal's empty-state case — not missing data.</li>
+      </ul>
+    </section>
+
+    <footer>
+      Source of truth: <a href="../artifacts/2026-07-05-demo-data-testing-guide.md">demo data testing
+      guide</a> (Objective 2), <a href="demo-data-testing-accounts.html">full testing accounts
+      reference</a>, and <code>backend/studybuddy/demo.py</code>.
+    </footer>
+  </main>
+</body>
+</html>

@@ -97,10 +97,10 @@
                   <button 
                     class="btn btn-sm btn-outline-success rounded-circle d-flex align-items-center justify-content-center sb-btn" 
                     style="width: 42px; height: 42px;"
-                    :disabled="confirmingId === session.id" 
+                    :disabled="tutorRenewalRequired || confirmingId === session.id" 
                     @click="confirmSession(session.id)"
-                    title="Confirm Session"
-                    aria-label="Confirm Session"
+                    :title="tutorRenewalRequired ? 'Renew your verification to confirm sessions' : 'Confirm Session'"
+                    :aria-label="tutorRenewalRequired ? 'Renew your verification to confirm sessions' : 'Confirm Session'"
                   >
                     <span v-if="confirmingId === session.id" class="spinner-border spinner-border-sm" aria-hidden="true"></span>
                     <svg v-else xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-check-lg" viewBox="0 0 16 16">
@@ -164,12 +164,49 @@
       </div>
     </Teleport>
 
+    <Teleport to="body">
+      <div
+        v-if="sessionLoadLimitModalOpen"
+        class="modal-backdrop show"
+        style="display: block;"
+        @click.self="closeSessionLoadLimitModal"
+      >
+        <div class="modal d-block" tabindex="-1" role="dialog" aria-modal="true">
+          <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content rounded-4">
+              <div class="modal-header border-0 pb-0">
+                <div>
+                  <h5 class="modal-title fw-bold">Accepted session limit reached</h5>
+                  <p class="small text-muted mb-0">You need to clear some accepted sessions first.</p>
+                </div>
+                <button type="button" class="btn-close" @click="closeSessionLoadLimitModal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body">
+                <p class="mb-2">
+                  You currently have <strong>{{ sessionLoadLimitModalLoad }}</strong>
+                  accepted session group{{ sessionLoadLimitModalLoad === 1 ? '' : 's' }} out of
+                  <strong>{{ sessionLoadLimitModalLimit }}</strong> allowed.
+                </p>
+                <p class="mb-0 text-muted">
+                  Manage the sessions you already accepted, or open Help to send a support ticket to your institution admin if you need an exception.
+                </p>
+              </div>
+              <div class="modal-footer border-0 pt-0">
+                <button type="button" class="btn btn-light sb-btn" @click="closeSessionLoadLimitModal">Close</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onBeforeUnmount, onMounted } from 'vue'
 import { useSessionsStore } from '@/stores/completedSessions'
+import { useProfileStore } from '@/stores/profile'
 import api from '@/services/api/api'
 import * as bootstrap from 'bootstrap'
 import { useToastStore } from '@/stores/toast'
@@ -178,9 +215,14 @@ const toastStore = useToastStore()
 const confirmingId = ref(null)
 const rejectingId = ref(null)
 const sessionStore = useSessionsStore()
+const profileStore = useProfileStore()
 const highlightedRequestIds = ref([])
 const selectedDate = ref('')
 const actionError = ref('')
+const sessionLoadLimitModalOpen = ref(false)
+const sessionLoadLimitModalLoad = ref(0)
+const sessionLoadLimitModalLimit = ref(10)
+const tutorRenewalRequired = computed(() => Boolean(profileStore.tutorRenewalRequired))
 
 // Modal Refs
 const locationModalRef = ref(null)
@@ -224,6 +266,10 @@ const closeLocationModal = () => {
     const modalInstance = bootstrap.Modal.getInstance(locationModalRef.value)
     modalInstance?.hide()
   }
+}
+
+const closeSessionLoadLimitModal = () => {
+  sessionLoadLimitModalOpen.value = false
 }
 
 const saveLocation = async () => {
@@ -287,14 +333,27 @@ const formatDisplayTime = (timeValue) => {
 }
 
 const confirmSession = async (id) => {
+  if (tutorRenewalRequired.value) {
+    return
+  }
+
   confirmingId.value = id
   actionError.value = ''
+  closeSessionLoadLimitModal()
 
   try {
     await sessionStore.approveSession(id)
   } catch (error) {
-    actionError.value =
-      error.response?.data?.error || 'Unable to confirm this session. Please refresh and try again.'
+    const errorCode = error.response?.data?.code
+    if (errorCode === 'session_load_limit_reached') {
+      sessionLoadLimitModalLoad.value = Number(error.response?.data?.accepted_session_load || 0)
+      sessionLoadLimitModalLimit.value = Number(error.response?.data?.session_load_limit || 10)
+      sessionLoadLimitModalOpen.value = true
+      actionError.value = ''
+    } else {
+      actionError.value =
+        error.response?.data?.error || 'Unable to confirm this session. Please refresh and try again.'
+    }
 
     await sessionStore.fetchSessions()
   } finally {

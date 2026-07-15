@@ -1,0 +1,361 @@
+<style>
+  .sbdoc {
+    /* Studybuddy light-theme tokens, from src/assets/main.css */
+    --sb-primary: #00895A;
+    --sb-primary-hover: #00704A;
+    --sb-primary-light: #edf6f1;
+    --sb-primary-lighter: #dff1e8;
+    --sb-bg: #F8F9FA;
+    --sb-card-bg: #ffffff;
+    --sb-card-border: #EAEAEA;
+    --sb-border-light: #e0e7e3;
+    --sb-text-main: #163127;
+    --sb-text-muted: #6B7280;
+    --sb-text-secondary: #495057;
+    --sb-danger: #ef4444;
+    --sb-warning-text: #997404;
+    --sb-pop-yellow: #FFC94D;
+    --sb-shadow-rest: 0 6px 16px rgba(15, 23, 42, 0.06);
+
+    max-width: 900px; margin: 0 auto; padding: 40px 24px 72px;
+    background: var(--sb-bg); color: var(--sb-text-main);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    line-height: 1.6;
+  }
+  .sbdoc h1 { font-size: 1.75rem; font-weight: 700; margin: 0 0 4px; color: var(--sb-text-main); }
+  .sbdoc .meta { color: var(--sb-text-muted); font-size: .88rem; margin-bottom: 12px; }
+  .sbdoc .sb-badge-row { margin-bottom: 28px; }
+  .sbdoc .sb-badge {
+    display: inline-block; padding: 4px 14px; border-radius: 999px; font-size: .78rem; font-weight: 600;
+    background: var(--sb-primary-light); color: var(--sb-primary); border: 1px solid var(--sb-primary-lighter);
+    margin-right: 8px;
+  }
+  .sbdoc .sb-badge.warn { background: #fff8e6; color: var(--sb-warning-text); border-color: #f3e2b3; }
+  .sbdoc h2 {
+    font-size: 1.2rem; font-weight: 700; margin: 40px 0 14px; color: var(--sb-text-main);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .sbdoc h2 .n {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 28px; height: 28px; border-radius: 999px; flex: 0 0 auto;
+    background: var(--sb-primary); color: #fff; font-size: .85rem; font-weight: 700;
+  }
+  .sbdoc h3 { font-size: 1rem; font-weight: 700; margin: 20px 0 8px; color: var(--sb-text-main); }
+  .sbdoc .sb-card {
+    background: var(--sb-card-bg); border: 1px solid var(--sb-card-border); border-radius: 16px;
+    box-shadow: var(--sb-shadow-rest); padding: 20px 24px; margin: 14px 0 22px;
+  }
+  .sbdoc table { border-collapse: collapse; width: 100%; margin: 12px 0 8px; font-size: .9rem; }
+  .sbdoc th, .sbdoc td { border-bottom: 1px solid var(--sb-card-border); padding: 9px 12px; text-align: left; vertical-align: top; }
+  .sbdoc th { background: var(--sb-primary-light); color: var(--sb-text-main); font-weight: 700; }
+  .sbdoc th:first-child { border-top-left-radius: 10px; }
+  .sbdoc th:last-child { border-top-right-radius: 10px; }
+  .sbdoc tr:last-child td { border-bottom: none; }
+  .sbdoc .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .sbdoc .callout {
+    border-left: 4px solid var(--sb-primary); background: var(--sb-primary-light);
+    padding: 14px 18px; margin: 16px 0; border-radius: 0 12px 12px 0;
+  }
+  .sbdoc .callout.warn { border-left-color: var(--sb-pop-yellow); background: #fff8e6; }
+  .sbdoc .callout .label {
+    font-weight: 700; font-size: .72rem; text-transform: uppercase; letter-spacing: .08em;
+    color: var(--sb-primary);
+  }
+  .sbdoc .callout.warn .label { color: var(--sb-warning-text); }
+  .sbdoc code {
+    background: var(--sb-primary-light); color: var(--sb-primary-hover);
+    padding: 1px 6px; border-radius: 6px; font-size: .86em;
+  }
+  .sbdoc .up { color: var(--sb-primary); font-weight: 700; }
+  .sbdoc .down { color: var(--sb-danger); font-weight: 700; }
+  .sbdoc .new { color: var(--sb-primary); font-weight: 700; }
+  .sbdoc .muted { color: var(--sb-text-muted); }
+  .sbdoc ul { margin: 8px 0 16px 22px; }
+  .sbdoc li { margin: 5px 0; color: var(--sb-text-secondary); }
+  .sbdoc li strong { color: var(--sb-text-main); }
+  .sbdoc p { color: var(--sb-text-secondary); }
+  .sbdoc .toc {
+    font-size: .88rem; background: var(--sb-card-bg); border: 1px solid var(--sb-card-border);
+    border-radius: 16px; padding: 16px 20px; box-shadow: var(--sb-shadow-rest);
+  }
+  .sbdoc .toc a { color: var(--sb-primary); text-decoration: none; font-weight: 600; }
+  .sbdoc .qa { margin: 14px 0; }
+  .sbdoc .qa .q {
+    font-weight: 700; color: var(--sb-text-main); margin-bottom: 4px;
+    padding-left: 14px; border-left: 3px solid var(--sb-primary);
+  }
+  .sbdoc .qa .a { color: var(--sb-text-secondary); padding-left: 17px; }
+</style>
+<div class="sbdoc">
+  <h1>Recommender Weight Rebalance</h1>
+  <div class="meta">Decision handoff · Grilled 2026-07-14, finalized 2026-07-15 ·
+  Plan: <code>docs/plans/2026-07-15-recommender-weight-rebalance.md</code></div>
+  <div class="sb-badge-row">
+    <span class="sb-badge">Approved</span>
+    <span class="sb-badge warn">Not yet implemented</span>
+    <span class="sb-badge warn">1 open loose end</span>
+  </div>
+
+  <div class="toc">
+    <strong>Contents</strong> —
+    1. <a href="#scope">Scope</a> ·
+    2. <a href="#weights">Final CBF weights</a> ·
+    3. <a href="#split">Specific / General split</a> ·
+    4. <a href="#dominance">Dominance property</a> ·
+    5. <a href="#expertise">Expertise cascade</a> ·
+    6. <a href="#edges">Edge cases</a> ·
+    7. <a href="#cf">CF peer ratings</a> ·
+    8. <a href="#fallback">Per-tutor vs per-request</a> ·
+    9. <a href="#scale">Scalability plan</a> ·
+    10. <a href="#loose">Loose ends &amp; tickets</a> ·
+    11. <a href="#defense">Defense Q&amp;A</a>
+  </div>
+
+  <h2 id="scope"><span class="n">1</span> Scope — and what deliberately did not change</h2>
+  <div class="sb-card">
+    <p>This session finalized the <strong>CBF sub-weights</strong> (including two new sub-scores) and the
+    <strong>CF neighbor-selection rules</strong>. The hybrid formula itself is untouched:</p>
+    <div class="callout"><span class="label">Unchanged</span><br>
+    <code>Hybrid = 0.7 &times; CBF + 0.3 &times; (CF / 5)</code> — the 0.7/0.3 split, the /5 normalization, and the
+    Cold-Start behavior (CF <code>None</code> coerced to 0, weight never reallocated) all stay as documented in the glossary.</div>
+  </div>
+
+  <h2 id="weights"><span class="n">2</span> Final CBF weights (old vs new)</h2>
+  <div class="sb-card">
+    <table>
+      <tr><th>Sub-score</th><th class="num">Old</th><th class="num">New</th><th>Rule</th></tr>
+      <tr><td><span class="new">Specific Subject</span></td><td class="num">— <span class="muted">(subject 0.35)</span></td><td class="num">0.40</td><td>1 if the tutor teaches the exact requested subject code, else 0</td></tr>
+      <tr><td><span class="new">General Subject</span></td><td class="num">—</td><td class="num">0.20</td><td><code>max(Specific, same-field match)</code>: teaches the requested subject itself, or &ge;1 subject in its field (<code>Subjects.category</code>). Null category earns nothing.</td></tr>
+      <tr><td>Expertise</td><td class="num">0.20</td><td class="num">0.15 <span class="down">&darr;</span></td><td>Cascade — see section 5</td></tr>
+      <tr><td>Course</td><td class="num">0.20</td><td class="num">0.10 <span class="down">&darr;</span></td><td>Unchanged formula: same course 1, same strand 0.5, else 0</td></tr>
+      <tr><td>Year</td><td class="num">0.15</td><td class="num">0.10 <span class="down">&darr;</span></td><td>Unchanged formula: <code>1 / (1 + year gap)</code></td></tr>
+      <tr><td>Teaching Level</td><td class="num">0.10</td><td class="num">0.05 <span class="down">&darr;</span></td><td>Unchanged penalty flag: 0 only for SHS tutor &times; college student. Deliberately ceremonial.</td></tr>
+    </table>
+    <div class="callout"><span class="label">The philosophy shift</span><br>
+    The subject block grew from <strong>0.35 to 0.60</strong> of CBF. This is a deliberate statement: rank primarily on
+    subject relevance to <em>this booking</em>; demographics (course/year/level) are tie-breakers. Everything else was
+    squeezed to pay for it — Course was <em>not</em> raided specifically for the split.</div>
+  </div>
+
+  <h2 id="split"><span class="n">3</span> The Specific / General split</h2>
+  <div class="sb-card">
+    <p><strong>General Subject</strong> = a field that groups related subjects (Science &sup; Biology, Physics;
+    Programming &sup; Data Structures, Python). Maps to the existing <code>Subjects.category</code> column — no schema change.
+    <strong>Specific Subject</strong> = the exact subject code requested.</p>
+    <h3>Why split at all?</h3>
+    <p>The old signal was all-or-nothing: a tutor teaching Python scored identically to one teaching Ethics when the
+    tutee requested Data Structures. The split gives field-relevant tutors partial credit — the graduated middle tier.</p>
+    <h3>Worked example — tutee requests Data Structures (field: Programming)</h3>
+    <table>
+      <tr><th>Tutor</th><th>Teaches</th><th class="num">Specific (0.40)</th><th class="num">General (0.20)</th><th class="num">Subject credit</th></tr>
+      <tr><td>A</td><td>Data Structures, OOP</td><td class="num">1</td><td class="num">1 (superset)</td><td class="num">0.60</td></tr>
+      <tr><td>B</td><td>Python, Calculus</td><td class="num">0</td><td class="num">1 (via Python)</td><td class="num">0.20</td></tr>
+      <tr><td>C</td><td>Ethics only</td><td class="num">0</td><td class="num">0</td><td class="num">0.00</td></tr>
+      <tr><td>D</td><td>Web Dev <span class="muted">(category NULL)</span></td><td class="num">0</td><td class="num">0 (no data, no credit)</td><td class="num">0.00</td></tr>
+    </table>
+    <h3>Key rules, and the whys</h3>
+    <ul>
+      <li><strong>Binary, not graded</strong> — auditable: point at the tutor's subject list and see why.</li>
+      <li><strong>Superset, not mutually exclusive</strong> — an exact-match tutor scores 1 on both. The alternative
+      ("General only when Specific = 0") shrinks the exact-vs-field gap from 0.25 to 0.15 and gives the perfect-case
+      tutor <em>less</em> subject credit (0.25) than the old undivided weight (0.35). Superset keeps exact strictly on top.</li>
+      <li><strong>Implement General as <code>max(Specific, category match)</code></strong> — teaching the exact subject counts
+      as being in its field by definition, no category lookup needed. Data holes can then never harm an exact match.</li>
+      <li><strong>Requested subject only</strong> — the tutee's preference list no longer feeds subject matching. Previously a
+      tutor matching <em>any</em> listed subject got full exact-match credit; now list-adjacent tutors earn field-level
+      credit at most, through General.</li>
+    </ul>
+    <h3>Course &harr; General overlap — examined and accepted</h3>
+    <p>Same-course students share fields, so General partially re-rewards what Course rewards. Verdict: not a blocker —
+    correlated signals are normal in a weighted sum; the two disagree exactly where it matters (the BS Math tutor who
+    teaches Programming; the BSCS tutor who only lists Ethics). Guardrails applied: Course was <em>lowered</em> (0.20 &rarr; 0.10),
+    and the honest defense line is that the latent "same academic field" signal effectively earns W<sub>general</sub> plus a
+    chunk of W<sub>course</sub>.</p>
+  </div>
+
+  <h2 id="dominance"><span class="n">4</span> The dominance property (the one-line defense answer)</h2>
+  <div class="sb-card">
+    <div class="callout"><span class="label">Guarantee</span><br>
+    <strong>No field-only tutor can ever outrank an exact-match tutor.</strong> Exact-match minimum:
+    0.40 + 0.20 + minimum expertise (1/5 &times; 0.15 = 0.03) = <strong>0.63</strong>. Field-only theoretical maximum:
+    0.20 + 0.15 + 0.10 + 0.10 + 0.05 = <strong>0.60</strong>, and only with a perfect score on every other signal.
+    This holds <em>because of</em> the superset rule and survives any category data hole.</div>
+  </div>
+
+  <h2 id="expertise"><span class="n">5</span> Expertise cascade (option C)</h2>
+  <div class="sb-card">
+    <p>"Use the most specific evidence available" — the same ladder as Specific/General:</p>
+    <table>
+      <tr><th>Tier</th><th>When</th><th>Value</th></tr>
+      <tr><td>1 — Exact</td><td>Tutor teaches the requested subject</td><td>That subject's <code>expertise_level / 5</code> — their unrelated subjects are ignored</td></tr>
+      <tr><td>2 — Field</td><td>No exact match, but same-field subjects exist</td><td>Mean expertise over same-field subjects / 5</td></tr>
+      <tr><td>3 — None</td><td>No relevant evidence (incl. null categories)</td><td>0</td></tr>
+    </table>
+    <p><strong>Why not the alternatives:</strong> (a) requested-subject-only makes Expertise a redundant shadow of Specific and
+    leaves field-match tutors undifferentiated — a Python master and a Python novice would tie; (b) field-average-for-everyone
+    dilutes an exact-match tutor's known level with unrelated courses (Data Structures 5 + OOP 2 reads as 3.5 when
+    you <em>know</em> they're a 5 at the thing being booked).</p>
+  </div>
+
+  <h2 id="edges"><span class="n">6</span> Edge cases</h2>
+  <div class="sb-card">
+    <table>
+      <tr><th>Case</th><th>Behavior</th><th>Why it's safe</th></tr>
+      <tr><td>Requested subject has <code>category = NULL</code></td><td>General = 0 for every non-exact tutor on that request</td><td>Uniform degradation; exact matches keep 0.60 via <code>max(Specific, ...)</code></td></tr>
+      <tr><td>Tutor's subjects lack categories (Case 1: "admin forgets general Math")</td><td>That tutor loses field credit only</td><td>Blast radius capped at 0.20 + 0.15 of <em>fallback</em> credit; can never zero an exact match. The weight is the insurance policy.</td></tr>
+      <tr><td>Spelling drift / typos ("pYTHones", "Math" vs "Mathematics") — <code>category</code> is free text</td><td>False-negative field matches</td><td>Same bounded cost; root fix is the admin-edit ticket + data hygiene ticket (section 10)</td></tr>
+      <tr><td>Empty <code>requested_subject</code></td><td class="muted">OPEN — would zero the whole 0.60 block</td><td class="muted">Loose end; recommendation on the table: fall back to preference-list matching (section 10)</td></tr>
+    </table>
+  </div>
+
+  <h2 id="cf"><span class="n">7</span> CF — same-course peer ratings</h2>
+  <div class="sb-card">
+    <p>Goal: predictions feel like "peer ratings" — students on the same curriculum rating the same tutors.</p>
+    <ul>
+      <li><strong>Peer Pool:</strong> Top-K neighbors drawn from students with <strong>exact course equality</strong>. No strand
+      tier — strand-mates don't share a curriculum, and a tiered pool (course &rarr; strand &rarr; global) was rejected as
+      three-pools-to-explain complexity for marginal gain.</li>
+      <li><strong>Null course:</strong> empty Peer Pool &rarr; the fallback quietly scores from the global pool. The fallback
+      <em>is</em> the null handling; no special case.</li>
+      <li><strong>Positive similarity only (<code>&gt; 0</code>), both pools:</strong> small peer pools would otherwise let a
+      negative-similarity "anti-peer" dominate a prediction (their contribution is inverted) and — worse — count as usable
+      peer signal that <em>blocks</em> the global fallback. Zero similarity carries no information and doesn't vote either.
+      This resolves the commented-out <code>if similarity &gt;= 0</code> already sitting in <code>CF.py</code>.</li>
+    </ul>
+  </div>
+
+  <h2 id="fallback"><span class="n">8</span> Per-tutor vs per-request fallback</h2>
+  <div class="sb-card">
+    <p>Both neighbor lists (peer + global) are computed once per request. The decision was <em>when</em> to fall back:</p>
+    <table>
+      <tr><th></th><th>Per-request <span class="muted">(one pool for the whole ranking)</span></th><th>Per-tutor <span class="muted">(chosen)</span></th></tr>
+      <tr><td><strong>Pros</strong></td><td>Statistically clean — one population per ranking; simplest story; one <code>top_k</code> call</td><td>No tutor zeroed for lack of peer opinion; avoids the new-tutor feedback loop (unrated by peers &rarr; ranked low &rarr; never booked by peers &rarr; never rated); never worse than the current system</td></tr>
+      <tr><td><strong>Cons</strong></td><td>Tutors your coursemates haven't rated get CF = 0 despite usable global data — a hidden 30% penalty; buries new and cross-course tutors; failure is invisible</td><td>Mixes populations within one ranking (apples-to-oranges objection); two <code>top_k</code> calls; slightly longer explanation</td></tr>
+      <tr><td><strong>Fails worst when</strong></td><td>Small programs / new tutors — the platform's <em>current</em> phase</td><td>Dense rating data — a future state, not the present</td></tr>
+    </table>
+    <div class="callout"><span class="label">Decision</span><br>
+    <strong>Per-tutor fallback</strong>: each prediction uses same-course peers when at least one qualifying peer rated that
+    tutor; otherwise that tutor's prediction falls back to the global pool. Peers always win when they have an opinion, so the
+    "peer ratings" promise holds everywhere it can hold. Rationale: at current data size, missing data is the dominant error,
+    not population mixing — a slightly-noisy real signal beats a clean zero.</div>
+  </div>
+
+  <h2 id="scale"><span class="n">9</span> Scalability plan</h2>
+  <div class="sb-card">
+    <div class="callout warn"><span class="label">Recorded revisit trigger — not a TODO</span><br>
+    When rating density is high enough that same-course pools reliably cover most candidate tutors, <strong>reconsider
+    per-request fallback</strong> for population purity (every CF score in one ranking drawn from a single population). The
+    per-tutor choice is the right starting posture, not a permanent commitment. Until then, the bounded costs are: two
+    <code>top_k</code> calls per request (negligible) and mixed populations within a ranking (accepted).</div>
+  </div>
+
+  <h2 id="loose"><span class="n">10</span> Loose ends &amp; follow-up tickets</h2>
+  <div class="sb-card">
+    <table>
+      <tr><th>Item</th><th>Status</th><th>Notes</th></tr>
+      <tr><td>Empty <code>requested_subject</code> fallback</td><td><strong>Open — resolve before implementation</strong></td><td>Recommendation: fall back to old preference-list matching so subjectless browsing still ranks sensibly (otherwise ranking degrades to course/year only)</td></tr>
+      <tr><td>Admin edit of tutor-proposed subjects (name, code, category)</td><td>Separate ticket</td><td>Fixes "pYTHones" typos and missing categories at the source; same edit surface serves both</td></tr>
+      <tr><td>Category data hygiene</td><td>Separate ticket (optional)</td><td>Audit <code>category IS NULL</code>; consider controlled vocabulary / case-insensitive matching instead of free text</td></tr>
+      <tr><td>Glossary</td><td>Done</td><td><code>CONTEXT.md</code> updated: General Subject, Specific Subject, Peer Pool added; CBF Score and Top-K Neighbor rewritten</td></tr>
+    </table>
+  </div>
+
+  <h2 id="defense"><span class="n">11</span> Defense Q&amp;A</h2>
+  <div class="sb-card">
+    <h3>On the weights themselves</h3>
+    <div class="qa">
+      <div class="q">Q: How did you determine these weights — empirically or by judgment?</div>
+      <div class="a">A: Design judgment, constrained by provable properties rather than guesses: the weights sum to 1.0; the
+      subject block (0.60) encodes the deliberate policy that subject relevance to the current booking dominates
+      demographics; and the Specific/General ratio was chosen so the exact-match dominance property holds mathematically
+      (0.63 minimum vs 0.60 maximum — section 4). We validate behavior through the superadmin algorithm demo tool, which
+      shows the full per-tutor breakdown. At our data volume, offline learning-to-rank would overfit; principled
+      constraints plus inspectable breakdowns are the honest approach.</div>
+    </div>
+    <div class="qa">
+      <div class="q">Q: Why did subject matching grow from 0.35 to 0.60 of CBF?</div>
+      <div class="a">A: The recommender ranks tutors for a specific requested subject, so subject relevance should dominate.
+      Under the old weights, a same-course, same-year tutor who didn't teach the subject could score 0.45 while an
+      exact-subject tutor from another course scored 0.55 — too close for signals of such different importance. The new
+      weights make demographics tie-breakers among subject-relevant tutors, which matches what a student actually wants.</div>
+    </div>
+    <div class="qa">
+      <div class="q">Q: Why are Specific and General binary instead of a graded similarity?</div>
+      <div class="a">A: Auditability. A binary signal can be verified by pointing at the tutor's subject list. Graded
+      similarity (e.g. text embeddings) would need training data we don't have and would make every ranking harder to
+      explain. The graduated behavior we wanted lives in the <em>structure</em> — exact (0.60) &gt; field (0.20) &gt; none (0)
+      — not in fractional sub-scores.</div>
+    </div>
+    <div class="qa">
+      <div class="q">Q: Doesn't General Subject double-count what Course already measures?</div>
+      <div class="a">A: They correlate but are not identical, and they disagree exactly where it matters: a BS Math tutor
+      teaching Programming subjects (General = 1, Course = 0) or a BSCS tutor listing only Ethics (General = 0,
+      Course = 1). We accounted for the correlation by lowering Course to 0.10 rather than raising it, and we acknowledge
+      that the latent "same academic field" signal effectively earns W<sub>general</sub> plus part of W<sub>course</sub>.</div>
+    </div>
+    <div class="qa">
+      <div class="q">Q: Teaching Level is only 0.05 — why keep it at all?</div>
+      <div class="a">A: It is a penalty flag, not a ranking signal: it scores 1 for nearly everyone and 0 only for an
+      SHS-level tutor matched to a college student. Its job is to nudge that mismatch down, not to reorder healthy
+      matches, so a small weight is the honest size for it.</div>
+    </div>
+
+    <h3>On robustness and edge cases</h3>
+    <div class="qa">
+      <div class="q">Q: What happens when subject categories are missing or misspelled?</div>
+      <div class="a">A: Bounded degradation, never breakage. General is implemented as <code>max(Specific, category match)</code>,
+      so a data hole can only ever cost <em>fallback</em> credit (at most 0.20 + 0.15) and can never harm an exact-subject
+      match. The system stays correct while two follow-up tickets fix the root cause: admin editing of tutor-proposed
+      subjects and a category hygiene pass.</div>
+    </div>
+    <div class="qa">
+      <div class="q">Q: Can a tutor who merely teaches something in the same field ever beat a tutor who teaches the exact subject?</div>
+      <div class="a">A: No — provably. The exact-match tutor's floor is 0.63 (Specific 0.40 + General 0.20 + minimum
+      expertise 0.03); the field-only tutor's ceiling is 0.60, and only with perfect course, year, and level. This is a
+      direct consequence of the superset rule and holds under any data-quality failure.</div>
+    </div>
+    <div class="qa">
+      <div class="q">Q: How does the system treat a brand-new student (cold start)?</div>
+      <div class="a">A: Unchanged by this rebalance: with no rating history CF returns <code>None</code>, coerced to 0, so a
+      Cold-Start Tutee's hybrid score is 0.7 &times; CBF. The CF weight is deliberately not reallocated — the cap is a
+      documented property of the formula, surfaced in the UI as a Cold Start badge, not a hidden bug.</div>
+    </div>
+
+    <h3>On the CF changes</h3>
+    <div class="qa">
+      <div class="q">Q: Why restrict CF neighbors to the same course? Doesn't that throw away data?</div>
+      <div class="a">A: It prioritizes, it doesn't discard. Same-course students rate the same tutors on the same
+      curriculum, so their ratings are the most comparable evidence — genuine "peer ratings." When peers have no opinion
+      on a tutor, that tutor's prediction falls back to the global pool, so no data is ever wasted; it is only
+      out-prioritized when better-matched evidence exists.</div>
+    </div>
+    <div class="qa">
+      <div class="q">Q: Isn't mixing peer-based and global-based scores in one ranking statistically impure?</div>
+      <div class="a">A: Yes, and we accepted that trade-off consciously. At our data density, missing data is the dominant
+      error source, not population mixing — a per-request pool would hand CF = 0 to every tutor our coursemates haven't
+      rated, systematically burying new tutors and creating a never-rated-by-peers feedback loop. We recorded a revisit
+      trigger: once rating density lets peer pools cover most tutors, we reconsider per-request fallback for purity.</div>
+    </div>
+    <div class="qa">
+      <div class="q">Q: Pearson similarity supports negative correlations — why exclude negative-similarity neighbors?</div>
+      <div class="a">A: Negative weights are only informative with dense data. In a small same-course pool, one
+      opposite-taste neighbor can dominate a prediction with an <em>inverted</em> contribution, and — worse — count as
+      "usable peer signal" that blocks the global fallback. Requiring similarity &gt; 0 means we only learn from
+      demonstrated agreement; zero similarity carries no information, so it doesn't vote either.</div>
+    </div>
+    <div class="qa">
+      <div class="q">Q: Why keep the hybrid at 0.7 CBF / 0.3 CF?</div>
+      <div class="a">A: CBF-dominant weighting is the standard posture for sparse-rating platforms: profile signals exist
+      for every tutor from day one, while CF quality grows with rating volume. Rebalancing the hybrid was explicitly
+      scoped out of this session; the 0.7/0.3 split is a stable, already-documented decision, and changing two layers at
+      once would make the effect of either change unmeasurable.</div>
+    </div>
+    <div class="qa">
+      <div class="q">Q: How will you verify the new formula actually behaves as designed?</div>
+      <div class="a">A: Three layers: unit tests asserting the invariants (dominance property, null-category handling,
+      expertise cascade tiers, both fallback levels, the positive-similarity filter); the superadmin algorithm demo tool
+      showing the full sub-score breakdown per tutor and which CF pool each prediction used; and the standard repo checks
+      (backend test suite) before anything merges.</div>
+    </div>
+  </div>
+</div>

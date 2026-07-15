@@ -1,0 +1,1092 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>StudyBuddy Booking Details Concept B Preview</title>
+  <style>
+    :root {
+      --bg-top: #f5fbf6;
+      --bg-bottom: #fbf3e7;
+      --ink: #10241c;
+      --muted: #5f746b;
+      --line: rgba(16, 36, 28, 0.1);
+      --surface: rgba(255, 255, 255, 0.76);
+      --surface-strong: rgba(255, 255, 255, 0.9);
+      --green-900: #123326;
+      --green-800: #184333;
+      --green-700: #0b6b47;
+      --green-600: #00895a;
+      --green-500: #14a56f;
+      --yellow-500: #ffbe3b;
+      --pink-500: #ff7eb6;
+      --violet-500: #7c6cf2;
+      --mint-500: #7df0c2;
+      --danger-500: #f26d64;
+      --shadow-lg: 0 26px 70px rgba(13, 28, 22, 0.12);
+      --shadow-md: 0 14px 32px rgba(13, 28, 22, 0.08);
+      --spring: cubic-bezier(0.2, 0.9, 0.2, 1);
+      --radius-xl: 30px;
+      --radius-lg: 24px;
+      --radius-md: 18px;
+      --orbit-progress: 61%;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      font-family: "Avenir Next", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(20, 165, 111, 0.12), transparent 30%),
+        radial-gradient(circle at top right, rgba(255, 190, 59, 0.16), transparent 26%),
+        linear-gradient(180deg, var(--bg-top), var(--bg-bottom));
+    }
+
+    button { font: inherit; }
+
+    .page {
+      width: min(1380px, calc(100% - 28px));
+      margin: 0 auto;
+      padding: 28px 0 60px;
+    }
+
+    .hero,
+    .controls,
+    .shell {
+      border: 1px solid rgba(255, 255, 255, 0.72);
+      border-radius: var(--radius-xl);
+      background: var(--surface);
+      backdrop-filter: blur(18px);
+      box-shadow: var(--shadow-lg);
+    }
+
+    .hero {
+      position: relative;
+      overflow: hidden;
+      padding: 28px;
+      margin-bottom: 18px;
+      background: linear-gradient(135deg, rgba(18, 51, 38, 0.97), rgba(0, 137, 90, 0.9));
+      color: #fff;
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      right: -26px;
+      bottom: -70px;
+      width: 240px;
+      height: 240px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(255, 255, 255, 0.22), transparent 70%);
+    }
+
+    .eyebrow {
+      margin: 0 0 10px;
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: rgba(255, 255, 255, 0.74);
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: clamp(34px, 5vw, 52px);
+      line-height: 0.96;
+    }
+
+    .hero p {
+      width: min(760px, 100%);
+      margin: 0;
+      color: rgba(255, 255, 255, 0.84);
+      font-size: 15px;
+      line-height: 1.5;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px 18px;
+      align-items: end;
+      padding: 18px 20px;
+      margin-bottom: 20px;
+      background: var(--surface-strong);
+    }
+
+    .field {
+      display: grid;
+      gap: 7px;
+    }
+
+    .field label {
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .segmented {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .segmented button {
+      min-height: 40px;
+      padding: 0 14px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #fff;
+      color: var(--ink);
+      cursor: pointer;
+      transition:
+        transform 180ms var(--spring),
+        background-color 180ms var(--spring),
+        border-color 180ms var(--spring),
+        color 180ms var(--spring),
+        box-shadow 180ms var(--spring);
+    }
+
+    .segmented button.active {
+      background: var(--green-600);
+      color: #fff;
+      border-color: var(--green-600);
+      box-shadow: 0 10px 20px rgba(0, 137, 90, 0.18);
+    }
+
+    .segmented button:hover {
+      transform: translateY(-1px);
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 20px;
+    }
+
+    .shell {
+      position: relative;
+      overflow: hidden;
+      min-width: 0;
+    }
+
+    .shell::before,
+    .shell::after {
+      content: "";
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(54px);
+      opacity: 0.5;
+      pointer-events: none;
+      animation: drift 14s ease-in-out infinite alternate;
+    }
+
+    .shell::before {
+      width: 250px;
+      height: 250px;
+      top: -80px;
+      right: -80px;
+      background: radial-gradient(circle, rgba(255, 190, 59, 0.2), transparent 68%);
+    }
+
+    .shell::after {
+      width: 220px;
+      height: 220px;
+      left: -70px;
+      bottom: -70px;
+      background: radial-gradient(circle, rgba(124, 108, 242, 0.18), transparent 70%);
+      animation-duration: 18s;
+    }
+
+    .shell-head {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: start;
+      padding: 22px 24px 12px;
+    }
+
+    .shell-head h2 {
+      margin: 0 0 4px;
+      font-size: 26px;
+      line-height: 1.02;
+    }
+
+    .shell-head p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .role-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      min-height: 34px;
+      padding: 0 12px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.78);
+      border: 1px solid rgba(255, 255, 255, 0.76);
+      color: var(--ink);
+      font-size: 12px;
+      font-weight: 800;
+      box-shadow: var(--shadow-md);
+      white-space: nowrap;
+    }
+
+    .role-pill span {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green-500);
+      box-shadow: 0 0 14px rgba(20, 165, 111, 0.5);
+    }
+
+    .section {
+      position: relative;
+      z-index: 1;
+      padding: 0 24px;
+    }
+
+    .hero-band {
+      margin: 0 24px 18px;
+      padding: 20px;
+      border-radius: var(--radius-lg);
+      background:
+        radial-gradient(circle at 18% 20%, rgba(51, 213, 166, 0.26), transparent 30%),
+        radial-gradient(circle at 84% 76%, rgba(255, 204, 111, 0.22), transparent 28%),
+        linear-gradient(135deg, #061814, #10342c 58%, #1b2621);
+      color: #fff;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
+    }
+
+    .hero-top {
+      display: grid;
+      grid-template-columns: 72px minmax(0, 1fr);
+      gap: 14px;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .avatar {
+      display: grid;
+      place-items: center;
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      border: 3px solid rgba(255, 255, 255, 0.3);
+      background: linear-gradient(135deg, rgba(255,255,255,0.28), rgba(255,255,255,0.08));
+      font-size: 24px;
+      font-weight: 800;
+      box-shadow: 0 12px 26px rgba(0,0,0,0.18);
+    }
+
+    .hero-meta {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: start;
+    }
+
+    .hero-meta h3 {
+      margin: 0 0 2px;
+      font-size: 30px;
+      line-height: 0.98;
+    }
+
+    .hero-meta p {
+      margin: 0;
+      color: rgba(255,255,255,0.7);
+      font-size: 13px;
+    }
+
+    .status-pill,
+    .subject-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      min-height: 32px;
+      padding: 0 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.2);
+      background: rgba(255,255,255,0.12);
+      font-size: 12px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .status-pill::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--mint-500);
+      box-shadow: 0 0 14px rgba(125, 240, 194, 0.72);
+    }
+
+    .subject-pill {
+      margin-top: 10px;
+      color: rgba(255,255,255,0.9);
+    }
+
+    .countdown-copy {
+      display: grid;
+      gap: 6px;
+      margin-bottom: 16px;
+    }
+
+    .countdown-copy strong {
+      font-size: clamp(28px, 4vw, 42px);
+      line-height: 0.95;
+    }
+
+    .countdown-copy span {
+      color: rgba(255,255,255,0.78);
+      font-size: 14px;
+    }
+
+    .orbit {
+      position: relative;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      min-height: 50px;
+      align-items: center;
+    }
+
+    .orbit-zone {
+      position: relative;
+      height: 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.14);
+      overflow: hidden;
+    }
+
+    .orbit-zone.active::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, rgba(124,108,242,0.6), rgba(255,126,182,0.56), rgba(255,190,59,0.56), rgba(125,240,194,0.64));
+      animation: pulse 2.8s ease-in-out infinite alternate;
+    }
+
+    .orbit-fill {
+      position: absolute;
+      left: 0;
+      top: 50%;
+      width: var(--orbit-progress);
+      height: 4px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--violet-500), var(--pink-500), var(--yellow-500), var(--mint-500));
+      transform: translateY(-50%);
+    }
+
+    .orbit-bead {
+      position: absolute;
+      left: var(--orbit-progress);
+      top: 50%;
+      width: 20px;
+      height: 20px;
+      border: 2px solid rgba(255,255,255,0.9);
+      border-radius: 50%;
+      background: #fbfffd;
+      box-shadow:
+        0 0 0 7px rgba(125, 240, 194, 0.14),
+        0 0 22px rgba(255, 190, 59, 0.45);
+      transform: translate(-50%, -50%);
+      animation: float 2.8s ease-in-out infinite;
+    }
+
+    .orbit-labels {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 10px;
+      color: rgba(255,255,255,0.74);
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .stream {
+      display: grid;
+      border-top: 1px solid var(--line);
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 130px minmax(0, 1fr);
+      gap: 16px;
+      padding: 16px 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .row:last-child {
+      border-bottom: 0;
+    }
+
+    .row-label {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .row-main {
+      display: grid;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .row-main strong {
+      font-size: 17px;
+      line-height: 1.2;
+    }
+
+    .row-main p,
+    .row-main span {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      min-height: 30px;
+      padding: 0 11px;
+      border-radius: 999px;
+      border: 1px solid rgba(16, 36, 28, 0.08);
+      background: rgba(255, 255, 255, 0.78);
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--ink);
+    }
+
+    .badge.good { color: var(--green-700); background: rgba(20, 165, 111, 0.12); }
+    .badge.issue { color: #9d4c11; background: rgba(255, 190, 59, 0.16); }
+    .badge.pending { color: #586d64; background: rgba(16, 36, 28, 0.06); }
+
+    .midcheck {
+      margin: 18px 24px 22px;
+      padding: 18px;
+      border-radius: var(--radius-lg);
+      background: linear-gradient(180deg, rgba(255,255,255,0.84), rgba(255,255,255,0.64));
+      border: 1px solid rgba(255,255,255,0.74);
+      box-shadow: var(--shadow-md);
+    }
+
+    .midcheck-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: start;
+      margin-bottom: 14px;
+    }
+
+    .midcheck-head h4 {
+      margin: 0 0 4px;
+      font-size: 20px;
+    }
+
+    .midcheck-head p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .elapsed {
+      display: inline-flex;
+      align-items: center;
+      min-height: 32px;
+      padding: 0 11px;
+      border-radius: 999px;
+      background: rgba(16, 36, 28, 0.06);
+      color: var(--ink);
+      font-size: 12px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .action-rail {
+      display: grid;
+      gap: 10px;
+    }
+
+    .action-button {
+      position: relative;
+      display: grid;
+      gap: 4px;
+      width: 100%;
+      padding: 16px 16px 16px 18px;
+      border: 1px solid rgba(16, 36, 28, 0.1);
+      border-radius: 20px;
+      background: rgba(255,255,255,0.92);
+      color: var(--ink);
+      text-align: left;
+      cursor: pointer;
+      overflow: hidden;
+      transition:
+        transform 180ms var(--spring),
+        border-color 180ms var(--spring),
+        box-shadow 180ms var(--spring),
+        background-color 180ms var(--spring);
+    }
+
+    .action-button::after {
+      content: "";
+      position: absolute;
+      inset: auto auto 0 0;
+      width: 100%;
+      height: 3px;
+      transform: scaleX(0.36);
+      transform-origin: left center;
+      opacity: 0.72;
+      transition: transform 220ms var(--spring);
+    }
+
+    .action-button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 16px 28px rgba(13, 28, 22, 0.08);
+    }
+
+    .action-button:hover::after {
+      transform: scaleX(1);
+    }
+
+    .action-button strong {
+      font-size: 16px;
+    }
+
+    .action-button span {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .action-button.good::after {
+      background: linear-gradient(90deg, var(--green-500), var(--mint-500));
+    }
+
+    .action-button.issue::after {
+      background: linear-gradient(90deg, var(--yellow-500), var(--danger-500));
+    }
+
+    .action-button.pending::after {
+      background: linear-gradient(90deg, var(--violet-500), var(--pink-500));
+    }
+
+    .action-button.selected {
+      border-color: rgba(0, 137, 90, 0.28);
+      background: rgba(236, 248, 241, 0.94);
+    }
+
+    .action-button.warn-selected {
+      border-color: rgba(242, 109, 100, 0.26);
+      background: rgba(255, 246, 240, 0.94);
+    }
+
+    .microcopy {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .hold-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 32px;
+      padding: 0 12px;
+      border-radius: 999px;
+      background: rgba(16, 36, 28, 0.06);
+      color: var(--ink);
+      font-weight: 700;
+    }
+
+    .hold-chip i {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green-500);
+      animation: beat 1.8s ease-in-out infinite;
+    }
+
+    .footer-note {
+      padding: 0 24px 22px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .footer-note strong {
+      color: var(--ink);
+    }
+
+    [data-mode="online"] .mode-online,
+    [data-mode="f2f"] .mode-f2f,
+    [data-state="live"] .when-live,
+    [data-state="upcoming"] .when-upcoming,
+    [data-state="wrap"] .when-wrap,
+    [data-check="good"] .check-good,
+    [data-check="issue"] .check-issue,
+    [data-check="pending"] .check-pending {
+      display: block;
+    }
+
+    .when-live,
+    .when-upcoming,
+    .when-wrap,
+    .mode-online,
+    .mode-f2f,
+    .check-good,
+    .check-issue,
+    .check-pending {
+      display: none;
+    }
+
+    [data-state="upcoming"] {
+      --orbit-progress: 18%;
+    }
+
+    [data-state="live"] {
+      --orbit-progress: 61%;
+    }
+
+    [data-state="wrap"] {
+      --orbit-progress: 91%;
+    }
+
+    [data-state="upcoming"] .orbit-zone:nth-child(1)::after,
+    [data-state="live"] .orbit-zone:nth-child(-n+3)::after,
+    [data-state="wrap"] .orbit-zone::after {
+      content: "";
+    }
+
+    [data-state="upcoming"] .orbit-zone.active,
+    [data-state="live"] .orbit-zone.active,
+    [data-state="wrap"] .orbit-zone.active {
+      background: rgba(109, 255, 214, 0.22);
+    }
+
+    @keyframes drift {
+      to { transform: translate(16px, -12px) scale(1.08); }
+    }
+
+    @keyframes float {
+      50% { transform: translate(-50%, -58%); }
+    }
+
+    @keyframes pulse {
+      from { opacity: 0.52; }
+      to { opacity: 0.88; }
+    }
+
+    @keyframes beat {
+      50% { transform: scale(1.6); }
+    }
+
+    @media (max-width: 1100px) {
+      .layout { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 760px) {
+      .page { width: min(100%, calc(100% - 18px)); }
+      .controls { padding: 16px; }
+      .shell-head,
+      .section { padding-left: 18px; padding-right: 18px; }
+      .hero-band,
+      .midcheck { margin-left: 18px; margin-right: 18px; }
+      .footer-note { padding-left: 18px; padding-right: 18px; }
+      .row { grid-template-columns: 1fr; gap: 8px; }
+      .hero-meta { display: grid; }
+      .midcheck-head { display: grid; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .shell::before,
+      .shell::after,
+      .orbit-zone.active::after,
+      .orbit-bead,
+      .hold-chip i {
+        animation: none;
+      }
+
+      .segmented button,
+      .action-button {
+        transition: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page" id="preview" data-mode="online" data-state="live" data-check="pending">
+    <section class="hero">
+      <p class="eyebrow">Concept B · Booking details redesign</p>
+      <h1>Booking details that feel alive for both the tutee and the tutor.</h1>
+      <p>
+        This preview carries the orbit-strip language into the actual session details view, replaces card stacking with a calmer stream layout,
+        and expands mid-session checks into clearer actions instead of one vague button.
+      </p>
+    </section>
+
+    <section class="controls">
+      <div class="field">
+        <label>Session state</label>
+        <div class="segmented" data-group="state">
+          <button type="button" data-value="upcoming">Upcoming</button>
+          <button type="button" data-value="live" class="active">Live</button>
+          <button type="button" data-value="wrap">Wrap-up</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Mode</label>
+        <div class="segmented" data-group="mode">
+          <button type="button" data-value="online" class="active">Online</button>
+          <button type="button" data-value="f2f">In person</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Mid-session result</label>
+        <div class="segmented" data-group="check">
+          <button type="button" data-value="pending" class="active">Pending</button>
+          <button type="button" data-value="good">All good</button>
+          <button type="button" data-value="issue">Needs help</button>
+        </div>
+      </div>
+    </section>
+
+    <div class="layout">
+      <section class="shell">
+        <div class="shell-head">
+          <div>
+            <h2>Tutee booking details</h2>
+            <p>The details read like one live surface, with the check-in action expanded into an intentional moment.</p>
+          </div>
+          <span class="role-pill"><span></span>Tutee view</span>
+        </div>
+
+        <section class="hero-band">
+          <div class="hero-top">
+            <div class="avatar">AL</div>
+            <div>
+              <div class="hero-meta">
+                <div>
+                  <h3>Angela Lim</h3>
+                  <p>Physics tutor · Thermodynamics</p>
+                </div>
+                <span class="status-pill when-live">Live now</span>
+                <span class="status-pill when-upcoming">Confirmed</span>
+                <span class="status-pill when-wrap">Wrapping up</span>
+              </div>
+              <span class="subject-pill">Calculus 2 · Integration techniques</span>
+            </div>
+          </div>
+
+          <div class="countdown-copy when-live">
+            <span>A live session is in progress</span>
+            <strong>53 minutes left in your scheduled session</strong>
+            <span>The timer ends at 3:30 PM, then this moves into payment handoff.</span>
+          </div>
+
+          <div class="countdown-copy when-upcoming">
+            <span>Your session window is approaching</span>
+            <strong>Starts in 14 minutes</strong>
+            <span>Everything stays quiet until the live countdown takes over at the start hour.</span>
+          </div>
+
+          <div class="countdown-copy when-wrap">
+            <span>The scheduled window is almost done</span>
+            <strong>7 minutes left before payment handoff</strong>
+            <span>After the timer ends, this screen pivots to post-session next steps.</span>
+          </div>
+
+          <div class="orbit" aria-hidden="true">
+            <span class="orbit-zone active"></span>
+            <span class="orbit-zone active"></span>
+            <span class="orbit-zone active"></span>
+            <span class="orbit-zone active"></span>
+            <span class="orbit-fill"></span>
+            <span class="orbit-bead"></span>
+          </div>
+          <div class="orbit-labels">
+            <span>Join</span>
+            <span>Settle</span>
+            <span>Deep work</span>
+            <span>Wrap</span>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="stream">
+            <div class="row">
+              <div class="row-label">When</div>
+              <div class="row-main">
+                <strong>Friday, July 3 · 2:00 PM to 3:30 PM</strong>
+                <p>Queued next: Physics with Angela at 5:00 PM.</p>
+              </div>
+            </div>
+            <div class="row">
+              <div class="row-label">Mode</div>
+              <div class="row-main">
+                <strong class="mode-online">Online session</strong>
+                <strong class="mode-f2f">In-person session</strong>
+                <span class="mode-online">Join link opens from chat. The location row stays out of the way for online sessions.</span>
+                <span class="mode-f2f">Meet at Henry Luce Library · 2nd floor discussion booths.</span>
+              </div>
+            </div>
+            <div class="row">
+              <div class="row-label">What to bring</div>
+              <div class="row-main">
+                <div class="badges">
+                  <span class="badge">Problem set</span>
+                  <span class="badge">Calculator</span>
+                  <span class="badge mode-online">Stable connection</span>
+                  <span class="badge mode-f2f">Notebook</span>
+                </div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="row-label">Session flow</div>
+              <div class="row-main">
+                <strong>Request accepted · Live session · Payment handoff</strong>
+                <p>This keeps the status model small while the orbit handles the sense of movement.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="midcheck">
+          <div class="midcheck-head">
+            <div>
+              <h4>Mid-session pulse</h4>
+              <p>Instead of one vague button, the tutee gets a clear check-in moment with explicit outcomes.</p>
+            </div>
+            <span class="elapsed">42 minutes elapsed</span>
+          </div>
+
+          <div class="action-rail">
+            <button type="button" class="action-button pending selected check-pending">
+              <strong>Hold to say everything is on track</strong>
+              <span>Fast reassurance. Saves a quiet “good” check without opening another modal.</span>
+            </button>
+            <button type="button" class="action-button issue check-pending">
+              <strong>Hold to ask for help</strong>
+              <span>Flags pacing, no-show, or confusion so support and the tutor flow can react while the session is still live.</span>
+            </button>
+
+            <button type="button" class="action-button good selected check-good">
+              <strong>Check-in sent: all good</strong>
+              <span>Angela can see that the session is moving fine. No extra steps unless something changes.</span>
+            </button>
+            <button type="button" class="action-button issue warn-selected check-issue">
+              <strong>Issue flagged during the session</strong>
+              <span>Support and the tutor view now have a stronger prompt to intervene instead of waiting until the end.</span>
+            </button>
+          </div>
+
+          <div class="microcopy">
+            <span class="hold-chip"><i></i>Hold to prevent accidental input</span>
+            <span class="check-pending">The check appears once during the live window and then clears after response.</span>
+            <span class="check-good">Saved at 2:42 PM.</span>
+            <span class="check-issue">Support escalation path unlocked.</span>
+          </div>
+        </section>
+
+        <p class="footer-note">
+          <strong>Why this is calmer:</strong> the details become a single read from top to bottom, while the check-in grows into a focused action band instead of another generic card with buttons.
+        </p>
+      </section>
+
+      <section class="shell">
+        <div class="shell-head">
+          <div>
+            <h2>Tutor booking details</h2>
+            <p>The tutor side mirrors the same feel, but the actions shift toward orchestrating the session rather than answering it.</p>
+          </div>
+          <span class="role-pill"><span></span>Tutor view</span>
+        </div>
+
+        <section class="hero-band">
+          <div class="hero-top">
+            <div class="avatar">JM</div>
+            <div>
+              <div class="hero-meta">
+                <div>
+                  <h3>Jared Morales</h3>
+                  <p>Tutee · Calculus 2 · CPU College of Engineering</p>
+                </div>
+                <span class="status-pill when-live">Live now</span>
+                <span class="status-pill when-upcoming">Confirmed</span>
+                <span class="status-pill when-wrap">Ready to end</span>
+              </div>
+              <span class="subject-pill">Goal: finish substitution + partial fractions</span>
+            </div>
+          </div>
+
+          <div class="countdown-copy when-live">
+            <span>The lesson is in progress</span>
+            <strong>53 minutes remain in the scheduled window</strong>
+            <span>The tutor can keep the original end time for the MVP and still use the bar for pacing.</span>
+          </div>
+
+          <div class="countdown-copy when-upcoming">
+            <span>Your lesson queue is lined up</span>
+            <strong>Starts in 14 minutes</strong>
+            <span>Use the pre-session time to settle the chat and materials, not to manage extra workflow.</span>
+          </div>
+
+          <div class="countdown-copy when-wrap">
+            <span>The session is nearing handoff</span>
+            <strong>7 minutes before payment flow unlocks</strong>
+            <span>End-session controls become more prominent as the scheduled window closes.</span>
+          </div>
+
+          <div class="orbit" aria-hidden="true">
+            <span class="orbit-zone active"></span>
+            <span class="orbit-zone active"></span>
+            <span class="orbit-zone active"></span>
+            <span class="orbit-zone active"></span>
+            <span class="orbit-fill"></span>
+            <span class="orbit-bead"></span>
+          </div>
+          <div class="orbit-labels">
+            <span>Join</span>
+            <span>Settle</span>
+            <span>Deep work</span>
+            <span>Wrap</span>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="stream">
+            <div class="row">
+              <div class="row-label">Learner</div>
+              <div class="row-main">
+                <strong>Jared Morales</strong>
+                <p>Needs help recognizing which integration pattern to use first.</p>
+              </div>
+            </div>
+            <div class="row">
+              <div class="row-label">Mode</div>
+              <div class="row-main">
+                <strong class="mode-online">Online lesson</strong>
+                <strong class="mode-f2f">In-person lesson</strong>
+                <span class="mode-online">Keep the live actions centered on chat, pacing, and support.</span>
+                <span class="mode-f2f">Venue confirmation stays visible because the physical meetup matters.</span>
+              </div>
+            </div>
+            <div class="row">
+              <div class="row-label">Tutor controls</div>
+              <div class="row-main">
+                <div class="badges">
+                  <span class="badge">Open chat</span>
+                  <span class="badge">Send check</span>
+                  <span class="badge">End session</span>
+                  <span class="badge mode-f2f">Venue confirmed</span>
+                </div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="row-label">Tutee response</div>
+              <div class="row-main">
+                <div class="badges check-pending">
+                  <span class="badge pending">Check not sent yet</span>
+                  <span class="badge pending">No tutee response yet</span>
+                </div>
+                <div class="badges check-good">
+                  <span class="badge good">All good received</span>
+                  <span class="badge">Responded at 2:42 PM</span>
+                </div>
+                <div class="badges check-issue">
+                  <span class="badge issue">Issue flagged</span>
+                  <span class="badge">Needs tutor follow-up</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="midcheck">
+          <div class="midcheck-head">
+            <div>
+              <h4>Mid-session orchestration</h4>
+              <p>The tutor does not answer the check. The tutor triggers, tracks, and responds to it.</p>
+            </div>
+            <span class="elapsed">Tutor actions</span>
+          </div>
+
+          <div class="action-rail">
+            <button type="button" class="action-button pending check-pending selected">
+              <strong>Send mid-session pulse</strong>
+              <span>Prompts the tutee with the hold-to-confirm choices. This is more explicit than a generic “mid check-in” button.</span>
+            </button>
+            <button type="button" class="action-button pending check-pending">
+              <strong>Confirm venue or presence</strong>
+              <span class="mode-f2f">Use when the tutee has arrived and the meetup is settled.</span>
+              <span class="mode-online">Swap this copy to “Confirm connection” for online sessions instead of showing a location concept.</span>
+            </button>
+
+            <button type="button" class="action-button good selected check-good">
+              <strong>Tutee says the session is going well</strong>
+              <span>The tutor sees reassurance, keeps teaching, and can still end the session at the scheduled handoff.</span>
+            </button>
+            <button type="button" class="action-button issue warn-selected check-issue">
+              <strong>Tutee flagged a problem</strong>
+              <span>Surface stronger next steps here: open chat, contact support, or resolve the pacing issue before the session ends.</span>
+            </button>
+          </div>
+
+          <div class="microcopy">
+            <span class="check-pending">Prompt once, then wait for the learner response.</span>
+            <span class="check-good">The result reads as reassurance, not another task.</span>
+            <span class="check-issue">Issue state deserves escalation-weight styling.</span>
+          </div>
+        </section>
+
+        <p class="footer-note">
+          <strong>Why this is better for the tutor:</strong> the tutor retains control over pacing and end-session flow, but the mid-session area becomes an operational rail with clearer consequence states.
+        </p>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    const root = document.getElementById('preview');
+
+    document.querySelectorAll('[data-group]').forEach((group) => {
+      group.addEventListener('click', (event) => {
+        const button = event.target.closest('button[data-value]');
+        if (!button) return;
+
+        const key = group.dataset.group;
+        root.dataset[key] = button.dataset.value;
+
+        group.querySelectorAll('button').forEach((node) => node.classList.remove('active'));
+        button.classList.add('active');
+      });
+    });
+  </script>
+</body>
+</html>

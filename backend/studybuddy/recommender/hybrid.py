@@ -1,10 +1,14 @@
 import logging
 
 from ..models import Tutor
-from .CF import compute_cf_score, top_k
-from .cbf import compute_cbf_score, get_student_subject_codes
+from .CF import compute_cf_breakdown, compute_cf_score, top_k
+from .cbf import compute_cbf_breakdown, compute_cbf_score, get_student_subject_codes
 
 logger = logging.getLogger(__name__)
+
+CBF_WEIGHT = 0.7
+CF_WEIGHT = 0.3
+CF_MAX_RATING = 5
 
 
 def hybrid_prediction(ratings, student_profile, tutor, requested_subject, student_subjects=None, neighbors=None):
@@ -28,7 +32,7 @@ def hybrid_prediction(ratings, student_profile, tutor, requested_subject, studen
     if cf_score is None:
         cf_score = 0
 
-    hybrid_score = (0.7 * cbf_score) + (0.3 * (cf_score / 5))
+    hybrid_score = (CBF_WEIGHT * cbf_score) + (CF_WEIGHT * (cf_score / CF_MAX_RATING))
 
     logger.debug(
         "Hybrid score for tutor %s: CBF %.3f, CF %.3f, hybrid %.3f",
@@ -39,6 +43,36 @@ def hybrid_prediction(ratings, student_profile, tutor, requested_subject, studen
     )
 
     return hybrid_score
+
+
+def hybrid_prediction_breakdown(ratings, student_profile, tutor, requested_subject, student_subjects=None, neighbors=None):
+    """Same computation as hybrid_prediction, but returns the full CBF/CF breakdown
+    alongside the hybrid score. Used by the algorithm demo tool (recommender/demo.py)."""
+    cbf = compute_cbf_breakdown(
+        student_profile,
+        tutor,
+        requested_subject,
+        student_subjects=student_subjects,
+        tutor_subjects=tutor.tutorsubjects_set.all(),
+    )
+
+    tutor_id = tutor.profile_id
+
+    cf = compute_cf_breakdown(
+        ratings,
+        student_profile.id,
+        tutor_id,
+        neighbors=neighbors,
+    )
+
+    cf_score_for_hybrid = cf["score"] if cf["score"] is not None else 0
+    hybrid_score = (CBF_WEIGHT * cbf["score"]) + (CF_WEIGHT * (cf_score_for_hybrid / CF_MAX_RATING))
+
+    return {
+        "hybrid_score": hybrid_score,
+        "cbf": cbf,
+        "cf": cf,
+    }
 
 
 def normalize_tutor_queryset(candidate_qs=None):

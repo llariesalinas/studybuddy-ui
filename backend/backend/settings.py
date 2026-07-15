@@ -34,6 +34,23 @@ if not SECRET_KEY:
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env_bool('DEBUG', False)
 
+if not DEBUG:
+    # Render (this project's demo/production host) has no outbound IPv6 route at all.
+    # Already hit this once for the database (Supabase's direct-connection host is
+    # IPv6-only; worked around via the Supavisor pooler -- see DB_HOST/DB_USER below) and
+    # again for login OTP email (smtp.gmail.com publishes both A and AAAA records, and the
+    # IPv6 attempt fails with "Network is unreachable"). Rather than special-case every
+    # outbound host one at a time, force all DNS resolution in this process to IPv4-only.
+    # No effect on local dev, which isn't gated by this network limitation.
+    import socket
+
+    _original_getaddrinfo = socket.getaddrinfo
+
+    def _ipv4_only_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
+        return _original_getaddrinfo(host, port, socket.AF_INET, type, proto, flags)
+
+    socket.getaddrinfo = _ipv4_only_getaddrinfo
+
 _allowed_hosts_raw = os.getenv('ALLOWED_HOSTS', '')
 ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts_raw.split(',') if h.strip()]
 
@@ -63,6 +80,28 @@ else:
     CORS_ALLOW_ALL_ORIGINS = False
     CORS_ALLOWED_ORIGINS = [
         o.strip() for o in os.getenv('CORS_ALLOWED_ORIGINS', '').split(',') if o.strip()
+    ]
+    # Optional regex allowlist, for platforms like Vercel that mint a unique per-deployment
+    # URL every push -- CORS_ALLOWED_ORIGINS alone can't cover those without editing the env
+    # var on every deploy. Empty by default, so real production (which won't set this) is
+    # unaffected.
+    CORS_ALLOWED_ORIGIN_REGEXES = [
+        r.strip() for r in os.getenv('CORS_ALLOWED_ORIGIN_REGEXES', '').split(',') if r.strip()
+    ]
+    # Explicit defaults plus x-demo-auth, which carries the demo Basic Auth
+    # credential (see demo_basic_auth.py) and isn't in django-cors-headers'
+    # built-in default list.
+    CORS_ALLOW_HEADERS = [
+        "accept",
+        "accept-encoding",
+        "authorization",
+        "content-type",
+        "dnt",
+        "origin",
+        "user-agent",
+        "x-csrftoken",
+        "x-requested-with",
+        "x-demo-auth",
     ]
     CSRF_TRUSTED_ORIGINS = [
         o.strip() for o in os.getenv('CSRF_TRUSTED_ORIGINS', '').split(',') if o.strip()
@@ -134,6 +173,21 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
+# Demo-only shared-password gate (see ADR-0005). Only active when both env vars are
+# set, so local dev and real production (which don't set these) are unaffected.
+DEMO_BASIC_AUTH_USER = os.getenv('DEMO_BASIC_AUTH_USER', '')
+DEMO_BASIC_AUTH_PASSWORD = os.getenv('DEMO_BASIC_AUTH_PASSWORD', '')
+if DEMO_BASIC_AUTH_USER and DEMO_BASIC_AUTH_PASSWORD:
+    MIDDLEWARE.insert(0, 'studybuddy.demo_basic_auth.DemoBasicAuthMiddleware')
+
+# No email can be delivered on the demo deployment (Render blocks outbound SMTP; see
+# docs/plans/2026-07-05-demo-deployment-plan.md), and Resend's sandbox mode without a
+# verified domain can only send to one address. Reuses the demo Basic Auth flag as the
+# "is this the demo deployment" signal rather than adding a second env var, so local dev
+# and real production (neither of which set these) keep sending real email as normal.
+IS_DEMO_DEPLOYMENT = bool(DEMO_BASIC_AUTH_USER and DEMO_BASIC_AUTH_PASSWORD)
+LOGIN_OTP_DISABLED = IS_DEMO_DEPLOYMENT
+
 ROOT_URLCONF = 'backend.urls'
 
 TEMPLATES = [
@@ -166,6 +220,10 @@ DATABASES = {
         "PASSWORD": os.getenv("DB_PASSWORD"),
         "HOST": os.getenv("DB_HOST"),
         "PORT": os.getenv("DB_PORT", "5432"),
+        # Supabase's external Postgres endpoint requires SSL; local Postgres does
+        # not, so this defaults to libpq's own default ("prefer") and only needs
+        # to be set to "require" via DB_SSLMODE for Supabase-backed environments.
+        "OPTIONS": {"sslmode": os.getenv("DB_SSLMODE", "prefer")},
     }
 }
 
@@ -261,6 +319,18 @@ TUTEE_VERIFICATION_ENFORCEMENT_START_DATE = os.getenv('TUTEE_VERIFICATION_ENFORC
 # SuperAdmin verification dev tools. Defaults False so it is inert in production even if DEBUG is on;
 # the dev endpoints check this flag before any work and 403 when it is off.
 VERIFICATION_DEV_TOOLS_ENABLED = env_bool('VERIFICATION_DEV_TOOLS_ENABLED', False)
+
+# Enables the staff-only recommendation algorithm demo endpoints (score breakdown for the live
+# panel demo tool). Defaults False so it is inert in production; the endpoints check this flag
+# before any work and 403 when it is off.
+ALGORITHM_DEMO_TOOLS_ENABLED = env_bool('ALGORITHM_DEMO_TOOLS_ENABLED', False)
+
+# Enables the dev booking/wallet tools (force a booking's session into a given live phase, mark
+# ready-for-payment, credit/debit a tutor wallet). Previously gated on DEBUG alone, which meant
+# they were unreachable on the demo deployment (DEBUG=False there by design). Defaults False so
+# real production stays inert; the demo sets this explicitly to let the panel force session/wallet
+# states for the thesis defense.
+BOOKING_DEV_TOOLS_ENABLED = env_bool('BOOKING_DEV_TOOLS_ENABLED', False)
 
 PASSWORD_RESET_TIMEOUT = 3600
 LOGIN_OTP_TTL_SECONDS = 600
@@ -360,16 +430,58 @@ PAYMONGO_CASHOUT_CALLBACK_URL = os.getenv("PAYMONGO_CASHOUT_CALLBACK_URL", "")
 PAYMONGO_CASHOUT_CALLBACK_SECRET = os.getenv("PAYMONGO_CASHOUT_CALLBACK_SECRET", "")
 # Dev-only: simulate a successful PayMongo wallet transaction instead of calling the
 # live Money Movement API. PayMongo test mode has no payouts product, so this is the
-# only way to exercise cash-out locally. Must never be enabled in production.
+# only way to exercise cash-out locally or in the demo environment (see ADR-0003).
+# Gated on the secret key's own mode (sk_live_ vs sk_test_) rather than DEBUG, since
+# the demo runs with DEBUG=False but still needs mock cash-outs on a sandbox key.
 PAYMONGO_CASHOUT_MOCK = os.getenv("PAYMONGO_CASHOUT_MOCK", "false").lower() in ("1", "true", "yes")
-if PAYMONGO_CASHOUT_MOCK and not DEBUG:
-    import logging
-    logging.getLogger(__name__).warning(
-        "PAYMONGO_CASHOUT_MOCK is enabled with DEBUG=false. Cash-outs will be "
-        "simulated as successful without moving real money."
+PAYMONGO_LIVE_MODE = PAYMONGO_SECRET_KEY.startswith("sk_live_")
+if PAYMONGO_CASHOUT_MOCK and PAYMONGO_LIVE_MODE:
+    raise RuntimeError(
+        "PAYMONGO_CASHOUT_MOCK cannot be enabled alongside a live PayMongo secret key "
+        "(sk_live_...). This would fake cash-out payouts while real money could be "
+        "moving elsewhere in the same environment."
+    )
+if not DEBUG and not PAYMONGO_CASHOUT_CALLBACK_SECRET:
+    raise RuntimeError(
+        "PAYMONGO_CASHOUT_CALLBACK_SECRET env var is required when DEBUG=false."
     )
 CASHOUT_PROVIDER_FEE_PHP = os.getenv("CASHOUT_PROVIDER_FEE_PHP", "10")
 CASHIN_MIN_PHP = os.getenv("CASHIN_MIN_PHP", "50")
 CASHOUT_MIN_PHP = os.getenv("CASHOUT_MIN_PHP", "50")
 # InstaPay's real per-transaction cap (see ADR-0001) -- every cash-out uses InstaPay now.
 CASHOUT_MAX_PHP = os.getenv("CASHOUT_MAX_PHP", "50000")
+
+# Logging. Without this, Django falls back to Python's "handler of last resort", which prints
+# only the bare message for unhandled exceptions (e.g. "Internal Server Error: /api/login/")
+# and drops the traceback entirely -- exactly what made the OTP email bug hard to diagnose from
+# Render's console. This sends full tracebacks (via exc_info) to stdout/stderr, which Render
+# captures as log output, so no separate log aggregator is needed for the demo.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": "{levelname} {asctime} {name} {message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "verbose",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": os.getenv("DJANGO_LOG_LEVEL", "INFO"),
+    },
+    "loggers": {
+        # Explicit entry so request-handling exceptions (unhandled 500s) always print with
+        # their traceback, regardless of the root logger's level.
+        "django.request": {
+            "handlers": ["console"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+    },
+}

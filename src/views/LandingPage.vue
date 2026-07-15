@@ -11,7 +11,7 @@
     <nav class="studio-nav" aria-label="Main navigation">
       <button class="brand hoverable" type="button" @click="goTo('/')">
         <span class="brand-mark" aria-hidden="true">S</span>
-        <span>Studybuddy</span>
+        <span>StudyBuddy</span>
       </button>
       <div class="navlinks">
         <button class="btn outline hoverable" type="button" @click="goTo('/login')">
@@ -36,7 +36,7 @@
           </h1>
           <div class="hero-sub">
             <p class="reveal">
-              Studybuddy matches you with students on your campus who took the class,
+              StudyBuddy matches you with students on your campus who took the class,
               passed the exam, and can actually explain it. Book a session, study
               together, get it.
             </p>
@@ -56,7 +56,7 @@
         </div>
       </section>
 
-      <div class="marquee" aria-label="Studybuddy highlights">
+      <div class="marquee" aria-label="StudyBuddy highlights">
         <div class="marquee-track">
           <span v-for="copy in 2" :key="copy" class="marquee-copy">
             <template v-for="item in marqueeItems" :key="`${copy}-${item.text}`">
@@ -68,7 +68,7 @@
         </div>
       </div>
 
-      <section class="panels" aria-label="How Studybuddy works">
+      <section class="panels" aria-label="How StudyBuddy works">
         <div class="inner">
           <article
             v-for="(panel, index) in panels"
@@ -303,7 +303,7 @@
         </div>
       </section>
 
-      <section class="countband" aria-label="Studybuddy product facts">
+      <section class="countband" aria-label="StudyBuddy product facts">
         <div class="inner countstrip">
           <div v-for="count in counts" :key="count.label" class="count reveal">
             <div class="n">
@@ -369,7 +369,7 @@
         </section>
       </div>
 
-      <footer>Studybuddy &mdash; built by students, for students. Bring it to your campus.</footer>
+      <footer>StudyBuddy &mdash; built by students, for students. Bring it to your campus.</footer>
     </main>
   </div>
 </template>
@@ -405,7 +405,7 @@ const panels = [
   {
     id: 'need',
     titleLines: ['Share what', 'you need.'],
-    copy: 'Choose a subject, topic, and goal so Studybuddy can surface the right peers.',
+    copy: 'Choose a subject, topic, and goal so StudyBuddy can surface the right peers.',
     depth: '0.06',
   },
   {
@@ -462,7 +462,7 @@ const faqs = [
   },
   {
     question: 'Can I use it on my campus?',
-    answer: "Studybuddy is open to any campus. Sign up with your student email and you'll be matched with peers from your own school.",
+    answer: "StudyBuddy is open to any campus. Sign up with your student email and you'll be matched with peers from your own school.",
   },
   {
     question: 'What happens if a session falls through?',

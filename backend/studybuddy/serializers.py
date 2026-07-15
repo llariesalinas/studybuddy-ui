@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from .models import (
-    AdminAccountRequest,
+    Course,
     InstitutionRequest,
     Notification,
     PartnerInstitution,
@@ -13,6 +13,7 @@ from .models import (
     TutorAvailability,
     TutorAvailabilityOverride,
     TutorDocumentRenewalReview,
+    TutorSubjects,
     TuteeApplication,
     TuteeDocumentRenewalReview,
     UserProfile,
@@ -73,6 +74,9 @@ class AdminUserSerializer(serializers.ModelSerializer):
     profile_picture_url = serializers.SerializerMethodField()
     tutor_sessions_completed = serializers.SerializerMethodField()
     tutor_avg_rating = serializers.SerializerMethodField()
+    tutor_session_load_limit = serializers.SerializerMethodField()
+    tutor_accepted_session_load = serializers.SerializerMethodField()
+    tutor_session_load_remaining = serializers.SerializerMethodField()
 
     class Meta:
         model = UserProfile
@@ -92,6 +96,9 @@ class AdminUserSerializer(serializers.ModelSerializer):
             'profile_picture_url',
             'tutor_sessions_completed',
             'tutor_avg_rating',
+            'tutor_session_load_limit',
+            'tutor_accepted_session_load',
+            'tutor_session_load_remaining',
             'created_at'
         ]
 
@@ -125,6 +132,30 @@ class AdminUserSerializer(serializers.ModelSerializer):
             return None
         try:
             return obj.tutor.rating_average
+        except Exception:
+            return 0
+
+    def get_tutor_session_load_limit(self, obj):
+        if obj.role != 'Tutor':
+            return None
+        try:
+            return obj.tutor.session_load_limit
+        except Exception:
+            return 10
+
+    def get_tutor_accepted_session_load(self, obj):
+        if obj.role != 'Tutor':
+            return None
+        try:
+            return obj.tutor.accepted_session_load()
+        except Exception:
+            return 0
+
+    def get_tutor_session_load_remaining(self, obj):
+        if obj.role != 'Tutor':
+            return None
+        try:
+            return obj.tutor.accepted_session_load_remaining()
         except Exception:
             return 0
 
@@ -168,46 +199,6 @@ class InstitutionRequestSerializer(serializers.ModelSerializer):
         return full_name or obj.reviewed_by.email or obj.reviewed_by.username
 
 
-class AdminAccountRequestSerializer(serializers.ModelSerializer):
-    requesting_admin_name = serializers.SerializerMethodField()
-    institution_name = serializers.CharField(source='institution.institution_name', read_only=True)
-    target_user_name = serializers.SerializerMethodField()
-    target_user_email = serializers.EmailField(source='target_user.user.email', read_only=True)
-
-    class Meta:
-        model = AdminAccountRequest
-        fields = [
-            'id',
-            'requesting_admin',
-            'requesting_admin_name',
-            'institution',
-            'institution_name',
-            'target_user',
-            'target_user_name',
-            'target_user_email',
-            'note',
-            'status',
-            'created_at',
-            'reviewed_at',
-        ]
-        read_only_fields = [
-            'requesting_admin',
-            'requesting_admin_name',
-            'institution_name',
-            'target_user_name',
-            'target_user_email',
-            'created_at',
-            'reviewed_at',
-        ]
-
-    def get_requesting_admin_name(self, obj):
-        return f"{obj.requesting_admin.fname} {obj.requesting_admin.lname}".strip()
-
-    def get_target_user_name(self, obj):
-        if not obj.target_user:
-            return None
-        return f"{obj.target_user.fname} {obj.target_user.lname}".strip()
-
 class TutorSearchSerializer(serializers.ModelSerializer):
 
     fname = serializers.CharField(source='profile.fname')
@@ -225,9 +216,24 @@ class TutorSearchSerializer(serializers.ModelSerializer):
         ]
 
 class SubjectSerializer(serializers.ModelSerializer):
+    is_recognized = serializers.SerializerMethodField()
+
+    def get_is_recognized(self, obj):
+        recognized_codes = self.context.get('recognized_codes')
+        if recognized_codes is None:
+            return None
+        return obj.subject_code in recognized_codes
+
     class Meta:
         model = Subjects
-        fields = ['subject_code', 'subject_name', 'department', 'category']
+        fields = [
+            'subject_code',
+            'subject_name',
+            'department',
+            'category',
+            'is_recognized',
+        ]
+        read_only_fields = ['is_recognized']
 
 
 class PinnedReviewSerializer(serializers.ModelSerializer):
@@ -444,12 +450,13 @@ class TutorApplicationSerializer(serializers.ModelSerializer):
     latest_document_renewal_reviewed_at = serializers.SerializerMethodField()
     latest_document_renewal_school_id_url = serializers.SerializerMethodField()
     latest_document_renewal_enrollment_proof_url = serializers.SerializerMethodField()
+    proposed_subjects = serializers.SerializerMethodField()
 
     class Meta:
         model = TutorApplication
         fields = [
             'id', 'review_type', 'applicant_name', 'email', 'institution_name',
-            'reason_to_tutor', 'application_status',
+            'application_status',
             'school_id_url', 'enrollment_proof_url',
             'rejection_reason', 'submitted_at', 'reviewed_at',
             'document_renewal_status', 'document_renewal_due_at',
@@ -459,6 +466,7 @@ class TutorApplicationSerializer(serializers.ModelSerializer):
             'latest_document_renewal_reviewed_at',
             'latest_document_renewal_school_id_url',
             'latest_document_renewal_enrollment_proof_url',
+            'proposed_subjects',
         ]
 
     def get_review_type(self, obj):
@@ -466,6 +474,26 @@ class TutorApplicationSerializer(serializers.ModelSerializer):
         if obj.application_status == 'approved' and renewal and renewal.status in ['pending', 'rejected']:
             return 'document_renewal'
         return 'initial'
+
+    def get_proposed_subjects(self, obj):
+        subjects = list(obj.proposed_subjects.filter(status='pending'))
+        descriptions = {
+            tutor_subject.subject_id: tutor_subject.description
+            for tutor_subject in TutorSubjects.objects.filter(
+                tutor__profile=obj.profile,
+                subject_id__in=[subject.subject_code for subject in subjects],
+            )
+        }
+        return [
+            {
+                'subject_code': subject.subject_code,
+                'subject_name': subject.subject_name,
+                'department': subject.department,
+                'description': descriptions.get(subject.subject_code, ''),
+                'status': subject.status,
+            }
+            for subject in subjects
+        ]
 
     def get_applicant_name(self, obj):
         return f"{obj.profile.fname} {obj.profile.lname}"
@@ -599,7 +627,7 @@ class TuteeApplicationSerializer(serializers.ModelSerializer):
         model = TuteeApplication
         fields = [
             'id', 'review_type', 'applicant_name', 'email', 'institution_name',
-            'reason_to_tutor', 'application_status',
+            'application_status',
             'school_id_url', 'enrollment_proof_url',
             'rejection_reason', 'submitted_at', 'reviewed_at',
             'document_renewal_status', 'document_renewal_due_at',

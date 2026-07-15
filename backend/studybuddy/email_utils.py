@@ -2,6 +2,10 @@ from django.core.mail import get_connection, send_mail
 from django.conf import settings
 import logging
 
+from django_q.tasks import async_task
+
+from .models import UserProfile
+
 logger = logging.getLogger(__name__)
 
 def _get_smtp_connection():
@@ -31,6 +35,9 @@ def _get_smtp_connection():
         return None
 
 def send_application_received_email(profile, role_label='tutor'):
+    if settings.IS_DEMO_DEPLOYMENT:
+        logger.info("Demo deployment: suppressing application received email to %s", profile.user.email)
+        return
     subject = f"Your StudyBuddy {role_label.capitalize()} Application"
     message = (
         f"Hi {profile.fname},\n\n"
@@ -55,6 +62,9 @@ def send_application_received_email(profile, role_label='tutor'):
         logger.exception("Failed to send application received email to %s", profile.user.email)
 
 def send_application_approved_email(profile, role_label='tutor'):
+    if settings.IS_DEMO_DEPLOYMENT:
+        logger.info("Demo deployment: suppressing application approved email to %s", profile.user.email)
+        return
     subject = f"Congratulations! Your StudyBuddy {role_label.capitalize()} Application was Approved"
     login_url = f"{settings.FRONTEND_URL.rstrip('/')}/login"
     message = (
@@ -81,6 +91,9 @@ def send_application_approved_email(profile, role_label='tutor'):
         logger.exception("Failed to send application approved email to %s", profile.user.email)
 
 def send_application_rejected_email(profile, reason, role_label='tutor'):
+    if settings.IS_DEMO_DEPLOYMENT:
+        logger.info("Demo deployment: suppressing application rejected email to %s", profile.user.email)
+        return
     subject = f"Update regarding your StudyBuddy {role_label.capitalize()} Application"
     status_url = f"{settings.FRONTEND_URL.rstrip('/')}/application-status"
     message = (
@@ -109,6 +122,9 @@ def send_application_rejected_email(profile, reason, role_label='tutor'):
         logger.exception("Failed to send application rejected email to %s", profile.user.email)
 
 def send_document_renewal_result_email(profile, role_label, new_status, reason=''):
+    if settings.IS_DEMO_DEPLOYMENT:
+        logger.info("Demo deployment: suppressing document renewal result email to %s", profile.user.email)
+        return
     status_url = f"{settings.FRONTEND_URL.rstrip('/')}/application-status"
     if new_status == 'approved':
         subject = f"Your StudyBuddy {role_label.capitalize()} Document Renewal was Approved"
@@ -144,4 +160,60 @@ def send_document_renewal_result_email(profile, role_label, new_status, reason='
         logger.info("Sent document renewal result email to %s (using connection: %s)", profile.user.email, connection)
     except Exception:
         logger.exception("Failed to send document renewal result email to %s", profile.user.email)
+
+
+# --- Asynchronous task targets (run inside the qcluster worker) -----------
+# Admin approve/reject actions block on these calls until the response is sent, so an SMTP
+# hiccup (or just a slow provider round-trip) makes the admin's request hang. Route them
+# through Django-Q the same way mailer.py does for password reset/notice emails: take
+# serializable args (profile_id) and re-fetch, so the request thread never touches SMTP.
+
+def send_application_approved_email_task(profile_id, role_label='tutor'):
+    try:
+        profile = UserProfile.objects.get(pk=profile_id)
+    except UserProfile.DoesNotExist:
+        logger.warning("send_application_approved_email_task: profile_id=%s no longer exists", profile_id)
+        return
+    send_application_approved_email(profile, role_label=role_label)
+
+
+def send_application_rejected_email_task(profile_id, reason, role_label='tutor'):
+    try:
+        profile = UserProfile.objects.get(pk=profile_id)
+    except UserProfile.DoesNotExist:
+        logger.warning("send_application_rejected_email_task: profile_id=%s no longer exists", profile_id)
+        return
+    send_application_rejected_email(profile, reason, role_label=role_label)
+
+
+def send_document_renewal_result_email_task(profile_id, role_label, new_status, reason=''):
+    try:
+        profile = UserProfile.objects.get(pk=profile_id)
+    except UserProfile.DoesNotExist:
+        logger.warning("send_document_renewal_result_email_task: profile_id=%s no longer exists", profile_id)
+        return
+    send_document_renewal_result_email(profile, role_label, new_status, reason)
+
+
+# --- Enqueue helpers (called from admin views) -----------------------------
+
+def enqueue_application_approved_email(profile, role_label='tutor'):
+    async_task(
+        "studybuddy.email_utils.send_application_approved_email_task",
+        profile.id, role_label=role_label,
+    )
+
+
+def enqueue_application_rejected_email(profile, reason, role_label='tutor'):
+    async_task(
+        "studybuddy.email_utils.send_application_rejected_email_task",
+        profile.id, reason, role_label=role_label,
+    )
+
+
+def enqueue_document_renewal_result_email(profile, role_label, new_status, reason=''):
+    async_task(
+        "studybuddy.email_utils.send_document_renewal_result_email_task",
+        profile.id, role_label, new_status, reason,
+    )
 

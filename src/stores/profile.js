@@ -12,6 +12,11 @@ export const useProfileStore = defineStore('profile', {
     renewalRequired: false,
     renewalDueAt: null,
     tuteeVerificationEnforced: false,
+    tutorOnboardingSkippedAt: null,
+    tutorOnboardingComplete: false,
+    tutorSubjectCount: 0,
+    tutorSubjectsCompleted: false,
+    walletNegative: false,
     loaded: false
   }),
 
@@ -25,6 +30,11 @@ export const useProfileStore = defineStore('profile', {
       this.renewalRequired = false
       this.renewalDueAt = null
       this.tuteeVerificationEnforced = false
+      this.tutorOnboardingSkippedAt = null
+      this.tutorOnboardingComplete = false
+      this.tutorSubjectCount = 0
+      this.tutorSubjectsCompleted = false
+      this.walletNegative = false
       this.loaded = false
     },
 
@@ -49,6 +59,11 @@ export const useProfileStore = defineStore('profile', {
       this.renewalRequired = Boolean(res.data.document_renewal_required)
       this.renewalDueAt = res.data.document_renewal_due_at || null
       this.tuteeVerificationEnforced = Boolean(res.data.tutee_verification_enforced)
+      this.tutorOnboardingSkippedAt = res.data.tutor_onboarding_skipped_at || null
+      this.tutorOnboardingComplete = Boolean(res.data.tutor_onboarding_complete)
+      this.tutorSubjectCount = res.data.tutor_subject_count || 0
+      this.tutorSubjectsCompleted = Boolean(res.data.tutor_subjects_completed)
+      this.walletNegative = Boolean(res.data.wallet_negative)
       this.loaded = true
 
       return res.data
