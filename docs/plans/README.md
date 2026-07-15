@@ -3,7 +3,22 @@
 Every finalized plan lives in this folder as its own dated file, created from [`_template.md`](_template.md).
 Status moves Draft â†’ Approved â†’ In Progress â†’ Done. When a plan is complete, its summary is linked below.
 
-**Status & Progress Summary** (2026-07-08): Booking subject persistence (Codex handoff) is Done —
+**Status & Progress Summary** (2026-07-15): Instant Booking is Approved — grilled end-to-end (11
+decisions) via `/grill-with-docs` from panel feedback: Instant Booking becomes the only booking
+model (request-to-book, approve/reject endpoints, and `TutorRequestedSessions.vue` removed);
+tutor protection moves to a symmetric 12h Grace Cutoff with self-serve Late Cancellations that
+auto-open system-opened Support Tickets for excused/counted admin review (Counted Strike: P50
+tutor wallet deduction, shared 3-per-month cap suspending booking/search visibility); the three
+accept-time tutor gates move to booking creation surfaced via search-visibility hiding; 14-day
+Booking Horizon bounds stale recurring availability; auto-generated Jitsi Meeting Links for
+Online sessions; full notification package with auto-opened chat —
+[Plan](2026-07-15-instant-booking.md), ADR-0008, seven glossary terms. Recommender weight rebalance (CBF split + CF peer
+ratings) is Approved — grilled end-to-end (10 decisions) via `/grill-with-docs`: CBF subject match
+splits into Specific (0.40) / General (0.20, superset via `Subjects.category`, null-safe) with an
+Expertise cascade (0.15) and squeezed course/year/level (0.10/0.10/0.05); CF neighbors filter to
+same-course peers with per-tutor global fallback and a positive-similarity requirement; hybrid
+0.7/0.3 untouched; one loose end (empty `requested_subject`) to resolve before implementation —
+[Plan](2026-07-15-recommender-weight-rebalance.md). Booking subject persistence (Codex handoff) is Done —
 added a nullable protected `Booking.subject` FK, persisted and displayed the tutee's selected
 catalog subject across booking confirmation, notifications, dashboard/request payloads, and
 session details, covered the behavior with backend tests, and updated both seed commands to give
@@ -199,4 +214,5 @@ Entries marked Done&ast; predate the session-summary convention; their status is
 | 2026-07-13 | Ran `ui-preview` for the tutor onboarding Step 3 (Verification) screen; Direction C picked and promoted to `docs/mockups/2026-07-13-tutor-onboarding-verification-redesign.html`; found the reminder banner can reuse the existing `VerificationBanner.vue` component instead of needing new UI |
 | 2026-07-13 | Ran `ui-preview` for the tutor onboarding Step 2 (Subjects) screen; Direction B (inline picker, no modal) picked and added to the same promoted mockup; onboarding screen visual design now fully decided |
 | 2026-07-14 | Created dedicated `feat/tutor-onboarding-verification-redesign` branch and committed the plan/mockup docs (previously uncommitted on the unrelated `feat/admin-role-consolidation` branch); compiled the plan into a Codex brief via `/codex-brief`, instructed per user request to skip the long-running full backend test suite; moved plan Approved -> In Progress |
+| 2026-07-15 | Grilled Instant Booking end-to-end (11 decisions) via `/grill-with-docs` from panel feedback ("cut the manual tutor confirmation layer"); added the Approved plan, ADR-0008 (instant booking replaces request-to-book), and glossary terms Instant Booking, Grace Cutoff, Late Cancellation, Counted Strike, Monthly Strike Cap, Booking Horizon, Meeting Link (plus a Support Ticket amendment for system-opened tickets) |
 | 2026-07-14 | `/codex-review` verified the implementation independently (targeted + full-suite backend tests on a fresh database, root-cause-traced all 33 pre-existing failures rather than assuming, frontend build/test green); reviewed and accepted Codex's one disclosed deviation; cleaned up two pieces of dead code directly; committed in three stops; added the session summary and moved the plan In Progress -> Done |

@@ -8,8 +8,9 @@ project's glossary — domain terms only, no implementation detail.
 ### Support
 
 **Support Ticket**:
-A user-reported issue that Studybuddy support staff can claim, discuss in a support chat, and
-resolve. A Support Ticket moves through a lifecycle: Open -> In Progress -> Escalated -> Resolved.
+A user-reported or system-opened issue that Studybuddy support staff can claim, discuss in a
+support chat, and resolve. (System-opened example: the ticket a Late Cancellation automatically
+creates for admin review — worded neutrally, since the "reporter" is the platform, not a person.) A Support Ticket moves through a lifecycle: Open -> In Progress -> Escalated -> Resolved.
 _Avoid_: Issue (too vague), support chat (the chat is only the conversation attached to the
 ticket)
 
@@ -134,11 +135,15 @@ _Avoid_: "match score", "recommendation score" — the codebase and this glossar
 only.
 
 **CBF Score**:
-The Content-Based Filtering half of the Hybrid Score — how well a Tutor's profile fits a Tutee's
-stated preferences, independent of any other student's history. A weighted sum of five sub-scores:
-subject match (0.35), expertise level (0.20), course match (0.20), year-level proximity (0.15),
-and teaching-level fit (0.10). Computed by `compute_cbf_score`
-(`backend/studybuddy/recommender/cbf.py:23`).
+The Content-Based Filtering half of the Hybrid Score — how well a Tutor's profile fits the
+Tutee's requested subject and profile, independent of any other student's history. A weighted sum
+of six sub-scores: Specific Subject match (0.40), General Subject match (0.20), expertise (0.15),
+course match (0.10), year-level proximity (0.10), and teaching-level fit (0.05). Subject and
+expertise signals anchor on the requested subject only, not the Tutee's preference list. An
+exact-subject-match Tutor can never be outranked on subject signals by a same-field-only Tutor
+(dominance property). Computed by `compute_cbf_score`
+(`backend/studybuddy/recommender/cbf.py`). Weights per the 2026-07-15 recommender weight
+rebalance plan.
 
 **CF Score**:
 The Collaborative Filtering half of the Hybrid Score — a predicted rating for a (Tutee, Tutor)
@@ -147,10 +152,20 @@ pair derived from how similar Tutees (see Top-K Neighbor) have rated that Tutor.
 no Rating history at all — see Cold-Start Tutee for what happens to the Hybrid Score in that case.
 
 **Top-K Neighbor**:
-One of up to 5 other Tutees whose past Ratings are most similar (by Pearson similarity) to the
-Tutee being scored. Found by `top_k` (`backend/studybuddy/recommender/CF.py:64`). A Tutee's set of
-Top-K Neighbors is computed once per recommendation request and reused across every candidate
-Tutor in that request.
+One of up to 5 other Tutees whose past Ratings are most similar (by Pearson similarity, and only
+with positive similarity — a Tutee with opposite or zero-information taste never qualifies) to
+the Tutee being scored. Found by `top_k` (`backend/studybuddy/recommender/CF.py`). Two neighbor
+lists are computed once per recommendation request and reused across every candidate Tutor: the
+Peer Pool and the global pool.
+
+**Peer Pool**:
+The Top-K Neighbors drawn only from Tutees with exactly the same course as the Tutee being scored
+(no strand tier). CF prefers the Peer Pool per candidate Tutor ("peer ratings"); when no peer has
+rated that Tutor, the prediction falls back to the global pool for that Tutor only (per-tutor
+fallback). A Tutee with no course simply has an empty Peer Pool and is scored from the global
+pool. Revisit trigger: at high rating density, per-request fallback may replace per-tutor
+fallback for population purity.
+_Avoid_: "coursemates" (informal), "same-strand peers" (strand does not qualify)
 
 **Cold-Start Tutee**:
 A Tutee with no Rating history, so `compute_cf_score` returns `None` for every Tutor. `None` is
@@ -161,6 +176,20 @@ reallocated to CBF when CF is unavailable), not a bug. Surfaced in the UI as a "
 with the subtext "CF unavailable — no rating history."
 _Avoid_: "new user" (too broad — a Tutee with bookings but no completed/rated ones is also
 Cold-Start; the defining trait is absence of Rating rows, not account age)
+
+**General Subject**:
+A subject field that groups related Specific Subjects — e.g. Science is the General Subject under
+which Biology and Physics live. Stored as `Subjects.category`. In CBF scoring, a General Subject
+match means the tutor teaches at least one subject in the same field as the requested subject,
+even if not the exact subject itself.
+_Avoid_: "category" alone in domain conversation (ambiguous with other category fields), "related
+subject"
+
+**Specific Subject**:
+An individual teachable subject identified by its subject code (e.g. Biology), living under
+exactly one General Subject. A Specific Subject match in CBF scoring means the tutor teaches the
+exact subject the Tutee requested.
+_Avoid_: "exact subject", "subject" alone when the General/Specific distinction matters
 
 ### Verification & booking gates
 
@@ -207,6 +236,62 @@ never-approved triggers a full-app lockout (`needsTutorApplicationLockout`), whi
 only ever blocks the Booking Gate, never general app access.
 _Avoid_: "unverified" alone — always distinguish never-approved from Renewal Required, since they
 have different consequences.
+
+### Instant Booking & cancellation
+
+**Instant Booking**:
+The platform's only booking model: a Tutee booking a slot inside a Tutor's published availability
+is confirmed immediately, with no manual acceptance step by the Tutor. Replaces request-to-book
+(the old Pending -> tutor approves -> Confirmed flow). The Tutor's safety valve is cancellation
+before the Grace Cutoff, not a pre-confirmation review.
+_Avoid_: "auto-approval" (there is no approval step at all), "booking request" (nothing is
+requested — the booking exists as Confirmed from the start)
+
+**Grace Cutoff**:
+The moment 12 hours before a session's start time, after which a cancellation stops being
+penalty-free. A single platform-wide constant (not admin-configurable), applied symmetrically to
+Tutors and Tutees. A booking created inside the final 12 hours (a "born-late" booking) is never
+penalty-free to cancel, and the Tutee is warned of this at booking time.
+_Avoid_: "decline window" (there is no separate decline action — cancellation is the single
+concept; see Late Cancellation)
+
+**Late Cancellation**:
+A cancellation made after the Grace Cutoff. It is still self-serve — the booking ends immediately
+and the other party is notified at once — but it automatically opens a Support Ticket against the
+cancelling party (Tutor or Tutee) — a real Support Ticket in the institution admin's existing
+queue, with a distinct category and an excused-or-counted verdict recorded at resolution. Admin judgment is post-review, never pre-approval: a
+Late Cancellation is never blocked waiting for an admin.
+_Avoid_: "decline" (a pre-cutoff cancellation is still a cancellation, just untracked), "no-show"
+(a different, more severe event — the session was never cancelled at all), "cancellation request"
+(nothing is requested — the cancellation takes effect immediately)
+
+**Counted Strike**:
+A Late Cancellation whose Support Ticket the admin resolved as counted rather than excused. For a
+Tutor it also costs a flat P50 wallet deduction (paid to the platform, not the wronged party; the
+deduction may push the wallet negative). Tutees pay no fee — they have no wallet to deduct from.
+Excused Late Cancellations and pre-cutoff cancellations are never Counted Strikes.
+_Avoid_: "penalty" alone (ambiguous between the fee and the cap), "fine" for Tutees (there is none)
+
+**Monthly Strike Cap**:
+The limit of 3 Counted Strikes per calendar month, applied per user to both roles. Reaching the
+cap suspends the role's core privilege for the remainder of that calendar month: a Tutee cannot
+create new bookings; a Tutor's availability is hidden from search. Existing confirmed sessions are
+untouched. The count resets at the start of the next calendar month.
+_Avoid_: "cancellation limit" (pre-cutoff and excused cancellations are unlimited and uncounted)
+
+**Booking Horizon**:
+The farthest ahead a session can be instant-booked: 14 days from the moment of booking. Bounds
+the damage a stale recurring availability slot can cause (a forgotten weekly slot can accumulate
+at most two weeks of auto-confirmed sessions, not a semester's worth). A platform-wide constant.
+_Avoid_: "advance booking limit" (one canonical term)
+
+**Meeting Link**:
+The video-call URL for an Online session, generated automatically by the platform at booking
+creation (one link per session group — both parties always see the same link). Exists only for
+Online-mode bookings; Face-to-face sessions have a Preferred Location instead, never a Meeting
+Link. Neither party supplies or edits the link.
+_Avoid_: "call link" / "room link" (one canonical term), treating it as tutor-provided (it never
+is)
 
 ### Booking mode & location
 
