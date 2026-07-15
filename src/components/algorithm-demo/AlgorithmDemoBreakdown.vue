@@ -12,7 +12,8 @@ const props = defineProps({
 const emit = defineEmits(['rating-updated'])
 
 const CBF_PARTS = [
-  ['subject', 'Subject match'],
+  ['specific', 'Specific subject'],
+  ['general', 'General subject'],
   ['expertise', 'Expertise'],
   ['course', 'Course match'],
   ['year', 'Year proximity'],

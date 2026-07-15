@@ -4678,6 +4678,167 @@ class RecommenderNeighborReuseTests(APITestCase):
         self.assertEqual(len(results), 1)  # did not raise
 
 
+class CbfGraduatedSubjectMatchTests(APITestCase):
+    """CBF graduated subject matching: a tutee requesting a specific subject
+    sees exact-match tutors ranked above same-field tutors, ranked above
+    unrelated tutors, instead of the old all-or-nothing subject match. See
+    docs/plans/ for the approved weights (W_SPECIFIC=0.40, W_GENERAL=0.20,
+    W_EXPERTISE=0.15, W_COURSE=0.10, W_YEAR=0.10, W_LEVEL=0.05)."""
+
+    def setUp(self):
+        from studybuddy.recommender.cbf import compute_cbf_breakdown
+
+        self.compute_cbf_breakdown = compute_cbf_breakdown
+
+        self.course = Course.objects.create(course_code="BSCS", course_name="Computer Science")
+
+        self.requested_subject = Subjects.objects.create(
+            subject_code="MATH101", subject_name="Calculus 1", department="Math",
+            category="STEM",
+        )
+        self.same_field_subject = Subjects.objects.create(
+            subject_code="MATH201", subject_name="Calculus 2", department="Math",
+            category="STEM",
+        )
+        self.other_same_field_subject = Subjects.objects.create(
+            subject_code="PHYS101", subject_name="Physics 1", department="Science",
+            category="STEM",
+        )
+        self.unrelated_subject = Subjects.objects.create(
+            subject_code="ART101", subject_name="Painting", department="Arts",
+            category="Arts",
+        )
+        self.null_category_subject = Subjects.objects.create(
+            subject_code="GEN101", subject_name="General Studies", department="Gen",
+        )
+        # Requested subject itself has a null category, to test the superset
+        # rule (General must still count an exact match even without a category).
+        self.null_category_requested_subject = Subjects.objects.create(
+            subject_code="GEN201", subject_name="Study Skills", department="Gen",
+        )
+
+        student_user = User.objects.create_user(
+            username="cbf-student", email="cbf-student@example.com", password="password",
+        )
+        self.student = UserProfile.objects.create(
+            user=student_user, fname="Cbf", mname="", lname="Student", role="Tutee",
+            year_level=12, course=self.course,
+        )
+
+    def _make_tutor(self, username, subjects_with_levels, teaching_level="College", year_level=12, course=None):
+        user = User.objects.create_user(
+            username=username, email=f"{username}@example.com", password="password",
+        )
+        profile = UserProfile.objects.create(
+            user=user, fname=username.title(), mname="", lname="Tutor", role="Tutor",
+            year_level=year_level, course=course,
+        )
+        tutor = Tutor.objects.create(
+            profile=profile, hourly_rate=200, can_online=True, can_f2f=False,
+            teaching_level=teaching_level,
+        )
+        for subject, level in subjects_with_levels:
+            TutorSubjects.objects.create(tutor=tutor, subject=subject, expertise_level=level)
+        return tutor
+
+    def test_dominance_exact_match_outranks_field_only_even_at_worst_case(self):
+        # Exact-match tutor at minimum possible expertise (1) still must bank
+        # >= 0.63 on the subject block alone.
+        exact_match_tutor = self._make_tutor(
+            "exact-match", [(self.requested_subject, 1)],
+            course=self.course, year_level=self.student.year_level,
+        )
+        # Field-only tutor at maximum possible expertise (5) plus perfect
+        # course/year/level must still cap out at 0.60 overall.
+        field_only_tutor = self._make_tutor(
+            "field-only", [(self.same_field_subject, 5)],
+            course=self.course, year_level=self.student.year_level,
+        )
+
+        exact_breakdown = self.compute_cbf_breakdown(
+            self.student, exact_match_tutor, self.requested_subject.subject_code,
+        )
+        field_breakdown = self.compute_cbf_breakdown(
+            self.student, field_only_tutor, self.requested_subject.subject_code,
+        )
+
+        exact_subject_block = (
+            exact_breakdown["specific"]["contribution"]
+            + exact_breakdown["general"]["contribution"]
+            + exact_breakdown["expertise"]["contribution"]
+        )
+        self.assertGreaterEqual(exact_subject_block, 0.63)
+        self.assertLessEqual(field_breakdown["score"], 0.60)
+        self.assertGreater(exact_breakdown["score"], field_breakdown["score"])
+
+    def test_null_category_tutor_subjects_contribute_zero_no_exception(self):
+        tutor = self._make_tutor("null-cat", [(self.null_category_subject, 5)])
+
+        breakdown = self.compute_cbf_breakdown(
+            self.student, tutor, self.requested_subject.subject_code,
+        )
+
+        self.assertEqual(breakdown["specific"]["value"], 0)
+        self.assertEqual(breakdown["general"]["value"], 0)
+        self.assertEqual(breakdown["expertise"]["value"], 0)
+
+    def test_exact_match_with_null_category_requested_subject_still_scores_general(self):
+        tutor = self._make_tutor(
+            "null-req-exact", [(self.null_category_requested_subject, 3)],
+        )
+
+        breakdown = self.compute_cbf_breakdown(
+            self.student, tutor, self.null_category_requested_subject.subject_code,
+        )
+
+        self.assertEqual(breakdown["specific"]["value"], 1)
+        self.assertEqual(breakdown["general"]["value"], 1)
+
+    def test_expertise_cascade_exact_match_uses_that_row_level(self):
+        tutor = self._make_tutor("exact-expertise", [(self.requested_subject, 3)])
+
+        breakdown = self.compute_cbf_breakdown(
+            self.student, tutor, self.requested_subject.subject_code,
+        )
+
+        self.assertAlmostEqual(breakdown["expertise"]["value"], 3 / 5)
+
+    def test_expertise_cascade_field_only_uses_mean_of_same_field_levels(self):
+        tutor = self._make_tutor(
+            "field-expertise",
+            [(self.same_field_subject, 2), (self.other_same_field_subject, 4)],
+        )
+
+        breakdown = self.compute_cbf_breakdown(
+            self.student, tutor, self.requested_subject.subject_code,
+        )
+
+        self.assertAlmostEqual(breakdown["expertise"]["value"], (2 + 4) / 2 / 5)
+
+    def test_expertise_cascade_unrelated_tutor_is_zero(self):
+        tutor = self._make_tutor("unrelated-expertise", [(self.unrelated_subject, 5)])
+
+        breakdown = self.compute_cbf_breakdown(
+            self.student, tutor, self.requested_subject.subject_code,
+        )
+
+        self.assertEqual(breakdown["expertise"]["value"], 0)
+
+    def test_empty_requested_subject_falls_back_to_preference_list(self):
+        tutor = self._make_tutor("fallback-match", [(self.requested_subject, 4)])
+
+        breakdown = self.compute_cbf_breakdown(
+            self.student,
+            tutor,
+            None,
+            student_subjects=[self.requested_subject.subject_code],
+        )
+
+        self.assertEqual(breakdown["specific"]["value"], 1)
+        self.assertEqual(breakdown["general"]["value"], 1)
+        self.assertAlmostEqual(breakdown["expertise"]["value"], 4 / 5)
+
+
 class DashboardRecommendationServiceTests(APITestCase):
     def setUp(self):
         cache.clear()
@@ -5395,7 +5556,8 @@ class AlgorithmDemoToolTests(APITestCase):
 
         cbf = row["cbf"]
         self.assertAlmostEqual(
-            cbf["subject"]["contribution"]
+            cbf["specific"]["contribution"]
+            + cbf["general"]["contribution"]
             + cbf["expertise"]["contribution"]
             + cbf["course"]["contribution"]
             + cbf["year"]["contribution"]

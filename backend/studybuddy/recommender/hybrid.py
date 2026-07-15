@@ -2,7 +2,12 @@ import logging
 
 from ..models import Tutor
 from .CF import compute_cf_breakdown, compute_cf_score, top_k
-from .cbf import compute_cbf_breakdown, compute_cbf_score, get_student_subject_codes
+from .cbf import (
+    compute_cbf_breakdown,
+    compute_cbf_score,
+    get_student_subject_codes,
+    resolve_target_categories,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -11,13 +16,31 @@ CF_WEIGHT = 0.3
 CF_MAX_RATING = 5
 
 
-def hybrid_prediction(ratings, student_profile, tutor, requested_subject, student_subjects=None, neighbors=None):
+def hybrid_prediction(
+    ratings,
+    student_profile,
+    tutor,
+    requested_subject,
+    student_subjects=None,
+    neighbors=None,
+    target_categories=None,
+):
+    """target_categories should be precomputed once via
+    cbf.resolve_target_categories() by callers that loop over many tutors for
+    the same student/subject (see recommend_tutors_hybrid) so this isn't a
+    per-tutor query; left as None it is resolved here instead."""
+    if target_categories is None:
+        target_categories = resolve_target_categories(
+            requested_subject, student_subjects or get_student_subject_codes(student_profile)
+        )
+
     cbf_score = compute_cbf_score(
         student_profile,
         tutor,
         requested_subject,
         student_subjects=student_subjects,
         tutor_subjects=tutor.tutorsubjects_set.all(),
+        target_categories=target_categories,
     )
 
     tutor_id = tutor.profile_id
@@ -45,15 +68,30 @@ def hybrid_prediction(ratings, student_profile, tutor, requested_subject, studen
     return hybrid_score
 
 
-def hybrid_prediction_breakdown(ratings, student_profile, tutor, requested_subject, student_subjects=None, neighbors=None):
+def hybrid_prediction_breakdown(
+    ratings,
+    student_profile,
+    tutor,
+    requested_subject,
+    student_subjects=None,
+    neighbors=None,
+    target_categories=None,
+):
     """Same computation as hybrid_prediction, but returns the full CBF/CF breakdown
-    alongside the hybrid score. Used by the algorithm demo tool (recommender/demo.py)."""
+    alongside the hybrid score. Used by the algorithm demo tool (recommender/demo.py).
+    See hybrid_prediction for the target_categories precompute-once contract."""
+    if target_categories is None:
+        target_categories = resolve_target_categories(
+            requested_subject, student_subjects or get_student_subject_codes(student_profile)
+        )
+
     cbf = compute_cbf_breakdown(
         student_profile,
         tutor,
         requested_subject,
         student_subjects=student_subjects,
         tutor_subjects=tutor.tutorsubjects_set.all(),
+        target_categories=target_categories,
     )
 
     tutor_id = tutor.profile_id
@@ -96,6 +134,7 @@ def normalize_tutor_queryset(candidate_qs=None):
 def recommend_tutors_hybrid(ratings, student_profile, requested_subject, candidate_qs=None):
     tutors = normalize_tutor_queryset(candidate_qs)
     student_subjects = get_student_subject_codes(student_profile)
+    target_categories = resolve_target_categories(requested_subject, student_subjects)
 
     student_id = student_profile.id
     neighbors = top_k(ratings, student_id) if student_id in ratings else []
@@ -110,6 +149,7 @@ def recommend_tutors_hybrid(ratings, student_profile, requested_subject, candida
             requested_subject,
             student_subjects=student_subjects,
             neighbors=neighbors,
+            target_categories=target_categories,
         )
 
         recommendations.append({

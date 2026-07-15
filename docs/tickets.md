@@ -23,14 +23,14 @@ algorithm demo shows the new sub-scores end to end (backend breakdown + frontend
 
 **Model:** mid
 
-- [ ] Dominance property holds: an exact-match tutor scores >= 0.63 on the subject+expertise
+- [x] Dominance property holds: an exact-match tutor scores >= 0.63 on the subject+expertise
       block while a field-only tutor's theoretical max is 0.60 — covered by a test.
-- [ ] Null `Subjects.category` contributes 0 to General/Expertise fallback without erroring,
+- [x] Null `Subjects.category` contributes 0 to General/Expertise fallback without erroring,
       and never harms an exact match — covered by a test.
-- [ ] Expertise cascade tiers (exact level / same-field mean / 0) each covered by a test.
-- [ ] Empty `requested_subject` falls back to preference-list matching — covered by a test.
-- [ ] CBF breakdown and the algorithm demo UI show the six new sub-scores with their weights.
-- [ ] Backend suite green (no new failures); `npm run lint` and `npm run build` pass if
+- [x] Expertise cascade tiers (exact level / same-field mean / 0) each covered by a test.
+- [x] Empty `requested_subject` falls back to preference-list matching — covered by a test.
+- [x] CBF breakdown and the algorithm demo UI show the six new sub-scores with their weights.
+- [x] Backend suite green (no new failures); `npm run lint` and `npm run build` pass if
       frontend touched.
 
 ## CF same-course peer neighbors with per-tutor global fallback

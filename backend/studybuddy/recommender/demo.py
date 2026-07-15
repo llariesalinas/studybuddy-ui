@@ -3,7 +3,7 @@ import logging
 from django.db.models import Q
 
 from ..models import Preference, UserProfile
-from .cbf import get_student_subject_codes
+from .cbf import get_student_subject_codes, resolve_target_categories
 from .CF import build_rating_matrix, top_k
 from .hybrid import hybrid_prediction_breakdown, normalize_tutor_queryset
 
@@ -100,6 +100,7 @@ def build_algorithm_demo_recommendation(tutee, institution_id=None):
     ratings = build_rating_matrix()
     neighbors = top_k(ratings, tutee.id) if tutee.id in ratings else []
     neighbor_names = _neighbor_name_map(neighbor_id for neighbor_id, _ in neighbors)
+    target_categories = resolve_target_categories(None, subject_codes)
 
     rows = []
     for tutor in candidate_tutors:
@@ -110,6 +111,7 @@ def build_algorithm_demo_recommendation(tutee, institution_id=None):
             None,
             student_subjects=subject_codes,
             neighbors=neighbors,
+            target_categories=target_categories,
         )
         cf = breakdown["cf"]
 
