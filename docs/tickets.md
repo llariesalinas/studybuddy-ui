@@ -1,158 +1,79 @@
-# Tickets: Admin role consolidation & SuperAdmin user analytics
+# Tickets: Recommender weight rebalance (CBF split + CF peer ratings)
 
-Removes the institution-scoped Admin role in favor of a single SuperAdmin tier, globalizes the
-subject/course catalog, and adds a per-tutor/per-tutee analytics drill-down to the SuperAdmin user
-list. Source spec: [`docs/specs/2026-07-12-admin-role-consolidation-design.md`](specs/2026-07-12-admin-role-consolidation-design.md).
-Also mirrored to GitHub Issues on the fork repo.
+Split the CBF subject match into Specific/General with rebalanced weights, and filter CF
+neighbors to same-course peers with a per-tutor global fallback. Source plan:
+[`docs/plans/2026-07-15-recommender-weight-rebalance.md`](plans/2026-07-15-recommender-weight-rebalance.md)
+(all decisions final; the empty-`requested_subject` fallback is resolved in the plan).
 
-Work the **frontier**: any ticket whose blockers are all done. Tickets 1, 2, 3, and 4 are done; the
-frontier is now tickets 5, 6 (both unblocked), and 7 (was already open).
+Work the **frontier**: any ticket whose blockers are all done.
 
-Mirrored to GitHub Issues on [RayDomD/studybuddy-ui](https://github.com/RayDomD/studybuddy-ui),
-labeled `ready-for-agent`, issue numbers noted per ticket below.
+## CBF graduated subject matching
 
-## Convert institutional Admins to SuperAdmin
-
-GitHub: [#1](https://github.com/RayDomD/studybuddy-ui/issues/1)
-
-**What to build:** Existing `Admin` accounts become `SuperAdmin` via a real-database-safe data
-migration; `Admin` is removed from the role choices; admin permission checks tighten to
-`SuperAdmin`-only everywhere. A former Admin logs in and lands with full SuperAdmin access.
+**What to build:** A tutee requesting a specific subject sees exact-match tutors ranked above
+same-field tutors, who rank above unrelated tutors — instead of today's all-or-nothing subject
+match. CBF weights become Specific Subject 0.40 / General Subject 0.20 / Expertise 0.15 /
+Course 0.10 / Year 0.10 / Teaching Level 0.05. General Subject is a superset match via
+`Subjects.category` (null category earns nothing, never errors). Expertise cascades: requested
+subject's level, else same-field mean, else 0. The tutee preference list no longer feeds
+subject/expertise matching when a subject is requested; when the request is empty, the
+preference list acts as the requested set (fallback decided in the plan). The superadmin
+algorithm demo shows the new sub-scores end to end (backend breakdown + frontend bars).
 
 **Blocked by:** None — can start immediately.
 
 **Model:** mid
 
-- [x] Data migration converts every `UserProfile` with role `Admin` to `SuperAdmin`, then removes
-      `Admin` from the role field's valid choices. (migration 0072)
-- [x] Every endpoint/view that previously accepted either `Admin` or `SuperAdmin` now requires
-      `SuperAdmin` only. (`IsAdminUser` deleted; 17 views re-gated; role checks tightened)
-- [x] `APITestCase` coverage: existing admin endpoints reject anything but `SuperAdmin`.
-      (`AdminEndpointsRequireSuperAdminTests`)
-- [x] Migration test: no `UserProfile` retains role `Admin` after migration; previously-Admin rows
-      are `SuperAdmin`. (`AdminToSuperAdminMigrationTests`)
+- [ ] Dominance property holds: an exact-match tutor scores >= 0.63 on the subject+expertise
+      block while a field-only tutor's theoretical max is 0.60 — covered by a test.
+- [ ] Null `Subjects.category` contributes 0 to General/Expertise fallback without erroring,
+      and never harms an exact match — covered by a test.
+- [ ] Expertise cascade tiers (exact level / same-field mean / 0) each covered by a test.
+- [ ] Empty `requested_subject` falls back to preference-list matching — covered by a test.
+- [ ] CBF breakdown and the algorithm demo UI show the six new sub-scores with their weights.
+- [ ] Backend suite green (no new failures); `npm run lint` and `npm run build` pass if
+      frontend touched.
 
-## Remove dead institution-scoping code from admin views
+## CF same-course peer neighbors with per-tutor global fallback
 
-GitHub: [#2](https://github.com/RayDomD/studybuddy-ui/issues/2)
+**What to build:** CF predictions come from "peers" — Top-K neighbors drawn from students in
+the same course (exact `course` equality) — so a tutee's score feels like "students in your
+program rated this tutor". Two top-5 neighbor lists are computed once per request (peer pool
+and global pool); per candidate tutor, the peer prediction is used when its denominator is
+nonzero, otherwise the global prediction. Only positive Pearson similarity (`> 0`) qualifies a
+neighbor, in both pools. A null-course tutee has an empty peer pool (global-only). Cold-Start
+behavior is unchanged. The algorithm demo shows which pool (peer/global) each tutor's CF
+prediction used.
 
-**What to build:** The institution-filtering branches across the admin view layer, now unreachable
-since only `SuperAdmin` exists, are deleted. Excludes the catalog views — the global-catalog ticket
-rebuilds those directly. Pure cleanup; no behavior change (`SuperAdmin` was already unscoped).
-
-**Blocked by:** Convert institutional Admins to SuperAdmin
-
-**Model:** small
-
-- [x] Institution-scoping helpers/branches removed from the admin view layer (excluding catalog
-      views).
-- [x] Full existing admin test suite still green with no behavior change.
-
-## Delete the admin-account-request workflow
-
-GitHub: [#3](https://github.com/RayDomD/studybuddy-ui/issues/3)
-
-**What to build:** The "request to become institutional Admin" model, endpoint, and any frontend
-surface are removed entirely. The separate "request a new partner institution" workflow is
-untouched and still works.
-
-**Blocked by:** Convert institutional Admins to SuperAdmin
-
-**Model:** small
-
-- [x] Admin-account-request model, endpoint, and UI references deleted.
-- [x] Institution-request workflow verified unchanged/still passing.
-- [x] Any tests referencing the deleted workflow removed or updated.
-
-## Global subject/course catalog
-
-GitHub: [#4](https://github.com/RayDomD/studybuddy-ui/issues/4)
-
-**What to build:** The per-institution course-catalog table and per-institution subject ownership
-are dropped via migration. Catalog management becomes one global subject/course CRUD screen with no
-institution picker.
-
-**Blocked by:** Convert institutional Admins to SuperAdmin
-
-**Model:** mid
-
-- [x] Migration drops the per-institution course-catalog table and the per-institution
-      subject-ownership field.
-- [x] Catalog management views reworked into a single global subject/course CRUD surface
-      (list/add/edit/remove), no institution selector.
-- [x] `APITestCase` coverage: catalog endpoint has no institution scoping and the dropped table is
-      gone.
-- [x] Manual check: a subject previously private to one institution is now visible platform-wide.
-
-## Update demo-data reset for the new role/catalog model
-
-GitHub: [#5](https://github.com/RayDomD/studybuddy-ui/issues/5)
-
-**What to build:** The demo-data reset command only seeds/preserves the SuperAdmin login (no
-per-institution Admin account) and seeds the course catalog against the new global model.
-
-**Blocked by:** Convert institutional Admins to SuperAdmin, Global subject/course catalog
-
-**Model:** small
-
-- [ ] Demo-data reset no longer creates/preserves a per-institution Admin account.
-- [ ] Demo-data reset's catalog seeding matches the global model.
-- [ ] Manual check: running the reset command leaves only the SuperAdmin login across resets.
-
-## Consolidate frontend admin views into SuperAdmin
-
-GitHub: [#6](https://github.com/RayDomD/studybuddy-ui/issues/6)
-
-**What to build:** Institution-scoped admin views (dashboard, reports, withdrawals, users, support,
-tutor/tutee applications) are deleted; any functionality they had that the SuperAdmin equivalents
-don't yet cover is merged in. Old institution-scoped routes redirect to their SuperAdmin
-equivalents.
-
-**Blocked by:** Convert institutional Admins to SuperAdmin, Delete the admin-account-request
-workflow, Global subject/course catalog
+**Blocked by:** None — can start immediately.
 
 **Model:** top
 
-- [ ] Institution-scoped admin views deleted; SuperAdmin views cover their functionality.
-- [ ] Old admin routes redirect to SuperAdmin equivalents (no dead links).
-- [ ] `npm run lint` and `npm run build` passing.
-- [ ] Manual check: diffed institution-scoped views against SuperAdmin equivalents for feature
-      parity before deletion (flagged risk in the plan — don't assume parity).
+- [ ] `top_k` excludes non-positive similarity neighbors in both pools — covered by a test.
+- [ ] Peer pool contains only same-course students; null-course tutee gets an empty peer pool —
+      covered by tests.
+- [ ] Per-tutor fallback: peer prediction used when peer denominator is nonzero, global
+      otherwise — covered by a test at the tutor level and the pool level.
+- [ ] Neighbor lists computed once per request (existing neighbor-reuse tests still pass or are
+      updated to the two-list shape).
+- [ ] CF breakdown exposes which pool each prediction used; demo tool and its UI surface it.
+- [ ] Backend suite green (no new failures); `npm run lint` and `npm run build` pass if
+      frontend touched.
 
-## Per-user analytics endpoint
+## Glossary and docs sync
 
-GitHub: [#7](https://github.com/RayDomD/studybuddy-ui/issues/7)
+**What to build:** `CONTEXT.md` reflects the shipped algorithm: CBF Score weights
+(0.40/0.20/0.15/0.10/0.10/0.05 with the Specific/General/Expertise-cascade rules and the
+empty-request fallback), and CF Score / Top-K Neighbor peer-pool semantics (same-course pool,
+per-tutor global fallback, positive-similarity filter, recorded per-request revisit trigger).
+The General/Specific Subject entries added during the grill are checked for accuracy against
+the implementation.
 
-**What to build:** A new read-only endpoint returns an all-time stats payload for one tutor or
-tutee: session counts by status, average rating, total earnings, subjects taught, and student list
-for tutors; session counts by status, total amount spent, subjects booked, tutor list, and ratings
-given for tutees.
+**Blocked by:** CBF graduated subject matching, CF same-course peer neighbors with per-tutor
+global fallback
 
-**Blocked by:** Convert institutional Admins to SuperAdmin
+**Model:** small
 
-**Model:** mid
-
-- [ ] Endpoint returns the correct tutor payload shape for a seeded tutor with known
-      Bookings/Payments/ratings.
-- [ ] Endpoint returns the correct tutee payload shape for a seeded tutee with known
-      Bookings/Payments/ratings given.
-- [ ] `APITestCase` coverage for both shapes.
-- [ ] Endpoint is `SuperAdmin`-only.
-
-## SuperAdmin user list drill-down panel
-
-GitHub: [#8](https://github.com/RayDomD/studybuddy-ui/issues/8)
-
-**What to build:** Clicking a tutor or tutee row in the SuperAdmin user list opens a slide-over
-panel (list stays visible underneath) showing that user's all-time stats, matching the confirmed
-mockup. One panel component, role-conditional body.
-
-**Blocked by:** Per-user analytics endpoint
-
-**Model:** mid
-
-- [ ] Clicking a row opens the panel without navigating away from the user list.
-- [ ] Tutor and tutee variants both match
-      [`docs/mockups/2026-07-12-superadmin-user-drilldown.html`](mockups/2026-07-12-superadmin-user-drilldown.html).
-- [ ] All-time totals only — no period toggle or export in this pass.
-- [ ] `npm run lint` and `npm run build` passing.
+- [ ] CONTEXT.md CBF Score entry matches the implemented weights and rules.
+- [ ] CONTEXT.md CF Score / Top-K Neighbor entries describe the peer pool, fallback, and
+      positive-similarity filter, including the per-request revisit trigger.
+- [ ] No stale references to the old 0.35/0.20/0.20/0.15/0.10 weights anywhere in docs.

@@ -1,16 +1,17 @@
 ---
 title: Recommender weight rebalance (CBF split + CF peer ratings)
 date: 2026-07-15
-status: Approved
+status: In Progress
 summary: Split CBF subject match into Specific/General with rebalanced weights, and filter CF neighbors to same-course peers with per-tutor global fallback.
 spec: ../mockups/2026-07-15-recommender-weights-handoff.html
 ---
 
 # Recommender weight rebalance (CBF split + CF peer ratings)
 
-**Status & Progress Summary** (2026-07-15): Approved, not yet implemented. All weight and
-mechanism decisions are final (10 decisions grilled 2026-07-14); one loose end remains open —
-empty `requested_subject` fallback — and must be resolved before implementation starts. The
+**Status & Progress Summary** (2026-07-15): In Progress via `/orchestrate` on branch
+`feat/recommender-weight-rebalance`. All weight and mechanism decisions are final (10 decisions
+grilled 2026-07-14); the last loose end — empty `requested_subject` fallback — was resolved
+2026-07-15 (see below): fall back to preference-list matching when no subject is requested. The
 visual handoff document explaining every decision — now styled with Studybuddy's design tokens
 and including a 13-question Defense Q&A — is saved at
 `docs/mockups/2026-07-15-recommender-weights-handoff.html` (linked as this plan's spec). Next
@@ -84,11 +85,16 @@ Key CBF decisions and why:
 - Cold-Start behavior unchanged: CF `None` is still coerced to 0 in the hybrid; the CF weight is
   never reallocated to CBF.
 
-### Loose end (decided later, before implementation)
+### Loose end — RESOLVED 2026-07-15
 
 - **Empty `requested_subject`:** under the new rules an empty request would zero the whole 0.60
-  subject block for every tutor. Recommendation on the table (not yet confirmed): fall back to the
-  old preference-list matching when no subject is requested. Resolve before implementing.
+  subject block for every tutor. **Decision: fall back to preference-list matching** — when no
+  subject is requested, the tutee's preference list acts as the requested set: Specific = 1 if
+  the tutor teaches any listed subject; General = `max(Specific, category match against any
+  listed subject's category)`; Expertise cascade runs over the listed subjects (mean expertise
+  on taught listed subjects, else same-field mean, else 0). This degrades gracefully to roughly
+  today's behavior exactly when the new signal is absent, and keeps the algorithm demo tool
+  (which passes `requested_subject=None`) meaningful.
 
 ### Follow-up tickets (explicitly out of scope here)
 
@@ -103,8 +109,9 @@ Key CBF decisions and why:
    (0.40 / 0.20 / 0.15 / 0.10 / 0.10 / 0.05).
 2. `cbf.py`: implement Specific (exact requested-subject match), General
    (`max(Specific, category match)`, null-safe), and the Expertise cascade; drop the
-   preference-list merge (`requested_subject` append) from subject/expertise matching, subject to
-   the empty-request loose end above.
+   preference-list merge (`requested_subject` append) from subject/expertise matching when a
+   subject is requested; when the request is empty, apply the preference-list fallback decided
+   above.
 3. Update `compute_cbf_breakdown` so the demo tool (`recommender/demo.py`) shows the new
    sub-scores.
 4. `CF.py`: filter `top_k` candidates to `similarity > 0`; add a course-filtered peer variant;
@@ -148,3 +155,8 @@ Key CBF decisions and why:
   `docs/mockups/2026-07-15-recommender-weights-handoff.html`; linked as this plan's `spec:`.
 - **2026-07-15** — Handoff restyled to Studybuddy design tokens (from `src/assets/main.css`) and
   extended with a Defense Q&A section (13 anticipated panel questions with answers).
+- **2026-07-15** — Loose end resolved: empty `requested_subject` falls back to preference-list
+  matching (preference list acts as the requested set for Specific/General/Expertise). Status
+  moved to In Progress; work started via `/orchestrate` on branch
+  `feat/recommender-weight-rebalance` with tickets in `docs/tickets.md` (previous admin-
+  consolidation tickets archived to `docs/tickets-2026-07-12-admin-consolidation.md`).
