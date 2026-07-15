@@ -442,8 +442,8 @@ const effectiveSelectedSlots = computed(() => {
 
       const isContinuousRange = slotsBetween.every((candidate, index) => {
         const previousTime = index === 0 ? previousExplicit.time_slot : slotsBetween[index - 1].time_slot
-        return addThirtyMinutes(previousTime) === candidate.time_slot
-      }) && addThirtyMinutes(slotsBetween.at(-1)?.time_slot || previousExplicit.time_slot) === nextExplicit.time_slot
+        return addOneHour(previousTime) === candidate.time_slot
+      }) && addOneHour(slotsBetween.at(-1)?.time_slot || previousExplicit.time_slot) === nextExplicit.time_slot
 
       if (!isContinuousRange) {
         return
@@ -466,7 +466,7 @@ const effectiveSelectedSlots = computed(() => {
   })
 })
 
-const SESSION_SLOT_HOURS = 0.5
+const SESSION_SLOT_HOURS = 1.0
 
 const selectedSessionCount = computed(() => effectiveSelectedSlots.value.length)
 
@@ -482,7 +482,7 @@ const sessionTimeRangeLabel = computed(() => {
   const first = effectiveSelectedSlots.value[0]
   const last = effectiveSelectedSlots.value[effectiveSelectedSlots.value.length - 1]
 
-  return formatTimeRangeLabel(first.session_date, first.time_slot, addThirtyMinutes(last.time_slot))
+  return formatTimeRangeLabel(first.session_date, first.time_slot, addOneHour(last.time_slot))
 })
 
 const tuteeVerificationSnapshot = computed(() => ({
@@ -574,7 +574,7 @@ function formatTimeRangeLabel(dateString, startTime, endTime) {
 }
 
 function formatSlotRange(dateString, time) {
-  return formatTimeRangeLabel(dateString, time, addThirtyMinutes(time))
+  return formatTimeRangeLabel(dateString, time, addOneHour(time))
 }
 
 function formatShortDay(dayName) {
@@ -593,9 +593,9 @@ function isToday(dateString) {
   return dateString === getDateKey(new Date())
 }
 
-function addThirtyMinutes(timeString) {
+function addOneHour(timeString) {
   const [hours, minutes] = timeString.split(':').map(Number)
-  const totalMinutes = (hours * 60) + minutes + 30
+  const totalMinutes = (hours * 60) + minutes + 60
   const normalizedHours = Math.floor(totalMinutes / 60) % 24
   const normalizedMinutes = totalMinutes % 60
 
@@ -731,7 +731,7 @@ function canExpandSelectionWithinDay(day, explicitSelections) {
     const currentSelection = orderedSelections[index]
     const nextSelection = orderedSelections[index + 1]
 
-    let expectedTime = addThirtyMinutes(currentSelection.time_slot)
+    let expectedTime = addOneHour(currentSelection.time_slot)
 
     while (expectedTime < nextSelection.time_slot) {
       const hasIntermediateSlot = availableSlots.some(slot => slot.time_slot === expectedTime)
@@ -740,7 +740,7 @@ function canExpandSelectionWithinDay(day, explicitSelections) {
         return false
       }
 
-      expectedTime = addThirtyMinutes(expectedTime)
+      expectedTime = addOneHour(expectedTime)
     }
   }
 

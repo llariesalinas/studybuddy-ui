@@ -1,0 +1,189 @@
+﻿diff --git a/backend/studybuddy/chat/services.py b/backend/studybuddy/chat/services.py
+index d3f8396..d5b6e80 100644
+--- a/backend/studybuddy/chat/services.py
++++ b/backend/studybuddy/chat/services.py
+@@ -9,7 +9,7 @@ from studybuddy.models import Booking, Tutor, TutorSubjects, UserProfile
+ 
+ from .models import ChatRoom, Message
+ 
+-SESSION_SLOT_MINUTES = 30
++SESSION_SLOT_MINUTES = 60
+ 
+ 
+ def full_name(profile):
+diff --git a/backend/studybuddy/views.py b/backend/studybuddy/views.py
+index 0fa13ca..40c009e 100644
+--- a/backend/studybuddy/views.py
++++ b/backend/studybuddy/views.py
+@@ -537,7 +537,7 @@ WEEKDAY_MAP = {
+     6: "Sun",
+ }
+ 
+-SESSION_SLOT_MINUTES = 30
++SESSION_SLOT_MINUTES = 60
+ 
+ 
+ def get_duration_hours_from_slot_count(slot_count):
+diff --git a/src/components/BookingTimePicker.vue b/src/components/BookingTimePicker.vue
+index 5db9339..537d856 100644
+--- a/src/components/BookingTimePicker.vue
++++ b/src/components/BookingTimePicker.vue
+@@ -138,7 +138,7 @@ const timeSlotOptions = computed(() => {
+   const slots = []
+ 
+   for (let hour = 0; hour < 24; hour += 1) {
+-    for (let minute = 0; minute < 60; minute += 30) {
++    for (let minute = 0; minute < 60; minute += 60) {
+       const value = `${padNumber(hour)}:${padNumber(minute)}`
+       const period = hour >= 12 ? 'PM' : 'AM'
+       const displayHour = hour % 12 || 12
+diff --git a/src/views/FindTutors.vue b/src/views/FindTutors.vue
+index 5d874a7..ebe94aa 100644
+--- a/src/views/FindTutors.vue
++++ b/src/views/FindTutors.vue
+@@ -249,7 +249,7 @@ const normalizeFutureDate = (date) => {
+ }
+ 
+ const nextTimeSlot = (value) => {
+-  const nextMinutes = timeToMinutes(value) + 30
++  const nextMinutes = timeToMinutes(value) + 60
+ 
+   if (nextMinutes >= 24 * 60) {
+     return null
+diff --git a/src/views/InitialBooking.vue b/src/views/InitialBooking.vue
+index 39329e3..da8d45a 100644
+--- a/src/views/InitialBooking.vue
++++ b/src/views/InitialBooking.vue
+@@ -166,7 +166,7 @@ const isPastTimeForDate = (date, time) => {
+ }
+ 
+ const nextTimeSlot = (value) => {
+-  const nextMinutes = timeToMinutes(value) + 30
++  const nextMinutes = timeToMinutes(value) + 60
+ 
+   if (nextMinutes >= 24 * 60) {
+     return null
+diff --git a/src/views/TutorDetails.vue b/src/views/TutorDetails.vue
+index 4b5bd6c..5c8ace7 100644
+--- a/src/views/TutorDetails.vue
++++ b/src/views/TutorDetails.vue
+@@ -431,8 +431,8 @@ const effectiveSelectedSlots = computed(() => {
+ 
+       const isContinuousRange = slotsBetween.every((candidate, index) => {
+         const previousTime = index === 0 ? previousExplicit.time_slot : slotsBetween[index - 1].time_slot
+-        return addThirtyMinutes(previousTime) === candidate.time_slot
+-      }) && addThirtyMinutes(slotsBetween.at(-1)?.time_slot || previousExplicit.time_slot) === nextExplicit.time_slot
++        return addOneHour(previousTime) === candidate.time_slot
++      }) && addOneHour(slotsBetween.at(-1)?.time_slot || previousExplicit.time_slot) === nextExplicit.time_slot
+ 
+       if (!isContinuousRange) {
+         return
+@@ -455,7 +455,7 @@ const effectiveSelectedSlots = computed(() => {
+   })
+ })
+ 
+-const SESSION_SLOT_HOURS = 0.5
++const SESSION_SLOT_HOURS = 1.0
+ 
+ const selectedSessionCount = computed(() => effectiveSelectedSlots.value.length)
+ 
+@@ -471,7 +471,7 @@ const sessionTimeRangeLabel = computed(() => {
+   const first = effectiveSelectedSlots.value[0]
+   const last = effectiveSelectedSlots.value[effectiveSelectedSlots.value.length - 1]
+ 
+-  return formatTimeRangeLabel(first.session_date, first.time_slot, addThirtyMinutes(last.time_slot))
++  return formatTimeRangeLabel(first.session_date, first.time_slot, addOneHour(last.time_slot))
+ })
+ 
+ const backButton = () => {
+@@ -533,7 +533,7 @@ function formatTimeRangeLabel(dateString, startTime, endTime) {
+ }
+ 
+ function formatSlotRange(dateString, time) {
+-  return formatTimeRangeLabel(dateString, time, addThirtyMinutes(time))
++  return formatTimeRangeLabel(dateString, time, addOneHour(time))
+ }
+ 
+ function formatShortDay(dayName) {
+@@ -552,9 +552,9 @@ function isToday(dateString) {
+   return dateString === getDateKey(new Date())
+ }
+ 
+-function addThirtyMinutes(timeString) {
++function addOneHour(timeString) {
+   const [hours, minutes] = timeString.split(':').map(Number)
+-  const totalMinutes = (hours * 60) + minutes + 30
++  const totalMinutes = (hours * 60) + minutes + 60
+   const normalizedHours = Math.floor(totalMinutes / 60) % 24
+   const normalizedMinutes = totalMinutes % 60
+ 
+@@ -690,7 +690,7 @@ function canExpandSelectionWithinDay(day, explicitSelections) {
+     const currentSelection = orderedSelections[index]
+     const nextSelection = orderedSelections[index + 1]
+ 
+-    let expectedTime = addThirtyMinutes(currentSelection.time_slot)
++    let expectedTime = addOneHour(currentSelection.time_slot)
+ 
+     while (expectedTime < nextSelection.time_slot) {
+       const hasIntermediateSlot = availableSlots.some(slot => slot.time_slot === expectedTime)
+@@ -699,7 +699,7 @@ function canExpandSelectionWithinDay(day, explicitSelections) {
+         return false
+       }
+ 
+-      expectedTime = addThirtyMinutes(expectedTime)
++      expectedTime = addOneHour(expectedTime)
+     }
+   }
+ 
+diff --git a/src/views/TutorSchedule.vue b/src/views/TutorSchedule.vue
+index 2667838..2881acd 100644
+--- a/src/views/TutorSchedule.vue
++++ b/src/views/TutorSchedule.vue
+@@ -362,7 +362,7 @@ const allTimeOptions = computed(() => {
+   const options = []
+ 
+   for (let hour = 0; hour < 24; hour += 1) {
+-    for (let minute = 0; minute < 60; minute += 30) {
++    for (let minute = 0; minute < 60; minute += 60) {
+       options.push(`${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`)
+     }
+   }
+@@ -506,7 +506,7 @@ function getTimePeriod(timeString) {
+ }
+ 
+ function formatSlotRange(timeString) {
+-  const endTime = addThirtyMinutes(timeString)
++  const endTime = addOneHour(timeString)
+   const startPeriod = getTimePeriod(timeString)
+   const endPeriod = getTimePeriod(endTime)
+ 
+@@ -529,7 +529,7 @@ function getSlotPeriodClass(timeString) {
+ 
+ function getSlotPeriodDescription(timeString) {
+   const startPeriod = getTimePeriod(timeString)
+-  const endPeriod = getTimePeriod(addThirtyMinutes(timeString))
++  const endPeriod = getTimePeriod(addOneHour(timeString))
+ 
+   if (startPeriod !== endPeriod) {
+     return startPeriod === 'AM' ? 'noon transition' : 'day transition'
+@@ -769,7 +769,7 @@ async function saveSlot() {
+         createdCount++
+       }
+ 
+-      current.setMinutes(current.getMinutes() + 30)
++      current.setMinutes(current.getMinutes() + 60)
+     }
+ 
+     if (createdCount === 0) {
+@@ -804,9 +804,9 @@ onMounted(async () => {
+   setInitialWeekIndex()
+ })
+ 
+-function addThirtyMinutes(timeString) {
++function addOneHour(timeString) {
+   const date = new Date(`1970-01-01T${timeString}`)
+-  date.setMinutes(date.getMinutes() + 30)
++  date.setMinutes(date.getMinutes() + 60)
+   return date.toTimeString().slice(0, 5)
+ }
+ </script>
