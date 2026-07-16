@@ -5,17 +5,7 @@
         <!-- Subject -->
         <div class="col-lg-4 col-md-6">
           <label class="form-label fw-semibold small sb-muted">Subject</label>
-          <SbSelectModal
-            v-model="subjectModel"
-            :groups="subjectGroups"
-            title="Choose Subject"
-            placeholder="Any Subject"
-            search-placeholder="Search subjects"
-            searchable
-            clearable
-            clear-label="Any Subject"
-            empty-message="No subjects found."
-          />
+          <SubjectTaxonomyPicker v-model="selectedSubjectCodes" :subjects="subjects" :max-selection="1" />
         </div>
 
         <!-- Mode -->
@@ -207,6 +197,7 @@ import BookingDatePicker from '@/components/BookingDatePicker.vue'
 import BookingTimePicker from '@/components/BookingTimePicker.vue'
 import CampusLocationModal from '@/components/CampusLocationModal.vue'
 import SbSelectModal from '@/components/SbSelectModal.vue'
+import SubjectTaxonomyPicker from '@/components/SubjectTaxonomyPicker.vue'
 
 import {
   INITIAL_BUDGET_MAX,
@@ -348,6 +339,10 @@ const subjectModel = computed({
   get: () => findTutorsStore.filters.subject,
   set: (value) => updateFindTutorsFilters({ subject: normalizeSelectValue(value) }),
 })
+const selectedSubjectCodes = computed({
+  get: () => (subjectModel.value ? [subjectModel.value] : []),
+  set: (codes) => { subjectModel.value = codes[0] || '' },
+})
 
 const modeModel = computed({
   get: () => findTutorsStore.filters.mode,
@@ -431,35 +426,6 @@ const onCampusModalCancelled = () => {
   locationModel.value = ''
   campusLocationType.value = null
 }
-
-const getSubjectGroupLabel = (subject) => {
-  return subject?.department?.trim() || subject?.category?.trim() || 'Other Subjects'
-}
-
-const subjectGroups = computed(() => {
-  const groups = new Map()
-
-  subjects.value.forEach((subject) => {
-    const groupLabel = getSubjectGroupLabel(subject)
-
-    if (!groups.has(groupLabel)) {
-      groups.set(groupLabel, [])
-    }
-
-    groups.get(groupLabel).push({
-      label: subject.subject_name,
-      value: subject.subject_code,
-      description: subject.description || subject.subject_code,
-    })
-  })
-
-  return [...groups.entries()]
-    .sort(([leftLabel], [rightLabel]) => leftLabel.localeCompare(rightLabel))
-    .map(([label, options]) => ({
-      label,
-      options: options.sort((left, right) => left.label.localeCompare(right.label)),
-    }))
-})
 
 const canRunRecommendation = () => {
   return Boolean(
