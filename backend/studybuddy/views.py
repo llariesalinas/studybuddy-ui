@@ -69,6 +69,7 @@ from .subject_recognition import (
     subject_selection_queryset_for_profile,
     visible_subject_queryset_for_profile,
 )
+from .subject_taxonomy import CATEGORIES as TAXONOMY_CATEGORIES
 from django.core.cache import cache
 from . import _verification_dev
 from .models import Booking, Course, EmailOTPChallenge, Notification, PartnerInstitution, Payment, PaymentMethod, Preference, Rating, SessionCheckIn, Subjects, SupportTicket, Tutor, TutorApplication, TutorAvailability, TutorAvailabilityOverride, TutorDocumentRenewalReview, TutorSubjects, Wallet, PlatformActivity, Transaction, TuteeApplication, TuteeDocumentRenewalReview
@@ -4135,24 +4136,18 @@ def propose_tutor_subject(request):
         )
 
     subject_name = str(request.data.get('subject_name') or '').strip()
-    department = str(request.data.get('department') or '').strip()
+    category = str(request.data.get('category') or '').strip()
     description = str(request.data.get('description') or '').strip()
 
-    if not subject_name or not department:
+    if not subject_name or not category:
         return Response(
-            {"error": "Subject name and department are required."},
+            {"error": "Subject name and category are required."},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    valid_departments = set(
-        Subjects.objects.filter(status='approved')
-        .exclude(department='')
-        .values_list('department', flat=True)
-        .distinct()
-    )
-    if department not in valid_departments:
+    if category not in TAXONOMY_CATEGORIES:
         return Response(
-            {"error": "Select a department from the existing catalog."},
+            {"error": "Select a category from the taxonomy."},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
@@ -4160,7 +4155,7 @@ def propose_tutor_subject(request):
     subject = Subjects.objects.create(
         subject_code=generate_proposed_subject_code(subject_name),
         subject_name=subject_name,
-        department=department,
+        category=category,
         status='pending',
         proposed_by_tutor=tutor,
         proposed_application=application,
@@ -4176,7 +4171,7 @@ def propose_tutor_subject(request):
         {
             "subject_code": subject.subject_code,
             "subject_name": subject.subject_name,
-            "department": subject.department,
+            "category": subject.category,
             "description": description,
             "status": subject.status,
         },

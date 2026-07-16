@@ -10,7 +10,7 @@ export const fetchApprovedSubjects = async (search = '') => {
   return Array.isArray(data) ? data : []
 }
 
-export const fetchSubjectDepartments = async () => {
+export const fetchSubjectCatalog = async () => {
   const { data } = await api.get('/subjects/', { params: { catalog_scope: 'all' } })
   return Array.isArray(data) ? data : []
 }
