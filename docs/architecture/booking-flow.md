@@ -2,6 +2,19 @@
 
 This document describes the end-to-end tutee booking flow in StudyBuddy. It is the authoritative source for architectural questions about how a tutee finds a tutor and books a session. Keep it updated whenever the flow changes.
 
+## Instant Booking safeguards
+
+`POST bookings/confirm/` confirms a booking immediately; new rows are never Pending. It enforces
+the Booking Horizon (14 days), tutor verification, non-negative wallet balance, Accepted Session
+Load Limit, and Monthly Strike Cap. Online session groups receive one server-generated Meeting
+Link; a chat room is opened with a neutral system message and both parties are notified.
+
+Cancellation remains self-serve. Before the Grace Cutoff (12 hours before the session) it is
+penalty-free. A Late Cancellation cancels immediately but creates a system-opened Support Ticket.
+An admin resolves it as excused or counted; a Counted Strike deducts P50 from a tutor wallet and
+three counted strikes in a calendar month suspend a tutee from booking or hide a tutor from search.
+The old approve/reject step and requested-sessions route are removed.
+
 ## Overview
 
 The booking flow is a 4-step process: preferences → search → slot selection → confirm.

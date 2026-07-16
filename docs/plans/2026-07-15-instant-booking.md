@@ -1,7 +1,7 @@
 ---
 title: Instant Booking
 date: 2026-07-15
-status: Approved
+status: In Progress
 summary: Replace request-to-book with instant confirmation, Grace Cutoff cancellations, strike accountability, and auto-generated meeting links.
 spec: ../adr/0008-instant-booking-replaces-request-to-book.md
 ---
@@ -10,8 +10,12 @@ spec: ../adr/0008-instant-booking-replaces-request-to-book.md
 
 ## Status & Progress Summary
 
-**Approved — not started.** Design settled in the 2026-07-15 grilling session; ADR 0008 and
-glossary terms written. No implementation steps begun.
+**In Progress.** Design settled in the 2026-07-15 grilling session; ADR 0008 and glossary terms
+written. Codex ran the 2026-07-16 brief and delivered steps 1-5, 6 (load-limit banner only), and
+8; `/codex-review` verified independently (full suite reproduces its 28 failures/5 errors
+identically on clean `main`, none attributable), fixed two dead-code nits itself, and committed in
+three stops. Remaining: the tutor cancel-before-cutoff affordance (rest of step 6), all of step 7
+(admin surfaces), and test coverage for steps 2/2b/3 — tracked as Fix round 1 in the same brief.
 
 ## Goal
 
@@ -101,3 +105,20 @@ review to post-hoc accountability:
 - **2026-07-15** — Plan created from the grilling session; status Approved. ADR 0008 and
   CONTEXT.md glossary entries (Instant Booking, Grace Cutoff, Late Cancellation, Counted Strike,
   Monthly Strike Cap, Booking Horizon, Meeting Link) written alongside.
+- **2026-07-16** — Compiled `docs/briefs/2026-07-16-instant-booking.md` for Codex on
+  `feat/instant-booking` (branched off `main`); status moved to In Progress. No `docs/tickets.md`
+  entry existed for this plan, so the brief covers all 8 steps directly. Dispatch to Codex not
+  yet run.
+- **2026-07-16** — `/codex-review`: Codex delivered booking-time confirmation with all three gates
+  plus the Booking Horizon and Meeting Link (step 1), Grace Cutoff cancellation with system-opened
+  Late Cancellation tickets and admin excused/counted resolution with strike/wallet effects
+  (steps 2, 2b), the search-visibility gate extension (step 3), the approve/reject teardown and
+  Pending-expiry migration (step 4), the confirmation-UX and Booking Horizon UI (step 5), route/nav
+  teardown plus the load-limit banner (part of step 6), and the architecture doc update (step 8).
+  Verified independently: full suite reproduces its pre-existing 28 failures/5 errors identically
+  on a clean `main` (confirmed by stashing), `npm run lint`/`build` clean, migration has no drift.
+  Fixed two dead-code nits myself (leftover `approve_booking`/`reject_booking` bodies; leftover
+  `approveSession`/`rejectSession` store methods hitting the removed routes) and a magic-number
+  duplication in `mailer.py`. Committed in three stops (backend, frontend, docs). Opened Fix round
+  1 in the same brief for the rest: the tutor cancel-before-cutoff affordance, all of step 7
+  (admin surfaces), and missing test coverage for steps 2/2b/3. Status stays In Progress.
