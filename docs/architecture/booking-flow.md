@@ -32,7 +32,14 @@ Dashboard (InitialBooking.vue)
 **Store:** `src/stores/initialbookingprefs.js` (persisted to sessionStorage)
 
 The tutee fills out a search form:
-- Subject (searchable dropdown, loaded from `GET subjects/`)
+- Subject — `SubjectTaxonomyPicker.vue` (category grid → subject chips), loaded from
+  `GET subjects/`. Subjects are the Preply-style taxonomy (see
+  `docs/plans/2026-07-16-subjects-taxonomy-reseed.md`): every subject carries a taxonomy
+  `category` (Mathematics & Data Sciences, Natural Sciences, Technology & Computer Science,
+  Business/Finance/Economics, Humanities & Social Sciences, Hobbies & Arts) and an internal
+  `department` sub-group that is never shown in the UI. Subject codes are opaque slugs
+  (`organic-chemistry`) and are likewise never displayed. Course-based subject gating was
+  retired — any tutee can search any approved subject regardless of their own course.
 - Date (date picker)
 - Time range — start time and end time (30-minute slots)
 - Mode: Online or Face-to-face

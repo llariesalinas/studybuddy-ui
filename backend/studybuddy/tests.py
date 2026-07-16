@@ -7742,7 +7742,7 @@ class TutorSubjectProposalTests(APITestCase):
         )
         self.catalog_subject = Subjects.objects.create(
             subject_code="MATH101", subject_name="College Algebra", department="Mathematics",
-            category="PROPOSAL",
+            category="Mathematics & Data Sciences",
         )
         self.course = Course.objects.create(course_code="PROPOSAL", course_name="Proposal Course")
         self.tutor_user = User.objects.create_user(
@@ -7761,12 +7761,13 @@ class TutorSubjectProposalTests(APITestCase):
         )
         self.client.force_authenticate(user=self.tutor_user)
 
-    def propose(self, subject_name="Educational Data Visualization", department="Mathematics"):
+    def propose(self, subject_name="Educational Data Visualization",
+                category="Mathematics & Data Sciences"):
         return self.client.post(
             "/api/tutor/subjects/propose/",
             {
                 "subject_name": subject_name,
-                "department": department,
+                "category": category,
                 "description": "A proposed specialty.",
             },
             format="json",
@@ -7784,8 +7785,8 @@ class TutorSubjectProposalTests(APITestCase):
         self.assertEqual(subject.proposed_application, self.application)
         self.assertTrue(TutorSubjects.objects.filter(tutor=self.tutor, subject=subject).exists())
 
-    def test_proposal_rejects_unknown_department(self):
-        response = self.propose(department="Invented Department")
+    def test_proposal_rejects_unknown_category(self):
+        response = self.propose(category="Invented Category")
 
         self.assertEqual(response.status_code, 400)
 
@@ -7822,18 +7823,30 @@ class TutorSubjectProposalTests(APITestCase):
         self.assertIn(self.catalog_subject.subject_code, codes)
         self.assertNotIn(proposal.data["subject_code"], codes)
 
-    def test_catalog_search_is_server_filtered_and_course_scoped(self):
-        Subjects.objects.create(
-            subject_code="OTHER101", subject_name="College Writing", department="Languages",
-            category="OTHER",
-        )
-
-        response = self.client.get("/api/subjects/", {"search": "College"})
+    def test_catalog_search_is_server_filtered(self):
+        response = self.client.get("/api/subjects/", {"search": "College Algebra"})
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
             [row["subject_code"] for row in response.data],
             [self.catalog_subject.subject_code],
+        )
+
+    def test_selection_is_not_scoped_to_the_requesting_users_course(self):
+        # Course-based subject gating was retired: a BSCS-course tutor (self.course above is
+        # unrelated to any taxonomy category) can still select/search a subject from a wholly
+        # different field, e.g. Hobbies & Arts, proving selection is catalog-wide now.
+        unrelated_subject = Subjects.objects.create(
+            subject_code="guitar-101", subject_name="Guitar Basics", department="Instruments",
+            category="Hobbies & Arts",
+        )
+
+        response = self.client.get("/api/subjects/", {"search": "Guitar"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(
+            unrelated_subject.subject_code,
+            [row["subject_code"] for row in response.data],
         )
 
 
@@ -8023,3 +8036,162 @@ class AdminToSuperAdminMigrationTests(APITestCase):
         self.assertEqual(admin_profile.role, "SuperAdmin")
         self.assertEqual(tutee_profile.role, "Tutee")
         self.assertFalse(UserProfile.objects.filter(role="Admin").exists())
+
+
+class SubjectTaxonomyModuleTests(APITestCase):
+    """subject_taxonomy.py is the single source of truth for the Preply-style catalog
+    (see docs/plans/2026-07-16-subjects-taxonomy-reseed.md). Its slugs must fit the
+    Subjects.subject_code column and stay unique; every subject must carry a real
+    taxonomy category."""
+
+    def test_slugs_are_unique_and_fit_the_subject_code_column(self):
+        from .models import Subjects
+        from .subject_taxonomy import SUBJECTS, slugify_subject_code
+
+        max_length = Subjects._meta.get_field('subject_code').max_length
+        slugs = [slugify_subject_code(name) for name, _category, _subgroup in SUBJECTS]
+
+        self.assertEqual(len(slugs), len(set(slugs)), "subject slugs must be unique")
+        for slug in slugs:
+            self.assertLessEqual(len(slug), max_length)
+            self.assertTrue(slug, "slug must not be empty")
+
+    def test_every_subject_has_a_valid_category(self):
+        from .subject_taxonomy import CATEGORIES, SUBJECTS
+
+        for name, category, _subgroup in SUBJECTS:
+            self.assertIn(category, CATEGORIES, f"{name} has an unrecognized category")
+
+
+class AdminCourseCatalogTaxonomyTests(APITestCase):
+    """Admin subject-catalog CRUD on the taxonomy shape: auto-generated slugs, category
+    validation, and category-based filtering (replacing the retired course filter)."""
+
+    def setUp(self):
+        self.institution = PartnerInstitution.objects.create(
+            institution_name="CPU", school_email_domain="cpu.edu.ph", is_active=True,
+        )
+        self.admin_user = User.objects.create_user(
+            username="catalog-admin@cpu.edu.ph", email="catalog-admin@cpu.edu.ph",
+            password="password",
+        )
+        UserProfile.objects.create(
+            user=self.admin_user, fname="Catalog", mname="", lname="Admin", role="SuperAdmin",
+            institution=self.institution,
+        )
+        self.client.force_authenticate(user=self.admin_user)
+
+    def test_create_without_code_generates_a_slug(self):
+        response = self.client.post(
+            "/api/admin/course-catalog/",
+            {
+                "subject_name": "Organic Chemistry",
+                "category": "Natural Sciences",
+                "department": "Chemistry",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["subject_code"], "organic-chemistry")
+        self.assertTrue(Subjects.objects.filter(subject_code="organic-chemistry").exists())
+
+    def test_create_rejects_a_category_outside_the_taxonomy(self):
+        response = self.client.post(
+            "/api/admin/course-catalog/",
+            {"subject_name": "Mystery Subject", "category": "Not A Real Category"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(Subjects.objects.filter(subject_name="Mystery Subject").exists())
+
+    def test_list_filters_by_category(self):
+        Subjects.objects.create(
+            subject_code="calculus", subject_name="Calculus", category="Mathematics & Data Sciences",
+        )
+        Subjects.objects.create(
+            subject_code="guitar", subject_name="Guitar", category="Hobbies & Arts",
+        )
+
+        response = self.client.get(
+            "/api/admin/course-catalog/", {"category": "Hobbies & Arts"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        codes = [row["subject_code"] for row in response.data]
+        self.assertEqual(codes, ["guitar"])
+
+
+class CuratedPersonaCbfOrderingTests(APITestCase):
+    """Locks in the seeded demo's headline claim (docs/plans/2026-07-16-subjects-taxonomy-
+    reseed.md, curated persona S1/T1-T4): a Python-seeking BSCS tutee ranks an exact-match,
+    high-expertise, same-course tutor first, then the weaker exact match, then the
+    same-category-only match, then the unrelated tutor — independent of the full seed
+    command, by constructing the same shape directly."""
+
+    def setUp(self):
+        from .recommender.cbf import compute_cbf_score
+
+        self.compute_cbf_score = compute_cbf_score
+
+        self.bscs = Course.objects.create(course_code="BSCS", course_name="Computer Science")
+        self.bsba = Course.objects.create(course_code="BSBA", course_name="Business Administration")
+
+        self.python = Subjects.objects.create(
+            subject_code="python", subject_name="Python", category="Technology & Computer Science",
+        )
+        self.data_structures = Subjects.objects.create(
+            subject_code="data-structures", subject_name="Data Structures",
+            category="Technology & Computer Science",
+        )
+        self.cpp = Subjects.objects.create(
+            subject_code="cpp", subject_name="C++", category="Technology & Computer Science",
+        )
+        self.financial_accounting = Subjects.objects.create(
+            subject_code="financial-accounting", subject_name="Financial Accounting",
+            category="Business, Finance & Economics",
+        )
+
+        s1_user = User.objects.create_user(
+            username="s1.felipe@cpu.edu.ph", email="s1.felipe@cpu.edu.ph", password="password",
+        )
+        self.s1 = UserProfile.objects.create(
+            user=s1_user, fname="Felipe", lname="Fernandez", role="Tutee",
+            year_level=14, course=self.bscs,
+        )
+
+        self.t1 = self._make_tutor(
+            "t1.marisol", self.bscs, 16, [(self.python, 5), (self.data_structures, 4)],
+        )
+        self.t4 = self._make_tutor("t4.domingo", self.bscs, 16, [(self.python, 3)])
+        self.t2 = self._make_tutor("t2.benigno", self.bscs, 15, [(self.cpp, 3)])
+        self.t3 = self._make_tutor(
+            "t3.corazon", self.bsba, 15, [(self.financial_accounting, 5)],
+        )
+
+    def _make_tutor(self, username, course, year_level, subjects_with_levels):
+        user = User.objects.create_user(
+            username=f"{username}@cpu.edu.ph", email=f"{username}@cpu.edu.ph", password="password",
+        )
+        profile = UserProfile.objects.create(
+            user=user, fname=username, lname="Tutor", role="Tutor",
+            year_level=year_level, course=course,
+        )
+        tutor = Tutor.objects.create(
+            profile=profile, hourly_rate=200, can_online=True, can_f2f=False,
+            teaching_level="College",
+        )
+        for subject, level in subjects_with_levels:
+            TutorSubjects.objects.create(tutor=tutor, subject=subject, expertise_level=level)
+        return tutor
+
+    def test_s1_ranking_is_t1_then_t4_then_t2_then_t3(self):
+        scores = {
+            key: self.compute_cbf_score(self.s1, tutor, self.python.subject_code)
+            for key, tutor in [("T1", self.t1), ("T4", self.t4), ("T2", self.t2), ("T3", self.t3)]
+        }
+
+        self.assertGreater(scores["T1"], scores["T4"])
+        self.assertGreater(scores["T4"], scores["T2"])
+        self.assertGreater(scores["T2"], scores["T3"])
