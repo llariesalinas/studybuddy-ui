@@ -869,12 +869,12 @@
       <h3>Hybrid recommender internals (Objective 2)</h3>
 
       <div class="qa">
-        <p class="q">Do the five CBF sub-score weights actually add up to a usable total?</p>
-        <p class="a">Yes &mdash; <code style="font-family:var(--font-mono);font-size:13px;">W_SUBJECT (0.35) + W_EXPERTISE (0.20) + W_COURSE (0.20) + W_YEAR (0.15) + W_LEVEL (0.10) = 1.0</code>. Each sub-score is normalized into a 0&ndash;1 range before it's weighted (expertise, for example, is divided by 5, the max expertise level), so a tutor who is a perfect match on every dimension caps out at a CBF score of exactly 1.0, never higher.</p>
-        <p class="a-short"><strong>30-second answer:</strong> All five parts of the profile-match score add up to exactly 1, so a perfect match tops out at 1 and nothing can score above that.</p>
+        <p class="q">Do the six CBF sub-score weights actually add up to a usable total?</p>
+        <p class="a">Yes &mdash; <code style="font-family:var(--font-mono);font-size:13px;">W_SPECIFIC (0.40) + W_GENERAL (0.20) + W_EXPERTISE (0.15) + W_COURSE (0.10) + W_YEAR (0.10) + W_LEVEL (0.05) = 1.0</code>. Each sub-score is normalized into a 0&ndash;1 range before it's weighted (expertise, for example, is divided by 5, the max expertise level), so a tutor who is a perfect match on every dimension caps out at a CBF score of exactly 1.0, never higher.</p>
+        <p class="a-short"><strong>30-second answer:</strong> All six parts of the profile-match score add up to exactly 1, so a perfect match tops out at 1 and nothing can score above that.</p>
         <details class="evidence">
           <summary>Evidence</summary>
-          <div class="ev-body">backend/studybuddy/recommender/cbf.py &mdash; W_SUBJECT, W_EXPERTISE, W_COURSE, W_YEAR, W_LEVEL, compute_cbf_breakdown()</div>
+          <div class="ev-body">backend/studybuddy/recommender/cbf.py &mdash; W_SPECIFIC, W_GENERAL, W_EXPERTISE, W_COURSE, W_YEAR, W_LEVEL, compute_cbf_breakdown()</div>
         </details>
       </div>
 

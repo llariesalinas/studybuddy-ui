@@ -301,37 +301,42 @@
     <table>
       <tr><th>Component</th><th>Constant</th><th>Weight</th><th></th></tr>
       <tr class="weight-bar-row">
-        <td>Subject match (binary)</td><td><code>W_SUBJECT</code></td><td>0.35</td>
-        <td><div class="bar-track"><div class="bar-fill" style="width:35%;background:var(--accent);"></div></div></td>
+        <td>Specific subject match</td><td><code>W_SPECIFIC</code></td><td>0.40</td>
+        <td><div class="bar-track"><div class="bar-fill" style="width:40%;background:var(--accent);"></div></div></td>
       </tr>
       <tr class="weight-bar-row">
-        <td>Expertise level in that subject</td><td><code>W_EXPERTISE</code></td><td>0.20</td>
+        <td>General subject match</td><td><code>W_GENERAL</code></td><td>0.20</td>
         <td><div class="bar-track"><div class="bar-fill" style="width:20%;background:var(--accent);"></div></div></td>
       </tr>
       <tr class="weight-bar-row">
-        <td>Same course / strand</td><td><code>W_COURSE</code></td><td>0.20</td>
-        <td><div class="bar-track"><div class="bar-fill" style="width:20%;background:var(--accent);"></div></div></td>
-      </tr>
-      <tr class="weight-bar-row">
-        <td>Year-level closeness</td><td><code>W_YEAR</code></td><td>0.15</td>
+        <td>Expertise level in matched subject</td><td><code>W_EXPERTISE</code></td><td>0.15</td>
         <td><div class="bar-track"><div class="bar-fill" style="width:15%;background:var(--accent);"></div></div></td>
       </tr>
       <tr class="weight-bar-row">
-        <td>Teaching-level eligibility</td><td><code>W_LEVEL</code></td><td>0.10</td>
+        <td>Same course / strand</td><td><code>W_COURSE</code></td><td>0.10</td>
         <td><div class="bar-track"><div class="bar-fill" style="width:10%;background:var(--accent);"></div></div></td>
+      </tr>
+      <tr class="weight-bar-row">
+        <td>Year-level closeness</td><td><code>W_YEAR</code></td><td>0.10</td>
+        <td><div class="bar-track"><div class="bar-fill" style="width:10%;background:var(--accent);"></div></div></td>
+      </tr>
+      <tr class="weight-bar-row">
+        <td>Teaching-level eligibility</td><td><code>W_LEVEL</code></td><td>0.05</td>
+        <td><div class="bar-track"><div class="bar-fill" style="width:5%;background:var(--accent);"></div></div></td>
       </tr>
     </table>
 
     <h3>How each sub-score is computed</h3>
     <table>
       <tr><th>Sub-score</th><th>Formula</th></tr>
-      <tr><td><code>s_subject</code></td><td>1 if the tutor teaches any subject in the tutee's subject list (preferences + requested subject), else 0</td></tr>
-      <tr><td><code>s_expertise</code></td><td>average(tutor's expertise_level across matching subjects) / 5 &nbsp;(0 if no match)</td></tr>
+      <tr><td><code>s_specific</code></td><td>1 if the tutor teaches the exact requested subject, else 0</td></tr>
+      <tr><td><code>s_general</code></td><td>1 for an exact or same non-null category match, else 0</td></tr>
+      <tr><td><code>s_expertise</code></td><td>average exact-match expertise / 5, falling back to same-field expertise only if there is no exact match</td></tr>
       <tr><td><code>s_course</code></td><td>1 if same course; 0.5 if different course but same strand; else 0</td></tr>
       <tr><td><code>s_year</code></td><td>1 / (1 + |student_year − tutor_year|) &nbsp;— closer year levels score higher, decays smoothly</td></tr>
       <tr><td><code>s_level</code></td><td>1 normally; forced to 0 if tutor's <code>teaching_level == "SHS"</code> but the tutee is college level (<code>year_level &gt; 12</code>)</td></tr>
     </table>
-    <div class="formula-box" style="font-size:13px;">score = 0.35·s_subject + 0.20·s_expertise + 0.20·s_course + 0.15·s_year + 0.10·s_level</div>
+    <div class="formula-box" style="font-size:13px;">score = 0.40·s_specific + 0.20·s_general + 0.15·s_expertise + 0.10·s_course + 0.10·s_year + 0.05·s_level</div>
 
     <h3>Catalog-awareness: how <code>get_student_subject_codes</code> filters preferences</h3>
     <p>Before matching, the CBF calls <code>recognized_subject_codes_for_profile(student_profile)</code> (<span class="pill file">subject_recognition.py</span>) to get the set of subjects the institution has recognized for the student's course via <code>InstitutionCourseCatalog</code>. Only preference subjects that appear in that recognized set are passed into the scoring loop.</p>

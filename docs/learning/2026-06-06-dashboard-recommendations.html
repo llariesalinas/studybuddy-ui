@@ -192,11 +192,12 @@ tutors = Tutor.objects.all().select_related(<span class="s">'profile'</span>)[:<
     <p>The CBF score is a weighted sum. Subject and course are the heaviest terms, which is why
        an IT student naturally sees IT-course tutors who teach their subjects at the top:</p>
     <pre><span class="c"># cbf.py weights</span>
-W_SUBJECT   = <span class="k">0.35</span>   <span class="c"># teaches a subject you need</span>
-W_EXPERTISE = <span class="k">0.20</span>   <span class="c"># how strong they are in it</span>
-W_COURSE    = <span class="k">0.20</span>   <span class="c"># same course (0.5 partial credit for same strand)</span>
-W_YEAR      = <span class="k">0.15</span>
-W_LEVEL     = <span class="k">0.10</span></pre>
+W_SPECIFIC  = <span class="k">0.40</span>   <span class="c"># exact subject match</span>
+W_GENERAL   = <span class="k">0.20</span>   <span class="c"># exact or same-category match</span>
+W_EXPERTISE = <span class="k">0.15</span>   <span class="c"># how strong they are in the best matching subject</span>
+W_COURSE    = <span class="k">0.10</span>   <span class="c"># same course (0.5 partial credit for same strand)</span>
+W_YEAR      = <span class="k">0.10</span>
+W_LEVEL     = <span class="k">0.05</span></pre>
     <p>For the dashboard, <strong>subject membership becomes a hard filter</strong> (we only score
        tutors who teach one of your preference subjects), and <strong>course stays a score term</strong>
        (so same-course tutors rank highest). That matches what you asked for: "IT course &rarr; IT
