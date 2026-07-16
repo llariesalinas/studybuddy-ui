@@ -4,7 +4,7 @@ from django.db.models import Q
 
 from ..models import Preference, UserProfile
 from .cbf import get_student_subject_codes, resolve_target_categories
-from .CF import build_rating_matrix, top_k
+from .CF import build_rating_matrix, get_peer_student_ids, top_k
 from .hybrid import hybrid_prediction_breakdown, normalize_tutor_queryset
 
 logger = logging.getLogger(__name__)
@@ -98,8 +98,13 @@ def build_algorithm_demo_recommendation(tutee, institution_id=None):
         return {"reason": "no_candidates", "rows": []}
 
     ratings = build_rating_matrix()
-    neighbors = top_k(ratings, tutee.id) if tutee.id in ratings else []
-    neighbor_names = _neighbor_name_map(neighbor_id for neighbor_id, _ in neighbors)
+    peer_ids = get_peer_student_ids(ratings, tutee) if tutee.id in ratings else []
+    peer_neighbors = top_k(ratings, tutee.id, candidate_ids=peer_ids) if tutee.id in ratings else []
+    global_neighbors = top_k(ratings, tutee.id) if tutee.id in ratings else []
+    neighbor_names = _neighbor_name_map(
+        neighbor_id
+        for neighbor_id, _ in [*peer_neighbors, *global_neighbors]
+    )
     target_categories = resolve_target_categories(None, subject_codes)
 
     rows = []
@@ -110,7 +115,8 @@ def build_algorithm_demo_recommendation(tutee, institution_id=None):
             tutor,
             None,
             student_subjects=subject_codes,
-            neighbors=neighbors,
+            peer_neighbors=peer_neighbors,
+            global_neighbors=global_neighbors,
             target_categories=target_categories,
         )
         cf = breakdown["cf"]
@@ -129,6 +135,7 @@ def build_algorithm_demo_recommendation(tutee, institution_id=None):
             "cbf": breakdown["cbf"],
             "cf": {
                 "score": cf["score"],
+                "pool": cf["pool"],
                 "neighbors": [
                     {
                         "neighbor_id": neighbor["neighbor_id"],

@@ -1,7 +1,12 @@
 import logging
 
 from ..models import Tutor
-from .CF import compute_cf_breakdown, compute_cf_score, top_k
+from .CF import (
+    compute_cf_breakdown_with_fallback,
+    compute_cf_score_with_fallback,
+    get_peer_student_ids,
+    top_k,
+)
 from .cbf import (
     compute_cbf_breakdown,
     compute_cbf_score,
@@ -22,7 +27,8 @@ def hybrid_prediction(
     tutor,
     requested_subject,
     student_subjects=None,
-    neighbors=None,
+    peer_neighbors=None,
+    global_neighbors=None,
     target_categories=None,
 ):
     """target_categories should be precomputed once via
@@ -32,6 +38,13 @@ def hybrid_prediction(
     if target_categories is None:
         target_categories = resolve_target_categories(
             requested_subject, student_subjects or get_student_subject_codes(student_profile)
+        )
+
+    if peer_neighbors is None:
+        peer_neighbors = []
+    if global_neighbors is None:
+        global_neighbors = (
+            top_k(ratings, student_profile.id) if student_profile.id in ratings else []
         )
 
     cbf_score = compute_cbf_score(
@@ -45,11 +58,12 @@ def hybrid_prediction(
 
     tutor_id = tutor.profile_id
 
-    cf_score = compute_cf_score(
+    cf_score = compute_cf_score_with_fallback(
         ratings,
         student_profile.id,
         tutor_id,
-        neighbors=neighbors,
+        peer_neighbors,
+        global_neighbors,
     )
 
     if cf_score is None:
@@ -74,7 +88,8 @@ def hybrid_prediction_breakdown(
     tutor,
     requested_subject,
     student_subjects=None,
-    neighbors=None,
+    peer_neighbors=None,
+    global_neighbors=None,
     target_categories=None,
 ):
     """Same computation as hybrid_prediction, but returns the full CBF/CF breakdown
@@ -83,6 +98,13 @@ def hybrid_prediction_breakdown(
     if target_categories is None:
         target_categories = resolve_target_categories(
             requested_subject, student_subjects or get_student_subject_codes(student_profile)
+        )
+
+    if peer_neighbors is None:
+        peer_neighbors = []
+    if global_neighbors is None:
+        global_neighbors = (
+            top_k(ratings, student_profile.id) if student_profile.id in ratings else []
         )
 
     cbf = compute_cbf_breakdown(
@@ -96,11 +118,12 @@ def hybrid_prediction_breakdown(
 
     tutor_id = tutor.profile_id
 
-    cf = compute_cf_breakdown(
+    cf = compute_cf_breakdown_with_fallback(
         ratings,
         student_profile.id,
         tutor_id,
-        neighbors=neighbors,
+        peer_neighbors,
+        global_neighbors,
     )
 
     cf_score_for_hybrid = cf["score"] if cf["score"] is not None else 0
@@ -137,7 +160,9 @@ def recommend_tutors_hybrid(ratings, student_profile, requested_subject, candida
     target_categories = resolve_target_categories(requested_subject, student_subjects)
 
     student_id = student_profile.id
-    neighbors = top_k(ratings, student_id) if student_id in ratings else []
+    peer_ids = get_peer_student_ids(ratings, student_profile) if student_id in ratings else []
+    peer_neighbors = top_k(ratings, student_id, candidate_ids=peer_ids) if student_id in ratings else []
+    global_neighbors = top_k(ratings, student_id) if student_id in ratings else []
 
     recommendations = []
 
@@ -148,7 +173,8 @@ def recommend_tutors_hybrid(ratings, student_profile, requested_subject, candida
             tutor,
             requested_subject,
             student_subjects=student_subjects,
-            neighbors=neighbors,
+            peer_neighbors=peer_neighbors,
+            global_neighbors=global_neighbors,
             target_categories=target_categories,
         )
 

@@ -1,6 +1,10 @@
 from collections import defaultdict
-from ..models import Rating, Tutor
+from ..models import Rating, Tutor, UserProfile
 import math
+
+
+DEFAULT_NEIGHBOR_COUNT = 5
+POSITIVE_SIMILARITY_THRESHOLD = 0
 
 
 # -----------------------------
@@ -61,31 +65,47 @@ def sim(ratings, u, v):
 # -----------------------------
 # FIND TOP-K NEIGHBORS
 # -----------------------------
-def top_k(ratings, student_id, k=5):
+def top_k(ratings, student_id, k=DEFAULT_NEIGHBOR_COUNT, candidate_ids=None):
 
     similarities = []
 
-    for other_student in ratings:
+    candidates = candidate_ids if candidate_ids is not None else ratings
 
-        if other_student == student_id:
+    for other_student in candidates:
+
+        if other_student == student_id or other_student not in ratings:
             continue
 
         similarity = sim(ratings, student_id, other_student)
-            
-       # if similarity >= 0:
-           # similarities.append(other_student,similarity)
-            
-        similarities.append((other_student,similarity))
+
+        if similarity > POSITIVE_SIMILARITY_THRESHOLD:
+            similarities.append((other_student, similarity))
 
     similarities.sort(key=lambda x: x[1], reverse=True)
 
     return similarities[:k]
 
 
+def get_peer_student_ids(ratings, student_profile):
+    """Return rated students in the tutee's exact course using one query."""
+    if student_profile.course_id is None:
+        return []
+
+    return list(
+        UserProfile.objects.filter(
+            id__in=ratings.keys(), course_id=student_profile.course_id
+        ).exclude(
+            id=student_profile.id
+        ).values_list("id", flat=True)
+    )
+
+
 # -----------------------------
 # PREDICT RATING
 # -----------------------------
-def compute_cf_breakdown(ratings, student_id, tutor_id, k=5, neighbors=None):
+def compute_cf_breakdown(
+    ratings, student_id, tutor_id, k=DEFAULT_NEIGHBOR_COUNT, neighbors=None
+):
     """Same computation as compute_cf_score, but also returns which neighbors
     contributed a rating for this tutor and whether the student is Cold-Start
     (no Rating history at all). Used by compute_cf_score and by the algorithm
@@ -127,14 +147,43 @@ def compute_cf_breakdown(ratings, student_id, tutor_id, k=5, neighbors=None):
     return {"score": score, "cold_start": False, "neighbors": contributing}
 
 
-def compute_cf_score(ratings, student_id, tutor_id, k=5, neighbors=None):
+def compute_cf_score(
+    ratings, student_id, tutor_id, k=DEFAULT_NEIGHBOR_COUNT, neighbors=None
+):
     return compute_cf_breakdown(ratings, student_id, tutor_id, k=k, neighbors=neighbors)["score"]
+
+
+def compute_cf_breakdown_with_fallback(
+    ratings, student_id, tutor_id, peer_neighbors, global_neighbors
+):
+    """Use the peer prediction when available, otherwise the global prediction."""
+    peer_breakdown = compute_cf_breakdown(
+        ratings, student_id, tutor_id, neighbors=peer_neighbors
+    )
+    if peer_breakdown["cold_start"]:
+        return {**peer_breakdown, "pool": None}
+    if peer_breakdown["score"] is not None:
+        return {**peer_breakdown, "pool": "peer"}
+
+    global_breakdown = compute_cf_breakdown(
+        ratings, student_id, tutor_id, neighbors=global_neighbors
+    )
+    pool = "global" if global_breakdown["score"] is not None else None
+    return {**global_breakdown, "pool": pool}
+
+
+def compute_cf_score_with_fallback(
+    ratings, student_id, tutor_id, peer_neighbors, global_neighbors
+):
+    return compute_cf_breakdown_with_fallback(
+        ratings, student_id, tutor_id, peer_neighbors, global_neighbors
+    )["score"]
 
 
 # -----------------------------
 # RECOMMEND TUTORS
 # -----------------------------
-def recommend_tutors_cf(student_profile, k=5):
+def recommend_tutors_cf(student_profile, k=DEFAULT_NEIGHBOR_COUNT):
 
     ratings = build_rating_matrix()
 

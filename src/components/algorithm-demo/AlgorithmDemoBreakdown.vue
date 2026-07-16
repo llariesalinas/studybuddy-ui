@@ -150,7 +150,9 @@ onBeforeUnmount(clearTimers)
       <div class="bar-row">
         <div class="bar-label">
           <span>
-            CF (peer ratings)
+            CF
+            <span v-if="row.cf.pool === 'peer'" class="cf-pool">Peer rating (same course)</span>
+            <span v-else-if="row.cf.pool === 'global'" class="cf-pool">Global rating</span>
             <span v-if="row.cold_start" class="sb-badge cold">Cold Start</span>
           </span>
           <span>{{ cfBar.label }}</span>
@@ -335,6 +337,12 @@ onBeforeUnmount(clearTimers)
   background: color-mix(in srgb, var(--sb-danger) 12%, transparent);
   color: var(--sb-danger);
   border-color: color-mix(in srgb, var(--sb-danger) 30%, transparent);
+}
+
+.cf-pool {
+  color: var(--sb-primary);
+  font-weight: 600;
+  margin-left: 4px;
 }
 
 .empty-state {

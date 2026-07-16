@@ -4645,7 +4645,7 @@ class RecommenderNeighborReuseTests(APITestCase):
 
         self.assertEqual(without, with_neighbors)
 
-    def test_recommend_hybrid_computes_neighbors_once(self):
+    def test_recommend_hybrid_computes_both_neighbor_lists_once(self):
         from studybuddy.recommender import hybrid
 
         # three candidate tutors, but neighbors should be computed only once
@@ -4653,7 +4653,7 @@ class RecommenderNeighborReuseTests(APITestCase):
         for t in tutors:
             t.tutorsubjects_set.all.return_value = []
 
-        student_profile = Mock(id=1, course=None, year_level=None)
+        student_profile = Mock(id=1, course_id=None, year_level=None)
 
         with patch.object(hybrid, "top_k", return_value=[]) as mocked_top_k, \
              patch.object(hybrid, "get_student_subject_codes", return_value=[]), \
@@ -4661,14 +4661,14 @@ class RecommenderNeighborReuseTests(APITestCase):
              patch.object(hybrid, "normalize_tutor_queryset", return_value=tutors):
             hybrid.recommend_tutors_hybrid(self.ratings, student_profile, None)
 
-        self.assertEqual(mocked_top_k.call_count, 1)
+        self.assertEqual(mocked_top_k.call_count, 2)
 
     def test_recommend_hybrid_handles_student_with_no_ratings(self):
         from studybuddy.recommender import hybrid
 
         tutor = Mock(profile_id=99, tutorsubjects_set=Mock())
         tutor.tutorsubjects_set.all.return_value = []
-        student_profile = Mock(id=4242, course=None, year_level=None)  # not in ratings
+        student_profile = Mock(id=4242, course_id=None, year_level=None)  # not in ratings
 
         with patch.object(hybrid, "get_student_subject_codes", return_value=[]), \
              patch.object(hybrid, "compute_cbf_score", return_value=0.5), \
@@ -4676,6 +4676,81 @@ class RecommenderNeighborReuseTests(APITestCase):
             results = hybrid.recommend_tutors_hybrid(self.ratings, student_profile, None)
 
         self.assertEqual(len(results), 1)  # did not raise
+
+
+class CfPeerNeighborTests(APITestCase):
+    def setUp(self):
+        self.course = Course.objects.create(
+            course_code="BSCS", course_name="Computer Science"
+        )
+        self.other_course = Course.objects.create(
+            course_code="BSIT", course_name="Information Technology"
+        )
+        self.tutee = self._make_tutee("target", self.course)
+        self.peer = self._make_tutee("peer", self.course)
+        self.other_tutee = self._make_tutee("other", self.other_course)
+        self.no_course_tutee = self._make_tutee("no-course", None)
+
+    def _make_tutee(self, username, course):
+        user = User.objects.create_user(
+            username=f"{username}@cpu.edu", email=f"{username}@cpu.edu", password="password"
+        )
+        return UserProfile.objects.create(
+            user=user, fname=username, mname="", lname="Tutee", role="Tutee", course=course
+        )
+
+    def test_top_k_excludes_zero_and_negative_similarity_neighbors(self):
+        from studybuddy.recommender.CF import top_k
+
+        ratings = {
+            1: {10: 5, 11: 1},
+            2: {10: 4, 11: 2},
+            3: {10: 1, 11: 5},
+            4: {10: 3, 11: 3},
+        }
+
+        neighbors = top_k(ratings, 1)
+        self.assertEqual([student_id for student_id, _ in neighbors], [2])
+        self.assertGreater(neighbors[0][1], 0)
+
+    def test_peer_ids_include_only_same_course_and_null_course_is_empty(self):
+        from studybuddy.recommender.CF import get_peer_student_ids
+
+        ratings = {
+            self.tutee.id: {10: 5, 11: 1},
+            self.peer.id: {10: 4, 11: 2},
+            self.other_tutee.id: {10: 4, 11: 2},
+        }
+
+        self.assertEqual(get_peer_student_ids(ratings, self.tutee), [self.peer.id])
+        self.assertEqual(get_peer_student_ids(ratings, self.no_course_tutee), [])
+
+    def test_peer_prediction_falls_back_to_global_per_tutor(self):
+        from studybuddy.recommender.CF import compute_cf_breakdown_with_fallback
+
+        ratings = {
+            1: {10: 5, 11: 1},
+            2: {10: 4, 11: 2, 12: 5},
+            3: {10: 4, 11: 2, 13: 1},
+        }
+        peer_neighbors = [(2, 1.0)]
+        global_neighbors = [(3, 1.0)]
+
+        peer_breakdown = compute_cf_breakdown_with_fallback(
+            ratings, 1, 12, peer_neighbors, global_neighbors
+        )
+        global_breakdown = compute_cf_breakdown_with_fallback(
+            ratings, 1, 13, peer_neighbors, global_neighbors
+        )
+        empty_peer_breakdown = compute_cf_breakdown_with_fallback(
+            ratings, 1, 13, [], global_neighbors
+        )
+
+        self.assertEqual(peer_breakdown["pool"], "peer")
+        self.assertEqual(peer_breakdown["neighbors"][0]["neighbor_id"], 2)
+        self.assertEqual(global_breakdown["pool"], "global")
+        self.assertEqual(global_breakdown["neighbors"][0]["neighbor_id"], 3)
+        self.assertEqual(empty_peer_breakdown["pool"], "global")
 
 
 class CbfGraduatedSubjectMatchTests(APITestCase):
