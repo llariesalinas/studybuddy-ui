@@ -571,7 +571,7 @@ class GlobalSubjectCatalogTests(APITestCase):
             subject_code="CS101",
             subject_name="Introduction to Computing",
             department="Computer Science",
-            category="BSCS",
+            category="Technology & Computer Science",
         )
         self.super_user = User.objects.create_user(
             username="super",
@@ -602,7 +602,7 @@ class GlobalSubjectCatalogTests(APITestCase):
                 "subject_code": "AI201",
                 "subject_name": "Applied Artificial Intelligence",
                 "department": "Computer Science",
-                "category": self.course.course_code,
+                "category": "Technology & Computer Science",
             },
             format="json",
         )
