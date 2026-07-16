@@ -1947,7 +1947,11 @@ class SubjectListView(ListAPIView):
             include_current=include_current,
         )
         self.recognized_codes = recognized_codes
-        queryset = queryset.filter(status='approved')
+        if not include_current:
+            # recognized_codes are already approved-status by construction; only re-filter
+            # here when the caller didn't ask to keep the profile's current (possibly
+            # pending, e.g. a tutor's own proposed-but-unreviewed) subjects.
+            queryset = queryset.filter(status='approved')
         if search_query:
             queryset = queryset.filter(
                 Q(subject_name__icontains=search_query)

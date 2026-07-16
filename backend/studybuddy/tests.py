@@ -8195,3 +8195,50 @@ class CuratedPersonaCbfOrderingTests(APITestCase):
         self.assertGreater(scores["T1"], scores["T4"])
         self.assertGreater(scores["T4"], scores["T2"])
         self.assertGreater(scores["T2"], scores["T3"])
+
+
+class PendingProposedSubjectRemainsSelectableTests(APITestCase):
+    """Regression test for a bug found while retiring course-based subject gating: a tutor's
+    own pending proposed subject must stay visible in their subject-selection queryset, even
+    though visible_subject_queryset_for_profile is approved-only (see
+    subject_recognition.subject_selection_queryset_for_profile and its include_current
+    handling in SubjectListView.get_queryset)."""
+
+    def setUp(self):
+        self.institution = PartnerInstitution.objects.create(
+            institution_name="CPU", school_email_domain="cpu.edu.ph", is_active=True,
+        )
+        self.tutor_user = User.objects.create_user(
+            username="pending-subj-tutor@cpu.edu.ph", email="pending-subj-tutor@cpu.edu.ph",
+            password="password",
+        )
+        self.tutor_profile = UserProfile.objects.create(
+            user=self.tutor_user, fname="Pending", mname="", lname="Tutor", role="Tutor",
+            institution=self.institution,
+        )
+        self.tutor = Tutor.objects.create(profile=self.tutor_profile)
+        self.pending_subject = Subjects.objects.create(
+            subject_code="pending-subj", subject_name="Pending Subject",
+            category="Hobbies & Arts", status="pending",
+        )
+        TutorSubjects.objects.create(
+            tutor=self.tutor, subject=self.pending_subject, expertise_level=3,
+        )
+
+    def test_selection_queryset_includes_own_pending_subject(self):
+        from .subject_recognition import subject_selection_queryset_for_profile
+
+        queryset, _recognized = subject_selection_queryset_for_profile(
+            self.tutor_profile, include_current=True,
+        )
+
+        self.assertIn(self.pending_subject, queryset)
+
+    def test_subjects_endpoint_includes_own_pending_subject_when_include_current(self):
+        self.client.force_authenticate(user=self.tutor_user)
+
+        response = self.client.get("/api/subjects/", {"include_current": "1"})
+
+        self.assertEqual(response.status_code, 200)
+        codes = [row["subject_code"] for row in response.data]
+        self.assertIn(self.pending_subject.subject_code, codes)
