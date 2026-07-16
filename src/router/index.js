@@ -158,12 +158,6 @@ const router = createRouter({
       meta: { requiresAuth: true, role: 'Tutor' }
     },
     {
-      path: '/tch-requestedSessions',
-      name: 'tch-requestedSessions',
-      component: () => import('@/views/TutorRequestedSessions.vue'),
-      meta: { requiresAuth: true, role: 'Tutor' }
-    },
-    {
       path: '/booking-details/:id',
       name: 'booking-details',
       component: () => import('@/views/TutorBookingDetailsFlow.vue'),
