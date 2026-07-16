@@ -14,9 +14,7 @@ Local/dev use only — this command deletes data.
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand
 
-from studybuddy.models import (
-    InstitutionCourseCatalog, InstitutionRequest, PlatformActivity, Subjects,
-)
+from studybuddy.models import InstitutionRequest, PlatformActivity, Subjects
 
 
 class Command(BaseCommand):
@@ -31,7 +29,6 @@ class Command(BaseCommand):
         """Delete all non-staff data while retaining administrator accounts."""
         demo_users = User.objects.filter(is_staff=False, is_superuser=False)
         deleted, _ = demo_users.delete()  # cascades profiles, tutors, bookings, wallets, ...
-        InstitutionCourseCatalog.objects.all().delete()
         PlatformActivity.objects.all().delete()
         InstitutionRequest.objects.all().delete()
         Subjects.objects.all().delete()

@@ -11,15 +11,35 @@ CATEGORIES = [
     'Hobbies & Arts',
 ]
 
-_OVERRIDES = {'C++': 'cpp', 'C#': 'csharp', 'C': 'c-language'}
+# Subjects.subject_code is a CharField(max_length=20); names whose plain slug would exceed
+# that get an explicit short form here so the code stays readable rather than a raw truncation.
+_OVERRIDES = {
+    'C++': 'cpp',
+    'C#': 'csharp',
+    'C': 'c-language',
+    'Differential Equations': 'diff-equations',
+    'Human Anatomy & Physiology': 'human-anatomy',
+    'Environmental Science': 'env-science',
+    'Artificial Intelligence': 'artificial-intel',
+    'Managerial Accounting': 'mgmt-accounting',
+    'Human Resource Management': 'hr-management',
+    'Operations Management': 'ops-management',
+    'International Relations': 'intl-relations',
+}
+
+SUBJECT_CODE_MAX_LENGTH = 20
 
 
 def slugify_subject_code(name):
-    """Return the stable wire-format code for a taxonomy subject."""
+    """Return the stable wire-format code for a taxonomy subject.
+
+    Always <= SUBJECT_CODE_MAX_LENGTH (the Subjects.subject_code column width).
+    """
     name = str(name or '').strip()
     if name in _OVERRIDES:
         return _OVERRIDES[name]
-    return re.sub(r'[^a-z0-9]+', '-', name.lower()).strip('-')
+    slug = re.sub(r'[^a-z0-9]+', '-', name.lower()).strip('-')
+    return slug[:SUBJECT_CODE_MAX_LENGTH].rstrip('-')
 
 
 _GROUPS = {
