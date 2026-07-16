@@ -16,6 +16,7 @@ written. Codex ran the 2026-07-16 brief and delivered steps 1-5, 6 (load-limit b
 identically on clean `main`, none attributable), fixed two dead-code nits itself, and committed in
 three stops. Remaining: the tutor cancel-before-cutoff affordance (rest of step 6), all of step 7
 (admin surfaces), and test coverage for steps 2/2b/3 — tracked as Fix round 1 in the same brief.
+Team handoff summary: `docs/mockups/2026-07-16-bookings-subjects-handoff.html`.
 
 ## Goal
 
@@ -122,3 +123,7 @@ review to post-hoc accountability:
   duplication in `mailer.py`. Committed in three stops (backend, frontend, docs). Opened Fix round
   1 in the same brief for the rest: the tutor cancel-before-cutoff affordance, all of step 7
   (admin surfaces), and missing test coverage for steps 2/2b/3. Status stays In Progress.
+- **2026-07-16** — Built a team handoff (`/ui-preview`) summarizing Instant Booking plus the
+  unrelated subject-catalog/tutor-proposed-subjects work (recommender changes excluded, already
+  covered by their own handoff). Promoted to `docs/mockups/2026-07-16-bookings-subjects-handoff.html`
+  and linked above.
