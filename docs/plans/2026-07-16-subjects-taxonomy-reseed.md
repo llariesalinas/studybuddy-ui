@@ -12,7 +12,11 @@ spec: ../mockups/2026-07-16-subject-taxonomy-picker.html
 Claude: `feat/subjects-reseed` created off `feat/instant-booking`, `feat/recommender-weight-rebalance`
 merged clean (zero conflicts); new formula test classes pass, and the 7 `RecommendTutorsViewTests`
 failures were verified pre-existing on the parent branch (recorded as baseline). Steps 2-10 are
-compiled into `docs/briefs/2026-07-16-subjects-taxonomy-reseed.md`; Codex dispatch pending.
+compiled into `docs/briefs/2026-07-16-subjects-taxonomy-reseed.md`. Codex run 1 reviewed:
+items 1-4, 6, 7 verified good (level fix, gating retirement, taxonomy module, wipe, admin
+API/UI, partial picker rollout); Fix round 1 appended covering the missing seed rewrite,
+picker rollout completion, code-display strip, docs, tests, a pending-subject regression, and
+picker polish. Awaiting fix-round dispatch.
 
 ## Goal
 
@@ -115,3 +119,6 @@ live-demo proof that the recommendation algorithm works.
   linked as spec.
 - 2026-07-16: Step 1 executed (branch + clean rebalance merge, baseline test run recorded);
   steps 2-10 compiled into the Codex brief; status moved to In Progress.
+- 2026-07-16: Codex run 1 reviewed. Verified independently (recommender classes: same 7
+  baseline failures only, new level test passes; vitest 67 pass; build green). Reviewer fixed
+  6 lint leftovers; Fix round 1 appended to the brief (8 findings, F1-F8).

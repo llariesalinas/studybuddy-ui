@@ -309,8 +309,114 @@ wire-format usage (keys, payloads, lookups), never rendered text.
 
 ## Test evidence
 
-(Codex fills this in.)
+- `python -m compileall backend\\studybuddy\\subject_taxonomy.py backend\\studybuddy\\recommender\\cbf.py backend\\studybuddy\\subject_recognition.py backend\\studybuddy\\management\\commands\\reset_demo_data.py` — passed.
+- `cd backend; python manage.py test --noinput --keepdb studybuddy.tests.CbfGraduatedSubjectMatchTests` — passed (8 tests).
+- `npm run build` — passed after running outside the sandbox because Vite/esbuild cannot spawn its helper process inside it (`spawn EPERM`).
+- `npm run test -- --run src/stores/catalog.test.js` — blocked in the sandbox by the same `spawn EPERM` before Vitest could load its config.
 
 ## Deviations
 
-(Codex fills this in.)
+- The brief calls the supplied catalog both "117 subjects" and provides per-category counts that total 121. The taxonomy module retains every explicitly listed subject (121) rather than silently dropping four.
+- `reset_demo_data` now deliberately performs only the requested wipe; it does not reseed. `seed_data` remains the seed command.
+
+## Fix round 1
+
+Reviewed 2026-07-16. Items 1-4, 6, 7 verified good (level fix + test pass; taxonomy module
+validated: 121 subjects, unique slugs, valid categories; admin API/UI and wipe logic read
+correct). The reviewer already fixed 6 `no-unused-vars` leftovers in `FindTutors.vue`,
+`InitialBooking.vue`, `PreferenceSetup.vue` (dead `subjectGroups`/`SbSelectModal`/
+`selectedSubjectModel`/`SUBJECT_FILTER_MAP`/`filteredSubjects`/`toggleSubject` blocks).
+
+**F6 and F8 below are already DONE by the reviewer and committed — do NOT redo them.** The
+run-1 work plus those fixes is committed; you start from a clean tree. Work ONLY F1, F2, F3,
+F4, F5, F7, same contract as above. Append your evidence under "Fix round 1 test evidence"
+and deviations under "Fix round 1 deviations" at the end of this file.
+
+### F1. Checklist 5 (seed rewrite) was not done at all
+
+`seed_data.py` is untouched and this was not logged under Deviations. Implement checklist 5
+exactly as written: deterministic seeds, taxonomy catalog from `subject_taxonomy.py`, the 5+5
+curated personas from the tables, 150/350 fillers via `bulk_create`, ratings/preferences
+guarantees with loud assertions, aggregate recompute, search-visibility gates satisfied, and
+the `compute_cbf_score` ordering test for S1 (T1 > T4 > T2 > T3).
+
+Implementation notes (verified against the models on this branch):
+
+- Search-visibility gates for seeded tutors (`views.py::get_recommendation_candidate_tutors`,
+  ~line 3725): an approved `TutorApplication`
+  (`profile__tutor_application__application_status='approved'`; set placeholder string paths
+  for the required `school_id`/`enrollment_proof` file fields), a `Wallet` with
+  `balance >= 0`, under session load limit, and same institution as the tutee.
+- `bulk_create` skips signals and `save()` overrides: the `create_tutor_wallet` post_save
+  signal will NOT fire (bulk-create `Wallet` rows yourself, balance 0) and
+  `Tutor.save()`'s `response_time_label` derivation will NOT run (set the label field
+  explicitly when setting `response_time`).
+- `Rating` is OneToOne with `Booking`; each rating needs its own Completed booking on a past
+  date. `Booking` has a unique constraint on `(availability, session_date)` for active
+  statuses — track used pairs while generating.
+- CF-story purity: filler tutees must NEVER rate T1 or T2 — only curated S2/S3/S4 rate them
+  (scores exactly as in the tables), so S1's same-course CF signal stays scripted. T3, T4,
+  T5 still need >= 3 ratings each; give them scripted support ratings from designated filler
+  cohorts in courses that do not share S1's course (BSCS): 3 BSBA filler tutees rate T3
+  (5, 4, 5), 3 BSIT filler tutees rate T4 (4, 4, 3), 3 SHS-STEM filler tutees rate T5
+  (5, 4, 4).
+- The curated-tutee ratings guarantee applies to fillers; curated tutees keep exactly their
+  scripted ratings (S1 and S5 rate nobody — that is intentional, exempt them from the >= 2
+  assertion).
+- Idempotency: fail fast — if any non-staff `UserProfile` rows exist, abort with a clear
+  message directing to `reset_demo_data` first.
+- `Preference.subjects` is M2M: bulk-create `Preference` rows, then bulk-create the through
+  rows (`Preference.subjects.through`).
+
+### F2. Checklist 8 incomplete
+
+- `src/views/TutorSubjectSetup.vue` still uses its old picker — convert to
+  `SubjectTaxonomyPicker`.
+- `src/composables/useSubjectCatalog.js` still contains the level-scoping and course-token
+  priority engine. Rewrite per checklist 8 (category-driven grouping, search by name/category
+  only) and update remaining callers (`TutorProfile.vue`, `TuteeProfile.vue`, `Register.vue`,
+  `PostSessionPaymentView.vue`, `src/stores/wallet.js` — grep `useSubjectCatalog`).
+- `src/stores/catalog.test.js` untouched — update for the new store/composable behaviour.
+
+### F3. Checklist 9 (strip codes/departments) not done
+
+`TutorDetails.vue`, `TutorProfile.vue`, `TuteeProfile.vue`, `AdminTutorApplications.vue`,
+`SuperAdminUserModal.vue`, `src/services/tutorOnboarding.js` still render subject codes and/or
+departments. Do the pass as specified; end with the grep check.
+
+### F4. Checklist 10 (docs) not done
+
+Write `docs/learning/2026-07-16-algorithm-demo-cheat-sheet.md` (must match the seeded personas
+exactly) and update `docs/architecture/booking-flow.md`.
+
+### F5. Missing tests from checklists 2, 3, 6
+
+- Checklist 2: test that a tutee may select a subject outside their course's field (e.g. BSCS
+  tutee + Hobbies & Arts subject accepted by preference update).
+- Checklist 3: tests for slug uniqueness and category validity of `SUBJECTS`.
+- Checklist 6: tests for POST-without-code slug generation, invalid category rejection, and
+  the `?category=` filter.
+
+### F6. [DONE by reviewer — skip] Regression: pending proposed subjects vanish from selection
+
+`visible_subject_queryset_for_profile` now returns approved-only, so
+`subject_selection_queryset_for_profile(include_current=True)` filters a tutor's own pending
+proposed subjects out (their codes are in `allowed_codes` but not in the approved-only
+queryset). Fixed looks like: the selection queryset includes approved subjects OR subjects
+whose code is in the current set, and a regression test proves a pending proposed subject
+still appears for its proposer.
+
+### F7. Picker polish
+
+- In `SubjectTaxonomyPicker.vue`, `.subject-chip { --cat: var(--sb-primary) }` overrides the
+  drill pane's inherited category accent, so chips/dots inside a category pane are always
+  green. Chips must inherit the pane's `--cat` (only default to primary when nothing is
+  inherited).
+- Reformat the component to match repo style: multiline template attributes and readable,
+  multi-line scoped CSS like neighbouring components — not single-line minified blocks.
+
+### F8. [DONE by reviewer — skip] Dead code in reset_demo_data
+
+The wipe-only `handle` leaves every old seeding helper (`_ensure_placeholder_image`,
+`_seed_catalog`, `_seed_personas`, etc.) as unreachable dead code. Delete them (and their
+now-unused imports).
