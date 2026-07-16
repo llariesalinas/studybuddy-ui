@@ -53,10 +53,6 @@
             <i class="bi bi-calendar3"></i>
             Schedule
           </button>
-          <button type="button" class="btn-primary-action sb-btn sb-elevated sb-elevated--brand" @click="goToPendingSessions">
-            <i class="bi bi-inbox-fill"></i>
-            Pending Sessions
-          </button>
         </div>
       </header>
 
@@ -1106,10 +1102,6 @@ async function saveProfile() {
 async function discardChanges() {
   await loadProfile()
   toastStore.push('Changes discarded.')
-}
-
-function goToPendingSessions() {
-  router.push('/tch-requestedSessions')
 }
 
 function goToSchedule() {

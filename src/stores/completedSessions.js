@@ -208,16 +208,6 @@ export const useSessionsStore = defineStore('sessions', () => {
     }
   }
 
-  const approveSession = async (id) => {
-    await api.post(`/bookings/${id}/approve/`)
-    await fetchSessions({ force: true })
-  }
-
-  const rejectSession = async (id) => {
-    await api.post(`/bookings/${id}/reject/`)
-    await fetchSessions({ force: true })
-  }
-
   const cancelSession = async (id, reason) => {
     await api.post(`/bookings/${id}/cancel/`, { reason })
     await fetchSessions({ force: true })
@@ -387,8 +377,6 @@ export const useSessionsStore = defineStore('sessions', () => {
     fetchSessions,
     fetchRecommendations,
     fetchSessionById,
-    approveSession,
-    rejectSession,
     cancelSession,
     dismissDashboardPill,
     markPendingRequestsSeen,

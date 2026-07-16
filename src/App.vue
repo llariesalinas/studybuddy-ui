@@ -208,16 +208,6 @@
             <p class="sb-muted">Claim and resolve escalated support tickets from institution admins.</p>
           </div>
 
-          <div v-if="route.path === '/tch-requestedSessions'">
-            <div class="d-flex align-items-center gap-2 flex-wrap">
-              <h2 class="fw-bold sb-text mb-1">Requested Sessions</h2>
-              <span v-if="sessionStore.hasNewPendingRequests" class="request-alert-dot" aria-label="New requests available"></span>
-            </div>
-            <p class="sb-muted mb-0">
-                Manage pending session requests.
-            </p>
-          </div>
-
           <div class="d-flex gap-3 align-items-center ms-auto">
             <button
               v-if="userRole === 'tutee' && route.path !== '/book'"
@@ -228,21 +218,6 @@
               Book Session
             </button>
 
-            <router-link
-              v-if="userRole === 'tutor' && route.path !== '/tch-requestedSessions'"
-              to="/tch-requestedSessions"
-              class="btn bg-sb-primary text-white px-4 py-2 rounded-3 fw-semibold pending-request-btn d-inline-flex align-items-center gap-2 sb-btn sb-elevated sb-elevated--brand"
-            >
-              <span v-if="sessionStore.hasNewPendingRequests" class="pending-request-dot" aria-hidden="true"></span>
-              <span>Manage Pending Sessions</span>
-              <span
-                v-if="sessionStore.requestedSessions.length > 0"
-                class="pending-request-count pending-request-count-surface badge rounded-pill text-sb-primary border border-sb"
-                :aria-label="`${sessionStore.requestedSessions.length} pending session request${sessionStore.requestedSessions.length === 1 ? '' : 's'}`"
-              >
-                {{ sessionStore.requestedSessions.length }}
-              </span>
-            </router-link>
 
             <div v-if="authStore.isAuthenticated && !isPublicRoute" class="d-flex align-items-center gap-2 ms-auto">
               <router-link to="/chat" class="chat-icon-btn sb-btn" aria-label="Open chat">

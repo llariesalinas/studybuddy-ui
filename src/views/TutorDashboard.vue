@@ -1,5 +1,8 @@
 <template>
   <div class="tutor-dashboard">
+    <div v-if="isHiddenByLoadLimit" class="alert alert-warning" role="status">
+      You are hidden from tutor search because you reached your Accepted Session Load Limit. Complete or cancel an upcoming session to become visible again.
+    </div>
     <section class="metric-grid" aria-label="Tutor dashboard metrics">
       <article
         v-for="metric in dashboardMetrics"
@@ -145,6 +148,7 @@ const sessionLoadLimit = ref(10)
 const upcomingBookings = ref([])
 const isLoading = ref(false)
 const errorMessage = ref('')
+const isHiddenByLoadLimit = computed(() => acceptedSessionLoad.value >= sessionLoadLimit.value)
 
 const nextBooking = computed(() => upcomingBookings.value[0] || null)
 const walletBalance = computed(() => Number(walletStore.balance || 0))

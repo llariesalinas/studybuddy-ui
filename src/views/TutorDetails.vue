@@ -804,14 +804,19 @@ const confirmBooking = async () => {
     bookedSessionStore.bookedSessionSub = bookedSessionStore.bookedSessionSub || initialBookingStore.selectedSubject
     bookedSessionStore.bookedSessionMode = bookedSessionStore.bookedSessionMode || initialBookingStore.selectedMode
 
-    await api.post('bookings/confirm/', {
+    const response = await api.post('bookings/confirm/', {
       tutor_id: tutorID,
       slots: effectiveSelectedSlots.value,
       preferred_location: bookedSessionStore.bookedSessionLocation,
       subject: bookedSessionStore.bookedSessionSub
     })
 
-    toastStore.push('Booking Confirmed!')
+    const confirmation = response.data
+    const destination = confirmation.meeting_link || confirmation.preferred_location
+    const cancellationCopy = confirmation.is_born_late
+      ? 'This booking has no penalty-free cancellation window.'
+      : `Cancel without a strike before ${new Date(confirmation.cancellation_deadline).toLocaleString()}.`
+    toastStore.push(`Booking confirmed. ${destination ? `Session details: ${destination}. ` : ''}${cancellationCopy}`)
     initialBookingStore.$reset()
     findTutorsStore.reset()
     selectedSlots.value = []
