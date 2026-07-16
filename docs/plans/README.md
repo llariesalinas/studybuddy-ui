@@ -6,7 +6,7 @@ Status moves Draft â†’ Approved â†’ In Progress â†’ Done. When a 
 **Status & Progress Summary** (2026-07-15): Merged `origin/main` into
 `feat/tutor-onboarding-verification-redesign`; main's "Remove Applicant Review from Super Admin"
 work is superseded on this branch by the Admin-into-SuperAdmin role consolidation (its plan row
-below is annotated accordingly), while main's migration-dependency fix was kept. Instant Booking is Approved — grilled end-to-end (11
+below is annotated accordingly), while main's migration-dependency fix was kept. Instant Booking is In Progress — a Codex brief (`docs/briefs/2026-07-16-instant-booking.md`) covering all 8 steps was compiled 2026-07-16 on `feat/instant-booking`; dispatch pending. Grilled end-to-end (11
 decisions) via `/grill-with-docs` from panel feedback: Instant Booking becomes the only booking
 model (request-to-book, approve/reject endpoints, and `TutorRequestedSessions.vue` removed);
 tutor protection moves to a symmetric 12h Grace Cutoff with self-serve Late Cancellations that
