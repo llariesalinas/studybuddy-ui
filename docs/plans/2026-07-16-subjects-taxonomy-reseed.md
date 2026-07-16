@@ -1,16 +1,18 @@
 ---
 title: Subjects taxonomy reseed and recommender proof
 date: 2026-07-16
-status: Approved
+status: In Progress
 summary: Replace coded curriculum subjects with a Preply-style category taxonomy, wipe and reseed with curated + filler personas, and prove the rebalanced recommender via the algorithm demo tool.
 spec: ../mockups/2026-07-16-subject-taxonomy-picker.html
 ---
 
 # Subjects taxonomy reseed and recommender proof
 
-**Status & Progress Summary** (2026-07-16): Plan approved after a full grilling session (12
-decisions) plus a ui-preview mockup session for the picker design (drilldown cards V1 chosen,
-saved to `docs/mockups/2026-07-16-subject-taxonomy-picker.html`). No implementation started.
+**Status & Progress Summary** (2026-07-16): In Progress via the Codex loop. Step 1 is done by
+Claude: `feat/subjects-reseed` created off `feat/instant-booking`, `feat/recommender-weight-rebalance`
+merged clean (zero conflicts); new formula test classes pass, and the 7 `RecommendTutorsViewTests`
+failures were verified pre-existing on the parent branch (recorded as baseline). Steps 2-10 are
+compiled into `docs/briefs/2026-07-16-subjects-taxonomy-reseed.md`; Codex dispatch pending.
 
 ## Goal
 
@@ -111,3 +113,5 @@ live-demo proof that the recommendation algorithm works.
 
 - 2026-07-16: Plan created and approved from the grilling session; picker mockup decided and
   linked as spec.
+- 2026-07-16: Step 1 executed (branch + clean rebalance merge, baseline test run recorded);
+  steps 2-10 compiled into the Codex brief; status moved to In Progress.
