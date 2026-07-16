@@ -1,25 +1,24 @@
 ---
 title: Subjects taxonomy reseed and recommender proof
 date: 2026-07-16
-status: In Progress
+status: Done
 summary: Replace coded curriculum subjects with a Preply-style category taxonomy, wipe and reseed with curated + filler personas, and prove the rebalanced recommender via the algorithm demo tool.
 spec: ../mockups/2026-07-16-subject-taxonomy-picker.html
 ---
 
 # Subjects taxonomy reseed and recommender proof
 
-**Status & Progress Summary** (2026-07-16): In Progress via the Codex loop. Step 1 is done by
-Claude: `feat/subjects-reseed` created off `feat/instant-booking`, `feat/recommender-weight-rebalance`
-merged clean (zero conflicts); new formula test classes pass, and the 7 `RecommendTutorsViewTests`
-failures were verified pre-existing on the parent branch (recorded as baseline). Steps 2-10 are
-compiled into `docs/briefs/2026-07-16-subjects-taxonomy-reseed.md`. Codex run 1 reviewed:
-items 1-4, 6, 7 verified good (level fix, gating retirement, taxonomy module, wipe, admin
-API/UI, partial picker rollout); Fix round 1 appended covering the missing seed rewrite,
-picker rollout completion, code-display strip, docs, tests, a pending-subject regression, and
-picker polish. Reviewer fixed F6/F8 directly; run-1 work committed. Codex fix-round run
-delivered only F7 + the composable rewrite (verified and committed); Fix round 2 appended for
-the rest — seed rewrite (F1), TutorSubjectSetup + catalog.test.js (F2 remainder), code strip
-(F3), docs (F4), tests (F5). Awaiting dispatch decision.
+**Status & Progress Summary** (2026-07-17): Done. After two Codex runs left the seed rewrite,
+picker rollout, doc, and test items incomplete, the reviewer implemented Fix round 2 directly:
+the full curated + filler seed (verified end-to-end against a real Postgres DB — S1's ranking
+matches the scripted claim exactly), the remaining picker conversions, the code/department
+strip, the cheat sheet and booking-flow doc, and the missing tests. A real regression was
+found and fixed along the way (`SubjectListView` was silently stripping a tutor's own pending
+proposed subject even with `include_current=True`). Final verification: 97 subjects-relevant
+tests across 15 classes pass, with exactly 2 unrelated pre-existing failures (an avatar-upload
+fixture using non-image bytes, and a `PaymentMethod` migration/test collision — both
+confirmed via git blame to predate this branch). Frontend: build, lint, and 67/67 vitest all
+green. See the session summary for the full breakdown.
 
 ## Goal
 
@@ -130,3 +129,8 @@ live-demo proof that the recommendation algorithm works.
 - 2026-07-16: Codex fix-round run reviewed: only F7 + useSubjectCatalog rewrite delivered
   (verified: build green, 67 vitest pass, lint clean; committed). No evidence logged by
   Codex. Fix round 2 appended (R2-1 through R2-5).
+- 2026-07-17: Fix round 2 implemented directly (seed rewrite, TutorSubjectSetup conversion,
+  code/department strip, cheat sheet + booking-flow doc, missing tests); found and fixed a
+  real regression in `SubjectListView`'s pending-subject handling; fixed a taxonomy-unrelated
+  test broken by the earlier category-validation change; verified 97 relevant tests pass with
+  only 2 confirmed-unrelated pre-existing failures; marked Done.
