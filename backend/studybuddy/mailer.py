@@ -15,7 +15,7 @@ shadow Python's stdlib ``email`` package that Django's mail internals import.
 """
 import logging
 import time
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -31,6 +31,9 @@ from django_q.tasks import async_task
 from .models import EmailSendLog
 
 logger = logging.getLogger(__name__)
+
+# Mirrors GRACE_CUTOFF_HOURS in views.py (kept separate to avoid a circular import).
+GRACE_CUTOFF_HOURS = 12
 
 
 class EmailRateLimitError(Exception):
@@ -188,6 +191,39 @@ def send_document_renewal_reminder_email_task(user_id, role_label, days_remainin
         "document_renewal_reminder",
         {"days_remaining": days_remaining, "due_at": due_at_iso, "status_url": status_url},
     )
+
+
+def send_booking_confirmed_email_task(booking_id):
+    if settings.IS_DEMO_DEPLOYMENT:
+        logger.info('Demo deployment: suppressing booking confirmation email for booking_id=%s', booking_id)
+        return
+    from .models import Booking
+
+    booking = Booking.objects.select_related('student__user', 'tutor__profile__user', 'availability').get(pk=booking_id)
+    session_start = timezone.make_aware(
+        datetime.combine(booking.session_date, booking.availability.time_slot),
+        timezone.get_current_timezone(),
+    )
+    deadline = session_start - timedelta(hours=GRACE_CUTOFF_HOURS)
+    deadline_copy = timezone.localtime(deadline).strftime('%b %d, %Y %I:%M %p')
+    cancellation_copy = (
+        'This booking has no penalty-free cancellation window.'
+        if booking.is_born_late
+        else f'Cancel without a strike before {deadline_copy}.'
+    )
+    text_body = (
+        f'Your StudyBuddy session on {booking.session_date} is confirmed. {cancellation_copy}\n'
+        f"Meeting Link: {booking.meeting_link or 'Face-to-face session; use the preferred location in StudyBuddy.'}"
+    )
+    _deliver(
+        subject='Your StudyBuddy booking is confirmed',
+        text_body=text_body,
+        html_body=text_body.replace('\n', '<br>'),
+        recipient=_recipient_for(booking.tutor.profile.user),
+        purpose=EmailSendLog.PURPOSE_BOOKING_CONFIRMED,
+        timeout=settings.EMAIL_TIMEOUT,
+        max_attempts=1,
+    )
     _deliver(
         subject=f"Your StudyBuddy {role_label.capitalize()} verification renewal is due soon",
         text_body=text_body,
@@ -228,3 +264,7 @@ def enqueue_document_renewal_reminder(profile, role_label, days_remaining, due_a
         days_remaining,
         due_at.isoformat(),
     )
+
+
+def enqueue_booking_confirmed(tutor_user, booking):
+    async_task('studybuddy.mailer.send_booking_confirmed_email_task', booking.id)
