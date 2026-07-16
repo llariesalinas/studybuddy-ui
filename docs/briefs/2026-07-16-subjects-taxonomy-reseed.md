@@ -420,3 +420,31 @@ still appears for its proposer.
 The wipe-only `handle` leaves every old seeding helper (`_ensure_placeholder_image`,
 `_seed_catalog`, `_seed_personas`, etc.) as unreachable dead code. Delete them (and their
 now-unused imports).
+
+## Fix round 1 outcome (reviewed 2026-07-16)
+
+The fix-round run delivered only F7 (verified: chips inherit the pane accent, component
+reformatted) and the `useSubjectCatalog.js` rewrite from F2 (verified: category-driven,
+callers unbroken, build + 67 vitest green). Both committed by the reviewer. No test evidence
+or deviations were logged. F1, F3, F4, F5 and the rest of F2 were not attempted.
+
+## Fix round 2
+
+Work ONLY these, same contract. Log evidence under "Fix round 2 test evidence" and deviations
+under "Fix round 2 deviations".
+
+### R2-1. Seed rewrite (= F1, unchanged)
+
+Do F1 exactly as specified above, including all Implementation notes. This is the core
+deliverable of the whole plan — nothing demos without it.
+
+### R2-2. Finish F2
+
+- Convert `src/views/TutorSubjectSetup.vue` to `SubjectTaxonomyPicker`.
+- Update `src/stores/catalog.test.js` for the rewritten composable/store behaviour.
+
+### R2-3. Strip codes/departments (= F3, unchanged)
+
+### R2-4. Docs (= F4, unchanged)
+
+### R2-5. Missing tests (= F5, unchanged)

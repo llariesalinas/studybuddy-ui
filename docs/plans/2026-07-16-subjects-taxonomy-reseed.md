@@ -16,7 +16,10 @@ compiled into `docs/briefs/2026-07-16-subjects-taxonomy-reseed.md`. Codex run 1 
 items 1-4, 6, 7 verified good (level fix, gating retirement, taxonomy module, wipe, admin
 API/UI, partial picker rollout); Fix round 1 appended covering the missing seed rewrite,
 picker rollout completion, code-display strip, docs, tests, a pending-subject regression, and
-picker polish. Awaiting fix-round dispatch.
+picker polish. Reviewer fixed F6/F8 directly; run-1 work committed. Codex fix-round run
+delivered only F7 + the composable rewrite (verified and committed); Fix round 2 appended for
+the rest — seed rewrite (F1), TutorSubjectSetup + catalog.test.js (F2 remainder), code strip
+(F3), docs (F4), tests (F5). Awaiting dispatch decision.
 
 ## Goal
 
@@ -122,3 +125,8 @@ live-demo proof that the recommendation algorithm works.
 - 2026-07-16: Codex run 1 reviewed. Verified independently (recommender classes: same 7
   baseline failures only, new level test passes; vitest 67 pass; build green). Reviewer fixed
   6 lint leftovers; Fix round 1 appended to the brief (8 findings, F1-F8).
+- 2026-07-16: Reviewer fixed F6 (pending proposed subjects stay selectable) and F8 (wipe-only
+  reset_demo_data, 1104 -> 38 lines); run-1 work committed in three stops.
+- 2026-07-16: Codex fix-round run reviewed: only F7 + useSubjectCatalog rewrite delivered
+  (verified: build green, 67 vitest pass, lint clean; committed). No evidence logged by
+  Codex. Fix round 2 appended (R2-1 through R2-5).
