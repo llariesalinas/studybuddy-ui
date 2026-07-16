@@ -176,13 +176,24 @@
         >
       </div>
 
-      <RouterLink
-        v-if="detailsTarget"
-        :to="detailsTarget"
-        class="chat-banner__btn chat-banner__btn--ghost sb-btn"
-      >
-        View Details
-      </RouterLink>
+      <div class="chat-banner__action-row chat-banner__action-row--inline">
+        <a
+          v-if="bannerContext.session_mode === 'Online' && bannerContext.meeting_link"
+          :href="bannerContext.meeting_link"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="chat-banner__btn chat-banner__btn--primary sb-btn"
+        >
+          Join session
+        </a>
+        <RouterLink
+          v-if="detailsTarget"
+          :to="detailsTarget"
+          class="chat-banner__btn chat-banner__btn--ghost sb-btn"
+        >
+          View Details
+        </RouterLink>
+      </div>
     </template>
 
     <template v-else-if="bannerContext.status_intent === 'awaiting_payment'">
