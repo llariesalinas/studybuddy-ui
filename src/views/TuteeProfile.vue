@@ -414,7 +414,7 @@
                 <span class="subject-option-copy">
                   <span class="subject-option-name">{{ subject.subject_name }}</span>
                   <span class="subject-option-meta">
-                    {{ subject.subject_code }} - {{ getSubjectGroup(subject) }}
+                    {{ getSubjectGroup(subject) }}
                   </span>
                   <span v-if="subject.is_recognized === false" class="subject-option-state">
                     No longer recognized for your course

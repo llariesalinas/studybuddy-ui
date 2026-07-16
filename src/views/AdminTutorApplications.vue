@@ -177,7 +177,7 @@
           >
             <div>
               <div class="fw-bold">{{ subject.subject_name }}</div>
-              <div class="small text-muted">{{ subject.department }}</div>
+              <div class="small text-muted">{{ subject.category }}</div>
             </div>
             <div class="d-flex gap-2">
               <button

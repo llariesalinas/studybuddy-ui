@@ -506,7 +506,7 @@
               <span class="subject-option-copy">
                 <span class="subject-option-name">{{ subject.subject_name }}</span>
                 <span class="subject-option-meta">
-                  {{ subject.subject_code }} - {{ normalizeCategory(subject.category) }}
+                  {{ normalizeCategory(subject.category) }}
                 </span>
               </span>
               <span class="subject-option-check" aria-hidden="true">
@@ -722,7 +722,7 @@ const filteredSubjects = computed(() => {
     const matchesSearch =
       !query ||
       subject.subject_name.toLowerCase().includes(query) ||
-      subject.subject_code.toLowerCase().includes(query)
+      category.toLowerCase().includes(query)
 
     return matchesCategory && matchesSearch
   })

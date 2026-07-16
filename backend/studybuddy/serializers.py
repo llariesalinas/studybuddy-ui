@@ -494,7 +494,7 @@ class TutorApplicationSerializer(serializers.ModelSerializer):
             {
                 'subject_code': subject.subject_code,
                 'subject_name': subject.subject_name,
-                'department': subject.department,
+                'category': subject.category,
                 'description': descriptions.get(subject.subject_code, ''),
                 'status': subject.status,
             }
