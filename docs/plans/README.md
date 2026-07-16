@@ -3,7 +3,15 @@
 Every finalized plan lives in this folder as its own dated file, created from [`_template.md`](_template.md).
 Status moves Draft â†’ Approved â†’ In Progress â†’ Done. When a plan is complete, its summary is linked below.
 
-**Status & Progress Summary** (2026-07-15): Merged `origin/main` into
+**Status & Progress Summary** (2026-07-16): Subjects taxonomy reseed and recommender proof is
+Approved — grilled end-to-end (12 decisions) from panel feedback: subjects become a Preply-style
+generic/specific taxonomy (slug PKs, `category` repurposed from course linkage to the 6 taxonomy
+categories, SPED deliberately excluded), course-based subject gating is retired, the demo DB gets
+a full non-staff wipe and a curated + filler reseed (10 curated personas covering every formula
+component, ~150/~350 Faker fillers with guaranteed ratings/preferences), built on top of a merge
+of `feat/recommender-weight-rebalance`, with a CBF level-check fix and a two-level drilldown
+subject picker (mockup decided via ui-preview) — [Plan](2026-07-16-subjects-taxonomy-reseed.md).
+Previous (2026-07-15): Merged `origin/main` into
 `feat/tutor-onboarding-verification-redesign`; main's "Remove Applicant Review from Super Admin"
 work is superseded on this branch by the Admin-into-SuperAdmin role consolidation (its plan row
 below is annotated accordingly), while main's migration-dependency fix was kept. Instant Booking is In Progress — a Codex brief (`docs/briefs/2026-07-16-instant-booking.md`) covering all 8 steps was compiled 2026-07-16 on `feat/instant-booking`; dispatch pending. Grilled end-to-end (11
@@ -87,6 +95,7 @@ three stops. Done.
 
 | Date | Plan | Status | Summary |
 |------|------|--------|---------|
+| 2026-07-16 | [Subjects taxonomy reseed and recommender proof](2026-07-16-subjects-taxonomy-reseed.md) | Approved | Preply-style category taxonomy (slug codes, no visible codes, SPED excluded), full wipe + curated/filler reseed with guaranteed ratings/preferences, rebalance-branch merge, CBF level fix, course-gating retirement, two-level drilldown picker ([mockup](../mockups/2026-07-16-subject-taxonomy-picker.html)), demo-tool proof with cheat sheet |
 | 2026-07-13 | [Tutor onboarding & verification redesign](2026-07-13-tutor-onboarding-verification-redesign.md) | Done | Removes the tutor route-lockout for a tutee-style search-visibility gate, folds verification into one guided onboarding sequence with a skip option, and lets tutors propose subjects missing from the catalog for admin review alongside their application; implemented via Codex, independently verified (full suite failures confirmed pre-existing/unrelated by root-cause tracing) — [Summary](../session-summaries/2026-07-14-tutor-onboarding-verification-redesign-summary.md) |
 | 2026-07-13 | [Remove Motivation field from Tutor/Tutee application flows](2026-07-13-remove-motivation-field.md) | Done | Removed `reason_to_tutor` ("Motivation") entirely — model, serializers, views, tests, demo data, and every frontend surface — while preserving the unrelated document-renewal "note" field it shared UI/variable names with; full backend suite + 26 targeted tests pass, lint/build clean, two-axis review clean — [Summary](../session-summaries/2026-07-13-remove-motivation-field-summary.md) |
 | 2026-07-08 | [Algorithm Demo — Live Rating Edit](2026-07-08-algorithm-demo-live-rating-edit.md) | In Progress | Dev-only inline rating edit in Compare Pair's neighbor list, new staff-only PATCH endpoint, refetch-and-reanimate on save — [Spec](../specs/2026-07-08-algorithm-demo-live-rating-edit-design.md) |
@@ -177,6 +186,7 @@ Entries marked Done&ast; predate the session-summary convention; their status is
 
 | Date | Change |
 |------|--------|
+| 2026-07-16 | Grilled the subjects taxonomy reseed end-to-end (12 decisions, including retiring course-based subject gating discovered mid-interview); ran a ui-preview session for the two-level picker (drilldown cards V1 chosen, promoted to `docs/mockups/2026-07-16-subject-taxonomy-picker.html`); added the Approved plan |
 | 2026-07-13 | Grilled removing the Motivation field end-to-end (scope expanded twice: also drop the backend column, also touch the Tutee-verification endpoints it's wired into); added the Approved plan |
 | 2026-07-13 | Implemented the Motivation field removal (8 steps), applied migration 0075, ran full backend suite + 26 targeted tests (all pass), lint/build clean, two-axis review clean; marked Done and linked summary |
 | 2026-07-08 | Completed booking-subject-persistence review follow-ups by extracting the shared subject error and display-label helper; added the session summary and marked the plan Done |
