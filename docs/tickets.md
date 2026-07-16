@@ -48,15 +48,15 @@ prediction used.
 
 **Model:** top
 
-- [ ] `top_k` excludes non-positive similarity neighbors in both pools — covered by a test.
-- [ ] Peer pool contains only same-course students; null-course tutee gets an empty peer pool —
+- [x] `top_k` excludes non-positive similarity neighbors in both pools — covered by a test.
+- [x] Peer pool contains only same-course students; null-course tutee gets an empty peer pool —
       covered by tests.
-- [ ] Per-tutor fallback: peer prediction used when peer denominator is nonzero, global
+- [x] Per-tutor fallback: peer prediction used when peer denominator is nonzero, global
       otherwise — covered by a test at the tutor level and the pool level.
-- [ ] Neighbor lists computed once per request (existing neighbor-reuse tests still pass or are
+- [x] Neighbor lists computed once per request (existing neighbor-reuse tests still pass or are
       updated to the two-list shape).
-- [ ] CF breakdown exposes which pool each prediction used; demo tool and its UI surface it.
-- [ ] Backend suite green (no new failures); `npm run lint` and `npm run build` pass if
+- [x] CF breakdown exposes which pool each prediction used; demo tool and its UI surface it.
+- [x] Backend suite green (no new failures); `npm run lint` and `npm run build` pass if
       frontend touched.
 
 ## Glossary and docs sync
@@ -73,7 +73,7 @@ global fallback
 
 **Model:** small
 
-- [ ] CONTEXT.md CBF Score entry matches the implemented weights and rules.
-- [ ] CONTEXT.md CF Score / Top-K Neighbor entries describe the peer pool, fallback, and
+- [x] CONTEXT.md CBF Score entry matches the implemented weights and rules.
+- [x] CONTEXT.md CF Score / Top-K Neighbor entries describe the peer pool, fallback, and
       positive-similarity filter, including the per-request revisit trigger.
-- [ ] No stale references to the old 0.35/0.20/0.20/0.15/0.10 weights anywhere in docs.
+- [x] No stale references to the old 0.35/0.20/0.20/0.15/0.10 weights anywhere in docs.

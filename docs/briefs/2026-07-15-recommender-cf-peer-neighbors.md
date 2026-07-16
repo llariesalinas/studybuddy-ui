@@ -158,8 +158,33 @@ Acceptance criteria:
 
 ## Test evidence
 
-(Codex fills this in.)
+- `cd backend; python manage.py test studybuddy.tests.CfPeerNeighborTests studybuddy.tests.RecommenderNeighborReuseTests studybuddy.tests.CbfGraduatedSubjectMatchTests --keepdb`
+  - Passed: 14 tests.
+- `npm run lint`
+  - Passed: oxlint reported 0 warnings/errors; ESLint completed successfully.
+- `npm run build`
+  - Passed: Vite production build completed successfully.
+- `cd backend; python manage.py test studybuddy.tests.CbfGraduatedSubjectMatchTests studybuddy.tests.DashboardRecommendationServiceTests studybuddy.tests.AlgorithmDemoToolTests --keepdb`
+  - Completed its test output in 139.361 seconds but the command runner timed out at 145 seconds.
+    The output contained the six documented AlgorithmDemoToolTests failures/errors and five
+    additional existing DashboardRecommendationServiceTests failures/errors; no changes were
+    made to those unrelated test fixtures or recommendation candidate filtering.
+- `cd backend; python manage.py test studybuddy.tests.DashboardRecommendationServiceTests --keepdb`
+  - Completed: 7 tests, with 4 failures and 1 error in the pre-existing course-less/
+    institution-less dashboard fixtures that return no candidates.
+- `cd backend; python manage.py test studybuddy.tests.AlgorithmDemoToolTests --keepdb`
+  - Completed: 20 tests, with exactly the documented 3 failures and 3 errors; the other 14 passed.
+- `rg -n "W_SUBJECT|0\.35·s_subject|0\.35/0\.20/0\.20/0\.15/0\.10" docs CONTEXT.md`
+  - Remaining hits are intentional historical plan/ticket/brief references; stale explanatory
+    documentation was updated.
+- `git diff --check`
+  - Passed (aside from the existing unreadable `backend/.pytest_cache/` warning).
 
 ## Deviations
 
-(Codex fills this in.)
+- Updated two older explanatory HTML documents in addition to `CONTEXT.md` and the algorithm
+  explainer artifact so the repository has no stale live description of the retired CBF weights.
+- The requested combined downstream Django command exceeded the command runner's 145-second
+  limit after emitting its complete test result. The documented AlgorithmDemoToolTests failures
+  remain, and the run also exposed pre-existing DashboardRecommendationServiceTests fixture
+  failures; both are outside this brief's scope and were left unchanged.

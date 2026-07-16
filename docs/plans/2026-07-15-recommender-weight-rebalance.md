@@ -1,21 +1,22 @@
 ---
 title: Recommender weight rebalance (CBF split + CF peer ratings)
 date: 2026-07-15
-status: In Progress
+status: Done
 summary: Split CBF subject match into Specific/General with rebalanced weights, and filter CF neighbors to same-course peers with per-tutor global fallback.
 spec: ../mockups/2026-07-15-recommender-weights-handoff.html
 ---
 
 # Recommender weight rebalance (CBF split + CF peer ratings)
 
-**Status & Progress Summary** (2026-07-15): In Progress via `/orchestrate` on branch
-`feat/recommender-weight-rebalance`. All weight and mechanism decisions are final (10 decisions
-grilled 2026-07-14); the last loose end — empty `requested_subject` fallback — was resolved
-2026-07-15 (see below): fall back to preference-list matching when no subject is requested. The
-visual handoff document explaining every decision — now styled with Studybuddy's design tokens
-and including a 13-question Defense Q&A — is saved at
-`docs/mockups/2026-07-15-recommender-weights-handoff.html` (linked as this plan's spec). Next
-step: implement Steps 1-7.
+**Status & Progress Summary** (2026-07-15): **Done.** Implemented on branch
+`feat/recommender-weight-rebalance` across three tickets: CBF graduated subject matching
+(`/orchestrate`, commit `5ef4372`), CF same-course peer neighbors with per-tutor global
+fallback (Codex loop via `docs/briefs/2026-07-15-recommender-cf-peer-neighbors.md`), and the
+CONTEXT.md/docs glossary sync — both independently verified (tests rerun, baseline-compared for
+pre-existing failures, lint/build green) and committed. All weight and mechanism decisions from
+the 2026-07-14 grill shipped as designed, including the empty-`requested_subject` fallback
+resolved 2026-07-15. The visual handoff document is saved at
+`docs/mockups/2026-07-15-recommender-weights-handoff.html` (linked as this plan's spec).
 
 Grilled end-to-end via `/grill-with-docs` on 2026-07-14. The hybrid split (`0.7 * CBF + 0.3 * (CF / 5)`)
 is deliberately untouched. All decisions below are final; a visual handoff document explaining the
@@ -160,3 +161,16 @@ Key CBF decisions and why:
   moved to In Progress; work started via `/orchestrate` on branch
   `feat/recommender-weight-rebalance` with tickets in `docs/tickets.md` (previous admin-
   consolidation tickets archived to `docs/tickets-2026-07-12-admin-consolidation.md`).
+- **2026-07-15** — Ticket 1 (CBF graduated subject matching) shipped via `/orchestrate`
+  (commit `5ef4372`): dominance property, null-category safety, expertise cascade, and the
+  preference-list fallback all covered by new tests; independently reviewed and verified
+  (baseline-compared full-suite run showed zero new failures).
+- **2026-07-15** — Tickets 2 and 3 (CF same-course peer neighbors + per-tutor global fallback;
+  CONTEXT.md/docs glossary sync) handed off to the Codex loop via
+  `docs/briefs/2026-07-15-recommender-cf-peer-neighbors.md`, executed by Codex, and
+  independently re-verified end to end: `CfPeerNeighborTests` +
+  `RecommenderNeighborReuseTests` + `CbfGraduatedSubjectMatchTests` 14/14 pass; the 11
+  `AlgorithmDemoToolTests`/`DashboardRecommendationServiceTests` failures were confirmed
+  pre-existing by stashing the diff and rerunning against the unmodified baseline (identical
+  names, identical counts); `npm run lint` / `npm run build` clean. Committed as two commits;
+  all three tickets' acceptance boxes ticked in `docs/tickets.md`. Plan status set to Done.
