@@ -1,7 +1,6 @@
 import logging
 
 from ..models import Preference, Subjects, Tutor
-from ..subject_recognition import recognized_subject_codes_for_profile
 
 logger = logging.getLogger(__name__)
 
@@ -11,6 +10,7 @@ W_EXPERTISE = 0.15
 W_COURSE = 0.10
 W_YEAR = 0.10
 W_LEVEL = 0.05
+TEACHING_LEVEL_MAX_YEAR = {'Elementary': 6, 'High School': 12, 'College': 16}
 
 # Sentinel distinguishing "caller did not supply target_categories" (resolve it
 # with a query) from "caller supplied an empty set" (there really are none).
@@ -23,12 +23,7 @@ def get_student_subject_codes(student_profile):
     except Preference.DoesNotExist:
         return []
 
-    recognized_codes = recognized_subject_codes_for_profile(student_profile)
-    return [
-        code
-        for code in pref.subjects.values_list("subject_code", flat=True)
-        if code in recognized_codes
-    ]
+    return list(pref.subjects.values_list('subject_code', flat=True))
 
 
 def resolve_target_categories(requested_subject, subject_codes):
@@ -137,7 +132,11 @@ def compute_cbf_breakdown(
 
     s_level = 1
 
-    if tutor_level == "SHS" and student_year is not None and int(student_year) > 12:
+    if (
+        tutor_level in TEACHING_LEVEL_MAX_YEAR
+        and student_year is not None
+        and int(student_year) > TEACHING_LEVEL_MAX_YEAR[tutor_level]
+    ):
         s_level = 0
 
     sub_scores = {

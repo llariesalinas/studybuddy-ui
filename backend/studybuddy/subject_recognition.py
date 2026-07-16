@@ -1,33 +1,8 @@
 from .models import Preference, Subjects, TutorSubjects
 
-COURSE_CODE_GROUPS = (
-    {"STEM", "SHS-STEM"},
-    {"ABM", "SHS-ABM"},
-    {"GAS", "SHS-GAS"},
-    {"HUMMS", "HUMSS", "SHS-HUMSS"},
-)
-
-
-def equivalent_course_codes(course_code):
-    normalized = str(course_code or "").strip()
-    if not normalized:
-        return set()
-
-    for group in COURSE_CODE_GROUPS:
-        if normalized in group:
-            return set(group)
-
-    return {normalized}
-
 
 def recognized_subject_codes_for_profile(profile, course_code=None):
-    course_codes = equivalent_course_codes(course_code or getattr(profile, "course_id", None))
-    if not course_codes:
-        return set()
-
-    return set(
-        Subjects.objects.filter(category__in=course_codes).values_list("subject_code", flat=True)
-    )
+    return set(Subjects.objects.filter(status='approved').values_list('subject_code', flat=True))
 
 
 def current_subject_codes_for_profile(profile):
@@ -48,7 +23,7 @@ def current_subject_codes_for_profile(profile):
 
 
 def visible_subject_queryset_for_profile(profile):
-    return Subjects.objects.all()
+    return Subjects.objects.filter(status='approved')
 
 
 def subject_selection_queryset_for_profile(profile, course_code=None, include_current=False):
@@ -56,13 +31,12 @@ def subject_selection_queryset_for_profile(profile, course_code=None, include_cu
     allowed_codes = set(recognized_codes)
 
     if include_current:
+        # Current subjects may include a tutor's own pending proposed subjects, which the
+        # approved-only visible queryset would otherwise hide from their selection list.
         allowed_codes.update(current_subject_codes_for_profile(profile))
 
-    queryset = visible_subject_queryset_for_profile(profile)
-    if not allowed_codes:
-        return queryset.none(), recognized_codes
-
-    return queryset.filter(subject_code__in=allowed_codes), recognized_codes
+    queryset = Subjects.objects.filter(subject_code__in=allowed_codes)
+    return queryset, recognized_codes
 
 
 def invalid_new_subject_codes(profile, requested_codes, course_code=None):

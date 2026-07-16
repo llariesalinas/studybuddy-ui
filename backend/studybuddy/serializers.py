@@ -235,6 +235,12 @@ class SubjectSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['is_recognized']
 
+    def validate_category(self, value):
+        from .subject_taxonomy import CATEGORIES
+        if value not in CATEGORIES:
+            raise serializers.ValidationError('Select a taxonomy category.')
+        return value
+
 
 class PinnedReviewSerializer(serializers.ModelSerializer):
 

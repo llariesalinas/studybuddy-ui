@@ -4816,6 +4816,24 @@ class CbfGraduatedSubjectMatchTests(APITestCase):
             TutorSubjects.objects.create(tutor=tutor, subject=subject, expertise_level=level)
         return tutor
 
+    def test_level_ceiling_penalizes_only_students_above_known_ceiling(self):
+        cases = [
+            ('High School', 14, 0),
+            ('Elementary', 8, 0),
+            ('College', 11, 1),
+            ('', 14, 1),
+        ]
+        for index, (level, student_year, expected) in enumerate(cases):
+            self.student.year_level = student_year
+            self.student.save(update_fields=['year_level'])
+            tutor = self._make_tutor(
+                f'level-{index}', [(self.requested_subject, 3)], teaching_level=level,
+            )
+            breakdown = self.compute_cbf_breakdown(
+                self.student, tutor, self.requested_subject.subject_code,
+            )
+            self.assertEqual(breakdown['level']['value'], expected)
+
     def test_dominance_exact_match_outranks_field_only_even_at_worst_case(self):
         # Exact-match tutor at minimum possible expertise (1) still must bank
         # >= 0.63 on the subject block alone.

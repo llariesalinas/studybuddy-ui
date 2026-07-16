@@ -883,16 +883,22 @@ class AdminCourseCatalogView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsSuperAdminUser]
 
     def get(self, request):
-        course_code = request.query_params.get('course')
+        category = request.query_params.get('category')
         subjects = Subjects.objects.all().order_by('subject_code')
-        if course_code:
-            subjects = subjects.filter(category=course_code)
+        if category:
+            subjects = subjects.filter(category=category)
 
         serializer = SubjectSerializer(subjects, many=True)
         return Response(serializer.data)
 
     def post(self, request):
-        serializer = SubjectSerializer(data=request.data)
+        from .subject_taxonomy import slugify_subject_code
+
+        data = request.data.copy()
+        if not data.get('subject_code'):
+            data['subject_code'] = slugify_subject_code(data.get('subject_name'))
+        data.setdefault('department', '')
+        serializer = SubjectSerializer(data=data)
         serializer.is_valid(raise_exception=True)
         subject = serializer.save()
         PlatformActivity.objects.create(
