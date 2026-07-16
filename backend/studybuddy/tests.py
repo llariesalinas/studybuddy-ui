@@ -3791,13 +3791,14 @@ class BookingVerificationGateTests(APITestCase):
             subject=self.subject,
             expertise_level=5,
         )
-        self.future_date = timezone.now().date() + timedelta(days=30)
+        self.future_date = timezone.now().date() + timedelta(days=5)
         self.availability = TutorAvailability.objects.create(
             tutor=self.tutor,
             day=WEEKDAY_MAP[self.future_date.weekday()],
             time_slot=time(14, 0),
             is_active=True,
         )
+        self.make_verified_application(TutorApplication, self.tutor_profile)
 
     def upload(self, name, content, content_type):
         from django.core.files.uploadedfile import SimpleUploadedFile
@@ -3887,6 +3888,9 @@ class BookingVerificationGateTests(APITestCase):
         response = self.post_confirm_booking()
 
         self.assertEqual(response.status_code, 200)
+        booking = Booking.objects.get(id=response.data['booking_ids'][0])
+        self.assertEqual(booking.status, 'Confirmed')
+        self.assertTrue(booking.meeting_link)
 
     @override_settings(**NOT_YET_ENFORCED)
     def test_confirm_booking_persists_subject(self):
@@ -3934,43 +3938,24 @@ class BookingVerificationGateTests(APITestCase):
             status="Pending",
         )
 
-    def test_tutor_without_application_blocked_from_approving(self):
+    def test_removed_approval_route_returns_404(self):
         booking = self.create_pending_booking()
         self.client.force_authenticate(user=self.tutor_user)
 
         response = self.client.post(f"/api/bookings/{booking.id}/approve/")
 
-        self.assertEqual(response.status_code, 403)
-        self.assertEqual(response.data.get("code"), "verification_required")
-        booking.refresh_from_db()
-        self.assertEqual(booking.status, "Pending")
+        self.assertEqual(response.status_code, 404)
 
-    def test_tutor_with_verified_application_can_approve_booking(self):
-        self.make_verified_application(TutorApplication, self.tutor_profile)
+    def test_removed_rejection_route_returns_404(self):
         booking = self.create_pending_booking()
         self.client.force_authenticate(user=self.tutor_user)
 
-        response = self.client.post(f"/api/bookings/{booking.id}/approve/")
+        response = self.client.post(f"/api/bookings/{booking.id}/reject/")
 
-        self.assertEqual(response.status_code, 200)
-        booking.refresh_from_db()
-        self.assertEqual(booking.status, "Confirmed")
-
-    def test_tutor_with_due_renewal_blocked_from_approving(self):
-        self.make_due_application(TutorApplication, self.tutor_profile)
-        booking = self.create_pending_booking()
-        self.client.force_authenticate(user=self.tutor_user)
-
-        response = self.client.post(f"/api/bookings/{booking.id}/approve/")
-
-        self.assertEqual(response.status_code, 403)
-        self.assertEqual(response.data.get("code"), "verification_required")
-        booking.refresh_from_db()
-        self.assertEqual(booking.status, "Pending")
+        self.assertEqual(response.status_code, 404)
 
     @override_settings(**ENFORCED)
     def test_tutor_acceptance_load_counts_session_groups_not_rows(self):
-        self.make_verified_application(TutorApplication, self.tutor_profile)
         shared_group_id = uuid4()
         self.create_accepted_booking_group(start_hour=15, group_id=shared_group_id)
         self.create_accepted_booking_group(start_hour=16, group_id=shared_group_id)
@@ -3978,24 +3963,18 @@ class BookingVerificationGateTests(APITestCase):
         self.assertEqual(self.tutor.accepted_session_load(), 1)
 
     @override_settings(**ENFORCED)
-    def test_tutor_at_acceptance_limit_cannot_approve_new_booking(self):
-        self.make_verified_application(TutorApplication, self.tutor_profile)
-
+    def test_tutor_at_acceptance_limit_cannot_receive_new_booking(self):
+        self.make_verified_application(TuteeApplication, self.tutee_profile)
         accepted_hours = [8, 9, 10, 11, 12, 13, 15, 16, 17, 18]
         for start_hour in accepted_hours:
             self.create_accepted_booking_group(start_hour=start_hour)
 
-        booking = self.create_pending_booking()
-        self.client.force_authenticate(user=self.tutor_user)
-
-        response = self.client.post(f"/api/bookings/{booking.id}/approve/")
+        response = self.post_confirm_booking()
 
         self.assertEqual(response.status_code, 409)
         self.assertEqual(response.data.get("code"), "session_load_limit_reached")
         self.assertEqual(response.data.get("accepted_session_load"), 10)
         self.assertEqual(response.data.get("session_load_limit"), 10)
-        booking.refresh_from_db()
-        self.assertEqual(booking.status, "Pending")
 
 
 class TuteeVerificationPhase3Tests(APITestCase):
