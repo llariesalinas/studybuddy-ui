@@ -11,8 +11,8 @@ spec: ../mockups/2026-07-18-tutor-subject-search.html
 <!-- LIVING SUMMARY: keep this section and the Changelog current on every edit -->
 ## Status & Progress Summary
 
-**Status:** Done — implemented, code-reviewed (Standards + Spec axes), and committed on
-`feat/subjects-reseed` (commit `5bdc25e`).
+**Status:** Done — implemented, code-reviewed (Standards + Spec axes), committed on
+`feat/subjects-reseed` (commit `5bdc25e`), and manually verified end-to-end in-browser.
 
 **Progress:** 8/8 steps done (see Steps below).
 
@@ -175,8 +175,17 @@ way to navigate backward at all.
   (Standards + Spec) ran against the diff; both hard-violation findings (hardcoded taxonomy list,
   `keywords` missing from the propose-subject response) were fixed, plus the missing
   `docs/architecture/booking-flow.md` update (plan Step 8) and a minor search-logic cleanup.
-  **Not done:** manual in-browser click-through verification (search/select on all 4 picker call
-  sites, the full propose→admin-review→approve loop, and Back-navigation) was not performed —
-  only static review and automated tests. Committed as `5bdc25e`, bundled with an unrelated
-  pre-existing "remove institution matching constraint" change per explicit user decision (see
-  Deviations above).
+  Committed as `5bdc25e`, bundled with an unrelated pre-existing "remove institution matching
+  constraint" change per explicit user decision (see Deviations above).
+- 2026-07-19 — Manual in-browser verification performed against local dev servers (Vite +
+  `manage.py runserver`). Caught and fixed one real bug first: the dev database had never had the
+  new migration applied (`makemigrations` was run but only the test DB got `migrate`d during test
+  runs), so `/api/subjects/` 500'd until `python manage.py migrate studybuddy 0078_subjects_keywords`
+  was run — a gap any dev pulling this branch would have hit. After that: registered a fresh tutor
+  and walked the full flow — dropdown search results, an unselected keyword-only match rendering
+  the `via "qubits"` badge correctly, "Added" state on selection, the zero-result → propose CTA
+  silently seeding `keywords` (confirmed via DB read), the admin review screen's inline edit
+  surfacing and persisting that seeded value, approval flow, and the router guard both directions
+  (Back navigation between steps without a forced bounce-forward, and a direct URL skip-ahead
+  attempt correctly redirected back to the furthest incomplete step on a second, zero-progress
+  account). All QA accounts/subjects created for this pass were deleted afterward.

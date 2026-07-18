@@ -58,9 +58,29 @@
   propose-subject response, missing `docs/architecture/booking-flow.md` update, and a minor
   duplicate-match-logic cleanup in `SubjectTaxonomyPicker.vue`.
 
-## Not done
+## Manual verification (2026-07-19)
 
-- **Manual in-browser verification was not performed** — no dev server was launched to click
-  through search/select on the 4 picker call sites, the full propose → admin-review → approve
-  loop, or the new Back buttons. Only static code review and automated tests were run. This should
-  be done before considering the feature fully verified.
+Launched both dev servers (`npm run dev` + `manage.py runserver`) and drove the app in a browser.
+
+- **Found and fixed a real bug first:** the dev database had never had migration
+  `0078_subjects_keywords` applied — `makemigrations` was run during implementation, but only the
+  *test* DB got `migrate`d (via `manage.py test`), not the dev DB. `/api/subjects/` 500'd
+  (`column studybuddy_subjects.keywords does not exist`) until `python manage.py migrate studybuddy
+  0078_subjects_keywords` was run. Any developer pulling this branch would have hit this.
+- Registered a fresh tutor and confirmed: dropdown search results render correctly; a keyword-only
+  match (searching "qubits" against a subject with "qubits" only in its `keywords` field, not its
+  name) renders the `via "qubits"` badge; selecting a result shows "✓ Added" and keeps the search
+  open; the zero-result state shows "Can't find it? Propose it" only on tutor onboarding; the
+  propose form pre-fills `subject_name` with no visible keywords field, and the seeded value was
+  confirmed via a direct DB read (`keywords: 'quantum computing xyz'`) after submission.
+- Confirmed the admin review screen (`AdminTutorApplications.vue`) surfaces that seeded `keywords`
+  value in its inline edit form, that editing and saving it persists correctly (`action=update`),
+  and that approving moves the subject into the catalog where the updated keywords are then
+  searchable and correctly badge-flagged.
+- Confirmed the router guard in both directions: Back navigation between onboarding steps no
+  longer bounces forward (tested on the original tutor, which had already completed Subjects);
+  and, using a second fresh account with zero progress, a direct URL attempt to skip ahead to
+  `/tutor-setup/verification` correctly redirected back to the actual furthest-incomplete step
+  (Preferences) instead of loading.
+- All QA accounts, the test proposed subject, and the test application created for this pass were
+  deleted from the dev DB afterward; both dev servers were stopped.
