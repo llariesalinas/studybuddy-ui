@@ -54,7 +54,6 @@ from .recommender.hybrid import recommend_tutors_hybrid
 from .recommender.CF import build_rating_matrix
 
 from .recommender.cbf import recommend_tutors
-from .recommender.utils import filter_tutors_by_institution
 from .recommender.dashboard import (
     bump_dashboard_recs_cache_version,
     dashboard_recs_cache_key,
@@ -1901,12 +1900,9 @@ class SearchTutorsView(APIView):
                 {"error": SUBJECT_NOT_RECOGNIZED_ERROR},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        tutors = filter_tutors_by_institution(
-            Tutor.objects.filter(
-                tutorsubjects__subject__subject_code=subject_code
-            ).select_related('profile').distinct(),
-            student_profile,
-        )
+        tutors = Tutor.objects.filter(
+            tutorsubjects__subject__subject_code=subject_code
+        ).select_related('profile').distinct()
 
         serializer = TutorSearchSerializer(tutors, many=True)
         return Response(serializer.data)
@@ -3729,7 +3725,6 @@ def get_recommendation_time_slots(start_time_string, end_time_string):
 
 def get_recommendation_candidate_tutors(
     subject,
-    student_profile,
     preferred_mode=None,
     min_budget=None,
     max_budget=None,
@@ -3737,12 +3732,9 @@ def get_recommendation_candidate_tutors(
     start_time=None,
     end_time=None,
 ):
-    base_candidates = filter_tutors_by_institution(
-        Tutor.objects.filter(
-            tutorsubjects__subject__subject_code=subject,
-            profile__tutor_application__application_status='approved',
-        ),
-        student_profile,
+    base_candidates = Tutor.objects.filter(
+        tutorsubjects__subject__subject_code=subject,
+        profile__tutor_application__application_status='approved',
     )
     eligible_candidate_ids = []
     for candidate in base_candidates.distinct():
@@ -3876,7 +3868,6 @@ def recommend_tutors_view(request):
     ratings = build_rating_matrix()
     candidate_qs = get_recommendation_candidate_tutors(
         subject,
-        student_profile,
         preferred_mode=preferred_mode,
         min_budget=min_budget,
         max_budget=max_budget,
@@ -4142,6 +4133,7 @@ def propose_tutor_subject(request):
     subject_name = str(request.data.get('subject_name') or '').strip()
     category = str(request.data.get('category') or '').strip()
     description = str(request.data.get('description') or '').strip()
+    keywords = str(request.data.get('keywords') or '').strip()
 
     if not subject_name or not category:
         return Response(
@@ -4160,6 +4152,7 @@ def propose_tutor_subject(request):
         subject_code=generate_proposed_subject_code(subject_name),
         subject_name=subject_name,
         category=category,
+        keywords=keywords,
         status='pending',
         proposed_by_tutor=tutor,
         proposed_application=application,
@@ -4176,6 +4169,7 @@ def propose_tutor_subject(request):
             "subject_code": subject.subject_code,
             "subject_name": subject.subject_name,
             "category": subject.category,
+            "keywords": subject.keywords,
             "description": description,
             "status": subject.status,
         },

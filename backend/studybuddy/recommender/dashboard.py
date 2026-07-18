@@ -7,7 +7,6 @@ from ..models import Tutor
 from .cbf import get_student_subject_codes
 from .CF import build_rating_matrix
 from .hybrid import recommend_tutors_hybrid
-from .utils import filter_tutors_by_institution
 
 logger = logging.getLogger(__name__)
 
@@ -72,11 +71,8 @@ def _serialize(tutor):
     }
 
 
-def _fallback(tutee, limit):
-    qs = filter_tutors_by_institution(
-        Tutor.objects.select_related("profile").prefetch_related("tutorsubjects_set__subject"),
-        tutee,
-    )
+def _fallback(limit):
+    qs = Tutor.objects.select_related("profile").prefetch_related("tutorsubjects_set__subject")
     return [_serialize(tutor) for tutor in qs[:limit]]
 
 
@@ -105,7 +101,7 @@ def get_dashboard_recommendations(tutee, limit=DEFAULT_LIMIT):
 
     subject_codes = get_student_subject_codes(tutee)
     if not subject_codes:
-        data = _fallback(tutee, limit)
+        data = _fallback(limit)
         _cache_set(key, data)
         logger.info(
             "Dashboard recs fallback for tutee %s: returned %s in %.3fs",
@@ -115,12 +111,9 @@ def get_dashboard_recommendations(tutee, limit=DEFAULT_LIMIT):
         )
         return data
 
-    candidate_qs = filter_tutors_by_institution(
-        Tutor.objects.filter(
-            tutorsubjects__subject__subject_code__in=subject_codes
-        ).distinct(),
-        tutee,
-    )
+    candidate_qs = Tutor.objects.filter(
+        tutorsubjects__subject__subject_code__in=subject_codes
+    ).distinct()
 
     ratings = build_rating_matrix()
     ranked = recommend_tutors_hybrid(

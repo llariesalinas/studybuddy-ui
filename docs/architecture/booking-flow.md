@@ -32,12 +32,18 @@ Dashboard (InitialBooking.vue)
 **Store:** `src/stores/initialbookingprefs.js` (persisted to sessionStorage)
 
 The tutee fills out a search form:
-- Subject — `SubjectTaxonomyPicker.vue` (category grid → subject chips), loaded from
-  `GET subjects/`. Subjects are the Preply-style taxonomy (see
-  `docs/plans/2026-07-16-subjects-taxonomy-reseed.md`): every subject carries a taxonomy
-  `category` (Mathematics & Data Sciences, Natural Sciences, Technology & Computer Science,
-  Business/Finance/Economics, Humanities & Social Sciences, Hobbies & Arts) and an internal
-  `department` sub-group that is never shown in the UI. Subject codes are opaque slugs
+- Subject — `SubjectTaxonomyPicker.vue`, loaded from `GET subjects/`. A persistent search box
+  sits above the category grid; typing filters the catalog client-side (name, category, and an
+  admin-curated `keywords` field) into a dropdown-row list, tagging keyword-only matches with a
+  "via ..." badge, and clearing the search returns to the category grid → subject chips browsing
+  UI. Zero-result behavior is screen-dependent: a plain "no matching subjects" state everywhere
+  except tutor onboarding (`TutorSubjectSetup.vue`), which additionally surfaces a "Can't find
+  it? Propose it" prompt into the propose-subject flow (see
+  `docs/plans/2026-07-18-tutor-subject-keyword-search.md`). Subjects are the Preply-style
+  taxonomy (see `docs/plans/2026-07-16-subjects-taxonomy-reseed.md`): every subject carries a
+  taxonomy `category` (Mathematics & Data Sciences, Natural Sciences, Technology & Computer
+  Science, Business/Finance/Economics, Humanities & Social Sciences, Hobbies & Arts) and an
+  internal `department` sub-group that is never shown in the UI. Subject codes are opaque slugs
   (`organic-chemistry`) and are likewise never displayed. Course-based subject gating was
   retired — any tutee can search any approved subject regardless of their own course.
 - Date (date picker)

@@ -231,6 +231,7 @@ class SubjectSerializer(serializers.ModelSerializer):
             'subject_name',
             'department',
             'category',
+            'keywords',
             'is_recognized',
         ]
         read_only_fields = ['is_recognized']
@@ -259,6 +260,9 @@ class TutorDetailSerializer(serializers.ModelSerializer):
     fname = serializers.CharField(source='profile.fname')
     lname = serializers.CharField(source='profile.lname')
     bio = serializers.CharField(source='profile.bio', allow_null=True)
+    institution_name = serializers.CharField(
+        source='profile.institution.institution_name', read_only=True,
+    )
     subjects = serializers.SerializerMethodField()
     profile_picture_url = serializers.SerializerMethodField()
     response_time_label = serializers.CharField(read_only=True)
@@ -276,6 +280,7 @@ class TutorDetailSerializer(serializers.ModelSerializer):
             'hourly_rate',
             'total_sessions',
             'bio',
+            'institution_name',
             'profile_picture_url',
             'subjects',
             'response_time',
@@ -495,6 +500,7 @@ class TutorApplicationSerializer(serializers.ModelSerializer):
                 'subject_code': subject.subject_code,
                 'subject_name': subject.subject_name,
                 'category': subject.category,
+                'keywords': subject.keywords,
                 'description': descriptions.get(subject.subject_code, ''),
                 'status': subject.status,
             }

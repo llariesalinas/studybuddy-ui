@@ -1408,8 +1408,41 @@ class AdminTutorProposedSubjectDetailView(APIView):
             subject.delete()
             return Response({"message": "Proposed subject rejected."})
 
+        if action == 'update':
+            from .subject_taxonomy import CATEGORIES as TAXONOMY_CATEGORIES
+
+            subject_name = str(request.data.get('subject_name') or '').strip()
+            category = str(request.data.get('category') or '').strip()
+            keywords = request.data.get('keywords')
+            description = request.data.get('description')
+
+            if not subject_name or not category:
+                return Response(
+                    {"error": "Subject name and category are required."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if category not in TAXONOMY_CATEGORIES:
+                return Response(
+                    {"error": "Select a category from the taxonomy."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            subject.subject_name = subject_name
+            subject.category = category
+            if keywords is not None:
+                subject.keywords = str(keywords).strip()
+            subject.save(update_fields=['subject_name', 'category', 'keywords'])
+
+            if description is not None:
+                TutorSubjects.objects.filter(
+                    tutor=subject.proposed_by_tutor,
+                    subject=subject,
+                ).update(description=str(description).strip())
+
+            return Response(SubjectSerializer(subject).data)
+
         return Response(
-            {"error": "Invalid action. Must be 'approve' or 'reject'."},
+            {"error": "Invalid action. Must be 'approve', 'reject', or 'update'."},
             status=status.HTTP_400_BAD_REQUEST,
         )
 

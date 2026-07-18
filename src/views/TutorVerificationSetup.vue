@@ -71,14 +71,24 @@
                 >
                   {{ isSubmitting ? 'Submitting...' : 'Submit & Finish Onboarding' }}
                 </button>
-                <button
-                  type="button"
-                  class="btn-outline-pill sb-btn"
-                  :disabled="isSubmitting"
-                  @click="skipVerification"
-                >
-                  Skip for Now
-                </button>
+                <div class="step-nav-row">
+                  <button
+                    type="button"
+                    class="btn-outline-pill sb-btn"
+                    :disabled="isSubmitting"
+                    @click="goBackToSubjects"
+                  >
+                    &larr; Back
+                  </button>
+                  <button
+                    type="button"
+                    class="btn-outline-pill sb-btn"
+                    :disabled="isSubmitting"
+                    @click="skipVerification"
+                  >
+                    Skip for Now
+                  </button>
+                </div>
               </div>
             </section>
           </div>
@@ -157,6 +167,10 @@ const skipVerification = async () => {
   } finally {
     isSubmitting.value = false
   }
+}
+
+const goBackToSubjects = () => {
+  router.push({ name: 'tutor-subjects-setup' })
 }
 </script>
 
@@ -284,6 +298,14 @@ const skipVerification = async () => {
   flex-direction: column;
   gap: 10px;
   margin-top: 20px;
+}
+.step-nav-row {
+  display: flex;
+  gap: 10px;
+}
+.step-nav-row .btn-outline-pill {
+  width: auto;
+  flex: 1;
 }
 .btn-primary-pill,
 .btn-outline-pill {

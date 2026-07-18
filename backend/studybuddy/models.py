@@ -667,6 +667,7 @@ class Subjects(models.Model):
     subject_name = models.CharField(max_length=100)
     department = models.CharField(max_length=100)
     category = models.CharField(max_length=100, null=True, blank=True)
+    keywords = models.TextField(blank=True, default='')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='approved')
     proposed_by_tutor = models.ForeignKey(
         'Tutor', on_delete=models.SET_NULL, null=True, blank=True,

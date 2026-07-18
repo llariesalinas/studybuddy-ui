@@ -174,27 +174,71 @@
             v-for="subject in proposedSubjects"
             :key="subject.subject_code"
             class="proposed-subject-row"
+            :class="{ editing: editingSubjectCode === subject.subject_code }"
           >
-            <div>
-              <div class="fw-bold">{{ subject.subject_name }}</div>
-              <div class="small text-muted">{{ subject.category }}</div>
-            </div>
-            <div class="d-flex gap-2">
-              <button
-                class="btn btn-sm btn-success rounded-pill"
-                :disabled="processingSubject === subject.subject_code"
-                @click="handleSubjectReview(subject, 'approved')"
-              >
-                Approve
-              </button>
-              <button
-                class="btn btn-sm btn-outline-danger rounded-pill"
-                :disabled="processingSubject === subject.subject_code"
-                @click="handleSubjectReview(subject, 'rejected')"
-              >
-                Reject
-              </button>
-            </div>
+            <template v-if="editingSubjectCode === subject.subject_code">
+              <div class="proposed-subject-edit-form">
+                <div class="mb-2">
+                  <label class="form-label small fw-bold">Subject name</label>
+                  <input v-model.trim="subjectEditForm.subject_name" class="form-control form-control-sm sb-field">
+                </div>
+                <div class="mb-2">
+                  <label class="form-label small fw-bold">Category</label>
+                  <select v-model="subjectEditForm.category" class="form-select form-select-sm sb-field">
+                    <option v-for="category in taxonomyCategories" :key="category" :value="category">{{ category }}</option>
+                  </select>
+                </div>
+                <div class="mb-2">
+                  <label class="form-label small fw-bold">Keywords</label>
+                  <input v-model.trim="subjectEditForm.keywords" class="form-control form-control-sm sb-field" placeholder="Comma-separated synonyms, e.g. coding, programming, cs">
+                </div>
+                <div class="mb-2">
+                  <label class="form-label small fw-bold">Description</label>
+                  <textarea v-model.trim="subjectEditForm.description" class="form-control form-control-sm sb-field" rows="2"></textarea>
+                </div>
+                <div class="d-flex gap-2">
+                  <button
+                    class="btn btn-sm btn-primary rounded-pill"
+                    :disabled="savingSubjectEdit"
+                    @click="saveSubjectEdit(subject)"
+                  >
+                    {{ savingSubjectEdit ? 'Saving...' : 'Save changes' }}
+                  </button>
+                  <button class="btn btn-sm btn-light rounded-pill" :disabled="savingSubjectEdit" @click="cancelSubjectEdit">
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </template>
+            <template v-else>
+              <div>
+                <div class="fw-bold">{{ subject.subject_name }}</div>
+                <div class="small text-muted">{{ subject.category }}</div>
+              </div>
+              <div class="d-flex gap-2">
+                <button
+                  class="btn btn-sm btn-outline-secondary rounded-pill"
+                  :disabled="processingSubject === subject.subject_code"
+                  @click="startSubjectEdit(subject)"
+                >
+                  Edit
+                </button>
+                <button
+                  class="btn btn-sm btn-success rounded-pill"
+                  :disabled="processingSubject === subject.subject_code"
+                  @click="handleSubjectReview(subject, 'approved')"
+                >
+                  Approve
+                </button>
+                <button
+                  class="btn btn-sm btn-outline-danger rounded-pill"
+                  :disabled="processingSubject === subject.subject_code"
+                  @click="handleSubjectReview(subject, 'rejected')"
+                >
+                  Reject
+                </button>
+              </div>
+            </template>
           </div>
         </div>
 
@@ -250,6 +294,7 @@ import {
   getReviewStatus,
   getReviewSubmittedAt,
 } from '@/services/tutorApplicationState'
+import { TAXONOMY_CATEGORIES } from '@/constants/subjectTaxonomy'
 
 const adminStore = useAdminStore()
 const filters = reactive({
@@ -263,6 +308,10 @@ const rejectionMode = ref(false)
 const rejectionReason = ref('')
 const processing = ref(false)
 const processingSubject = ref('')
+const editingSubjectCode = ref('')
+const savingSubjectEdit = ref(false)
+const subjectEditForm = reactive({ subject_name: '', category: '', keywords: '', description: '' })
+const taxonomyCategories = TAXONOMY_CATEGORIES
 let offcanvas = null
 
 const pageTitle = computed(() => (filters.role === 'tutee' ? 'Tutee Applications' : 'Tutor Applications'))
@@ -356,6 +405,7 @@ const viewDetails = (app) => {
   selectedApp.value = app
   rejectionMode.value = false
   rejectionReason.value = ''
+  editingSubjectCode.value = ''
   if (!offcanvas) {
     offcanvas = new Offcanvas(document.getElementById('appDetailOffcanvas'))
   }
@@ -401,6 +451,37 @@ const handleSubjectReview = async (subject, status) => {
     console.error('Subject review failed:', err)
   } finally {
     processingSubject.value = ''
+  }
+}
+
+const startSubjectEdit = (subject) => {
+  editingSubjectCode.value = subject.subject_code
+  Object.assign(subjectEditForm, {
+    subject_name: subject.subject_name,
+    category: subject.category,
+    keywords: subject.keywords || '',
+    description: subject.description || '',
+  })
+}
+
+const cancelSubjectEdit = () => {
+  editingSubjectCode.value = ''
+}
+
+const saveSubjectEdit = async (subject) => {
+  savingSubjectEdit.value = true
+  try {
+    const updated = await adminStore.updateTutorProposedSubject(
+      selectedApp.value.id,
+      subject.subject_code,
+      { ...subjectEditForm },
+    )
+    Object.assign(subject, updated, { description: subjectEditForm.description })
+    editingSubjectCode.value = ''
+  } catch (err) {
+    console.error('Subject update failed:', err)
+  } finally {
+    savingSubjectEdit.value = false
   }
 }
 
@@ -521,6 +602,15 @@ onMounted(() => {
   gap: 1rem;
   padding: 0.85rem 0;
   border-bottom: 1px solid var(--sb-card-border);
+}
+
+.proposed-subject-row.editing {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.proposed-subject-edit-form {
+  width: 100%;
 }
 
 .fade-enter-active,

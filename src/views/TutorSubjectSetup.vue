@@ -33,6 +33,8 @@
                 v-model="selectedCodes"
                 :subjects="allSubjects"
                 :max-selection="SUBJECT_LIMIT"
+                allow-propose
+                @propose="openProposalForm"
               />
 
               <button
@@ -93,14 +95,24 @@
                 </div>
               </form>
 
-              <button
-                type="button"
-                class="btn-primary-pill continue-button sb-btn"
-                :disabled="!selectedSubjects.length || isSubmitting"
-                @click="continueToVerification"
-              >
-                Continue to Verification
-              </button>
+              <div class="step-nav-row">
+                <button
+                  type="button"
+                  class="btn-outline-pill sb-btn"
+                  :disabled="isSubmitting"
+                  @click="goBackToPreferences"
+                >
+                  &larr; Back
+                </button>
+                <button
+                  type="button"
+                  class="btn-primary-pill continue-button sb-btn"
+                  :disabled="!selectedSubjects.length || isSubmitting"
+                  @click="continueToVerification"
+                >
+                  Continue to Verification
+                </button>
+              </div>
             </section>
           </div>
         </div>
@@ -134,7 +146,7 @@ const allSubjects = ref([])
 const selectedSubjects = ref([])
 const showProposalForm = ref(false)
 const isSubmitting = ref(false)
-const proposal = reactive({ subject_name: '', category: '', description: '' })
+const proposal = reactive({ subject_name: '', category: '', description: '', keywords: '' })
 
 const categories = computed(() => [...new Set(allSubjects.value.map((s) => s.category))].sort())
 
@@ -176,14 +188,16 @@ const handleAdd = async (subjectCode) => {
   }
 }
 
-const openProposalForm = () => {
+const openProposalForm = (searchText) => {
   if (selectedSubjects.value.length >= SUBJECT_LIMIT) {
     toastStore.push(SUBJECT_LIMIT_MESSAGE, 'warning')
     return
   }
-  proposal.subject_name = ''
+  const prefill = typeof searchText === 'string' ? searchText : ''
+  proposal.subject_name = prefill
   proposal.category = ''
   proposal.description = ''
+  proposal.keywords = prefill
   showProposalForm.value = true
 }
 
@@ -216,6 +230,10 @@ const continueToVerification = async () => {
   profileStore.tutorSubjectCount = selectedSubjects.value.length
   profileStore.tutorSubjectsCompleted = selectedSubjects.value.length > 0
   await router.push({ name: 'tutor-verification-setup' })
+}
+
+const goBackToPreferences = () => {
+  router.push({ name: 'tutorpreferencesetup' })
 }
 
 onMounted(loadSubjects)
@@ -336,9 +354,6 @@ onMounted(loadSubjects)
   color: var(--sb-text-muted);
   margin-bottom: 8px;
 }
-.search-wrap {
-  position: relative;
-}
 .mini-input {
   width: 100%;
   padding: 10px 12px;
@@ -351,38 +366,6 @@ onMounted(loadSubjects)
 }
 .mini-input:focus {
   border-color: var(--sb-primary);
-}
-.dropdown-preview {
-  margin-top: 8px;
-  border: 1px solid var(--sb-card-border);
-  border-radius: 10px;
-  overflow: hidden;
-}
-.dropdown-row {
-  width: 100%;
-  display: flex;
-  justify-content: space-between;
-  padding: 9px 12px;
-  border: 0;
-  border-bottom: 1px solid var(--sb-card-border);
-  background: var(--sb-card-bg);
-  color: var(--sb-text-main);
-  font-size: 0.85rem;
-  text-align: left;
-}
-.dropdown-row:last-child {
-  border-bottom: 0;
-}
-.dropdown-row:hover {
-  background: color-mix(in srgb, var(--sb-primary) 6%, var(--sb-card-bg));
-}
-.meta,
-.dropdown-empty {
-  color: var(--sb-text-muted);
-  font-size: 0.76rem;
-}
-.dropdown-empty {
-  padding: 10px 12px;
 }
 .btn-primary-pill,
 .btn-outline-pill {
@@ -425,10 +408,13 @@ onMounted(loadSubjects)
   display: flex;
   gap: 10px;
 }
-.continue-button {
-  display: block;
-  width: 100%;
+.step-nav-row {
+  display: flex;
+  gap: 10px;
   margin-top: 24px;
+}
+.continue-button {
+  flex: 1;
 }
 @media (max-width: 640px) {
   .onboarding-shell {

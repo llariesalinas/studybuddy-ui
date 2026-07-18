@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Tutor subject search &amp; step back-navigation — chosen design</title>
+<style>
+  body {
+    --sb-primary: #00895A;
+    --sb-primary-hover: #00704A;
+    --sb-primary-contrast: #ffffff;
+    --sb-card-bg: #ffffff;
+    --sb-card-border: #EAEAEA;
+    --sb-bg: #F8F9FA;
+    --sb-text-main: #163127;
+    --sb-text-muted: #6B7280;
+    --sb-border-light: #e0e7e3;
+    --sb-warning-text: #997404;
+    --sb-pop-yellow-deep: #DCA21B;
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: var(--sb-text-main);
+    background: var(--sb-bg);
+    padding: 32px;
+  }
+  h1 { font-size: 1.1rem; margin-bottom: 4px; }
+  .subtitle { color: var(--sb-text-muted); font-size: .85rem; margin: 0 0 24px; max-width: 640px; }
+  .onboarding-shell { display:flex; background:var(--sb-card-bg); border:1px solid var(--sb-card-border); border-radius:18px; box-shadow:0 6px 20px rgba(10,25,22,0.06); overflow:hidden; max-width: 640px; margin-bottom: 28px; }
+  .onboarding-rail { width:150px; flex-shrink:0; background: color-mix(in srgb, var(--sb-primary) 8%, var(--sb-card-bg)); border-right:1px solid var(--sb-card-border); padding:24px 14px; }
+  .rail-step { display:flex; align-items:center; gap:10px; margin-bottom:22px; font-size:12.5px; color:var(--sb-text-muted); }
+  .rail-num { width:22px; height:22px; border-radius:50%; border:1.5px solid var(--sb-card-border); background:var(--sb-card-bg); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:10.5px; flex-shrink:0; }
+  .rail-step-active { color:var(--sb-text-main); font-weight:700; }
+  .rail-step-active .rail-num, .rail-step-done .rail-num { background:var(--sb-primary); border-color:var(--sb-primary); color:#fff; }
+  .rail-step-done .rail-num::after { content:'\2713'; font-size:11px; }
+  .onboarding-main { flex:1; min-width:0; padding:26px 26px 24px; }
+  .onboarding-main h3 { font-weight:800; margin:0 0 .2rem; font-size:1.1rem; }
+  .subject-counter { float:right; color:var(--sb-text-muted); font-size:.75rem; font-weight:700; }
+  .muted { color:var(--sb-text-muted); margin:0 0 1.1rem; font-size:.88rem; }
+  .field-label { display:block; font-size:11px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--sb-text-muted); margin-bottom:8px; }
+  .search-input-wrap { position:relative; margin-bottom:14px; }
+  .search-input { width:100%; padding:10px 12px 10px 34px; border:1.5px solid var(--sb-primary); border-radius:10px; font-size:.9rem; background:var(--sb-bg); color:var(--sb-text-main); font-family:inherit; box-sizing:border-box; }
+  .search-icon { position:absolute; left:11px; top:50%; transform:translateY(-50%); color:var(--sb-text-muted); font-size:.85rem; }
+  .dropdown-preview { border:1px solid var(--sb-card-border); border-radius:10px; overflow:hidden; margin-bottom:14px; }
+  .dropdown-row { width:100%; display:flex; justify-content:space-between; align-items:center; padding:10px 12px; border:0; border-bottom:1px solid var(--sb-card-border); background:var(--sb-card-bg); color:var(--sb-text-main); font-size:.85rem; text-align:left; }
+  .dropdown-row:last-child { border-bottom:0; }
+  .dropdown-row.selected { background: color-mix(in srgb, var(--sb-primary) 10%, var(--sb-card-bg)); font-weight:600; }
+  .dropdown-row .left { display:flex; flex-direction:column; gap:2px; }
+  .dropdown-row .name { font-weight:600; }
+  .dropdown-row .meta { font-size:.74rem; color:var(--sb-text-muted); }
+  .dropdown-row .via-badge { font-size:.68rem; padding:2px 7px; border-radius:999px; background: color-mix(in srgb, var(--sb-pop-yellow-deep) 15%, var(--sb-card-bg)); color:var(--sb-warning-text); white-space:nowrap; }
+  .dropdown-row .check { color: var(--sb-primary); font-weight:700; }
+  .propose-trigger { display:block; margin: 4px 0 18px; border:0; background:transparent; color:var(--sb-primary); font-weight:700; font-size:.82rem; }
+  .btn-row { display:flex; gap:10px; margin-top:6px; }
+  .btn-primary-pill, .btn-outline-pill { border-radius:999px; padding:11px 22px; font-weight:700; font-size:13px; border:0; }
+  .btn-primary-pill { background:var(--sb-primary); color:#fff; flex:1; }
+  .btn-outline-pill { background:transparent; border:1px solid var(--sb-card-border); color:var(--sb-text-main); }
+  .empty-state { padding:22px 16px; text-align:center; }
+  .empty-state p { color:var(--sb-text-muted); font-size:.85rem; margin:0 0 10px; }
+  .propose-cta { border:0; background:transparent; color:var(--sb-primary); font-weight:700; font-size:.85rem; }
+  .note { font-size:.8rem; color:var(--sb-text-muted); margin: 0 0 10px; max-width: 640px; }
+  @media (max-width: 640px) { .onboarding-shell { flex-direction: column; } .onboarding-rail { width:100%; display:flex; justify-content:space-between; padding:14px 16px; } .rail-step { margin-bottom:0; flex-direction:column; gap:4px; font-size:10.5px; } }
+</style>
+</head>
+<body>
+  <h1>Chosen design: subject search + step back-navigation</h1>
+  <p class="subtitle">Decided in the 2026-07-18 grilling session for docs/plans/2026-07-18-tutor-subject-keyword-search.md. Search results render as dropdown rows (reusing TutorSubjectSetup.vue's existing but unused .mini-input/.dropdown-row CSS), matched-via-keyword badge on keyword-only hits, and a side-by-side Back/Continue row closes out the step.</p>
+
+  <div class="onboarding-shell">
+    <aside class="onboarding-rail">
+      <div class="rail-step rail-step-done"><span class="rail-num"></span><span>Preferences</span></div>
+      <div class="rail-step rail-step-active"><span class="rail-num">2</span><span>Subjects</span></div>
+      <div class="rail-step"><span class="rail-num">3</span><span>Verify</span></div>
+    </aside>
+    <section class="onboarding-main">
+      <h3>Add your subjects<span class="subject-counter">1/8</span></h3>
+      <p class="muted">Search the catalog, or propose one that's missing.</p>
+
+      <label class="field-label">Search subjects</label>
+      <div class="search-input-wrap">
+        <span class="search-icon">&#128269;</span>
+        <input class="search-input" value="coding" readonly>
+      </div>
+      <div class="dropdown-preview">
+        <button class="dropdown-row selected">
+          <span class="left"><span class="name">Programming</span><span class="meta">Technology &amp; Computer Science</span></span>
+          <span class="check">&#10003; Added</span>
+        </button>
+        <button class="dropdown-row">
+          <span class="left"><span class="name">Data Structures &amp; Algorithms</span><span class="meta">Technology &amp; Computer Science</span></span>
+          <span class="via-badge">via "coding"</span>
+        </button>
+        <button class="dropdown-row">
+          <span class="left"><span class="name">Web Development</span><span class="meta">Technology &amp; Computer Science</span></span>
+          <span class="via-badge">via "coding"</span>
+        </button>
+      </div>
+
+      <button type="button" class="propose-trigger">+ Propose a subject not in the catalog</button>
+
+      <div class="btn-row">
+        <button class="btn-outline-pill">&larr; Back</button>
+        <button class="btn-primary-pill">Continue to Verification</button>
+      </div>
+    </section>
+  </div>
+
+  <p class="note">Zero-result state — tutee-facing screens (FindTutors, InitialBooking, PreferenceSetup):</p>
+  <div class="dropdown-preview" style="max-width:400px;">
+    <div class="empty-state"><p style="margin:0;">No matching subjects.</p></div>
+  </div>
+
+  <p class="note" style="margin-top:18px;">Zero-result state — tutor onboarding (TutorSubjectSetup), links into the propose form:</p>
+  <div class="dropdown-preview" style="max-width:400px;">
+    <div class="empty-state">
+      <p>No matching subjects for "quantum computing".</p>
+      <button class="propose-cta">Can't find it? Propose it &rarr;</button>
+    </div>
+  </div>
+</body>
+</html>

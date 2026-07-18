@@ -626,6 +626,32 @@ class GlobalSubjectCatalogTests(APITestCase):
         with self.assertRaises(LookupError):
             apps.get_model('studybuddy', 'InstitutionCourseCatalog')
 
+    def test_catalog_create_and_update_persist_keywords(self):
+        create_response = self.client.post(
+            "/api/admin/course-catalog/",
+            {
+                "subject_code": "AI202",
+                "subject_name": "Machine Learning",
+                "department": "Computer Science",
+                "category": "Technology & Computer Science",
+                "keywords": "ml, coding, ai",
+            },
+            format="json",
+        )
+        self.assertEqual(create_response.status_code, 201)
+        self.assertEqual(create_response.data["keywords"], "ml, coding, ai")
+
+        update_response = self.client.patch(
+            "/api/admin/course-catalog/AI202/",
+            {"keywords": "ml, coding, ai, deep learning"},
+            format="json",
+        )
+        self.assertEqual(update_response.status_code, 200)
+        self.assertEqual(update_response.data["keywords"], "ml, coding, ai, deep learning")
+
+    def test_catalog_keywords_defaults_to_blank(self):
+        self.assertEqual(self.subject.keywords, "")
+
 
 class RecommendTutorsViewTests(APITestCase):
     def setUp(self):
@@ -6718,7 +6744,11 @@ class SupportTicketEscalationTests(APITestCase):
         self.assertEqual(self.ticket.status, "Resolved")
 
 
-class InstitutionScopedMatchingTests(APITestCase):
+class CrossInstitutionMatchingTests(APITestCase):
+    """Matching is unscoped by institution — a tutee from one school can match a tutor from
+    any other, or a tutor with no institution at all. See
+    docs/plans/2026-07-17-remove-institution-matching-constraint.md."""
+
     def setUp(self):
         cache.clear()
 
@@ -6765,7 +6795,7 @@ class InstitutionScopedMatchingTests(APITestCase):
             tutor=self.tutor_a, subject=self.subject, expertise_level=5
         )
 
-        # Tutor from inst_b
+        # Tutor from inst_b — a different institution than the tutee
         tutor_b_user = User.objects.create_user(
             username="scope_tutor_b", email="tutor_b@wvu.edu.ph", password="pass"
         )
@@ -6781,7 +6811,7 @@ class InstitutionScopedMatchingTests(APITestCase):
             tutor=self.tutor_b, subject=self.subject, expertise_level=5
         )
 
-        # Tutor with no institution
+        # Tutor with no institution at all
         tutor_null_user = User.objects.create_user(
             username="scope_tutor_null", email="tutor_null@example.com", password="pass"
         )
@@ -6797,30 +6827,26 @@ class InstitutionScopedMatchingTests(APITestCase):
             tutor=self.tutor_null, subject=self.subject, expertise_level=5
         )
 
+        # recommend-tutors only surfaces approved tutors — approve all three so the
+        # inclusion assertions below are meaningful rather than vacuously true.
+        for tutor in (self.tutor_a, self.tutor_b, self.tutor_null):
+            self._approve(tutor)
+
+    def _approve(self, tutor):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        TutorApplication.objects.create(
+            profile=tutor.profile,
+            school_id=SimpleUploadedFile("id.jpg", b"id", content_type="image/jpeg"),
+            enrollment_proof=SimpleUploadedFile("rf.pdf", b"rf", content_type="application/pdf"),
+            application_status="approved",
+        )
+
     def _set_preferences(self, *subjects):
         pref, _ = Preference.objects.get_or_create(user=self.tutee)
         pref.subjects.set([s.subject_code for s in subjects])
 
-    def test_helper_filters_by_institution(self):
-        from .recommender.utils import filter_tutors_by_institution
-        qs = filter_tutors_by_institution(Tutor.objects.all(), self.tutee)
-        self.assertIn(self.tutor_a, qs)
-        self.assertNotIn(self.tutor_b, qs)
-        self.assertNotIn(self.tutor_null, qs)
-
-    def test_helper_returns_empty_when_tutee_has_no_institution(self):
-        from .recommender.utils import filter_tutors_by_institution
-        no_inst_user = User.objects.create_user(
-            username="scope_no_inst", email="noinst@test.com", password="pass"
-        )
-        no_inst_tutee = UserProfile.objects.create(
-            user=no_inst_user, fname="No", mname="", lname="Inst",
-            role="Tutee", institution=None,
-        )
-        qs = filter_tutors_by_institution(Tutor.objects.all(), no_inst_tutee)
-        self.assertFalse(qs.exists())
-
-    def test_recommend_returns_same_institution_tutors(self):
+    def test_recommend_includes_same_institution_tutor(self):
         self.client.force_authenticate(user=self.tutee.user)
         resp = self.client.post(
             "/api/recommend-tutors/",
@@ -6831,7 +6857,7 @@ class InstitutionScopedMatchingTests(APITestCase):
         ids = {r["id"] for r in resp.data}
         self.assertIn(self.tutor_a.profile.id, ids)
 
-    def test_recommend_excludes_other_institution_tutor(self):
+    def test_recommend_includes_other_institution_tutor(self):
         self.client.force_authenticate(user=self.tutee.user)
         resp = self.client.post(
             "/api/recommend-tutors/",
@@ -6840,9 +6866,9 @@ class InstitutionScopedMatchingTests(APITestCase):
         )
         self.assertEqual(resp.status_code, 200)
         ids = {r["id"] for r in resp.data}
-        self.assertNotIn(self.tutor_b.profile.id, ids)
+        self.assertIn(self.tutor_b.profile.id, ids)
 
-    def test_recommend_tutee_no_institution_gets_empty_list(self):
+    def test_recommend_tutee_no_institution_still_matches(self):
         no_inst_user = User.objects.create_user(
             username="scope_no_inst2", email="noinst2@test.com", password="pass"
         )
@@ -6857,9 +6883,10 @@ class InstitutionScopedMatchingTests(APITestCase):
             format="json",
         )
         self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp.data, [])
+        ids = {r["id"] for r in resp.data}
+        self.assertIn(self.tutor_a.profile.id, ids)
 
-    def test_recommend_null_institution_tutor_not_shown(self):
+    def test_recommend_includes_null_institution_tutor(self):
         self.client.force_authenticate(user=self.tutee.user)
         resp = self.client.post(
             "/api/recommend-tutors/",
@@ -6868,33 +6895,33 @@ class InstitutionScopedMatchingTests(APITestCase):
         )
         self.assertEqual(resp.status_code, 200)
         ids = {r["id"] for r in resp.data}
-        self.assertNotIn(self.tutor_null.profile.id, ids)
+        self.assertIn(self.tutor_null.profile.id, ids)
 
-    def test_dashboard_widget_respects_institution(self):
+    def test_dashboard_widget_includes_cross_institution_tutors(self):
         from studybuddy.recommender import dashboard
         self._set_preferences(self.subject)
         data = dashboard.get_dashboard_recommendations(self.tutee)
         ids = {row["id"] for row in data}
-        self.assertNotIn(self.tutor_b.profile.id, ids)
-        self.assertNotIn(self.tutor_null.profile.id, ids)
+        self.assertIn(self.tutor_b.profile.id, ids)
+        self.assertIn(self.tutor_null.profile.id, ids)
 
-    def test_dashboard_fallback_respects_institution(self):
+    def test_dashboard_fallback_includes_cross_institution_tutors(self):
         from studybuddy.recommender import dashboard
         # tutee has no preferences set, so get_student_subject_codes returns []
         # and the code falls through to _fallback
         data = dashboard.get_dashboard_recommendations(self.tutee)
         ids = {row["id"] for row in data}
-        self.assertNotIn(self.tutor_b.profile.id, ids)
-        self.assertNotIn(self.tutor_null.profile.id, ids)
+        self.assertIn(self.tutor_b.profile.id, ids)
+        self.assertIn(self.tutor_null.profile.id, ids)
 
-    def test_search_tutors_respects_institution(self):
+    def test_search_tutors_includes_cross_institution_tutors(self):
         self.client.force_authenticate(user=self.tutee.user)
         resp = self.client.get("/api/search-tutors/", {"subject": "SCOPE101"})
         self.assertEqual(resp.status_code, 200)
         ids = {r["profile_id"] for r in resp.data}
         self.assertIn(self.tutor_a.profile.id, ids)
-        self.assertNotIn(self.tutor_b.profile.id, ids)
-        self.assertNotIn(self.tutor_null.profile.id, ids)
+        self.assertIn(self.tutor_b.profile.id, ids)
+        self.assertIn(self.tutor_null.profile.id, ids)
 
     def test_search_tutors_requires_authentication(self):
         resp = self.client.get("/api/search-tutors/", {"subject": "SCOPE101"})
@@ -7524,6 +7551,13 @@ class TutorDetailVerifiedBadgeTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.data["is_verified"])
 
+    def test_includes_institution_name(self):
+        profile = self._make_tutor("badge-institution@cpu.edu")
+        self.client.force_authenticate(user=self.viewer_user)
+        response = self.client.get(f"/api/tutors/{profile.id}/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["institution_name"], "CPU")
+
 
 class TutorOnboardingSearchVisibilityTests(APITestCase):
     def setUp(self):
@@ -7790,6 +7824,32 @@ class TutorSubjectProposalTests(APITestCase):
 
         self.assertEqual(response.status_code, 400)
 
+    def test_proposal_persists_keywords_when_provided(self):
+        with patch("studybuddy.views.subject_is_recognized_for_profile"):
+            response = self.client.post(
+                "/api/tutor/subjects/propose/",
+                {
+                    "subject_name": "Quantum Computing",
+                    "category": "Technology & Computer Science",
+                    "description": "A proposed specialty.",
+                    "keywords": "quantum, qubits",
+                },
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["keywords"], "quantum, qubits")
+        subject = Subjects.objects.get(subject_code="QUANTUM-COMPUTING")
+        self.assertEqual(subject.keywords, "quantum, qubits")
+
+    def test_proposal_defaults_keywords_to_blank(self):
+        with patch("studybuddy.views.subject_is_recognized_for_profile"):
+            response = self.propose()
+
+        self.assertEqual(response.status_code, 201)
+        subject = Subjects.objects.get(subject_code=response.data["subject_code"])
+        self.assertEqual(subject.keywords, "")
+
     def test_proposal_enforces_eight_subject_cap_across_statuses(self):
         for index in range(8):
             subject = Subjects.objects.create(
@@ -7881,17 +7941,17 @@ class AdminProposedSubjectReviewTests(APITestCase):
         )
         self.client.force_authenticate(user=self.admin_user)
 
-    def make_proposal(self, code):
+    def make_proposal(self, code, keywords=""):
         subject = Subjects.objects.create(
             subject_code=code, subject_name=f"Proposal {code}", department="Mathematics",
             status="pending", proposed_by_tutor=self.tutor,
-            proposed_application=self.application,
+            proposed_application=self.application, keywords=keywords,
         )
         TutorSubjects.objects.create(tutor=self.tutor, subject=subject, expertise_level=3)
         return subject
 
     def test_application_detail_includes_pending_proposed_subjects(self):
-        proposal = self.make_proposal("DETAIL-PROP")
+        proposal = self.make_proposal("DETAIL-PROP", keywords="coding, cs")
 
         response = self.client.get(f"/api/admin/tutor-applications/{self.application.id}/")
 
@@ -7900,6 +7960,7 @@ class AdminProposedSubjectReviewTests(APITestCase):
             response.data["proposed_subjects"][0]["subject_code"],
             proposal.subject_code,
         )
+        self.assertEqual(response.data["proposed_subjects"][0]["keywords"], "coding, cs")
 
     def test_approve_subject_keeps_tutor_link_regardless_of_application_status(self):
         proposal = self.make_proposal("APPROVE-PROP")
@@ -7916,6 +7977,47 @@ class AdminProposedSubjectReviewTests(APITestCase):
         self.assertTrue(TutorSubjects.objects.filter(tutor=self.tutor, subject=proposal).exists())
         self.application.refresh_from_db()
         self.assertEqual(self.application.application_status, "rejected")
+
+    def test_update_action_edits_pending_proposal_fields_and_description(self):
+        proposal = self.make_proposal("UPDATE-PROP")
+
+        response = self.client.patch(
+            f"/api/admin/tutor-applications/{self.application.id}/subjects/"
+            f"{proposal.subject_code}/",
+            {
+                "action": "update",
+                "subject_name": "Updated Proposal Name",
+                "category": "Mathematics & Data Sciences",
+                "keywords": "algebra, math",
+                "description": "Refined by admin.",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        proposal.refresh_from_db()
+        self.assertEqual(proposal.subject_name, "Updated Proposal Name")
+        self.assertEqual(proposal.category, "Mathematics & Data Sciences")
+        self.assertEqual(proposal.keywords, "algebra, math")
+        self.assertEqual(proposal.status, "pending")
+        link = TutorSubjects.objects.get(tutor=self.tutor, subject=proposal)
+        self.assertEqual(link.description, "Refined by admin.")
+
+    def test_update_action_rejects_unknown_category(self):
+        proposal = self.make_proposal("UPDATE-BAD-CAT")
+
+        response = self.client.patch(
+            f"/api/admin/tutor-applications/{self.application.id}/subjects/"
+            f"{proposal.subject_code}/",
+            {
+                "action": "update",
+                "subject_name": "Still Fine",
+                "category": "Invented Category",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
 
     def test_reject_subject_deletes_subject_and_tutor_link(self):
         proposal = self.make_proposal("REJECT-PROP")
