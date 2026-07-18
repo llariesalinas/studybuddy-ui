@@ -1,7 +1,7 @@
 ---
 title: Tutor subject keyword search + onboarding back-navigation
 date: 2026-07-18
-status: Approved
+status: Done
 summary: Add keyword-aware search to the subject picker and back buttons across tutor onboarding.
 spec: ../mockups/2026-07-18-tutor-subject-search.html
 ---
@@ -11,10 +11,10 @@ spec: ../mockups/2026-07-18-tutor-subject-search.html
 <!-- LIVING SUMMARY: keep this section and the Changelog current on every edit -->
 ## Status & Progress Summary
 
-**Status:** Approved — design fully settled via a `/grill-with-docs` session (domain-modeling +
-two `ui-preview` rounds); implementation not started.
+**Status:** Done — implemented, code-reviewed (Standards + Spec axes), and committed on
+`feat/subjects-reseed` (commit `5bdc25e`).
 
-**Progress:** 0/8 steps done (see Steps below).
+**Progress:** 8/8 steps done (see Steps below).
 
 **Locked decisions:** dropdown-row search results with a "via keyword" badge (not flat chips or
 grouped-by-category); Back + Continue side by side (not stacked or a text link); search is
@@ -23,8 +23,20 @@ field seeded silently on the propose form and admin-editable from day one; captu
 text only happens if a proposal is actually submitted (no separate logging table); one-step-back
 navigation only (rail steps stay non-interactive).
 
-**Open items:** none — all open questions from the grilling session were resolved before this plan
-was saved.
+**Deviations from plan during implementation:**
+- Extracted `src/constants/subjectTaxonomy.js` (not in the original plan) to fix a code-review
+  finding: the taxonomy category list was hardcoded independently in both `AdminCourseCatalog.vue`
+  and the new `AdminTutorApplications.vue` edit form.
+- `propose_tutor_subject`'s response body was missing `keywords` (a pre-existing hand-built dict
+  that predates this change) — fixed to include it, since the frontend pushes that response
+  straight into its local subject list.
+- The commit also bundles an unrelated, already in-progress "remove institution matching
+  constraint" change (see `docs/plans/2026-07-17-remove-institution-matching-constraint.md`) that
+  was sitting uncommitted in the same shared backend files (`views.py`, `serializers.py`,
+  `tests.py`) before this session started; bundling was an explicit user decision, not part of
+  this plan's original scope.
+
+**Open items:** none.
 
 ## Goal
 
@@ -155,3 +167,16 @@ way to navigate backward at all.
   onboarding back-navigation. Two `ui-preview` rounds settled the search-results layout (dropdown
   rows) and the Back/Continue button placement (side by side); merged mockup saved to
   `docs/mockups/2026-07-18-tutor-subject-search.html`.
+- 2026-07-18 — Implemented via `/implement`, all 8 steps done. `npm run lint`, `npm run build`, and
+  the targeted Django test classes (`GlobalSubjectCatalogTests`, `TutorSubjectProposalTests`,
+  `AdminProposedSubjectReviewTests`) all pass; the full `manage.py test` suite has 19 pre-existing
+  failures + 1 error unrelated to this feature (cashout fee math, avatar upload, verification-dev
+  env flags), confirmed via diff inspection to predate this work. A two-axis `/code-review`
+  (Standards + Spec) ran against the diff; both hard-violation findings (hardcoded taxonomy list,
+  `keywords` missing from the propose-subject response) were fixed, plus the missing
+  `docs/architecture/booking-flow.md` update (plan Step 8) and a minor search-logic cleanup.
+  **Not done:** manual in-browser click-through verification (search/select on all 4 picker call
+  sites, the full propose→admin-review→approve loop, and Back-navigation) was not performed —
+  only static review and automated tests. Committed as `5bdc25e`, bundled with an unrelated
+  pre-existing "remove institution matching constraint" change per explicit user decision (see
+  Deviations above).
