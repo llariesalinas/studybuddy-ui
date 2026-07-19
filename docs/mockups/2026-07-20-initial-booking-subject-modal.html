@@ -1,0 +1,203 @@
+<style>
+  .sbv4 {
+    --sb-primary: #00895A; --sb-primary-hover: #00704A; --sb-primary-light: #edf6f1;
+    --sb-bg: #F8F9FA; --sb-card-bg: #ffffff; --sb-card-border: #EAEAEA;
+    --sb-text-main: #163127; --sb-text-muted: #6B7280; --sb-border-light: #e0e7e3;
+    --sb-focus-ring: rgba(0, 137, 90, 0.12);
+    --sb-secondary-blue: #006591; --sb-aurora-violet: #8E7CF4;
+    --sb-pop-yellow-deep: #DCA21B; --sb-pop-orange-deep: #E0683A; --sb-pop-pink-deep: #E26D86;
+    --sb-warning-text: #997404;
+    font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+    color: var(--sb-text-main);
+  }
+
+  .sbv4 .stage { display:flex; gap:24px; flex-wrap:wrap; align-items:flex-start; }
+  .sbv4 .col { flex:1; min-width:300px; }
+  .sbv4 .col h4 { font-size:.78rem; color:var(--sb-text-muted); margin:0 0 10px; font-weight:700;
+                  text-transform:uppercase; letter-spacing:.05em; }
+
+  /* booking card context */
+  .sbv4 .bcard { background:var(--sb-card-bg); border:1px solid var(--sb-card-border);
+                 border-radius:16px; padding:20px; max-width:380px;
+                 box-shadow:0 6px 16px rgba(15,23,42,.06); }
+  .sbv4 .lbl { font-size:.7rem; font-weight:700; margin:0 0 6px; }
+  .sbv4 .fld { margin-bottom:13px; }
+  .sbv4 .two { display:grid; grid-template-columns:1fr 1fr; gap:9px; }
+  .sbv4 .ghostf { height:36px; border:1px solid var(--sb-card-border); border-radius:10px;
+                  background:var(--sb-bg); }
+
+  .sbv4 .trig { border:1px solid var(--sb-card-border); border-radius:10px; padding:10px 12px;
+                font-size:.78rem; color:var(--sb-text-muted); display:flex;
+                justify-content:space-between; align-items:center; background:#fff;
+                min-height:42px; box-sizing:border-box; }
+  .sbv4 .trig.focus { border-color:var(--sb-primary); box-shadow:0 0 0 4px var(--sb-focus-ring); }
+  .sbv4 .trig.sel { color:var(--sb-text-main); font-weight:600; }
+  .sbv4 .trig .tag { font-size:.6rem; color:var(--sb-primary); background:var(--sb-primary-light);
+                     border-radius:999px; padding:2px 9px; font-weight:700; }
+
+  /* modal */
+  .sbv4 .overlay { background:rgba(22,49,39,.35); border-radius:14px; padding:26px 18px; }
+  .sbv4 .modal { background:var(--sb-card-bg); border-radius:16px; max-width:430px; margin:0 auto;
+                 box-shadow:0 16px 36px rgba(15,23,42,.22); overflow:hidden; }
+  .sbv4 .mh { display:flex; justify-content:space-between; align-items:center;
+              padding:14px 18px; border-bottom:1px solid var(--sb-card-border); }
+  .sbv4 .mh b { font-size:.88rem; }
+  .sbv4 .x { color:var(--sb-text-muted); font-size:.85rem; }
+  .sbv4 .srchwrap { padding:12px 16px 0; }
+  .sbv4 .srch { border:1.5px solid var(--sb-card-border); border-radius:10px; padding:9px 12px;
+                font-size:.76rem; color:var(--sb-text-muted); display:flex; gap:7px;
+                align-items:center; }
+
+  .sbv4 .panes { display:flex; min-height:250px; margin-top:12px;
+                 border-top:1px solid var(--sb-card-border); }
+  .sbv4 .pane-l { width:148px; border-right:1px solid var(--sb-card-border); padding:10px 7px;
+                  background:var(--sb-bg); }
+  .sbv4 .cat { --cat:var(--sb-primary); font-size:.66rem; font-weight:600; padding:8px 9px;
+               border-radius:9px; color:var(--sb-text-muted); display:flex; align-items:center;
+               gap:7px; margin-bottom:2px; }
+  .sbv4 .cat .dot { width:8px; height:8px; border-radius:50%; background:var(--cat); flex:0 0 auto; }
+  .sbv4 .cat small { margin-left:auto; font-size:.58rem; color:var(--sb-text-muted); opacity:.7; }
+  .sbv4 .cat.on { background:color-mix(in srgb, var(--cat) 12%, #fff); color:var(--sb-text-main);
+                  font-weight:700; }
+  .sbv4 .c-math { --cat:var(--sb-primary); } .sbv4 .c-sci { --cat:var(--sb-secondary-blue); }
+  .sbv4 .c-tech { --cat:var(--sb-aurora-violet); } .sbv4 .c-biz { --cat:var(--sb-pop-yellow-deep); }
+  .sbv4 .c-hum { --cat:var(--sb-pop-orange-deep); } .sbv4 .c-art { --cat:var(--sb-pop-pink-deep); }
+
+  .sbv4 .pane-r { flex:1; padding:10px 10px; }
+  .sbv4 .crumb { font-size:.6rem; font-weight:700; letter-spacing:.05em; text-transform:uppercase;
+                 color:var(--sb-text-muted); padding:2px 8px 8px; }
+  .sbv4 .li { padding:9px 10px; font-size:.76rem; border-radius:9px; display:flex;
+              justify-content:space-between; align-items:center; }
+  .sbv4 .li:hover, .sbv4 .li.hov { background:var(--sb-primary-light); }
+  .sbv4 .li.picked { background:var(--sb-primary-light); font-weight:700; color:var(--sb-primary); }
+  .sbv4 .li .chk { color:var(--sb-primary); font-weight:800; font-size:.72rem; }
+
+  /* search-active state */
+  .sbv4 .srch.active { border-color:var(--sb-primary); box-shadow:0 0 0 4px var(--sb-focus-ring);
+                       color:var(--sb-text-main); font-weight:600; }
+  .sbv4 .flatlist { padding:8px 10px 14px; }
+  .sbv4 .li .meta { font-size:.6rem; color:var(--sb-text-muted); font-weight:400; }
+  .sbv4 .via { font-size:.58rem; color:var(--sb-warning-text); background:#fdf5d7;
+               border-radius:999px; padding:2px 8px; white-space:nowrap; }
+  .sbv4 .lft { display:flex; flex-direction:column; gap:1px; }
+
+  .sbv4 .note { font-size:.7rem; color:var(--sb-text-muted); margin-top:10px; line-height:1.55; }
+  .sbv4 .mobile-tabs { display:flex; gap:5px; padding:10px 14px 2px; flex-wrap:wrap; }
+  .sbv4 .mtab { --cat:var(--sb-primary); font-size:.6rem; font-weight:700; padding:4px 10px;
+                border-radius:999px; border:1px solid var(--sb-card-border);
+                color:var(--sb-text-muted); display:flex; align-items:center; gap:5px; }
+  .sbv4 .mtab .dot { width:6px; height:6px; border-radius:50%; background:var(--cat); }
+  .sbv4 .mtab.on { border-color:var(--cat); background:color-mix(in srgb, var(--cat) 10%, #fff);
+                   color:var(--sb-text-main); }
+  .sbv4 .phone { max-width:270px; }
+</style>
+
+<div class="sbv4">
+  <h2>Final design &mdash; StudyBuddy theme</h2>
+  <p class="subtitle">Two-pane subject modal behind a compact trigger, using the real tokens
+  (<code>--sb-primary</code> green, category accents, focus halo)</p>
+
+  <div class="stage" style="margin-bottom:30px">
+    <div class="col">
+      <h4>Trigger in the booking card</h4>
+      <div class="bcard">
+        <div class="fld"><p class="lbl">Subject</p><div class="trig">Select subject <span>&#9662;</span></div></div>
+        <div class="fld two">
+          <div><p class="lbl">Date</p><div class="ghostf"></div></div>
+          <div><p class="lbl">Preferred Mode</p><div class="ghostf"></div></div>
+        </div>
+        <div class="fld two">
+          <div><p class="lbl">Time From</p><div class="ghostf"></div></div>
+          <div><p class="lbl">Time To</p><div class="ghostf"></div></div>
+        </div>
+      </div>
+      <p class="note">Hover/focus gets the standard green halo; after choosing, the trigger shows
+      the subject with a category tag:</p>
+      <div class="bcard" style="padding:14px">
+        <div class="trig sel focus">Calculus II <span class="tag">Mathematics</span></div>
+      </div>
+    </div>
+
+    <div class="col">
+      <h4>Modal &mdash; browsing (two-pane)</h4>
+      <div class="overlay">
+        <div class="modal">
+          <div class="mh"><b>Choose Subject</b><span class="x">&#10005;</span></div>
+          <div class="srchwrap"><div class="srch">&#128269; Search subjects</div></div>
+          <div class="panes">
+            <div class="pane-l">
+              <div class="cat c-math on"><span class="dot"></span>Math &amp; Data <small>14</small></div>
+              <div class="cat c-sci"><span class="dot"></span>Sciences <small>11</small></div>
+              <div class="cat c-tech"><span class="dot"></span>Technology <small>16</small></div>
+              <div class="cat c-biz"><span class="dot"></span>Business <small>12</small></div>
+              <div class="cat c-hum"><span class="dot"></span>Humanities <small>13</small></div>
+              <div class="cat c-art"><span class="dot"></span>Hobbies &amp; Arts <small>9</small></div>
+            </div>
+            <div class="pane-r">
+              <div class="crumb">Mathematics &amp; Data Sciences</div>
+              <div class="li picked">Calculus II <span class="chk">&#10003;</span></div>
+              <div class="li">Calculus I</div>
+              <div class="li hov">Statistics</div>
+              <div class="li">Linear Algebra</div>
+              <div class="li">Discrete Mathematics</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="stage">
+    <div class="col">
+      <h4>Modal &mdash; searching overrides browsing</h4>
+      <div class="overlay">
+        <div class="modal">
+          <div class="mh"><b>Choose Subject</b><span class="x">&#10005;</span></div>
+          <div class="srchwrap"><div class="srch active">&#128269; calc</div></div>
+          <div class="flatlist" style="margin-top:8px; border-top:1px solid var(--sb-card-border); padding-top:10px">
+            <div class="li hov"><span class="lft"><b>Calculus II</b><span class="meta">Mathematics &amp; Data Sciences</span></span></div>
+            <div class="li"><span class="lft"><b>Calculus I</b><span class="meta">Mathematics &amp; Data Sciences</span></span></div>
+            <div class="li"><span class="lft"><b>Physics I</b><span class="meta">Natural Sciences</span></span><span class="via">via "calc"</span></div>
+          </div>
+        </div>
+      </div>
+      <p class="note">Typing hides the panes and shows one flat result list with category meta;
+      keyword-only matches keep the "via" badge from the new search feature.</p>
+    </div>
+
+    <div class="col">
+      <h4>Mobile &mdash; sidebar collapses to pills</h4>
+      <div class="overlay" style="max-width:300px">
+        <div class="modal phone">
+          <div class="mh"><b>Choose Subject</b><span class="x">&#10005;</span></div>
+          <div class="srchwrap"><div class="srch">&#128269; Search subjects</div></div>
+          <div class="mobile-tabs">
+            <span class="mtab c-math on"><span class="dot"></span>Math</span>
+            <span class="mtab c-sci"><span class="dot"></span>Science</span>
+            <span class="mtab c-tech"><span class="dot"></span>Tech</span>
+            <span class="mtab c-biz"><span class="dot"></span>Business</span>
+          </div>
+          <div class="flatlist">
+            <div class="li picked">Calculus II <span class="chk">&#10003;</span></div>
+            <div class="li">Calculus I</div>
+            <div class="li">Statistics</div>
+            <div class="li">Linear Algebra</div>
+          </div>
+        </div>
+      </div>
+      <p class="note">Below 640px the category sidebar becomes a horizontally scrollable pill row
+      with the same category dot colors.</p>
+    </div>
+  </div>
+
+  <div class="options" style="margin-top:26px">
+    <div class="option" data-choice="approve-v4" onclick="toggleSelect(this)">
+      <div class="letter">&#10003;</div>
+      <div class="content"><h3>Approve this design</h3><p>Proceed to plan the implementation.</p></div>
+    </div>
+    <div class="option" data-choice="tweak-v4" onclick="toggleSelect(this)">
+      <div class="letter">&#8634;</div>
+      <div class="content"><h3>Tweak something</h3><p>Tell me in the terminal what to adjust.</p></div>
+    </div>
+  </div>
+</div>
