@@ -5,7 +5,7 @@
         <form @submit.prevent="findTutor">
           <div class="mb-3">
             <label class="form-label fw-semibold small">Subject</label>
-            <SubjectTaxonomyPicker v-model="selectedSubjectCodes" :subjects="subjects" :max-selection="1" />
+            <SubjectPickerModal v-model="selectedSubjectCodes" :subjects="subjects" />
           </div>
 
           <div class="row g-3 mb-3">
@@ -124,7 +124,7 @@ import BudgetRangeSlider from '@/components/BudgetRangeSlider.vue'
 import BookingDatePicker from '@/components/BookingDatePicker.vue'
 import BookingTimePicker from '@/components/BookingTimePicker.vue'
 import CampusLocationModal from '@/components/CampusLocationModal.vue'
-import SubjectTaxonomyPicker from '@/components/SubjectTaxonomyPicker.vue'
+import SubjectPickerModal from '@/components/SubjectPickerModal.vue'
 import {
   INITIAL_BUDGET_MAX,
   INITIAL_BUDGET_MIN,

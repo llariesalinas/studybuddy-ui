@@ -90,6 +90,7 @@
 
 <script setup>
 import { computed, ref } from 'vue'
+import { categoryClass, searchSubjects, subjectCategories } from '@/components/subjectPicker.shared'
 
 const props = defineProps({
   subjects: { type: Array, required: true },
@@ -100,25 +101,13 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue', 'propose'])
 const activeCategory = ref('')
 const searchQuery = ref('')
-const categories = computed(() => [...new Set(props.subjects.map((subject) => subject.category).filter(Boolean))])
+const categories = computed(() => subjectCategories(props.subjects))
 const selectedSubjects = computed(() => props.subjects.filter((subject) => props.modelValue.includes(subject.subject_code)))
 const subjectsFor = (category) => props.subjects.filter((subject) => subject.category === category)
 const selectedFor = (category) => subjectsFor(category).filter((subject) => props.modelValue.includes(subject.subject_code)).length
-const categoryClass = (category) => ({ 'cat-math': category === 'Mathematics & Data Sciences', 'cat-science': category === 'Natural Sciences', 'cat-tech': category === 'Technology & Computer Science', 'cat-business': category === 'Business, Finance & Economics', 'cat-humanities': category === 'Humanities & Social Sciences', 'cat-arts': category === 'Hobbies & Arts' })
 function toggle(code) { if (props.modelValue.includes(code)) emit('update:modelValue', props.modelValue.filter((value) => value !== code)); else if (!props.maxSelection || props.modelValue.length < props.maxSelection) emit('update:modelValue', [...props.modelValue, code]) }
 
-const searchResults = computed(() => {
-  const query = searchQuery.value.trim().toLowerCase()
-  if (!query) return []
-  return props.subjects
-    .map((subject) => {
-      const nameMatch = subject.subject_name?.toLowerCase().includes(query) || false
-      const categoryMatch = subject.category?.toLowerCase().includes(query) || false
-      const keywordMatch = subject.keywords?.toLowerCase().includes(query) || false
-      return { ...subject, isMatch: nameMatch || categoryMatch || keywordMatch, matchedViaKeyword: !nameMatch && !categoryMatch && keywordMatch }
-    })
-    .filter((subject) => subject.isMatch)
-})
+const searchResults = computed(() => searchSubjects(props.subjects, searchQuery.value))
 </script>
 
 <style scoped>
