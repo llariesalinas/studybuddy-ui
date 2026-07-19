@@ -13,9 +13,11 @@ spec: ../mockups/2026-07-20-initial-booking-subject-modal.html
 **In Progress** — implemented and committed (`21774b6`): shared search module
 `src/components/subjectPicker.shared.js` (TDD, 9 tests), new `SubjectPickerModal.vue`
 (trigger + two-pane modal, arrow-key nav, mobile pill collapse), swapped into
-`InitialBooking.vue`; two-axis code review run and all actionable findings fixed. Automated
-checks green (lint / build / 77-test suite). Remaining: the manual dev-server visual pass from
-Checks to run — then this moves to Done.
+`InitialBooking.vue`; two-axis code review run and all actionable findings fixed. Scope
+extended 2026-07-20: the flagged FindTutors.vue follow-up was confirmed and the same swap
+applied there after a ui-preview comparison (modal chosen over popover/combobox alternatives).
+Automated checks green (lint / build / 77-test suite). Remaining: the manual dev-server visual
+pass from Checks to run — then this moves to Done.
 
 ## Goal
 
@@ -63,7 +65,10 @@ fork of the picker would tangle both layouts in one file.
 ## Risks
 
 - FindTutors.vue also renders the picker inside a constrained column — if it suffers the same
-  crowding, that is a follow-up swap, deliberately out of scope here.
+  crowding, that is a follow-up swap, deliberately out of scope here. (Resolved 2026-07-20: the
+  crowding was confirmed and the same swap applied after a ui-preview comparison against
+  filter-bar-native alternatives — see
+  [FindTutors mockup](../mockups/2026-07-20-findtutors-subject-modal.html).)
 - Modal focus/keyboard handling: follow the existing pattern in `SbSelectModal.vue` /
   `CampusLocationModal.vue` rather than inventing new behavior.
 - Category label truncation in the 148px sidebar for long names ("Business, Finance & Economics")
@@ -88,3 +93,8 @@ fork of the picker would tangle both layouts in one file.
   centralized, `isMatch` no longer leaked, arrow-key navigation added, sidebar labels
   ellipsized, re-click no longer clears the selection. Status Approved -> In Progress pending
   the manual dev-server pass.
+- 2026-07-20 — Scope extended to FindTutors.vue: the risk section's flagged follow-up was
+  confirmed live (inline picker inflating the col-lg-4 filter column). A ui-preview session
+  compared reusing the modal vs an anchored popover vs a search-only combobox; the modal was
+  chosen for consistency. Same two-line swap applied; mockup promoted to
+  `../mockups/2026-07-20-findtutors-subject-modal.html`; lint/build/77-test suite green.

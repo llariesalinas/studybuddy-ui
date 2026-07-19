@@ -10,7 +10,9 @@ compact 42px trigger opening a two-pane subject modal (category sidebar, search 
 keyword badges, mobile pill collapse) themed with the app's real tokens. Implemented and
 committed (`21774b6`): TDD'd shared search module, new `SubjectPickerModal.vue` with arrow-key
 nav, swap into `InitialBooking.vue`; two-axis review findings all fixed; lint/build/77-test
-suite green. Remaining: manual dev-server visual pass, then Done. Earlier (2026-07-17): Subjects taxonomy reseed and recommender proof is
+suite green. Scope extended same day to `FindTutors.vue` after a ui-preview comparison (modal
+chosen over popover/combobox for the filter bar) — same swap applied there.
+Remaining: manual dev-server visual pass, then Done. Earlier (2026-07-17): Subjects taxonomy reseed and recommender proof is
 Done — grilled end-to-end (12 decisions) from panel feedback and shipped on `feat/subjects-reseed`:
 subjects are now a Preply-style generic/specific taxonomy (slug PKs, `category` repurposed from
 course linkage to 6 taxonomy categories, SPED excluded), course-based subject gating retired, a
@@ -245,3 +247,4 @@ Entries marked Done&ast; predate the session-summary convention; their status is
 | 2026-07-15 | Merged `origin/main` (5 commits) into `feat/tutor-onboarding-verification-redesign` ahead of the PR; resolved 4 conflicts in favor of this branch's Admin-into-SuperAdmin consolidation (main's SuperAdmin applicant-review ban and its tests dropped as superseded), kept main's 0057 migration-dependency fix, restored SuperAdmin access to `/admin/tutor-applications`, and annotated main's plan row as superseded |
 | 2026-07-20 | Diagnosed the InitialBooking subject-field regression from `2d1c1a8` (inline `SubjectTaxonomyPicker` crowding the 600px booking card) via a `ui-preview` session; iterated compact designs, two-pane modal picked and themed with real StudyBuddy tokens, mockup promoted to `docs/mockups/2026-07-20-initial-booking-subject-modal.html`; added the Approved plan and regenerated the dashboard |
 | 2026-07-20 | Implemented the initial booking subject picker modal via /implement (commit `21774b6`): TDD shared search module (9 tests), new `SubjectPickerModal.vue`, swap into `InitialBooking.vue`; two-axis code review run in parallel subagents, all actionable findings fixed (centralized category-class map, arrow-key nav, ellipsized sidebar labels, no clear-on-reclick); lint/build/full 77-test suite green; plan moved Approved -> In Progress pending the manual dev-server pass |
+| 2026-07-20 | Confirmed the same subject-picker crowding in `FindTutors.vue` via ui-preview (filter-bar context rendered to scale); compared reuse-modal vs anchored-popover vs combobox, modal chosen for consistency; applied the swap, promoted `docs/mockups/2026-07-20-findtutors-subject-modal.html`, checks green |
