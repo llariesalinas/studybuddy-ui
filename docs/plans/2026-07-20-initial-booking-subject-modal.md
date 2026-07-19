@@ -1,7 +1,7 @@
 ---
 title: Initial booking subject picker modal
 date: 2026-07-20
-status: In Progress
+status: Done
 summary: Replace the inline SubjectTaxonomyPicker on InitialBooking with a compact trigger that opens a two-pane subject modal.
 spec: ../mockups/2026-07-20-initial-booking-subject-modal.html
 ---
@@ -10,14 +10,11 @@ spec: ../mockups/2026-07-20-initial-booking-subject-modal.html
 
 ## Status & Progress Summary
 
-**In Progress** — implemented and committed (`21774b6`): shared search module
-`src/components/subjectPicker.shared.js` (TDD, 9 tests), new `SubjectPickerModal.vue`
-(trigger + two-pane modal, arrow-key nav, mobile pill collapse), swapped into
-`InitialBooking.vue`; two-axis code review run and all actionable findings fixed. Scope
-extended 2026-07-20: the flagged FindTutors.vue follow-up was confirmed and the same swap
-applied there after a ui-preview comparison (modal chosen over popover/combobox alternatives).
-Automated checks green (lint / build / 77-test suite). Remaining: the manual dev-server visual
-pass from Checks to run — then this moves to Done.
+**Done** — shipped in `21774b6` (shared search module, `SubjectPickerModal.vue`, InitialBooking
+swap) and `8c0851b` (FindTutors swap, added to scope after a ui-preview comparison). Two-axis
+code review findings all fixed; lint / build / 77-test suite green; user confirmed the result
+visually. See the
+[session summary](../session-summaries/2026-07-20-initial-booking-subject-modal-summary.md).
 
 ## Goal
 
@@ -98,3 +95,6 @@ fork of the picker would tangle both layouts in one file.
   compared reusing the modal vs an anchored popover vs a search-only combobox; the modal was
   chosen for consistency. Same two-line swap applied; mockup promoted to
   `../mockups/2026-07-20-findtutors-subject-modal.html`; lint/build/77-test suite green.
+- 2026-07-20 — Closed as Done: user confirmed the result visually ("that works already"),
+  standing in for the plan's manual dev-server check. Session summary written and linked;
+  status In Progress -> Done.

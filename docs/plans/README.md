@@ -3,7 +3,7 @@
 Every finalized plan lives in this folder as its own dated file, created from [`_template.md`](_template.md).
 Status moves Draft â†’ Approved â†’ In Progress â†’ Done. When a plan is complete, its summary is linked below.
 
-**Status & Progress Summary** (2026-07-20): Initial booking subject picker modal is In Progress —
+**Status & Progress Summary** (2026-07-20): Initial booking subject picker modal is Done —
 the taxonomy picker rollout (`2d1c1a8`) crowded the InitialBooking card with a ~370px inline
 browser for a single-select field; a ui-preview session diagnosed the regression and settled on a
 compact 42px trigger opening a two-pane subject modal (category sidebar, search override with
@@ -11,8 +11,9 @@ keyword badges, mobile pill collapse) themed with the app's real tokens. Impleme
 committed (`21774b6`): TDD'd shared search module, new `SubjectPickerModal.vue` with arrow-key
 nav, swap into `InitialBooking.vue`; two-axis review findings all fixed; lint/build/77-test
 suite green. Scope extended same day to `FindTutors.vue` after a ui-preview comparison (modal
-chosen over popover/combobox for the filter bar) — same swap applied there.
-Remaining: manual dev-server visual pass, then Done. Earlier (2026-07-17): Subjects taxonomy reseed and recommender proof is
+chosen over popover/combobox for the filter bar) — same swap applied there (`8c0851b`). User
+confirmed the shipped result visually; closed as Done with a
+[session summary](../session-summaries/2026-07-20-initial-booking-subject-modal-summary.md). Earlier (2026-07-17): Subjects taxonomy reseed and recommender proof is
 Done — grilled end-to-end (12 decisions) from panel feedback and shipped on `feat/subjects-reseed`:
 subjects are now a Preply-style generic/specific taxonomy (slug PKs, `category` repurposed from
 course linkage to 6 taxonomy categories, SPED excluded), course-based subject gating retired, a
@@ -107,7 +108,7 @@ three stops. Done.
 
 | Date | Plan | Status | Summary |
 |------|------|--------|---------|
-| 2026-07-20 | [Initial booking subject picker modal](2026-07-20-initial-booking-subject-modal.md) | In Progress | Fixes the `2d1c1a8` regression where the inline `SubjectTaxonomyPicker` (~370px, built for full-width setup screens) crowded the 600px booking card; replaces it with a 42px trigger opening a two-pane subject modal (category sidebar + subject list, search override with keyword badges, mobile pill collapse) per the approved mockup ([mockup](../mockups/2026-07-20-initial-booking-subject-modal.html)); `SubjectTaxonomyPicker` stays untouched on setup screens |
+| 2026-07-20 | [Initial booking subject picker modal](2026-07-20-initial-booking-subject-modal.md) | Done | Fixes the `2d1c1a8` regression where the inline `SubjectTaxonomyPicker` (~370px, built for full-width setup screens) crowded the 600px booking card; replaces it with a 42px trigger opening a two-pane subject modal (category sidebar + subject list, search override with keyword badges, mobile pill collapse) per the approved mockup ([mockup](../mockups/2026-07-20-initial-booking-subject-modal.html)); scope extended to `FindTutors.vue` ([mockup](../mockups/2026-07-20-findtutors-subject-modal.html)); `SubjectTaxonomyPicker` unchanged on setup screens — [Summary](../session-summaries/2026-07-20-initial-booking-subject-modal-summary.md) |
 | 2026-07-16 | [Subjects taxonomy reseed and recommender proof](2026-07-16-subjects-taxonomy-reseed.md) | Done | Preply-style category taxonomy (slug codes, no visible codes, SPED excluded), full wipe + curated/filler reseed with guaranteed ratings/preferences (verified end-to-end against Postgres), rebalance-branch merge, CBF level fix, course-gating retirement, two-level drilldown picker ([mockup](../mockups/2026-07-16-subject-taxonomy-picker.html)), demo-tool proof with cheat sheet; fixed a pending-subject visibility regression found during review — [Summary](../session-summaries/2026-07-17-subjects-taxonomy-reseed-summary.md) |
 | 2026-07-13 | [Tutor onboarding & verification redesign](2026-07-13-tutor-onboarding-verification-redesign.md) | Done | Removes the tutor route-lockout for a tutee-style search-visibility gate, folds verification into one guided onboarding sequence with a skip option, and lets tutors propose subjects missing from the catalog for admin review alongside their application; implemented via Codex, independently verified (full suite failures confirmed pre-existing/unrelated by root-cause tracing) — [Summary](../session-summaries/2026-07-14-tutor-onboarding-verification-redesign-summary.md) |
 | 2026-07-13 | [Remove Motivation field from Tutor/Tutee application flows](2026-07-13-remove-motivation-field.md) | Done | Removed `reason_to_tutor` ("Motivation") entirely — model, serializers, views, tests, demo data, and every frontend surface — while preserving the unrelated document-renewal "note" field it shared UI/variable names with; full backend suite + 26 targeted tests pass, lint/build clean, two-axis review clean — [Summary](../session-summaries/2026-07-13-remove-motivation-field-summary.md) |
@@ -248,3 +249,4 @@ Entries marked Done&ast; predate the session-summary convention; their status is
 | 2026-07-20 | Diagnosed the InitialBooking subject-field regression from `2d1c1a8` (inline `SubjectTaxonomyPicker` crowding the 600px booking card) via a `ui-preview` session; iterated compact designs, two-pane modal picked and themed with real StudyBuddy tokens, mockup promoted to `docs/mockups/2026-07-20-initial-booking-subject-modal.html`; added the Approved plan and regenerated the dashboard |
 | 2026-07-20 | Implemented the initial booking subject picker modal via /implement (commit `21774b6`): TDD shared search module (9 tests), new `SubjectPickerModal.vue`, swap into `InitialBooking.vue`; two-axis code review run in parallel subagents, all actionable findings fixed (centralized category-class map, arrow-key nav, ellipsized sidebar labels, no clear-on-reclick); lint/build/full 77-test suite green; plan moved Approved -> In Progress pending the manual dev-server pass |
 | 2026-07-20 | Confirmed the same subject-picker crowding in `FindTutors.vue` via ui-preview (filter-bar context rendered to scale); compared reuse-modal vs anchored-popover vs combobox, modal chosen for consistency; applied the swap, promoted `docs/mockups/2026-07-20-findtutors-subject-modal.html`, checks green |
+| 2026-07-20 | Closed the initial booking subject picker modal plan as Done: user visually confirmed both swapped screens; wrote the session summary, linked it from the plan row, and regenerated the dashboard |
