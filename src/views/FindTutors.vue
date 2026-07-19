@@ -5,7 +5,7 @@
         <!-- Subject -->
         <div class="col-lg-4 col-md-6">
           <label class="form-label fw-semibold small sb-muted">Subject</label>
-          <SubjectTaxonomyPicker v-model="selectedSubjectCodes" :subjects="subjects" :max-selection="1" />
+          <SubjectPickerModal v-model="selectedSubjectCodes" :subjects="subjects" />
         </div>
 
         <!-- Mode -->
@@ -197,7 +197,7 @@ import BookingDatePicker from '@/components/BookingDatePicker.vue'
 import BookingTimePicker from '@/components/BookingTimePicker.vue'
 import CampusLocationModal from '@/components/CampusLocationModal.vue'
 import SbSelectModal from '@/components/SbSelectModal.vue'
-import SubjectTaxonomyPicker from '@/components/SubjectTaxonomyPicker.vue'
+import SubjectPickerModal from '@/components/SubjectPickerModal.vue'
 
 import {
   INITIAL_BUDGET_MAX,
