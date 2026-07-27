@@ -463,6 +463,57 @@ def algorithm_demo_recommend(request):
     return Response(result)
 
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, IsSuperAdminUser])
+def algorithm_demo_recommend_whatif(request):
+    """Re-run the recommender with what-if rating overrides applied in memory.
+
+    POST rather than GET because the override list is a body, not a query, but
+    this writes nothing — it is the read-only counterpart of
+    algorithm_demo_recommend. Overrides let the demo panel retune a rating and
+    watch the ranking respond while the numbers still come from the real
+    recommender, instead of a second implementation in the frontend.
+    """
+    if not settings.ALGORITHM_DEMO_TOOLS_ENABLED:
+        return Response({"error": "Algorithm demo tools are disabled."}, status=403)
+
+    tutee_id = request.data.get('tutee_id')
+    if not tutee_id:
+        return Response({"error": "tutee_id is required."}, status=400)
+
+    raw_overrides = request.data.get('overrides') or []
+    if not isinstance(raw_overrides, list):
+        return Response({"error": "overrides must be a list."}, status=400)
+
+    overrides = []
+    for entry in raw_overrides:
+        if not isinstance(entry, dict):
+            return Response({"error": "Each override must be an object."}, status=400)
+        try:
+            student_id = int(entry.get('student_id'))
+            tutor_id = int(entry.get('tutor_id'))
+            rating_score = int(entry.get('rating_score'))
+        except (TypeError, ValueError):
+            return Response(
+                {"error": "Each override needs student_id, tutor_id and rating_score."},
+                status=400,
+            )
+        if rating_score < 1 or rating_score > 5:
+            return Response({"error": "rating_score must be between 1 and 5."}, status=400)
+        overrides.append({
+            "student_id": student_id,
+            "tutor_id": tutor_id,
+            "rating_score": rating_score,
+        })
+
+    tutee = get_object_or_404(UserProfile, id=tutee_id, role="Tutee")
+    institution_id = request.data.get('institution_id') or None
+    result = build_algorithm_demo_recommendation(
+        tutee, institution_id=institution_id, overrides=overrides
+    )
+    return Response(result)
+
+
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated, IsSuperAdminUser])
 def algorithm_demo_update_rating(request):

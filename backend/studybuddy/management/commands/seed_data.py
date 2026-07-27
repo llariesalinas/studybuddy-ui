@@ -102,6 +102,17 @@ CURATED_TUTORS = [
      [('Python', 3)]),
     ('T5', 'Esperanza', 'Elizalde', 'SHS-STEM', 12, 'High School', True, False, 200,
      [('Python', 5)]),
+    # Tier-1 programming core (see TIER1_TUTEE_KEYS): three more BSCS tutors so the
+    # curated BSCS tutees have enough shared tutors to co-rate. Pearson runs over the
+    # co-rated intersection only (CF.py), so a pair sharing 1 tutor scores 0 and is
+    # dropped, and a pair sharing 2 always scores exactly +/-1 — neither is worth showing
+    # a panel. Five shared tutors puts every pair at 3 or more.
+    ('T6', 'Fidel', 'Fajardo', 'BSCS', 16, 'College', True, True, 320,
+     [('Data Structures', 5), ('Algorithms', 4)]),
+    ('T7', 'Gemma', 'Gatchalian', 'BSCS', 15, 'College', True, False, 290,
+     [('Web Development', 5)]),
+    ('T8', 'Hector', 'Hidalgo', 'BSCS', 16, 'College', True, True, 310,
+     [('SQL', 4)]),
 ]
 
 # Curated tutees: (key, fname, lname, course_code, year, [preferred_subject_name, ...])
@@ -111,18 +122,50 @@ CURATED_TUTEES = [
     ('S3', 'Hernan', 'Herrera', 'BSCS', 15, ['Python', 'Data Structures']),
     ('S4', 'Imelda', 'Ignacio', 'BSCS', 13, ['SQL', 'Web Development']),
     ('S5', 'Jacinto', 'Jimenez', 'BSBA', 14, ['Financial Accounting', 'Marketing']),
+    # S6 is the CF protagonist for the algorithm demo: a BSCS tutee with a real rating
+    # history, as opposed to S1, who is deliberately left with none so the Cold-Start
+    # path stays demonstrable. S6's preferences deliberately span Python/SQL/Data
+    # Structures so the candidate pool comes out at five tutors — enough for the top-5
+    # comparison table — and includes T5, whose High School teaching level zeroes the
+    # Level sub-score against a college year.
+    ('S6', 'Katrina', 'Katigbak', 'BSCS', 14, ['Python', 'SQL', 'Data Structures']),
+    ('S7', 'Lorenzo', 'Lazaro', 'BSCS', 14, ['Python', 'Web Development']),
+    ('S8', 'Milagros', 'Manalo', 'BSCS', 15, ['Web Development', 'C++']),
+    ('S9', 'Nestor', 'Navarro', 'BSCS', 13, ['Web Development', 'SQL']),
+    ('S10', 'Olivia', 'Ocampo', 'BSCS', 14, ['Python', 'Data Structures']),
 ]
 
-# Curated ratings proving the same-course CF story for S1: S2/S3/S4 are S1's BSCS peers and
-# all rate T1 highly, T2 modestly, so S1's CF signal (via same-course neighbors) favors T1.
+# The BSCS tutees whose co-rating density the algorithm demo depends on. Enforced in
+# _assert_guarantees: every pair must share at least MIN_CO_RATED tutors, and no pair may
+# land on a degenerate +/-1 similarity.
+TIER1_TUTEE_KEYS = ['S2', 'S3', 'S4', 'S6', 'S7', 'S8', 'S9', 'S10']
+MIN_CO_RATED = 3
+
+# Tier-1 programming core: eight BSCS tutees over five shared tutors, with deliberately
+# opposed taste archetypes so Pearson lands on a believable spread instead of a wall of
+# 1.00 — fundamentals-leaning (S2/S3/S10), mixed (S4/S7), web-leaning (S8/S9, which come
+# out negative and are correctly filtered by the sim > 0 threshold in CF.top_k).
+#
+# Verified against a mirror of CF.py: relative to S6, similarities are S10 +0.970,
+# S2 +0.853, S3 +0.852, S4 +0.308, and the CF prediction for T1 is
+# 3.80 + (2.811 / 2.983) = 4.742, with S4 pulling backwards because he rated T1 below his
+# own average. S6 rates T1 himself, which both makes T1 an already-rated candidate (so the
+# demo can show prediction against actual) and puts T1 inside the co-rated set.
 CURATED_RATINGS = [
-    ('S2', 'T1', 5), ('S2', 'T2', 3),
-    ('S3', 'T1', 5), ('S3', 'T2', 3),
-    ('S4', 'T1', 4), ('S4', 'T2', 2),
+    ('S6', 'T1', 5), ('S6', 'T2', 3), ('S6', 'T6', 5), ('S6', 'T7', 2), ('S6', 'T8', 4),
+    ('S2', 'T1', 5), ('S2', 'T2', 3), ('S2', 'T6', 4), ('S2', 'T8', 4),
+    ('S3', 'T1', 5), ('S3', 'T2', 2), ('S3', 'T6', 5), ('S3', 'T7', 3),
+    ('S4', 'T1', 3), ('S4', 'T2', 2), ('S4', 'T7', 3), ('S4', 'T8', 5),
+    ('S7', 'T1', 4), ('S7', 'T2', 4), ('S7', 'T6', 3), ('S7', 'T7', 4), ('S7', 'T8', 3),
+    ('S8', 'T1', 2), ('S8', 'T2', 5), ('S8', 'T6', 2), ('S8', 'T7', 5),
+    ('S9', 'T1', 3), ('S9', 'T2', 4), ('S9', 'T7', 5), ('S9', 'T8', 2),
+    ('S10', 'T1', 4), ('S10', 'T2', 2), ('S10', 'T6', 5), ('S10', 'T7', 1), ('S10', 'T8', 3),
 ]
 
-# Filler support ratings for T3/T4/T5, from courses that are NOT S1's course (BSCS), so they
-# never touch S1's same-course CF neighborhood.
+# Filler support ratings for T3/T4/T5, from courses that are NOT BSCS, so they never touch
+# the tier-1 same-course CF neighborhood shared by S1 and S6. A side effect worth keeping:
+# T4/T5 are candidates for S6 but have no BSCS peer rating them, so they fall through to the
+# global pool and end up with no CF signal — the contrast that shows what CF contributes.
 FILLER_SUPPORT_RATINGS = [
     ('T3', 'BSBA', [5, 4, 5]),
     ('T4', 'BSIT', [4, 4, 3]),
@@ -530,7 +573,7 @@ class Command(BaseCommand):
             for tutor in list(curated['tutors_by_key'].values()) + fillers['tutors']
         }
 
-        # Curated ratings: the scripted S1 CF story.
+        # Curated ratings: the scripted tier-1 CF story (S6 protagonist, S1 cold-start).
         for tutee_key, tutor_key, score in CURATED_RATINGS:
             student = curated['tutees_by_key'][tutee_key]
             tutor = curated['tutors_by_key'][tutor_key]
@@ -644,3 +687,46 @@ class Command(BaseCommand):
 
         self.stdout.write('  guarantees verified: every tutor >= 3 ratings received, every '
                            'non-exempt tutee >= 2 ratings given.')
+
+        self._assert_tier1_co_rating_density(curated)
+
+    def _assert_tier1_co_rating_density(self, curated):
+        """The algorithm demo is only worth showing if similarity is a real number.
+
+        CF.sim computes Pearson over the co-rated intersection, so a tier-1 pair sharing
+        one tutor scores 0 and is dropped by the sim > 0 threshold, and a pair sharing
+        exactly two always scores exactly +/-1 whatever the values are. Both produce a
+        demo that either has no neighbors or shows a wall of 1.00. This asserts the
+        density the curated matrix was designed for, so a later edit to CURATED_RATINGS
+        cannot quietly reintroduce it.
+        """
+        from studybuddy.recommender.CF import sim
+
+        ratings = {}
+        for key in TIER1_TUTEE_KEYS:
+            tutee = curated['tutees_by_key'][key]
+            ratings[key] = {
+                rating.tutor_id: rating.rating_score
+                for rating in Rating.objects.filter(student=tutee)
+            }
+
+        for index, key in enumerate(TIER1_TUTEE_KEYS):
+            for other in TIER1_TUTEE_KEYS[index + 1:]:
+                shared = len(set(ratings[key]) & set(ratings[other]))
+                if shared < MIN_CO_RATED:
+                    raise CommandError(
+                        f'Guarantee violated: tier-1 tutees {key} and {other} co-rate only '
+                        f'{shared} tutors (need >= {MIN_CO_RATED}, or Pearson is degenerate).'
+                    )
+
+                similarity = sim(ratings, key, other)
+                if abs(abs(similarity) - 1.0) < 1e-9:
+                    raise CommandError(
+                        f'Guarantee violated: tier-1 tutees {key} and {other} have a '
+                        f'degenerate similarity of {similarity:+.3f}.'
+                    )
+
+        self.stdout.write(
+            f'  guarantees verified: all {len(TIER1_TUTEE_KEYS)} tier-1 tutees co-rate '
+            f'>= {MIN_CO_RATED} tutors pairwise with no degenerate similarity.'
+        )

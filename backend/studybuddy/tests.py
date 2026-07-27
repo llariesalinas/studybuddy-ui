@@ -5584,15 +5584,20 @@ class AlgorithmDemoToolTests(APITestCase):
             tutor=self.tutor, day="Mon", time_slot=time(9, 0),
         )
 
-    def _create_rating(self, student=None, rating_score=3, session_date=None):
+    def _create_rating(self, student=None, rating_score=3, session_date=None, tutor=None):
         student = student or self.tutee
+        tutor = tutor or self.tutor
+        availability = (
+            self.availability if tutor == self.tutor
+            else TutorAvailability.objects.filter(tutor=tutor).first()
+        )
         session_date = session_date or date(2026, 1, 1)
         booking = Booking.objects.create(
-            student=student, tutor=self.tutor, availability=self.availability,
+            student=student, tutor=tutor, availability=availability,
             session_date=session_date, session_mode="Online", status="Completed",
         )
         return Rating.objects.create(
-            booking=booking, student=student, tutor=self.tutor, rating_score=rating_score,
+            booking=booking, student=student, tutor=tutor, rating_score=rating_score,
         )
 
     def test_403_when_flag_disabled_even_for_superadmin(self):
@@ -5931,6 +5936,125 @@ class AlgorithmDemoToolTests(APITestCase):
                 format="json",
             )
         self.assertEqual(disabled_response.status_code, 403)
+
+    # --- what-if re-scoring + CF derivation payload -----------------------------------------
+    # See docs/plans/2026-07-23-algorithm-demo-cf-clarity.md.
+
+    def _shared_other_tutor(self):
+        """A second tutor, deliberately without the demo subject so it stays out
+        of the candidate pool, existing only to be co-rated. Pearson runs over the
+        co-rated intersection (CF.py:37) and returns 0 for a single shared item,
+        so a neighbour sharing only one tutor is filtered out before it can
+        influence anything — CF needs at least two co-rated tutors to register."""
+        other_user = User.objects.create_user(
+            username="algo-tutor-other@cpu.edu", email="algo-tutor-other@cpu.edu",
+            password="password",
+        )
+        other_profile = UserProfile.objects.create(
+            user=other_user, fname="Nena", mname="", lname="Other", role="Tutor",
+            year_level=12, institution=self.institution,
+        )
+        other_tutor = Tutor.objects.create(
+            profile=other_profile, hourly_rate=180, can_online=True, can_f2f=False,
+            teaching_level="College",
+        )
+        TutorAvailability.objects.create(tutor=other_tutor, day="Tue", time_slot=time(10, 0))
+        return other_tutor
+
+    def _peer_who_rated(self, rating_score):
+        """A second tutee who has co-rated two tutors with the demo tutee, so the
+        similarity is non-zero and the peer survives into the neighbour set."""
+        peer_user = User.objects.create_user(
+            username="algo-peer@cpu.edu", email="algo-peer@cpu.edu", password="password",
+        )
+        peer = UserProfile.objects.create(
+            user=peer_user, fname="Peer", mname="", lname="Rater", role="Tutee",
+            year_level=11, institution=self.institution,
+        )
+        other_tutor = self._shared_other_tutor()
+        self._create_rating(
+            student=self.tutee, rating_score=4, session_date=date(2026, 2, 2), tutor=other_tutor,
+        )
+        self._create_rating(
+            student=peer, rating_score=5, session_date=date(2026, 2, 3), tutor=other_tutor,
+        )
+        self._create_rating(student=peer, rating_score=rating_score, session_date=date(2026, 2, 1))
+        return peer
+
+    def test_recommend_payload_carries_cf_derivation_terms(self):
+        self._create_rating(rating_score=4)
+
+        self.client.force_authenticate(user=self.super_user)
+        response = self.client.get(
+            f"/api/dev/algorithm-demo/recommend/?tutee_id={self.tutee.id}"
+        )
+        self.assertEqual(response.status_code, 200)
+
+        cf = response.data["rows"][0]["cf"]
+        for key in ("student_avg", "student_rating", "numerator", "denominator"):
+            self.assertIn(key, cf)
+        # The tutee rated this tutor herself, so the panel can compare prediction
+        # against the real score — the candidate pool does not exclude rated tutors.
+        self.assertEqual(cf["student_rating"], 4)
+
+    def test_whatif_override_changes_score_without_writing(self):
+        self._create_rating(rating_score=2)
+        peer = self._peer_who_rated(rating_score=2)
+
+        self.client.force_authenticate(user=self.super_user)
+        baseline = self.client.get(
+            f"/api/dev/algorithm-demo/recommend/?tutee_id={self.tutee.id}"
+        )
+        baseline_score = baseline.data["rows"][0]["hybrid_score"]
+
+        response = self.client.post(
+            "/api/dev/algorithm-demo/recommend-whatif/",
+            {
+                "tutee_id": self.tutee.id,
+                "overrides": [
+                    {"student_id": peer.id, "tutor_id": self.tutor.pk, "rating_score": 5},
+                ],
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertNotEqual(response.data["rows"][0]["hybrid_score"], baseline_score)
+
+        # Nothing persisted: the peer's stored rating is untouched.
+        self.assertEqual(
+            Rating.objects.get(student=peer, tutor=self.tutor).rating_score, 2
+        )
+
+    def test_whatif_rejects_out_of_range_override(self):
+        self.client.force_authenticate(user=self.super_user)
+        response = self.client.post(
+            "/api/dev/algorithm-demo/recommend-whatif/",
+            {
+                "tutee_id": self.tutee.id,
+                "overrides": [
+                    {"student_id": self.tutee.id, "tutor_id": self.tutor.pk, "rating_score": 9},
+                ],
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_whatif_requires_superadmin_and_flag(self):
+        self.client.force_authenticate(user=self.admin_user)
+        payload = {"tutee_id": self.tutee.id, "overrides": []}
+        self.assertEqual(
+            self.client.post(
+                "/api/dev/algorithm-demo/recommend-whatif/", payload, format="json"
+            ).status_code,
+            403,
+        )
+
+        self.client.force_authenticate(user=self.super_user)
+        with override_settings(ALGORITHM_DEMO_TOOLS_ENABLED=False):
+            disabled = self.client.post(
+                "/api/dev/algorithm-demo/recommend-whatif/", payload, format="json"
+            )
+        self.assertEqual(disabled.status_code, 403)
 
 
 class SessionCheckInTests(APITestCase):

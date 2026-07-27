@@ -79,13 +79,36 @@ def _neighbor_name_map(neighbor_ids):
     return {profile.id: f"{profile.fname} {profile.lname}" for profile in profiles}
 
 
-def build_algorithm_demo_recommendation(tutee, institution_id=None):
+def apply_rating_overrides(ratings, overrides):
+    """Apply what-if rating overrides to an in-memory rating matrix, in place.
+
+    The demo tool's editable ratings run through here rather than through the
+    database: the panel can retune a rating and watch the ranking respond
+    without the experiment persisting, and the numbers are still produced by
+    the real recommender rather than a second implementation in the frontend.
+
+    Overrides may update an existing rating or introduce one that does not
+    exist (e.g. giving a Cold-Start tutee their first rating to show CF switch
+    on). They must be applied before neighbor selection, since a changed rating
+    shifts both the rater's average and any Pearson similarity computed over a
+    co-rated set containing that tutor.
+    """
+    for override in overrides:
+        ratings[override["student_id"]][override["tutor_id"]] = override["rating_score"]
+
+    return ratings
+
+
+def build_algorithm_demo_recommendation(tutee, institution_id=None, overrides=None):
     """Runs the real hybrid recommender for a Tutee and returns every candidate
     Tutor's full Hybrid Score breakdown (CBF sub-scores, CF score + contributing
     Top-K Neighbors, Cold-Start flag) for the live panel demo tool. Mirrors
     get_dashboard_recommendations' subject-preference-match candidate pool,
     unscoped by institution unless institution_id is given (see
-    _candidate_tutors)."""
+    _candidate_tutors).
+
+    overrides is an optional list of what-if rating edits applied to the matrix
+    in memory and never written back — see apply_rating_overrides."""
     subject_codes = get_student_subject_codes(tutee)
 
     if not subject_codes:
@@ -96,6 +119,9 @@ def build_algorithm_demo_recommendation(tutee, institution_id=None):
         return {"reason": "no_candidates", "rows": []}
 
     ratings = build_rating_matrix()
+    if overrides:
+        apply_rating_overrides(ratings, overrides)
+
     peer_ids = get_peer_student_ids(ratings, tutee) if tutee.id in ratings else []
     peer_neighbors = top_k(ratings, tutee.id, candidate_ids=peer_ids) if tutee.id in ratings else []
     global_neighbors = top_k(ratings, tutee.id) if tutee.id in ratings else []
@@ -134,12 +160,22 @@ def build_algorithm_demo_recommendation(tutee, institution_id=None):
             "cf": {
                 "score": cf["score"],
                 "pool": cf["pool"],
+                # Every term of the prediction, so the demo panel can render the
+                # derivation rather than just the total — see compute_cf_breakdown.
+                "student_avg": cf["student_avg"],
+                "student_rating": cf["student_rating"],
+                "numerator": cf["numerator"],
+                "denominator": cf["denominator"],
                 "neighbors": [
                     {
                         "neighbor_id": neighbor["neighbor_id"],
                         "name": neighbor_names.get(neighbor["neighbor_id"], "Unknown"),
                         "similarity": neighbor["similarity"],
                         "rating": neighbor["rating"],
+                        "neighbor_avg": neighbor["neighbor_avg"],
+                        "deviation": neighbor["deviation"],
+                        "weighted": neighbor["weighted"],
+                        "co_rated_count": neighbor["co_rated_count"],
                     }
                     for neighbor in cf["neighbors"]
                 ],
