@@ -9,7 +9,7 @@ from studybuddy.models import Booking, Tutor, TutorSubjects, UserProfile
 
 from .models import ChatRoom, Message
 
-SESSION_SLOT_MINUTES = 30
+SESSION_SLOT_MINUTES = 60
 
 
 def full_name(profile):

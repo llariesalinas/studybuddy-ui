@@ -269,7 +269,7 @@ const normalizeFutureDate = (date) => {
 }
 
 const nextTimeSlot = (value) => {
-  const nextMinutes = timeToMinutes(value) + 30
+  const nextMinutes = timeToMinutes(value) + 60
 
   if (nextMinutes >= 24 * 60) {
     return null

@@ -362,7 +362,7 @@ const allTimeOptions = computed(() => {
   const options = []
 
   for (let hour = 0; hour < 24; hour += 1) {
-    for (let minute = 0; minute < 60; minute += 30) {
+    for (let minute = 0; minute < 60; minute += 60) {
       options.push(`${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`)
     }
   }
@@ -506,7 +506,7 @@ function getTimePeriod(timeString) {
 }
 
 function formatSlotRange(timeString) {
-  const endTime = addThirtyMinutes(timeString)
+  const endTime = addOneHour(timeString)
   const startPeriod = getTimePeriod(timeString)
   const endPeriod = getTimePeriod(endTime)
 
@@ -529,7 +529,7 @@ function getSlotPeriodClass(timeString) {
 
 function getSlotPeriodDescription(timeString) {
   const startPeriod = getTimePeriod(timeString)
-  const endPeriod = getTimePeriod(addThirtyMinutes(timeString))
+  const endPeriod = getTimePeriod(addOneHour(timeString))
 
   if (startPeriod !== endPeriod) {
     return startPeriod === 'AM' ? 'noon transition' : 'day transition'
@@ -769,7 +769,7 @@ async function saveSlot() {
         createdCount++
       }
 
-      current.setMinutes(current.getMinutes() + 30)
+      current.setMinutes(current.getMinutes() + 60)
     }
 
     if (createdCount === 0) {
@@ -804,9 +804,9 @@ onMounted(async () => {
   setInitialWeekIndex()
 })
 
-function addThirtyMinutes(timeString) {
+function addOneHour(timeString) {
   const date = new Date(`1970-01-01T${timeString}`)
-  date.setMinutes(date.getMinutes() + 30)
+  date.setMinutes(date.getMinutes() + 60)
   return date.toTimeString().slice(0, 5)
 }
 </script>

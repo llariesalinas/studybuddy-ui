@@ -138,7 +138,7 @@ const timeSlotOptions = computed(() => {
   const slots = []
 
   for (let hour = 0; hour < 24; hour += 1) {
-    for (let minute = 0; minute < 60; minute += 30) {
+    for (let minute = 0; minute < 60; minute += 60) {
       const value = `${padNumber(hour)}:${padNumber(minute)}`
       const period = hour >= 12 ? 'PM' : 'AM'
       const displayHour = hour % 12 || 12

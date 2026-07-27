@@ -628,7 +628,7 @@ WEEKDAY_MAP = {
     6: "Sun",
 }
 
-SESSION_SLOT_MINUTES = 30
+SESSION_SLOT_MINUTES = 60
 
 
 def get_duration_hours_from_slot_count(slot_count):
