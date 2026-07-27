@@ -1,0 +1,1181 @@
+<title>Algorithm Demo Guide</title>
+<style>
+  :root {
+    --sb-primary: #00895A;
+    --sb-primary-hover: #00704A;
+    --sb-primary-light: #edf6f1;
+    --sb-primary-lighter: #dff1e8;
+    --sb-bg: #F8F9FA;
+    --sb-card-bg: #ffffff;
+    --sb-card-border: #EAEAEA;
+    --sb-text-main: #163127;
+    --sb-text-muted: #6B7280;
+    --sb-text-secondary: #495057;
+    --sb-text-subtle: #a0acb8;
+    --sb-border-light: #e0e7e3;
+    --sb-shadow-soft: rgba(10, 25, 22, 0.06);
+    --sb-danger: #ef4444;
+    --sb-danger-light: #fdecec;
+    --sb-warning: #997404;
+    --sb-warning-light: #fff8e6;
+    --sb-mono-tint: #f4f6f5;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --sb-primary: #86B7A3;
+      --sb-primary-hover: #9CC8B8;
+      --sb-primary-light: #10231D;
+      --sb-primary-lighter: #14251E;
+      --sb-bg: #050807;
+      --sb-card-bg: #0C1110;
+      --sb-card-border: #1B2A25;
+      --sb-text-main: #F3F7F5;
+      --sb-text-muted: #9AA8A1;
+      --sb-text-secondary: #BAC8C1;
+      --sb-text-subtle: #6f7d77;
+      --sb-border-light: #1B2A25;
+      --sb-shadow-soft: rgba(0, 0, 0, 0.3);
+      --sb-danger: #f18787;
+      --sb-danger-light: #291414;
+      --sb-warning: #d9ae52;
+      --sb-warning-light: #24200f;
+      --sb-mono-tint: #101513;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --sb-primary: #86B7A3;
+    --sb-primary-hover: #9CC8B8;
+    --sb-primary-light: #10231D;
+    --sb-primary-lighter: #14251E;
+    --sb-bg: #050807;
+    --sb-card-bg: #0C1110;
+    --sb-card-border: #1B2A25;
+    --sb-text-main: #F3F7F5;
+    --sb-text-muted: #9AA8A1;
+    --sb-text-secondary: #BAC8C1;
+    --sb-text-subtle: #6f7d77;
+    --sb-border-light: #1B2A25;
+    --sb-shadow-soft: rgba(0, 0, 0, 0.3);
+    --sb-danger: #f18787;
+    --sb-danger-light: #291414;
+    --sb-warning: #d9ae52;
+    --sb-warning-light: #24200f;
+    --sb-mono-tint: #101513;
+  }
+
+  :root[data-theme="light"] {
+    --sb-primary: #00895A;
+    --sb-primary-hover: #00704A;
+    --sb-primary-light: #edf6f1;
+    --sb-primary-lighter: #dff1e8;
+    --sb-bg: #F8F9FA;
+    --sb-card-bg: #ffffff;
+    --sb-card-border: #EAEAEA;
+    --sb-text-main: #163127;
+    --sb-text-muted: #6B7280;
+    --sb-text-secondary: #495057;
+    --sb-text-subtle: #a0acb8;
+    --sb-border-light: #e0e7e3;
+    --sb-shadow-soft: rgba(10, 25, 22, 0.06);
+    --sb-danger: #ef4444;
+    --sb-danger-light: #fdecec;
+    --sb-warning: #997404;
+    --sb-warning-light: #fff8e6;
+    --sb-mono-tint: #f4f6f5;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--sb-bg);
+    color: var(--sb-text-main);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    padding: 0 0 6rem;
+  }
+
+  .wrap {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 3rem 1.5rem 0;
+  }
+
+  header.hero {
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid var(--sb-border-light);
+  }
+
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--sb-primary);
+  }
+
+  .eyebrow::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--sb-primary);
+  }
+
+  h1 {
+    font-size: clamp(1.6rem, 2.6vw, 2.15rem);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+    margin: 0;
+  }
+
+  .hero-note {
+    color: var(--sb-text-secondary);
+    font-size: 14.5px;
+    line-height: 1.65;
+    max-width: 68ch;
+  }
+
+  code {
+    font-family: 'SFMono-Regular', ui-monospace, Menlo, Consolas, monospace;
+    font-size: 0.92em;
+    background: var(--sb-mono-tint);
+    border: 1px solid var(--sb-card-border);
+    border-radius: 5px;
+    padding: 0.08em 0.4em;
+    color: var(--sb-text-main);
+  }
+
+  .meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.2rem;
+  }
+
+  .pill {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--sb-primary);
+    background: var(--sb-primary-light);
+    border: 1px solid var(--sb-primary-lighter);
+    border-radius: 9999px;
+    padding: 4px 11px;
+  }
+
+  section {
+    padding: 2.4rem 0;
+    border-bottom: 1px solid var(--sb-border-light);
+  }
+
+  section:last-of-type { border-bottom: none; }
+
+  h2 {
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin: 0 0 1rem;
+    display: flex;
+    align-items: baseline;
+    gap: 0.55rem;
+  }
+
+  h2 .h2-tag {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--sb-text-subtle);
+  }
+
+  h3 {
+    font-size: 13.5px;
+    font-weight: 700;
+    margin: 1.3rem 0 0.6rem;
+  }
+
+  p { line-height: 1.65; font-size: 14px; color: var(--sb-text-secondary); }
+
+  /* quick facts */
+  .fact-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.9rem;
+  }
+
+  @media (max-width: 760px) {
+    .fact-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  .fact-card {
+    background: var(--sb-card-bg);
+    border: 1px solid var(--sb-card-border);
+    border-radius: 14px;
+    padding: 1rem 1.1rem;
+    box-shadow: 0 2px 10px var(--sb-shadow-soft);
+  }
+
+  .fact-card h4 {
+    margin: 0 0 0.35rem;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--sb-text-muted);
+  }
+
+  .fact-card p { font-size: 12.5px; margin: 0; line-height: 1.55; }
+
+  /* steps */
+  ol.steps {
+    counter-reset: step;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+  }
+
+  ol.steps li {
+    position: relative;
+    padding-left: 2.3rem;
+    font-size: 13.5px;
+    line-height: 1.6;
+    color: var(--sb-text-secondary);
+  }
+
+  ol.steps li::before {
+    counter-increment: step;
+    content: counter(step);
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 7px;
+    background: var(--sb-primary-light);
+    color: var(--sb-primary);
+    font-weight: 700;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .env-block {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.1rem;
+    margin-top: 1rem;
+  }
+
+  @media (max-width: 760px) {
+    .env-block { grid-template-columns: 1fr; }
+  }
+
+  .env-card {
+    background: var(--sb-card-bg);
+    border: 1px solid var(--sb-card-border);
+    border-radius: 14px;
+    padding: 1.1rem 1.2rem;
+    box-shadow: 0 2px 10px var(--sb-shadow-soft);
+  }
+
+  .env-card h4 {
+    margin: 0 0 0.7rem;
+    font-size: 12.5px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--sb-text-main);
+  }
+
+  .note {
+    font-size: 12.5px;
+    color: var(--sb-text-secondary);
+    background: var(--sb-mono-tint);
+    border-left: 3px solid var(--sb-primary);
+    border-radius: 0 8px 8px 0;
+    padding: 0.7rem 0.9rem;
+    line-height: 1.6;
+    margin-top: 0.9rem;
+  }
+
+  .note strong { color: var(--sb-text-main); }
+
+  .note.danger {
+    border-left-color: var(--sb-danger);
+    background: var(--sb-danger-light);
+  }
+
+  .note.warning {
+    border-left-color: var(--sb-warning);
+    background: var(--sb-warning-light);
+  }
+
+  /* roster */
+  .table-wrap {
+    overflow-x: auto;
+    background: var(--sb-card-bg);
+    border: 1px solid var(--sb-card-border);
+    border-radius: 14px;
+    box-shadow: 0 2px 10px var(--sb-shadow-soft);
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 560px;
+    font-size: 13px;
+  }
+
+  th, td {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--sb-border-light);
+    text-align: left;
+    vertical-align: top;
+  }
+
+  th {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--sb-text-muted);
+    background: var(--sb-mono-tint);
+  }
+
+  .whoto-table td:first-child {
+    width: 200px;
+    white-space: nowrap;
+  }
+
+  tr:last-child td { border-bottom: none; }
+
+  td code { white-space: nowrap; }
+
+  .role-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.28rem 0.65rem;
+    border-radius: 9999px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+  }
+
+  .role-superadmin {
+    color: var(--sb-primary);
+    background: var(--sb-primary-light);
+    border: 1px solid var(--sb-primary-lighter);
+  }
+
+  .role-admin {
+    color: var(--sb-text-secondary);
+    background: var(--sb-mono-tint);
+    border: 1px solid var(--sb-card-border);
+  }
+
+  .roster-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem;
+  }
+
+  @media (max-width: 720px) {
+    .roster-grid { grid-template-columns: 1fr; }
+  }
+
+  .roster-card {
+    background: var(--sb-card-bg);
+    border: 1px solid var(--sb-card-border);
+    border-radius: 14px;
+    padding: 1.1rem 1.2rem 1.3rem;
+    box-shadow: 0 2px 10px var(--sb-shadow-soft);
+  }
+
+  .roster-card h3 {
+    font-size: 12.5px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--sb-text-muted);
+    margin: 0 0 0.75rem;
+  }
+
+  .password-strip {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    background: var(--sb-primary-light);
+    border: 1px solid var(--sb-primary-lighter);
+    border-radius: 10px;
+    padding: 0.6rem 0.9rem;
+    margin-bottom: 1rem;
+    font-size: 12.5px;
+    color: var(--sb-text-main);
+  }
+
+  .password-strip code {
+    background: var(--sb-card-bg);
+    font-weight: 700;
+    color: var(--sb-primary);
+  }
+
+  .person-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+  }
+
+  .person {
+    display: grid;
+    grid-template-columns: 30px 1fr;
+    gap: 0.7rem;
+    align-items: start;
+  }
+
+  .person-key {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: var(--sb-primary);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .person-name { font-size: 13.5px; font-weight: 600; color: var(--sb-text-main); }
+  .person-sub { font-size: 12px; color: var(--sb-text-muted); line-height: 1.5; }
+  .person-login { font-family: 'SFMono-Regular', ui-monospace, Menlo, Consolas, monospace; font-size: 11px; color: var(--sb-text-subtle); }
+
+  .population-note {
+    margin-top: 1rem;
+    font-size: 12px;
+    color: var(--sb-text-muted);
+  }
+
+  /* stories */
+  .story {
+    background: var(--sb-card-bg);
+    border: 1px solid var(--sb-card-border);
+    border-radius: 16px;
+    padding: 1.5rem 1.6rem;
+    box-shadow: 0 2px 10px var(--sb-shadow-soft);
+  }
+
+  .story + .story { margin-top: 1.1rem; }
+
+  .story-head {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    margin-bottom: 0.4rem;
+  }
+
+  .story-num {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--sb-primary);
+    background: var(--sb-primary-light);
+    border-radius: 7px;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .story-title { font-size: 14.5px; font-weight: 700; color: var(--sb-text-main); }
+
+  .story-context {
+    font-size: 13px;
+    color: var(--sb-text-secondary);
+    margin: 0.5rem 0 1rem;
+    line-height: 1.6;
+  }
+
+  .rank-table {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 0.85rem;
+  }
+
+  .rank-row {
+    display: grid;
+    grid-template-columns: 22px 1fr auto;
+    align-items: center;
+    gap: 0.8rem;
+  }
+
+  .rank-pos {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--sb-text-subtle);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .rank-bar-track {
+    background: var(--sb-mono-tint);
+    border-radius: 8px;
+    padding: 6px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--sb-card-border);
+  }
+
+  .rank-bar-fill {
+    position: absolute;
+    inset: 0;
+    background: var(--sb-primary-light);
+    z-index: 0;
+  }
+
+  .rank-bar-content {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.5rem;
+  }
+
+  .rank-name { font-size: 13px; font-weight: 600; color: var(--sb-text-main); }
+  .rank-why { position: relative; z-index: 1; font-size: 11.5px; color: var(--sb-text-muted); line-height: 1.5; }
+
+  .rank-score {
+    font-variant-numeric: tabular-nums;
+    font-size: 13.5px;
+    font-weight: 700;
+    color: var(--sb-primary);
+    white-space: nowrap;
+  }
+
+  .story-tip {
+    font-size: 12.5px;
+    color: var(--sb-text-secondary);
+    background: var(--sb-mono-tint);
+    border-left: 3px solid var(--sb-primary);
+    border-radius: 0 8px 8px 0;
+    padding: 0.6rem 0.85rem;
+    line-height: 1.55;
+  }
+
+  .story-tip strong { color: var(--sb-text-main); }
+
+  /* gotchas */
+  .check-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  .check-list li {
+    font-size: 13px;
+    color: var(--sb-text-secondary);
+    display: flex;
+    gap: 0.6rem;
+    line-height: 1.6;
+  }
+
+  .check-list li::before {
+    content: "";
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--sb-text-subtle);
+    margin-top: 0.6em;
+    flex-shrink: 0;
+  }
+
+  .source-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+  }
+
+  .source-list li {
+    font-size: 13px;
+    color: var(--sb-text-secondary);
+    display: flex;
+    gap: 0.6rem;
+    line-height: 1.6;
+  }
+
+  .source-list li::before {
+    content: "";
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--sb-text-subtle);
+    margin-top: 0.6em;
+    flex-shrink: 0;
+  }
+
+  footer {
+    padding-top: 1.6rem;
+    font-size: 11.5px;
+    color: var(--sb-text-subtle);
+    text-align: center;
+  }
+</style>
+
+<div class="wrap">
+  <header class="hero">
+    <span class="eyebrow">Architecture reference &middot; SuperAdmin tool</span>
+    <h1>Algorithm demo guide</h1>
+    <p class="hero-note">
+      How to enable, log into, and exercise the SuperAdmin Algorithm Demo page — the tool that runs
+      the real hybrid recommender (CBF + CF) against seeded data. Covers both the mechanics
+      (flag, gate, routes) and the curated personas whose scenarios prove each part of the scoring.
+      Every score below was read from the seeded database on 2026-07-16, not hand-calculated —
+      rerun the seed with its fixed random seed <code>20260716</code> and these numbers reproduce
+      exactly.
+    </p>
+    <div class="meta-row">
+      <span class="pill">Subjects taxonomy reseed</span>
+      <span class="pill">Ranked List tab</span>
+      <span class="pill">Compare Pair tab</span>
+      <span class="pill">Live rating edit</span>
+    </div>
+  </header>
+
+  <section>
+    <h2>Quick facts</h2>
+    <div class="fact-grid">
+      <div class="fact-card">
+        <h4>Where</h4>
+        <p>SuperAdmin panel &rarr; <code>/superadmin/algorithm-demo</code>. Ranked List and Compare Pair tabs.</p>
+      </div>
+      <div class="fact-card">
+        <h4>Gate</h4>
+        <p><code>IsAuthenticated + IsSuperAdminUser</code>, plus <code>ALGORITHM_DEMO_TOOLS_ENABLED</code> — checked first, 403 when off.</p>
+      </div>
+      <div class="fact-card">
+        <h4>Data</h4>
+        <p>Runs the real <code>hybrid.py</code> recommender against whatever is currently seeded — not a mock or a fixture.</p>
+      </div>
+      <div class="fact-card">
+        <h4>Scope</h4>
+        <p>Unscoped by institution by default (any subject-matching tutor). An optional institution filter narrows it.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Enabling the tool</h2>
+    <p>The flag defaults to <strong>OFF</strong> everywhere and must be explicitly turned on per environment.</p>
+    <div class="env-block">
+      <div class="env-card">
+        <h4>Local dev</h4>
+        <ol class="steps">
+          <li>In <code>backend/.env</code>, set <code>ALGORITHM_DEMO_TOOLS_ENABLED=true</code>.</li>
+          <li>Restart Django: <code>cd backend &amp;&amp; venv\Scripts\python.exe manage.py runserver</code>.</li>
+          <li>Log in as SuperAdmin (<code>superadmin@studybuddy.test</code>, password <code>studybuddy123</code>) and open <code>/superadmin/algorithm-demo</code>.</li>
+        </ol>
+      </div>
+      <div class="env-card">
+        <h4>Demo deployment (Render)</h4>
+        <ol class="steps">
+          <li>Render dashboard &rarr; <code>studybuddy-demo-backend</code> service &rarr; Environment tab.</li>
+          <li>Add <code>ALGORITHM_DEMO_TOOLS_ENABLED</code> = <code>true</code>. Saving auto-redeploys.</li>
+          <li>Log in on the demo frontend as a promoted SuperAdmin and revisit the page.</li>
+        </ol>
+        <p class="note danger">Render env vars are <strong>not</strong> read from any <code>.env</code> file — they live in the Render dashboard only. If the page shows "Algorithm demo tools are disabled on this backend," the var was never added there.</p>
+      </div>
+    </div>
+    <p class="note">Per the <a href="../plans/2026-07-05-demo-deployment-plan.md">demo deployment plan</a>, this flag should stay ON for the protected demo environment (defense/testing) and OFF for any future real production deployment.</p>
+  </section>
+
+  <section>
+    <h2>Before you start: reset the demo data</h2>
+    <p class="note warning">
+      From <code>backend/</code>, run <code>venv\Scripts\python.exe manage.py reset_demo_data &amp;&amp;
+      venv\Scripts\python.exe manage.py seed_data</code>. Local/dev only, destructive: wipes all
+      Tutee/Tutor users and reseeds the curated personas below plus filler population with a fixed
+      random seed (<code>20260716</code>) — same result every run. Admin and SuperAdmin logins are
+      never touched.
+    </p>
+  </section>
+
+  <section>
+    <h2>Admin &amp; SuperAdmin logins <span class="h2-tag">preserved across every reset_demo_data run</span></h2>
+    <p>These accounts are never created or overwritten by <code>reset_demo_data</code> — they must already exist. Use them for the SuperAdmin gate above, or to cross-check institution-scoped data around the same curated tutors/tutees.</p>
+    <div class="password-strip">
+      Shared demo password for every account below: <code>studybuddy123</code>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Role</th>
+            <th>Login</th>
+            <th>Scope</th>
+            <th>Use for</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="role-badge role-superadmin">SuperAdmin</span></td>
+            <td><code>superadmin@studybuddy.test</code></td>
+            <td>All institutions</td>
+            <td>The Algorithm Demo page itself — Ranked List, Compare Pair, live rating edit.</td>
+          </tr>
+          <tr>
+            <td><span class="role-badge role-admin">Admin</span></td>
+            <td><code>demo.admin@cpu.edu.ph</code></td>
+            <td>Central Philippine University</td>
+            <td>CPU-scoped admin dashboard, course catalog, tutor/tutee/session data behind the curated cast.</td>
+          </tr>
+          <tr>
+            <td><span class="role-badge role-admin">Admin</span></td>
+            <td><code>demo.admin@north.edu.ph</code></td>
+            <td>North University</td>
+            <td>North-scoped admin dashboard, for comparing institution-filtered results against CPU's.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">Full reference, including named CPU personas outside the recommender demo: <a href="demo-data-testing-accounts.html">demo-data-testing-accounts.html</a>.</p>
+  </section>
+
+  <section>
+    <h2>Curated cast <span class="h2-tag">alphabetical by surname, Aquino &rarr; Ocampo</span></h2>
+    <div class="password-strip">
+      Shared demo password for every curated account: <code>studybuddy123</code>
+    </div>
+    <div class="roster-grid">
+      <div class="roster-card">
+        <h3>Tutors</h3>
+        <div class="person-list">
+          <div class="person">
+            <div class="person-key">T1</div>
+            <div>
+              <div class="person-name">Marisol Aquino</div>
+              <div class="person-sub">BSCS, 4th yr &middot; College &middot; Python (5), Data Structures (4), Algorithms (4)</div>
+              <div class="person-login">t1.marisol.aquino@cpu.edu.ph</div>
+            </div>
+          </div>
+          <div class="person">
+            <div class="person-key">T2</div>
+            <div>
+              <div class="person-name">Benigno Bautista</div>
+              <div class="person-sub">BSCS, 3rd yr &middot; College &middot; C++ (3), Web Development (3)</div>
+              <div class="person-login">t2.benigno.bautista@cpu.edu.ph</div>
+            </div>
+          </div>
+          <div class="person">
+            <div class="person-key">T3</div>
+            <div>
+              <div class="person-name">Corazon Cruz</div>
+              <div class="person-sub">BSBA, 3rd yr &middot; College &middot; Financial Accounting (5), Microeconomics (4)</div>
+              <div class="person-login">t3.corazon.cruz@cpu.edu.ph</div>
+            </div>
+          </div>
+          <div class="person">
+            <div class="person-key">T4</div>
+            <div>
+              <div class="person-name">Domingo Diaz</div>
+              <div class="person-sub">BSCS, 4th yr &middot; College &middot; Python (3)</div>
+              <div class="person-login">t4.domingo.diaz@cpu.edu.ph</div>
+            </div>
+          </div>
+          <div class="person">
+            <div class="person-key">T5</div>
+            <div>
+              <div class="person-name">Esperanza Elizalde</div>
+              <div class="person-sub">SHS-STEM, grade 12 &middot; High School &middot; Python (5)</div>
+              <div class="person-login">t5.esperanza.elizalde@cpu.edu.ph</div>
+            </div>
+          </div>
+          <div class="person">
+            <div class="person-key">T6</div>
+            <div>
+              <div class="person-name">Fidel Fajardo</div>
+              <div class="person-sub">BSCS, 4th yr &middot; College &middot; Data Structures (5), Algorithms (4)</div>
+              <div class="person-login">t6.fidel.fajardo@cpu.edu.ph</div>
+            </div>
+          </div>
+          <div class="person">
+            <div class="person-key">T7</div>
+            <div>
+              <div class="person-name">Gemma Gatchalian</div>
+              <div class="person-sub">BSCS, 3rd yr &middot; College &middot; Web Development (5)</div>
+              <div class="person-login">t7.gemma.gatchalian@cpu.edu.ph</div>
+            </div>
+          </div>
+          <div class="person">
+            <div class="person-key">T8</div>
+            <div>
+              <div class="person-name">Hector Hidalgo</div>
+              <div class="person-sub">BSCS, 4th yr &middot; College &middot; SQL (4)</div>
+              <div class="person-login">t8.hector.hidalgo@cpu.edu.ph</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="roster-card">
+        <h3>Tutees</h3>
+        <div class="person-list">
+          <div class="person">
+            <div class="person-key">S1</div>
+            <div>
+              <div class="person-name">Felipe Fernandez</div>
+              <div class="person-sub">BSCS, 2nd yr &middot; Prefers Python, SQL</div>
+              <div class="person-login">s1.felipe.fernandez@cpu.edu.ph</div>
+            </div>
+          </div>
+          <div class="person">
+            <div class="person-key">S2</div>
+            <div>
+              <div class="person-name">Gloria Garcia</div>
+              <div class="person-sub">BSCS, 2nd yr &middot; Prefers Python, Algorithms</div>
+              <div class="person-login">s2.gloria.garcia@cpu.edu.ph</div>
+            </div>
+          </div>
+          <div class="person">
+            <div class="person-key">S3</div>
+            <div>
+              <div class="person-name">Hernan Herrera</div>
+              <div class="person-sub">BSCS, 3rd yr &middot; Prefers Python, Data Structures</div>
+              <div class="person-login">s3.hernan.herrera@cpu.edu.ph</div>
+            </div>
+          </div>
+          <div class="person">
+            <div class="person-key">S4</div>
+            <div>
+              <div class="person-name">Imelda Ignacio</div>
+              <div class="person-sub">BSCS, 1st yr &middot; Prefers SQL, Web Development</div>
+              <div class="person-login">s4.imelda.ignacio@cpu.edu.ph</div>
+            </div>
+          </div>
+          <div class="person">
+            <div class="person-key">S5</div>
+            <div>
+              <div class="person-name">Jacinto Jimenez</div>
+              <div class="person-sub">BSBA, 2nd yr &middot; Prefers Financial Accounting, Marketing</div>
+              <div class="person-login">s5.jacinto.jimenez@cpu.edu.ph</div>
+            </div>
+          </div>
+          <div class="person">
+            <div class="person-key">S6</div>
+            <div>
+              <div class="person-name">Katrina Katigbak</div>
+              <div class="person-sub">BSCS, 2nd yr &middot; Prefers Python, SQL, Data Structures</div>
+              <div class="person-login">s6.katrina.katigbak@cpu.edu.ph</div>
+            </div>
+          </div>
+          <div class="person">
+            <div class="person-key">S7</div>
+            <div>
+              <div class="person-name">Lorenzo Lazaro</div>
+              <div class="person-sub">BSCS, 2nd yr &middot; Prefers Python, Web Development</div>
+              <div class="person-login">s7.lorenzo.lazaro@cpu.edu.ph</div>
+            </div>
+          </div>
+          <div class="person">
+            <div class="person-key">S8</div>
+            <div>
+              <div class="person-name">Milagros Manalo</div>
+              <div class="person-sub">BSCS, 3rd yr &middot; Prefers Web Development, C++</div>
+              <div class="person-login">s8.milagros.manalo@cpu.edu.ph</div>
+            </div>
+          </div>
+          <div class="person">
+            <div class="person-key">S9</div>
+            <div>
+              <div class="person-name">Nestor Navarro</div>
+              <div class="person-sub">BSCS, 1st yr &middot; Prefers Web Development, SQL</div>
+              <div class="person-login">s9.nestor.navarro@cpu.edu.ph</div>
+            </div>
+          </div>
+          <div class="person">
+            <div class="person-key">S10</div>
+            <div>
+              <div class="person-name">Olivia Ocampo</div>
+              <div class="person-sub">BSCS, 2nd yr &middot; Prefers Python, Data Structures</div>
+              <div class="person-login">s10.olivia.ocampo@cpu.edu.ph</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="population-note">
+      18 curated personas in total &mdash; 8 tutors and 10 tutees. The filler population fills out
+      the pool around them: 150 Faker-generated tutors and 350 Faker-generated tutees, seeded with
+      random subjects, courses, and ratings (158 tutors / 360 tutees total, 518 demo accounts).
+      See the <a href="demo-data-testing-accounts.html">full testing accounts reference</a> for
+      every other seeded persona (wallet, compensation, admin logins) &mdash; note that its account
+      IDs are stale after the 2026-07-24 reseed.
+    </p>
+  </section>
+
+  <section>
+    <h2>Demo script <span class="h2-tag">the CBF story &mdash; S1 requesting Python</span></h2>
+    <p class="note">
+      This script isolates the <strong>CBF</strong> half. S1 is cold-start by design, so CF
+      contributes nothing and the ranking is driven purely by the 70% content term &mdash; which
+      is exactly what makes the sub-score comparisons below clean. For the <strong>CF</strong>
+      half, switch to S6 Katrina Katigbak; see &ldquo;Who to demo with&rdquo; above.
+    </p>
+
+    <div class="story">
+      <div class="story-head">
+        <div class="story-num">1</div>
+        <div class="story-title">Specific vs. general vs. unrelated, plus expertise and the level ceiling</div>
+      </div>
+      <p class="story-context">S1 Felipe Fernandez requests <strong>Python</strong>. Expected ranked order among the curated tutors:</p>
+      <div class="rank-table">
+        <div class="rank-row">
+          <span class="rank-pos">1</span>
+          <div class="rank-bar-track">
+            <div class="rank-bar-fill" style="width: 93.33%"></div>
+            <div class="rank-bar-content">
+              <span class="rank-name">T1 Marisol Aquino</span>
+              <span class="rank-score">0.9333</span>
+            </div>
+            <span class="rank-why">Exact match on Python, expertise 5, same course (BSCS) as S1, adjacent year</span>
+          </div>
+        </div>
+        <div class="rank-row">
+          <span class="rank-pos">2</span>
+          <div class="rank-bar-track">
+            <div class="rank-bar-fill" style="width: 87.33%"></div>
+            <div class="rank-bar-content">
+              <span class="rank-name">T4 Domingo Diaz</span>
+              <span class="rank-score">0.8733</span>
+            </div>
+            <span class="rank-why">Exact match on Python, but expertise only 3 — the Expertise component (0.15 weight) is what separates T1 from T4</span>
+          </div>
+        </div>
+        <div class="rank-row">
+          <span class="rank-pos">3</span>
+          <div class="rank-bar-track">
+            <div class="rank-bar-fill" style="width: 83.33%"></div>
+            <div class="rank-bar-content">
+              <span class="rank-name">T5 Esperanza Elizalde</span>
+              <span class="rank-score">0.8333</span>
+            </div>
+            <span class="rank-why">Exact match at expertise 5 (as high as T1), but the Level component drops to 0 — she teaches High School and S1 is a college student above her ceiling</span>
+          </div>
+        </div>
+        <div class="rank-row">
+          <span class="rank-pos">4</span>
+          <div class="rank-bar-track">
+            <div class="rank-bar-fill" style="width: 49%"></div>
+            <div class="rank-bar-content">
+              <span class="rank-name">T2 Benigno Bautista</span>
+              <span class="rank-score">0.49</span>
+            </div>
+            <span class="rank-why">No Python — only C++ and Web Development, both in Technology &amp; Computer Science. General match only, no Specific credit</span>
+          </div>
+        </div>
+        <div class="rank-row">
+          <span class="rank-pos">5</span>
+          <div class="rank-bar-track">
+            <div class="rank-bar-fill" style="width: 10%"></div>
+            <div class="rank-bar-content">
+              <span class="rank-name">T3 Corazon Cruz</span>
+              <span class="rank-score">0.1</span>
+            </div>
+            <span class="rank-why">No Technology &amp; Computer Science subjects at all — Specific and General both fail; only Course/Year/Level residue remains</span>
+          </div>
+        </div>
+      </div>
+      <p class="story-tip">Use <strong>Compare Pair</strong> on T1 vs. T5 to show the level-ceiling mechanic directly: identical Specific and Expertise sub-scores, but T5's Level cell reads 0 while T1's reads 1.</p>
+    </div>
+
+    <div class="story">
+      <div class="story-head">
+        <div class="story-num">2</div>
+        <div class="story-title">Course / strand affinity</div>
+      </div>
+      <p class="story-context">Switch the tutee to <strong>S5 Jacinto Jimenez</strong>, request <strong>Financial Accounting</strong>.</p>
+      <div class="rank-table">
+        <div class="rank-row">
+          <span class="rank-pos">1</span>
+          <div class="rank-bar-track">
+            <div class="rank-bar-fill" style="width: 95%"></div>
+            <div class="rank-bar-content">
+              <span class="rank-name">T3 Corazon Cruz</span>
+              <span class="rank-score">0.95</span>
+            </div>
+            <span class="rank-why">Exact subject match, expertise 5, and same course (BSBA) as S5</span>
+          </div>
+        </div>
+      </div>
+      <p class="story-tip">This is the counterpart to story 1: T3 was the worst match for a BSCS tutee, but the best match for a BSBA tutee requesting her subject.</p>
+    </div>
+
+    <div class="story">
+      <div class="story-head">
+        <div class="story-num">3</div>
+        <div class="story-title">Same-course CF peer signal</div>
+      </div>
+      <p class="story-context">
+        S1's same-course (BSCS) peers — <strong>S2, S3, S4</strong> — each rated T1 highly
+        (5, 5, 4) and T2 modestly (3, 3, 2). None of them, and no filler tutee, ever rated
+        T1 or T2 — those eight ratings are the entire rating history for both tutors.
+      </p>
+      <p class="story-tip">In <strong>Compare Pair</strong>, look at T1's and T2's neighbor lists: the same three BSCS names appear as T1's top positive-similarity neighbors, reinforcing the same ranking the CBF side already produced independently.</p>
+    </div>
+
+    <div class="story">
+      <div class="story-head">
+        <div class="story-num">4</div>
+        <div class="story-title">Everyone has a real rating history</div>
+      </div>
+      <p class="story-context">
+        Every seeded tutor (curated and filler, 155 total) has at least 3 ratings; every tutee
+        except S1 and S5 — who only appear as CF <em>raters</em>, not <em>ratees</em>, in this
+        script, since S1's own booking history is deliberately the demo subject rather than the
+        demo evidence — has rated at least 2 tutors.
+      </p>
+      <p class="story-tip"><strong>T1:</strong> 4.67 avg / 3 sessions. <strong>T2:</strong> 2.67 avg / 3 sessions — visibly lower, consistent with story 3.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Who to demo with <span class="h2-tag">two accounts carry the whole story</span></h2>
+    <p>
+      Eight of the ten tutees (S2, S3, S4, S6, S7, S8, S9, S10) form the <strong>tier-1
+      programming core</strong>: BSCS students who co-rate an overlapping set of five tutors
+      (T1, T2, T6, T7, T8). That overlap is the point. Pearson similarity is computed only over
+      tutors <em>both</em> students have rated, so a pair sharing one tutor scores 0 and is
+      dropped entirely, and a pair sharing exactly two always scores exactly &plusmn;1 whatever
+      the values are. Three or more shared tutors is what makes similarity a real number rather
+      than a wall of 1.00. <code>seed_data</code> asserts this on every run and refuses to
+      finish if it is violated.
+    </p>
+    <table class="whoto-table">
+      <tr>
+        <td><strong>S6 Katrina Katigbak</strong></td>
+        <td>
+          The CF protagonist. Five ratings given, four contributing neighbours on T1 with
+          similarities spread from <code>+0.308</code> to <code>+0.970</code>, and one neighbour
+          (S4) who rated T1 <em>below</em> her own average and so pulls the score down. She has
+          also rated T1 herself, so the panel can compare CF's prediction of
+          <code>4.742</code> against her actual <code>5</code>.
+        </td>
+      </tr>
+      <tr>
+        <td><strong>S1 Felipe Fernandez</strong></td>
+        <td>
+          The Cold-Start showcase. Deliberately has <em>no</em> ratings at all, so he is absent
+          from the rating matrix and every candidate returns <code>cold_start: true</code> with
+          CF contributing nothing. Ranking falls back entirely to the 70% CBF term.
+        </td>
+      </tr>
+    </table>
+    <p class="note">
+      Two moments worth pointing at on S6's board, both emergent from the data rather than
+      staged: <strong>T6 Fidel Fajardo outranks T1</strong> (0.949 vs 0.927), so the top of the
+      board is a genuine contest; and a <strong>filler tutor holds the highest CBF of the entire
+      pool</strong> (0.935) yet falls to 4th because no peer has rated him &mdash; the clearest
+      available illustration of what the CF term actually buys.
+    </p>
+    <p class="note">
+      S5 Jacinto Jimenez (BSBA) sits outside the core as a non-BSCS control, and like S1 gives
+      no ratings. T3/T4/T5 are rated only by non-BSCS filler cohorts, which is why T4 and T5
+      appear in S6's candidate list with no peer signal and fall through to the global pool.
+    </p>
+  </section>
+
+  <section>
+    <h2>Walkthrough</h2>
+    <h3>Ranked List tab</h3>
+    <ol class="steps">
+      <li>Pick a tutee (e.g. S6 Katrina Katigbak) from the searchable dropdown.</li>
+      <li>The top-5 comparison table shows every weight side by side &mdash; each cell carries the
+        sub-score with its weighted contribution beneath it, shaded so the weights that carried
+        the ranking stand out.</li>
+      <li>Below it, every subject-matching tutor ranked by Hybrid Score.</li>
+      <li>Click any row, in the table or the list, to open its CBF bars and the CF waterfall.</li>
+    </ol>
+
+    <h3>Compare Pair tab</h3>
+    <ol class="steps">
+      <li>Pick a tutee, then a tutor (e.g. S1 Felipe Fernandez &rarr; T1 Marisol Aquino, then S1 &rarr; T5 Esperanza Elizalde).</li>
+      <li>See stat cards for both sides: subject preferences/expertise and tutor rating history.</li>
+      <li>Watch the same animated CBF/CF/Hybrid breakdown, side by side.</li>
+    </ol>
+
+    <h3>What-if rating edits <span class="h2-tag">nothing is saved</span></h3>
+    <p>
+      Each contributing neighbour row carries a 1&ndash;5 slider. Dragging it re-runs the
+      <em>real</em> recommender on the server with that rating overridden in memory &mdash; the
+      rating matrix is patched in <code>apply_rating_overrides</code> before neighbour selection,
+      and nothing is ever written to the database. The frontend does not recompute anything
+      itself, so there is no second implementation of the algorithm to defend.
+    </p>
+    <ol class="steps">
+      <li>Select S6 Katrina Katigbak, then T1 Marisol Aquino.</li>
+      <li>Drag S10 Olivia Ocampo's rating down. Her deviation segment shortens and flips
+        direction, the CF score falls, and the Hybrid Score follows.</li>
+      <li>Watch the top-5 table re-sort underneath &mdash; T1 can lose its place outright.</li>
+      <li>A &ldquo;What-if &mdash; nothing saved&rdquo; chip appears with a Reset button that
+        discards every override and refetches the stored data.</li>
+    </ol>
+    <p class="note">
+      <strong>Similarity normally holds still while you drag</strong>, and that is correct:
+      Pearson is computed over tutors both students rated, and the tutee has usually not rated
+      the candidate. The exception is a candidate the tutee <em>has</em> rated &mdash; T1 for S6
+      &mdash; where the tutor sits inside the co-rated set and the similarity meters do move.
+      Those rows are labelled.
+    </p>
+    <p class="note">Gated by the same <code>ALGORITHM_DEMO_TOOLS_ENABLED</code> flag as the rest of the page. See <a href="../plans/2026-07-23-algorithm-demo-cf-clarity.md">the CF clarity plan</a>; the earlier <a href="../specs/2026-07-08-algorithm-demo-live-rating-edit-design.md">live rating edit design doc</a> describes the superseded save-to-database behaviour.</p>
+  </section>
+
+  <section>
+    <h2>Things to know</h2>
+    <ul class="check-list">
+      <li>The candidate pool is <strong>unscoped by institution by default</strong> — any subject-matching tutor, any institution. An institution filter (defaulting to "All institutions") narrows both the tutee picker and the tutor candidate pool.</li>
+      <li>Changing the institution filter while a tutee is selected clears that selection, since it may no longer be valid under the new scope.</li>
+      <li>Curated surnames run alphabetically (Aquino &rarr; Ocampo) so they're easy to spot in the filler population by eye.</li>
+      <li>Similarity is computed over the <strong>co-rated intersection only</strong>. Fewer than 3 shared tutors makes it meaningless — 1 shared scores 0 and drops the neighbour, 2 shared always scores exactly &plusmn;1 — so any neighbour row below that threshold is labelled in the UI, and <code>seed_data</code> refuses to finish if a tier-1 pair falls under it.</li>
+      <li>The candidate pool <strong>does not exclude tutors the tutee has already rated</strong>, matching both production paths. That is what makes the prediction-vs-actual accuracy check possible on S6 &rarr; T1.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Where this comes from</h2>
+    <ul class="source-list">
+      <li>Formula and weights: <code>backend/studybuddy/recommender/cbf.py</code> (<code>W_SPECIFIC</code> / <code>W_GENERAL</code> / <code>W_EXPERTISE</code> / <code>W_COURSE</code> / <code>W_YEAR</code> / <code>W_LEVEL</code>, <code>TEACHING_LEVEL_MAX_YEAR</code>)</li>
+      <li>Persona definitions and rating script: <code>backend/studybuddy/management/commands/seed_data.py</code> (<code>CURATED_TUTORS</code>, <code>CURATED_TUTEES</code>, <code>CURATED_RATINGS</code>, <code>FILLER_SUPPORT_RATINGS</code>)</li>
+      <li>Demo endpoints: <code>backend/studybuddy/recommender/demo.py</code>, gated in <code>backend/studybuddy/views.py</code></li>
+      <li>Regression test locking in story 1's ordering: <code>backend/studybuddy/tests.py::CuratedPersonaCbfOrderingTests</code></li>
+      <li>Plans: <a href="../plans/2026-07-16-subjects-taxonomy-reseed.md">2026-07-16 subjects taxonomy reseed</a>, <a href="../plans/2026-07-04-recommendation-algorithm-demo-tool.md">2026-07-04 algorithm demo tool</a></li>
+      <li>Full accounts reference: <a href="demo-data-testing-accounts.html">demo-data-testing-accounts.html</a></li>
+    </ul>
+  </section>
+
+  <footer>docs/architecture/algorithm-demo-guide.html &middot; consolidated from algorithm-demo-testing-guide.html and 2026-07-17-algorithm-demo-cheat-sheet.html</footer>
+</div>

@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Algorithm demo - CF waterfall (locked design)</title>
+<style>
+  :root { --p: #00895A; --dark: #0A1916; --muted: #6b7f79; --line: #dbe5e1; }
+  body { margin: 0; padding: 32px; background: #f2f6f4; color: var(--dark);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .lede { color: var(--muted); font-size: 13px; margin: 0 0 28px; max-width: 760px; line-height: 1.5; }
+  h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--muted); margin: 32px 0 10px; }
+  .panel { background: #fff; border: 1px solid var(--line); border-radius: 14px;
+    padding: 18px 20px; font-size: 13px; }
+  .sub { color: var(--muted); font-size: 12px; margin: 0; }
+  table.deriv { width: 100%; border-collapse: collapse; font-size: 12px; }
+  table.deriv th { text-align: right; font-weight: 600; color: var(--muted);
+    padding: 5px 8px; border-bottom: 1px solid var(--line); font-size: 11px;
+    text-transform: uppercase; letter-spacing: .04em; }
+  table.deriv th:first-child, table.deriv td:first-child { text-align: left; }
+  table.deriv td { text-align: right; padding: 6px 8px; border-bottom: 1px solid #f0f4f2; }
+  table.deriv tr.total td { border-bottom: none; border-top: 2px solid var(--dark);
+    font-weight: 700; padding-top: 9px; }
+  .pos { color: #00895A; font-weight: 600; }
+  .neg { color: #c0392b; font-weight: 600; }
+  .chip { display: inline-block; border-radius: 9999px; font-size: 10px; font-weight: 600;
+    padding: 2px 8px; margin-left: 6px; }
+  .chip.peer { background: rgba(0,137,90,.12); color: #00895A; border: 1px solid rgba(0,137,90,.3); }
+  .chip.global { background: rgba(52,120,200,.12); color: #2f6db3; border: 1px solid rgba(52,120,200,.3); }
+  .chip.none { background: rgba(192,57,43,.10); color: #c0392b; border: 1px solid rgba(192,57,43,.28); }
+  .baseline-note { background: #f4f8f6; border-left: 3px solid var(--p); padding: 8px 12px;
+    font-size: 12px; margin: 0 0 14px; border-radius: 0 8px 8px 0; }
+  .formula { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px;
+    background: #f4f8f6; padding: 10px 12px; border-radius: 8px; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 11px;
+    color: var(--muted); margin-top: 12px; padding-top: 10px; border-top: 1px solid #f0f4f2; }
+  .w-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .w-table th { padding: 6px; font-size: 10px; text-transform: uppercase;
+    letter-spacing: .04em; color: var(--muted); border-bottom: 1px solid var(--line); text-align: center; }
+  .w-table th.left, .w-table td.left { text-align: left; }
+  .w-table td { padding: 7px 6px; text-align: center; border-bottom: 1px solid #f0f4f2; }
+  .w-table tr.top td { background: rgba(0,137,90,.06); }
+  .cellv { font-weight: 600; }
+  .cellc { font-size: 10px; color: var(--muted); display: block; }
+  .heat { display: inline-block; width: 100%; border-radius: 4px; padding: 3px 0; }
+  .scroll { overflow-x: auto; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Algorithm demo &mdash; Collaborative Filtering waterfall</h1>
+  <p class="lede">
+    Locked design, 2026-07-23. Chosen from three waterfall treatments; the deciding factor was that
+    every quantity is read off its own labelled scale rather than encoded in bar thickness, so the
+    panel can verify each number without decoding a visual channel.
+    Sample data is arithmetically consistent with <code>recommender/CF.py</code> and
+    <code>recommender/cbf.py</code>.
+  </p>
+
+  <h2>1 &middot; CF derivation</h2>
+  <div class="panel">
+    <div class="baseline-note">
+      Ana has rated 3 tutors (Miguel 5.0, Joy 3.0, Paolo 4.0).
+      <b>Her baseline average is 4.00</b> &mdash; CF starts here and gets nudged by peers.
+    </div>
+    <div class="scroll">
+    <table class="deriv">
+      <thead>
+        <tr>
+          <th>Neighbour <span class="chip peer">Peer pool &mdash; same course</span></th>
+          <th>Similarity</th><th>Rated Rafael</th><th>Their avg</th>
+          <th>Deviation</th><th>sim &times; dev</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Bea Santos</td><td>0.87</td><td>5.0</td><td>4.00</td>
+            <td class="pos">+1.00</td><td class="pos">+0.870</td></tr>
+        <tr><td>Carl Uy</td><td>0.65</td><td>4.0</td><td>3.75</td>
+            <td class="pos">+0.25</td><td class="pos">+0.163</td></tr>
+        <tr><td>Dina Lim</td><td>0.50</td><td>3.0</td><td>3.75</td>
+            <td class="neg">&minus;0.75</td><td class="neg">&minus;0.375</td></tr>
+        <tr class="total"><td>&Sigma;</td><td>2.02</td><td></td><td></td><td></td><td>+0.658</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <div class="formula" style="margin-top:14px">
+      CF = 4.00 + (0.658 &divide; 2.02) = 4.00 + 0.33 = <b style="color:#00895A">4.33</b><br>
+      Hybrid = 0.7 &times; 0.935 (CBF) + 0.3 &times; (4.33 &divide; 5) = <b style="color:#00895A">0.914</b>
+    </div>
+    <p class="sub" style="margin-top:12px">
+      CF is not "the average of what peers gave him." It is Ana's own baseline, shifted by how much
+      each similar peer rated Rafael above or below their own habit.
+    </p>
+  </div>
+
+  <h2>2 &middot; The waterfall (locked: two-zone layout)</h2>
+  <div class="panel">
+    <div class="scroll">
+    <svg viewBox="0 0 780 250" width="100%" height="240" role="img" aria-label="Two-zone CF waterfall">
+      <text x="10" y="16" font-size="9.5" fill="#6b7f79" letter-spacing=".05em">SIMILARITY TO ANA</text>
+      <text x="196" y="16" font-size="9.5" fill="#6b7f79" letter-spacing=".05em">RATED RAFAEL</text>
+      <text x="300" y="16" font-size="9.5" fill="#6b7f79" letter-spacing=".05em">EFFECT ON ANA'S BASELINE</text>
+      <line x1="288" y1="6" x2="288" y2="228" stroke="#dbe5e1"/>
+      <line x1="300" y1="228" x2="740" y2="228" stroke="#dbe5e1"/>
+      <text x="300" y="244" font-size="10" fill="#6b7f79" text-anchor="middle">3.5</text>
+      <text x="447" y="244" font-size="10" fill="#6b7f79" text-anchor="middle">4.0</text>
+      <text x="593" y="244" font-size="10" fill="#6b7f79" text-anchor="middle">4.5</text>
+      <text x="740" y="244" font-size="10" fill="#6b7f79" text-anchor="middle">5.0</text>
+      <line x1="447" y1="30" x2="447" y2="228" stroke="#0A1916" stroke-dasharray="3 3" stroke-opacity=".4"/>
+
+      <text x="10" y="48" font-size="11" font-weight="600">Ana baseline</text>
+      <rect x="300" y="38" width="147" height="14" rx="4" fill="#0A1916" fill-opacity=".82"/>
+      <text x="455" y="49" font-size="11" font-weight="700">4.00</text>
+
+      <text x="10" y="88" font-size="11" font-weight="600">Bea</text>
+      <rect x="66" y="80" width="100" height="9" rx="4" fill="#eef3f1"/>
+      <rect x="66" y="80" width="87" height="9" rx="4" fill="#00895A"/>
+      <text x="172" y="88" font-size="10" fill="#00895A" font-weight="700">.87</text>
+      <circle cx="200" cy="84" r="4.5" fill="#00895A"/><circle cx="214" cy="84" r="4.5" fill="#00895A"/>
+      <circle cx="228" cy="84" r="4.5" fill="#00895A"/><circle cx="242" cy="84" r="4.5" fill="#00895A"/>
+      <circle cx="256" cy="84" r="4.5" fill="#00895A"/>
+      <text x="268" y="88" font-size="10" font-weight="700">5.0</text>
+      <rect x="447" y="77" width="126" height="15" rx="4" fill="#00895A"/>
+      <text x="581" y="89" font-size="11" fill="#00895A" font-weight="700">+0.43</text>
+
+      <text x="10" y="128" font-size="11" font-weight="600">Carl</text>
+      <rect x="66" y="120" width="100" height="9" rx="4" fill="#eef3f1"/>
+      <rect x="66" y="120" width="65" height="9" rx="4" fill="#00895A"/>
+      <text x="172" y="128" font-size="10" fill="#00895A" font-weight="700">.65</text>
+      <circle cx="200" cy="124" r="4.5" fill="#00895A"/><circle cx="214" cy="124" r="4.5" fill="#00895A"/>
+      <circle cx="228" cy="124" r="4.5" fill="#00895A"/><circle cx="242" cy="124" r="4.5" fill="#00895A"/>
+      <circle cx="256" cy="124" r="4.5" fill="none" stroke="#c8d5d0" stroke-width="1.5"/>
+      <text x="268" y="128" font-size="10" font-weight="700">4.0</text>
+      <rect x="573" y="117" width="24" height="15" rx="4" fill="#00895A" fill-opacity=".72"/>
+      <text x="605" y="129" font-size="11" fill="#00895A" font-weight="700">+0.08</text>
+
+      <text x="10" y="168" font-size="11" font-weight="600">Dina</text>
+      <rect x="66" y="160" width="100" height="9" rx="4" fill="#eef3f1"/>
+      <rect x="66" y="160" width="50" height="9" rx="4" fill="#00895A" fill-opacity=".75"/>
+      <text x="172" y="168" font-size="10" fill="#00895A" font-weight="700">.50</text>
+      <circle cx="200" cy="164" r="4.5" fill="#c0392b"/><circle cx="214" cy="164" r="4.5" fill="#c0392b"/>
+      <circle cx="228" cy="164" r="4.5" fill="#c0392b"/>
+      <circle cx="242" cy="164" r="4.5" fill="none" stroke="#c8d5d0" stroke-width="1.5"/>
+      <circle cx="256" cy="164" r="4.5" fill="none" stroke="#c8d5d0" stroke-width="1.5"/>
+      <text x="268" y="168" font-size="10" font-weight="700">3.0</text>
+      <rect x="542" y="157" width="55" height="15" rx="4" fill="#c0392b" fill-opacity=".8"/>
+      <text x="534" y="169" font-size="11" fill="#c0392b" font-weight="700" text-anchor="end">&minus;0.19</text>
+
+      <text x="10" y="208" font-size="11" font-weight="700">CF score</text>
+      <rect x="300" y="197" width="242" height="18" rx="4" fill="#00895A" fill-opacity=".92"/>
+      <text x="550" y="211" font-size="12" fill="#00895A" font-weight="700">4.33</text>
+    </svg>
+    </div>
+    <div class="legend">
+      <span><b>Left</b> = why this peer counts &nbsp;|&nbsp; <b>Right</b> = what it did to the score</span>
+      <span>Every value sits on its own labelled scale &mdash; nothing encoded in thickness</span>
+    </div>
+  </div>
+
+  <h2>3 &middot; Top-5 weight comparison</h2>
+  <div class="panel">
+    <div class="scroll">
+    <table class="w-table">
+      <thead>
+        <tr>
+          <th class="left">#&nbsp;&nbsp;Tutor</th>
+          <th>Specific<br><span style="font-weight:400">w .40</span></th>
+          <th>General<br><span style="font-weight:400">w .20</span></th>
+          <th>Expertise<br><span style="font-weight:400">w .15</span></th>
+          <th>Course<br><span style="font-weight:400">w .10</span></th>
+          <th>Year<br><span style="font-weight:400">w .10</span></th>
+          <th>Level<br><span style="font-weight:400">w .05</span></th>
+          <th>CBF<br><span style="font-weight:400">&times; .70</span></th>
+          <th>CF<br><span style="font-weight:400">&times; .30</span></th>
+          <th>Hybrid</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="top">
+          <td class="left"><b>1&nbsp;&nbsp;Rafael Uy</b></td>
+          <td><span class="heat" style="background:rgba(0,137,90,.30)"><span class="cellv">1.00</span><span class="cellc">.400</span></span></td>
+          <td><span class="heat" style="background:rgba(0,137,90,.22)"><span class="cellv">1.00</span><span class="cellc">.200</span></span></td>
+          <td><span class="heat" style="background:rgba(0,137,90,.16)"><span class="cellv">0.90</span><span class="cellc">.135</span></span></td>
+          <td><span class="heat" style="background:rgba(0,137,90,.14)"><span class="cellv">1.00</span><span class="cellc">.100</span></span></td>
+          <td><span class="heat" style="background:rgba(0,137,90,.07)"><span class="cellv">0.50</span><span class="cellc">.050</span></span></td>
+          <td><span class="heat" style="background:rgba(0,137,90,.07)"><span class="cellv">1.00</span><span class="cellc">.050</span></span></td>
+          <td><b>0.935</b></td><td>4.33 <span class="chip peer">peer</span></td>
+          <td><b style="color:#00895A;font-size:14px">0.914</b></td>
+        </tr>
+        <tr>
+          <td class="left"><b>2&nbsp;&nbsp;Nadia Cruz</b></td>
+          <td><span class="heat" style="background:rgba(0,137,90,.30)"><span class="cellv">1.00</span><span class="cellc">.400</span></span></td>
+          <td><span class="heat" style="background:rgba(0,137,90,.22)"><span class="cellv">1.00</span><span class="cellc">.200</span></span></td>
+          <td><span class="heat" style="background:rgba(0,137,90,.14)"><span class="cellv">0.80</span><span class="cellc">.120</span></span></td>
+          <td><span class="heat" style="background:rgba(0,137,90,.07)"><span class="cellv">0.50</span><span class="cellc">.050</span></span></td>
+          <td><span class="heat" style="background:rgba(0,137,90,.05)"><span class="cellv">0.33</span><span class="cellc">.033</span></span></td>
+          <td><span class="heat" style="background:rgba(0,137,90,.07)"><span class="cellv">1.00</span><span class="cellc">.050</span></span></td>
+          <td><b>0.853</b></td><td>4.00 <span class="chip peer">peer</span></td>
+          <td><b style="color:#00895A;font-size:14px">0.837</b></td>
+        </tr>
+        <tr>
+          <td class="left"><b>3&nbsp;&nbsp;Rina Cortez</b></td>
+          <td><span class="heat" style="background:rgba(192,57,43,.10)"><span class="cellv">0.00</span><span class="cellc">.000</span></span></td>
+          <td><span class="heat" style="background:rgba(0,137,90,.22)"><span class="cellv">1.00</span><span class="cellc">.200</span></span></td>
+          <td><span class="heat" style="background:rgba(0,137,90,.12)"><span class="cellv">0.70</span><span class="cellc">.105</span></span></td>
+          <td><span class="heat" style="background:rgba(0,137,90,.14)"><span class="cellv">1.00</span><span class="cellc">.100</span></span></td>
+          <td><span class="heat" style="background:rgba(0,137,90,.07)"><span class="cellv">0.50</span><span class="cellc">.050</span></span></td>
+          <td><span class="heat" style="background:rgba(0,137,90,.07)"><span class="cellv">1.00</span><span class="cellc">.050</span></span></td>
+          <td><b>0.505</b></td><td>4.20 <span class="chip global">global</span></td>
+          <td><b style="color:#00895A;font-size:14px">0.606</b></td>
+        </tr>
+        <tr>
+          <td class="left"><b>4&nbsp;&nbsp;Ivan Delgado</b></td>
+          <td><span class="heat" style="background:rgba(0,137,90,.30)"><span class="cellv">1.00</span><span class="cellc">.400</span></span></td>
+          <td><span class="heat" style="background:rgba(0,137,90,.22)"><span class="cellv">1.00</span><span class="cellc">.200</span></span></td>
+          <td><span class="heat" style="background:rgba(0,137,90,.10)"><span class="cellv">0.60</span><span class="cellc">.090</span></span></td>
+          <td><span class="heat" style="background:rgba(192,57,43,.10)"><span class="cellv">0.00</span><span class="cellc">.000</span></span></td>
+          <td><span class="heat" style="background:rgba(0,137,90,.14)"><span class="cellv">1.00</span><span class="cellc">.100</span></span></td>
+          <td><span class="heat" style="background:rgba(0,137,90,.07)"><span class="cellv">1.00</span><span class="cellc">.050</span></span></td>
+          <td><b>0.840</b></td><td>&mdash; <span class="chip none">no signal</span></td>
+          <td><b style="color:#00895A;font-size:14px">0.588</b></td>
+        </tr>
+        <tr>
+          <td class="left"><b>5&nbsp;&nbsp;Ben Salas</b></td>
+          <td><span class="heat" style="background:rgba(192,57,43,.10)"><span class="cellv">0.00</span><span class="cellc">.000</span></span></td>
+          <td><span class="heat" style="background:rgba(0,137,90,.22)"><span class="cellv">1.00</span><span class="cellc">.200</span></span></td>
+          <td><span class="heat" style="background:rgba(0,137,90,.09)"><span class="cellv">0.50</span><span class="cellc">.075</span></span></td>
+          <td><span class="heat" style="background:rgba(0,137,90,.07)"><span class="cellv">0.50</span><span class="cellc">.050</span></span></td>
+          <td><span class="heat" style="background:rgba(0,137,90,.05)"><span class="cellv">0.33</span><span class="cellc">.033</span></span></td>
+          <td><span class="heat" style="background:rgba(192,57,43,.10)"><span class="cellv">0.00</span><span class="cellc">.000</span></span></td>
+          <td><b>0.358</b></td><td>3.60 <span class="chip global">global</span></td>
+          <td><b style="color:#00895A;font-size:14px">0.467</b></td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+    <p class="sub" style="margin-top:14px">
+      Ivan is the 2nd-best subject match (CBF 0.840) but no peer has rated him, so CF contributes
+      nothing and he falls to 4th behind Rina, whose subject match is weak but who has a global
+      rating. Ben's Level cell is 0: he teaches High School and Ana is a college Year 2, so the
+      teaching-level ceiling zeroes it out.
+    </p>
+  </div>
+
+  <h2>Open at time of locking</h2>
+  <div class="panel">
+    <p class="sub">
+      The interaction model for editable ratings (live re-score and re-rank) was still being
+      decided when this visual was locked. Whichever model is chosen affects only the editing
+      affordance and the re-rank animation, not the layout above.
+    </p>
+  </div>
+</div>
+</body>
+</html>
