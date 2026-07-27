@@ -1,8 +1,15 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import SbSelectModal from '@/components/SbSelectModal.vue'
 import AlgorithmDemoBreakdown from './AlgorithmDemoBreakdown.vue'
-import { getAlgorithmDemoRecommendation } from '@/services/api/algorithmDemo'
+import {
+  getAlgorithmDemoRecommendation,
+  getAlgorithmDemoWhatIf
+} from '@/services/api/algorithmDemo'
+
+// Matches AlgorithmDemoRankedList: rating edits are re-scored server-side, so they
+// are paced rather than fired on every slider tick.
+const WHATIF_DEBOUNCE_MS = 250
 
 const props = defineProps({
   tutees: {
@@ -25,6 +32,14 @@ const rows = ref([])
 const reason = ref(null)
 const loading = ref(false)
 const errorMessage = ref('')
+const overrides = ref([])
+let whatIfTimer = null
+
+function clearWhatIf() {
+  clearTimeout(whatIfTimer)
+  whatIfTimer = null
+  overrides.value = []
+}
 
 const selectedTutee = computed(
   () => props.tutees.find((tutee) => tutee.id === selectedTuteeId.value) || null
@@ -45,6 +60,7 @@ async function onTuteeChange(tuteeId) {
   rows.value = []
   reason.value = null
   errorMessage.value = ''
+  clearWhatIf()
   if (!tuteeId) return
   await refetchRows()
 }
@@ -64,9 +80,50 @@ async function refetchRows() {
   }
 }
 
-function onRatingUpdated() {
-  refetchRows()
+// What-if overrides are applied to the rating matrix in memory by the backend and never
+// written, so every edit here is reversible — see recommender/demo.apply_rating_overrides.
+function onOverride({ studentId, tutorId, ratingScore }) {
+  const existing = overrides.value.find(
+    (item) => item.student_id === studentId && item.tutor_id === tutorId
+  )
+
+  if (existing) {
+    existing.rating_score = ratingScore
+  } else {
+    overrides.value.push({
+      student_id: studentId,
+      tutor_id: tutorId,
+      rating_score: ratingScore
+    })
+  }
+
+  clearTimeout(whatIfTimer)
+  whatIfTimer = setTimeout(refreshWhatIf, WHATIF_DEBOUNCE_MS)
 }
+
+async function refreshWhatIf() {
+  if (!selectedTuteeId.value) return
+
+  try {
+    const { data } = await getAlgorithmDemoWhatIf(
+      selectedTuteeId.value,
+      props.institutionId,
+      overrides.value
+    )
+    rows.value = data.rows
+    reason.value = data.reason
+    errorMessage.value = ''
+  } catch (err) {
+    errorMessage.value = err.response?.data?.error || 'Could not re-score with these ratings.'
+  }
+}
+
+async function resetWhatIf() {
+  clearWhatIf()
+  await refetchRows()
+}
+
+onBeforeUnmount(() => clearTimeout(whatIfTimer))
 
 watch(
   () => props.institutionId,
@@ -172,7 +229,13 @@ watch(
         </div>
       </div>
 
-      <AlgorithmDemoBreakdown :row="selectedRow" @rating-updated="onRatingUpdated" />
+      <div v-if="overrides.length" class="whatif-bar">
+        <span class="whatif-chip">What-if — {{ overrides.length }} rating
+          {{ overrides.length === 1 ? 'change' : 'changes' }}, nothing saved</span>
+        <button type="button" class="whatif-reset" @click="resetWhatIf">Reset</button>
+      </div>
+
+      <AlgorithmDemoBreakdown :row="selectedRow" @override="onOverride" />
     </template>
   </div>
 </template>
@@ -295,5 +358,37 @@ watch(
   background: color-mix(in srgb, var(--sb-danger) 12%, transparent);
   color: var(--sb-danger);
   border-color: color-mix(in srgb, var(--sb-danger) 30%, transparent);
+}
+
+.whatif-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.whatif-chip {
+  background: color-mix(in srgb, var(--sb-warning, #d29922) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sb-warning, #d29922) 35%, transparent);
+  border-radius: 9999px;
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.whatif-reset {
+  background: none;
+  border: 1px solid var(--sb-card-border);
+  border-radius: 9999px;
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--sb-text-muted);
+  cursor: pointer;
+}
+
+.whatif-reset:hover {
+  border-color: var(--sb-primary);
+  color: var(--sb-primary);
 }
 </style>

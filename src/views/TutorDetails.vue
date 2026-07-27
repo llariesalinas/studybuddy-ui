@@ -39,6 +39,10 @@
                     <i class="bi bi-patch-check-fill"></i>
                     Verified
                   </span>
+                  <span v-if="tutorProfile.institutionName" class="institution-badge">
+                    <i class="bi bi-mortarboard-fill"></i>
+                    {{ tutorProfile.institutionName }}
+                  </span>
                 </div>
 
                 <div class="bio-container">
@@ -358,6 +362,7 @@ const tutorProfile = computed(() => ({
   name: tutorDetails.value.name || 'Tutor Name',
   profilePictureUrl: tutorDetails.value.profile_picture_url || '',
   isVerified: Boolean(tutorDetails.value.is_verified),
+  institutionName: tutorDetails.value.institutionName || '',
   hourlyRate: Number(tutorDetails.value.hourly_rate) || 0,
   rating: Number(tutorDetails.value.rating) || 4.7,
   sessionCount: Number(tutorDetails.value.total_sessions) || 124,
@@ -623,6 +628,7 @@ const getTutorDetails = async () => {
     tutorDetails.value = {
       profile_id: response.data.profile_id,
       name: [response.data.fname, response.data.lname].filter(Boolean).join(' '),
+      institutionName: response.data.institution_name || '',
       subjects: Array.isArray(response.data.subjects) ? response.data.subjects : [],
       rating: response.data.rating_average ?? 4.7,
       bio: response.data.bio,
@@ -988,6 +994,19 @@ onMounted(async () => {
   border-radius: 999px;
   background: #e8f7f1;
   color: #0a7a51;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.institution-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: var(--sb-bg, #f8f9fa);
+  border: 1px solid var(--sb-card-border, #eaeaea);
+  color: var(--sb-text-secondary, #495057);
   font-size: 0.85rem;
   font-weight: 600;
 }
