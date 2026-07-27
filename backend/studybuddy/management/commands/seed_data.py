@@ -319,7 +319,7 @@ class Command(BaseCommand):
         end = current + datetime.timedelta(hours=block_hours)
         while current < end:
             slots.append(current.time())
-            current += datetime.timedelta(minutes=30)
+            current += datetime.timedelta(minutes=60)
         return slots
 
     def _make_availability(self, tutor, now):
