@@ -1,7 +1,7 @@
 ---
 title: Proactive verification UI gates (booking & accept)
 date: 2026-07-06
-status: Approved
+status: Done
 spec: docs/plans/2026-07-01-tutee-verification-overview.md
 ---
 
@@ -10,7 +10,9 @@ spec: docs/plans/2026-07-01-tutee-verification-overview.md
 <!-- LIVING SUMMARY: keep this section and the Changelog current on every edit -->
 ## Status & Progress Summary
 
-**Status: Approved — design locked via `/grill-with-docs`, not yet implemented.**
+**Status (2026-07-17): Done.** Design locked via `/grill-with-docs`. `needsTuteeVerificationBlock`
+is wired into `TutorDetails.vue`'s booking button (rendering "Verify to book"); frontmatter status
+was never flipped from Approved.
 
 Standalone plan (not filed as a phase of the tutee-verification overview, by explicit user choice),
 but it directly builds on that initiative's Phase 2 (Reactive Gate, server-side, Done) and Phase 3
@@ -141,3 +143,7 @@ hovering shows a tooltip with more specific detail (e.g. "You are verified", "Re
   persistent per-session-dismissible banner for both roles, suppressed during the Tutee grace
   period; informational (non-gating) verified/unverified badge added to both dashboard headers in
   `App.vue` (where those headers actually live, not in `Dashboard.vue`/`TutorDashboard.vue`).
+- 2026-07-17: Verified against the codebase during a plan-vs-code implementation audit —
+  `needsTuteeVerificationBlock` wired into `TutorDetails.vue`'s booking button and
+  `VerificationBanner.vue` exists. Frontmatter status was never flipped from Approved —
+  corrected to Done.

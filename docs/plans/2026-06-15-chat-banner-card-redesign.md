@@ -1,7 +1,7 @@
 ---
 title: Chat banner & booking card compact-timeline redesign
 date: 2026-06-15
-status: Approved
+status: Done
 spec:
 ---
 
@@ -110,3 +110,6 @@ visual - no changes to accept/reject/edit/confirm logic.
   lightweight `.chat-banner__quick-actions` class (no border/background/min-width) so
   the buttons sit inline within the flex `.chat-banner` row; added a matching mobile
   stretch rule. `npm run lint`/`eslint` and `npm run build` pass.
+- 2026-07-17: Frontmatter `status` was still `Approved` despite this section already
+  saying "Implemented" since 2026-06-15 — corrected to `Done` during a plan-vs-code
+  implementation audit.

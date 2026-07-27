@@ -1,7 +1,7 @@
 ---
 title: Verification dev tools — self-service profile-page debug panel
 date: 2026-07-02
-status: Approved
+status: Done
 spec: 2026-07-01-tutee-verification-overview.md
 ---
 
@@ -15,8 +15,10 @@ spec: 2026-07-01-tutee-verification-overview.md
 <!-- LIVING SUMMARY: keep this section and the Changelog current on every edit -->
 ## Status & Progress Summary
 
-**Status: Approved — design locked via grilling, not yet implemented.** Every decision below was
-made explicitly with the user; file/line references were read against current `HEAD` on 2026-07-02.
+**Status: Done.** Every decision below was made explicitly with the user; file/line references
+were read against current `HEAD` on 2026-07-02. Implemented same-day: `_verification_dev.py`
+helper, `VERIFICATION_DEV_TOOLS_ENABLED` setting, three `dev/verification/*` endpoints in
+`urls.py`, `VerificationDevPanel.vue`, and `verificationDev.js` service are all in the codebase.
 
 ## Goal
 
@@ -122,3 +124,7 @@ Phase 4's `AdminUserVerificationDevToolsView` import it (Phase 4 plan updated to
   self-service panel sharing a Phase 4 helper; 3 capabilities; reuse `VERIFICATION_DEV_TOOLS_ENABLED`
   self-only; both roles with tutee-only enforcement toggle; cache-based 3-state override;
   deterministic overwrite setter; no mockups). Status Approved, awaiting go-ahead to implement.
+- 2026-07-17: Verified against the codebase during a plan-vs-code implementation audit — all 8
+  steps confirmed present (helper, setting, endpoints, service, panel, mount points), committed
+  same-day as the plan (2026-07-02). Frontmatter status was never flipped from Approved —
+  corrected to Done.

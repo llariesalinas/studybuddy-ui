@@ -1,11 +1,21 @@
 ---
 title: Frontend and chat caching
 date: 2026-06-06
-status: Approved
+status: Done
 spec:
 ---
 
 # Frontend and chat caching
+
+## Status & Progress Summary
+
+**Status (2026-07-17): Done.** This plan predates the living-plan convention and never had a
+tracked summary. Verified against the codebase during a plan-vs-code implementation audit:
+`src/services/api/cache.js` implements the cached-GET helper (`cachedGet`, TTL constants),
+`src/stores/catalog.js` consumes it, `src/stores/chat.js` has `cachedAt`/`readChatCache`/
+`getRoomsCacheKey`, `after_id` is implemented in `backend/studybuddy/chat/views.py`, and
+`package.json` has the `"test": "vitest run"` script the plan's Step 0 required. Frontmatter
+status was never flipped from Approved.
 
 ## Goal
 
@@ -105,3 +115,10 @@ The Django backend is in-tree at `backend/studybuddy/chat/`.
 - `pytest studybuddy/tests.py::ChatFeatureTests` (from `backend/`) should pass, including
   new coverage for normal history loading, `history/?after_id=...`, unauthorized history
   access, and system-message serialization.
+
+## Changelog
+
+- 2026-06-06: Plan written and approved.
+- 2026-07-17: Verified implemented during a plan-vs-code implementation audit; frontmatter
+  status corrected from Approved to Done. Added this Status & Progress Summary/Changelog
+  retroactively per the living-plan convention.
