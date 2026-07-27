@@ -689,6 +689,8 @@ class RecommendTutorsViewTests(APITestCase):
         can_online=True,
         can_f2f=False,
     ):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
         user = User.objects.create_user(
             username=username,
             email=f"{username}@example.com",
@@ -713,6 +715,16 @@ class RecommendTutorsViewTests(APITestCase):
             tutor=tutor,
             subject=subject or self.subject,
             expertise_level=5,
+        )
+        TutorApplication.objects.create(
+            profile=profile,
+            school_id=SimpleUploadedFile(
+                f"{username}-id.jpg", b"id", content_type="image/jpeg"
+            ),
+            enrollment_proof=SimpleUploadedFile(
+                f"{username}-rf.pdf", b"rf", content_type="application/pdf"
+            ),
+            application_status="approved",
         )
         return tutor
 
@@ -760,10 +772,10 @@ class RecommendTutorsViewTests(APITestCase):
     def test_multislot_search_requires_every_slot(self):
         complete = self.create_tutor("complete")
         incomplete = self.create_tutor("incomplete")
-        self.add_slots(complete, [time(14, 0), time(14, 30)])
+        self.add_slots(complete, [time(14, 0), time(15, 0)])
         self.add_slots(incomplete, [time(14, 0)])
 
-        response = self.recommend()
+        response = self.recommend(end_time="16:00")
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(self.response_ids(response), {complete.profile_id})
@@ -800,12 +812,12 @@ class RecommendTutorsViewTests(APITestCase):
     def test_booked_slot_excludes_tutor(self):
         available = self.create_tutor("available")
         booked = self.create_tutor("booked")
-        self.add_slots(available, [time(14, 0), time(14, 30)])
-        booked_slots = self.add_slots(booked, [time(14, 0), time(14, 30)])
+        self.add_slots(available, [time(14, 0)])
+        booked_slots = self.add_slots(booked, [time(14, 0)])
         Booking.objects.create(
             student=self.student_profile,
             tutor=booked,
-            availability=booked_slots[1],
+            availability=booked_slots[0],
             session_date=self.search_date,
             session_mode="Online",
             status="Confirmed",
@@ -1245,7 +1257,7 @@ class ChatFeatureTests(APITestCase):
         second_slot = TutorAvailability.objects.create(
             tutor=self.tutor,
             day="Mon",
-            time_slot=time(14, 30),
+            time_slot=time(15, 0),
             is_active=True,
         )
         first_group_id = uuid4()
@@ -1281,7 +1293,7 @@ class ChatFeatureTests(APITestCase):
         context = get_partner_context(room, self.tutee_user)
 
         self.assertEqual(context['sessions_together'], 2)
-        self.assertEqual(context['focused_hours'], 1.5)
+        self.assertEqual(context['focused_hours'], 3.0)
 
     def test_partner_context_returns_tutor_topics(self):
         room = ChatRoom.objects.create(tutee=self.tutee_profile, tutor=self.tutor_profile)
@@ -1630,7 +1642,7 @@ class OnlinePaymentInitiationTests(APITestCase):
         second_availability = TutorAvailability.objects.create(
             tutor=self.tutor,
             day="Mon",
-            time_slot=time(14, 30),
+            time_slot=time(15, 0),
             is_active=True,
         )
         return Booking.objects.create(
@@ -1663,7 +1675,7 @@ class OnlinePaymentInitiationTests(APITestCase):
             response.data["payment_url"],
             "https://checkout.paymongo.com/test-session",
         )
-        self.assertEqual(payment.amount, Decimal("140.00"))
+        self.assertEqual(payment.amount, Decimal("280.00"))
         self.assertEqual(payment.method.code, "PAYMONGO")
         self.assertEqual(payment.payment_status, "Pending")
         self.assertEqual(payment.transaction_reference, "cs_test_123")
@@ -1833,10 +1845,10 @@ class OnlinePaymentInitiationTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        # Both slots should be reflected in the response. With 2 x 30-min slots the
-        # duration_hours must be 1.0; if the bug is present (get_session_group_bookings
-        # is used and session_group_id is None) only one slot is included → 0.5.
-        self.assertEqual(response.data["session"]["duration_hours"], 1.0)
+        # Both slots should be reflected in the response. With 2 x 60-min slots the
+        # duration_hours must be 2.0; if the bug is present (get_session_group_bookings
+        # is used and session_group_id is None) only one slot is included → 1.0.
+        self.assertEqual(response.data["session"]["duration_hours"], 2.0)
         _ = second_booking  # referenced to avoid unused-variable warning
 
     def test_manual_payment_submission_updates_all_session_group_slots(self):
