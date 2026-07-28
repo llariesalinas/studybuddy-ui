@@ -18,6 +18,15 @@
       <span v-if="booking.session_mode === 'F2F'">
         <i class="bi bi-geo-alt"></i>{{ booking.preferred_location || 'No location' }}
       </span>
+      <a
+        v-if="booking.session_mode === 'Online' && booking.meeting_link"
+        :href="booking.meeting_link"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="meeting-link"
+      >
+        <i class="bi bi-camera-video"></i>Join session
+      </a>
     </div>
 
     <div v-if="canEditLocation || detailsTarget" class="booking-card-footer">
@@ -368,6 +377,16 @@ async function saveLocation() {
   font-size: 13px;
   font-weight: 700;
   margin-left: auto;
+  text-decoration: none;
+}
+
+.meeting-link {
+  color: var(--sb-primary);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 700;
   text-decoration: none;
 }
 

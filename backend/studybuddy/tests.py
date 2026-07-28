@@ -571,7 +571,7 @@ class GlobalSubjectCatalogTests(APITestCase):
             subject_code="CS101",
             subject_name="Introduction to Computing",
             department="Computer Science",
-            category="BSCS",
+            category="Technology & Computer Science",
         )
         self.super_user = User.objects.create_user(
             username="super",
@@ -602,7 +602,7 @@ class GlobalSubjectCatalogTests(APITestCase):
                 "subject_code": "AI201",
                 "subject_name": "Applied Artificial Intelligence",
                 "department": "Computer Science",
-                "category": self.course.course_code,
+                "category": "Technology & Computer Science",
             },
             format="json",
         )
@@ -625,6 +625,32 @@ class GlobalSubjectCatalogTests(APITestCase):
 
         with self.assertRaises(LookupError):
             apps.get_model('studybuddy', 'InstitutionCourseCatalog')
+
+    def test_catalog_create_and_update_persist_keywords(self):
+        create_response = self.client.post(
+            "/api/admin/course-catalog/",
+            {
+                "subject_code": "AI202",
+                "subject_name": "Machine Learning",
+                "department": "Computer Science",
+                "category": "Technology & Computer Science",
+                "keywords": "ml, coding, ai",
+            },
+            format="json",
+        )
+        self.assertEqual(create_response.status_code, 201)
+        self.assertEqual(create_response.data["keywords"], "ml, coding, ai")
+
+        update_response = self.client.patch(
+            "/api/admin/course-catalog/AI202/",
+            {"keywords": "ml, coding, ai, deep learning"},
+            format="json",
+        )
+        self.assertEqual(update_response.status_code, 200)
+        self.assertEqual(update_response.data["keywords"], "ml, coding, ai, deep learning")
+
+    def test_catalog_keywords_defaults_to_blank(self):
+        self.assertEqual(self.subject.keywords, "")
 
 
 class RecommendTutorsViewTests(APITestCase):
@@ -663,6 +689,8 @@ class RecommendTutorsViewTests(APITestCase):
         can_online=True,
         can_f2f=False,
     ):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
         user = User.objects.create_user(
             username=username,
             email=f"{username}@example.com",
@@ -687,6 +715,16 @@ class RecommendTutorsViewTests(APITestCase):
             tutor=tutor,
             subject=subject or self.subject,
             expertise_level=5,
+        )
+        TutorApplication.objects.create(
+            profile=profile,
+            school_id=SimpleUploadedFile(
+                f"{username}-id.jpg", b"id", content_type="image/jpeg"
+            ),
+            enrollment_proof=SimpleUploadedFile(
+                f"{username}-rf.pdf", b"rf", content_type="application/pdf"
+            ),
+            application_status="approved",
         )
         return tutor
 
@@ -734,10 +772,10 @@ class RecommendTutorsViewTests(APITestCase):
     def test_multislot_search_requires_every_slot(self):
         complete = self.create_tutor("complete")
         incomplete = self.create_tutor("incomplete")
-        self.add_slots(complete, [time(14, 0), time(14, 30)])
+        self.add_slots(complete, [time(14, 0), time(15, 0)])
         self.add_slots(incomplete, [time(14, 0)])
 
-        response = self.recommend()
+        response = self.recommend(end_time="16:00")
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(self.response_ids(response), {complete.profile_id})
@@ -774,12 +812,12 @@ class RecommendTutorsViewTests(APITestCase):
     def test_booked_slot_excludes_tutor(self):
         available = self.create_tutor("available")
         booked = self.create_tutor("booked")
-        self.add_slots(available, [time(14, 0), time(14, 30)])
-        booked_slots = self.add_slots(booked, [time(14, 0), time(14, 30)])
+        self.add_slots(available, [time(14, 0)])
+        booked_slots = self.add_slots(booked, [time(14, 0)])
         Booking.objects.create(
             student=self.student_profile,
             tutor=booked,
-            availability=booked_slots[1],
+            availability=booked_slots[0],
             session_date=self.search_date,
             session_mode="Online",
             status="Confirmed",
@@ -1219,7 +1257,7 @@ class ChatFeatureTests(APITestCase):
         second_slot = TutorAvailability.objects.create(
             tutor=self.tutor,
             day="Mon",
-            time_slot=time(14, 30),
+            time_slot=time(15, 0),
             is_active=True,
         )
         first_group_id = uuid4()
@@ -1255,7 +1293,7 @@ class ChatFeatureTests(APITestCase):
         context = get_partner_context(room, self.tutee_user)
 
         self.assertEqual(context['sessions_together'], 2)
-        self.assertEqual(context['focused_hours'], 1.5)
+        self.assertEqual(context['focused_hours'], 3.0)
 
     def test_partner_context_returns_tutor_topics(self):
         room = ChatRoom.objects.create(tutee=self.tutee_profile, tutor=self.tutor_profile)
@@ -1604,7 +1642,7 @@ class OnlinePaymentInitiationTests(APITestCase):
         second_availability = TutorAvailability.objects.create(
             tutor=self.tutor,
             day="Mon",
-            time_slot=time(14, 30),
+            time_slot=time(15, 0),
             is_active=True,
         )
         return Booking.objects.create(
@@ -1637,7 +1675,7 @@ class OnlinePaymentInitiationTests(APITestCase):
             response.data["payment_url"],
             "https://checkout.paymongo.com/test-session",
         )
-        self.assertEqual(payment.amount, Decimal("140.00"))
+        self.assertEqual(payment.amount, Decimal("280.00"))
         self.assertEqual(payment.method.code, "PAYMONGO")
         self.assertEqual(payment.payment_status, "Pending")
         self.assertEqual(payment.transaction_reference, "cs_test_123")
@@ -1807,10 +1845,10 @@ class OnlinePaymentInitiationTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        # Both slots should be reflected in the response. With 2 x 30-min slots the
-        # duration_hours must be 1.0; if the bug is present (get_session_group_bookings
-        # is used and session_group_id is None) only one slot is included → 0.5.
-        self.assertEqual(response.data["session"]["duration_hours"], 1.0)
+        # Both slots should be reflected in the response. With 2 x 60-min slots the
+        # duration_hours must be 2.0; if the bug is present (get_session_group_bookings
+        # is used and session_group_id is None) only one slot is included → 1.0.
+        self.assertEqual(response.data["session"]["duration_hours"], 2.0)
         _ = second_booking  # referenced to avoid unused-variable warning
 
     def test_manual_payment_submission_updates_all_session_group_slots(self):
@@ -3791,13 +3829,14 @@ class BookingVerificationGateTests(APITestCase):
             subject=self.subject,
             expertise_level=5,
         )
-        self.future_date = timezone.now().date() + timedelta(days=30)
+        self.future_date = timezone.now().date() + timedelta(days=5)
         self.availability = TutorAvailability.objects.create(
             tutor=self.tutor,
             day=WEEKDAY_MAP[self.future_date.weekday()],
             time_slot=time(14, 0),
             is_active=True,
         )
+        self.make_verified_application(TutorApplication, self.tutor_profile)
 
     def upload(self, name, content, content_type):
         from django.core.files.uploadedfile import SimpleUploadedFile
@@ -3887,6 +3926,9 @@ class BookingVerificationGateTests(APITestCase):
         response = self.post_confirm_booking()
 
         self.assertEqual(response.status_code, 200)
+        booking = Booking.objects.get(id=response.data['booking_ids'][0])
+        self.assertEqual(booking.status, 'Confirmed')
+        self.assertTrue(booking.meeting_link)
 
     @override_settings(**NOT_YET_ENFORCED)
     def test_confirm_booking_persists_subject(self):
@@ -3934,43 +3976,24 @@ class BookingVerificationGateTests(APITestCase):
             status="Pending",
         )
 
-    def test_tutor_without_application_blocked_from_approving(self):
+    def test_removed_approval_route_returns_404(self):
         booking = self.create_pending_booking()
         self.client.force_authenticate(user=self.tutor_user)
 
         response = self.client.post(f"/api/bookings/{booking.id}/approve/")
 
-        self.assertEqual(response.status_code, 403)
-        self.assertEqual(response.data.get("code"), "verification_required")
-        booking.refresh_from_db()
-        self.assertEqual(booking.status, "Pending")
+        self.assertEqual(response.status_code, 404)
 
-    def test_tutor_with_verified_application_can_approve_booking(self):
-        self.make_verified_application(TutorApplication, self.tutor_profile)
+    def test_removed_rejection_route_returns_404(self):
         booking = self.create_pending_booking()
         self.client.force_authenticate(user=self.tutor_user)
 
-        response = self.client.post(f"/api/bookings/{booking.id}/approve/")
+        response = self.client.post(f"/api/bookings/{booking.id}/reject/")
 
-        self.assertEqual(response.status_code, 200)
-        booking.refresh_from_db()
-        self.assertEqual(booking.status, "Confirmed")
-
-    def test_tutor_with_due_renewal_blocked_from_approving(self):
-        self.make_due_application(TutorApplication, self.tutor_profile)
-        booking = self.create_pending_booking()
-        self.client.force_authenticate(user=self.tutor_user)
-
-        response = self.client.post(f"/api/bookings/{booking.id}/approve/")
-
-        self.assertEqual(response.status_code, 403)
-        self.assertEqual(response.data.get("code"), "verification_required")
-        booking.refresh_from_db()
-        self.assertEqual(booking.status, "Pending")
+        self.assertEqual(response.status_code, 404)
 
     @override_settings(**ENFORCED)
     def test_tutor_acceptance_load_counts_session_groups_not_rows(self):
-        self.make_verified_application(TutorApplication, self.tutor_profile)
         shared_group_id = uuid4()
         self.create_accepted_booking_group(start_hour=15, group_id=shared_group_id)
         self.create_accepted_booking_group(start_hour=16, group_id=shared_group_id)
@@ -3978,24 +4001,18 @@ class BookingVerificationGateTests(APITestCase):
         self.assertEqual(self.tutor.accepted_session_load(), 1)
 
     @override_settings(**ENFORCED)
-    def test_tutor_at_acceptance_limit_cannot_approve_new_booking(self):
-        self.make_verified_application(TutorApplication, self.tutor_profile)
-
+    def test_tutor_at_acceptance_limit_cannot_receive_new_booking(self):
+        self.make_verified_application(TuteeApplication, self.tutee_profile)
         accepted_hours = [8, 9, 10, 11, 12, 13, 15, 16, 17, 18]
         for start_hour in accepted_hours:
             self.create_accepted_booking_group(start_hour=start_hour)
 
-        booking = self.create_pending_booking()
-        self.client.force_authenticate(user=self.tutor_user)
-
-        response = self.client.post(f"/api/bookings/{booking.id}/approve/")
+        response = self.post_confirm_booking()
 
         self.assertEqual(response.status_code, 409)
         self.assertEqual(response.data.get("code"), "session_load_limit_reached")
         self.assertEqual(response.data.get("accepted_session_load"), 10)
         self.assertEqual(response.data.get("session_load_limit"), 10)
-        booking.refresh_from_db()
-        self.assertEqual(booking.status, "Pending")
 
 
 class TuteeVerificationPhase3Tests(APITestCase):
@@ -4666,7 +4683,7 @@ class RecommenderNeighborReuseTests(APITestCase):
 
         self.assertEqual(without, with_neighbors)
 
-    def test_recommend_hybrid_computes_neighbors_once(self):
+    def test_recommend_hybrid_computes_both_neighbor_lists_once(self):
         from studybuddy.recommender import hybrid
 
         # three candidate tutors, but neighbors should be computed only once
@@ -4674,7 +4691,7 @@ class RecommenderNeighborReuseTests(APITestCase):
         for t in tutors:
             t.tutorsubjects_set.all.return_value = []
 
-        student_profile = Mock(id=1, course=None, year_level=None)
+        student_profile = Mock(id=1, course_id=None, year_level=None)
 
         with patch.object(hybrid, "top_k", return_value=[]) as mocked_top_k, \
              patch.object(hybrid, "get_student_subject_codes", return_value=[]), \
@@ -4682,14 +4699,14 @@ class RecommenderNeighborReuseTests(APITestCase):
              patch.object(hybrid, "normalize_tutor_queryset", return_value=tutors):
             hybrid.recommend_tutors_hybrid(self.ratings, student_profile, None)
 
-        self.assertEqual(mocked_top_k.call_count, 1)
+        self.assertEqual(mocked_top_k.call_count, 2)
 
     def test_recommend_hybrid_handles_student_with_no_ratings(self):
         from studybuddy.recommender import hybrid
 
         tutor = Mock(profile_id=99, tutorsubjects_set=Mock())
         tutor.tutorsubjects_set.all.return_value = []
-        student_profile = Mock(id=4242, course=None, year_level=None)  # not in ratings
+        student_profile = Mock(id=4242, course_id=None, year_level=None)  # not in ratings
 
         with patch.object(hybrid, "get_student_subject_codes", return_value=[]), \
              patch.object(hybrid, "compute_cbf_score", return_value=0.5), \
@@ -4697,6 +4714,260 @@ class RecommenderNeighborReuseTests(APITestCase):
             results = hybrid.recommend_tutors_hybrid(self.ratings, student_profile, None)
 
         self.assertEqual(len(results), 1)  # did not raise
+
+
+class CfPeerNeighborTests(APITestCase):
+    def setUp(self):
+        self.course = Course.objects.create(
+            course_code="BSCS", course_name="Computer Science"
+        )
+        self.other_course = Course.objects.create(
+            course_code="BSIT", course_name="Information Technology"
+        )
+        self.tutee = self._make_tutee("target", self.course)
+        self.peer = self._make_tutee("peer", self.course)
+        self.other_tutee = self._make_tutee("other", self.other_course)
+        self.no_course_tutee = self._make_tutee("no-course", None)
+
+    def _make_tutee(self, username, course):
+        user = User.objects.create_user(
+            username=f"{username}@cpu.edu", email=f"{username}@cpu.edu", password="password"
+        )
+        return UserProfile.objects.create(
+            user=user, fname=username, mname="", lname="Tutee", role="Tutee", course=course
+        )
+
+    def test_top_k_excludes_zero_and_negative_similarity_neighbors(self):
+        from studybuddy.recommender.CF import top_k
+
+        ratings = {
+            1: {10: 5, 11: 1},
+            2: {10: 4, 11: 2},
+            3: {10: 1, 11: 5},
+            4: {10: 3, 11: 3},
+        }
+
+        neighbors = top_k(ratings, 1)
+        self.assertEqual([student_id for student_id, _ in neighbors], [2])
+        self.assertGreater(neighbors[0][1], 0)
+
+    def test_peer_ids_include_only_same_course_and_null_course_is_empty(self):
+        from studybuddy.recommender.CF import get_peer_student_ids
+
+        ratings = {
+            self.tutee.id: {10: 5, 11: 1},
+            self.peer.id: {10: 4, 11: 2},
+            self.other_tutee.id: {10: 4, 11: 2},
+        }
+
+        self.assertEqual(get_peer_student_ids(ratings, self.tutee), [self.peer.id])
+        self.assertEqual(get_peer_student_ids(ratings, self.no_course_tutee), [])
+
+    def test_peer_prediction_falls_back_to_global_per_tutor(self):
+        from studybuddy.recommender.CF import compute_cf_breakdown_with_fallback
+
+        ratings = {
+            1: {10: 5, 11: 1},
+            2: {10: 4, 11: 2, 12: 5},
+            3: {10: 4, 11: 2, 13: 1},
+        }
+        peer_neighbors = [(2, 1.0)]
+        global_neighbors = [(3, 1.0)]
+
+        peer_breakdown = compute_cf_breakdown_with_fallback(
+            ratings, 1, 12, peer_neighbors, global_neighbors
+        )
+        global_breakdown = compute_cf_breakdown_with_fallback(
+            ratings, 1, 13, peer_neighbors, global_neighbors
+        )
+        empty_peer_breakdown = compute_cf_breakdown_with_fallback(
+            ratings, 1, 13, [], global_neighbors
+        )
+
+        self.assertEqual(peer_breakdown["pool"], "peer")
+        self.assertEqual(peer_breakdown["neighbors"][0]["neighbor_id"], 2)
+        self.assertEqual(global_breakdown["pool"], "global")
+        self.assertEqual(global_breakdown["neighbors"][0]["neighbor_id"], 3)
+        self.assertEqual(empty_peer_breakdown["pool"], "global")
+
+
+class CbfGraduatedSubjectMatchTests(APITestCase):
+    """CBF graduated subject matching: a tutee requesting a specific subject
+    sees exact-match tutors ranked above same-field tutors, ranked above
+    unrelated tutors, instead of the old all-or-nothing subject match. See
+    docs/plans/ for the approved weights (W_SPECIFIC=0.40, W_GENERAL=0.20,
+    W_EXPERTISE=0.15, W_COURSE=0.10, W_YEAR=0.10, W_LEVEL=0.05)."""
+
+    def setUp(self):
+        from studybuddy.recommender.cbf import compute_cbf_breakdown
+
+        self.compute_cbf_breakdown = compute_cbf_breakdown
+
+        self.course = Course.objects.create(course_code="BSCS", course_name="Computer Science")
+
+        self.requested_subject = Subjects.objects.create(
+            subject_code="MATH101", subject_name="Calculus 1", department="Math",
+            category="STEM",
+        )
+        self.same_field_subject = Subjects.objects.create(
+            subject_code="MATH201", subject_name="Calculus 2", department="Math",
+            category="STEM",
+        )
+        self.other_same_field_subject = Subjects.objects.create(
+            subject_code="PHYS101", subject_name="Physics 1", department="Science",
+            category="STEM",
+        )
+        self.unrelated_subject = Subjects.objects.create(
+            subject_code="ART101", subject_name="Painting", department="Arts",
+            category="Arts",
+        )
+        self.null_category_subject = Subjects.objects.create(
+            subject_code="GEN101", subject_name="General Studies", department="Gen",
+        )
+        # Requested subject itself has a null category, to test the superset
+        # rule (General must still count an exact match even without a category).
+        self.null_category_requested_subject = Subjects.objects.create(
+            subject_code="GEN201", subject_name="Study Skills", department="Gen",
+        )
+
+        student_user = User.objects.create_user(
+            username="cbf-student", email="cbf-student@example.com", password="password",
+        )
+        self.student = UserProfile.objects.create(
+            user=student_user, fname="Cbf", mname="", lname="Student", role="Tutee",
+            year_level=12, course=self.course,
+        )
+
+    def _make_tutor(self, username, subjects_with_levels, teaching_level="College", year_level=12, course=None):
+        user = User.objects.create_user(
+            username=username, email=f"{username}@example.com", password="password",
+        )
+        profile = UserProfile.objects.create(
+            user=user, fname=username.title(), mname="", lname="Tutor", role="Tutor",
+            year_level=year_level, course=course,
+        )
+        tutor = Tutor.objects.create(
+            profile=profile, hourly_rate=200, can_online=True, can_f2f=False,
+            teaching_level=teaching_level,
+        )
+        for subject, level in subjects_with_levels:
+            TutorSubjects.objects.create(tutor=tutor, subject=subject, expertise_level=level)
+        return tutor
+
+    def test_level_ceiling_penalizes_only_students_above_known_ceiling(self):
+        cases = [
+            ('High School', 14, 0),
+            ('Elementary', 8, 0),
+            ('College', 11, 1),
+            ('', 14, 1),
+        ]
+        for index, (level, student_year, expected) in enumerate(cases):
+            self.student.year_level = student_year
+            self.student.save(update_fields=['year_level'])
+            tutor = self._make_tutor(
+                f'level-{index}', [(self.requested_subject, 3)], teaching_level=level,
+            )
+            breakdown = self.compute_cbf_breakdown(
+                self.student, tutor, self.requested_subject.subject_code,
+            )
+            self.assertEqual(breakdown['level']['value'], expected)
+
+    def test_dominance_exact_match_outranks_field_only_even_at_worst_case(self):
+        # Exact-match tutor at minimum possible expertise (1) still must bank
+        # >= 0.63 on the subject block alone.
+        exact_match_tutor = self._make_tutor(
+            "exact-match", [(self.requested_subject, 1)],
+            course=self.course, year_level=self.student.year_level,
+        )
+        # Field-only tutor at maximum possible expertise (5) plus perfect
+        # course/year/level must still cap out at 0.60 overall.
+        field_only_tutor = self._make_tutor(
+            "field-only", [(self.same_field_subject, 5)],
+            course=self.course, year_level=self.student.year_level,
+        )
+
+        exact_breakdown = self.compute_cbf_breakdown(
+            self.student, exact_match_tutor, self.requested_subject.subject_code,
+        )
+        field_breakdown = self.compute_cbf_breakdown(
+            self.student, field_only_tutor, self.requested_subject.subject_code,
+        )
+
+        exact_subject_block = (
+            exact_breakdown["specific"]["contribution"]
+            + exact_breakdown["general"]["contribution"]
+            + exact_breakdown["expertise"]["contribution"]
+        )
+        self.assertGreaterEqual(exact_subject_block, 0.63)
+        self.assertLessEqual(field_breakdown["score"], 0.60)
+        self.assertGreater(exact_breakdown["score"], field_breakdown["score"])
+
+    def test_null_category_tutor_subjects_contribute_zero_no_exception(self):
+        tutor = self._make_tutor("null-cat", [(self.null_category_subject, 5)])
+
+        breakdown = self.compute_cbf_breakdown(
+            self.student, tutor, self.requested_subject.subject_code,
+        )
+
+        self.assertEqual(breakdown["specific"]["value"], 0)
+        self.assertEqual(breakdown["general"]["value"], 0)
+        self.assertEqual(breakdown["expertise"]["value"], 0)
+
+    def test_exact_match_with_null_category_requested_subject_still_scores_general(self):
+        tutor = self._make_tutor(
+            "null-req-exact", [(self.null_category_requested_subject, 3)],
+        )
+
+        breakdown = self.compute_cbf_breakdown(
+            self.student, tutor, self.null_category_requested_subject.subject_code,
+        )
+
+        self.assertEqual(breakdown["specific"]["value"], 1)
+        self.assertEqual(breakdown["general"]["value"], 1)
+
+    def test_expertise_cascade_exact_match_uses_that_row_level(self):
+        tutor = self._make_tutor("exact-expertise", [(self.requested_subject, 3)])
+
+        breakdown = self.compute_cbf_breakdown(
+            self.student, tutor, self.requested_subject.subject_code,
+        )
+
+        self.assertAlmostEqual(breakdown["expertise"]["value"], 3 / 5)
+
+    def test_expertise_cascade_field_only_uses_mean_of_same_field_levels(self):
+        tutor = self._make_tutor(
+            "field-expertise",
+            [(self.same_field_subject, 2), (self.other_same_field_subject, 4)],
+        )
+
+        breakdown = self.compute_cbf_breakdown(
+            self.student, tutor, self.requested_subject.subject_code,
+        )
+
+        self.assertAlmostEqual(breakdown["expertise"]["value"], (2 + 4) / 2 / 5)
+
+    def test_expertise_cascade_unrelated_tutor_is_zero(self):
+        tutor = self._make_tutor("unrelated-expertise", [(self.unrelated_subject, 5)])
+
+        breakdown = self.compute_cbf_breakdown(
+            self.student, tutor, self.requested_subject.subject_code,
+        )
+
+        self.assertEqual(breakdown["expertise"]["value"], 0)
+
+    def test_empty_requested_subject_falls_back_to_preference_list(self):
+        tutor = self._make_tutor("fallback-match", [(self.requested_subject, 4)])
+
+        breakdown = self.compute_cbf_breakdown(
+            self.student,
+            tutor,
+            None,
+            student_subjects=[self.requested_subject.subject_code],
+        )
+
+        self.assertEqual(breakdown["specific"]["value"], 1)
+        self.assertEqual(breakdown["general"]["value"], 1)
+        self.assertAlmostEqual(breakdown["expertise"]["value"], 4 / 5)
 
 
 class DashboardRecommendationServiceTests(APITestCase):
@@ -5325,15 +5596,20 @@ class AlgorithmDemoToolTests(APITestCase):
             tutor=self.tutor, day="Mon", time_slot=time(9, 0),
         )
 
-    def _create_rating(self, student=None, rating_score=3, session_date=None):
+    def _create_rating(self, student=None, rating_score=3, session_date=None, tutor=None):
         student = student or self.tutee
+        tutor = tutor or self.tutor
+        availability = (
+            self.availability if tutor == self.tutor
+            else TutorAvailability.objects.filter(tutor=tutor).first()
+        )
         session_date = session_date or date(2026, 1, 1)
         booking = Booking.objects.create(
-            student=student, tutor=self.tutor, availability=self.availability,
+            student=student, tutor=tutor, availability=availability,
             session_date=session_date, session_mode="Online", status="Completed",
         )
         return Rating.objects.create(
-            booking=booking, student=student, tutor=self.tutor, rating_score=rating_score,
+            booking=booking, student=student, tutor=tutor, rating_score=rating_score,
         )
 
     def test_403_when_flag_disabled_even_for_superadmin(self):
@@ -5416,7 +5692,8 @@ class AlgorithmDemoToolTests(APITestCase):
 
         cbf = row["cbf"]
         self.assertAlmostEqual(
-            cbf["subject"]["contribution"]
+            cbf["specific"]["contribution"]
+            + cbf["general"]["contribution"]
             + cbf["expertise"]["contribution"]
             + cbf["course"]["contribution"]
             + cbf["year"]["contribution"]
@@ -5671,6 +5948,125 @@ class AlgorithmDemoToolTests(APITestCase):
                 format="json",
             )
         self.assertEqual(disabled_response.status_code, 403)
+
+    # --- what-if re-scoring + CF derivation payload -----------------------------------------
+    # See docs/plans/2026-07-23-algorithm-demo-cf-clarity.md.
+
+    def _shared_other_tutor(self):
+        """A second tutor, deliberately without the demo subject so it stays out
+        of the candidate pool, existing only to be co-rated. Pearson runs over the
+        co-rated intersection (CF.py:37) and returns 0 for a single shared item,
+        so a neighbour sharing only one tutor is filtered out before it can
+        influence anything — CF needs at least two co-rated tutors to register."""
+        other_user = User.objects.create_user(
+            username="algo-tutor-other@cpu.edu", email="algo-tutor-other@cpu.edu",
+            password="password",
+        )
+        other_profile = UserProfile.objects.create(
+            user=other_user, fname="Nena", mname="", lname="Other", role="Tutor",
+            year_level=12, institution=self.institution,
+        )
+        other_tutor = Tutor.objects.create(
+            profile=other_profile, hourly_rate=180, can_online=True, can_f2f=False,
+            teaching_level="College",
+        )
+        TutorAvailability.objects.create(tutor=other_tutor, day="Tue", time_slot=time(10, 0))
+        return other_tutor
+
+    def _peer_who_rated(self, rating_score):
+        """A second tutee who has co-rated two tutors with the demo tutee, so the
+        similarity is non-zero and the peer survives into the neighbour set."""
+        peer_user = User.objects.create_user(
+            username="algo-peer@cpu.edu", email="algo-peer@cpu.edu", password="password",
+        )
+        peer = UserProfile.objects.create(
+            user=peer_user, fname="Peer", mname="", lname="Rater", role="Tutee",
+            year_level=11, institution=self.institution,
+        )
+        other_tutor = self._shared_other_tutor()
+        self._create_rating(
+            student=self.tutee, rating_score=4, session_date=date(2026, 2, 2), tutor=other_tutor,
+        )
+        self._create_rating(
+            student=peer, rating_score=5, session_date=date(2026, 2, 3), tutor=other_tutor,
+        )
+        self._create_rating(student=peer, rating_score=rating_score, session_date=date(2026, 2, 1))
+        return peer
+
+    def test_recommend_payload_carries_cf_derivation_terms(self):
+        self._create_rating(rating_score=4)
+
+        self.client.force_authenticate(user=self.super_user)
+        response = self.client.get(
+            f"/api/dev/algorithm-demo/recommend/?tutee_id={self.tutee.id}"
+        )
+        self.assertEqual(response.status_code, 200)
+
+        cf = response.data["rows"][0]["cf"]
+        for key in ("student_avg", "student_rating", "numerator", "denominator"):
+            self.assertIn(key, cf)
+        # The tutee rated this tutor herself, so the panel can compare prediction
+        # against the real score — the candidate pool does not exclude rated tutors.
+        self.assertEqual(cf["student_rating"], 4)
+
+    def test_whatif_override_changes_score_without_writing(self):
+        self._create_rating(rating_score=2)
+        peer = self._peer_who_rated(rating_score=2)
+
+        self.client.force_authenticate(user=self.super_user)
+        baseline = self.client.get(
+            f"/api/dev/algorithm-demo/recommend/?tutee_id={self.tutee.id}"
+        )
+        baseline_score = baseline.data["rows"][0]["hybrid_score"]
+
+        response = self.client.post(
+            "/api/dev/algorithm-demo/recommend-whatif/",
+            {
+                "tutee_id": self.tutee.id,
+                "overrides": [
+                    {"student_id": peer.id, "tutor_id": self.tutor.pk, "rating_score": 5},
+                ],
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertNotEqual(response.data["rows"][0]["hybrid_score"], baseline_score)
+
+        # Nothing persisted: the peer's stored rating is untouched.
+        self.assertEqual(
+            Rating.objects.get(student=peer, tutor=self.tutor).rating_score, 2
+        )
+
+    def test_whatif_rejects_out_of_range_override(self):
+        self.client.force_authenticate(user=self.super_user)
+        response = self.client.post(
+            "/api/dev/algorithm-demo/recommend-whatif/",
+            {
+                "tutee_id": self.tutee.id,
+                "overrides": [
+                    {"student_id": self.tutee.id, "tutor_id": self.tutor.pk, "rating_score": 9},
+                ],
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_whatif_requires_superadmin_and_flag(self):
+        self.client.force_authenticate(user=self.admin_user)
+        payload = {"tutee_id": self.tutee.id, "overrides": []}
+        self.assertEqual(
+            self.client.post(
+                "/api/dev/algorithm-demo/recommend-whatif/", payload, format="json"
+            ).status_code,
+            403,
+        )
+
+        self.client.force_authenticate(user=self.super_user)
+        with override_settings(ALGORITHM_DEMO_TOOLS_ENABLED=False):
+            disabled = self.client.post(
+                "/api/dev/algorithm-demo/recommend-whatif/", payload, format="json"
+            )
+        self.assertEqual(disabled.status_code, 403)
 
 
 class SessionCheckInTests(APITestCase):
@@ -6484,7 +6880,11 @@ class SupportTicketEscalationTests(APITestCase):
         self.assertEqual(self.ticket.status, "Resolved")
 
 
-class InstitutionScopedMatchingTests(APITestCase):
+class CrossInstitutionMatchingTests(APITestCase):
+    """Matching is unscoped by institution — a tutee from one school can match a tutor from
+    any other, or a tutor with no institution at all. See
+    docs/plans/2026-07-17-remove-institution-matching-constraint.md."""
+
     def setUp(self):
         cache.clear()
 
@@ -6531,7 +6931,7 @@ class InstitutionScopedMatchingTests(APITestCase):
             tutor=self.tutor_a, subject=self.subject, expertise_level=5
         )
 
-        # Tutor from inst_b
+        # Tutor from inst_b — a different institution than the tutee
         tutor_b_user = User.objects.create_user(
             username="scope_tutor_b", email="tutor_b@wvu.edu.ph", password="pass"
         )
@@ -6547,7 +6947,7 @@ class InstitutionScopedMatchingTests(APITestCase):
             tutor=self.tutor_b, subject=self.subject, expertise_level=5
         )
 
-        # Tutor with no institution
+        # Tutor with no institution at all
         tutor_null_user = User.objects.create_user(
             username="scope_tutor_null", email="tutor_null@example.com", password="pass"
         )
@@ -6563,30 +6963,26 @@ class InstitutionScopedMatchingTests(APITestCase):
             tutor=self.tutor_null, subject=self.subject, expertise_level=5
         )
 
+        # recommend-tutors only surfaces approved tutors — approve all three so the
+        # inclusion assertions below are meaningful rather than vacuously true.
+        for tutor in (self.tutor_a, self.tutor_b, self.tutor_null):
+            self._approve(tutor)
+
+    def _approve(self, tutor):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        TutorApplication.objects.create(
+            profile=tutor.profile,
+            school_id=SimpleUploadedFile("id.jpg", b"id", content_type="image/jpeg"),
+            enrollment_proof=SimpleUploadedFile("rf.pdf", b"rf", content_type="application/pdf"),
+            application_status="approved",
+        )
+
     def _set_preferences(self, *subjects):
         pref, _ = Preference.objects.get_or_create(user=self.tutee)
         pref.subjects.set([s.subject_code for s in subjects])
 
-    def test_helper_filters_by_institution(self):
-        from .recommender.utils import filter_tutors_by_institution
-        qs = filter_tutors_by_institution(Tutor.objects.all(), self.tutee)
-        self.assertIn(self.tutor_a, qs)
-        self.assertNotIn(self.tutor_b, qs)
-        self.assertNotIn(self.tutor_null, qs)
-
-    def test_helper_returns_empty_when_tutee_has_no_institution(self):
-        from .recommender.utils import filter_tutors_by_institution
-        no_inst_user = User.objects.create_user(
-            username="scope_no_inst", email="noinst@test.com", password="pass"
-        )
-        no_inst_tutee = UserProfile.objects.create(
-            user=no_inst_user, fname="No", mname="", lname="Inst",
-            role="Tutee", institution=None,
-        )
-        qs = filter_tutors_by_institution(Tutor.objects.all(), no_inst_tutee)
-        self.assertFalse(qs.exists())
-
-    def test_recommend_returns_same_institution_tutors(self):
+    def test_recommend_includes_same_institution_tutor(self):
         self.client.force_authenticate(user=self.tutee.user)
         resp = self.client.post(
             "/api/recommend-tutors/",
@@ -6597,7 +6993,7 @@ class InstitutionScopedMatchingTests(APITestCase):
         ids = {r["id"] for r in resp.data}
         self.assertIn(self.tutor_a.profile.id, ids)
 
-    def test_recommend_excludes_other_institution_tutor(self):
+    def test_recommend_includes_other_institution_tutor(self):
         self.client.force_authenticate(user=self.tutee.user)
         resp = self.client.post(
             "/api/recommend-tutors/",
@@ -6606,9 +7002,9 @@ class InstitutionScopedMatchingTests(APITestCase):
         )
         self.assertEqual(resp.status_code, 200)
         ids = {r["id"] for r in resp.data}
-        self.assertNotIn(self.tutor_b.profile.id, ids)
+        self.assertIn(self.tutor_b.profile.id, ids)
 
-    def test_recommend_tutee_no_institution_gets_empty_list(self):
+    def test_recommend_tutee_no_institution_still_matches(self):
         no_inst_user = User.objects.create_user(
             username="scope_no_inst2", email="noinst2@test.com", password="pass"
         )
@@ -6623,9 +7019,10 @@ class InstitutionScopedMatchingTests(APITestCase):
             format="json",
         )
         self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp.data, [])
+        ids = {r["id"] for r in resp.data}
+        self.assertIn(self.tutor_a.profile.id, ids)
 
-    def test_recommend_null_institution_tutor_not_shown(self):
+    def test_recommend_includes_null_institution_tutor(self):
         self.client.force_authenticate(user=self.tutee.user)
         resp = self.client.post(
             "/api/recommend-tutors/",
@@ -6634,33 +7031,33 @@ class InstitutionScopedMatchingTests(APITestCase):
         )
         self.assertEqual(resp.status_code, 200)
         ids = {r["id"] for r in resp.data}
-        self.assertNotIn(self.tutor_null.profile.id, ids)
+        self.assertIn(self.tutor_null.profile.id, ids)
 
-    def test_dashboard_widget_respects_institution(self):
+    def test_dashboard_widget_includes_cross_institution_tutors(self):
         from studybuddy.recommender import dashboard
         self._set_preferences(self.subject)
         data = dashboard.get_dashboard_recommendations(self.tutee)
         ids = {row["id"] for row in data}
-        self.assertNotIn(self.tutor_b.profile.id, ids)
-        self.assertNotIn(self.tutor_null.profile.id, ids)
+        self.assertIn(self.tutor_b.profile.id, ids)
+        self.assertIn(self.tutor_null.profile.id, ids)
 
-    def test_dashboard_fallback_respects_institution(self):
+    def test_dashboard_fallback_includes_cross_institution_tutors(self):
         from studybuddy.recommender import dashboard
         # tutee has no preferences set, so get_student_subject_codes returns []
         # and the code falls through to _fallback
         data = dashboard.get_dashboard_recommendations(self.tutee)
         ids = {row["id"] for row in data}
-        self.assertNotIn(self.tutor_b.profile.id, ids)
-        self.assertNotIn(self.tutor_null.profile.id, ids)
+        self.assertIn(self.tutor_b.profile.id, ids)
+        self.assertIn(self.tutor_null.profile.id, ids)
 
-    def test_search_tutors_respects_institution(self):
+    def test_search_tutors_includes_cross_institution_tutors(self):
         self.client.force_authenticate(user=self.tutee.user)
         resp = self.client.get("/api/search-tutors/", {"subject": "SCOPE101"})
         self.assertEqual(resp.status_code, 200)
         ids = {r["profile_id"] for r in resp.data}
         self.assertIn(self.tutor_a.profile.id, ids)
-        self.assertNotIn(self.tutor_b.profile.id, ids)
-        self.assertNotIn(self.tutor_null.profile.id, ids)
+        self.assertIn(self.tutor_b.profile.id, ids)
+        self.assertIn(self.tutor_null.profile.id, ids)
 
     def test_search_tutors_requires_authentication(self):
         resp = self.client.get("/api/search-tutors/", {"subject": "SCOPE101"})
@@ -7290,6 +7687,13 @@ class TutorDetailVerifiedBadgeTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.data["is_verified"])
 
+    def test_includes_institution_name(self):
+        profile = self._make_tutor("badge-institution@cpu.edu")
+        self.client.force_authenticate(user=self.viewer_user)
+        response = self.client.get(f"/api/tutors/{profile.id}/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["institution_name"], "CPU")
+
 
 class TutorOnboardingSearchVisibilityTests(APITestCase):
     def setUp(self):
@@ -7508,7 +7912,7 @@ class TutorSubjectProposalTests(APITestCase):
         )
         self.catalog_subject = Subjects.objects.create(
             subject_code="MATH101", subject_name="College Algebra", department="Mathematics",
-            category="PROPOSAL",
+            category="Mathematics & Data Sciences",
         )
         self.course = Course.objects.create(course_code="PROPOSAL", course_name="Proposal Course")
         self.tutor_user = User.objects.create_user(
@@ -7527,12 +7931,13 @@ class TutorSubjectProposalTests(APITestCase):
         )
         self.client.force_authenticate(user=self.tutor_user)
 
-    def propose(self, subject_name="Educational Data Visualization", department="Mathematics"):
+    def propose(self, subject_name="Educational Data Visualization",
+                category="Mathematics & Data Sciences"):
         return self.client.post(
             "/api/tutor/subjects/propose/",
             {
                 "subject_name": subject_name,
-                "department": department,
+                "category": category,
                 "description": "A proposed specialty.",
             },
             format="json",
@@ -7550,10 +7955,36 @@ class TutorSubjectProposalTests(APITestCase):
         self.assertEqual(subject.proposed_application, self.application)
         self.assertTrue(TutorSubjects.objects.filter(tutor=self.tutor, subject=subject).exists())
 
-    def test_proposal_rejects_unknown_department(self):
-        response = self.propose(department="Invented Department")
+    def test_proposal_rejects_unknown_category(self):
+        response = self.propose(category="Invented Category")
 
         self.assertEqual(response.status_code, 400)
+
+    def test_proposal_persists_keywords_when_provided(self):
+        with patch("studybuddy.views.subject_is_recognized_for_profile"):
+            response = self.client.post(
+                "/api/tutor/subjects/propose/",
+                {
+                    "subject_name": "Quantum Computing",
+                    "category": "Technology & Computer Science",
+                    "description": "A proposed specialty.",
+                    "keywords": "quantum, qubits",
+                },
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["keywords"], "quantum, qubits")
+        subject = Subjects.objects.get(subject_code="QUANTUM-COMPUTING")
+        self.assertEqual(subject.keywords, "quantum, qubits")
+
+    def test_proposal_defaults_keywords_to_blank(self):
+        with patch("studybuddy.views.subject_is_recognized_for_profile"):
+            response = self.propose()
+
+        self.assertEqual(response.status_code, 201)
+        subject = Subjects.objects.get(subject_code=response.data["subject_code"])
+        self.assertEqual(subject.keywords, "")
 
     def test_proposal_enforces_eight_subject_cap_across_statuses(self):
         for index in range(8):
@@ -7588,18 +8019,30 @@ class TutorSubjectProposalTests(APITestCase):
         self.assertIn(self.catalog_subject.subject_code, codes)
         self.assertNotIn(proposal.data["subject_code"], codes)
 
-    def test_catalog_search_is_server_filtered_and_course_scoped(self):
-        Subjects.objects.create(
-            subject_code="OTHER101", subject_name="College Writing", department="Languages",
-            category="OTHER",
-        )
-
-        response = self.client.get("/api/subjects/", {"search": "College"})
+    def test_catalog_search_is_server_filtered(self):
+        response = self.client.get("/api/subjects/", {"search": "College Algebra"})
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
             [row["subject_code"] for row in response.data],
             [self.catalog_subject.subject_code],
+        )
+
+    def test_selection_is_not_scoped_to_the_requesting_users_course(self):
+        # Course-based subject gating was retired: a BSCS-course tutor (self.course above is
+        # unrelated to any taxonomy category) can still select/search a subject from a wholly
+        # different field, e.g. Hobbies & Arts, proving selection is catalog-wide now.
+        unrelated_subject = Subjects.objects.create(
+            subject_code="guitar-101", subject_name="Guitar Basics", department="Instruments",
+            category="Hobbies & Arts",
+        )
+
+        response = self.client.get("/api/subjects/", {"search": "Guitar"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(
+            unrelated_subject.subject_code,
+            [row["subject_code"] for row in response.data],
         )
 
 
@@ -7634,17 +8077,17 @@ class AdminProposedSubjectReviewTests(APITestCase):
         )
         self.client.force_authenticate(user=self.admin_user)
 
-    def make_proposal(self, code):
+    def make_proposal(self, code, keywords=""):
         subject = Subjects.objects.create(
             subject_code=code, subject_name=f"Proposal {code}", department="Mathematics",
             status="pending", proposed_by_tutor=self.tutor,
-            proposed_application=self.application,
+            proposed_application=self.application, keywords=keywords,
         )
         TutorSubjects.objects.create(tutor=self.tutor, subject=subject, expertise_level=3)
         return subject
 
     def test_application_detail_includes_pending_proposed_subjects(self):
-        proposal = self.make_proposal("DETAIL-PROP")
+        proposal = self.make_proposal("DETAIL-PROP", keywords="coding, cs")
 
         response = self.client.get(f"/api/admin/tutor-applications/{self.application.id}/")
 
@@ -7653,6 +8096,7 @@ class AdminProposedSubjectReviewTests(APITestCase):
             response.data["proposed_subjects"][0]["subject_code"],
             proposal.subject_code,
         )
+        self.assertEqual(response.data["proposed_subjects"][0]["keywords"], "coding, cs")
 
     def test_approve_subject_keeps_tutor_link_regardless_of_application_status(self):
         proposal = self.make_proposal("APPROVE-PROP")
@@ -7669,6 +8113,47 @@ class AdminProposedSubjectReviewTests(APITestCase):
         self.assertTrue(TutorSubjects.objects.filter(tutor=self.tutor, subject=proposal).exists())
         self.application.refresh_from_db()
         self.assertEqual(self.application.application_status, "rejected")
+
+    def test_update_action_edits_pending_proposal_fields_and_description(self):
+        proposal = self.make_proposal("UPDATE-PROP")
+
+        response = self.client.patch(
+            f"/api/admin/tutor-applications/{self.application.id}/subjects/"
+            f"{proposal.subject_code}/",
+            {
+                "action": "update",
+                "subject_name": "Updated Proposal Name",
+                "category": "Mathematics & Data Sciences",
+                "keywords": "algebra, math",
+                "description": "Refined by admin.",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        proposal.refresh_from_db()
+        self.assertEqual(proposal.subject_name, "Updated Proposal Name")
+        self.assertEqual(proposal.category, "Mathematics & Data Sciences")
+        self.assertEqual(proposal.keywords, "algebra, math")
+        self.assertEqual(proposal.status, "pending")
+        link = TutorSubjects.objects.get(tutor=self.tutor, subject=proposal)
+        self.assertEqual(link.description, "Refined by admin.")
+
+    def test_update_action_rejects_unknown_category(self):
+        proposal = self.make_proposal("UPDATE-BAD-CAT")
+
+        response = self.client.patch(
+            f"/api/admin/tutor-applications/{self.application.id}/subjects/"
+            f"{proposal.subject_code}/",
+            {
+                "action": "update",
+                "subject_name": "Still Fine",
+                "category": "Invented Category",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
 
     def test_reject_subject_deletes_subject_and_tutor_link(self):
         proposal = self.make_proposal("REJECT-PROP")
@@ -7789,3 +8274,209 @@ class AdminToSuperAdminMigrationTests(APITestCase):
         self.assertEqual(admin_profile.role, "SuperAdmin")
         self.assertEqual(tutee_profile.role, "Tutee")
         self.assertFalse(UserProfile.objects.filter(role="Admin").exists())
+
+
+class SubjectTaxonomyModuleTests(APITestCase):
+    """subject_taxonomy.py is the single source of truth for the Preply-style catalog
+    (see docs/plans/2026-07-16-subjects-taxonomy-reseed.md). Its slugs must fit the
+    Subjects.subject_code column and stay unique; every subject must carry a real
+    taxonomy category."""
+
+    def test_slugs_are_unique_and_fit_the_subject_code_column(self):
+        from .models import Subjects
+        from .subject_taxonomy import SUBJECTS, slugify_subject_code
+
+        max_length = Subjects._meta.get_field('subject_code').max_length
+        slugs = [slugify_subject_code(name) for name, _category, _subgroup in SUBJECTS]
+
+        self.assertEqual(len(slugs), len(set(slugs)), "subject slugs must be unique")
+        for slug in slugs:
+            self.assertLessEqual(len(slug), max_length)
+            self.assertTrue(slug, "slug must not be empty")
+
+    def test_every_subject_has_a_valid_category(self):
+        from .subject_taxonomy import CATEGORIES, SUBJECTS
+
+        for name, category, _subgroup in SUBJECTS:
+            self.assertIn(category, CATEGORIES, f"{name} has an unrecognized category")
+
+
+class AdminCourseCatalogTaxonomyTests(APITestCase):
+    """Admin subject-catalog CRUD on the taxonomy shape: auto-generated slugs, category
+    validation, and category-based filtering (replacing the retired course filter)."""
+
+    def setUp(self):
+        self.institution = PartnerInstitution.objects.create(
+            institution_name="CPU", school_email_domain="cpu.edu.ph", is_active=True,
+        )
+        self.admin_user = User.objects.create_user(
+            username="catalog-admin@cpu.edu.ph", email="catalog-admin@cpu.edu.ph",
+            password="password",
+        )
+        UserProfile.objects.create(
+            user=self.admin_user, fname="Catalog", mname="", lname="Admin", role="SuperAdmin",
+            institution=self.institution,
+        )
+        self.client.force_authenticate(user=self.admin_user)
+
+    def test_create_without_code_generates_a_slug(self):
+        response = self.client.post(
+            "/api/admin/course-catalog/",
+            {
+                "subject_name": "Organic Chemistry",
+                "category": "Natural Sciences",
+                "department": "Chemistry",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["subject_code"], "organic-chemistry")
+        self.assertTrue(Subjects.objects.filter(subject_code="organic-chemistry").exists())
+
+    def test_create_rejects_a_category_outside_the_taxonomy(self):
+        response = self.client.post(
+            "/api/admin/course-catalog/",
+            {"subject_name": "Mystery Subject", "category": "Not A Real Category"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(Subjects.objects.filter(subject_name="Mystery Subject").exists())
+
+    def test_list_filters_by_category(self):
+        Subjects.objects.create(
+            subject_code="calculus", subject_name="Calculus", category="Mathematics & Data Sciences",
+        )
+        Subjects.objects.create(
+            subject_code="guitar", subject_name="Guitar", category="Hobbies & Arts",
+        )
+
+        response = self.client.get(
+            "/api/admin/course-catalog/", {"category": "Hobbies & Arts"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        codes = [row["subject_code"] for row in response.data]
+        self.assertEqual(codes, ["guitar"])
+
+
+class CuratedPersonaCbfOrderingTests(APITestCase):
+    """Locks in the seeded demo's headline claim (docs/plans/2026-07-16-subjects-taxonomy-
+    reseed.md, curated persona S1/T1-T4): a Python-seeking BSCS tutee ranks an exact-match,
+    high-expertise, same-course tutor first, then the weaker exact match, then the
+    same-category-only match, then the unrelated tutor — independent of the full seed
+    command, by constructing the same shape directly."""
+
+    def setUp(self):
+        from .recommender.cbf import compute_cbf_score
+
+        self.compute_cbf_score = compute_cbf_score
+
+        self.bscs = Course.objects.create(course_code="BSCS", course_name="Computer Science")
+        self.bsba = Course.objects.create(course_code="BSBA", course_name="Business Administration")
+
+        self.python = Subjects.objects.create(
+            subject_code="python", subject_name="Python", category="Technology & Computer Science",
+        )
+        self.data_structures = Subjects.objects.create(
+            subject_code="data-structures", subject_name="Data Structures",
+            category="Technology & Computer Science",
+        )
+        self.cpp = Subjects.objects.create(
+            subject_code="cpp", subject_name="C++", category="Technology & Computer Science",
+        )
+        self.financial_accounting = Subjects.objects.create(
+            subject_code="financial-accounting", subject_name="Financial Accounting",
+            category="Business, Finance & Economics",
+        )
+
+        s1_user = User.objects.create_user(
+            username="s1.felipe@cpu.edu.ph", email="s1.felipe@cpu.edu.ph", password="password",
+        )
+        self.s1 = UserProfile.objects.create(
+            user=s1_user, fname="Felipe", lname="Fernandez", role="Tutee",
+            year_level=14, course=self.bscs,
+        )
+
+        self.t1 = self._make_tutor(
+            "t1.marisol", self.bscs, 16, [(self.python, 5), (self.data_structures, 4)],
+        )
+        self.t4 = self._make_tutor("t4.domingo", self.bscs, 16, [(self.python, 3)])
+        self.t2 = self._make_tutor("t2.benigno", self.bscs, 15, [(self.cpp, 3)])
+        self.t3 = self._make_tutor(
+            "t3.corazon", self.bsba, 15, [(self.financial_accounting, 5)],
+        )
+
+    def _make_tutor(self, username, course, year_level, subjects_with_levels):
+        user = User.objects.create_user(
+            username=f"{username}@cpu.edu.ph", email=f"{username}@cpu.edu.ph", password="password",
+        )
+        profile = UserProfile.objects.create(
+            user=user, fname=username, lname="Tutor", role="Tutor",
+            year_level=year_level, course=course,
+        )
+        tutor = Tutor.objects.create(
+            profile=profile, hourly_rate=200, can_online=True, can_f2f=False,
+            teaching_level="College",
+        )
+        for subject, level in subjects_with_levels:
+            TutorSubjects.objects.create(tutor=tutor, subject=subject, expertise_level=level)
+        return tutor
+
+    def test_s1_ranking_is_t1_then_t4_then_t2_then_t3(self):
+        scores = {
+            key: self.compute_cbf_score(self.s1, tutor, self.python.subject_code)
+            for key, tutor in [("T1", self.t1), ("T4", self.t4), ("T2", self.t2), ("T3", self.t3)]
+        }
+
+        self.assertGreater(scores["T1"], scores["T4"])
+        self.assertGreater(scores["T4"], scores["T2"])
+        self.assertGreater(scores["T2"], scores["T3"])
+
+
+class PendingProposedSubjectRemainsSelectableTests(APITestCase):
+    """Regression test for a bug found while retiring course-based subject gating: a tutor's
+    own pending proposed subject must stay visible in their subject-selection queryset, even
+    though visible_subject_queryset_for_profile is approved-only (see
+    subject_recognition.subject_selection_queryset_for_profile and its include_current
+    handling in SubjectListView.get_queryset)."""
+
+    def setUp(self):
+        self.institution = PartnerInstitution.objects.create(
+            institution_name="CPU", school_email_domain="cpu.edu.ph", is_active=True,
+        )
+        self.tutor_user = User.objects.create_user(
+            username="pending-subj-tutor@cpu.edu.ph", email="pending-subj-tutor@cpu.edu.ph",
+            password="password",
+        )
+        self.tutor_profile = UserProfile.objects.create(
+            user=self.tutor_user, fname="Pending", mname="", lname="Tutor", role="Tutor",
+            institution=self.institution,
+        )
+        self.tutor = Tutor.objects.create(profile=self.tutor_profile)
+        self.pending_subject = Subjects.objects.create(
+            subject_code="pending-subj", subject_name="Pending Subject",
+            category="Hobbies & Arts", status="pending",
+        )
+        TutorSubjects.objects.create(
+            tutor=self.tutor, subject=self.pending_subject, expertise_level=3,
+        )
+
+    def test_selection_queryset_includes_own_pending_subject(self):
+        from .subject_recognition import subject_selection_queryset_for_profile
+
+        queryset, _recognized = subject_selection_queryset_for_profile(
+            self.tutor_profile, include_current=True,
+        )
+
+        self.assertIn(self.pending_subject, queryset)
+
+    def test_subjects_endpoint_includes_own_pending_subject_when_include_current(self):
+        self.client.force_authenticate(user=self.tutor_user)
+
+        response = self.client.get("/api/subjects/", {"include_current": "1"})
+
+        self.assertEqual(response.status_code, 200)
+        codes = [row["subject_code"] for row in response.data]
+        self.assertIn(self.pending_subject.subject_code, codes)

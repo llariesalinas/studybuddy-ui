@@ -18,8 +18,6 @@ from .views import(
                    tutor_dashboard,
                     tutor_detail,
                     list_bookings,
-                    approve_booking,
-                    reject_booking,
                     booking_detail,
                     setup_profile,
                     profile_status,
@@ -144,8 +142,6 @@ urlpatterns = [
     path('availability-overrides/<int:override_id>/', views.delete_availability_override),
     path('bookings/<int:booking_id>/complete/', complete_booking),
     path('bookings/<uuid:booking_request_id>/location/', views.update_booking_location),
-    path('bookings/<int:booking_id>/approve/', views.approve_booking),
-    path('bookings/<int:booking_id>/reject/', views.reject_booking),
     path('notifications/', list_notifications),
     path('notifications/<int:notification_id>/read/', mark_notification_read),
     path('wallet/', views.wallet_status),
@@ -176,6 +172,7 @@ urlpatterns = [
     # Recommendation algorithm demo tool (gated in-view by ALGORITHM_DEMO_TOOLS_ENABLED + IsSuperAdminUser)
     path('dev/algorithm-demo/tutees/', views.algorithm_demo_search_tutees),
     path('dev/algorithm-demo/recommend/', views.algorithm_demo_recommend),
+    path('dev/algorithm-demo/recommend-whatif/', views.algorithm_demo_recommend_whatif),
     path('dev/algorithm-demo/rating/', views.algorithm_demo_update_rating),
     path('tutor/setup/', views.tutor_setup),
     path(

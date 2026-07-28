@@ -177,11 +177,13 @@ class EmailSendLog(models.Model):
     PURPOSE_PASSWORD_RESET = 'password_reset'
     PURPOSE_PASSWORD_CHANGED = 'password_changed'
     PURPOSE_DOCUMENT_RENEWAL_REMINDER = 'document_renewal_reminder'
+    PURPOSE_BOOKING_CONFIRMED = 'booking_confirmed'
     PURPOSE_CHOICES = [
         (PURPOSE_LOGIN_OTP, 'Login OTP'),
         (PURPOSE_PASSWORD_RESET, 'Password reset'),
         (PURPOSE_PASSWORD_CHANGED, 'Password changed'),
         (PURPOSE_DOCUMENT_RENEWAL_REMINDER, 'Document renewal reminder'),
+        (PURPOSE_BOOKING_CONFIRMED, 'Booking confirmed'),
     ]
 
     STATUS_SENT = 'sent'
@@ -548,6 +550,7 @@ class Transaction(models.Model):
         ('cashout_fee_reversal', 'Cash-Out Provider Fee Reversal'),
         ('commission_deduction', 'Commission Deduction'),
         ('cash_in', 'Wallet Top-Up'),
+        ('counted_strike', 'Counted Strike Penalty'),
     ]
 
     wallet = models.ForeignKey(Wallet, on_delete=models.CASCADE, related_name='transactions')
@@ -664,6 +667,7 @@ class Subjects(models.Model):
     subject_name = models.CharField(max_length=100)
     department = models.CharField(max_length=100)
     category = models.CharField(max_length=100, null=True, blank=True)
+    keywords = models.TextField(blank=True, default='')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='approved')
     proposed_by_tutor = models.ForeignKey(
         'Tutor', on_delete=models.SET_NULL, null=True, blank=True,
@@ -831,6 +835,8 @@ class Booking(models.Model):
         default='',
         choices=[('tutee', 'Tutee'), ('tutor', 'Tutor')],
     )
+    meeting_link = models.URLField(blank=True, default='')
+    is_born_late = models.BooleanField(default=False)
     tutee_confirmed = models.BooleanField(default=False)
     tutor_confirmed = models.BooleanField(default=False)
     dashboard_hidden_by_student_at = models.DateTimeField(null=True, blank=True)
@@ -1058,6 +1064,7 @@ class SupportTicket(models.Model):
         ('Technical', 'Technical Problem'),
         ('Dispute', 'Tutee/Tutor Dispute'),
         ('Other', 'Other'),
+        ('Late_Cancellation', 'Late Cancellation'),
     ]
     STATUS_CHOICES = [
         ('Open', 'Open'),
@@ -1071,9 +1078,23 @@ class SupportTicket(models.Model):
     subject = models.CharField(max_length=150)
     description = models.TextField()
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="Open")
+    reported_by_system = models.BooleanField(default=False)
+    resolution_verdict = models.CharField(
+        max_length=10,
+        choices=[('excused', 'Excused'), ('counted', 'Counted')],
+        null=True,
+        blank=True,
+    )
 
     booking = models.ForeignKey('Booking', on_delete=models.SET_NULL, null=True, blank=True)
     transaction = models.ForeignKey('Transaction', on_delete=models.SET_NULL, null=True, blank=True)
+    penalized_user = models.ForeignKey(
+        UserProfile,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='late_cancellation_tickets',
+    )
 
     chatroom = models.OneToOneField('ChatRoom', on_delete=models.SET_NULL, null=True, related_name='ticket')
 

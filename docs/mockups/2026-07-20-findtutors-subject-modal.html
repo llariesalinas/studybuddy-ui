@@ -1,0 +1,120 @@
+<style>
+  .ftr {
+    --sb-primary: #00895A; --sb-primary-light: #edf6f1; --sb-card-bg: #fff;
+    --sb-card-border: #EAEAEA; --sb-text-main: #163127; --sb-text-muted: #6B7280;
+    --sb-bg: #F8F9FA; --sb-secondary-blue: #006591; --sb-aurora-violet: #8E7CF4;
+    --sb-pop-yellow-deep: #DCA21B; --sb-pop-orange-deep: #E0683A; --sb-pop-pink-deep: #E26D86;
+    font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; color: var(--sb-text-main);
+  }
+  .ftr .bar { background:var(--sb-card-bg); border:1px solid var(--sb-card-border);
+              border-radius:14px; padding:16px; display:grid;
+              grid-template-columns:4fr 2fr 3fr 3fr; gap:12px; align-items:end; }
+  .ftr .lbl { font-size:.66rem; font-weight:700; color:var(--sb-text-muted); margin:0 0 5px; }
+  .ftr .trig { border:1px solid var(--sb-card-border); border-radius:9px; padding:9px 11px;
+               font-size:.75rem; color:var(--sb-text-muted); display:flex;
+               justify-content:space-between; align-items:center; background:#fff;
+               min-height:40px; box-sizing:border-box; }
+  .ftr .trig.sel { color:var(--sb-text-main); font-weight:600; }
+  .ftr .trig.focus { border-color:var(--sb-primary);
+                     box-shadow:0 0 0 4px rgba(0,137,90,.12); }
+  .ftr .tag { font-size:.58rem; color:var(--sb-primary); background:var(--sb-primary-light);
+              border-radius:999px; padding:2px 8px; font-weight:700; white-space:nowrap; }
+  .ftr .row2 { display:grid; grid-template-columns:3fr 3fr 3fr; gap:12px; margin-top:12px; }
+  .ftr .searchbtn { background:var(--sb-primary); color:#fff; border-radius:9px; min-height:40px;
+                    display:flex; align-items:center; justify-content:center; font-size:.75rem;
+                    font-weight:700; }
+  .ftr .results { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:14px; }
+  .ftr .rescard { border:1px solid var(--sb-card-border); border-radius:12px; padding:12px;
+                  background:var(--sb-card-bg); font-size:.68rem; color:var(--sb-text-muted); }
+  .ftr .rescard b { color:var(--sb-text-main); font-size:.74rem; display:block; margin-bottom:3px; }
+
+  .ftr .overlaywrap { margin-top:26px; background:rgba(22,49,39,.35); border-radius:14px;
+                      padding:24px 16px; }
+  .ftr .modal { background:#fff; border-radius:16px; max-width:430px; margin:0 auto;
+                box-shadow:0 16px 36px rgba(15,23,42,.22); overflow:hidden; }
+  .ftr .mh { display:flex; justify-content:space-between; align-items:center; padding:14px 18px;
+             border-bottom:1px solid var(--sb-card-border); font-weight:800; font-size:.88rem; }
+  .ftr .x { color:var(--sb-text-muted); font-weight:400; }
+  .ftr .srchwrap { padding:12px 16px 0; }
+  .ftr .srch { border:1.5px solid var(--sb-card-border); border-radius:10px; padding:9px 12px;
+               font-size:.76rem; color:var(--sb-text-muted); }
+  .ftr .panes { display:flex; min-height:230px; margin-top:12px;
+                border-top:1px solid var(--sb-card-border); }
+  .ftr .pane-l { width:148px; border-right:1px solid var(--sb-card-border); padding:10px 7px;
+                 background:var(--sb-bg); }
+  .ftr .cat { --cat:var(--sb-primary); font-size:.66rem; font-weight:600; padding:8px 9px;
+              border-radius:9px; color:var(--sb-text-muted); display:flex; align-items:center;
+              gap:7px; margin-bottom:2px; }
+  .ftr .cat .dot { width:8px; height:8px; border-radius:50%; background:var(--cat); flex:0 0 auto; }
+  .ftr .cat small { margin-left:auto; font-size:.58rem; opacity:.7; }
+  .ftr .cat .nm { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ftr .cat.on { background:color-mix(in srgb, var(--cat) 12%, #fff); color:var(--sb-text-main);
+                 font-weight:700; }
+  .ftr .c-sci { --cat:var(--sb-secondary-blue); } .ftr .c-tech { --cat:var(--sb-aurora-violet); }
+  .ftr .c-biz { --cat:var(--sb-pop-yellow-deep); } .ftr .c-hum { --cat:var(--sb-pop-orange-deep); }
+  .ftr .c-art { --cat:var(--sb-pop-pink-deep); }
+  .ftr .pane-r { flex:1; padding:10px; }
+  .ftr .crumb { font-size:.6rem; font-weight:800; letter-spacing:.05em; text-transform:uppercase;
+                color:var(--sb-text-muted); padding:2px 8px 8px; margin:0; }
+  .ftr .li { padding:9px 10px; font-size:.76rem; border-radius:9px; display:flex;
+             justify-content:space-between; align-items:center; }
+  .ftr .li.picked { background:var(--sb-primary-light); font-weight:700; color:var(--sb-primary); }
+  .ftr .li.hov { background:var(--sb-primary-light); }
+  .ftr .note { font-size:.7rem; color:var(--sb-text-muted); margin-top:10px; line-height:1.55; }
+</style>
+
+<div class="ftr">
+  <h2>FindTutors with the same subject modal</h2>
+  <p class="subtitle">Identical component to InitialBooking &mdash; the bar flattens back to one
+  row of 40px controls</p>
+
+  <h3 style="margin:16px 0 10px">Filter bar &mdash; closed</h3>
+  <div class="bar">
+    <div><p class="lbl">SUBJECT</p><div class="trig sel focus">Calculus II <span class="tag">Mathematics</span></div></div>
+    <div><p class="lbl">MODE</p><div class="trig">Any Mode <span>&#9662;</span></div></div>
+    <div><p class="lbl">DATE</p><div class="trig">Select date <span>&#128197;</span></div></div>
+    <div><p class="lbl">BUDGET RANGE</p><div class="trig">&#8369;150&ndash;&#8369;800 <span>&#9662;</span></div></div>
+  </div>
+  <div class="row2">
+    <div><p class="lbl">START TIME</p><div class="trig">Select start time <span>&#128337;</span></div></div>
+    <div><p class="lbl">END TIME</p><div class="trig">Select end time <span>&#128337;</span></div></div>
+    <div><p class="lbl">&nbsp;</p><div class="searchbtn">&#128269;&nbsp; Search Tutors</div></div>
+  </div>
+  <div class="results">
+    <div class="rescard"><b>Maria S.</b>BSCS 3rd Yr &middot; &#9733; 4.8 &middot; &#8369;250/hr &middot; 42 sessions</div>
+    <div class="rescard"><b>Jomar T.</b>BSIT 2nd Yr &middot; &#9733; 4.6 &middot; &#8369;200/hr &middot; 31 sessions</div>
+    <div class="rescard"><b>Ana R.</b>BSCS 4th Yr &middot; &#9733; 4.9 &middot; &#8369;300/hr &middot; 57 sessions</div>
+    <div class="rescard"><b>Paolo D.</b>BSMath 3rd Yr &middot; &#9733; 4.5 &middot; &#8369;180/hr &middot; 19 sessions</div>
+  </div>
+  <p class="note">Results stay above the fold; the trigger shows the picked subject + category tag
+  exactly like the booking page.</p>
+
+  <h3 style="margin:24px 0 0">Clicking the Subject field</h3>
+  <div class="overlaywrap">
+    <div class="modal">
+      <div class="mh">Choose Subject <span class="x">&#10005;</span></div>
+      <div class="srchwrap"><div class="srch">&#128269; Search subjects</div></div>
+      <div class="panes">
+        <div class="pane-l">
+          <div class="cat on"><span class="dot"></span><span class="nm">Math &amp; Data</span> <small>14</small></div>
+          <div class="cat c-sci"><span class="dot"></span><span class="nm">Sciences</span> <small>11</small></div>
+          <div class="cat c-tech"><span class="dot"></span><span class="nm">Technology</span> <small>16</small></div>
+          <div class="cat c-biz"><span class="dot"></span><span class="nm">Business, Finance&hellip;</span> <small>12</small></div>
+          <div class="cat c-hum"><span class="dot"></span><span class="nm">Humanities</span> <small>13</small></div>
+          <div class="cat c-art"><span class="dot"></span><span class="nm">Hobbies &amp; Arts</span> <small>9</small></div>
+        </div>
+        <div class="pane-r">
+          <p class="crumb">Mathematics &amp; Data Sciences</p>
+          <div class="li picked">Calculus II <span>&#10003;</span></div>
+          <div class="li">Calculus I</div>
+          <div class="li hov">Statistics</div>
+          <div class="li">Linear Algebra</div>
+          <div class="li">Discrete Mathematics</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="note">Same component, same behavior: search overrides browsing with keyword badges,
+  Esc/arrow keys work, sidebar collapses to pills on mobile. Choosing closes the modal and
+  refreshes the trigger.</p>
+</div>

@@ -23,7 +23,7 @@ def noop(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('studybuddy', '0076_subjects_proposed_application_and_more'),
+        ('studybuddy', '0078_subjects_keywords'),
     ]
 
     operations = [

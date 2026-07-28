@@ -1,8 +1,16 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import SbSelectModal from '@/components/SbSelectModal.vue'
 import AlgorithmDemoBreakdown from './AlgorithmDemoBreakdown.vue'
-import { getAlgorithmDemoRecommendation } from '@/services/api/algorithmDemo'
+import AlgorithmDemoWeightTable from './AlgorithmDemoWeightTable.vue'
+import {
+  getAlgorithmDemoRecommendation,
+  getAlgorithmDemoWhatIf
+} from '@/services/api/algorithmDemo'
+
+// Rating edits are re-scored server-side so the numbers keep coming from the real
+// recommender, which costs a round trip — this paces them without feeling laggy.
+const WHATIF_DEBOUNCE_MS = 250
 
 const props = defineProps({
   tutees: {
@@ -26,9 +34,18 @@ const selectedTutorId = ref(null)
 const loading = ref(false)
 const errorMessage = ref('')
 
+const overrides = ref([])
+let whatIfTimer = null
+
 const selectedRow = computed(
   () => rows.value.find((row) => row.tutor_id === selectedTutorId.value) || null
 )
+
+function clearWhatIf() {
+  clearTimeout(whatIfTimer)
+  whatIfTimer = null
+  overrides.value = []
+}
 
 async function onTuteeChange(tuteeId) {
   selectedTuteeId.value = tuteeId
@@ -36,6 +53,7 @@ async function onTuteeChange(tuteeId) {
   reason.value = null
   selectedTutorId.value = null
   errorMessage.value = ''
+  clearWhatIf()
 
   if (!tuteeId) return
 
@@ -51,6 +69,52 @@ async function onTuteeChange(tuteeId) {
     loading.value = false
   }
 }
+
+// Overrides are applied to the rating matrix in memory by the backend and never
+// written, so every edit is reversible and the demo database stays intact.
+function onOverride({ studentId, tutorId, ratingScore }) {
+  const existing = overrides.value.find(
+    (item) => item.student_id === studentId && item.tutor_id === tutorId
+  )
+
+  if (existing) {
+    existing.rating_score = ratingScore
+  } else {
+    overrides.value.push({
+      student_id: studentId,
+      tutor_id: tutorId,
+      rating_score: ratingScore
+    })
+  }
+
+  clearTimeout(whatIfTimer)
+  whatIfTimer = setTimeout(refreshWhatIf, WHATIF_DEBOUNCE_MS)
+}
+
+async function refreshWhatIf() {
+  if (!selectedTuteeId.value) return
+
+  try {
+    const { data } = await getAlgorithmDemoWhatIf(
+      selectedTuteeId.value,
+      props.institutionId,
+      overrides.value
+    )
+    // The selection is held by tutor_id, so a tutor that moves rank stays selected.
+    rows.value = data.rows
+    reason.value = data.reason
+    errorMessage.value = ''
+  } catch (err) {
+    errorMessage.value = err.response?.data?.error || 'Could not re-score with these ratings.'
+  }
+}
+
+async function resetWhatIf() {
+  clearWhatIf()
+  await onTuteeChange(selectedTuteeId.value)
+}
+
+onBeforeUnmount(() => clearTimeout(whatIfTimer))
 
 watch(
   () => props.institutionId,
@@ -81,6 +145,19 @@ watch(
 
     <p v-if="errorMessage" class="error-text">{{ errorMessage }}</p>
 
+    <div v-if="overrides.length" class="whatif-bar">
+      <span class="whatif-chip">What-if — {{ overrides.length }} rating
+        {{ overrides.length === 1 ? 'change' : 'changes' }}, nothing saved</span>
+      <button type="button" class="whatif-reset" @click="resetWhatIf">Reset</button>
+    </div>
+
+    <AlgorithmDemoWeightTable
+      v-if="rows.length"
+      :rows="rows"
+      :selected-tutor-id="selectedTutorId"
+      @select="selectedTutorId = $event"
+    />
+
     <div class="split">
       <div class="list-pane">
         <p v-if="loading" class="empty-state">Loading…</p>
@@ -110,7 +187,7 @@ watch(
         </div>
       </div>
 
-      <AlgorithmDemoBreakdown :row="selectedRow" />
+      <AlgorithmDemoBreakdown :row="selectedRow" @override="onOverride" />
     </div>
   </div>
 </template>
@@ -132,6 +209,38 @@ watch(
 .error-text {
   color: var(--sb-danger);
   font-size: 13px;
+}
+
+.whatif-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.whatif-chip {
+  background: color-mix(in srgb, var(--sb-warning, #d29922) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sb-warning, #d29922) 35%, transparent);
+  border-radius: 9999px;
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.whatif-reset {
+  background: none;
+  border: 1px solid var(--sb-card-border);
+  border-radius: 9999px;
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--sb-text-muted);
+  cursor: pointer;
+}
+
+.whatif-reset:hover {
+  border-color: var(--sb-primary);
+  color: var(--sb-primary);
 }
 
 .split {

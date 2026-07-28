@@ -1,11 +1,20 @@
 ---
 title: SuperAdmin role + per-institution admin scoping
 date: 2026-06-08
-status: Approved
+status: Done
 spec:
 ---
 
 # SuperAdmin role + per-institution admin scoping
+
+## Status & Progress Summary
+
+**Status (2026-07-17): Done.** This plan predates the living-plan convention and never had a
+tracked summary. Verified against the codebase during a plan-vs-code implementation audit:
+`SuperAdmin` is a live role in `ROLE_CHOICES` (`models.py`), `IsSuperAdminUser` permission class
+and `SuperAdminInstitutionPerformanceView` endpoint both exist, `login_view()` has the
+domain-exemption check for `SuperAdmin`, and `src/router/index.js` guards SuperAdmin routes with
+`role: ['Admin', 'SuperAdmin']`. Frontmatter status was never flipped from Approved.
 
 ## Goal
 
@@ -68,3 +77,10 @@ axis (`role ==`) instead of adding a second one to get wrong.
   authenticate as a member of institution B.
 - `npm run lint` and `npm run build` pass; backend test run
   (`backend/studybuddy/tests.py`) passes.
+
+## Changelog
+
+- 2026-06-08: Plan written and approved.
+- 2026-07-17: Verified implemented during a plan-vs-code implementation audit; frontmatter
+  status corrected from Approved to Done. Added this Status & Progress Summary/Changelog
+  retroactively per the living-plan convention.

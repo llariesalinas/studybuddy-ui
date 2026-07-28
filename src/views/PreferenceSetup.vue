@@ -175,28 +175,12 @@
                 Showing subjects for <strong class="onboarding-accent">{{ card3Label }}</strong>.
               </p>
 
-              <div v-if="filteredSubjects.length === 0" class="empty-state">
+              <div v-if="subjects.length === 0" class="empty-state">
                 <p class="fw-semibold mb-1">No subjects found for this selection.</p>
                 <p class="small mb-0 sb-muted">Contact your administrator to seed subjects for this level.</p>
               </div>
 
-              <div v-else class="subject-list">
-                <label
-                  v-for="subject in filteredSubjects"
-                  :key="subject.subject_code"
-                  class="subject-row"
-                  :class="{ 'subject-row-selected': store.selectedSubjects.includes(subject.subject_code) }"
-                >
-                  <input
-                    class="subject-checkbox"
-                    type="checkbox"
-                    :checked="store.selectedSubjects.includes(subject.subject_code)"
-                    @change="toggleSubject(subject.subject_code)"
-                  >
-                  <span class="subject-code">{{ subject.subject_code }}</span>
-                  <span class="subject-name">{{ subject.subject_name }}</span>
-                </label>
-              </div>
+              <SubjectTaxonomyPicker v-else v-model="store.selectedSubjects" :subjects="subjects" />
 
               <div class="d-flex justify-content-between mt-4">
                 <button class="btn onboarding-btn-outline" @click="prevCard">Back</button>
@@ -229,6 +213,7 @@ import { usePreferenceStore } from '@/stores/preferences'
 import { useProfileStore } from '@/stores/profile'
 import SbThemeToggle from '@/components/SbThemeToggle.vue'
 import SbSelectModal from '@/components/SbSelectModal.vue'
+import SubjectTaxonomyPicker from '@/components/SubjectTaxonomyPicker.vue'
 import { useToastStore } from '@/stores/toast'
 
 const router = useRouter()
@@ -298,41 +283,6 @@ const collegeYears = [
   { label: '4th Year', value: 16 },
 ]
 
-// ── Department Filter Map ────────────────────────────────────
-const SUBJECT_FILTER_MAP = {
-  'grade-1':  ['Grade 1'],
-  'grade-2':  ['Grade 2'],
-  'grade-3':  ['Grade 3'],
-  'grade-4':  ['Grade 4'],
-  'grade-5':  ['Grade 5'],
-  'grade-6':  ['Grade 6'],
-  'grade-7':  ['Grade 7'],
-  'grade-8':  ['Grade 8'],
-  'grade-9':  ['Grade 9'],
-  'grade-10': ['Grade 10'],
-  'STEM':     ['STEM'],
-  'ABM':      ['ABM'],
-  'HUMSS':    ['HUMSS'],
-  'GAS':      ['GAS'],
-  'BSCS':     ['Computer Science', 'Mathematics', 'English'],
-  'BSIT':     ['Information Technology', 'Computer Science', 'English'],
-  'BSBA':     ['Business', 'Accountancy', 'English'],
-}
-
-const computedFilterKey = computed(() => {
-  if (educationLevel.value === 'elementary' && selectedGrade.value) return `grade-${selectedGrade.value}`
-  if (educationLevel.value === 'jhs'        && selectedGrade.value) return `grade-${selectedGrade.value}`
-  if (educationLevel.value === 'shs'        && selectedStrand.value) return selectedStrand.value
-  if (educationLevel.value === 'college'    && selectedCourse.value) return selectedCourse.value
-  return null
-})
-
-const filteredSubjects = computed(() => {
-  const key = computedFilterKey.value
-  if (!key) return []
-  const allowedDepts = SUBJECT_FILTER_MAP[key] ?? []
-  return subjects.value.filter(s => allowedDepts.includes(s.department))
-})
 
 // Only show actual college degree programs in the dropdown —
 // excludes virtual containers like ELEMENTARY, JUNIOR_HIGH, SHS-* that
@@ -423,12 +373,6 @@ const nextCard = () => {
 
 const prevCard = () => {
   if (currentCard.value > 0) currentCard.value--
-}
-
-const toggleSubject = (code) => {
-  const index = store.selectedSubjects.indexOf(code)
-  if (index > -1) store.selectedSubjects.splice(index, 1)
-  else store.selectedSubjects.push(code)
 }
 
 const finish = async () => {

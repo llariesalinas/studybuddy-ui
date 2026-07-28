@@ -8,3 +8,11 @@ export const reviewTutorProposedSubject = async (applicationId, subjectCode, sta
   )
   return data
 }
+
+export const updateTutorProposedSubject = async (applicationId, subjectCode, fields) => {
+  const { data } = await api.patch(
+    `/admin/tutor-applications/${applicationId}/subjects/${subjectCode}/`,
+    { action: 'update', ...fields },
+  )
+  return data
+}

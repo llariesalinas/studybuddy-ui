@@ -164,6 +164,7 @@ def serialize_booking_context(booking, grouped_bookings=None):
         'duration_hours': len(bookings) * (SESSION_SLOT_MINUTES / 60),
         'preferred_location': representative.preferred_location,
         'session_mode': representative.session_mode,
+        'meeting_link': representative.meeting_link,
         'student': full_name(representative.student),
         'tuteeName': full_name(representative.student),
         'tutor': full_name(representative.tutor.profile),

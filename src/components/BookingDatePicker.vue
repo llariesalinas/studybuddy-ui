@@ -71,7 +71,7 @@
                 'date-cell-today': day.isToday,
                 'date-cell-selected': day.isSelected,
               }"
-              :disabled="day.isPast || !day.inMonth"
+              :disabled="day.isPast || day.isBeyondBookingHorizon || !day.inMonth"
               @click="selectDate(day)"
             >
               <span>{{ day.dayNumber }}</span>
@@ -106,6 +106,7 @@ const emit = defineEmits(['update:modelValue'])
 const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const isOpen = ref(false)
 const monthOffset = ref(0)
+const BOOKING_HORIZON_DAYS = 14
 
 const padNumber = (value) => String(value).padStart(2, '0')
 
@@ -133,6 +134,7 @@ const getMondayIndex = (date) => {
 }
 
 const todayKey = computed(() => getDateKey(new Date()))
+const bookingHorizonKey = computed(() => getDateKey(addDays(new Date(), BOOKING_HORIZON_DAYS)))
 
 const selectedDateLabel = computed(() => {
   const selectedDate = parseDateKey(props.modelValue)
@@ -171,6 +173,7 @@ const calendar = computed(() => {
       dayNumber: currentDate.getDate(),
       inMonth: currentDate >= monthStart && currentDate <= monthEnd,
       isPast: dateKey < todayKey.value,
+      isBeyondBookingHorizon: dateKey > bookingHorizonKey.value,
       isToday: dateKey === todayKey.value,
       isSelected: dateKey === props.modelValue,
     })
@@ -219,7 +222,7 @@ const changeMonth = (direction) => {
 }
 
 const selectDate = (day) => {
-  if (day.isPast || !day.inMonth) {
+  if (day.isPast || day.isBeyondBookingHorizon || !day.inMonth) {
     return
   }
 

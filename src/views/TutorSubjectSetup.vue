@@ -29,59 +29,21 @@
               </h3>
               <p class="muted">Search the catalog, or propose one that's missing.</p>
 
-              <div v-if="selectedSubjects.length" class="subject-pill-row">
-                <span
-                  v-for="subject in selectedSubjects"
-                  :key="subject.subject_code"
-                  class="subject-pill"
-                  :class="{ pending: subject.status === 'pending' }"
-                >
-                  {{ subject.subject_name }}
-                  <button
-                    type="button"
-                    class="pill-remove sb-btn"
-                    :aria-label="`Remove ${subject.subject_name}`"
-                    @click="handleRemove(subject)"
-                  >
-                    <i class="bi bi-x"></i>
-                  </button>
-                </span>
-              </div>
-
-              <div class="field-label">Search subjects</div>
-              <div class="search-wrap">
-                <input
-                  v-model.trim="searchText"
-                  class="mini-input sb-field"
-                  type="search"
-                  placeholder="Search by subject name or code"
-                  autocomplete="off"
-                />
-                <div v-if="searchText" class="dropdown-preview">
-                  <button
-                    v-for="subject in matchingSubjects"
-                    :key="subject.subject_code"
-                    type="button"
-                    class="dropdown-row sb-btn"
-                    @click="handleCatalogPick(subject)"
-                  >
-                    <span>{{ subject.subject_name }}</span>
-                    <span class="meta">{{ subject.department }}</span>
-                  </button>
-                  <div v-if="isSearching" class="dropdown-empty">Searching...</div>
-                  <div v-else-if="!matchingSubjects.length" class="dropdown-empty">
-                    No catalog subjects match “{{ searchText }}”.
-                  </div>
-                </div>
-              </div>
+              <SubjectTaxonomyPicker
+                v-model="selectedCodes"
+                :subjects="allSubjects"
+                :max-selection="SUBJECT_LIMIT"
+                allow-propose
+                @propose="openProposalForm"
+              />
 
               <button
-                v-if="searchText && !isSearching && !matchingSubjects.length && !showProposalForm"
+                v-if="!showProposalForm"
                 type="button"
                 class="btn-outline-pill sb-btn propose-trigger"
                 @click="openProposalForm"
               >
-                + Propose new subject
+                + Propose a subject not in the catalog
               </button>
 
               <form v-if="showProposalForm" class="proposal-form" @submit.prevent="handleProposal">
@@ -95,16 +57,16 @@
                   />
                 </div>
                 <div>
-                  <label class="field-label" for="proposal-department">Department</label>
+                  <label class="field-label" for="proposal-category">Category</label>
                   <select
-                    id="proposal-department"
-                    v-model="proposal.department"
+                    id="proposal-category"
+                    v-model="proposal.category"
                     class="mini-input sb-field"
                     required
                   >
-                    <option value="" disabled>Select a department</option>
-                    <option v-for="department in departments" :key="department" :value="department">
-                      {{ department }}
+                    <option value="" disabled>Select a category</option>
+                    <option v-for="category in categories" :key="category" :value="category">
+                      {{ category }}
                     </option>
                   </select>
                 </div>
@@ -133,14 +95,24 @@
                 </div>
               </form>
 
-              <button
-                type="button"
-                class="btn-primary-pill continue-button sb-btn"
-                :disabled="!selectedSubjects.length || isSubmitting"
-                @click="continueToVerification"
-              >
-                Continue to Verification
-              </button>
+              <div class="step-nav-row">
+                <button
+                  type="button"
+                  class="btn-outline-pill sb-btn"
+                  :disabled="isSubmitting"
+                  @click="goBackToPreferences"
+                >
+                  &larr; Back
+                </button>
+                <button
+                  type="button"
+                  class="btn-primary-pill continue-button sb-btn"
+                  :disabled="!selectedSubjects.length || isSubmitting"
+                  @click="continueToVerification"
+                >
+                  Continue to Verification
+                </button>
+              </div>
             </section>
           </div>
         </div>
@@ -150,15 +122,15 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import SbThemeToggle from '@/components/SbThemeToggle.vue'
+import SubjectTaxonomyPicker from '@/components/SubjectTaxonomyPicker.vue'
 import { useProfileStore } from '@/stores/profile'
 import { useToastStore } from '@/stores/toast'
 import {
   addTutorSubject,
-  fetchApprovedSubjects,
-  fetchSubjectDepartments,
+  fetchSubjectCatalog,
   fetchTutorSubjects,
   proposeTutorSubject,
   removeTutorSubject,
@@ -170,78 +142,45 @@ const SUBJECT_LIMIT_MESSAGE = `You can add up to ${SUBJECT_LIMIT} subjects only.
 const router = useRouter()
 const profileStore = useProfileStore()
 const toastStore = useToastStore()
-const matchingSubjects = ref([])
-const departmentSubjects = ref([])
+const allSubjects = ref([])
 const selectedSubjects = ref([])
-const searchText = ref('')
 const showProposalForm = ref(false)
 const isSubmitting = ref(false)
-const isSearching = ref(false)
-const proposal = reactive({ subject_name: '', department: '', description: '' })
+const proposal = reactive({ subject_name: '', category: '', description: '', keywords: '' })
 
-const selectedCodes = computed(
-  () => new Set(selectedSubjects.value.map((subject) => subject.subject_code)),
-)
-const departments = computed(() => {
-  const values = departmentSubjects.value.map((subject) => subject.department).filter(Boolean)
-  return [...new Set(values)].sort()
+const categories = computed(() => [...new Set(allSubjects.value.map((s) => s.category))].sort())
+
+const selectedCodes = computed({
+  get: () => selectedSubjects.value.map((subject) => subject.subject_code),
+  set: (codes) => {
+    const previousCodes = selectedSubjects.value.map((subject) => subject.subject_code)
+    const addedCode = codes.find((code) => !previousCodes.includes(code))
+    const removedCode = previousCodes.find((code) => !codes.includes(code))
+    if (addedCode) handleAdd(addedCode)
+    if (removedCode) handleRemove(removedCode)
+  },
 })
-
-const atSubjectLimit = () => {
-  if (selectedSubjects.value.length < SUBJECT_LIMIT) return false
-  toastStore.push(SUBJECT_LIMIT_MESSAGE, 'warning')
-  return true
-}
 
 const loadSubjects = async () => {
   try {
-    const [catalog, selected] = await Promise.all([
-      fetchSubjectDepartments(),
-      fetchTutorSubjects(),
-    ])
-    departmentSubjects.value = catalog
+    const [catalog, selected] = await Promise.all([fetchSubjectCatalog(), fetchTutorSubjects()])
+    allSubjects.value = catalog
     selectedSubjects.value = selected
   } catch (error) {
     toastStore.push(error.response?.data?.error || 'Could not load subjects.', 'error')
   }
 }
 
-let searchTimer = null
-let searchSequence = 0
-watch(searchText, (query) => {
-  clearTimeout(searchTimer)
-  const sequence = ++searchSequence
-  if (!query) {
-    matchingSubjects.value = []
-    isSearching.value = false
+const handleAdd = async (subjectCode) => {
+  if (selectedSubjects.value.length >= SUBJECT_LIMIT) {
+    toastStore.push(SUBJECT_LIMIT_MESSAGE, 'warning')
     return
   }
-
-  isSearching.value = true
-  searchTimer = setTimeout(async () => {
-    try {
-      const results = await fetchApprovedSubjects(query)
-      if (sequence !== searchSequence) return
-      matchingSubjects.value = results.filter(
-        (subject) => !selectedCodes.value.has(subject.subject_code),
-      )
-    } catch (error) {
-      if (sequence !== searchSequence) return
-      matchingSubjects.value = []
-      toastStore.push(error.response?.data?.error || 'Could not search subjects.', 'error')
-    } finally {
-      if (sequence === searchSequence) isSearching.value = false
-    }
-  }, 250)
-})
-
-const handleCatalogPick = async (subject) => {
-  if (atSubjectLimit()) return
+  const subject = allSubjects.value.find((s) => s.subject_code === subjectCode)
   isSubmitting.value = true
   try {
-    await addTutorSubject(subject.subject_code)
+    await addTutorSubject(subjectCode)
     selectedSubjects.value.push({ ...subject, status: 'approved' })
-    searchText.value = ''
   } catch (error) {
     toastStore.push(error.response?.data?.error || 'Could not add that subject.', 'error')
   } finally {
@@ -249,21 +188,25 @@ const handleCatalogPick = async (subject) => {
   }
 }
 
-const openProposalForm = () => {
-  if (atSubjectLimit()) return
-  proposal.subject_name = searchText.value
-  proposal.department = ''
+const openProposalForm = (searchText) => {
+  if (selectedSubjects.value.length >= SUBJECT_LIMIT) {
+    toastStore.push(SUBJECT_LIMIT_MESSAGE, 'warning')
+    return
+  }
+  const prefill = typeof searchText === 'string' ? searchText : ''
+  proposal.subject_name = prefill
+  proposal.category = ''
   proposal.description = ''
+  proposal.keywords = prefill
   showProposalForm.value = true
 }
 
 const handleProposal = async () => {
-  if (atSubjectLimit()) return
   isSubmitting.value = true
   try {
     const subject = await proposeTutorSubject({ ...proposal })
     selectedSubjects.value.push(subject)
-    searchText.value = ''
+    allSubjects.value.push(subject)
     showProposalForm.value = false
   } catch (error) {
     toastStore.push(error.response?.data?.error || 'Could not propose that subject.', 'error')
@@ -272,11 +215,11 @@ const handleProposal = async () => {
   }
 }
 
-const handleRemove = async (subject) => {
+const handleRemove = async (subjectCode) => {
   try {
-    await removeTutorSubject(subject.subject_code)
+    await removeTutorSubject(subjectCode)
     selectedSubjects.value = selectedSubjects.value.filter(
-      (selected) => selected.subject_code !== subject.subject_code,
+      (selected) => selected.subject_code !== subjectCode,
     )
   } catch (error) {
     toastStore.push(error.response?.data?.error || 'Could not remove that subject.', 'error')
@@ -287,6 +230,10 @@ const continueToVerification = async () => {
   profileStore.tutorSubjectCount = selectedSubjects.value.length
   profileStore.tutorSubjectsCompleted = selectedSubjects.value.length > 0
   await router.push({ name: 'tutor-verification-setup' })
+}
+
+const goBackToPreferences = () => {
+  router.push({ name: 'tutorpreferencesetup' })
 }
 
 onMounted(loadSubjects)
@@ -407,9 +354,6 @@ onMounted(loadSubjects)
   color: var(--sb-text-muted);
   margin-bottom: 8px;
 }
-.search-wrap {
-  position: relative;
-}
 .mini-input {
   width: 100%;
   padding: 10px 12px;
@@ -422,38 +366,6 @@ onMounted(loadSubjects)
 }
 .mini-input:focus {
   border-color: var(--sb-primary);
-}
-.dropdown-preview {
-  margin-top: 8px;
-  border: 1px solid var(--sb-card-border);
-  border-radius: 10px;
-  overflow: hidden;
-}
-.dropdown-row {
-  width: 100%;
-  display: flex;
-  justify-content: space-between;
-  padding: 9px 12px;
-  border: 0;
-  border-bottom: 1px solid var(--sb-card-border);
-  background: var(--sb-card-bg);
-  color: var(--sb-text-main);
-  font-size: 0.85rem;
-  text-align: left;
-}
-.dropdown-row:last-child {
-  border-bottom: 0;
-}
-.dropdown-row:hover {
-  background: color-mix(in srgb, var(--sb-primary) 6%, var(--sb-card-bg));
-}
-.meta,
-.dropdown-empty {
-  color: var(--sb-text-muted);
-  font-size: 0.76rem;
-}
-.dropdown-empty {
-  padding: 10px 12px;
 }
 .btn-primary-pill,
 .btn-outline-pill {
@@ -496,10 +408,13 @@ onMounted(loadSubjects)
   display: flex;
   gap: 10px;
 }
-.continue-button {
-  display: block;
-  width: 100%;
+.step-nav-row {
+  display: flex;
+  gap: 10px;
   margin-top: 24px;
+}
+.continue-button {
+  flex: 1;
 }
 @media (max-width: 640px) {
   .onboarding-shell {

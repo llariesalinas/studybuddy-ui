@@ -1,20 +1,22 @@
 ---
 title: Recommender weight rebalance (CBF split + CF peer ratings)
 date: 2026-07-15
-status: Approved
+status: Done
 summary: Split CBF subject match into Specific/General with rebalanced weights, and filter CF neighbors to same-course peers with per-tutor global fallback.
 spec: ../mockups/2026-07-15-recommender-weights-handoff.html
 ---
 
 # Recommender weight rebalance (CBF split + CF peer ratings)
 
-**Status & Progress Summary** (2026-07-15): Approved, not yet implemented. All weight and
-mechanism decisions are final (10 decisions grilled 2026-07-14); one loose end remains open —
-empty `requested_subject` fallback — and must be resolved before implementation starts. The
-visual handoff document explaining every decision — now styled with Studybuddy's design tokens
-and including a 13-question Defense Q&A — is saved at
-`docs/mockups/2026-07-15-recommender-weights-handoff.html` (linked as this plan's spec). Next
-step: implement Steps 1-7.
+**Status & Progress Summary** (2026-07-15): **Done.** Implemented on branch
+`feat/recommender-weight-rebalance` across three tickets: CBF graduated subject matching
+(`/orchestrate`, commit `5ef4372`), CF same-course peer neighbors with per-tutor global
+fallback (Codex loop via `docs/briefs/2026-07-15-recommender-cf-peer-neighbors.md`), and the
+CONTEXT.md/docs glossary sync — both independently verified (tests rerun, baseline-compared for
+pre-existing failures, lint/build green) and committed. All weight and mechanism decisions from
+the 2026-07-14 grill shipped as designed, including the empty-`requested_subject` fallback
+resolved 2026-07-15. The visual handoff document is saved at
+`docs/mockups/2026-07-15-recommender-weights-handoff.html` (linked as this plan's spec).
 
 Grilled end-to-end via `/grill-with-docs` on 2026-07-14. The hybrid split (`0.7 * CBF + 0.3 * (CF / 5)`)
 is deliberately untouched. All decisions below are final; a visual handoff document explaining the
@@ -84,11 +86,16 @@ Key CBF decisions and why:
 - Cold-Start behavior unchanged: CF `None` is still coerced to 0 in the hybrid; the CF weight is
   never reallocated to CBF.
 
-### Loose end (decided later, before implementation)
+### Loose end — RESOLVED 2026-07-15
 
 - **Empty `requested_subject`:** under the new rules an empty request would zero the whole 0.60
-  subject block for every tutor. Recommendation on the table (not yet confirmed): fall back to the
-  old preference-list matching when no subject is requested. Resolve before implementing.
+  subject block for every tutor. **Decision: fall back to preference-list matching** — when no
+  subject is requested, the tutee's preference list acts as the requested set: Specific = 1 if
+  the tutor teaches any listed subject; General = `max(Specific, category match against any
+  listed subject's category)`; Expertise cascade runs over the listed subjects (mean expertise
+  on taught listed subjects, else same-field mean, else 0). This degrades gracefully to roughly
+  today's behavior exactly when the new signal is absent, and keeps the algorithm demo tool
+  (which passes `requested_subject=None`) meaningful.
 
 ### Follow-up tickets (explicitly out of scope here)
 
@@ -103,8 +110,9 @@ Key CBF decisions and why:
    (0.40 / 0.20 / 0.15 / 0.10 / 0.10 / 0.05).
 2. `cbf.py`: implement Specific (exact requested-subject match), General
    (`max(Specific, category match)`, null-safe), and the Expertise cascade; drop the
-   preference-list merge (`requested_subject` append) from subject/expertise matching, subject to
-   the empty-request loose end above.
+   preference-list merge (`requested_subject` append) from subject/expertise matching when a
+   subject is requested; when the request is empty, apply the preference-list fallback decided
+   above.
 3. Update `compute_cbf_breakdown` so the demo tool (`recommender/demo.py`) shows the new
    sub-scores.
 4. `CF.py`: filter `top_k` candidates to `similarity > 0`; add a course-filtered peer variant;
@@ -148,3 +156,21 @@ Key CBF decisions and why:
   `docs/mockups/2026-07-15-recommender-weights-handoff.html`; linked as this plan's `spec:`.
 - **2026-07-15** — Handoff restyled to Studybuddy design tokens (from `src/assets/main.css`) and
   extended with a Defense Q&A section (13 anticipated panel questions with answers).
+- **2026-07-15** — Loose end resolved: empty `requested_subject` falls back to preference-list
+  matching (preference list acts as the requested set for Specific/General/Expertise). Status
+  moved to In Progress; work started via `/orchestrate` on branch
+  `feat/recommender-weight-rebalance` with tickets in `docs/tickets.md` (previous admin-
+  consolidation tickets archived to `docs/tickets-2026-07-12-admin-consolidation.md`).
+- **2026-07-15** — Ticket 1 (CBF graduated subject matching) shipped via `/orchestrate`
+  (commit `5ef4372`): dominance property, null-category safety, expertise cascade, and the
+  preference-list fallback all covered by new tests; independently reviewed and verified
+  (baseline-compared full-suite run showed zero new failures).
+- **2026-07-15** — Tickets 2 and 3 (CF same-course peer neighbors + per-tutor global fallback;
+  CONTEXT.md/docs glossary sync) handed off to the Codex loop via
+  `docs/briefs/2026-07-15-recommender-cf-peer-neighbors.md`, executed by Codex, and
+  independently re-verified end to end: `CfPeerNeighborTests` +
+  `RecommenderNeighborReuseTests` + `CbfGraduatedSubjectMatchTests` 14/14 pass; the 11
+  `AlgorithmDemoToolTests`/`DashboardRecommendationServiceTests` failures were confirmed
+  pre-existing by stashing the diff and rerunning against the unmodified baseline (identical
+  names, identical counts); `npm run lint` / `npm run build` clean. Committed as two commits;
+  all three tickets' acceptance boxes ticked in `docs/tickets.md`. Plan status set to Done.

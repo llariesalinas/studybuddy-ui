@@ -5,15 +5,7 @@
         <form @submit.prevent="findTutor">
           <div class="mb-3">
             <label class="form-label fw-semibold small">Subject</label>
-            <SbSelectModal
-              v-model="selectedSubjectModel"
-              :groups="subjectGroups"
-              title="Choose Subject"
-              placeholder="Select subject"
-              search-placeholder="Search subjects"
-              searchable
-              empty-message="No subjects found."
-            />
+            <SubjectPickerModal v-model="selectedSubjectCodes" :subjects="subjects" />
           </div>
 
           <div class="row g-3 mb-3">
@@ -132,7 +124,7 @@ import BudgetRangeSlider from '@/components/BudgetRangeSlider.vue'
 import BookingDatePicker from '@/components/BookingDatePicker.vue'
 import BookingTimePicker from '@/components/BookingTimePicker.vue'
 import CampusLocationModal from '@/components/CampusLocationModal.vue'
-import SbSelectModal from '@/components/SbSelectModal.vue'
+import SubjectPickerModal from '@/components/SubjectPickerModal.vue'
 import {
   INITIAL_BUDGET_MAX,
   INITIAL_BUDGET_MIN,
@@ -198,13 +190,9 @@ const nextTimeSlot = (value) => {
   return `${padNumber(hours)}:${padNumber(minutes)}`
 }
 
-const normalizeSelectValue = (value) => (value == null ? '' : String(value))
-
-const selectedSubjectModel = computed({
-  get: () => store.selectedSubject,
-  set: (value) => {
-    store.selectedSubject = normalizeSelectValue(value)
-  },
+const selectedSubjectCodes = computed({
+  get: () => (store.selectedSubject ? [store.selectedSubject] : []),
+  set: (codes) => { store.selectedSubject = codes[0] || '' },
 })
 
 const selectMode = (value) => {
@@ -265,35 +253,6 @@ const selectedEndTimeModel = computed({
 
     store.selectedEndTime = value
   },
-})
-
-const getSubjectGroupLabel = (subject) => {
-  return subject?.department?.trim() || subject?.category?.trim() || 'Other Subjects'
-}
-
-const subjectGroups = computed(() => {
-  const groups = new Map()
-
-  subjects.value.forEach((subject) => {
-    const groupLabel = getSubjectGroupLabel(subject)
-
-    if (!groups.has(groupLabel)) {
-      groups.set(groupLabel, [])
-    }
-
-    groups.get(groupLabel).push({
-      label: subject.subject_name,
-      value: subject.subject_code,
-      description: subject.description || subject.subject_code,
-    })
-  })
-
-  return [...groups.entries()]
-    .sort(([leftLabel], [rightLabel]) => leftLabel.localeCompare(rightLabel))
-    .map(([label, options]) => ({
-      label,
-      options: options.sort((left, right) => left.label.localeCompare(right.label)),
-    }))
 })
 
 // Load subjects from backend

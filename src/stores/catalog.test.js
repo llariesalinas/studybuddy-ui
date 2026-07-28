@@ -41,30 +41,30 @@ describe('catalog store', () => {
     expect(catalog.receivingInstitutions).toEqual(institutions)
   })
 
-  it('manages the subject catalog globally without institution parameters', async () => {
+  it('manages the subject catalog globally on the taxonomy shape', async () => {
     const subject = {
-      subject_code: 'CS101',
-      subject_name: 'Introduction to Computing',
-      department: 'Computer Science',
-      category: 'BSCS',
+      subject_code: 'python',
+      subject_name: 'Python',
+      department: 'Programming Languages',
+      category: 'Technology & Computer Science',
     }
     api.get.mockResolvedValueOnce({ data: [subject] })
     api.post.mockResolvedValueOnce({ data: subject })
-    api.patch.mockResolvedValueOnce({ data: { ...subject, subject_name: 'Computing' } })
+    api.patch.mockResolvedValueOnce({ data: { ...subject, subject_name: 'Python 3' } })
     api.delete.mockResolvedValueOnce({})
 
     const catalog = useCatalogStore()
     await catalog.fetchCourseCatalog()
     await catalog.addCatalogSubject(subject)
-    await catalog.updateCatalogSubject('CS101', { subject_name: 'Computing' })
-    await catalog.removeCatalogSubject('CS101')
+    await catalog.updateCatalogSubject('python', { subject_name: 'Python 3' })
+    await catalog.removeCatalogSubject('python')
 
     expect(api.get).toHaveBeenCalledWith('/admin/course-catalog/')
     expect(api.post).toHaveBeenCalledWith('/admin/course-catalog/', subject)
-    expect(api.patch).toHaveBeenCalledWith('/admin/course-catalog/CS101/', {
-      subject_name: 'Computing',
+    expect(api.patch).toHaveBeenCalledWith('/admin/course-catalog/python/', {
+      subject_name: 'Python 3',
     })
-    expect(api.delete).toHaveBeenCalledWith('/admin/course-catalog/CS101/')
+    expect(api.delete).toHaveBeenCalledWith('/admin/course-catalog/python/')
     expect(catalog.courseCatalog).toEqual([])
   })
 })

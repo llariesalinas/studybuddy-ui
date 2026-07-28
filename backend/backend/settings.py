@@ -398,7 +398,10 @@ else:
 STATIC_URL = 'static/'
 
 MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+# Defaults to the project-local folder for dev. In production (Render), set MEDIA_ROOT
+# to the mount path of an attached persistent Disk -- Render's web service filesystem is
+# otherwise ephemeral and wipes uploaded avatars/documents on every deploy or restart.
+MEDIA_ROOT = os.getenv('MEDIA_ROOT', os.path.join(BASE_DIR, 'media'))
 
 ASGI_APPLICATION = 'backend.asgi.application'
 

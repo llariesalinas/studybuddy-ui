@@ -1,7 +1,7 @@
 ---
 title: Tutor profile real-time reflection and avatar image compression
 date: 2026-06-21
-status: In Progress
+status: Done
 spec: ../specs/2026-06-21-tutor-profile-realtime-image-compression-design.md
 ---
 
@@ -91,3 +91,6 @@ WebP) so full-size phone photos are no longer stored or served raw.
   wiring, `image_utils.compress_image`, avatar-view compression, tests). Frontend
   lint/build pass; compression verified standalone. Backend endpoint tests blocked
   by remote test-DB pooler. Committed; status set to Done.
+- 2026-07-17: Frontmatter `status` was still `In Progress` despite the body
+  already saying Done since 2026-06-21 — corrected to `Done` during a
+  plan-vs-code implementation audit.

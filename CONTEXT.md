@@ -138,17 +138,23 @@ only.
 The Content-Based Filtering half of the Hybrid Score — how well a Tutor's profile fits the
 Tutee's requested subject and profile, independent of any other student's history. A weighted sum
 of six sub-scores: Specific Subject match (0.40), General Subject match (0.20), expertise (0.15),
-course match (0.10), year-level proximity (0.10), and teaching-level fit (0.05). Subject and
-expertise signals anchor on the requested subject only, not the Tutee's preference list. An
-exact-subject-match Tutor can never be outranked on subject signals by a same-field-only Tutor
-(dominance property). Computed by `compute_cbf_score`
+course match (0.10), year-level proximity (0.10), and teaching-level fit (0.05). With a requested
+subject, Specific/General/Expertise use it; without one, the Tutee's preference
+list is the target set. Specific is an exact subject-code match; General includes Specific matches
+and same non-null `Subjects.category` matches, so it is a superset. A null category never produces
+General or same-field expertise credit. Expertise uses exact matches first, then same-field matches
+only when there is no exact match; it is otherwise zero. An empty request and empty preference list
+produce zero subject signals. An exact-subject-match Tutor can never be outranked on subject signals
+by a same-field-only Tutor (dominance property). Computed by `compute_cbf_score`
 (`backend/studybuddy/recommender/cbf.py`). Weights per the 2026-07-15 recommender weight
 rebalance plan.
 
 **CF Score**:
 The Collaborative Filtering half of the Hybrid Score — a predicted rating for a (Tutee, Tutor)
-pair derived from how similar Tutees (see Top-K Neighbor) have rated that Tutor. Computed by
-`compute_cf_score` (`backend/studybuddy/recommender/CF.py:88`). Returns `None` when the Tutee has
+pair derived from how similar Tutees (see Top-K Neighbor) have rated that Tutor. It prefers the
+same-course Peer Pool when its neighbors rated the candidate Tutor, otherwise uses a global-pool
+prediction for that Tutor. Computed by
+`compute_cf_score_with_fallback` (`backend/studybuddy/recommender/CF.py`). Returns `None` when the Tutee has
 no Rating history at all — see Cold-Start Tutee for what happens to the Hybrid Score in that case.
 
 **Top-K Neighbor**:

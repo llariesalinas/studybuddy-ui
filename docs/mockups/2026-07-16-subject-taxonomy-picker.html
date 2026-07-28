@@ -1,0 +1,143 @@
+<!-- Decision mockup: subject taxonomy picker (category -> subject drilldown).
+     Chosen 2026-07-16 during the subjects-reseed grilling session.
+     Design: drilldown cards (Preply-style) with tinted-wash category cards and a
+     giant serif initial monogram; each category owns an accent color from the
+     existing --sb-* palette, reused on subject chips, the drill pane spine, and
+     the selection tray. No icons or emojis. -->
+<style>
+  .sbx {
+    --sb-primary: #00895A;
+    --sb-primary-hover: #00704A;
+    --sb-primary-light: #edf6f1;
+    --sb-primary-lighter: #dff1e8;
+    --sb-bg: #F8F9FA;
+    --sb-card-bg: #ffffff;
+    --sb-card-border: #EAEAEA;
+    --sb-text-main: #163127;
+    --sb-text-muted: #6B7280;
+    --sb-border-light: #e0e7e3;
+    --sb-pop-yellow-deep: #DCA21B;
+    --sb-pop-orange-deep: #E0683A;
+    --sb-pop-pink-deep: #E26D86;
+    --sb-aurora-violet: #8E7CF4;
+    --sb-secondary-blue: #006591;
+    --sb-shadow-hover: 0 16px 36px rgba(15, 23, 42, 0.12);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    color: var(--sb-text-main);
+    background: var(--sb-bg);
+    border-radius: 12px;
+    padding: 24px;
+  }
+  .sbx * { box-sizing: border-box; }
+  .sbx h5 { margin: 0 0 2px; font-weight: 700; font-size: 1.05rem; }
+  .sbx .muted { color: var(--sb-text-muted); font-size: .82rem; margin: 0 0 16px; }
+
+  /* Category accent mapping */
+  .sbx .c-math { --cat: var(--sb-primary); }
+  .sbx .c-sci  { --cat: var(--sb-secondary-blue); }
+  .sbx .c-tech { --cat: var(--sb-aurora-violet); }
+  .sbx .c-biz  { --cat: var(--sb-pop-yellow-deep); }
+  .sbx .c-hum  { --cat: var(--sb-pop-orange-deep); }
+  .sbx .c-art  { --cat: var(--sb-pop-pink-deep); }
+
+  .sbx .chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    border: 1.5px solid var(--sb-border-light);
+    background: var(--sb-card-bg);
+    border-radius: 999px; padding: 7px 14px;
+    font-size: .84rem; margin: 0 8px 8px 0; cursor: pointer;
+    transition: transform .13s cubic-bezier(0.16,1,0.3,1);
+  }
+  .sbx .chip:hover { transform: translateY(-2px); border-color: var(--cat); }
+  .sbx .chip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--cat, var(--sb-primary)); }
+  .sbx .chip.on {
+    border-color: var(--cat, var(--sb-primary));
+    background: color-mix(in srgb, var(--cat, var(--sb-primary)) 12%, white);
+    font-weight: 600;
+  }
+  .sbx .tray {
+    border-top: 1px dashed var(--sb-border-light);
+    margin-top: 14px; padding-top: 12px;
+    display: flex; align-items: center; flex-wrap: wrap; gap: 4px;
+  }
+  .sbx .tray .lbl { font-size: .74rem; text-transform: uppercase; letter-spacing: .06em; color: var(--sb-text-muted); margin-right: 8px; }
+  .sbx .tray .chip { margin: 0 4px 4px 0; padding: 5px 12px; }
+  .sbx .x { color: var(--sb-text-muted); font-size: .9em; margin-left: 2px; }
+
+  .sbx .cat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .sbx .card1 {
+    position: relative; overflow: hidden; cursor: pointer;
+    border-radius: 16px; padding: 20px 16px 16px;
+    border: 1.5px solid color-mix(in srgb, var(--cat) 28%, white);
+    background: linear-gradient(135deg, color-mix(in srgb, var(--cat) 12%, white) 0%, #ffffff 62%);
+    transition: transform .18s cubic-bezier(0.16,1,0.3,1), box-shadow .18s;
+    min-height: 108px;
+  }
+  .sbx .card1:hover { transform: translateY(-4px); box-shadow: var(--sb-shadow-hover); }
+  .sbx .card1 .mono {
+    position: absolute; right: -10px; bottom: -34px;
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 6.2rem; font-weight: 700; line-height: 1;
+    color: color-mix(in srgb, var(--cat) 22%, white);
+    user-select: none; pointer-events: none;
+  }
+  .sbx .card1 b { display: block; font-size: .9rem; margin-bottom: 3px; position: relative; }
+  .sbx .card1 span { font-size: .74rem; color: var(--sb-text-muted); position: relative; }
+  .sbx .card1 .selcount { color: var(--cat); font-weight: 700; }
+
+  .sbx .crumb { font-size: .82rem; color: var(--sb-text-muted); margin-bottom: 12px; }
+  .sbx .crumb a { color: var(--sb-primary); font-weight: 600; text-decoration: none; }
+  .sbx .drill {
+    background: var(--sb-card-bg); border: 1px solid var(--sb-card-border);
+    border-left: 4px solid var(--cat);
+    border-radius: 14px; padding: 18px; margin-top: 14px;
+  }
+</style>
+
+<h2>Subject taxonomy picker &mdash; decided design</h2>
+<p class="subtitle">Drilldown cards with tinted wash + serif monogram (V1), category-colored drill pane and selection tray.</p>
+
+<div class="mockup">
+  <div class="mockup-header">Category grid</div>
+  <div class="mockup-body">
+    <div class="sbx">
+      <h5>Pick your subjects</h5>
+      <p class="muted">Tap a category to browse its subjects.</p>
+      <div class="cat-grid">
+        <div class="card1 c-math"><span class="mono">M</span><b>Math &amp; Data Sciences</b><span>18 subjects &middot; <span class="selcount">1 selected</span></span></div>
+        <div class="card1 c-sci"><span class="mono">N</span><b>Natural Sciences</b><span>16 subjects &middot; <span class="selcount">1 selected</span></span></div>
+        <div class="card1 c-tech"><span class="mono">T</span><b>Technology &amp; CS</b><span>17 subjects</span></div>
+        <div class="card1 c-biz"><span class="mono">B</span><b>Business &amp; Economics</b><span>14 subjects</span></div>
+        <div class="card1 c-hum"><span class="mono">H</span><b>Humanities &amp; Social Sciences</b><span>20 subjects</span></div>
+        <div class="card1 c-art"><span class="mono">A</span><b>Hobbies &amp; Arts</b><span>11 subjects</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="mockup">
+  <div class="mockup-header">Drilldown pane &mdash; category-colored spine</div>
+  <div class="mockup-body">
+    <div class="sbx">
+      <div class="drill c-sci">
+        <div class="crumb"><a href="#" onclick="return false">&larr; All categories</a> &nbsp;/&nbsp; <b>Natural Sciences</b></div>
+        <span class="chip"><span class="dot"></span>Classical Mechanics</span>
+        <span class="chip"><span class="dot"></span>Thermodynamics</span>
+        <span class="chip"><span class="dot"></span>Electromagnetism</span>
+        <span class="chip"><span class="dot"></span>General Chemistry</span>
+        <span class="chip on"><span class="dot"></span>Organic Chemistry</span>
+        <span class="chip"><span class="dot"></span>Biochemistry</span>
+        <span class="chip"><span class="dot"></span>Genetics</span>
+        <span class="chip"><span class="dot"></span>Cell Biology</span>
+        <span class="chip"><span class="dot"></span>Human Anatomy &amp; Physiology</span>
+        <span class="chip"><span class="dot"></span>Ecology</span>
+        <span class="chip"><span class="dot"></span>Environmental Science</span>
+        <div class="tray">
+          <span class="lbl">Selected 2/5</span>
+          <span class="chip on c-math"><span class="dot"></span>Calculus<span class="x">&times;</span></span>
+          <span class="chip on c-sci"><span class="dot"></span>Organic Chemistry<span class="x">&times;</span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

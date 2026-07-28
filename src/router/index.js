@@ -3,6 +3,11 @@ import { useAuthStore } from '@/stores/auth'
 import { useProfileStore } from '@/stores/profile'
 
 const GUEST_ONLY_ROUTE_NAMES = ['login', 'register']
+const TUTOR_ONBOARDING_STEP_ORDER = [
+  'tutorpreferencesetup',
+  'tutor-subjects-setup',
+  'tutor-verification-setup',
+]
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -155,12 +160,6 @@ const router = createRouter({
       path: '/tch-wallet',
       name: 'tch-wallet',
       component: () => import('@/views/TutorWallet.vue'),
-      meta: { requiresAuth: true, role: 'Tutor' }
-    },
-    {
-      path: '/tch-requestedSessions',
-      name: 'tch-requestedSessions',
-      component: () => import('@/views/TutorRequestedSessions.vue'),
       meta: { requiresAuth: true, role: 'Tutor' }
     },
     {
@@ -326,13 +325,20 @@ router.beforeEach(async (to) => {
     }
 
     if (normalizedUserRole === 'tutor' && !profileStore.tutorOnboardingComplete) {
-      const nextOnboardingRoute = !profileStore.profileCompleted
-        ? 'tutorpreferencesetup'
+      const furthestStepIndex = !profileStore.profileCompleted
+        ? 0
         : !profileStore.tutorSubjectsCompleted
-          ? 'tutor-subjects-setup'
-          : 'tutor-verification-setup'
+          ? 1
+          : 2
+      const nextOnboardingRoute = TUTOR_ONBOARDING_STEP_ORDER[furthestStepIndex]
 
-      if (to.name !== nextOnboardingRoute) return { name: nextOnboardingRoute }
+      // Allow navigating back to any step at or behind the furthest one completed
+      // (e.g. a "Back" button from Verify to Subjects) without bouncing forward
+      // again; only skipping ahead of actual progress gets redirected.
+      const targetStepIndex = TUTOR_ONBOARDING_STEP_ORDER.indexOf(to.name)
+      const isAllowedOnboardingStep = targetStepIndex !== -1 && targetStepIndex <= furthestStepIndex
+
+      if (!isAllowedOnboardingStep) return { name: nextOnboardingRoute }
     }
     // 3️⃣ Profile completion guard
     if (!profileStore.profileCompleted) {

@@ -2,6 +2,19 @@
 
 This document describes the end-to-end tutee booking flow in StudyBuddy. It is the authoritative source for architectural questions about how a tutee finds a tutor and books a session. Keep it updated whenever the flow changes.
 
+## Instant Booking safeguards
+
+`POST bookings/confirm/` confirms a booking immediately; new rows are never Pending. It enforces
+the Booking Horizon (14 days), tutor verification, non-negative wallet balance, Accepted Session
+Load Limit, and Monthly Strike Cap. Online session groups receive one server-generated Meeting
+Link; a chat room is opened with a neutral system message and both parties are notified.
+
+Cancellation remains self-serve. Before the Grace Cutoff (12 hours before the session) it is
+penalty-free. A Late Cancellation cancels immediately but creates a system-opened Support Ticket.
+An admin resolves it as excused or counted; a Counted Strike deducts P50 from a tutor wallet and
+three counted strikes in a calendar month suspend a tutee from booking or hide a tutor from search.
+The old approve/reject step and requested-sessions route are removed.
+
 ## Overview
 
 The booking flow is a 4-step process: preferences → search → slot selection → confirm.
@@ -19,7 +32,20 @@ Dashboard (InitialBooking.vue)
 **Store:** `src/stores/initialbookingprefs.js` (persisted to sessionStorage)
 
 The tutee fills out a search form:
-- Subject (searchable dropdown, loaded from `GET subjects/`)
+- Subject — `SubjectTaxonomyPicker.vue`, loaded from `GET subjects/`. A persistent search box
+  sits above the category grid; typing filters the catalog client-side (name, category, and an
+  admin-curated `keywords` field) into a dropdown-row list, tagging keyword-only matches with a
+  "via ..." badge, and clearing the search returns to the category grid → subject chips browsing
+  UI. Zero-result behavior is screen-dependent: a plain "no matching subjects" state everywhere
+  except tutor onboarding (`TutorSubjectSetup.vue`), which additionally surfaces a "Can't find
+  it? Propose it" prompt into the propose-subject flow (see
+  `docs/plans/2026-07-18-tutor-subject-keyword-search.md`). Subjects are the Preply-style
+  taxonomy (see `docs/plans/2026-07-16-subjects-taxonomy-reseed.md`): every subject carries a
+  taxonomy `category` (Mathematics & Data Sciences, Natural Sciences, Technology & Computer
+  Science, Business/Finance/Economics, Humanities & Social Sciences, Hobbies & Arts) and an
+  internal `department` sub-group that is never shown in the UI. Subject codes are opaque slugs
+  (`organic-chemistry`) and are likewise never displayed. Course-based subject gating was
+  retired — any tutee can search any approved subject regardless of their own course.
 - Date (date picker)
 - Time range — start time and end time (30-minute slots)
 - Mode: Online or Face-to-face

@@ -142,7 +142,6 @@ const menuItems = computed(() => {
   if (role.value === 'tutor') {
     return [
       { to: '/tch-dashboard', label: 'Dashboard', icon: 'bi-grid-1x2' },
-      { to: '/tch-requestedSessions', label: 'Requested Sessions', icon: 'bi-inboxes' },
       { to: '/tutor-profile', label: 'Profile', icon: 'bi-person' },
       { to: '/tch-availability', label: 'Schedule', icon: 'bi-calendar3' },
       { to: '/reports', label: 'Sessions & Reports', icon: 'bi-file-earmark-text' },

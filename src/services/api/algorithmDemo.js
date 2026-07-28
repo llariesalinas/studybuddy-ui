@@ -13,6 +13,16 @@ export const getAlgorithmDemoRecommendation = (tuteeId, institutionId = null) =>
     params: { tutee_id: tuteeId, institution_id: institutionId || undefined }
   })
 
+// What-if re-scoring: the overrides are applied to the rating matrix in memory and
+// never written, so the panel can retune a rating and watch the ranking respond
+// without the experiment persisting. Same row shape as getAlgorithmDemoRecommendation.
+export const getAlgorithmDemoWhatIf = (tuteeId, institutionId = null, overrides = []) =>
+  api.post('dev/algorithm-demo/recommend-whatif/', {
+    tutee_id: tuteeId,
+    institution_id: institutionId || undefined,
+    overrides
+  })
+
 export const updateAlgorithmDemoRating = (studentId, tutorId, ratingScore) =>
   api.patch('dev/algorithm-demo/rating/', {
     student_id: studentId,

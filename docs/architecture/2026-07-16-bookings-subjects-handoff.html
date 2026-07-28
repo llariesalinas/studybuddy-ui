@@ -1,0 +1,212 @@
+<style>
+  .sbdoc {
+    --sb-primary: #00895A;
+    --sb-primary-hover: #00704A;
+    --sb-primary-light: #edf6f1;
+    --sb-primary-lighter: #dff1e8;
+    --sb-bg: #F8F9FA;
+    --sb-card-bg: #ffffff;
+    --sb-card-border: #EAEAEA;
+    --sb-border-light: #e0e7e3;
+    --sb-text-main: #163127;
+    --sb-text-muted: #6B7280;
+    --sb-text-secondary: #495057;
+    --sb-danger: #ef4444;
+    --sb-warning-text: #997404;
+    --sb-pop-yellow: #FFC94D;
+    --sb-shadow-rest: 0 6px 16px rgba(15, 23, 42, 0.06);
+
+    max-width: 900px; margin: 0 auto; padding: 40px 24px 72px;
+    background: var(--sb-bg); color: var(--sb-text-main);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    line-height: 1.6;
+  }
+  .sbdoc h1 { font-size: 1.75rem; font-weight: 700; margin: 0 0 4px; color: var(--sb-text-main); }
+  .sbdoc .meta { color: var(--sb-text-muted); font-size: .88rem; margin-bottom: 12px; }
+  .sbdoc .sb-badge-row { margin-bottom: 28px; }
+  .sbdoc .sb-badge {
+    display: inline-block; padding: 4px 14px; border-radius: 999px; font-size: .78rem; font-weight: 600;
+    background: var(--sb-primary-light); color: var(--sb-primary); border: 1px solid var(--sb-primary-lighter);
+    margin-right: 8px;
+  }
+  .sbdoc .sb-badge.warn { background: #fff8e6; color: var(--sb-warning-text); border-color: #f3e2b3; }
+  .sbdoc .sb-badge.done { background: var(--sb-primary-light); color: var(--sb-primary); }
+  .sbdoc h2 {
+    font-size: 1.2rem; font-weight: 700; margin: 40px 0 14px; color: var(--sb-text-main);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .sbdoc h2 .n {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 28px; height: 28px; border-radius: 999px; flex: 0 0 auto;
+    background: var(--sb-primary); color: #fff; font-size: .85rem; font-weight: 700;
+  }
+  .sbdoc h3 { font-size: 1rem; font-weight: 700; margin: 20px 0 8px; color: var(--sb-text-main); }
+  .sbdoc .sb-card {
+    background: var(--sb-card-bg); border: 1px solid var(--sb-card-border); border-radius: 16px;
+    box-shadow: var(--sb-shadow-rest); padding: 20px 24px; margin: 14px 0 22px;
+  }
+  .sbdoc table { border-collapse: collapse; width: 100%; margin: 12px 0 8px; font-size: .9rem; }
+  .sbdoc th, .sbdoc td { border-bottom: 1px solid var(--sb-card-border); padding: 9px 12px; text-align: left; vertical-align: top; }
+  .sbdoc th { background: var(--sb-primary-light); color: var(--sb-text-main); font-weight: 700; }
+  .sbdoc th:first-child { border-top-left-radius: 10px; }
+  .sbdoc th:last-child { border-top-right-radius: 10px; }
+  .sbdoc tr:last-child td { border-bottom: none; }
+  .sbdoc .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .sbdoc .callout {
+    border-left: 4px solid var(--sb-primary); background: var(--sb-primary-light);
+    padding: 14px 18px; margin: 16px 0; border-radius: 0 12px 12px 0;
+  }
+  .sbdoc .callout.warn { border-left-color: var(--sb-pop-yellow); background: #fff8e6; }
+  .sbdoc .callout .label {
+    font-weight: 700; font-size: .72rem; text-transform: uppercase; letter-spacing: .08em;
+    color: var(--sb-primary);
+  }
+  .sbdoc .callout.warn .label { color: var(--sb-warning-text); }
+  .sbdoc code {
+    background: var(--sb-primary-light); color: var(--sb-primary-hover);
+    padding: 1px 6px; border-radius: 6px; font-size: .86em;
+  }
+  .sbdoc .new { color: var(--sb-primary); font-weight: 700; }
+  .sbdoc .removed { color: var(--sb-danger); font-weight: 700; }
+  .sbdoc .muted { color: var(--sb-text-muted); }
+  .sbdoc ul { margin: 8px 0 16px 22px; }
+  .sbdoc li { margin: 5px 0; color: var(--sb-text-secondary); }
+  .sbdoc li strong { color: var(--sb-text-main); }
+  .sbdoc p { color: var(--sb-text-secondary); }
+  .sbdoc .toc {
+    font-size: .88rem; background: var(--sb-card-bg); border: 1px solid var(--sb-card-border);
+    border-radius: 16px; padding: 16px 20px; box-shadow: var(--sb-shadow-rest);
+  }
+  .sbdoc .toc a { color: var(--sb-primary); text-decoration: none; font-weight: 600; }
+  .sbdoc .checklist { list-style: none; margin: 8px 0 16px 4px; }
+  .sbdoc .checklist li { padding-left: 26px; position: relative; }
+  .sbdoc .checklist li.done::before { content: "✓"; position: absolute; left: 0; color: var(--sb-primary); font-weight: 700; }
+  .sbdoc .checklist li.open::before { content: "○"; position: absolute; left: 0; color: var(--sb-warning-text); font-weight: 700; }
+</style>
+<div class="sbdoc">
+  <h1>Bookings &amp; Subjects — Recent Changes Handoff</h1>
+  <div class="meta">Team handoff · Compiled 2026-07-16 · Scope: Instant Booking + subject catalog/proposals.
+  Recommender/algorithm changes are <strong>not</strong> covered here — see
+  <code>docs/mockups/2026-07-15-recommender-weights-handoff.html</code> for that.</div>
+  <div class="sb-badge-row">
+    <span class="sb-badge warn">Instant Booking: In Progress</span>
+    <span class="sb-badge done">Subjects: Done</span>
+  </div>
+
+  <div class="toc">
+    <strong>Contents</strong> —
+    1. <a href="#scope">Scope</a> ·
+    2. <a href="#booking-what">Instant Booking — what changed</a> ·
+    3. <a href="#booking-status">Instant Booking — shipped vs. remaining</a> ·
+    4. <a href="#catalog">Subjects — one global catalog</a> ·
+    5. <a href="#proposals">Subjects — tutors can propose their own</a> ·
+    6. <a href="#links">Where to look</a>
+  </div>
+
+  <h2 id="scope"><span class="n">1</span> Scope</h2>
+  <div class="sb-card">
+    <p>Two independent pieces of recent work, unrelated to each other except in timing:</p>
+    <ul>
+      <li><strong>Instant Booking</strong> — replaces the old request-to-book flow (tutor manually
+      accepts/rejects) with instant confirmation. Design is finalized (ADR 0008); backend and most
+      of the frontend shipped; a few UI pieces are still open — see section 3.</li>
+      <li><strong>Subjects</strong> — the course catalog went from per-institution to one global
+      list, and tutors can now propose subjects missing from it during onboarding. Both fully
+      shipped.</li>
+    </ul>
+  </div>
+
+  <h2 id="booking-what"><span class="n">2</span> Instant Booking — what changed</h2>
+  <div class="sb-card">
+    <p>Old flow: tutee sends a booking request → sits <code>Pending</code> → tutor manually
+    approves or rejects it. New flow: a slot inside a tutor's published availability
+    <strong>confirms immediately</strong> on submission — no tutor review step at all.</p>
+    <div class="callout"><span class="label">Why</span><br>
+    Panel feedback asked for the manual confirmation layer to be cut entirely. The trade-off:
+    tutors lose per-tutee vetting before commitment; the replacements are an auto-opened chat
+    thread and a real cancellation window instead of a pre-booking gate.</div>
+    <h3>The new mechanics</h3>
+    <ul>
+      <li><strong>Grace Cutoff (12h):</strong> cancel before it, free and untracked, for either
+      role. Cancel after it (a <strong>Late Cancellation</strong>) and the booking still cancels
+      immediately — never blocked — but it auto-opens a Support Ticket for an admin to review.</li>
+      <li><strong>Counted Strike:</strong> admin resolves a Late Cancellation ticket as
+      <em>Excused</em> or <em>Counted</em>. Counted deducts a flat ₱50 from a tutor's wallet
+      (tutees have no wallet, so no fee). Both roles share a <strong>Monthly Strike Cap of 3</strong>
+      — hitting it suspends booking (tutee) or search visibility (tutor) for the rest of the
+      calendar month.</li>
+      <li><strong>Booking-time gates:</strong> the three checks that used to run when a tutor
+      accepted a request (verification/renewal, non-negative wallet, session load limit) now run
+      at booking creation instead. A tutor failing any of them is simply hidden from search — no
+      more "accept and then get blocked."</li>
+      <li><strong>Booking Horizon (14 days):</strong> a session can't be booked more than 14 days
+      out, to cap the damage from stale recurring availability now that there's no approval step
+      to catch it.</li>
+      <li><strong>Meeting Link:</strong> Online sessions get a server-generated Jitsi room link at
+      booking time, no manual scheduling.</li>
+    </ul>
+    <div class="callout warn"><span class="label">Removed outright</span><br>
+    The old <code>approve_booking</code>/<code>reject_booking</code> endpoints and the tutor's
+    "Requested Sessions" screen are gone, not deprecated. <code>Pending</code> survives only as a
+    historical status on old rows — nothing new is ever created in it.</div>
+  </div>
+
+  <h2 id="booking-status"><span class="n">3</span> Instant Booking — shipped vs. remaining</h2>
+  <div class="sb-card">
+    <p>Backend is fully in place and reviewed. A few frontend surfaces are still open.</p>
+    <h3>Shipped</h3>
+    <ul class="checklist">
+      <li class="done">Instant confirmation, all three booking-time gates, Booking Horizon, Meeting Link generation</li>
+      <li class="done">Grace Cutoff cancellation, Late Cancellation ticket auto-open, admin excused/counted resolution with wallet/strike effects</li>
+      <li class="done">Search-visibility extended for negative wallet, load limit, and strike-cap suspension</li>
+      <li class="done">approve/reject endpoints + Requested Sessions screen removed; existing Pending bookings auto-expired with a rebook notification</li>
+      <li class="done">Booking confirmation screen shows the Meeting Link/location and cancel deadline; 14-day horizon enforced in the date picker</li>
+      <li class="done">Tutor dashboard banner explaining load-limit invisibility</li>
+    </ul>
+    <h3>Still open (tracked as Fix round 1 on the same brief)</h3>
+    <ul class="checklist">
+      <li class="open">Tutors have no cancel button yet — only tutees can cancel a session from the UI today</li>
+      <li class="open">Admin support queue has no Excused/Counted control for Late Cancellation tickets yet</li>
+      <li class="open">Tutor Management doesn't show a tutor's monthly strike count yet</li>
+      <li class="open">No test coverage yet for the Grace Cutoff cancellation, strike accounting, or the new search-visibility gates (the code is in and manually verified correct; automated coverage is the gap)</li>
+    </ul>
+  </div>
+
+  <h2 id="catalog"><span class="n">4</span> Subjects — one global catalog</h2>
+  <div class="sb-card">
+    <p>The course/subject catalog used to be scoped per institution. It's now a single global
+    list — one CRUD surface (<code>AdminCourseCatalog.vue</code>) instead of duplicated
+    per-institution catalogs, alongside removing the now-meaningless institutional-Admin-promotion
+    workflow left over from the SuperAdmin role consolidation.</p>
+  </div>
+
+  <h2 id="proposals"><span class="n">5</span> Subjects — tutors can propose their own</h2>
+  <div class="sb-card">
+    <p>Landed as part of the tutor onboarding &amp; verification redesign. During onboarding, a
+    tutor searches the catalog first; if what they teach isn't listed, they can propose it as a
+    new subject (capped at 8 subjects total across approved + pending).</p>
+    <ul>
+      <li><strong>Independent per-subject review:</strong> an admin approves or rejects each
+      proposed subject on its own, separate from the tutor's overall application decision — in
+      <code>AdminTutorApplications.vue</code>'s new "Proposed Subjects" list.</li>
+      <li><strong>No recognition check on proposals</strong> — a tutor can propose something not
+      yet in the catalog by definition; recognition checks only apply to subjects a tutee books.</li>
+    </ul>
+    <div class="callout"><span class="label">Known follow-up, not yet ticketed as urgent</span><br>
+    Typos or missing categories in a tutor-proposed subject (e.g. "pYTHones", or a subject with no
+    field/category set) degrade recommendation quality slightly but never break it — flagged as a
+    separate data-hygiene/admin-edit follow-up, not a blocker.</div>
+  </div>
+
+  <h2 id="links"><span class="n">6</span> Where to look</h2>
+  <div class="sb-card">
+    <table>
+      <tr><th>Topic</th><th>Plan / doc</th></tr>
+      <tr><td>Instant Booking design</td><td><code>docs/adr/0008-instant-booking-replaces-request-to-book.md</code>, <code>docs/plans/2026-07-15-instant-booking.md</code></td></tr>
+      <tr><td>Instant Booking implementation status</td><td><code>docs/briefs/2026-07-16-instant-booking.md</code> (Test evidence, Deviations, Fix round 1)</td></tr>
+      <tr><td>Booking flow architecture</td><td><code>docs/architecture/booking-flow.md</code></td></tr>
+      <tr><td>Tutor onboarding + subject proposals</td><td><code>docs/plans/2026-07-13-tutor-onboarding-verification-redesign.md</code>, <code>docs/session-summaries/2026-07-14-tutor-onboarding-verification-redesign-summary.md</code></td></tr>
+      <tr><td>Catalog globalization</td><td><code>docs/plans/2026-07-12-admin-role-consolidation.md</code> (tickets 2-4)</td></tr>
+    </table>
+  </div>
+</div>

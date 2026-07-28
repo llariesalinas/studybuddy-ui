@@ -54,7 +54,6 @@ from .recommender.hybrid import recommend_tutors_hybrid
 from .recommender.CF import build_rating_matrix
 
 from .recommender.cbf import recommend_tutors
-from .recommender.utils import filter_tutors_by_institution
 from .recommender.dashboard import (
     bump_dashboard_recs_cache_version,
     dashboard_recs_cache_key,
@@ -69,9 +68,10 @@ from .subject_recognition import (
     subject_selection_queryset_for_profile,
     visible_subject_queryset_for_profile,
 )
+from .subject_taxonomy import CATEGORIES as TAXONOMY_CATEGORIES
 from django.core.cache import cache
 from . import _verification_dev
-from .models import Booking, Course, EmailOTPChallenge, Notification, PartnerInstitution, Payment, PaymentMethod, Preference, Rating, SessionCheckIn, Subjects, Tutor, TutorApplication, TutorAvailability, TutorAvailabilityOverride, TutorDocumentRenewalReview, TutorSubjects, Wallet, PlatformActivity, Transaction, TuteeApplication, TuteeDocumentRenewalReview
+from .models import Booking, Course, EmailOTPChallenge, Notification, PartnerInstitution, Payment, PaymentMethod, Preference, Rating, SessionCheckIn, Subjects, SupportTicket, Tutor, TutorApplication, TutorAvailability, TutorAvailabilityOverride, TutorDocumentRenewalReview, TutorSubjects, Wallet, PlatformActivity, Transaction, TuteeApplication, TuteeDocumentRenewalReview
 from .serializers import (
     NotificationSerializer,
     SubjectSerializer,
@@ -84,7 +84,7 @@ from .serializers import (
     TuteeApplicationSerializer,
 )
 from .email_utils import send_application_received_email
-from .chat.services import create_booking_event
+from .chat.services import create_booking_event, get_canonical_room_for_booking
 from .image_utils import compress_image, compress_if_image
 
 from .models import (
@@ -98,6 +98,10 @@ from .models import (
 logger = logging.getLogger(__name__)
 TUTOR_SUBJECT_LIMIT = 8
 DEFAULT_TUTOR_SUBJECT_EXPERTISE_LEVEL = 3
+BOOKING_HORIZON_DAYS = 14
+GRACE_CUTOFF_HOURS = 12
+COUNTED_STRIKE_WALLET_DEDUCTION = decimal.Decimal('50.00')
+MONTHLY_STRIKE_CAP = 3
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
@@ -318,10 +322,28 @@ def can_create_new_booking(profile):
     if application is None:
         return False
 
-    return (
+    if not (
         application.application_status == 'approved'
         and application.document_renewal_status() == 'verified'
-    )
+    ):
+        return False
+
+    return not has_reached_monthly_strike_cap(profile)
+
+
+def get_monthly_counted_strike_count(profile, reference_time=None):
+    reference_time = timezone.localtime(reference_time or timezone.now())
+    return SupportTicket.objects.filter(
+        category='Late_Cancellation',
+        resolution_verdict='counted',
+        penalized_user=profile,
+        created_at__year=reference_time.year,
+        created_at__month=reference_time.month,
+    ).count()
+
+
+def has_reached_monthly_strike_cap(profile, reference_time=None):
+    return get_monthly_counted_strike_count(profile, reference_time) >= MONTHLY_STRIKE_CAP
 
 
 # --- Verification dev tools (self-service) ---------------------------------------------------------
@@ -438,6 +460,57 @@ def algorithm_demo_recommend(request):
     tutee = get_object_or_404(UserProfile, id=tutee_id, role="Tutee")
     institution_id = request.query_params.get('institution_id') or None
     result = build_algorithm_demo_recommendation(tutee, institution_id=institution_id)
+    return Response(result)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, IsSuperAdminUser])
+def algorithm_demo_recommend_whatif(request):
+    """Re-run the recommender with what-if rating overrides applied in memory.
+
+    POST rather than GET because the override list is a body, not a query, but
+    this writes nothing — it is the read-only counterpart of
+    algorithm_demo_recommend. Overrides let the demo panel retune a rating and
+    watch the ranking respond while the numbers still come from the real
+    recommender, instead of a second implementation in the frontend.
+    """
+    if not settings.ALGORITHM_DEMO_TOOLS_ENABLED:
+        return Response({"error": "Algorithm demo tools are disabled."}, status=403)
+
+    tutee_id = request.data.get('tutee_id')
+    if not tutee_id:
+        return Response({"error": "tutee_id is required."}, status=400)
+
+    raw_overrides = request.data.get('overrides') or []
+    if not isinstance(raw_overrides, list):
+        return Response({"error": "overrides must be a list."}, status=400)
+
+    overrides = []
+    for entry in raw_overrides:
+        if not isinstance(entry, dict):
+            return Response({"error": "Each override must be an object."}, status=400)
+        try:
+            student_id = int(entry.get('student_id'))
+            tutor_id = int(entry.get('tutor_id'))
+            rating_score = int(entry.get('rating_score'))
+        except (TypeError, ValueError):
+            return Response(
+                {"error": "Each override needs student_id, tutor_id and rating_score."},
+                status=400,
+            )
+        if rating_score < 1 or rating_score > 5:
+            return Response({"error": "rating_score must be between 1 and 5."}, status=400)
+        overrides.append({
+            "student_id": student_id,
+            "tutor_id": tutor_id,
+            "rating_score": rating_score,
+        })
+
+    tutee = get_object_or_404(UserProfile, id=tutee_id, role="Tutee")
+    institution_id = request.data.get('institution_id') or None
+    result = build_algorithm_demo_recommendation(
+        tutee, institution_id=institution_id, overrides=overrides
+    )
     return Response(result)
 
 
@@ -996,12 +1069,21 @@ def get_current_display_status_for_booking(booking):
     return get_display_status(representative_booking.status, session_date, start_time, end_time)
 
 
-def create_booking_status_notification(recipient, status_key, bookings, recipient_role=None, actor_role=None, reason=None):
+def create_booking_status_notification(
+    recipient,
+    status_key,
+    bookings,
+    recipient_role=None,
+    actor_role=None,
+    reason=None,
+    cancellation_deadline=None,
+    is_born_late=False,
+):
     context = get_session_notification_context(bookings)
 
     messages = {
         "pending": f"New booking request received for {context['subject']} on {context['date']}. Please review and respond.",
-        "confirmed": f"Your booking for {context['subject']} with {context['tutor_name']} has been accepted. The session is now upcoming.",
+        "confirmed": f"Your booking for {context['subject']} with {context['tutor_name']} is confirmed. The session is now upcoming.",
         "rejected": f"Your booking for {context['subject']} with {context['tutor_name']} on {context['date']} was rejected.",
         "awaiting_payment_verification": f"A tutee has confirmed their {context['subject']} session on {context['date']} and sent payment for review.",
         "completed": f"Your session for {context['subject']} with {context['tutor_name']} was marked complete. You can rate it anytime.",
@@ -1026,6 +1108,12 @@ def create_booking_status_notification(recipient, status_key, bookings, recipien
             message = f"{message} Reason: {reason}"
     else:
         message = messages.get(status_key)
+
+    if status_key == 'confirmed' and message:
+        if is_born_late:
+            message = f'{message} This booking has no penalty-free cancellation window.'
+        elif cancellation_deadline:
+            message = f'{message} Cancel without a strike before {cancellation_deadline}.'
 
     if not message:
         return
@@ -1863,12 +1951,9 @@ class SearchTutorsView(APIView):
                 {"error": SUBJECT_NOT_RECOGNIZED_ERROR},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        tutors = filter_tutors_by_institution(
-            Tutor.objects.filter(
-                tutorsubjects__subject__subject_code=subject_code
-            ).select_related('profile').distinct(),
-            student_profile,
-        )
+        tutors = Tutor.objects.filter(
+            tutorsubjects__subject__subject_code=subject_code
+        ).select_related('profile').distinct()
 
         serializer = TutorSearchSerializer(tutors, many=True)
         return Response(serializer.data)
@@ -1909,7 +1994,11 @@ class SubjectListView(ListAPIView):
             include_current=include_current,
         )
         self.recognized_codes = recognized_codes
-        queryset = queryset.filter(status='approved')
+        if not include_current:
+            # recognized_codes are already approved-status by construction; only re-filter
+            # here when the caller didn't ask to keep the profile's current (possibly
+            # pending, e.g. a tutor's own proposed-but-unreviewed) subjects.
+            queryset = queryset.filter(status='approved')
         if search_query:
             queryset = queryset.filter(
                 Q(subject_name__icontains=search_query)
@@ -2220,6 +2309,14 @@ def tutor_detail(request, profile_id):
 def tutor_availability(request, tutor_id):
 
     tutor = get_object_or_404(Tutor, profile_id=tutor_id)
+    if not can_create_new_booking(tutor.profile):
+        return Response(
+            {
+                'error': 'This tutor is not currently eligible to accept new bookings.',
+                'code': 'tutor_booking_gate_closed',
+            },
+            status=403,
+        )
     current_now = timezone.localtime(timezone.now())
     today = current_now.date()
     month_offset = int(request.GET.get("month_offset", 0))
@@ -2453,6 +2550,24 @@ def confirm_payment_and_book(request):
     normalized_slots = []
 
     with transaction.atomic():
+        wallet, _ = Wallet.objects.get_or_create(tutor=tutor)
+        if wallet.balance < 0:
+            return Response(
+                {'error': 'This tutor cannot accept bookings while their wallet balance is negative.'},
+                status=409,
+            )
+
+        load_snapshot = get_tutor_acceptance_load_snapshot(tutor)
+        if load_snapshot['accepted_session_load'] >= load_snapshot['session_load_limit']:
+            return Response(
+                {
+                    'error': 'This tutor has reached their accepted session limit.',
+                    'code': 'session_load_limit_reached',
+                    **load_snapshot,
+                },
+                status=409,
+            )
+
         for slot in slots:
             availability = get_object_or_404(
                 TutorAvailability.objects.select_for_update(),
@@ -2470,6 +2585,11 @@ def confirm_payment_and_book(request):
 
             # 🚫 Prevent booking past dates/times
             current_now = timezone.localtime(timezone.now())
+            if session_date > current_now.date() + timedelta(days=BOOKING_HORIZON_DAYS):
+                return Response(
+                    {'error': f'Sessions can only be booked up to {BOOKING_HORIZON_DAYS} days ahead.'},
+                    status=400,
+                )
             if session_date < current_now.date():
                 return Response(
                     {"error": "Cannot book a past date."},
@@ -2534,6 +2654,17 @@ def confirm_payment_and_book(request):
 
         for slot_group in group_slot_requests(normalized_slots):
             session_group_id = uuid4()
+            session_mode = slot_group[0]['session_mode']
+            meeting_link = (
+                f'https://meet.jit.si/studybuddy-{uuid4().hex}'
+                if session_mode == 'Online'
+                else ''
+            )
+            session_start = timezone.make_aware(
+                datetime.combine(slot_group[0]['session_date'], slot_group[0]['availability'].time_slot),
+                timezone.get_current_timezone(),
+            )
+            is_born_late = current_now >= session_start - timedelta(hours=GRACE_CUTOFF_HOURS)
 
             for slot_request in slot_group:
                 booking = Booking.objects.create(
@@ -2546,28 +2677,60 @@ def confirm_payment_and_book(request):
                     preferred_location=preferred_location,
                     session_group_id=session_group_id,
                     booking_request_id=booking_request_id,
-                    status="Pending"
+                    status='Confirmed',
+                    meeting_link=meeting_link,
+                    is_born_late=is_born_late,
                 )
                 created_bookings.append(booking.id)
                 request_bookings.append(booking)
 
-        create_booking_status_notification(
-            tutor.profile,
-            "pending",
-            request_bookings
+        representative_booking = get_representative_booking(request_bookings)
+        session_start = timezone.make_aware(
+            datetime.combine(
+                representative_booking.session_date,
+                representative_booking.availability.time_slot,
+            ),
+            timezone.get_current_timezone(),
+        )
+        cancellation_deadline = session_start - timedelta(hours=GRACE_CUTOFF_HOURS)
+        deadline_copy = timezone.localtime(cancellation_deadline).strftime('%b %d, %Y %I:%M %p')
+        for recipient in (tutor.profile, user_profile):
+            create_booking_status_notification(
+                recipient,
+                'confirmed',
+                request_bookings,
+                cancellation_deadline=deadline_copy,
+                is_born_late=representative_booking.is_born_late,
+            )
+        room = get_canonical_room_for_booking(representative_booking)
+        from studybuddy.chat.models import Message
+        Message.objects.create(
+            room=room,
+            sender=None,
+            content='This chat was opened automatically when the booking was confirmed.',
+        )
+        transaction.on_commit(
+            lambda booking=representative_booking: mailer.enqueue_booking_confirmed(
+                booking.tutor.profile.user,
+                booking,
+            )
         )
 
     if request_bookings:
         create_booking_event(
             request_bookings[0],
             request.user,
-            "New booking request sent.",
-            "booking_requested"
+            'Booking confirmed instantly.',
+            'booking_confirmed'
         )
 
     return Response({
-        "message": "Booking successful",
-        "booking_ids": created_bookings
+        'message': 'Booking confirmed instantly.',
+        'booking_ids': created_bookings,
+        'meeting_link': request_bookings[0].meeting_link if request_bookings else '',
+        'preferred_location': preferred_location,
+        'is_born_late': request_bookings[0].is_born_late if request_bookings else False,
+        'cancellation_deadline': cancellation_deadline.isoformat() if request_bookings else None,
     })
 
 # ==========================================
@@ -2802,115 +2965,6 @@ def delete_availability_override(request, override_id):
     override.delete()
     return Response({"message": "Override removed successfully."})
 
-#accept booking
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def approve_booking(request, booking_id):
-    with transaction.atomic():
-        booking = get_object_or_404(Booking.objects.select_for_update(), id=booking_id)
-        session_group_bookings = (
-            get_booking_request_bookings(booking)
-            if booking.status == "Pending"
-            else get_session_group_bookings(booking)
-        )
-
-        # Ensure tutor owns booking
-        if request.user.userprofile != booking.tutor.profile:
-            return Response({"error": "Unauthorized"}, status=403)
-
-        if not can_create_new_booking(request.user.userprofile):
-            return Response(
-                {
-                    "error": "Please complete your enrollment verification before accepting new bookings.",
-                    "code": "verification_required",
-                },
-                status=403,
-            )
-
-        wallet, _ = Wallet.objects.get_or_create(tutor=booking.tutor)
-        if wallet.balance < 0:
-            return Response(
-                {"error": "You cannot accept bookings while your wallet balance is negative."},
-                status=400
-            )
-
-        if booking.status == "Confirmed":
-            return Response({"message": "Booking is already confirmed."})
-
-        if booking.status != "Pending":
-            return Response({"error": "Only pending bookings can be approved."}, status=400)
-
-        load_snapshot = get_tutor_acceptance_load_snapshot(booking.tutor)
-        if load_snapshot["accepted_session_load"] >= load_snapshot["session_load_limit"]:
-            return Response(
-                {
-                    "error": (
-                        "You have reached your accepted session limit. "
-                        "Please clear some accepted sessions before approving more."
-                    ),
-                    "code": "session_load_limit_reached",
-                    **load_snapshot,
-                },
-                status=409,
-            )
-
-        Booking.objects.filter(id__in=[group_booking.id for group_booking in session_group_bookings]).update(
-            status="Confirmed",
-            tutee_confirmed=False,
-            tutor_confirmed=False,
-        )
-
-        create_booking_status_notification(
-            booking.student,
-            "confirmed",
-            session_group_bookings
-        )
-
-        booking.refresh_from_db()
-        create_booking_event(
-            booking,
-            request.user,
-            "Booking request approved.",
-            "booking_approved"
-        )
-
-        return Response({"message": "Booking confirmed successfully."})
-
-#Reject booking
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def reject_booking(request, booking_id):
-
-    booking = get_object_or_404(Booking, id=booking_id)
-    session_group_bookings = get_booking_request_bookings(booking) if booking.status == "Pending" else get_session_group_bookings(booking)
-
-    if request.user.userprofile != booking.tutor.profile:
-        return Response({"error": "Unauthorized"}, status=403)
-
-    if booking.status != "Pending":
-        return Response({"error": "Only pending bookings can be rejected."}, status=400)
-
-    Booking.objects.filter(id__in=[group_booking.id for group_booking in session_group_bookings]).update(
-        status="Rejected",
-        tutee_confirmed=False,
-        tutor_confirmed=False,
-    )
-
-    create_booking_status_notification(
-        booking.student,
-        "rejected",
-        session_group_bookings
-    )
-
-    booking.refresh_from_db()
-    create_booking_event(
-        booking,
-        request.user,
-        "Booking request rejected.",
-        "booking_rejected"
-    )
-
-    return Response({"message": "Booking rejected successfully."})
 
 
 @api_view(['POST'])
@@ -2972,19 +3026,19 @@ def cancel_booking(request, booking_id):
         end_time
     )
 
-    # Allowed: pending requests (withdraw) or confirmed-upcoming sessions.
-    if raw_status != "Pending" and display_status != "Upcoming":
+    if display_status != 'Upcoming':
         return Response(
-            {"error": "Only pending requests or upcoming sessions can be cancelled."},
+            {'error': 'Only upcoming sessions can be cancelled.'},
             status=400
         )
 
-    # Cutoff: cannot cancel the day of or the day before the session.
-    if representative_booking.session_date <= timezone.localdate() + timedelta(days=1):
-        return Response(
-            {"error": "Sessions can only be cancelled at least two days before the session date."},
-            status=400
-        )
+    session_start = timezone.make_aware(
+        datetime.combine(first_booking.session_date, first_booking.availability.time_slot),
+        timezone.get_current_timezone(),
+    )
+    is_late_cancellation = timezone.localtime(timezone.now()) >= (
+        session_start - timedelta(hours=GRACE_CUTOFF_HOURS)
+    )
 
     with transaction.atomic():
         Booking.objects.filter(id__in=[group_booking.id for group_booking in session_group_bookings]).update(
@@ -2994,6 +3048,21 @@ def cancel_booking(request, booking_id):
             cancellation_reason=reason,
             cancelled_by_role=actor_role,
         )
+
+        if is_late_cancellation:
+            aggrieved_party = representative_booking.tutor.profile if is_student else representative_booking.student
+            SupportTicket.objects.create(
+                user=aggrieved_party,
+                booking=representative_booking,
+                category='Late_Cancellation',
+                subject='Late Cancellation review',
+                description=(
+                    f'A {actor_role} cancelled this session after the Grace Cutoff. '
+                    f'Reason: {reason}'
+                ),
+                reported_by_system=True,
+                penalized_user=profile,
+            )
 
         create_booking_status_notification(
             representative_booking.tutor.profile,
@@ -3707,7 +3776,6 @@ def get_recommendation_time_slots(start_time_string, end_time_string):
 
 def get_recommendation_candidate_tutors(
     subject,
-    student_profile,
     preferred_mode=None,
     min_budget=None,
     max_budget=None,
@@ -3715,13 +3783,21 @@ def get_recommendation_candidate_tutors(
     start_time=None,
     end_time=None,
 ):
-    base_candidates = filter_tutors_by_institution(
-        Tutor.objects.filter(
-            tutorsubjects__subject__subject_code=subject,
-            profile__tutor_application__application_status='approved',
-        ),
-        student_profile,
+    base_candidates = Tutor.objects.filter(
+        tutorsubjects__subject__subject_code=subject,
+        profile__tutor_application__application_status='approved',
     )
+    eligible_candidate_ids = []
+    for candidate in base_candidates.distinct():
+        wallet, _ = Wallet.objects.get_or_create(tutor=candidate)
+        load_snapshot = get_tutor_acceptance_load_snapshot(candidate)
+        if (
+            wallet.balance >= 0
+            and load_snapshot['accepted_session_load'] < load_snapshot['session_load_limit']
+            and not has_reached_monthly_strike_cap(candidate.profile)
+        ):
+            eligible_candidate_ids.append(candidate.profile_id)
+    base_candidates = base_candidates.filter(profile_id__in=eligible_candidate_ids)
 
     if preferred_mode == "Online":
         base_candidates = base_candidates.filter(can_online=True)
@@ -3843,7 +3919,6 @@ def recommend_tutors_view(request):
     ratings = build_rating_matrix()
     candidate_qs = get_recommendation_candidate_tutors(
         subject,
-        student_profile,
         preferred_mode=preferred_mode,
         min_budget=min_budget,
         max_budget=max_budget,
@@ -4107,24 +4182,19 @@ def propose_tutor_subject(request):
         )
 
     subject_name = str(request.data.get('subject_name') or '').strip()
-    department = str(request.data.get('department') or '').strip()
+    category = str(request.data.get('category') or '').strip()
     description = str(request.data.get('description') or '').strip()
+    keywords = str(request.data.get('keywords') or '').strip()
 
-    if not subject_name or not department:
+    if not subject_name or not category:
         return Response(
-            {"error": "Subject name and department are required."},
+            {"error": "Subject name and category are required."},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    valid_departments = set(
-        Subjects.objects.filter(status='approved')
-        .exclude(department='')
-        .values_list('department', flat=True)
-        .distinct()
-    )
-    if department not in valid_departments:
+    if category not in TAXONOMY_CATEGORIES:
         return Response(
-            {"error": "Select a department from the existing catalog."},
+            {"error": "Select a category from the taxonomy."},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
@@ -4132,7 +4202,8 @@ def propose_tutor_subject(request):
     subject = Subjects.objects.create(
         subject_code=generate_proposed_subject_code(subject_name),
         subject_name=subject_name,
-        department=department,
+        category=category,
+        keywords=keywords,
         status='pending',
         proposed_by_tutor=tutor,
         proposed_application=application,
@@ -4148,7 +4219,8 @@ def propose_tutor_subject(request):
         {
             "subject_code": subject.subject_code,
             "subject_name": subject.subject_name,
-            "department": subject.department,
+            "category": subject.category,
+            "keywords": subject.keywords,
             "description": description,
             "status": subject.status,
         },
@@ -5633,6 +5705,7 @@ def admin_list_tickets(request):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
+@transaction.atomic
 def admin_resolve_ticket(request, ticket_id):
     profile = request.user.userprofile
     if profile.role != 'SuperAdmin':
@@ -5643,21 +5716,48 @@ def admin_resolve_ticket(request, ticket_id):
     if profile.role != 'SuperAdmin':
         queryset = queryset.filter(user__institution=profile.institution)
 
-    ticket = get_object_or_404(queryset, id=ticket_id)
+    ticket = get_object_or_404(queryset.select_for_update(), id=ticket_id)
     if ticket.status == 'Escalated' and profile.role != 'SuperAdmin':
         return Response({"error": "Escalated tickets must be resolved by a SuperAdmin."}, status=403)
 
+    verdict = request.data.get('verdict')
+    if ticket.category == 'Late_Cancellation':
+        if verdict not in {'excused', 'counted'}:
+            return Response({'error': 'A Late Cancellation requires an excused or counted verdict.'}, status=400)
+        if ticket.resolution_verdict:
+            return Response({'error': 'This Late Cancellation has already been resolved.'}, status=400)
+        ticket.resolution_verdict = verdict
+        if verdict == 'counted' and ticket.penalized_user and ticket.penalized_user.role == 'Tutor':
+            tutor = Tutor.objects.select_for_update().get(profile=ticket.penalized_user)
+            wallet, _ = Wallet.objects.select_for_update().get_or_create(tutor=tutor)
+            wallet.balance -= COUNTED_STRIKE_WALLET_DEDUCTION
+            wallet.save(update_fields=['balance', 'last_updated'])
+            Transaction.objects.create(
+                wallet=wallet,
+                transaction_type='counted_strike',
+                amount=-COUNTED_STRIKE_WALLET_DEDUCTION,
+                description='Counted Strike Penalty for a Late Cancellation.',
+                reference_id=f'LT-{ticket.id}',
+            )
+
     ticket.status = 'Resolved'
-    ticket.save()
+    ticket.save(update_fields=['status', 'resolution_verdict', 'updated_at'])
 
     from studybuddy.chat.models import Message
-    Message.objects.create(
-        room=ticket.chatroom,
-        sender=None,
-        content="This support ticket has been marked as Resolved. The chat is now closed."
-    )
+    if ticket.chatroom:
+        Message.objects.create(
+            room=ticket.chatroom,
+            sender=None,
+            content='This support ticket has been marked as Resolved. The chat is now closed.',
+        )
 
-    return Response({"message": "Ticket resolved", "status": "Resolved"})
+    return Response({
+        'message': 'Ticket resolved',
+        'status': 'Resolved',
+        'resolution_verdict': ticket.resolution_verdict,
+        'monthly_counted_strikes': get_monthly_counted_strike_count(ticket.penalized_user)
+        if ticket.penalized_user else 0,
+    })
 
 
 @api_view(['GET'])

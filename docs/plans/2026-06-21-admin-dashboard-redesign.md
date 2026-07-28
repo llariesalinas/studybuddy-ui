@@ -1,7 +1,7 @@
 ---
 title: Institutional Admin dashboard redesign (Phase 1)
 date: 2026-06-21
-status: In Progress
+status: Done
 spec: ../specs/2026-06-21-admin-dashboard-redesign-design.md
 ---
 
@@ -148,3 +148,6 @@ are written and will run against a local/direct Postgres. See summary.
   `AdminDashboard.vue` to Variant A. Lint + build pass; queries verified against
   the live dev DB. Django test runner blocked by the remote Supabase pooler /
   PG-only migration on SQLite. Status set to Done.
+- 2026-07-17: Frontmatter `status` was still `In Progress` despite the body
+  already saying Done since 2026-06-21 — corrected to `Done` during a
+  plan-vs-code implementation audit.

@@ -1,7 +1,7 @@
 ---
 title: Face-to-face campus location modal
 date: 2026-07-07
-status: Approved
+status: Done
 spec:
 ---
 
@@ -11,11 +11,10 @@ spec:
 
 ## Status & Progress Summary
 
-**Status (2026-07-07): Approved — handed off for implementation.** Grilled end-to-end (9
-decisions) via `/grill-with-docs`, domain terms recorded in `CONTEXT.md`, ADR 0007 written for the
-not-persisted liability acknowledgment decision. All open items (icons, copy, component contract,
-mount/revisit edge case) have since been pinned down below — nothing left for the implementer to
-decide. No code written yet.
+**Status (2026-07-17): Done.** Grilled end-to-end (9 decisions) via `/grill-with-docs`, domain
+terms recorded in `CONTEXT.md`, ADR 0007 written for the not-persisted liability acknowledgment
+decision. `CampusLocationModal.vue` is implemented and wired into both `InitialBooking.vue` and
+`FindTutors.vue` (committed 2026-07-08); frontmatter status was never flipped from Approved.
 
 ## Handoff note (read this first)
 
@@ -261,3 +260,4 @@ a valid state, unlike `InitialBooking.vue` where a mode is always required).
 |------|--------|
 | 2026-07-07 | Created plan from the `/grill-with-docs` session (9 decisions); added Status & Progress Summary and Changelog sections per the living-plan convention |
 | 2026-07-07 | Rewritten as an exact implementation handoff for Codex: pinned down the component's props/emits contract, exact copy/icons, template structure, wiring code for both views, and the mount/revisit edge case that was previously undecided |
+| 2026-07-17 | Verified against the codebase during a plan-vs-code implementation audit — `CampusLocationModal.vue` exists, committed 2026-07-08, wired into both `InitialBooking.vue` and `FindTutors.vue`. Frontmatter status was never flipped from Approved — corrected to Done |

@@ -1,7 +1,7 @@
 ---
 title: Tutor details slot range clarity
 date: 2026-06-15
-status: Approved
+status: Done
 spec:
 ---
 
@@ -79,3 +79,6 @@ Make both the cells and the cost summary spell out the actual time range.
   both template changes, and a `.slot-link` font-size/line-height tweak
   (0.82rem / 1.25) so the longer range labels fit the 7-column day grid.
   `npm run lint` and `npm run build` both pass for these changes.
+- 2026-07-17: Frontmatter `status` was still `Approved` despite this section already
+  saying "Implemented" since 2026-06-15 — corrected to `Done` during a plan-vs-code
+  implementation audit.
