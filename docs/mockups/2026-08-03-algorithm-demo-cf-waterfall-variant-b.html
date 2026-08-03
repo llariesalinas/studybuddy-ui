@@ -1,0 +1,465 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Algorithm Demo — Variant B, full page</title>
+<style>
+  :root {
+    --sb-primary: #00895A;
+    --sb-card-bg: #ffffff;
+    --sb-card-border: #dbe5e1;
+    --sb-text-muted: #6b7f79;
+    --sb-danger: #c0392b;
+    --sb-dark: #0A1916;
+    --sb-info: #2f6db3;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: linear-gradient(135deg,#eef6f1,#fbf8ee 60%,#f5eef2);
+    color: var(--sb-dark); font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    display: flex; min-height: 100vh;
+  }
+  .note-banner {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 50;
+    background: var(--sb-dark); color: #fff; font-size: 12px; text-align: center;
+    padding: 6px 10px;
+  }
+  .note-banner b { color: #8fe3c0; }
+
+  /* -- sidebar (approximate, not pixel-exact) -- */
+  .sidebar {
+    width: 200px; background: #fff; border-right: 1px solid var(--sb-card-border);
+    padding: 18px 14px; flex-shrink: 0; margin-top: 30px;
+  }
+  .sb-logo { font-weight: 700; font-size: 15px; margin-bottom: 18px; display:flex; align-items:center; gap:8px; }
+  .sb-logo .box { width:26px;height:26px;border-radius:7px;background:var(--sb-primary); }
+  .sb-user { background: color-mix(in srgb, var(--sb-primary) 8%, transparent); border-radius: 10px; padding: 8px 10px; margin-bottom: 18px; font-size: 12px; }
+  .sb-user b { display:block; font-size:13px; }
+  .sb-menu-label { font-size: 10px; text-transform: uppercase; letter-spacing:.05em; color: var(--sb-text-muted); margin: 14px 0 6px; }
+  .sb-nav a { display:block; padding: 7px 10px; border-radius: 8px; font-size: 13px; color: var(--sb-dark); text-decoration:none; margin-bottom: 2px; }
+  .sb-nav a.active { background: color-mix(in srgb, var(--sb-primary) 10%, transparent); color: var(--sb-primary); font-weight: 600; }
+
+  .main { flex: 1; padding: 46px 36px 80px; max-width: 1300px; }
+  .eyebrow { color: var(--sb-primary); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+  h1 { font-size: 22px; margin: 4px 0 2px; }
+  .lede { color: var(--sb-text-muted); font-size: 13px; margin: 0 0 20px; }
+
+  .toolbar { display:flex; justify-content: space-between; align-items:center; margin-bottom: 16px; }
+  .tabs { display:flex; gap: 6px; }
+  .tab { padding: 7px 16px; border-radius: 9999px; font-size: 13px; font-weight: 600; cursor:pointer; }
+  .tab.active { background: var(--sb-dark); color:#fff; }
+  .tab:not(.active) { color: var(--sb-text-muted); }
+  .inst-select { background:#fff; border:1px solid var(--sb-card-border); border-radius:9px; padding:8px 14px; font-size:13px; }
+
+  .sb-card { background: var(--sb-card-bg); border: 1px solid var(--sb-card-border); border-radius: 14px; padding: 20px 22px; }
+  .panel-top { margin-bottom: 18px; }
+  .tutee-select-label { font-size: 11px; color: var(--sb-text-muted); margin-bottom: 6px; display:block; }
+  .tutee-select { border:1px solid var(--sb-card-border); border-radius:9px; padding:10px 14px; font-size: 14px; max-width: 320px; }
+
+  /* weight table */
+  .wt-header h3 { margin: 0 0 2px; font-size: 14px; }
+  .wt-header p { margin: 0 0 12px; font-size: 11.5px; color: var(--sb-text-muted); }
+  .wt-table { width:100%; border-collapse: collapse; font-size: 12px; }
+  .wt-table th { padding:6px; font-size:10px; text-transform:uppercase; letter-spacing:.04em; color: var(--sb-text-muted); border-bottom:1px solid var(--sb-card-border); text-align:center; white-space:nowrap; }
+  .wt-table th.left, .wt-table td.left { text-align:left; white-space:nowrap; }
+  .wt-table td { padding:6px; text-align:center; border-bottom:1px solid var(--sb-card-border); }
+  .wt-weight { font-weight:400; }
+  .wt-row { cursor:pointer; }
+  .wt-row.selected td { background: color-mix(in srgb, var(--sb-primary) 10%, transparent); }
+  .wt-cell { display:block; border-radius:5px; padding:3px 0; }
+  .wt-value { font-weight:600; }
+  .wt-contrib { display:block; font-size:10px; color: var(--sb-text-muted); }
+  .sb-badge { display:inline-block; background: color-mix(in srgb, var(--sb-primary) 12%, transparent); color: var(--sb-primary);
+    border:1px solid color-mix(in srgb, var(--sb-primary) 25%, transparent); border-radius:9999px; font-size:9.5px; font-weight:600; padding:1px 7px; margin-left:4px; }
+
+  .split { display:grid; grid-template-columns: 230px 1fr; gap: 18px; margin-top: 18px; }
+  .tutor-list { background:#fff; border:1px solid var(--sb-card-border); border-radius:14px; padding: 8px; height: fit-content; }
+  .tutor-list-item { display:flex; justify-content:space-between; padding: 10px 12px; border-radius:9px; font-size: 13px; cursor:pointer; }
+  .tutor-list-item.selected { background: color-mix(in srgb, var(--sb-primary) 10%, transparent); border: 1px solid color-mix(in srgb, var(--sb-primary) 30%, transparent); color: var(--sb-primary); font-weight:600; }
+  .tutor-list-item span.n { color: var(--sb-text-muted); }
+  .tutor-list-item.selected span.n { color: var(--sb-primary); }
+
+  /* --- breakdown card --- */
+  .algo-breakdown h2 { margin: 0 0 2px; font-size: 18px; }
+  .final-score { font-size: 13px; color: var(--sb-text-muted); margin: 0 0 18px; }
+  .final-score b { color: var(--sb-primary); font-size: 22px; }
+  .bar-row { margin-bottom: 14px; }
+  .bar-label { display:flex; justify-content:space-between; font-size:12px; color:var(--sb-text-muted); margin-bottom:4px; }
+  .bar-track { background: var(--sb-card-border); border-radius:5px; height:10px; width:100%; overflow:hidden; }
+  .bar-fill { height:100%; border-radius:5px; background: var(--sb-primary); }
+  .bar-fill.hybrid { background: var(--sb-dark); }
+
+  /* CF section — variant B */
+  .cf-section { border: 1px solid var(--sb-card-border); border-radius: 12px; padding: 18px 20px; margin: 20px 0; }
+  .cf-header { display:flex; justify-content: space-between; align-items:baseline; font-size:14px; font-weight:600; margin-bottom: 12px; }
+  .cf-pool { color: var(--sb-primary); font-weight:600; font-size:11.5px; margin-left:6px; }
+  .cf-score-badge { color: var(--sb-primary); font-size: 22px; font-weight:700; }
+  .cf-accuracy { font-size:12.5px; color: var(--sb-text-muted); line-height:1.6;
+    background: color-mix(in srgb, var(--sb-primary) 6%, transparent); border-left:3px solid var(--sb-primary);
+    padding: 10px 14px; border-radius: 0 8px 8px 0; margin: 0 0 18px; }
+
+  .vB-grid { display:grid; grid-template-columns: 1fr 1fr; gap: 0; }
+  .vB-zone-header { font-size: 10.5px; text-transform: uppercase; letter-spacing:.05em; color: var(--sb-text-muted);
+    padding: 0 0 10px; border-bottom: 1px solid var(--sb-card-border); margin-bottom: 12px; }
+  .vB-left { padding-right: 26px; border-right: 1px solid var(--sb-card-border); }
+  .vB-right { padding-left: 26px; }
+  .vB-row { padding: 14px 0; border-bottom: 1px solid #f0f4f2; min-height: 56px; }
+  .vB-row:last-child { border-bottom: none; }
+  .vB-name { font-size: 13.5px; font-weight: 700; margin-bottom: 8px; display:flex; align-items:center; gap:8px; }
+  .vB-name small { font-weight: 400; font-size: 11px; color: var(--sb-text-muted); }
+  .vB-name small.warn { color: var(--sb-danger); }
+  .vB-evidence-line { display:flex; align-items:center; gap: 10px; font-size: 12.5px; flex-wrap: wrap; }
+  .vB-meter { width: 80px; background: var(--sb-card-border); border-radius:5px; height:10px; overflow:hidden; }
+  .vB-meter i { display:block; height:100%; background: var(--sb-primary); border-radius:5px; }
+  .vB-sim-val { font-weight:700; color: var(--sb-primary); min-width: 30px; }
+  .vB-rate-control { display:flex; align-items:center; gap: 8px; }
+  .vB-rate-control input[type=range] { width: 100px; accent-color: var(--sb-primary); }
+  .vB-rate-val { font-weight:700; min-width:24px; }
+  .vB-avg { color: var(--sb-text-muted); font-size: 11px; }
+
+  .vB-track { position:relative; height: 30px; margin-top: 4px; }
+  .vB-seg { position:absolute; top: 7px; height: 18px; border-radius:5px; background: var(--sb-primary); transition: left .2s ease, width .2s ease; }
+  .vB-seg.neg { background: var(--sb-danger); }
+  .vB-seg.base { background: var(--sb-dark); opacity: .78; }
+  .vB-seg.total { height: 22px; top: 5px; }
+  .vB-segval { position:absolute; top: 7px; font-size: 12.5px; font-weight:700; color: var(--sb-primary); white-space:nowrap; transition: left .2s ease; }
+  .vB-segval.neg { color: var(--sb-danger); }
+  .vB-axis { display:flex; justify-content:space-between; font-size:11px; color: var(--sb-text-muted); margin-top: 6px; }
+  .vB-formula { grid-column: 1 / -1; font-size: 14px; color: var(--sb-text-muted); margin: 18px 0 0; padding-top: 16px; border-top: 1px solid var(--sb-card-border); }
+  .vB-formula b { color: var(--sb-primary); font-size: 16px; }
+  .reset-link { font-size: 11.5px; color: var(--sb-primary); cursor:pointer; text-decoration: underline; margin-left: 10px; }
+  .chip-unsaved { font-size:10.5px; color: var(--sb-danger); font-weight:600; margin-left: 8px; }
+</style>
+</head>
+<body>
+<div class="note-banner">Prototype — sliders are live and recompute CF/Hybrid with the real formula. <b>Nothing here is saved to a database.</b></div>
+
+<div class="sidebar">
+  <div class="sb-logo"><span class="box"></span> StudyBuddy</div>
+  <div class="sb-user"><b>StudyBuddy User</b>Superadmin</div>
+  <div class="sb-menu-label">Menu</div>
+  <div class="sb-nav">
+    <a>Dashboard</a><a>Institutions</a><a>All Users</a><a>Course Catalog</a><a>Applications</a><a>Reports</a><a>Support Desk</a>
+    <a class="active">Algorithm Demo</a>
+  </div>
+</div>
+
+<div class="main">
+  <div class="eyebrow">Recommender testing</div>
+  <h1>Algorithm Demo</h1>
+  <p class="lede">Runs the real hybrid recommender (CBF + CF) against seeded data. Staff-only.</p>
+
+  <div class="toolbar">
+    <div class="tabs"><div class="tab active">Ranked List</div><div class="tab">Compare Pair</div></div>
+    <div class="inst-select">All institutions ▾</div>
+  </div>
+
+  <div class="sb-card panel-top">
+    <span class="tutee-select-label">Tutee</span>
+    <div class="tutee-select">Katrina Katigbak ▾</div>
+  </div>
+
+  <div class="sb-card" style="margin-top:18px;">
+    <div class="wt-header">
+      <h3>Top 5 side by side</h3>
+      <p>Each cell shows the sub-score with its weighted contribution beneath. Click a row to open its full calculation.</p>
+    </div>
+    <table class="wt-table">
+      <thead>
+        <tr>
+          <th class="left">#&nbsp;&nbsp;Tutor</th>
+          <th>Specific<br><span class="wt-weight">w 0.40</span></th>
+          <th>General<br><span class="wt-weight">w 0.20</span></th>
+          <th>Expertise<br><span class="wt-weight">w 0.15</span></th>
+          <th>Course<br><span class="wt-weight">w 0.10</span></th>
+          <th>Year<br><span class="wt-weight">w 0.10</span></th>
+          <th>Level<br><span class="wt-weight">w 0.05</span></th>
+          <th>CBF<br><span class="wt-weight">× .70</span></th>
+          <th>CF<br><span class="wt-weight">× .30</span></th>
+          <th>Hybrid</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="wt-row selected">
+          <td class="left"><b>1&nbsp;&nbsp;Fidel Fajardo</b></td>
+          <td><span class="wt-cell" style="background:color-mix(in srgb, var(--sb-primary) 30%, transparent)"><span class="wt-value">1.00</span><span class="wt-contrib">.400</span></span></td>
+          <td><span class="wt-cell" style="background:color-mix(in srgb, var(--sb-primary) 22%, transparent)"><span class="wt-value">1.00</span><span class="wt-contrib">.200</span></span></td>
+          <td><span class="wt-cell" style="background:color-mix(in srgb, var(--sb-primary) 16%, transparent)"><span class="wt-value">1.00</span><span class="wt-contrib">.150</span></span></td>
+          <td><span class="wt-cell" style="background:color-mix(in srgb, var(--sb-primary) 14%, transparent)"><span class="wt-value">1.00</span><span class="wt-contrib">.100</span></span></td>
+          <td><span class="wt-cell" style="background:color-mix(in srgb, var(--sb-primary) 7%, transparent)"><span class="wt-value">0.33</span><span class="wt-contrib">.033</span></span></td>
+          <td><span class="wt-cell" style="background:color-mix(in srgb, var(--sb-primary) 7%, transparent)"><span class="wt-value">1.00</span><span class="wt-contrib">.050</span></span></td>
+          <td><b>0.933</b></td>
+          <td id="wt-cf-cell">4.92 <span class="sb-badge">peer</span></td>
+          <td><b id="wt-hybrid-cell" style="color:var(--sb-primary)">0.949</b></td>
+        </tr>
+        <tr class="wt-row"><td class="left"><b>2&nbsp;&nbsp;Marisol Aquino</b></td><td colspan="8" style="color:var(--sb-text-muted)">— unaffected by edits above —</td></tr>
+        <tr class="wt-row"><td class="left"><b>3&nbsp;&nbsp;Hector Hidalgo</b></td><td colspan="8" style="color:var(--sb-text-muted)">— unaffected by edits above —</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div class="tutor-list">
+      <div class="tutor-list-item selected">1. Fidel Fajardo <span class="n">0.95</span></div>
+      <div class="tutor-list-item">2. Marisol Aquino <span class="n">0.93</span></div>
+      <div class="tutor-list-item">3. Hector Hidalgo <span class="n">0.88</span></div>
+      <div class="tutor-list-item">4. Rose Hansen <span class="n">0.65</span></div>
+      <div class="tutor-list-item">5. Domingo Diaz <span class="n">0.61</span></div>
+    </div>
+
+    <div class="algo-breakdown sb-card">
+      <h2>Fidel Fajardo</h2>
+      <p class="final-score">Hybrid Score <b id="hybrid-final">0.949</b></p>
+
+      <div class="bar-row">
+        <div class="bar-label"><span>Specific subject (weight 0.40)</span><span>1.00</span></div>
+        <div class="bar-track"><div class="bar-fill" style="width:100%"></div></div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label"><span>General subject (weight 0.20)</span><span>1.00</span></div>
+        <div class="bar-track"><div class="bar-fill" style="width:100%"></div></div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label"><span>Expertise (weight 0.15)</span><span>1.00</span></div>
+        <div class="bar-track"><div class="bar-fill" style="width:100%"></div></div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label"><span>Course match (weight 0.10)</span><span>1.00</span></div>
+        <div class="bar-track"><div class="bar-fill" style="width:100%"></div></div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label"><span>Year proximity (weight 0.10)</span><span>0.33</span></div>
+        <div class="bar-track"><div class="bar-fill" style="width:33%"></div></div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label"><span>Teaching level (weight 0.05)</span><span>1.00</span></div>
+        <div class="bar-track"><div class="bar-fill" style="width:100%"></div></div>
+      </div>
+
+      <!-- ===== CF section, Variant B ===== -->
+      <section class="cf-section">
+        <header class="cf-header">
+          <span>Collaborative Filtering <span class="cf-pool">Peer pool — same course</span></span>
+          <span class="cf-score-badge" id="cf-score-badge">4.92</span>
+        </header>
+
+        <p class="cf-accuracy">
+          This tutee has already rated this tutor <b>5.0</b> — CF predicted <b id="cf-accuracy-predicted">4.92</b>,
+          off by <b id="cf-accuracy-gap">0.08</b>. Editing a rating here re-runs the similarity too, because this
+          tutor is inside the co-rated set.
+          <span class="reset-link" id="reset-link" style="display:none">Reset</span>
+          <span class="chip-unsaved" id="unsaved-chip" style="display:none">nothing saved — in-memory only</span>
+        </p>
+
+        <div class="vB-grid">
+          <div class="vB-left">
+            <div class="vB-zone-header">Evidence — similarity &amp; rating</div>
+
+            <div class="vB-row">
+              <div class="vB-name">Baseline <small>tutee's own average</small></div>
+            </div>
+
+            <div class="vB-row" data-neighbor="olivia">
+              <div class="vB-name">Olivia Ocampo <small>5 co-rated</small></div>
+              <div class="vB-evidence-line">
+                <div class="vB-meter"><i style="width:97%"></i></div><span class="vB-sim-val">0.97</span>
+                <div class="vB-rate-control">
+                  <input type="range" min="1" max="5" step="0.5" value="5" oninput="onRate('olivia', this.value)">
+                  <span class="vB-rate-val" id="rate-olivia">5.0</span>
+                </div>
+                <span class="vB-avg">her avg 3.00</span>
+              </div>
+            </div>
+
+            <div class="vB-row" data-neighbor="gloria">
+              <div class="vB-name">Gloria Garcia <small>4 co-rated</small></div>
+              <div class="vB-evidence-line">
+                <div class="vB-meter"><i style="width:85%"></i></div><span class="vB-sim-val">0.85</span>
+                <div class="vB-rate-control">
+                  <input type="range" min="1" max="5" step="0.5" value="4" oninput="onRate('gloria', this.value)">
+                  <span class="vB-rate-val" id="rate-gloria">4.0</span>
+                </div>
+                <span class="vB-avg">her avg 4.00</span>
+              </div>
+            </div>
+
+            <div class="vB-row" data-neighbor="hernan">
+              <div class="vB-name">Hernan Herrera <small>4 co-rated</small></div>
+              <div class="vB-evidence-line">
+                <div class="vB-meter"><i style="width:85%"></i></div><span class="vB-sim-val">0.85</span>
+                <div class="vB-rate-control">
+                  <input type="range" min="1" max="5" step="0.5" value="5" oninput="onRate('hernan', this.value)">
+                  <span class="vB-rate-val" id="rate-hernan">5.0</span>
+                </div>
+                <span class="vB-avg">her avg 3.75</span>
+              </div>
+            </div>
+
+            <div class="vB-row" style="border-bottom:none">
+              <div class="vB-name" style="font-weight:700">CF score</div>
+            </div>
+          </div>
+
+          <div class="vB-right">
+            <div class="vB-zone-header">Effect on Katrina's baseline</div>
+
+            <div class="vB-row"><div style="height:22px"></div>
+              <div class="vB-track"><div class="vB-seg base" id="seg-base"></div><span class="vB-segval" id="segval-base">3.80</span></div>
+            </div>
+            <div class="vB-row"><div style="height:22px"></div>
+              <div class="vB-track"><div class="vB-seg" id="seg-olivia"></div><span class="vB-segval" id="segval-olivia">+0.73</span></div>
+            </div>
+            <div class="vB-row"><div style="height:22px"></div>
+              <div class="vB-track"><div class="vB-seg" id="seg-gloria"></div><span class="vB-segval" id="segval-gloria">+0.00</span></div>
+            </div>
+            <div class="vB-row"><div style="height:22px"></div>
+              <div class="vB-track"><div class="vB-seg" id="seg-hernan"></div><span class="vB-segval" id="segval-hernan">+0.40</span></div>
+            </div>
+            <div class="vB-row" style="border-bottom:none"><div style="height:22px"></div>
+              <div class="vB-track"><div class="vB-seg total" id="seg-total"></div><span class="vB-segval total" id="segval-total">4.92</span></div>
+              <div class="vB-axis"><span id="axis-lo">3.5</span><span id="axis-mid">4.3</span><span id="axis-hi">5.0</span></div>
+            </div>
+          </div>
+
+          <p class="vB-formula" id="formula-line">CF = 3.80 + (3.003 ÷ 2.67) = <b>4.92</b></p>
+        </div>
+      </section>
+
+      <div class="bar-row">
+        <div class="bar-label"><span>Hybrid Score = 0.7×CBF + 0.3×(CF/5)</span></div>
+        <div class="bar-track"><div class="bar-fill hybrid" id="hybrid-bar" style="width:94.9%"></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const CBF = 0.933;
+  const BASELINE = 3.80;
+  const AXIS_PAD = 0.25;
+  const AXIS_MIN_SPAN = 1;
+  const CF_MAX = 5;
+
+  const neighbors = {
+    olivia: { sim: 0.97, avg: 3.00, rating: 5.0 },
+    gloria: { sim: 0.85, avg: 4.00, rating: 4.0 },
+    hernan: { sim: 0.85, avg: 3.75, rating: 5.0 }
+  };
+  const initialRatings = { olivia: 5.0, gloria: 4.0, hernan: 5.0 };
+  const studentRating = 5.0; // Katrina's own rating of Fidel, for the accuracy callout
+
+  function onRate(key, value) {
+    neighbors[key].rating = Number(value);
+    document.getElementById('rate-' + key).textContent = Number(value).toFixed(1);
+    recompute();
+  }
+
+  function pct(value, lo, hi) {
+    if (hi === lo) return 0;
+    return Math.max(0, Math.min(1, (value - lo) / (hi - lo))) * 100;
+  }
+
+  function recompute() {
+    const keys = Object.keys(neighbors);
+    let numerator = 0, denominator = 0;
+    const shares = {};
+
+    keys.forEach((k) => {
+      const n = neighbors[k];
+      const term = n.sim * (n.rating - n.avg);
+      numerator += term;
+      denominator += Math.abs(n.sim);
+    });
+
+    keys.forEach((k) => {
+      const n = neighbors[k];
+      const term = n.sim * (n.rating - n.avg);
+      shares[k] = term / denominator;
+    });
+
+    const cf = BASELINE + numerator / denominator;
+
+    // running cumulative for the waterfall
+    let cumulative = BASELINE;
+    const steps = {};
+    keys.forEach((k) => {
+      const from = cumulative;
+      cumulative += shares[k];
+      steps[k] = { from, to: cumulative, share: shares[k] };
+    });
+
+    const points = [BASELINE, cf].concat(keys.flatMap((k) => [steps[k].from, steps[k].to]));
+    let lo = Math.min(...points) - AXIS_PAD;
+    let hi = Math.max(...points) + AXIS_PAD;
+    if (hi - lo < AXIS_MIN_SPAN) {
+      const mid = (lo + hi) / 2;
+      lo = mid - AXIS_MIN_SPAN / 2;
+      hi = mid + AXIS_MIN_SPAN / 2;
+    }
+    lo = Math.max(0, lo);
+    hi = Math.min(CF_MAX, hi);
+
+    // baseline segment
+    setSeg('base', 0, pct(BASELINE, lo, hi), false);
+    document.getElementById('segval-base').textContent = BASELINE.toFixed(2);
+
+    keys.forEach((k) => {
+      const s = steps[k];
+      const from = pct(Math.min(s.from, s.to), lo, hi);
+      const to = pct(Math.max(s.from, s.to), lo, hi);
+      const neg = s.share < 0;
+      setSeg(k, from, Math.max(0.5, to - from), neg);
+      document.getElementById('segval-' + k).textContent =
+        (s.share >= 0 ? '+' : '−') + Math.abs(s.share).toFixed(2);
+      document.getElementById('segval-' + k).classList.toggle('neg', neg);
+    });
+
+    setSeg('total', 0, pct(cf, lo, hi), false);
+    document.getElementById('segval-total').textContent = cf.toFixed(2);
+
+    document.getElementById('axis-lo').textContent = lo.toFixed(1);
+    document.getElementById('axis-mid').textContent = ((lo + hi) / 2).toFixed(1);
+    document.getElementById('axis-hi').textContent = hi.toFixed(1);
+
+    document.getElementById('cf-score-badge').textContent = cf.toFixed(2);
+    document.getElementById('wt-cf-cell').innerHTML = cf.toFixed(2) + ' <span class="sb-badge">peer</span>';
+
+    const gap = Math.abs(cf - studentRating);
+    document.getElementById('cf-accuracy-predicted').textContent = cf.toFixed(2);
+    document.getElementById('cf-accuracy-gap').textContent = gap.toFixed(2);
+
+    document.getElementById('formula-line').innerHTML =
+      'CF = ' + BASELINE.toFixed(2) + ' + (' + numerator.toFixed(3) + ' ÷ ' + denominator.toFixed(2) +
+      ') = <b>' + cf.toFixed(2) + '</b>';
+
+    const hybrid = 0.7 * CBF + 0.3 * (cf / CF_MAX);
+    document.getElementById('hybrid-final').textContent = hybrid.toFixed(3);
+    document.getElementById('wt-hybrid-cell').textContent = hybrid.toFixed(3);
+    document.getElementById('hybrid-bar').style.width = (hybrid * 100).toFixed(1) + '%';
+
+    const changed = keys.some((k) => neighbors[k].rating !== initialRatings[k]);
+    document.getElementById('reset-link').style.display = changed ? 'inline' : 'none';
+    document.getElementById('unsaved-chip').style.display = changed ? 'inline' : 'none';
+  }
+
+  function setSeg(key, leftPct, widthPct, neg) {
+    const el = document.getElementById('seg-' + key);
+    el.style.left = leftPct + '%';
+    el.style.width = widthPct + '%';
+    el.classList.toggle('neg', neg && key !== 'base' && key !== 'total');
+  }
+
+  document.getElementById('reset-link').addEventListener('click', () => {
+    Object.keys(neighbors).forEach((k) => {
+      neighbors[k].rating = initialRatings[k];
+      document.querySelector(`input[oninput*="${k}"]`).value = initialRatings[k];
+      document.getElementById('rate-' + k).textContent = initialRatings[k].toFixed(1);
+    });
+    recompute();
+  });
+
+  recompute();
+</script>
+</body>
+</html>
