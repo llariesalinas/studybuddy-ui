@@ -90,11 +90,12 @@ it only unlocks access to the demo site at all. Real logins need a seeded person
 
 ### Login accounts
 Full list and what each proves:
-[demo-data-testing-guide.md](../artifacts/2026-07-05-demo-data-testing-guide.md). Quick picks, all
-with password `studybuddy123`:
-- `bea.santos@cpu.edu.ph` — cold-start recommendation tutee
-- `miguel.torres@cpu.edu.ph` — strongest-CBF-fit tutor
-- `demo.admin@cpu.edu.ph` / `demo.admin@north.edu.ph` — per-institution admins
+[demo-data-testing-accounts.html](demo-data-testing-accounts.html). Quick picks, all with
+password `studybuddy123`:
+- `s1.felipe.fernandez@cpu.edu.ph` — cold-start recommendation tutee
+- `t1.marisol.aquino@cpu.edu.ph` — strongest-CBF-fit tutor
+- There is no institutional Admin tier anymore (role removed in migration `0072`) and no
+  second institution — only CPU is seeded.
 - SuperAdmin — not auto-seeded; promote one with
   `python manage.py make_superadmin <email> --create` (run against the demo DB per the steps
   above; prompts for password interactively, never logged).
