@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tutor Dashboard Simplification - agreed design (2026-08-05)</title>
+<style>
+  :root {
+    --g:#1f8a54; --g-soft:#e7f4ed; --ink:#14261d; --muted:#6b7d73;
+    --line:#dfe7e2; --gold:#a66d00; --gold-soft:#fdf3dc; --red:#b0533f;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:#eef2f0; padding:28px 20px 60px;
+         font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color:var(--ink); }
+  .wrap { max-width:1130px; margin:0 auto; }
+  h1 { font-size:21px; margin:0 0 4px; letter-spacing:-.01em; }
+  .lede { font-size:13px; color:var(--muted); margin:0 0 22px; line-height:1.5; }
+  .lede code { background:#e2e8e5; padding:1px 5px; border-radius:4px; font-size:12px; }
+  h2.sec { font-size:13px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted);
+           margin:30px 0 9px; font-weight:800; }
+
+  .sb { background:#fbfdfc; border:1px solid #e2e8e5; border-radius:14px; padding:16px 18px 18px; }
+
+  .pill { display:inline-block; font-size:10.5px; font-weight:800; padding:3px 9px; border-radius:99px; white-space:nowrap; }
+  .p-ok { background:var(--g-soft); color:var(--g); }
+  .p-warn { background:var(--gold-soft); color:var(--gold); }
+  .p-pend { background:#eef1f0; color:var(--muted); }
+  .p-live { background:#fdecea; color:var(--red); }
+  .subj { font-size:11.5px; color:var(--g); font-weight:700; }
+  .btn-ghost { border:1px solid var(--line); background:#fff; color:var(--ink);
+               font-weight:700; font-size:11px; padding:4px 9px; border-radius:7px; cursor:pointer; }
+  .btn-solid { border:0; background:var(--g); color:#fff; font-weight:800; font-size:11.5px;
+               padding:7px 15px; border-radius:99px; cursor:pointer; }
+
+  .banner { border-radius:10px; padding:9px 13px; font-size:11.5px; font-weight:700;
+            background:var(--gold-soft); border:1px solid #f0d9a4; color:var(--gold);
+            margin-bottom:12px; line-height:1.45; }
+
+  .strip { display:flex; border:1px solid var(--line); background:#fff; border-radius:12px;
+           overflow:hidden; margin-bottom:14px; }
+  .strip > div { flex:1; padding:10px 14px; border-right:1px solid var(--line); }
+  .strip > div:last-child { border-right:0; }
+  .strip .k { font-size:9.5px; font-weight:800; text-transform:uppercase; letter-spacing:.04em;
+              color:var(--muted); display:block; margin-bottom:3px; }
+  .strip .v { font-size:17px; font-weight:800; letter-spacing:-.01em; }
+  .strip .v small { font-size:11.5px; font-weight:600; color:var(--muted); margin-left:3px; }
+  .cap-cell { background:#fffdf6; }
+  .at-cap { color:var(--gold); }
+  .cap-note { font-size:9.5px; color:var(--gold); font-weight:800; margin-top:2px; }
+
+  .two-col { display:grid; grid-template-columns:1fr 300px; gap:14px; align-items:start; }
+  .one-col { display:grid; grid-template-columns:1fr; gap:14px; }
+
+  .panel-hd { display:flex; justify-content:space-between; align-items:baseline; margin:0 0 8px; }
+  .panel-hd h3 { font-size:13px; margin:0; font-weight:800; }
+  .panel-hd .cnt { font-size:11px; color:var(--muted); font-weight:700; }
+
+  .grp { background:#fff; border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+  .grp-hd { background:#f6faf8; padding:6px 12px; font-size:10px; font-weight:800;
+            text-transform:uppercase; letter-spacing:.04em; color:var(--muted);
+            border-bottom:1px solid var(--line); display:flex; justify-content:space-between; }
+  .grp-hd em { font-style:normal; color:var(--g); }
+  .grow { display:grid; grid-template-columns:70px 1fr 122px 54px; align-items:center;
+          gap:10px; padding:8px 12px; border-bottom:1px solid var(--line); }
+  .grow:last-child { border-bottom:0; }
+  .grow .tm { font-size:11px; font-weight:800; }
+  .grow .nm { font-size:12px; font-weight:700; }
+
+  .attn { border:1px solid #f0d9a4; background:#fffdf6; border-radius:12px; overflow:hidden; }
+  .sub-hd { padding:5px 12px; font-size:9.5px; font-weight:800; text-transform:uppercase;
+            letter-spacing:.04em; color:var(--gold); background:#fdf8ec;
+            border-bottom:1px solid #f5e9cf; display:flex; justify-content:space-between; }
+  .expander { padding:8px 12px; text-align:center; font-size:11px; font-weight:800;
+              color:var(--gold); background:#fdf8ec; cursor:pointer; }
+  .rrow { padding:9px 12px; border-bottom:1px solid #f5e9cf; }
+  .rrow:last-child { border-bottom:0; }
+  .rrow .nm { font-size:12px; font-weight:700; }
+  .rrow .ln2 { display:flex; justify-content:space-between; align-items:center; margin-top:5px; gap:6px; }
+  .rrow .when { font-size:10.5px; font-weight:700; color:var(--muted); }
+
+  .pager { display:flex; justify-content:space-between; align-items:center;
+           margin-top:11px; padding-top:10px; border-top:1px solid var(--line); }
+  .pager .rng { font-size:11px; color:var(--muted); font-weight:600; }
+  .pager .nums { display:flex; gap:5px; }
+  .pager .nums span { min-width:24px; height:24px; display:inline-flex; align-items:center;
+                      justify-content:center; border:1px solid var(--line); background:#fff;
+                      border-radius:7px; font-size:11px; font-weight:700; }
+  .pager .nums span.on { background:var(--g); color:#fff; border-color:var(--g); }
+
+  .empty-hero { border:1px dashed var(--line); background:#fff; border-radius:12px;
+                padding:30px 20px; text-align:center; }
+  .empty-hero .t { font-size:13.5px; font-weight:800; }
+  .empty-hero .s { font-size:11.5px; color:var(--muted); margin:6px 0 14px; line-height:1.5; }
+
+  .callout { font-size:11.5px; line-height:1.5; border-radius:8px; padding:9px 12px; margin-top:11px; }
+  .c-note { background:#eef3f0; color:var(--muted); border:1px solid #dde5e1; }
+  .rules { background:#fff; border:1px solid #e2e8e5; border-radius:12px; padding:4px 0; margin-top:8px; }
+  .rules table { width:100%; border-collapse:collapse; font-size:12px; }
+  .rules th { text-align:left; font-size:9.5px; text-transform:uppercase; letter-spacing:.04em;
+              color:var(--muted); font-weight:800; padding:9px 14px; border-bottom:1px solid var(--line); }
+  .rules td { padding:9px 14px; border-bottom:1px solid #eef2f0; vertical-align:top; }
+  .rules tr:last-child td { border-bottom:0; }
+  .rules code { background:#eef3f0; padding:1px 5px; border-radius:4px; font-size:11px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Tutor Dashboard - agreed design</h1>
+  <p class="lede">
+    Decided 2026-08-05 in a grill + ui-preview session. Replaces the six-metric card grid and
+    unpaginated booking card list in <code>TutorDashboard.vue</code>.
+    Layout pattern: <strong>sidebar-and-main</strong> (<code>1fr + 300px</code>), mocked at the real
+    content width of ~1090px available beside the app nav.
+    Companion plan: <code>docs/plans/2026-08-05-tutor-dashboard-simplification.md</code>
+  </p>
+
+  <h2 class="sec">Default state - requests and payments waiting</h2>
+  <div class="sb">
+    <div class="strip">
+      <div><span class="k">Wallet Balance</span><span class="v">PHP 50</span></div>
+      <div><span class="k">Avg Rating</span><span class="v">3.9<small>/ 5.0</small></span></div>
+      <div><span class="k">Accepted Sessions</span><span class="v">4<small>/ 10</small></span></div>
+    </div>
+
+    <div class="two-col">
+      <div>
+        <div class="panel-hd"><h3>Full Schedule</h3><span class="cnt">9 committed</span></div>
+        <div class="grp">
+          <div class="grp-hd"><span>Tue, Aug 5 <em>&middot; Today</em></span><span>2 sessions</span></div>
+          <div class="grow"><div class="tm">9:00 AM</div><div><div class="nm">Andrea Lim</div><span class="subj">Calculus I &middot; 1 hr</span></div><div><span class="pill p-warn">Payment Required</span></div><div style="text-align:right"><button class="btn-ghost">View</button></div></div>
+          <div class="grow"><div class="tm">3:00 PM</div><div><div class="nm">Nico Tan</div><span class="subj">Calculus I &middot; 1 hr</span></div><div><span class="pill p-live">Ongoing</span></div><div style="text-align:right"><button class="btn-ghost">View</button></div></div>
+          <div class="grp-hd"><span>Wed, Aug 6</span><span>1 session</span></div>
+          <div class="grow"><div class="tm">10:00 AM</div><div><div class="nm">Kim Soriano</div><span class="subj">Gen Chemistry &middot; 1 hr</span></div><div><span class="pill p-warn">Awaiting Verification</span></div><div style="text-align:right"><button class="btn-ghost">View</button></div></div>
+          <div class="grp-hd"><span>Thu, Aug 7</span><span>2 sessions</span></div>
+          <div class="grow"><div class="tm">2:00 PM</div><div><div class="nm">Paolo Cruz</div><span class="subj">Data Structures &middot; 2 hrs</span></div><div><span class="pill p-ok">Upcoming</span></div><div style="text-align:right"><button class="btn-ghost">View</button></div></div>
+          <div class="grow"><div class="tm">4:00 PM</div><div><div class="nm">Trina Lopez</div><span class="subj">Algorithms &middot; 1 hr</span></div><div><span class="pill p-ok">Upcoming</span></div><div style="text-align:right"><button class="btn-ghost">View</button></div></div>
+        </div>
+        <div class="pager">
+          <span class="rng">Showing 1-5 of 9</span>
+          <span class="nums"><span>&lsaquo;</span><span class="on">1</span><span>2</span><span>&rsaquo;</span></span>
+        </div>
+      </div>
+
+      <div>
+        <div class="panel-hd"><h3 style="color:var(--gold)">Needs Attention</h3><span class="cnt">5</span></div>
+        <div class="attn">
+          <div class="sub-hd"><span>Requests</span><span>3</span></div>
+          <div class="rrow"><div class="nm">Josh Ramirez</div><div class="ln2"><span class="subj">Physics 101</span><span class="when">Aug 5, 1:00 PM</span></div><div class="ln2"><span class="pill p-pend">Pending</span><button class="btn-ghost">View</button></div></div>
+          <div class="rrow"><div class="nm">Bea Villanueva</div><div class="ln2"><span class="subj">Statistics</span><span class="when">Aug 8, 8:00 AM</span></div><div class="ln2"><span class="pill p-pend">Pending</span><button class="btn-ghost">View</button></div></div>
+          <div class="rrow"><div class="nm">Ivan Delos Reyes</div><div class="ln2"><span class="subj">Calculus II</span><span class="when">Aug 9, 9:00 AM</span></div><div class="ln2"><span class="pill p-pend">Pending</span><button class="btn-ghost">View</button></div></div>
+          <div class="expander">Show 9 more requests</div>
+          <div class="sub-hd"><span>Payments</span><span>2</span></div>
+          <div class="rrow"><div class="nm">Andrea Lim</div><div class="ln2"><span class="subj">Calculus I</span><span class="when">Aug 5, 9:00 AM</span></div><div class="ln2"><span class="pill p-warn">Payment Required</span><button class="btn-ghost">View</button></div></div>
+          <div class="rrow"><div class="nm">Kim Soriano</div><div class="ln2"><span class="subj">Gen Chemistry</span><span class="when">Aug 6, 10:00 AM</span></div><div class="ln2"><span class="pill p-warn">Awaiting</span><button class="btn-ghost">View</button></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout c-note">
+      Requests subsection caps at 5 with an inline expander; Payments is never capped.
+      Andrea and Kim appear in both columns by design - they are committed time
+      <em>and</em> carry an outstanding payment action. Josh, Bea and Ivan are requests, so they
+      appear in the rail only - an unaccepted request is not committed time and must not read as
+      a scheduled session.
+    </div>
+  </div>
+
+  <h2 class="sec">Routing rules</h2>
+  <div class="rules">
+    <table>
+      <tr><th>Booking</th><th>Rail</th><th>Schedule</th><th>Why</th></tr>
+      <tr><td><code>raw_status = Pending</code></td><td>Requests</td><td>&mdash;</td>
+          <td>A request, not a commitment. Showing it in the schedule would overstate the tutor's booked time.</td></tr>
+      <tr><td><code>display = Payment Required</code><br><span style="color:var(--muted);font-size:11px">(Confirmed, past end time)</span></td><td>Payments</td><td>Yes</td>
+          <td>Committed time that already happened, with an action still owed. Pagination would otherwise bury it as days pass.</td></tr>
+      <tr><td><code>raw = Awaiting Payment Verification</code><br><span style="color:var(--muted);font-size:11px">(displays as Awaiting Verification)</span></td><td>Payments</td><td>Yes</td>
+          <td>Committed time holding a real slot, with money outstanding.</td></tr>
+      <tr><td><code>display = Upcoming / Ongoing</code><br><span style="color:var(--muted);font-size:11px">(Confirmed)</span></td><td>&mdash;</td><td>Yes</td>
+          <td>Nothing owed. <code>Ongoing</code> needs no pinned bar - the global <code>OngoingBookingBar</code> already docks it app-wide.</td></tr>
+    </table>
+  </div>
+  <div class="callout c-note">
+    Everything routes on <code>raw_status</code> except the Payments bucket, which routes on the
+    derived <code>status</code>. This matters: <code>display_status</code> is rewritten to
+    "Payment Required" when <code>BOOKING_DEV_TOOLS_ENABLED</code> is on, so routing the other
+    buckets by display value would shift behaviour between environments.
+  </div>
+
+  <h2 class="sec">Nothing needs attention - rail collapses</h2>
+  <div class="sb">
+    <div class="strip">
+      <div><span class="k">Wallet Balance</span><span class="v">PHP 50</span></div>
+      <div><span class="k">Avg Rating</span><span class="v">3.9<small>/ 5.0</small></span></div>
+      <div><span class="k">Accepted Sessions</span><span class="v">4<small>/ 10</small></span></div>
+    </div>
+    <div class="one-col">
+      <div>
+        <div class="panel-hd"><h3>Full Schedule</h3><span class="cnt">9 committed</span></div>
+        <div class="grp">
+          <div class="grp-hd"><span>Tue, Aug 5 <em>&middot; Today</em></span><span>2 sessions</span></div>
+          <div class="grow"><div class="tm">9:00 AM</div><div><div class="nm">Andrea Lim</div><span class="subj">Calculus I &middot; 1 hr</span></div><div><span class="pill p-ok">Upcoming</span></div><div style="text-align:right"><button class="btn-ghost">View</button></div></div>
+          <div class="grow"><div class="tm">3:00 PM</div><div><div class="nm">Nico Tan</div><span class="subj">Calculus I &middot; 1 hr</span></div><div><span class="pill p-ok">Upcoming</span></div><div style="text-align:right"><button class="btn-ghost">View</button></div></div>
+          <div class="grp-hd"><span>Wed, Aug 6</span><span>1 session</span></div>
+          <div class="grow"><div class="tm">10:00 AM</div><div><div class="nm">Kim Soriano</div><span class="subj">Gen Chemistry &middot; 1 hr</span></div><div><span class="pill p-ok">Upcoming</span></div><div style="text-align:right"><button class="btn-ghost">View</button></div></div>
+        </div>
+        <div class="pager">
+          <span class="rng">Showing 1-3 of 9</span>
+          <span class="nums"><span>&lsaquo;</span><span class="on">1</span><span>2</span><span>3</span><span>&rsaquo;</span></span>
+        </div>
+      </div>
+    </div>
+    <div class="callout c-note">
+      The rail is removed from the DOM, not emptied - the grid drops to one column and the schedule
+      reflows to full width. No 300px column reserved to say "nothing here".
+    </div>
+  </div>
+
+  <h2 class="sec">At the accepted-session limit</h2>
+  <div class="sb">
+    <div class="banner">
+      You are hidden from tutor search because you reached your Accepted Session Load Limit.
+      Complete or cancel an upcoming session to become visible again.
+    </div>
+    <div class="strip">
+      <div><span class="k">Wallet Balance</span><span class="v">PHP 50</span></div>
+      <div><span class="k">Avg Rating</span><span class="v">3.9<small>/ 5.0</small></span></div>
+      <div class="cap-cell"><span class="k">Accepted Sessions</span><span class="v at-cap">10<small>/ 10</small></span>
+        <div class="cap-note">At capacity</div></div>
+    </div>
+    <div class="one-col">
+      <div>
+        <div class="panel-hd"><h3>Full Schedule</h3><span class="cnt">10 committed</span></div>
+        <div class="grp">
+          <div class="grp-hd"><span>Tue, Aug 5 <em>&middot; Today</em></span><span>2 sessions</span></div>
+          <div class="grow"><div class="tm">9:00 AM</div><div><div class="nm">Andrea Lim</div><span class="subj">Calculus I &middot; 1 hr</span></div><div><span class="pill p-ok">Upcoming</span></div><div style="text-align:right"><button class="btn-ghost">View</button></div></div>
+          <div class="grow"><div class="tm">3:00 PM</div><div><div class="nm">Nico Tan</div><span class="subj">Calculus I &middot; 1 hr</span></div><div><span class="pill p-ok">Upcoming</span></div><div style="text-align:right"><button class="btn-ghost">View</button></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="callout c-note">
+      Existing banner copy kept verbatim - it already names the remedy, so there is no
+      "Learn more" button and nowhere for one to go (no help or FAQ route exists).
+      The Accepted cell tints gold so the banner and the number visibly refer to each other.
+    </div>
+  </div>
+
+  <h2 class="sec">Brand-new tutor</h2>
+  <div class="sb">
+    <div class="strip">
+      <div><span class="k">Wallet Balance</span><span class="v">PHP 0</span></div>
+      <div><span class="k">Avg Rating</span><span class="v">&ndash;</span></div>
+      <div><span class="k">Accepted Sessions</span><span class="v">0<small>/ 10</small></span></div>
+    </div>
+    <div class="panel-hd"><h3>Full Schedule</h3><span class="cnt">0 committed</span></div>
+    <div class="empty-hero">
+      <div class="t">No sessions yet</div>
+      <div class="s">Tutees find you through your subjects and availability.<br>Make sure both are set so you show up in search.</div>
+      <button class="btn-solid">Check my availability</button>
+    </div>
+    <div class="callout c-note">
+      CTA routes to <code>tch-availability</code> (<code>TutorSchedule.vue</code>) - the screen that
+      fixes the usual cause of an empty dashboard. The rail is collapsed here too.
+    </div>
+  </div>
+
+  <h2 class="sec">Pagination</h2>
+  <div class="rules">
+    <table>
+      <tr><th>Rule</th><th>Detail</th></tr>
+      <tr><td>Side</td><td>Client-side. The endpoint already returns every upcoming booking and groups them server-side, so paginating in Django would still fetch the whole queryset. No backend change.</td></tr>
+      <tr><td>Unit</td><td>Day-packed: accumulate whole days toward a target of <strong>6 bookings</strong>, never splitting a day across pages. Always take at least one day, so a single heavy day gets its own page.</td></tr>
+      <tr><td>Scope</td><td>Schedule only. The rail is capped + expandable instead, so there is never more than one pager on screen.</td></tr>
+      <tr><td>Label</td><td>Actual range, e.g. "Showing 1-5 of 9" - page sizes vary because pages break on day boundaries.</td></tr>
+    </table>
+  </div>
+
+</div>
+</body>
+</html>
