@@ -282,6 +282,7 @@ import { useProfileStore } from '@/stores/profile'
 import { useSessionsStore } from '@/stores/completedSessions'
 import { useActiveSessionStore } from '@/stores/activeSession'
 import { useToastStore } from '@/stores/toast'
+import { useDensityStore } from '@/stores/density'
 import NotificationBell from '@/components/NotificationBell.vue'
 import RatingReminderBanner from '@/components/RatingReminderBanner.vue'
 import OngoingBookingBar from '@/components/OngoingBookingBar.vue'
@@ -305,6 +306,7 @@ const chatStore = useChatStore()
 const sessionStore = useSessionsStore()
 const activeSession = useActiveSessionStore()
 const toastStore = useToastStore()
+const densityStore = useDensityStore()
 const logoutModalRef = ref(null)
 const showLogoutModal = ref(false)
 
@@ -629,6 +631,8 @@ const isPublicRoute = computed(() => {
 // Get the role from the store to control the sidebar links
 const userRole = computed(() => authStore.user?.role?.toLowerCase() || null)
 const userFname =  computed(() => authStore.user?.fname || null)
+
+watch(userRole, (role) => densityStore.syncFromRole(role), { immediate: true })
 
 const refreshTutorPendingSessions = async () => {
   if (!authStore.isAuthenticated || userRole.value !== 'tutor') {
