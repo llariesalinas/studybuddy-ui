@@ -1,7 +1,7 @@
 ---
 title: Tutor dashboard simplification and booking pagination
 date: 2026-08-05
-status: Approved
+status: In Progress
 summary: Replace the six-card metric grid with a 3-metric strip and rebuild the booking list as a date-grouped, day-packed paginated schedule with a Needs Attention rail.
 spec: ../mockups/2026-08-05-tutor-dashboard-simplification.html
 ---
@@ -10,7 +10,12 @@ spec: ../mockups/2026-08-05-tutor-dashboard-simplification.html
 
 Agreed design: [`docs/mockups/2026-08-05-tutor-dashboard-simplification.html`](../mockups/2026-08-05-tutor-dashboard-simplification.html)
 
-**Status & Progress Summary** (2026-08-05): Approved, not yet implemented. A grill +
+**Status & Progress Summary** (2026-08-05, updated): In Progress — compiled to a Codex brief at
+`docs/briefs/2026-08-05-tutor-dashboard-simplification.md`. Amended before dispatch: a
+pre-brief check found that `Pending` bookings can no longer be created (ADR 0008 / Instant Booking;
+the live path sets `status='Confirmed'` at `views.py:2670`), so the rail's `Requests` subsection is
+now conditional and self-retiring, and its cap-plus-expander was dropped as solving an impossible
+state. Everything else from the design session stands. A grill +
 ui-preview session settled every design question across five mockup rounds: dashboard reframed as a
 work queue rather than a metrics report, six metric cards cut to a three-value compact strip, and
 the booking list rebuilt as a date-grouped schedule with client-side day-packed pagination beside a
@@ -65,13 +70,23 @@ between environments.
 
 | Booking | Rail | Schedule |
 | --- | --- | --- |
-| `raw_status = Pending` | Requests | — |
+| `raw_status = Pending` (legacy only) | Requests, if any exist | — |
 | `display = Payment Required` | Payments | yes |
 | `raw = Awaiting Payment Verification` | Payments | yes |
 | `display = Upcoming` / `Ongoing` | — | yes |
 
 A Pending booking is a *request*, not committed time, so it must not render as a scheduled session.
 Payment-bucket bookings are committed time that also owe an action, so they appear in both.
+
+**Pending is vestigial — the Requests subsection is conditional and self-retiring.** ADR 0008
+(`docs/adr/0008-instant-booking-replaces-request-to-book.md:19`) records that Instant Booking removed
+the approve/reject flow outright and that `Pending` "survives only as a historical status value on old
+rows". The code agrees: the only live creation path sets `status='Confirmed'` (`views.py:2670`), and
+the other `Booking.objects.create` (`views.py:2453`) sits inside a `"""`-commented-out `bulk_booking`.
+So the Requests subsection renders **only when legacy Pending rows are present**, with **no cap and no
+expander** — the uncapped-requests problem those solved cannot occur. It disappears on its own once
+legacy rows age past the date filter. For every tutor without pre-migration data the rail holds
+Payments alone.
 
 **No pinned Ongoing bar.** `OngoingBookingBar.vue` is already mounted globally (`App.vue:255`) and
 handles live sessions, handoff, and sessions starting within `UPCOMING_WINDOW_MS = 15 min`
@@ -95,8 +110,8 @@ remedy — and add a gold tint to the Accepted cell so banner and number refer t
 6. Add `currentPage` ref, clamp it when the booking data changes, and reset to 1 on refresh.
 7. Rebuild the template: banner (conditional) → metric strip → grid. Grid is `1fr 300px` when the
    rail has content, `1fr` when empty (`v-if` the rail out of the DOM, do not render it empty).
-8. Build the rail: `Requests` subsection capped at 5 with an inline expander (`showAllRequests` ref),
-   `Payments` subsection uncapped.
+8. Build the rail: `Payments` subsection always rendered when it has rows; `Requests` subsection
+   rendered only when legacy Pending rows exist — no cap, no expander.
 9. Build the schedule: date-grouped rows, pager with actual range label ("Showing 1-5 of 9").
 10. Replace the empty state with the "No sessions yet" hero plus a **Check my availability** button
     routing to `tch-availability`.
@@ -118,6 +133,9 @@ remedy — and add a gold tint to the Accepted cell so banner and number refer t
 - **Fallback path.** `upcomingBookings` falls back to `sessionsStore.upcomingSessions` when the API
   list is empty (`TutorDashboard.vue:245-249`). That fallback shape may lack `raw_status` — the split
   must degrade safely rather than dropping bookings from both columns.
+- **Legacy Pending rows are the only source for the Requests subsection.** Seed/demo data may still
+  contain them, so the section can appear in dev while being absent in production. Do not treat its
+  presence in a local run as proof the path is live.
 - **Accepted Sessions count vs. rail count** are different numbers (`accepted_session_load` counts
   accepted sessions; the rail counts requests + payment items). Don't let the labels imply they match.
 
@@ -144,3 +162,12 @@ remedy — and add a gold tint to the Accepted cell so banner and number refer t
   `OngoingBookingBar`), and the "Payment Required" bucket added to the rail after
   `get_display_status` was found to split `Confirmed` into three clock-dependent states. Agreed
   mockup promoted to `docs/mockups/2026-08-05-tutor-dashboard-simplification.html`.
+- **2026-08-05** — Amended during `/codex-brief` compilation, before dispatch. A pre-brief check of
+  ADR 0008 and the booking-creation paths established that `Pending` bookings can no longer be
+  created (Instant Booking; `views.py:2670` sets `status='Confirmed'`, and the only other
+  `Booking.objects.create` at `views.py:2453` is commented out). The `Requests` subsection would
+  therefore be permanently empty for any tutor without pre-migration data. Changed to a conditional,
+  self-retiring subsection with the cap and inline expander removed, since the uncapped-requests
+  state they guarded against is unreachable. Added a risk note that demo/seed data may still contain
+  legacy Pending rows. Status moved to In Progress; brief written to
+  `docs/briefs/2026-08-05-tutor-dashboard-simplification.md`.

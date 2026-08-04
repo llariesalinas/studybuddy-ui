@@ -145,11 +145,8 @@
       <div>
         <div class="panel-hd"><h3 style="color:var(--gold)">Needs Attention</h3><span class="cnt">5</span></div>
         <div class="attn">
-          <div class="sub-hd"><span>Requests</span><span>3</span></div>
+          <div class="sub-hd"><span>Requests</span><span>1</span></div>
           <div class="rrow"><div class="nm">Josh Ramirez</div><div class="ln2"><span class="subj">Physics 101</span><span class="when">Aug 5, 1:00 PM</span></div><div class="ln2"><span class="pill p-pend">Pending</span><button class="btn-ghost">View</button></div></div>
-          <div class="rrow"><div class="nm">Bea Villanueva</div><div class="ln2"><span class="subj">Statistics</span><span class="when">Aug 8, 8:00 AM</span></div><div class="ln2"><span class="pill p-pend">Pending</span><button class="btn-ghost">View</button></div></div>
-          <div class="rrow"><div class="nm">Ivan Delos Reyes</div><div class="ln2"><span class="subj">Calculus II</span><span class="when">Aug 9, 9:00 AM</span></div><div class="ln2"><span class="pill p-pend">Pending</span><button class="btn-ghost">View</button></div></div>
-          <div class="expander">Show 9 more requests</div>
           <div class="sub-hd"><span>Payments</span><span>2</span></div>
           <div class="rrow"><div class="nm">Andrea Lim</div><div class="ln2"><span class="subj">Calculus I</span><span class="when">Aug 5, 9:00 AM</span></div><div class="ln2"><span class="pill p-warn">Payment Required</span><button class="btn-ghost">View</button></div></div>
           <div class="rrow"><div class="nm">Kim Soriano</div><div class="ln2"><span class="subj">Gen Chemistry</span><span class="when">Aug 6, 10:00 AM</span></div><div class="ln2"><span class="pill p-warn">Awaiting</span><button class="btn-ghost">View</button></div></div>
@@ -158,7 +155,12 @@
     </div>
 
     <div class="callout c-note">
-      Requests subsection caps at 5 with an inline expander; Payments is never capped.
+      <strong>Requests is conditional and self-retiring.</strong> Per ADR 0008 (Instant Booking),
+      <code>Pending</code> bookings can no longer be created - the live path sets
+      <code>status='Confirmed'</code> at <code>views.py:2670</code>. The subsection renders only when
+      legacy Pending rows exist, so they are not stranded, and disappears once they age out. It has
+      no cap and no expander: the uncapped-requests state those would have guarded against is
+      unreachable. Payments is never capped.
       Andrea and Kim appear in both columns by design - they are committed time
       <em>and</em> carry an outstanding payment action. Josh, Bea and Ivan are requests, so they
       appear in the rail only - an unaccepted request is not committed time and must not read as
@@ -170,8 +172,8 @@
   <div class="rules">
     <table>
       <tr><th>Booking</th><th>Rail</th><th>Schedule</th><th>Why</th></tr>
-      <tr><td><code>raw_status = Pending</code></td><td>Requests</td><td>&mdash;</td>
-          <td>A request, not a commitment. Showing it in the schedule would overstate the tutor's booked time.</td></tr>
+      <tr><td><code>raw_status = Pending</code><br><span style="color:var(--muted);font-size:11px">(legacy rows only)</span></td><td>Requests</td><td>&mdash;</td>
+          <td>A request, not a commitment. Showing it in the schedule would overstate the tutor's booked time. No longer generated - see the note above.</td></tr>
       <tr><td><code>display = Payment Required</code><br><span style="color:var(--muted);font-size:11px">(Confirmed, past end time)</span></td><td>Payments</td><td>Yes</td>
           <td>Committed time that already happened, with an action still owed. Pagination would otherwise bury it as days pass.</td></tr>
       <tr><td><code>raw = Awaiting Payment Verification</code><br><span style="color:var(--muted);font-size:11px">(displays as Awaiting Verification)</span></td><td>Payments</td><td>Yes</td>
