@@ -332,6 +332,18 @@ ALGORITHM_DEMO_TOOLS_ENABLED = env_bool('ALGORITHM_DEMO_TOOLS_ENABLED', False)
 # states for the thesis defense.
 BOOKING_DEV_TOOLS_ENABLED = env_bool('BOOKING_DEV_TOOLS_ENABLED', False)
 
+# Surfaces the login OTP code in the API response and the "Check Your Email" screen, so demo/test
+# accounts can be logged into without access to their inbox. Previously gated on DEBUG alone, which
+# meant it was unreachable on the demo deployment (DEBUG=False there by design). Defaults False so
+# real production never leaks OTP codes; the demo sets this explicitly.
+OTP_DEBUG_CODE_ENABLED = env_bool('OTP_DEBUG_CODE_ENABLED', False)
+
+# Includes the raw PayMongo error body (provider_status/provider_error) in payment failure
+# responses. Previously gated on DEBUG alone, which meant it was unreachable on the demo
+# deployment. Defaults False so real production never echoes provider error payloads to
+# clients; the demo sets this explicitly to help diagnose sandbox payment failures live.
+PAYMONGO_DEBUG_ERRORS_ENABLED = env_bool('PAYMONGO_DEBUG_ERRORS_ENABLED', False)
+
 PASSWORD_RESET_TIMEOUT = 3600
 LOGIN_OTP_TTL_SECONDS = 600
 LOGIN_OTP_MAX_ATTEMPTS = 5
