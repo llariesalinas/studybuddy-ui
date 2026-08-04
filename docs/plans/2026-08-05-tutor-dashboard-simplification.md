@@ -1,7 +1,7 @@
 ---
 title: Tutor dashboard simplification and booking pagination
 date: 2026-08-05
-status: In Progress
+status: Done
 summary: Replace the six-card metric grid with a 3-metric strip and rebuild the booking list as a date-grouped, day-packed paginated schedule with a Needs Attention rail.
 spec: ../mockups/2026-08-05-tutor-dashboard-simplification.html
 ---
@@ -10,12 +10,19 @@ spec: ../mockups/2026-08-05-tutor-dashboard-simplification.html
 
 Agreed design: [`docs/mockups/2026-08-05-tutor-dashboard-simplification.html`](../mockups/2026-08-05-tutor-dashboard-simplification.html)
 
-**Status & Progress Summary** (2026-08-05, updated): In Progress — compiled to a Codex brief at
-`docs/briefs/2026-08-05-tutor-dashboard-simplification.md`. Amended before dispatch: a
-pre-brief check found that `Pending` bookings can no longer be created (ADR 0008 / Instant Booking;
-the live path sets `status='Confirmed'` at `views.py:2670`), so the rail's `Requests` subsection is
-now conditional and self-retiring, and its cap-plus-expander was dropped as solving an impossible
-state. Everything else from the design session stands. A grill +
+**Status & Progress Summary** (2026-08-05, final): **Done** — executed by Codex against
+`docs/briefs/2026-08-05-tutor-dashboard-simplification.md`, reviewed and completed in Claude Code.
+Shipped as designed: three-metric strip (fake sparklines gone), `sidebar-and-main` layout with a
+self-collapsing attention rail, and a date-grouped schedule paginated client-side on whole-day
+boundaries. No backend change. Three review findings were fixed in place rather than redispatched —
+a UTC date-key bug that would have mislabelled Today/Tomorrow for Manila mornings, a "1 sessions"
+pluralization bug, and a missing test for the core day-packing path. Final state: 82 tests passing,
+build clean, both linters clean on the touched files. Amended before dispatch: a pre-brief check
+found that `Pending` bookings can no longer be created (ADR 0008 / Instant Booking; the live path
+sets `status='Confirmed'` at `views.py:2670`), so the rail's `Requests` subsection is
+conditional and self-retiring, and its cap-plus-expander was dropped as solving an impossible
+state. Summary: `docs/session-summaries/2026-08-05-tutor-dashboard-simplification-summary.md`.
+A grill +
 ui-preview session settled every design question across five mockup rounds: dashboard reframed as a
 work queue rather than a metrics report, six metric cards cut to a three-value compact strip, and
 the booking list rebuilt as a date-grouped schedule with client-side day-packed pagination beside a
@@ -171,3 +178,15 @@ remedy — and add a gold tint to the Accepted cell so banner and number refer t
   state they guarded against is unreachable. Added a risk note that demo/seed data may still contain
   legacy Pending rows. Status moved to In Progress; brief written to
   `docs/briefs/2026-08-05-tutor-dashboard-simplification.md`.
+- **2026-08-05** — Codex executed the brief; reviewed via `/codex-review` and closed. Codex's logged
+  evidence was independently reproduced and matched (17 files / 81 tests, clean build); its single
+  logged deviation (pre-existing oxlint failure in `useSubjectCatalog.js`) was verified accurate. Its
+  evidence had one gap: `npm run lint` is `run-s lint:*`, so the oxlint failure short-circuits the
+  chain and ESLint never ran — ESLint reports 4 further pre-existing `no-undef` errors in the
+  unrelated root `make_algo_pptx.*` scripts. Three review findings fixed in place: `getDateAccent`
+  built its date key with `toISOString()` (UTC), which would mislabel Today/Tomorrow for every Manila
+  morning before 08:00; date headers rendered "1 sessions"; and `dayPackedPages` had no test for its
+  core accumulate-until-exceeded path. Final: 82 tests passing, build clean, both linters clean on the
+  touched files. One cosmetic gap left deliberately unaddressed (blank schedule column when a tutor's
+  only bookings are legacy Pending rows) rather than invent unapproved UI. Status moved to Done;
+  summary written to `docs/session-summaries/2026-08-05-tutor-dashboard-simplification-summary.md`.

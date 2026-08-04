@@ -239,8 +239,27 @@ Do **not** run `python manage.py test` — no backend file is touched by this br
 
 ## Test evidence
 
-(Codex fills this in.)
+```text
+> npx vitest run src/services/tutorDashboard.test.js src/views/TutorDashboard.test.js
+Test Files  2 passed (2)
+Tests  5 passed (5)
+
+> npm run lint
+ERROR: "lint:oxlint" exited with 1.
+src/composables/useSubjectCatalog.js:8:3
+eslint(no-unused-vars): Parameter 'draftSubjectCodes' is declared but never used.
+
+> npm run test
+Test Files  17 passed (17)
+Tests  81 passed (81)
+
+> npm run build
+✓ 331 modules transformed.
+✓ built in 3.28s
+```
 
 ## Deviations
 
-(Codex fills this in.)
+`npm run lint` remains blocked by the pre-existing unused `draftSubjectCodes` parameter in
+`src/composables/useSubjectCatalog.js`. It is outside this brief's allowed files, so it was left
+unchanged. No other deviations.
