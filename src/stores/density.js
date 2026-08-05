@@ -1,6 +1,9 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
 
+// Roles that render at 80% density. Admin/SuperAdmin stay at 100%.
+const COMPACT_ROLES = new Set(['tutee', 'tutor'])
+
 export const useDensityStore = defineStore('density', () => {
   const density = ref('comfortable')
 
@@ -15,7 +18,7 @@ export const useDensityStore = defineStore('density', () => {
   }
 
   function syncFromRole(role) {
-    setDensity(role?.toLowerCase() === 'tutee' ? 'compact' : 'comfortable')
+    setDensity(COMPACT_ROLES.has(role?.toLowerCase()) ? 'compact' : 'comfortable')
   }
 
   return { density, setDensity, syncFromRole }
