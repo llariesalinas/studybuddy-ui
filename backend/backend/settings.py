@@ -180,13 +180,18 @@ DEMO_BASIC_AUTH_PASSWORD = os.getenv('DEMO_BASIC_AUTH_PASSWORD', '')
 if DEMO_BASIC_AUTH_USER and DEMO_BASIC_AUTH_PASSWORD:
     MIDDLEWARE.insert(0, 'studybuddy.demo_basic_auth.DemoBasicAuthMiddleware')
 
-# No email can be delivered on the demo deployment (Render blocks outbound SMTP; see
-# docs/plans/2026-07-05-demo-deployment-plan.md), and Resend's sandbox mode without a
-# verified domain can only send to one address. Reuses the demo Basic Auth flag as the
-# "is this the demo deployment" signal rather than adding a second env var, so local dev
-# and real production (neither of which set these) keep sending real email as normal.
 IS_DEMO_DEPLOYMENT = bool(DEMO_BASIC_AUTH_USER and DEMO_BASIC_AUTH_PASSWORD)
-LOGIN_OTP_DISABLED = IS_DEMO_DEPLOYMENT
+
+# Kill switch for all outbound email. Email suppression used to be implied by
+# IS_DEMO_DEPLOYMENT because Render's free tier blocks outbound SMTP (ports 25/465/587)
+# and Resend needs a verified domain StudyBuddy does not own. The demo now runs on a paid
+# Render instance, which unblocks 465/587, so delivery defaults to ON everywhere and this
+# stays only as an explicit opt-out (e.g. if the provider's daily send cap is hit).
+# See docs/plans/2026-08-05-enable-demo-email-delivery.md.
+EMAIL_DELIVERY_DISABLED = env_bool("EMAIL_DELIVERY_DISABLED", False)
+
+# The login OTP is only skippable when mail cannot be delivered at all.
+LOGIN_OTP_DISABLED = EMAIL_DELIVERY_DISABLED
 
 ROOT_URLCONF = 'backend.urls'
 

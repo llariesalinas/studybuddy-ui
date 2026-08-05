@@ -7384,6 +7384,58 @@ class EmailUtilsRoleLabelTests(APITestCase):
         self.assertIn("Blurry scan.", message)
 
 
+class EmailDeliveryDisabledTests(APITestCase):
+    """EMAIL_DELIVERY_DISABLED is the single kill switch for outbound mail. It used to be implied
+    by IS_DEMO_DEPLOYMENT (Render's free tier blocked outbound SMTP); the demo now runs on a paid
+    instance, so delivery defaults to on and the switch is an explicit opt-out.
+    See docs/plans/2026-08-05-enable-demo-email-delivery.md."""
+
+    def setUp(self):
+        self.institution = PartnerInstitution.objects.create(
+            institution_name="CPU", school_email_domain="cpu.edu", is_active=True,
+        )
+        self.user = User.objects.create_user(
+            username="killswitch@cpu.edu", email="killswitch@cpu.edu", password="password",
+        )
+        self.profile = UserProfile.objects.create(
+            user=self.user, fname="Kill", mname="", lname="Switch", role="Tutor",
+            institution=self.institution,
+        )
+
+    @override_settings(EMAIL_DELIVERY_DISABLED=True)
+    def test_application_email_suppressed_when_disabled(self):
+        from .email_utils import send_application_received_email
+
+        with patch("studybuddy.email_utils.send_mail") as mock_send:
+            send_application_received_email(self.profile)
+        mock_send.assert_not_called()
+
+    @override_settings(EMAIL_DELIVERY_DISABLED=False)
+    def test_application_email_delivered_when_enabled(self):
+        from .email_utils import send_application_received_email
+
+        with patch("studybuddy.email_utils.send_mail") as mock_send:
+            send_application_received_email(self.profile)
+        mock_send.assert_called_once()
+
+    @override_settings(EMAIL_DELIVERY_DISABLED=True)
+    def test_login_otp_suppressed_when_disabled(self):
+        from . import mailer
+
+        with patch("studybuddy.mailer._deliver") as mock_deliver:
+            mailer.send_login_otp(self.user, "123456")
+        mock_deliver.assert_not_called()
+
+    @override_settings(EMAIL_DELIVERY_DISABLED=False)
+    def test_login_otp_delivered_when_enabled(self):
+        from . import mailer
+
+        with patch("studybuddy.mailer._deliver") as mock_deliver:
+            mailer.send_login_otp(self.user, "123456")
+        mock_deliver.assert_called_once()
+        self.assertEqual(mock_deliver.call_args.kwargs["recipient"], self.user.email)
+
+
 class RenewalReminderTests(APITestCase):
     """Opportunistic 7-day/1-day renewal reminders, triggered from get_document_review_context via
     profile_status. See docs/plans/2026-07-01-tutee-verification-phase4-email-devtools.md."""
