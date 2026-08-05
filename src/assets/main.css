@@ -69,6 +69,61 @@
   --sb-shadow-hover: 0 16px 36px rgba(15, 23, 42, 0.12);
   --sb-shadow-rest-brand: 0 8px 18px rgba(0, 137, 90, 0.20);
   --sb-shadow-hover-brand: 0 14px 30px rgba(0, 137, 90, 0.28);
+  --sb-density-scale: 1;
+}
+
+:root[data-sb-density='compact'] {
+  --sb-density-scale: 0.8;
+  --sb-vh-fix: calc(100vh / var(--sb-density-scale));
+  zoom: var(--sb-density-scale);
+}
+
+[data-sb-density='compact'] html,
+[data-sb-density='compact'] body {
+  min-height: var(--sb-vh-fix);
+}
+
+[data-sb-density='compact'] body > #app {
+  min-height: var(--sb-vh-fix);
+}
+
+[data-sb-density='compact'] .vh-100 {
+  height: var(--sb-vh-fix) !important;
+}
+
+[data-sb-density='compact'] .sb-sidebar {
+  height: var(--sb-vh-fix);
+}
+
+[data-sb-density='compact'] .weekly-panel,
+[data-sb-density='compact'] .recommendation-panel {
+  height: clamp(460px, calc(var(--sb-vh-fix) - 230px), 600px);
+}
+
+[data-sb-density='compact'] .tutee-profile-shell {
+  min-height: var(--sb-vh-fix);
+}
+
+[data-sb-density='compact'] .glass-modal,
+[data-sb-density='compact'] .sb-select-dialog,
+[data-sb-density='compact'] .subject-dialog {
+  max-height: calc(var(--sb-vh-fix) - 2.5rem);
+}
+
+[data-sb-density='compact'] .date-modal,
+[data-sb-density='compact'] .time-modal {
+  max-height: calc(var(--sb-vh-fix) - 2rem);
+}
+
+[data-sb-density='compact'] .rating-stack-modal {
+  max-height: calc(98vh / var(--sb-density-scale));
+}
+
+@media (max-width: 640px) {
+  [data-sb-density='compact'] .sb-select-dialog,
+  [data-sb-density='compact'] .subject-dialog {
+    max-height: calc(var(--sb-vh-fix) - 1.5rem);
+  }
 }
 
 [data-sb-theme="dark"] {
