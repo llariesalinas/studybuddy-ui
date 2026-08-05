@@ -119,6 +119,37 @@
   max-height: calc(98vh / var(--sb-density-scale));
 }
 
+/* Tutee-reachable, missed by the original audit: `/tutor/:id` is a Tutee route. */
+[data-sb-density='compact'] .booking-page {
+  min-height: var(--sb-vh-fix);
+}
+
+/* Tutor-reachable vh consumers. `.sb-auth-page` is also Tutee-reachable via
+   `/application-status`; on the public auth routes density is never `compact`. */
+[data-sb-density='compact'] .min-vh-100 {
+  min-height: var(--sb-vh-fix) !important;
+}
+
+[data-sb-density='compact'] .onboarding-page,
+[data-sb-density='compact'] .sb-auth-page,
+[data-sb-density='compact'] .tutor-profile-shell {
+  min-height: var(--sb-vh-fix);
+}
+
+[data-sb-density='compact'] .wallet-shell {
+  min-height: calc(var(--sb-vh-fix) - 7rem);
+}
+
+[data-sb-density='compact'] .modal-box {
+  max-height: calc(88vh / var(--sb-density-scale));
+}
+
+/* Qualified through the shell so it beats the Tutee-authored `.glass-modal` rule
+   above, which ties with TutorProfile's scoped rule on specificity alone. */
+[data-sb-density='compact'] .tutor-profile-shell .glass-modal {
+  max-height: min(calc(86vh / var(--sb-density-scale)), 780px);
+}
+
 @media (max-width: 640px) {
   [data-sb-density='compact'] .sb-select-dialog,
   [data-sb-density='compact'] .subject-dialog {
