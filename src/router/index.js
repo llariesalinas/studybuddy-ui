@@ -347,7 +347,7 @@ router.beforeEach(async (to) => {
       if (!isAllowedOnboardingStep) return { name: nextOnboardingRoute }
     }
 
-    // 2️⃣b Retroactive commission-terms gate (ADR-0010) — only reachable once onboarding is
+    // 2b. Retroactive commission-terms gate (ADR-0010) — only reachable once onboarding is
     // already complete; a tutor still mid-onboarding accepts inline at the hourly-rate step.
     if (
       normalizedUserRole === 'tutor' &&
