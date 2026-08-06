@@ -244,8 +244,8 @@ const selectToday = () => {
 
 .date-trigger {
   min-height: 42px;
-  background: #ffffff;
-  color: var(--sb-text-dark);
+  background: color-mix(in srgb, var(--sb-card-bg) 86%, transparent);
+  color: var(--sb-text-main);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -260,7 +260,7 @@ const selectToday = () => {
 
 .date-trigger-active {
   border-color: var(--sb-primary);
-  box-shadow: 0 0 0 0.15rem rgba(0, 137, 90, 0.12);
+  box-shadow: 0 0 0 0.15rem color-mix(in srgb, var(--sb-primary) 12%, transparent);
 }
 
 .date-modal-backdrop {
@@ -270,16 +270,18 @@ const selectToday = () => {
   display: grid;
   place-items: center;
   padding: 1rem;
-  background: rgba(15, 23, 42, 0.44);
+  background: rgba(7, 19, 16, 0.48);
 }
 
 .date-modal {
   width: min(420px, 100%);
   max-height: calc(100vh - 2rem);
   overflow-y: auto;
+  border: 1px solid color-mix(in srgb, var(--sb-card-border) 78%, transparent);
   border-radius: 18px;
-  background: #ffffff;
-  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.22);
+  background: color-mix(in srgb, var(--sb-card-bg) 94%, transparent);
+  color: var(--sb-text-main);
+  box-shadow: 0 30px 80px rgba(7, 19, 16, 0.28);
   padding: 1.25rem;
 }
 
@@ -350,7 +352,7 @@ const selectToday = () => {
   aspect-ratio: 1;
   border: 1px solid var(--sb-border-light);
   border-radius: 12px;
-  background: #ffffff;
+  background: color-mix(in srgb, var(--sb-card-bg) 82%, transparent);
   color: var(--sb-text-main);
   font-weight: 700;
   display: grid;
@@ -359,7 +361,7 @@ const selectToday = () => {
 }
 
 .date-cell:hover:not(:disabled) {
-  border-color: rgba(0, 137, 90, 0.36);
+  border-color: color-mix(in srgb, var(--sb-primary) 36%, transparent);
   background: var(--sb-primary-light);
   color: var(--sb-primary-dark);
 }
@@ -376,15 +378,15 @@ const selectToday = () => {
 }
 
 .date-cell-today {
-  border-color: rgba(0, 137, 90, 0.45);
-  box-shadow: inset 0 0 0 1px rgba(0, 137, 90, 0.2);
+  border-color: color-mix(in srgb, var(--sb-primary) 45%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sb-primary) 20%, transparent);
 }
 
 .date-cell-selected {
-  color: #ffffff;
+  color: var(--sb-primary-contrast);
   background: var(--sb-primary);
   border-color: var(--sb-primary);
-  box-shadow: 0 8px 18px rgba(0, 137, 90, 0.18);
+  box-shadow: var(--sb-shadow-rest-brand);
 }
 
 .date-modal-footer {
@@ -396,7 +398,7 @@ const selectToday = () => {
 .date-today-btn {
   border: 1px solid var(--sb-border-light);
   border-radius: 10px;
-  background: #ffffff;
+  background: color-mix(in srgb, var(--sb-card-bg) 82%, transparent);
   color: var(--sb-primary-dark);
   padding: 0.45rem 0.8rem;
   font-weight: 700;

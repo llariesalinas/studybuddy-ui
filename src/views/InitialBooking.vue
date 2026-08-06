@@ -58,31 +58,16 @@
             />
           </div>
 
-          <div class="row g-3 mb-4">
-            <div class="col-6">
-              <label class="form-label fw-semibold small">Time From</label>
-              <BookingTimePicker
-                v-model="selectedStartTimeModel"
-                :selected-date="store.selectedDate"
-                title="Choose Start Time"
-                placeholder="Select start time"
-                empty-message="No available start times for this date."
-              />
-            </div>
-
-            <div class="col-6">
-              <label class="form-label fw-semibold small">Time To</label>
-              <BookingTimePicker
-                v-model="selectedEndTimeModel"
-                ref="endTimePickerRef"
-                :selected-date="store.selectedDate"
-                :min-time="store.selectedStartTime"
-                :disabled="!store.selectedStartTime"
-                title="Choose End Time"
-                placeholder="Select end time"
-                empty-message="Choose a later time for the session to end."
-              />
-            </div>
+          <div class="mb-4">
+            <label class="form-label fw-semibold small">
+              Time <span class="fw-normal sb-muted">(optional)</span>
+            </label>
+            <BookingTimeRangePicker
+              v-model:start="selectedStartTimeModel"
+              v-model:end="selectedEndTimeModel"
+              :selected-date="store.selectedDate"
+              title="Choose a time range"
+            />
           </div>
 
           <div class="budget-card border-sb rounded-4 p-3 p-md-4 mb-4">
@@ -118,13 +103,14 @@
 </template>
 
 <script setup>
-import { computed, nextTick, ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import BudgetRangeSlider from '@/components/BudgetRangeSlider.vue'
 import BookingDatePicker from '@/components/BookingDatePicker.vue'
-import BookingTimePicker from '@/components/BookingTimePicker.vue'
+import BookingTimeRangePicker from '@/components/BookingTimeRangePicker.vue'
 import CampusLocationModal from '@/components/CampusLocationModal.vue'
 import SubjectPickerModal from '@/components/SubjectPickerModal.vue'
+import { isPastDate, isPastTimeForDate } from '@/utils/time'
 import {
   INITIAL_BUDGET_MAX,
   INITIAL_BUDGET_MIN,
@@ -142,7 +128,6 @@ const toastStore = useToastStore()
 
 const isSubmitting = ref(false)
 const subjects = ref([])
-const endTimePickerRef = ref(null)
 const showCampusModal = ref(false)
 const campusLocationType = ref(null)
 
@@ -150,45 +135,6 @@ const modes = [
   { label: 'Online', value: 'Online', icon: 'bi-camera-video-fill' },
   { label: 'Face-to-face', value: 'Face-to-face', icon: 'bi-geo-alt-fill' },
 ]
-const padNumber = (value) => String(value).padStart(2, '0')
-const todayKey = () => {
-  const today = new Date()
-  return `${today.getFullYear()}-${padNumber(today.getMonth() + 1)}-${padNumber(today.getDate())}`
-}
-
-const isPastDate = (date) => {
-  return Boolean(date) && date < todayKey()
-}
-
-const timeToMinutes = (time) => {
-  const [hours = 0, minutes = 0] = String(time || '00:00')
-    .split(':')
-    .map(Number)
-  return hours * 60 + minutes
-}
-
-const currentComparableMinutes = () => {
-  const now = new Date()
-  return now.getHours() * 60 + now.getMinutes() + (now.getSeconds() > 0 ? 1 : 0)
-}
-
-const isPastTimeForDate = (date, time) => {
-  return (
-    Boolean(date && time) && date === todayKey() && timeToMinutes(time) < currentComparableMinutes()
-  )
-}
-
-const nextTimeSlot = (value) => {
-  const nextMinutes = timeToMinutes(value) + 60
-
-  if (nextMinutes >= 24 * 60) {
-    return null
-  }
-
-  const hours = Math.floor(nextMinutes / 60)
-  const minutes = nextMinutes % 60
-  return `${padNumber(hours)}:${padNumber(minutes)}`
-}
 
 const selectedSubjectCodes = computed({
   get: () => (store.selectedSubject ? [store.selectedSubject] : []),
@@ -229,28 +175,18 @@ const selectedDateModel = computed({
   },
 })
 
+// The range picker commits both bounds together, so these are plain pass-throughs -- no
+// auto-filled end time and no second modal to chain open.
 const selectedStartTimeModel = computed({
   get: () => store.selectedStartTime,
   set: (value) => {
     store.selectedStartTime = value
-
-    if (!store.selectedEndTime || store.selectedEndTime <= value) {
-      store.selectedEndTime = nextTimeSlot(value)
-    }
-
-    nextTick(() => {
-      endTimePickerRef.value?.openModal()
-    })
   },
 })
 
 const selectedEndTimeModel = computed({
   get: () => store.selectedEndTime,
   set: (value) => {
-    if (store.selectedStartTime && value <= store.selectedStartTime) {
-      return
-    }
-
     store.selectedEndTime = value
   },
 })
@@ -293,18 +229,19 @@ const findTutor = async () => {
     return
   }
 
+  // The time range is optional -- no times means "any time that day", which the recommender
+  // handles by falling back to its date-only candidate stage. A half-set range can only come
+  // from stale sessionStorage (the picker always commits both bounds together); drop it and
+  // search the whole day rather than blocking on it.
   if (!store.selectedStartTime || !store.selectedEndTime) {
-    return
-  }
-
-  if (isPastTimeForDate(store.selectedDate, store.selectedStartTime)) {
+    store.selectedStartTime = null
+    store.selectedEndTime = null
+  } else if (isPastTimeForDate(store.selectedDate, store.selectedStartTime)) {
     store.selectedStartTime = null
     store.selectedEndTime = null
     toastStore.push('Please choose a future start time.', 'warning')
     return
-  }
-
-  if (store.selectedEndTime <= store.selectedStartTime) {
+  } else if (store.selectedEndTime <= store.selectedStartTime) {
     store.selectedEndTime = null
     toastStore.push('Please choose an end time after the start time.', 'warning')
     return
@@ -390,12 +327,6 @@ const findTutor = async () => {
 .mode-button-icon {
   display: inline-flex;
   flex: 0 0 auto;
-}
-
-.time-trigger {
-  min-height: 42px;
-  background: #fff;
-  color: #212529;
 }
 
 .initial-booking-content :deep(.date-trigger:hover),
