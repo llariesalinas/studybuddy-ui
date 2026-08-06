@@ -13,12 +13,20 @@ from .cbf import (
     get_student_subject_codes,
     resolve_target_categories,
 )
+from .workload import get_upcoming_week_loads
 
 logger = logging.getLogger(__name__)
 
 CBF_WEIGHT = 0.7
 CF_WEIGHT = 0.3
 CF_MAX_RATING = 5
+
+# Two hybrid scores are "the same" when they agree to this many decimals — the same
+# precision the recommendation API returns, so a tie to the algorithm is also a tie
+# on screen. Quantizing rather than comparing within an epsilon band is deliberate:
+# a band is not transitive (A ties B, B ties C, A does not tie C), which leaves the
+# sort ill-defined. See docs/adr/0009-tie-breaker-upcoming-week-load.md.
+HYBRID_SCORE_PRECISION = 3
 
 
 def hybrid_prediction(
@@ -183,18 +191,35 @@ def recommend_tutors_hybrid(ratings, student_profile, requested_subject, candida
             "score": score,
         })
 
+    loads = get_upcoming_week_loads(
+        [recommendation["tutor"].profile_id for recommendation in recommendations]
+    )
+
+    for recommendation in recommendations:
+        recommendation["upcoming_week_load"] = loads.get(
+            recommendation["tutor"].profile_id, 0
+        )
+
+    # Tie Breaker: tutors whose scores agree to HYBRID_SCORE_PRECISION are equally
+    # good matches, so the one with fewer sessions booked in the coming week ranks
+    # higher. profile_id is the final key so an equal-score/equal-load group still
+    # has one defined order rather than whatever the database returned.
     recommendations.sort(
-        key=lambda x: x["score"],
-        reverse=True,
+        key=lambda x: (
+            -round(x["score"], HYBRID_SCORE_PRECISION),
+            x["upcoming_week_load"],
+            x["tutor"].profile_id,
+        )
     )
 
     for index, recommendation in enumerate(recommendations[:10], start=1):
         tutor = recommendation["tutor"]
         logger.debug(
-            "Hybrid ranking %s: tutor %s, score %.3f",
+            "Hybrid ranking %s: tutor %s, score %.3f, upcoming week load %s",
             index,
             tutor.profile_id,
             recommendation["score"],
+            recommendation["upcoming_week_load"],
         )
 
     return recommendations

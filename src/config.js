@@ -64,3 +64,9 @@ export const RECEIVING_INSTITUTIONS_CACHE_TTL_MS = 12 * 60 * 60 * 1000
 export const CHAT_SHAKE_MS = 420
 export const CHAT_POP_MS   = 600
 export const CHAT_PULSE_MS = 600
+
+// Recommender display — must match the backend's HYBRID_SCORE_PRECISION and
+// UPCOMING_WEEK_DAYS (backend/studybuddy/recommender/hybrid.py, workload.py), so
+// scores that read as tied on screen are the ones the Tie Breaker actually tied.
+export const HYBRID_SCORE_PRECISION = 3
+export const UPCOMING_WEEK_DAYS = 7

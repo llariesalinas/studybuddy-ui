@@ -1,10 +1,17 @@
 <script setup>
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { HYBRID_SCORE_PRECISION, UPCOMING_WEEK_DAYS } from '@/config'
 
 const props = defineProps({
   row: {
     type: Object,
     default: null
+  },
+  // Every row sharing the selected tutor's tie group, already ranked. Empty when
+  // the selected tutor's score is unique, which is the common case.
+  tieGroup: {
+    type: Array,
+    default: () => []
   }
 })
 
@@ -333,6 +340,27 @@ onBeforeUnmount(clearTimers)
           <div class="bar-fill hybrid" :style="{ width: hybridBar.widthPct + '%' }"></div>
         </div>
       </div>
+
+      <section v-if="tieGroup.length > 1" class="tie-block">
+        <h5>Tie Breaker — Upcoming Week Load</h5>
+        <p class="tie-note">
+          {{ tieGroup.length }} tutors tied at
+          {{ row.hybrid_score.toFixed(HYBRID_SCORE_PRECISION) }}. Fewer sessions booked in the next
+          {{ UPCOMING_WEEK_DAYS }} days ranks higher.
+        </p>
+        <div
+          v-for="peer in tieGroup"
+          :key="peer.tutor_id"
+          class="tie-cmp"
+          :class="{ current: peer.tutor_id === row.tutor_id }"
+        >
+          <span>{{ peer.name }}</span>
+          <span>
+            {{ peer.upcoming_week_load }}
+            {{ peer.upcoming_week_load === 1 ? 'session' : 'sessions' }} → rank {{ peer.rank }}
+          </span>
+        </div>
+      </section>
     </template>
     <p v-else class="empty-state">Select a tutor to see the calculation.</p>
   </div>
@@ -341,6 +369,40 @@ onBeforeUnmount(clearTimers)
 <style scoped>
 .algo-breakdown {
   min-height: 320px;
+}
+
+.tie-block {
+  border: 1px dashed color-mix(in srgb, var(--sb-warning, #d29922) 50%, transparent);
+  background: color-mix(in srgb, var(--sb-warning, #d29922) 7%, transparent);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-top: 14px;
+}
+
+.tie-block h5 {
+  margin: 0 0 8px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sb-warning, #d29922);
+}
+
+.tie-note {
+  margin: 0 0 8px;
+  font-size: 11px;
+  color: var(--sb-text-muted);
+}
+
+.tie-cmp {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 3px 0;
+  font-size: 12px;
+}
+
+.tie-cmp.current {
+  font-weight: 700;
 }
 
 .sb-card {
