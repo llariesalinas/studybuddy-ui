@@ -1,7 +1,7 @@
 ---
 title: Tutee-side UI at 80% density
 date: 2026-08-04
-status: In Progress
+status: Done
 spec:
 ---
 
@@ -56,6 +56,8 @@ wrong density after a role change (e.g. an Admin impersonation flow or account s
 | `TuteeProfile.vue`, `SbSelectModal.vue`, `SubjectPickerModal.vue` | `.glass-modal`, `.sb-select-dialog`, `.subject-dialog` | `max-height: calc(var(--sb-vh-fix) - 2.5rem)`, `- 1.5rem` at `<640px` |
 | `BookingDatePicker.vue`, `BookingTimePicker.vue` | `.date-modal`, `.time-modal` | `max-height: calc(var(--sb-vh-fix) - 2rem)` |
 | `RatingStackModal.vue` | `.rating-stack-modal` | `max-height: calc(98vh / var(--sb-density-scale))` |
+| `TutorDetails.vue` | `.booking-page` | `min-height: var(--sb-vh-fix)` — added 2026-08-05, see below |
+| `AuthShell.vue` | `.sb-auth-page` | `min-height: var(--sb-vh-fix)` — added 2026-08-05, see below |
 
 The initial audit only searched `.vue` `<style>` blocks and missed a `vh`-based rule applied via
 a *template* utility class: `App.vue`'s authenticated shell root (`<div class="d-flex vh-100
@@ -66,11 +68,19 @@ blank space below (the container itself, one level above the already-fixed `.sb-
 still short). Re-verified the same way as the rest of the audit (DOM measurement in Chrome,
 `.vh-100`-classed test element within 2px of `window.innerHeight` post-fix).
 
-Tutor/Admin/SuperAdmin-only files with `vh` (`LandingPage.vue`, `AuthShell.vue`,
-`TutorProfile.vue`, `TutorSchedule.vue`, `TutorWallet.vue`, `TutorDetails.vue`,
-`TutorSubjectSetup.vue`, `TutorVerificationSetup.vue`, `AdminTutorApplications.vue`,
-`SuperAdminUserModal.vue`) are unreachable with `data-sb-density='compact'` set (only the Tutee
-role sets it), so they were left untouched. `SbBgWash.vue`'s `vh`-positioned blobs need no
+Tutor/Admin/SuperAdmin-only files with `vh` (`LandingPage.vue`, `TutorProfile.vue`,
+`TutorSchedule.vue`, `TutorWallet.vue`, `TutorSubjectSetup.vue`, `TutorVerificationSetup.vue`,
+`AdminTutorApplications.vue`, `SuperAdminUserModal.vue`) are unreachable with
+`data-sb-density='compact'` set (only the Tutee role sets it), so they were left untouched.
+
+**Correction (2026-08-05).** Two files were misclassified into that list by filename rather than by
+route: `TutorDetails.vue` backs `/tutor/:id`, which is `role: 'Tutee'` (`src/router/index.js:97`),
+and `AuthShell.vue` backs `/application-status`, which is `role: ['Tutor', 'Tutee']`
+(`src/router/index.js:130`) alongside the public auth screens. Both are Tutee-reachable and had been
+rendering 20% short since `2cc9981`; their compensation rules were added in
+`2026-08-05-tutor-ui-80-percent-density.md` and are listed in the table above. `AuthShell`'s rule
+stays inert on `/login`, `/register`, `/forgot-password` and `/reset-password` — `userRole` is null
+there, so density is `comfortable` and the selector never matches. `SbBgWash.vue`'s `vh`-positioned blobs need no
 compensation: `.sb-bg-wash` itself covers the viewport via `inset: 0`, not `vh`, and slight
 imprecision in decorative blob placement isn't visually load-bearing.
 
@@ -118,9 +128,11 @@ imprecision in decorative blob placement isn't visually load-bearing.
   - Confirmed the `--sb-vh-fix` compensation is correct: a `.sb-sidebar`-classed test element
     with `data-sb-density="compact"` set rendered its `getBoundingClientRect().bottom` within
     2px of `window.innerHeight` (742.4 vs 742).
-- Still needed — full manual walkthrough, once demo data is available (either seed this DB via
-  `backend/manage.py reset_demo_data` or point at an environment that already has it), side by
-  side against the same page at 100% with the browser itself zoomed to 80%:
+- Done (2026-08-05) — full manual walkthrough, run by the user against a logged-in session and
+  confirmed identical to 80% browser zoom. It was run as part of the Tutor pass
+  ([2026-08-05-tutor-ui-80-percent-density.md](2026-08-05-tutor-ui-80-percent-density.md)), which
+  also added the two Tutee-reachable rules this plan's audit had missed (see the correction above),
+  so the two passes were confirmed together. What was walked:
   - Logged in as Tutee, confirm `AppSidebar` fills top to bottom with no gap at any window
     height.
   - Walk `/dashboard`, `/tutee-profile`, `/tuteeSessions`, `/tuteeSessionDetails/:id`, `/book`,
