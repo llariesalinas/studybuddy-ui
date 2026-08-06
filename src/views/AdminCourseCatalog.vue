@@ -9,6 +9,7 @@
       <div class="col-12 col-md-4"><label class="form-label small fw-bold">CATEGORY</label><select v-model="form.category" class="form-select rounded-3 sb-field" required><option value="" disabled>Select a category</option><option v-for="category in categories" :key="category" :value="category">{{ category }}</option></select></div>
       <div class="col-12 col-md-4"><label class="form-label small fw-bold">SUB-GROUP</label><input v-model.trim="form.department" class="form-control rounded-3 sb-field"></div>
       <div class="col-12"><label class="form-label small fw-bold">KEYWORDS</label><input v-model.trim="form.keywords" class="form-control rounded-3 sb-field" placeholder="Comma-separated synonyms, e.g. coding, programming, cs"></div>
+      <div class="col-12"><label class="form-label small fw-bold">DESCRIPTION</label><textarea v-model.trim="form.description" class="form-control rounded-3 sb-field" rows="2" placeholder="A brief description of what this subject covers"></textarea></div>
       <div class="col-12 d-flex justify-content-end gap-2"><button type="button" class="btn btn-light rounded-pill px-3" @click="cancelForm">Cancel</button><button class="btn bg-sb-primary text-white rounded-pill px-3" :disabled="saving">{{ editingCode ? 'Save changes' : 'Add subject' }}</button></div>
     </form>
     <div class="border rounded-4 bg-white shadow-sm overflow-hidden"><div class="catalog-toolbar p-3 border-bottom"><input v-model.trim="search" class="form-control rounded-3 sb-field" placeholder="Search by name, category, or sub-group"></div>
@@ -26,11 +27,11 @@ import { TAXONOMY_CATEGORIES } from '@/constants/subjectTaxonomy'
 const catalogStore = useCatalogStore(); const toastStore = useToastStore()
 const categories = TAXONOMY_CATEGORIES
 const search = ref(''); const loading = ref(false); const saving = ref(false); const removingCode = ref(null); const showForm = ref(false); const editingCode = ref(null)
-const form = reactive({ subject_name: '', department: '', category: '', keywords: '' })
+const form = reactive({ subject_name: '', department: '', category: '', keywords: '', description: '' })
 const filteredSubjects = computed(() => { const query = search.value.toLowerCase(); return catalogStore.courseCatalog.filter((subject) => !query || [subject.subject_name, subject.department, subject.category, subject.keywords].filter(Boolean).some((value) => String(value).toLowerCase().includes(query))) })
-function resetForm() { Object.assign(form, { subject_name: '', department: '', category: '', keywords: '' }); editingCode.value = null }
+function resetForm() { Object.assign(form, { subject_name: '', department: '', category: '', keywords: '', description: '' }); editingCode.value = null }
 function startCreate() { resetForm(); showForm.value = true }
-function startEdit(subject) { editingCode.value = subject.subject_code; Object.assign(form, { subject_name: subject.subject_name, department: subject.department, category: subject.category, keywords: subject.keywords || '' }); showForm.value = true }
+function startEdit(subject) { editingCode.value = subject.subject_code; Object.assign(form, { subject_name: subject.subject_name, department: subject.department, category: subject.category, keywords: subject.keywords || '', description: subject.description || '' }); showForm.value = true }
 function cancelForm() { showForm.value = false; resetForm() }
 async function saveSubject() { saving.value = true; try { if (editingCode.value) await catalogStore.updateCatalogSubject(editingCode.value, { ...form }); else await catalogStore.addCatalogSubject({ ...form }); toastStore.push('Subject saved.', 'success'); cancelForm() } catch { toastStore.push('Failed to save subject.', 'error') } finally { saving.value = false } }
 async function removeSubject(subject) { removingCode.value = subject.subject_code; try { await catalogStore.removeCatalogSubject(subject.subject_code); toastStore.push('Subject removed.', 'success') } catch { toastStore.push('Failed to remove subject.', 'error') } finally { removingCode.value = null } }

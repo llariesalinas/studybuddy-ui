@@ -1434,12 +1434,16 @@ def profile_status(request):
     document_context = get_role_document_review_context(profile)
     wallet_negative = False
     tutor_subject_count = 0
+    # Default True (never gated) for non-Tutors and Tutors with no Tutor row yet — the commission
+    # gate only applies once a Tutor record exists to accept terms on. See ADR-0010.
+    commission_terms_accepted = True
     if profile.role == 'Tutor':
         tutor = getattr(profile, 'tutor', None)
         if tutor is not None:
             wallet = Wallet.objects.filter(tutor=tutor).first()
             wallet_negative = bool(wallet and wallet.balance < 0)
             tutor_subject_count = TutorSubjects.objects.filter(tutor=tutor).count()
+            commission_terms_accepted = tutor.commission_terms_accepted_at is not None
 
     return Response({
         "profile_completed": profile.profile_completed,
@@ -1449,6 +1453,7 @@ def profile_status(request):
         **get_tutor_onboarding_context(profile),
         "tutor_subject_count": tutor_subject_count,
         "tutor_subjects_completed": tutor_subject_count > 0,
+        "commission_terms_accepted": commission_terms_accepted,
         **document_context
     })
 
@@ -2259,6 +2264,7 @@ def tutor_dashboard(request):
         "total_sessions": tutor.total_sessions,
         "rating_average": tutor.rating_average,
         "hourly_rate": tutor.hourly_rate,
+        "commission_terms_accepted_at": tutor.commission_terms_accepted_at,
         "total_earnings": round(total_earnings, 2),
         "session_load_limit": load_snapshot["session_load_limit"],
         "accepted_session_load": load_snapshot["accepted_session_load"],
@@ -3718,6 +3724,16 @@ def tutor_setup(request):
     profile = request.user.userprofile
     tutor = Tutor.objects.get(profile=profile)
 
+    # Reactive Gate: a tutor must acknowledge the commission disclosure before an hourly rate is
+    # ever accepted, mirroring the "Continue" button's Proactive Gate in TutorPreferenceSetup.vue
+    # (see ADR-0010). Already-accepted tutors keep re-submitting this on every profile edit, which
+    # is fine — commission_terms_accepted_at only needs to be set once.
+    if not tutor.commission_terms_accepted_at and not request.data.get("commission_terms_accepted"):
+        return Response(
+            {"error": "Please acknowledge the platform commission before continuing."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
     tutor.teaching_level = request.data.get("teaching_level")
 
     tutor.can_online = request.data.get("can_online", True)
@@ -3726,6 +3742,9 @@ def tutor_setup(request):
     tutor.hourly_rate = request.data.get("hourly_rate")
     tutor.response_time = request.data.get("response_time", tutor.response_time)
 
+    if not tutor.commission_terms_accepted_at:
+        tutor.commission_terms_accepted_at = timezone.now()
+
     tutor.save()
     bump_dashboard_recs_cache_version()
 
@@ -3733,6 +3752,23 @@ def tutor_setup(request):
     profile.save()
 
     return Response({"message": "Tutor profile updated"})
+
+
+@api_view(['POST'])
+def accept_commission_terms(request):
+    """Retroactive commission-disclosure acceptance for tutors who completed onboarding before
+    this gate existed (see ADR-0010). Separate from tutor_setup's inline acceptance so an
+    already-onboarded tutor isn't forced to resubmit their full profile just to acknowledge the
+    commission rate."""
+
+    profile = request.user.userprofile
+    tutor = Tutor.objects.get(profile=profile)
+
+    if not tutor.commission_terms_accepted_at:
+        tutor.commission_terms_accepted_at = timezone.now()
+        tutor.save(update_fields=['commission_terms_accepted_at'])
+
+    return Response({"commission_terms_accepted_at": tutor.commission_terms_accepted_at})
 
 
 RECOMMENDATION_BLOCKING_STATUSES = [

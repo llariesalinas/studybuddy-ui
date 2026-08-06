@@ -28,6 +28,7 @@ from studybuddy.models import (
     Rating, Strand, Subjects, Tutor, TutorApplication, TutorAvailability,
     TutorSubjects, UserProfile, Wallet,
 )
+from studybuddy.subject_descriptions import SUBJECT_DESCRIPTIONS
 from studybuddy.subject_taxonomy import CATEGORIES, SUBJECTS, slugify_subject_code
 
 from ._year_level_scale import YEAR_RANGE_BY_COURSE, random_year_level
@@ -252,6 +253,7 @@ class Command(BaseCommand):
                 subject_name=name,
                 department=subgroup,
                 category=category,
+                description=SUBJECT_DESCRIPTIONS.get(name, ''),
                 status='approved',
             )
             for name, category, subgroup in SUBJECTS

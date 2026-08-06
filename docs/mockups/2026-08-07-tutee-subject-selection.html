@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Tutee Subject Selection — Folded into Preferences (chosen)</title>
+<style>
+  body { font-family: -apple-system, Segoe UI, sans-serif; background: #f6f6f7; padding: 40px; }
+  .sb-mock {
+    --sb-primary: #00895a;
+    --sb-primary-hover: #00704a;
+    --sb-green-tint: #edf7f3;
+    --sb-green-border: #b8dece;
+    --sb-ink: #1d1d1f;
+    --sb-muted: #6e6e73;
+    color: var(--sb-ink);
+    max-width: 640px;
+    margin: 0 auto;
+  }
+  .sb-mock .onboarding-rail {
+    display: flex; gap: 18px; padding: 14px 20px;
+    background: var(--sb-green-tint); border-radius: 14px 14px 0 0;
+    font-size: 13px; font-weight: 500; color: var(--sb-muted);
+  }
+  .sb-mock .rail-step { display: flex; align-items: center; gap: 6px; }
+  .sb-mock .rail-step-active { color: var(--sb-ink); font-weight: 700; }
+  .sb-mock .rail-num {
+    width: 20px; height: 20px; border-radius: 50%;
+    background: #fff; border: 1px solid var(--sb-green-border);
+    display: inline-flex; align-items: center; justify-content: center; font-size: 11px;
+  }
+  .sb-mock .rail-step-active .rail-num { background: var(--sb-primary); color: #fff; border-color: var(--sb-primary); }
+  .sb-mock .step-body {
+    border: 1px solid #e8e8e8; border-top: none; border-radius: 0 0 14px 14px;
+    padding: 24px; background: #fff;
+  }
+  .sb-mock h4 { margin: 0 0 4px; font-size: 18px; }
+  .sb-mock .muted { color: var(--sb-muted); font-size: 13px; margin: 0 0 16px; }
+  .sb-mock .search-wrap {
+    border: 1px solid #e0e0e0; border-radius: 9999px; padding: 9px 16px;
+    font-size: 13px; color: var(--sb-muted); margin-bottom: 16px;
+  }
+  .sb-mock .category-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px; }
+  .sb-mock .subj-card {
+    border: 1px solid #e8e8e8; border-radius: 12px; padding: 12px 14px; cursor: pointer;
+  }
+  .sb-mock .subj-card.selected { border-color: var(--sb-primary); background: var(--sb-green-tint); }
+  .sb-mock .subj-card .name { font-weight: 600; font-size: 14px; display: flex; justify-content: space-between; }
+  .sb-mock .subj-card .desc { font-size: 12px; color: var(--sb-muted); margin-top: 4px; line-height: 1.4; }
+  .sb-mock .sb-badge {
+    display: inline-block; background: var(--sb-green-tint); color: var(--sb-primary);
+    border: 1px solid var(--sb-green-border); border-radius: 9999px;
+    font-size: 10px; font-weight: 500; padding: 2px 8px; margin-top: 6px;
+  }
+  .sb-mock .check { color: var(--sb-primary); font-size: 12px; font-weight: 700; }
+  .sb-mock .step-nav-row { display: flex; justify-content: space-between; margin-top: 20px; }
+  .sb-mock .sb-btn-pill {
+    background: var(--sb-primary); color: #fff; padding: 10px 24px;
+    border-radius: 9999px; font-size: 13px; font-weight: 500; border: none;
+  }
+  .sb-mock .sb-btn-outline {
+    background: #fff; color: var(--sb-ink); padding: 10px 24px;
+    border-radius: 9999px; font-size: 13px; font-weight: 500; border: 1px solid #ddd;
+  }
+  .note { max-width: 640px; margin: 0 auto 16px; font-size: 13px; color: #6e6e73; }
+</style>
+</head>
+<body>
+  <p class="note">Chosen design (2026-08-07 grilling session): Tutee subject selection folded into the
+  existing <code>PreferenceSetup.vue</code> onboarding step, alongside Course/Year Level. Subject
+  descriptions shown under each subject name — same <code>SubjectTaxonomyPicker</code> component used
+  by the Tutor onboarding flow.</p>
+  <div class="sb-mock">
+    <div class="onboarding-rail">
+      <div class="rail-step rail-step-active"><span class="rail-num">1</span><span>Preferences</span></div>
+      <div class="rail-step"><span class="rail-num">2</span><span>Verify</span></div>
+    </div>
+    <div class="step-body">
+      <h4>Tell us about yourself</h4>
+      <p class="muted">Course, year level, and the subjects you need help with.</p>
+      <div class="search-wrap">Course: BS Computer Science &#9662;</div>
+      <div class="search-wrap">Year Level: 2nd Year &#9662;</div>
+      <div style="font-size:13px;font-weight:600;margin:16px 0 8px">Subjects you need tutoring in</div>
+      <div class="search-wrap">&#128269; Search subjects</div>
+      <div class="category-grid">
+        <div class="subj-card selected">
+          <div class="name">Calculus 1 <span class="check">&#10003;</span></div>
+          <div class="desc">Limits, derivatives, and integrals for single-variable functions.</div>
+          <span class="sb-badge">Mathematics</span>
+        </div>
+        <div class="subj-card">
+          <div class="name">Data Structures</div>
+          <div class="desc">Arrays, linked lists, trees, and algorithmic complexity.</div>
+          <span class="sb-badge">Computer Science</span>
+        </div>
+      </div>
+      <div class="step-nav-row">
+        <button class="sb-btn-outline">&larr; Back</button>
+        <button class="sb-btn-pill">Continue to Verification</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

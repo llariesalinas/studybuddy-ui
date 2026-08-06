@@ -17,6 +17,7 @@ export const useProfileStore = defineStore('profile', {
     tutorSubjectCount: 0,
     tutorSubjectsCompleted: false,
     walletNegative: false,
+    commissionTermsAccepted: true,
     loaded: false
   }),
 
@@ -35,6 +36,7 @@ export const useProfileStore = defineStore('profile', {
       this.tutorSubjectCount = 0
       this.tutorSubjectsCompleted = false
       this.walletNegative = false
+      this.commissionTermsAccepted = true
       this.loaded = false
     },
 
@@ -64,6 +66,7 @@ export const useProfileStore = defineStore('profile', {
       this.tutorSubjectCount = res.data.tutor_subject_count || 0
       this.tutorSubjectsCompleted = Boolean(res.data.tutor_subjects_completed)
       this.walletNegative = Boolean(res.data.wallet_negative)
+      this.commissionTermsAccepted = res.data.commission_terms_accepted !== false
       this.loaded = true
 
       return res.data

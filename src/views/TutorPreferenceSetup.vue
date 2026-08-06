@@ -39,12 +39,20 @@
                   </div>
                 </div>
 
-                <div class="mb-5">
+                <div class="mb-4">
                   <label class="form-label fw-bold small sb-muted">HOURLY RATE (PHP)</label>
                   <input type="number" v-model="form.hourly_rate" class="form-control border-sb shadow-none sb-field" placeholder="₱ 0.00" required>
                 </div>
 
-                <button type="submit" class="btn bg-sb-primary text-white w-100 py-3 rounded-3 fw-bold shadow-sm sb-btn">
+                <div class="form-check mb-5">
+                  <input class="form-check-input" type="checkbox" v-model="commissionTermsAccepted" id="commission-terms">
+                  <label class="form-check-label small sb-muted" for="commission-terms">
+                    I understand StudyBuddy deducts a {{ commissionRatePercent }}% platform fee from
+                    each completed session's payout.
+                  </label>
+                </div>
+
+                <button type="submit" class="btn bg-sb-primary text-white w-100 py-3 rounded-3 fw-bold shadow-sm sb-btn" :disabled="!commissionTermsAccepted">
                   Complete Profile
                 </button>
               </form>
@@ -62,6 +70,7 @@ import { useRouter } from 'vue-router'
 import { useProfileStore } from '@/stores/profile'
 import { useToastStore } from '@/stores/toast'
 import api from '@/services/api/api'
+import { PLATFORM_COMMISSION_RATE_PERCENT } from '@/config'
 import SbThemeToggle from '@/components/SbThemeToggle.vue'
 import SbSelectModal from '@/components/SbSelectModal.vue'
 
@@ -69,12 +78,18 @@ const router = useRouter()
 const profileStore = useProfileStore()
 const toastStore = useToastStore()
 
+const commissionRatePercent = PLATFORM_COMMISSION_RATE_PERCENT
+
 const form = ref({
   teaching_level: '',
   can_online: true,
   can_f2f: false,
   hourly_rate: null
 })
+
+// Pre-checked once accepted (see profileStore.checkProfileStatus) so a returning tutor editing
+// their profile isn't asked to re-acknowledge every time — see ADR-0010.
+const commissionTermsAccepted = ref(profileStore.commissionTermsAccepted)
 
 const teachingLevelOptions = [
   { label: 'Elementary', value: 'Elementary' },
@@ -114,12 +129,21 @@ const handleCompleteSetup = async () => {
     return
   }
 
+  if (!commissionTermsAccepted.value) {
+    toastStore.push("Please acknowledge the platform commission before continuing.", 'warning')
+    return
+  }
+
   try {
 
-    await api.post('/tutor/setup/', form.value)
+    await api.post('/tutor/setup/', {
+      ...form.value,
+      commission_terms_accepted: commissionTermsAccepted.value,
+    })
 
     // update profile guard state
     profileStore.profileCompleted = true
+    profileStore.commissionTermsAccepted = true
 
     router.push({ name: 'tutor-subjects-setup' })
 
