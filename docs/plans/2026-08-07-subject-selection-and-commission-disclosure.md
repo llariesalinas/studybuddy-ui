@@ -1,7 +1,7 @@
 ---
 title: Subject Selection Onboarding + Commission Disclosure
 date: 2026-08-07
-status: In Progress
+status: Done
 summary: Add subject descriptions and a Tutee onboarding subject picker; disclose the 10% commission to Tutors before they set their rate, with persisted acceptance.
 spec: ../mockups/2026-08-07-tutee-subject-selection.html
 ---
@@ -10,13 +10,18 @@ spec: ../mockups/2026-08-07-tutee-subject-selection.html
 
 ## Status/Progress Summary
 
-**2026-08-07:** In Progress. Discovered during implementation that `PreferenceSetup.vue` already
-has a Tutee subject-selection card (Card 3, using `SubjectTaxonomyPicker`) that already persists
-to `Preference` via `POST preferences/` → `save_preferences`. This was missed by the pre-grilling
-exploration (stale relative to work already on `feat/subjects-reseed`). Steps 5 and 6 needed no
-new code as a result — the `description` field/display work (steps 1-4) covers this screen for
-free since it shares `SubjectTaxonomyPicker`. Commission disclosure (steps 6-8 in the numbered
-list, i.e. the `Tutor` field/onboarding checkbox/router guard) still to implement.
+**2026-08-07:** Done. All 9 steps implemented on `feat/subject-descriptions-commission-disclosure`
+(branched from `feat/subjects-reseed`). Discovered mid-implementation that `PreferenceSetup.vue`
+already had a Tutee subject-selection card wired to `Preference` — steps 5-6 needed no new code.
+Commission disclosure shipped as designed: Proactive Gate (disabled Continue button) +
+Reactive Gate (`tutor_setup` 400s without acknowledgement) per ADR-0010, plus a dedicated
+`accept-commission-terms` endpoint and `TutorCommissionTermsAcceptance.vue` screen forcing
+retroactive acceptance on already-onboarded/seeded tutors via the router guard. 12 new backend
+tests all pass; full backend suite has 7 pre-existing failures unrelated to this diff (confirmed
+via `git stash` on the same failing tests — reproduce identically without these changes). Frontend
+lint/build/vitest all clean. Two-axis code review ran clean on Spec; Standards found one hard
+violation (stray emoji in a router comment, fixed) and no-action judgement calls. Session summary:
+[2026-08-07 summary](../session-summaries/2026-08-07-subject-selection-and-commission-disclosure-summary.md).
 
 ## Changelog
 
@@ -25,6 +30,11 @@ list, i.e. the `Tutor` field/onboarding checkbox/router guard) still to implemen
   field, `SubjectTaxonomyPicker` description display, and seed description backfill (all 121
   seeded subjects) are done. Found Tutee subject-selection onboarding already exists — no new
   frontend/backend work needed there. Status: In Progress.
+- 2026-08-07: Commission disclosure implemented (Tutor field, migration, onboarding checkbox,
+  retroactive router-guard gate, new acceptance screen/endpoint). 12 new backend tests added, full
+  suite run (7 pre-existing unrelated failures confirmed via git-stash comparison), frontend
+  lint/build/vitest clean. Two-axis code review run and one finding (stray emoji) fixed. Committed
+  as `0a6e3d3` + a follow-up fix commit. Status: Done.
 
 ## Goal
 
