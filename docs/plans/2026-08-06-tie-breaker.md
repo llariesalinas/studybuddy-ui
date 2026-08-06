@@ -1,7 +1,7 @@
 ---
 title: Tie Breaker for equal hybrid scores
 date: 2026-08-06
-status: In Progress
+status: Done
 summary: Break equal hybrid scores by Upcoming Week Load so equally-matched tutors share work.
 spec: ../adr/0009-tie-breaker-upcoming-week-load.md
 ---
@@ -10,12 +10,9 @@ spec: ../adr/0009-tie-breaker-upcoming-week-load.md
 
 ## Status & Progress Summary
 
-**In Progress — all steps implemented, final verification running.** Steps 1-8 are done:
-`recommender/workload.py` added, the three-part sort key applied in `recommend_tutors_hybrid`,
-tie groups tagged in `demo.py`, both demo components updated, and `CONTEXT.md` plus ADR-0009
-written. 23 new backend tests and 5 new frontend tests pass; `npm run build`, `npm run test`
-(93 passing) and `npm run lint` are clean. Outstanding: the full Django suite result, then commit
-and the session summary.
+**Done** — shipped as `c343cc3` on `feat/subjects-reseed`. All eight steps landed as planned,
+with three additive deviations recorded below. Full check results and the process caveats are in the
+[session summary](../session-summaries/2026-08-06-tie-breaker-summary.md). Not pushed.
 
 ## Goal
 
@@ -118,3 +115,8 @@ the derivation in the breakdown pane alongside the existing CBF and CF derivatio
   `HYBRID_SCORE_PRECISION` / `UPCOMING_WEEK_DAYS` exported from `src/config.js` so the frontend
   does not hardcode either. Added `AlgorithmDemoRankedList.test.js` (5 cases), which the plan did
   not call for — the badge and tie-peer logic were otherwise untested. Status: In Progress.
+- **2026-08-07** — Verified and committed as `c343cc3`. Full Django suite run in chunks (370 tests;
+  the remote Supabase test DB exceeds the command timeout in one pass and `--parallel` cannot clone
+  past the pooler): 11 failures, each re-run against a stashed clean tree and confirmed pre-existing.
+  Frontend build/lint/tests clean. Status: Done. The `accepted_session_load()` stale-row issue
+  remains open and unfiled.
