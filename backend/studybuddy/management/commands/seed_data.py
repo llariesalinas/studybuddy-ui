@@ -1,10 +1,16 @@
 """Deterministic demo-data seed for the subjects taxonomy reseed.
 
 Seeds the Preply-style subject catalog, a small set of hand-curated tutor/tutee personas
-engineered to exercise every CBF/CF formula component, and a larger Faker-generated filler
-population, so the superadmin algorithm demo tool has something real to show. See
-docs/plans/2026-07-16-subjects-taxonomy-reseed.md and
-docs/learning/2026-07-16-algorithm-demo-cheat-sheet.md.
+engineered to exercise every CBF/CF formula component, a larger Faker-generated filler
+population, and 2 permanent SuperAdmin accounts, so the superadmin algorithm demo tool has
+something real to show. See docs/plans/2026-07-16-subjects-taxonomy-reseed.md,
+docs/learning/2026-07-16-algorithm-demo-cheat-sheet.md, and
+docs/plans/2026-08-08-consolidate-demo-seed.md.
+
+Also orchestrates the three standalone, independently reversible additive demo-case commands
+(seed_booking_load_limit_demo, seed_wallet_cases_demo, seed_tie_breaker_demo) at the end of its
+run, so `reset_demo_data && seed_data` alone produces a fully demoable database — no need to
+chain them by hand.
 
 Run `python manage.py reset_demo_data` first on a non-empty database — this command refuses
 to run if any non-staff data already exists, to keep seeding deterministic and idempotent.
@@ -18,6 +24,7 @@ from uuid import uuid4
 
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User
+from django.core.management import call_command
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils import timezone
@@ -28,6 +35,7 @@ from studybuddy.models import (
     Rating, Strand, Subjects, Tutor, TutorApplication, TutorAvailability,
     TutorSubjects, UserProfile, Wallet,
 )
+from studybuddy.recommender.demo import build_algorithm_demo_recommendation
 from studybuddy.subject_descriptions import SUBJECT_DESCRIPTIONS
 from studybuddy.subject_taxonomy import CATEGORIES, SUBJECTS, slugify_subject_code
 
@@ -89,6 +97,20 @@ RESPONSE_TIME_LABELS = {
 
 FILLER_TUTOR_COUNT = 150
 FILLER_TUTEE_COUNT = 350
+
+# Two permanent SuperAdmin logins, seeded so a fresh reset+reseed never needs a manual
+# `make_superadmin` step. Share the same demo PASSWORD as every other seeded account for
+# easy access. `is_staff=True` (not `is_superuser`, which gates Django's own /admin and is
+# unrelated to the app's SuperAdmin role) means reset_demo_data's existing
+# `is_staff=False` deletion filter already protects both accounts on every future reset.
+SUPERADMINS = [
+    ('superadmin.demo@cpu.edu.ph', 'Sonia', 'Superadmin'),
+    ('superadmin2.demo@cpu.edu.ph', 'Ramon', 'Superadmin'),
+]
+
+# How many curated tutees (in id order) to scan for a real tie group before giving up.
+# Mirrors the manual shell workaround previously documented in demo-deployment.md.
+TIE_GROUP_SEARCH_LIMIT = 50
 
 # Curated tutors: (key, fname, lname, course_code, year, teaching_level, can_online, can_f2f,
 # hourly_rate, [(subject_name, expertise_level), ...])
@@ -214,6 +236,12 @@ class Command(BaseCommand):
             self._recompute_tutor_aggregates()
 
             self._assert_guarantees(curated, fillers)
+
+            self.stdout.write('Seeding SuperAdmin accounts...')
+            self._seed_superadmins()
+
+            self.stdout.write('Seeding additive demo cases (load limit, wallet, tie breaker)...')
+            self._seed_additive_demo_cases(curated)
 
         self.stdout.write(self.style.SUCCESS('Seeding complete.'))
 
@@ -732,3 +760,71 @@ class Command(BaseCommand):
             f'  guarantees verified: all {len(TIER1_TUTEE_KEYS)} tier-1 tutees co-rate '
             f'>= {MIN_CO_RATED} tutors pairwise with no degenerate similarity.'
         )
+
+    # ------------------------------------------------------------------ superadmins
+
+    def _seed_superadmins(self):
+        """Two permanent SuperAdmin logins. `is_staff=True` (mirrors make_superadmin.py)
+        means reset_demo_data's `is_staff=False` deletion filter already protects both
+        accounts on every future reset, without any code change to that command."""
+        password_hash = make_password(PASSWORD)
+        for username, fname, lname in SUPERADMINS:
+            user, user_created = User.objects.get_or_create(
+                username=username,
+                defaults={
+                    'email': username, 'first_name': fname, 'last_name': lname,
+                    'password': password_hash, 'is_staff': True,
+                },
+            )
+            if not user_created and not user.is_staff:
+                user.is_staff = True
+                user.save(update_fields=['is_staff'])
+
+            UserProfile.objects.get_or_create(
+                user=user,
+                defaults={
+                    'fname': fname, 'lname': lname, 'role': 'SuperAdmin',
+                    'profile_completed': True, 'is_domain_exempt': True,
+                    'is_suspended': False,
+                },
+            )
+        self.stdout.write(f'  seeded {len(SUPERADMINS)} SuperAdmin accounts.')
+
+    # ------------------------------------------------------------------ additive demo cases
+
+    def _find_tutee_with_tie_group(self):
+        """Scans curated tutees (in id order) for one whose recommendation ranking has a
+        real tie group, so seed_tie_breaker_demo never depends on a hardcoded tutee id
+        that only matches one specific database's row numbering."""
+        tutees = UserProfile.objects.filter(
+            role='Tutee',
+        ).order_by('id')[:TIE_GROUP_SEARCH_LIMIT]
+
+        for tutee in tutees:
+            result = build_algorithm_demo_recommendation(tutee)
+            rows = result.get('rows') or []
+            if any(row.get('tie_group_id') is not None for row in rows):
+                return tutee.id
+
+        return None
+
+    def _seed_additive_demo_cases(self, curated):
+        """Orchestrates the three standalone, independently reversible (--remove) demo-case
+        commands so a plain `seed_data` run alone produces a fully demoable database.
+
+        Order matters: seed_tie_breaker_demo's tutee/tie-group discovery must run before
+        seed_booking_load_limit_demo/seed_wallet_cases_demo create their own tutors, or
+        those brand-new tutors (with no CF signal of their own) can produce an incidental
+        tie against an unrelated tutee -- e.g. the deliberately cold-start S1 -- instead of
+        a real tier-1 CF tie, and then fail on their unrelated availability shape."""
+        tutee_id = self._find_tutee_with_tie_group()
+        if tutee_id is None:
+            self.stdout.write(self.style.WARNING(
+                '  no tie group found among the first '
+                f'{TIE_GROUP_SEARCH_LIMIT} tutees — skipping seed_tie_breaker_demo.'
+            ))
+        else:
+            call_command('seed_tie_breaker_demo', tutee=tutee_id)
+
+        call_command('seed_booking_load_limit_demo')
+        call_command('seed_wallet_cases_demo')
