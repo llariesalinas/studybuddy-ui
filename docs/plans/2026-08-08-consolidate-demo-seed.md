@@ -17,9 +17,12 @@ additive demo cases, and the SuperAdmins survive a second reset. Found and fixed
 bug during verification (see Deviations). Also found and fixed an unrelated, pre-existing
 production incident along the way: Render's `DB_HOST` had drifted to a stale value, meaning the
 live demo backend could not reach its database at all — fixed via Render's Environment tab,
-confirmed via Supabase's own dashboard. Remaining: Step 8 backend test suite is running
-(`--keepdb`, slow over the remote pooler), result not yet known; Step 9 (live-DB operational wipe)
-is effectively already covered, since the verification run above *was* against the live DB.
+confirmed via Supabase's own dashboard. Step 8 backend test suite finished: 381 tests, 7 failures + 1 error, all in
+`TutorCashOutTests`/`TutorProfileTests`/`VerificationDevToolsTests` — unrelated to this diff's
+scope, not independently re-verified against `origin/main` without these changes. Step 9
+(live-DB operational wipe) is effectively already covered, since the verification run above *was*
+against the live DB. Committed and pushed; PR opened:
+[#116](https://github.com/llariesalinas/studybuddy-ui/pull/116).
 
 **Deviations from the plan:**
 - Additive demo case call order had to be tie-breaker discovery first, then
@@ -98,5 +101,6 @@ extra demo-case commands afterward, and a SuperAdmin login should exist without 
 
 | Date | Change |
 |------|--------|
+| 2026-08-08 | Committed (all 5 files) and pushed `chore/consolidate-demo-seed`; opened [PR #116](https://github.com/llariesalinas/studybuddy-ui/pull/116) against `origin/main`. Test suite result (381 tests, 7 failures + 1 error, all unrelated to this diff) recorded |
 | 2026-08-08 | Implemented Steps 1-7: branched off `origin/main`, seeded 2 SuperAdmins + orchestrated the 3 additive demo cases in `seed_data.py`, verified end-to-end (reset+seed twice, SuperAdmins survive), updated both demo docs. Found/fixed a call-order bug (tie-breaker must run before load-limit/wallet). Found/fixed an unrelated live incident: Render's `DB_HOST` had drifted stale, breaking the demo backend's DB connectivity entirely; corrected via Render's Environment tab. Status set to In Progress pending the backend test suite result |
 | 2026-08-08 | Plan created and Approved after an 8-decision `/grill-with-docs` session; added Status & Progress Summary and this Changelog |
