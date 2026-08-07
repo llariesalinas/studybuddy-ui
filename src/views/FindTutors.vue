@@ -76,30 +76,16 @@
           </div>
         </div>
 
-        <!-- From -->
+        <!-- Time range (optional) -->
         <div class="col-lg-3 col-md-6">
-          <label class="form-label fw-semibold small sb-muted">Start Time</label>
-          <BookingTimePicker
-            v-model="startTimeModel"
+          <label class="form-label fw-semibold small sb-muted">
+            Time <span class="fw-normal">(optional)</span>
+          </label>
+          <BookingTimeRangePicker
+            v-model:start="startTimeModel"
+            v-model:end="endTimeModel"
             :selected-date="findTutorsStore.filters.date"
-            title="Choose Start Time"
-            placeholder="Select start time"
-            empty-message="No available start times for this date."
-          />
-        </div>
-
-        <!-- To -->
-        <div class="col-lg-3 col-md-6">
-          <label class="form-label fw-semibold small sb-muted">End Time</label>
-          <BookingTimePicker
-            v-model="endTimeModel"
-            ref="endTimePickerRef"
-            :selected-date="findTutorsStore.filters.date"
-            :min-time="findTutorsStore.filters.startTime"
-            :disabled="!findTutorsStore.filters.startTime"
-            title="Choose End Time"
-            placeholder="Select end time"
-            empty-message="Choose a later time for the session to end."
+            title="Choose a time range"
           />
         </div>
 
@@ -121,6 +107,10 @@
         @cancel="onCampusModalCancelled"
       />
     </form>
+
+    <p v-if="!isLoading && searchScopeLabel" class="sb-muted small fw-semibold mb-3">
+      {{ searchScopeLabel }}
+    </p>
 
     <div v-if="isLoading" class="text-center py-5">
       <div class="spinner-border text-sb-primary" role="status"></div>
@@ -191,13 +181,14 @@
 <script setup>
 import { useRoute, useRouter, onBeforeRouteUpdate } from 'vue-router'
 import api from '@/services/api/api'
-import { computed, nextTick, ref, onMounted, watch } from 'vue'
+import { computed, ref, onMounted, watch } from 'vue'
 import BudgetRangeSlider from '@/components/BudgetRangeSlider.vue'
 import BookingDatePicker from '@/components/BookingDatePicker.vue'
-import BookingTimePicker from '@/components/BookingTimePicker.vue'
+import BookingTimeRangePicker from '@/components/BookingTimeRangePicker.vue'
 import CampusLocationModal from '@/components/CampusLocationModal.vue'
 import SbSelectModal from '@/components/SbSelectModal.vue'
 import SubjectPickerModal from '@/components/SubjectPickerModal.vue'
+import { formatTimeRangeLabel, isPastDate, isPastTimeForDate } from '@/utils/time'
 
 import {
   INITIAL_BUDGET_MAX,
@@ -221,54 +212,14 @@ const toastStore = useToastStore()
 const isLoading = ref(true)
 const isSubmitting = ref(false)
 const showBudgetFilter = ref(false)
-const endTimePickerRef = ref(null)
 const showCampusModal = ref(false)
 const campusLocationType = ref(null)
 
 const subjects = ref([])
 const matchedTutors = computed(() => findTutorsStore.results)
-const padNumber = (value) => String(value).padStart(2, '0')
-const todayKey = () => {
-  const today = new Date()
-  return `${today.getFullYear()}-${padNumber(today.getMonth() + 1)}-${padNumber(today.getDate())}`
-}
-
-const isPastDate = (date) => {
-  return Boolean(date) && date < todayKey()
-}
-
-const timeToMinutes = (time) => {
-  const [hours = 0, minutes = 0] = String(time || '00:00')
-    .split(':')
-    .map(Number)
-  return hours * 60 + minutes
-}
-
-const currentComparableMinutes = () => {
-  const now = new Date()
-  return now.getHours() * 60 + now.getMinutes() + (now.getSeconds() > 0 ? 1 : 0)
-}
-
-const isPastTimeForDate = (date, time) => {
-  return (
-    Boolean(date && time) && date === todayKey() && timeToMinutes(time) < currentComparableMinutes()
-  )
-}
 
 const normalizeFutureDate = (date) => {
   return isPastDate(date) ? null : date
-}
-
-const nextTimeSlot = (value) => {
-  const nextMinutes = timeToMinutes(value) + 60
-
-  if (nextMinutes >= 24 * 60) {
-    return null
-  }
-
-  const hours = Math.floor(nextMinutes / 60)
-  const minutes = nextMinutes % 60
-  return `${padNumber(hours)}:${padNumber(minutes)}`
 }
 
 const filteredTutors = computed(() =>
@@ -278,17 +229,58 @@ const filteredTutors = computed(() =>
   }),
 )
 
+const hasTimeFilter = computed(() =>
+  Boolean(findTutorsStore.filters.startTime && findTutorsStore.filters.endTime),
+)
+
 const noBackendResults = computed(() => matchedTutors.value.length === 0)
 const emptyStateTitle = computed(() =>
   noBackendResults.value
     ? 'No tutors available for this search'
     : 'No tutors match this budget range',
 )
-const emptyStateMessage = computed(() =>
-  noBackendResults.value
-    ? 'No tutors are available for the selected filters. Try a different date, time, subject, or mode.'
-    : 'Try widening the slider range to see more tutor options.',
-)
+const emptyStateMessage = computed(() => {
+  if (!noBackendResults.value) {
+    return 'Try widening the slider range to see more tutor options.'
+  }
+
+  return hasTimeFilter.value
+    ? 'No tutors are available for the selected filters. Clearing the time range widens the search to the whole day.'
+    : 'No tutors are available for the selected filters. Try a different date, subject, or mode.'
+})
+
+const searchDateLabel = computed(() => {
+  const date = findTutorsStore.filters.date
+
+  if (!date) {
+    return ''
+  }
+
+  const [year, month, day] = date.split('-').map(Number)
+
+  return new Date(year, month - 1, day).toLocaleDateString('en-US', {
+    month: 'long',
+    day: 'numeric',
+  })
+})
+
+// Say what the search actually covered -- without this, a whole-day result set looks identical
+// to a narrow one and reads as a time filter that silently failed.
+const searchScopeLabel = computed(() => {
+  if (!searchDateLabel.value) {
+    return ''
+  }
+
+  if (hasTimeFilter.value) {
+    const range = formatTimeRangeLabel(
+      findTutorsStore.filters.startTime,
+      findTutorsStore.filters.endTime,
+    )
+    return `Tutors available ${searchDateLabel.value}, ${range}`
+  }
+
+  return `Tutors available any time on ${searchDateLabel.value}`
+})
 
 const budgetSummary = computed(() => {
   const minLabel = Number(findTutorsStore.filters.minRate || 0).toLocaleString('en-PH')
@@ -391,30 +383,16 @@ const maxRateModel = computed({
 
 const modes = ['Online', 'Face-to-face']
 const modeOptions = modes.map((mode) => ({ label: mode, value: mode }))
+// The range picker commits both bounds together, so these are plain pass-throughs -- no
+// auto-filled end time and no second modal to chain open.
 const startTimeModel = computed({
   get: () => findTutorsStore.filters.startTime,
-  set: (value) => {
-    updateFindTutorsFilters({ startTime: value })
-
-    if (!findTutorsStore.filters.endTime || findTutorsStore.filters.endTime <= value) {
-      updateFindTutorsFilters({ endTime: nextTimeSlot(value) })
-    }
-
-    nextTick(() => {
-      endTimePickerRef.value?.openModal()
-    })
-  },
+  set: (value) => updateFindTutorsFilters({ startTime: value }),
 })
 
 const endTimeModel = computed({
   get: () => findTutorsStore.filters.endTime,
-  set: (value) => {
-    if (findTutorsStore.filters.startTime && value <= findTutorsStore.filters.startTime) {
-      return
-    }
-
-    updateFindTutorsFilters({ endTime: value })
-  },
+  set: (value) => updateFindTutorsFilters({ endTime: value }),
 })
 
 const onCampusTypeSelected = (type) => {
@@ -427,12 +405,10 @@ const onCampusModalCancelled = () => {
   campusLocationType.value = null
 }
 
+// Times are optional -- omitting them widens the search to the whole day. `subject` is required
+// by the backend (it 400s without one), so gate on it here rather than firing a doomed request.
 const canRunRecommendation = () => {
-  return Boolean(
-    findTutorsStore.filters.date &&
-      findTutorsStore.filters.startTime &&
-      findTutorsStore.filters.endTime,
-  )
+  return Boolean(findTutorsStore.filters.subject && findTutorsStore.filters.date)
 }
 
 const runRecommendation = async () => {
@@ -508,18 +484,17 @@ const searchTutor = async () => {
     return
   }
 
+  // The time range is optional -- no times means "any time that day", which the recommender
+  // handles by falling back to its date-only candidate stage. A half-set range can only come
+  // from stale sessionStorage (the picker always commits both bounds together); drop it and
+  // search the whole day rather than blocking on it.
   if (!findTutorsStore.filters.startTime || !findTutorsStore.filters.endTime) {
-    toastStore.push('Please select a start and end time.', 'warning')
-    return
-  }
-
-  if (isPastTimeForDate(findTutorsStore.filters.date, findTutorsStore.filters.startTime)) {
+    updateFindTutorsFilters({ startTime: null, endTime: null })
+  } else if (isPastTimeForDate(findTutorsStore.filters.date, findTutorsStore.filters.startTime)) {
     updateFindTutorsFilters({ startTime: null, endTime: null })
     toastStore.push('Please choose a future start time.', 'warning')
     return
-  }
-
-  if (findTutorsStore.filters.endTime <= findTutorsStore.filters.startTime) {
+  } else if (findTutorsStore.filters.endTime <= findTutorsStore.filters.startTime) {
     updateFindTutorsFilters({ endTime: null })
     toastStore.push('Please choose an end time after the start time.', 'warning')
     return
@@ -615,12 +590,6 @@ onBeforeRouteUpdate(async (to, from, next) => {
 </script>
 
 <style scoped>
-.time-trigger {
-  min-height: 42px;
-  background: var(--sb-card-bg);
-  color: var(--sb-text-main);
-}
-
 .subject-filter-column {
   position: relative;
 }
