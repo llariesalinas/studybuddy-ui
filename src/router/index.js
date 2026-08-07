@@ -127,6 +127,12 @@ const router = createRouter({
       meta: { requiresAuth: true, role: 'Tutor' }
     },
     {
+      path: '/tutor-commission-terms',
+      name: 'tutor-commission-terms',
+      component: () => import('@/views/TutorCommissionTermsAcceptance.vue'),
+      meta: { requiresAuth: true, role: 'Tutor' }
+    },
+    {
       path: '/application-status',
       name: 'tutor-application-status',
       component: () => import('@/views/TutorApplicationStatus.vue'),
@@ -340,6 +346,18 @@ router.beforeEach(async (to) => {
 
       if (!isAllowedOnboardingStep) return { name: nextOnboardingRoute }
     }
+
+    // 2b. Retroactive commission-terms gate (ADR-0010) — only reachable once onboarding is
+    // already complete; a tutor still mid-onboarding accepts inline at the hourly-rate step.
+    if (
+      normalizedUserRole === 'tutor' &&
+      profileStore.tutorOnboardingComplete &&
+      !profileStore.commissionTermsAccepted &&
+      to.name !== 'tutor-commission-terms'
+    ) {
+      return { name: 'tutor-commission-terms' }
+    }
+
     // 3️⃣ Profile completion guard
     if (!profileStore.profileCompleted) {
 

@@ -24,6 +24,7 @@
           <span class="left">
             <span class="name">{{ subject.subject_name }}</span>
             <span class="meta">{{ subject.category }}</span>
+            <span v-if="subject.description" class="desc">{{ subject.description }}</span>
           </span>
           <span v-if="modelValue.includes(subject.subject_code)" class="check">&#10003; Added</span>
           <span v-else-if="subject.matchedViaKeyword" class="via-badge">via "{{ searchQuery }}"</span>
@@ -64,6 +65,7 @@
             type="button"
             class="subject-chip"
             :class="{ selected: modelValue.includes(subject.subject_code) }"
+            :title="subject.description || undefined"
             @click="toggle(subject.subject_code)"
           >
             <span class="dot"></span>{{ subject.subject_name }}
@@ -124,6 +126,7 @@ const searchResults = computed(() => searchSubjects(props.subjects, searchQuery.
 .dropdown-row .left { display: flex; flex-direction: column; gap: 2px; }
 .dropdown-row .name { font-weight: 600; }
 .dropdown-row .meta { font-size: .74rem; color: var(--sb-text-muted); }
+.dropdown-row .desc { font-size: .74rem; color: var(--sb-text-muted); line-height: 1.35; }
 .dropdown-row .via-badge { font-size: .68rem; padding: 2px 7px; border-radius: 999px; background: color-mix(in srgb, var(--sb-pop-yellow-deep) 15%, var(--sb-card-bg)); color: var(--sb-warning-text); white-space: nowrap; }
 .dropdown-row .check { color: var(--sb-primary); font-weight: 700; font-size: .78rem; white-space: nowrap; }
 .empty-state { padding: 22px 16px; text-align: center; }

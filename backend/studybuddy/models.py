@@ -276,6 +276,8 @@ class Tutor(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
 
+    commission_terms_accepted_at = models.DateTimeField(null=True, blank=True)
+
     def save(self, *args, **kwargs):
         self.response_time_label = self.RESPONSE_TIME_LABELS.get(self.response_time)
         super().save(*args, **kwargs)
@@ -668,6 +670,7 @@ class Subjects(models.Model):
     department = models.CharField(max_length=100)
     category = models.CharField(max_length=100, null=True, blank=True)
     keywords = models.TextField(blank=True, default='')
+    description = models.TextField(blank=True, default='')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='approved')
     proposed_by_tutor = models.ForeignKey(
         'Tutor', on_delete=models.SET_NULL, null=True, blank=True,

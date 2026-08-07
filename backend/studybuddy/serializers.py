@@ -232,6 +232,7 @@ class SubjectSerializer(serializers.ModelSerializer):
             'department',
             'category',
             'keywords',
+            'description',
             'is_recognized',
         ]
         read_only_fields = ['is_recognized']

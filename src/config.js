@@ -41,6 +41,9 @@ export const ACCESS_REFRESH_INTERVAL_MS = 4 * 60 * 1000   // 4 min
 export const IDLE_LOGOUT_MS             = 10 * 60 * 1000  // 10 min
 export const MAX_DOCUMENT_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024 // 5 MB; keep in sync with backend
 
+// Wallet / commission — keep in sync with COMMISSION_RATE in backend/studybuddy/views.py
+export const PLATFORM_COMMISSION_RATE_PERCENT = 10
+
 // Polling
 export const SESSION_POLL_INTERVAL_MS      = 60_000
 export const NOTIFICATION_POLL_INTERVAL_MS = 60_000

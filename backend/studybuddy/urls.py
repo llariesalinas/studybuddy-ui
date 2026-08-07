@@ -175,6 +175,7 @@ urlpatterns = [
     path('dev/algorithm-demo/recommend-whatif/', views.algorithm_demo_recommend_whatif),
     path('dev/algorithm-demo/rating/', views.algorithm_demo_update_rating),
     path('tutor/setup/', views.tutor_setup),
+    path('tutor/accept-commission-terms/', views.accept_commission_terms),
     path(
         'tutor/onboarding/skip-verification/',
         views.skip_tutor_onboarding_verification,

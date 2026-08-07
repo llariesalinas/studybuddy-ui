@@ -652,6 +652,35 @@ class GlobalSubjectCatalogTests(APITestCase):
     def test_catalog_keywords_defaults_to_blank(self):
         self.assertEqual(self.subject.keywords, "")
 
+    def test_catalog_create_and_update_persist_description(self):
+        create_response = self.client.post(
+            "/api/admin/course-catalog/",
+            {
+                "subject_code": "AI203",
+                "subject_name": "Neural Networks",
+                "department": "Computer Science",
+                "category": "Technology & Computer Science",
+                "description": "Layered models trained to recognize patterns in data.",
+            },
+            format="json",
+        )
+        self.assertEqual(create_response.status_code, 201)
+        self.assertEqual(
+            create_response.data["description"],
+            "Layered models trained to recognize patterns in data.",
+        )
+
+        update_response = self.client.patch(
+            "/api/admin/course-catalog/AI203/",
+            {"description": "Updated description."},
+            format="json",
+        )
+        self.assertEqual(update_response.status_code, 200)
+        self.assertEqual(update_response.data["description"], "Updated description.")
+
+    def test_catalog_description_defaults_to_blank(self):
+        self.assertEqual(self.subject.description, "")
+
 
 class RecommendTutorsViewTests(APITestCase):
     def setUp(self):
@@ -2333,6 +2362,114 @@ class ProfileStatusWalletNegativeTests(APITestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.data["wallet_negative"])
+
+
+class CommissionTermsDisclosureTests(APITestCase):
+    """Commission-disclosure acceptance (ADR-0010): tutor_setup blocks without acknowledgement,
+    accept_commission_terms covers already-onboarded tutors retroactively, and profile_status
+    exposes commission_terms_accepted for the router guard."""
+
+    def setUp(self):
+        self.tutor_user = User.objects.create_user(
+            username="commission-tutor",
+            email="commission-tutor@example.com",
+            password="password",
+        )
+        self.tutor_profile = UserProfile.objects.create(
+            user=self.tutor_user, fname="Comm", mname="", lname="Tutor", role="Tutor",
+        )
+        self.tutor = Tutor.objects.create(profile=self.tutor_profile)
+
+        self.tutee_user = User.objects.create_user(
+            username="commission-tutee",
+            email="commission-tutee@example.com",
+            password="password",
+        )
+        UserProfile.objects.create(
+            user=self.tutee_user, fname="Comm", mname="", lname="Tutee", role="Tutee",
+            profile_completed=True,
+        )
+
+    def test_tutor_setup_rejects_without_acknowledgement(self):
+        self.client.force_authenticate(user=self.tutor_user)
+
+        response = self.client.post(
+            "/api/tutor/setup/",
+            {"teaching_level": "College", "hourly_rate": "300.00"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.tutor.refresh_from_db()
+        self.assertIsNone(self.tutor.commission_terms_accepted_at)
+
+    def test_tutor_setup_accepts_and_stamps_timestamp(self):
+        self.client.force_authenticate(user=self.tutor_user)
+
+        response = self.client.post(
+            "/api/tutor/setup/",
+            {
+                "teaching_level": "College",
+                "hourly_rate": "300.00",
+                "commission_terms_accepted": True,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.tutor.refresh_from_db()
+        self.assertIsNotNone(self.tutor.commission_terms_accepted_at)
+
+    def test_tutor_setup_does_not_require_reacknowledgement_once_accepted(self):
+        self.tutor.commission_terms_accepted_at = timezone.now()
+        self.tutor.save(update_fields=["commission_terms_accepted_at"])
+        original_timestamp = self.tutor.commission_terms_accepted_at
+        self.client.force_authenticate(user=self.tutor_user)
+
+        response = self.client.post(
+            "/api/tutor/setup/",
+            {"teaching_level": "College", "hourly_rate": "350.00"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.tutor.refresh_from_db()
+        self.assertEqual(self.tutor.commission_terms_accepted_at, original_timestamp)
+
+    def test_accept_commission_terms_endpoint_is_idempotent(self):
+        self.client.force_authenticate(user=self.tutor_user)
+
+        first_response = self.client.post("/api/tutor/accept-commission-terms/")
+        self.assertEqual(first_response.status_code, 200)
+        self.tutor.refresh_from_db()
+        first_timestamp = self.tutor.commission_terms_accepted_at
+        self.assertIsNotNone(first_timestamp)
+
+        second_response = self.client.post("/api/tutor/accept-commission-terms/")
+        self.assertEqual(second_response.status_code, 200)
+        self.tutor.refresh_from_db()
+        self.assertEqual(self.tutor.commission_terms_accepted_at, first_timestamp)
+
+    def test_profile_status_reflects_commission_terms_accepted_for_tutor(self):
+        self.client.force_authenticate(user=self.tutor_user)
+
+        response = self.client.get("/api/profile/status/")
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.data["commission_terms_accepted"])
+
+        self.tutor.commission_terms_accepted_at = timezone.now()
+        self.tutor.save(update_fields=["commission_terms_accepted_at"])
+
+        response = self.client.get("/api/profile/status/")
+        self.assertTrue(response.data["commission_terms_accepted"])
+
+    def test_profile_status_commission_terms_accepted_true_for_tutee(self):
+        self.client.force_authenticate(user=self.tutee_user)
+
+        response = self.client.get("/api/profile/status/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["commission_terms_accepted"])
 
 
 @override_settings(
