@@ -1158,52 +1158,134 @@ class AdminAnalyticsExportView(APIView):
             period = '30d'
 
         days = ANALYTICS_PERIODS[period]
-        start_date = None if days is None else today - timedelta(days=days - 1)
-        institutions = PartnerInstitution.objects.all().order_by('institution_name')
+        qs_bookings = Booking.objects.all()
+        qs_tutors = Tutor.objects.all()
 
         institution_id = request.query_params.get('institution_id')
+        institution_label = 'All institutions'
         if institution_id:
-            institutions = institutions.filter(pk=institution_id)
+            try:
+                inst = PartnerInstitution.objects.get(pk=institution_id)
+                qs_bookings = qs_bookings.filter(tutor__profile__institution=inst)
+                qs_tutors = qs_tutors.filter(profile__institution=inst)
+                institution_label = inst.institution_name
+            except PartnerInstitution.DoesNotExist:
+                pass
+
+        if days is None:
+            earliest = qs_bookings.order_by('session_date').values_list('session_date', flat=True).first()
+            start_date = earliest or today
+            chart_days = max((today - start_date).days + 1, 1)
+        else:
+            start_date = today - timedelta(days=days - 1)
+            chart_days = days
+
+        period_bookings = qs_bookings.filter(session_date__gte=start_date) if days is not None else qs_bookings
+        completed_bookings = period_bookings.filter(status='Completed')
+        qs_payments = Payment.objects.filter(
+            booking__in=completed_bookings,
+            payment_status='Paid',
+        )
+
+        gross_revenue = qs_payments.aggregate(total=Sum('amount'))['total'] or Decimal('0')
+        commission_total = gross_revenue * Decimal('0.10')
+        payout_total = gross_revenue - commission_total
+        total_sessions = period_bookings.count()
+        completed_sessions = completed_bookings.count()
+        completion_rate = round((completed_sessions / total_sessions) * 100, 1) if total_sessions else 0
+
+        daily_counts = (
+            completed_bookings
+            .values('session_date')
+            .annotate(count=Count('id'))
+        )
+        counts_dict = {item['session_date']: item['count'] for item in daily_counts}
+
+        top_tutors = qs_tutors.order_by('-total_sessions')[:5]
+
+        subject_popularity = list(
+            TutorSubjects.objects.filter(
+                tutor__in=qs_tutors,
+                tutor__tutor_bookings__in=completed_bookings
+            )
+            .values('subject__subject_name')
+            .annotate(booking_count=Count('tutor__tutor_bookings'))
+            .order_by('-booking_count')[:10]
+        )
+
+        transactions = (
+            completed_bookings
+            .filter(payment__payment_status='Paid')
+            .select_related('payment', 'student', 'tutor__profile__institution', 'subject')
+            .order_by('session_date')
+        )
 
         response = HttpResponse(content_type='text/csv')
         response['Content-Disposition'] = 'attachment; filename="studybuddy-analytics.csv"'
         writer = csv.writer(response)
+
+        writer.writerow(['Report', 'Studybuddy Platform Analytics'])
+        writer.writerow(['Period', period])
+        writer.writerow(['Date range', f'{start_date.isoformat()} to {today.isoformat()}'])
+        writer.writerow(['Institution filter', institution_label])
+        writer.writerow(['Generated at', timezone.localtime(timezone.now()).isoformat()])
+
+        writer.writerow([])
+        writer.writerow(['Summary'])
         writer.writerow([
-            'date',
-            'institution',
-            'tutors',
-            'tutees',
-            'sessions',
-            'completion_rate',
-            'gross_revenue',
-            'commissions',
+            'total_sessions', 'completed_sessions', 'completion_rate',
+            'gross_revenue', 'commissions', 'tutor_payouts',
+        ])
+        writer.writerow([
+            total_sessions, completed_sessions, completion_rate,
+            float(gross_revenue), float(commission_total), float(payout_total),
         ])
 
-        for inst in institutions:
-            bookings = Booking.objects.filter(tutor__profile__institution=inst)
-            if start_date:
-                bookings = bookings.filter(session_date__gte=start_date)
+        writer.writerow([])
+        writer.writerow(['Sessions Over Time'])
+        writer.writerow(['date', 'completed_sessions'])
+        for i in range(chart_days - 1, -1, -1):
+            day = today - timedelta(days=i)
+            writer.writerow([day.isoformat(), counts_dict.get(day, 0)])
 
-            completed = bookings.filter(status='Completed')
-            payments = Payment.objects.filter(
-                booking__in=completed,
-                payment_status='Paid',
-            )
-            gross = payments.aggregate(total=Sum('amount'))['total'] or Decimal('0')
-            commissions = gross * Decimal('0.10')
-            total_sessions = bookings.count()
-            completed_sessions = completed.count()
-            completion_rate = round((completed_sessions / total_sessions) * 100, 1) if total_sessions else 0
-
+        writer.writerow([])
+        writer.writerow(['Top Tutors'])
+        writer.writerow(['name', 'sessions', 'rating', 'earnings'])
+        for tutor in top_tutors:
+            tutor_gross = qs_payments.filter(booking__tutor=tutor).aggregate(total=Sum('amount'))['total'] or Decimal('0')
             writer.writerow([
-                today.isoformat(),
-                inst.institution_name,
-                Tutor.objects.filter(profile__institution=inst).count(),
-                UserProfile.objects.filter(role='Tutee', institution=inst).count(),
-                completed_sessions,
-                completion_rate,
-                float(gross),
-                float(commissions),
+                f"{tutor.profile.fname} {tutor.profile.lname}",
+                tutor.total_sessions,
+                tutor.rating_average,
+                float(tutor_gross * Decimal('0.90')),
+            ])
+
+        writer.writerow([])
+        writer.writerow(['Subject Popularity'])
+        writer.writerow(['subject', 'booking_count'])
+        for item in subject_popularity:
+            writer.writerow([item['subject__subject_name'] or 'General', item['booking_count']])
+
+        writer.writerow([])
+        writer.writerow(['Booking Transactions'])
+        writer.writerow([
+            'session_date', 'institution', 'tutor', 'tutee', 'subject',
+            'amount', 'commission', 'payout',
+        ])
+        for booking in transactions:
+            amount = booking.payment.amount
+            commission = amount * Decimal('0.10')
+            payout = amount - commission
+            tutor_institution = booking.tutor.profile.institution
+            writer.writerow([
+                booking.session_date.isoformat(),
+                tutor_institution.institution_name if tutor_institution else '',
+                f"{booking.tutor.profile.fname} {booking.tutor.profile.lname}",
+                f"{booking.student.fname} {booking.student.lname}",
+                booking.subject.subject_name if booking.subject else 'General',
+                float(amount),
+                float(commission),
+                float(payout),
             ])
 
         return response

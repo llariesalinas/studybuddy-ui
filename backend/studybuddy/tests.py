@@ -260,7 +260,17 @@ class SuperAdminRedesignApiTests(APITestCase):
         export_response = self.client.get("/api/admin/analytics/export/?period=7d")
         self.assertEqual(export_response.status_code, 200)
         self.assertEqual(export_response["Content-Type"], "text/csv")
-        self.assertIn("date,institution,tutors,tutees,sessions,completion_rate,gross_revenue,commissions", export_response.content.decode())
+        export_content = export_response.content.decode()
+        self.assertIn("Sessions Over Time", export_content)
+        self.assertIn("Top Tutors", export_content)
+        self.assertIn("Subject Popularity", export_content)
+        self.assertIn("Booking Transactions", export_content)
+        self.assertIn(
+            "session_date,institution,tutor,tutee,subject,amount,commission,payout",
+            export_content,
+        )
+        self.assertIn(f"{self.institution.institution_name},Tutor One,", export_content)
+        self.assertIn("College Algebra,500.0,50.0,450.0", export_content)
 
 
 class SuperAdminUserDetailApiTests(APITestCase):
