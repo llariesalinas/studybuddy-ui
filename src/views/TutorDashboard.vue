@@ -1,221 +1,251 @@
 <template>
   <div class="tutor-dashboard">
     <div v-if="isHiddenByLoadLimit" class="alert alert-warning" role="status">
-      You are hidden from tutor search because you reached your Accepted Session Load Limit. Complete or cancel an upcoming session to become visible again.
+      You are hidden from tutor search because you reached your Accepted Session Load Limit.
+      Complete or cancel an upcoming session to become visible again.
     </div>
-    <section class="metric-grid" aria-label="Tutor dashboard metrics">
-      <article
-        v-for="metric in dashboardMetrics"
-        :key="metric.label"
-        class="metric-card sb-card-lift"
-      >
-        <div class="metric-copy">
-          <span class="metric-icon" :class="`metric-icon-${metric.tone}`">
-            <i :class="['bi', metric.icon]"></i>
-          </span>
-          <span class="metric-label">{{ metric.label }}</span>
-          <strong class="metric-value">{{ metric.value }}</strong>
-          <span class="metric-note">{{ metric.note }}</span>
-        </div>
 
-        <div class="metric-visual" :class="`metric-visual-${metric.visual}`" aria-hidden="true">
-          <svg v-if="metric.visual === 'ring'" class="metric-ring" viewBox="0 0 72 72">
-            <circle class="metric-ring-track" cx="36" cy="36" r="28"></circle>
-            <circle
-              class="metric-ring-fill"
-              cx="36"
-              cy="36"
-              r="28"
-              :style="{ '--metric-progress': metric.progress }"
-            ></circle>
-          </svg>
-
-          <div v-else class="metric-bars">
-            <span
-              v-for="(height, index) in metric.bars"
-              :key="`${metric.label}-${height}-${index}`"
-              :style="{ height: height + '%' }"
-            ></span>
-          </div>
-        </div>
-      </article>
+    <section class="metric-strip" aria-label="Tutor dashboard metrics">
+      <div class="metric-cell">
+        <span class="metric-label">Wallet Balance</span>
+        <strong class="metric-value">{{ formatCurrency(walletBalance) }}</strong>
+      </div>
+      <div class="metric-cell">
+        <span class="metric-label">Avg Rating</span>
+        <strong class="metric-value">{{ formatRating(avgRating) }} <small>/ 5.0</small></strong>
+      </div>
+      <div class="metric-cell" :class="{ 'metric-cell-capacity': isHiddenByLoadLimit }">
+        <span class="metric-label">Accepted Sessions</span>
+        <strong class="metric-value" :class="{ 'metric-value-capacity': isHiddenByLoadLimit }">
+          {{ acceptedSessionLoad }} <small>/ {{ sessionLoadLimit }}</small>
+        </strong>
+        <span v-if="isHiddenByLoadLimit" class="capacity-note">At capacity</span>
+      </div>
     </section>
 
-    <section class="bookings-panel">
-      <header class="panel-header">
-        <div>
-          <p class="panel-kicker">Tutor Workspace</p>
-          <h4 class="panel-title">
-            <i class="bi bi-calendar2-week"></i>
-            Upcoming Bookings
-          </h4>
+    <section
+      class="dashboard-layout"
+      :class="{ 'dashboard-layout-with-rail': hasAttentionBookings }"
+    >
+      <main class="schedule-column">
+        <header class="panel-header">
+          <h2>Full Schedule</h2>
+          <span>{{ scheduleBookings.length }} committed</span>
+        </header>
+
+        <div v-if="isLoading" class="state-panel">
+          <div class="spinner-border text-sb-primary mb-3" role="status"></div>
+          <p>Loading dashboard...</p>
         </div>
 
-        <span class="booking-count">
-          <i class="bi bi-clock-history"></i>
-          {{ upcomingBookings.length }} upcoming
-        </span>
-      </header>
+        <div v-else-if="errorMessage" class="state-panel state-panel-error">
+          <i class="bi bi-exclamation-triangle"></i>
+          <p>{{ errorMessage }}</p>
+          <button type="button" class="retry-btn sb-btn" @click="loadTutorDashboard">
+            <i class="bi bi-arrow-clockwise"></i>
+            Retry
+          </button>
+        </div>
 
-      <div v-if="isLoading" class="state-panel">
-        <div class="spinner-border text-sb-primary mb-3" role="status"></div>
-        <p>Loading dashboard...</p>
-      </div>
+        <div v-else-if="!upcomingBookings.length" class="empty-hero">
+          <h3>No sessions yet</h3>
+          <p>
+            Tutees find you through your subjects and availability. Make sure both are set so you
+            show up in search.
+          </p>
+          <button type="button" class="availability-btn sb-btn" @click="goToAvailability">
+            Check my availability
+          </button>
+        </div>
 
-      <div v-else-if="errorMessage" class="state-panel state-panel-error">
-        <i class="bi bi-exclamation-triangle"></i>
-        <p>{{ errorMessage }}</p>
-        <button type="button" class="retry-btn sb-btn" @click="loadTutorDashboard">
-          <i class="bi bi-arrow-clockwise"></i>
-          Retry
-        </button>
-      </div>
+        <template v-else>
+          <div v-if="currentPageGroups.length" class="schedule-groups">
+            <section v-for="group in currentPageGroups" :key="group.date" class="schedule-group">
+              <header class="date-header">
+                <span>
+                  {{ formatScheduleDate(group.date) }}
+                  <em v-if="getDateAccent(group.date)"> · {{ getDateAccent(group.date) }}</em>
+                </span>
+                <span>{{ formatSessionCount(group.bookings.length) }}</span>
+              </header>
 
-      <div v-else-if="upcomingBookings.length" class="booking-list">
-        <article
-          v-for="booking in upcomingBookings"
-          :key="getBookingId(booking)"
-          class="booking-card sb-card-lift"
-        >
-          <div class="booking-main">
-            <span class="booking-avatar">
-              <i class="bi bi-person"></i>
-            </span>
-
-            <div class="booking-title-group">
-              <h5>{{ getBookingStudent(booking) }}</h5>
-              <span class="subject-pill">{{ getBookingSubject(booking) }}</span>
-            </div>
-          </div>
-
-          <div class="booking-meta-grid">
-            <div class="booking-meta-item">
-              <span>Date</span>
-              <strong>{{ formatDate(booking.date) }}</strong>
-            </div>
-
-            <div class="booking-meta-item">
-              <span>Time</span>
-              <strong>{{ formatBookingTime(booking) }}</strong>
-            </div>
-
-            <div class="booking-meta-item">
-              <span>Status</span>
-              <strong>
+              <article
+                v-for="booking in group.bookings"
+                :key="getBookingId(booking)"
+                class="schedule-row"
+              >
+                <strong class="schedule-time">{{ formatBookingStartTime(booking) }}</strong>
+                <div class="schedule-details">
+                  <strong>{{ getBookingStudent(booking) }}</strong>
+                  <span>{{ getBookingSubject(booking) }} · {{ formatDuration(booking) }}</span>
+                </div>
                 <span class="status-badge" :class="getStatusClass(booking.status)">
                   {{ booking.status || 'Pending' }}
                 </span>
-              </strong>
-            </div>
+                <button
+                  type="button"
+                  class="view-btn sb-btn"
+                  @click="goToBookingDetails(getBookingId(booking))"
+                >
+                  View
+                </button>
+              </article>
+            </section>
           </div>
 
-          <button
-            type="button"
-            class="details-btn sb-btn"
-            @click="goToBookingDetails(getBookingId(booking))"
-          >
-            <span>Details</span>
-            <i class="bi bi-arrow-right"></i>
-          </button>
-        </article>
-      </div>
+          <div v-if="schedulePages.length" class="pager">
+            <span>Showing {{ rangeStart }}-{{ rangeEnd }} of {{ scheduleBookings.length }}</span>
+            <nav aria-label="Schedule pages">
+              <button
+                type="button"
+                class="page-btn"
+                :disabled="currentPage === 1"
+                aria-label="Previous page"
+                @click="currentPage -= 1"
+              >
+                ‹
+              </button>
+              <button
+                v-for="page in schedulePages.length"
+                :key="page"
+                type="button"
+                class="page-btn"
+                :class="{ 'page-btn-current': currentPage === page }"
+                :aria-current="currentPage === page ? 'page' : undefined"
+                @click="currentPage = page"
+              >
+                {{ page }}
+              </button>
+              <button
+                type="button"
+                class="page-btn"
+                :disabled="currentPage === schedulePages.length"
+                aria-label="Next page"
+                @click="currentPage += 1"
+              >
+                ›
+              </button>
+            </nav>
+          </div>
+        </template>
+      </main>
 
-      <div v-else class="state-panel">
-        <i class="bi bi-calendar2-plus"></i>
-        <p>No upcoming sessions yet.</p>
-      </div>
+      <aside v-if="hasAttentionBookings" class="attention-rail">
+        <header class="panel-header">
+          <h2>Needs Attention</h2>
+          <span>{{ attentionBookings.requests.length + attentionBookings.payments.length }}</span>
+        </header>
+
+        <div class="attention-panel">
+          <section v-if="attentionBookings.requests.length">
+            <header class="attention-section-header">
+              <span>Requests</span>
+              <span>{{ attentionBookings.requests.length }}</span>
+            </header>
+            <article
+              v-for="booking in attentionBookings.requests"
+              :key="getBookingId(booking)"
+              class="attention-row"
+            >
+              <strong>{{ getBookingStudent(booking) }}</strong>
+              <span class="attention-subject">{{ getBookingSubject(booking) }}</span>
+              <span class="attention-when">{{ formatAttentionTime(booking) }}</span>
+              <div>
+                <span class="status-badge" :class="getStatusClass(booking.status)">
+                  {{ booking.status || 'Pending' }}
+                </span>
+                <button
+                  type="button"
+                  class="view-btn sb-btn"
+                  @click="goToBookingDetails(getBookingId(booking))"
+                >
+                  View
+                </button>
+              </div>
+            </article>
+          </section>
+
+          <section v-if="attentionBookings.payments.length">
+            <header class="attention-section-header">
+              <span>Payments</span>
+              <span>{{ attentionBookings.payments.length }}</span>
+            </header>
+            <article
+              v-for="booking in attentionBookings.payments"
+              :key="getBookingId(booking)"
+              class="attention-row"
+            >
+              <strong>{{ getBookingStudent(booking) }}</strong>
+              <span class="attention-subject">{{ getBookingSubject(booking) }}</span>
+              <span class="attention-when">{{ formatAttentionTime(booking) }}</span>
+              <div>
+                <span class="status-badge" :class="getStatusClass(booking.status)">
+                  {{ booking.status || 'Pending' }}
+                </span>
+                <button
+                  type="button"
+                  class="view-btn sb-btn"
+                  @click="goToBookingDetails(getBookingId(booking))"
+                >
+                  View
+                </button>
+              </div>
+            </article>
+          </section>
+        </div>
+      </aside>
     </section>
   </div>
 </template>
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useSessionsStore } from '@/stores/completedSessions'
 import { useWalletStore } from '@/stores/wallet'
 import api from '@/services/api/api'
+import { dayPackedPages, groupByDate, splitBookingsByAttention } from '@/services/tutorDashboard'
 
 const router = useRouter()
 const route = useRoute()
 const sessionsStore = useSessionsStore()
 const walletStore = useWalletStore()
 
-const totalSessions = ref(0)
 const avgRating = ref(0)
-const earnings = ref(0)
 const acceptedSessionLoad = ref(0)
 const sessionLoadLimit = ref(10)
 const upcomingBookings = ref([])
 const isLoading = ref(false)
 const errorMessage = ref('')
-const isHiddenByLoadLimit = computed(() => acceptedSessionLoad.value >= sessionLoadLimit.value)
+const currentPage = ref(1)
 
-const nextBooking = computed(() => upcomingBookings.value[0] || null)
 const walletBalance = computed(() => Number(walletStore.balance || 0))
+const isHiddenByLoadLimit = computed(() => acceptedSessionLoad.value >= sessionLoadLimit.value)
+const attentionBookings = computed(() => splitBookingsByAttention(upcomingBookings.value))
+const scheduleBookings = computed(() => attentionBookings.value.schedule)
+const schedulePages = computed(() => dayPackedPages(groupByDate(scheduleBookings.value)))
+const currentPageGroups = computed(() => schedulePages.value[currentPage.value - 1] || [])
+const hasAttentionBookings = computed(
+  () => attentionBookings.value.requests.length + attentionBookings.value.payments.length > 0,
+)
+const rangeStart = computed(() => {
+  if (!currentPageGroups.value.length) {
+    return 0
+  }
 
-const dashboardMetrics = computed(() => [
-  {
-    label: 'Wallet Balance',
-    value: formatCurrency(walletBalance.value),
-    note: walletBalance.value >= 0 ? 'Available to cash out' : 'Top up to settle deductions',
-    icon: 'bi-wallet2',
-    tone: walletBalance.value >= 0 ? 'green' : 'gold',
-    visual: 'bars',
-    bars: walletBalance.value >= 0 ? [28, 44, 60, 76, 88, 68] : [70, 54, 42, 34, 24, 18],
-  },
-  {
-    label: 'Total Sessions',
-    value: totalSessions.value,
-    note: 'All tutor sessions',
-    icon: 'bi-calendar-event',
-    tone: 'green',
-    visual: 'ring',
-    progress: Math.min(Number(totalSessions.value || 0) * 10, 100),
-  },
-  {
-    label: 'Avg Rating',
-    value: formatRating(avgRating.value),
-    note: Number(avgRating.value || 0) ? 'Out of 5.0' : 'No ratings yet',
-    icon: 'bi-star',
-    tone: 'gold',
-    visual: 'ring',
-    progress: Math.round((Number(avgRating.value || 0) / 5) * 100),
-  },
-  {
-    label: 'Earnings',
-    value: formatCurrency(earnings.value),
-    note: 'Total earnings',
-    icon: 'bi-wallet2',
-    tone: 'green',
-    visual: 'bars',
-    bars: [34, 52, 72, 92, 64, 44],
-  },
-  {
-    label: 'Accepted Sessions',
-    value: `${acceptedSessionLoad.value} / ${sessionLoadLimit.value}`,
-    note:
-      acceptedSessionLoad.value >= sessionLoadLimit.value
-        ? 'At capacity for new accepts'
-        : `${Math.max(sessionLoadLimit.value - acceptedSessionLoad.value, 0)} slots left`,
-    icon: 'bi-clipboard-check',
-    tone: acceptedSessionLoad.value >= sessionLoadLimit.value ? 'gold' : 'blue',
-    visual: 'ring',
-    progress: sessionLoadLimit.value
-      ? Math.min(Math.round((acceptedSessionLoad.value / sessionLoadLimit.value) * 100), 100)
-      : 0,
-  },
-  {
-    label: 'Next Session',
-    value: nextBooking.value ? formatDate(nextBooking.value.date, 'short') : 'None',
-    note: nextBooking.value
-      ? `${getBookingSubject(nextBooking.value)} with ${getBookingStudent(nextBooking.value)}`
-      : `${upcomingBookings.value.length} upcoming bookings`,
-    icon: 'bi-clock-history',
-    tone: 'blue',
-    visual: 'bars',
-    bars: upcomingBookings.value.length ? [42, 58, 76, 88, 70, 50] : [22, 22, 22, 22, 22, 22],
-  },
-])
+  return (
+    schedulePages.value
+      .slice(0, currentPage.value - 1)
+      .flat()
+      .reduce((count, group) => count + group.bookings.length, 0) + 1
+  )
+})
+const rangeEnd = computed(
+  () =>
+    rangeStart.value +
+    currentPageGroups.value.reduce((count, group) => count + group.bookings.length, 0) -
+    1,
+)
 
 const goToBookingDetails = (id) => {
   router.push({
@@ -223,6 +253,8 @@ const goToBookingDetails = (id) => {
     params: { id },
   })
 }
+
+const goToAvailability = () => router.push({ name: 'tch-availability' })
 
 const loadTutorDashboard = async () => {
   isLoading.value = true
@@ -236,9 +268,7 @@ const loadTutorDashboard = async () => {
     ])
     await walletLoad.catch(() => {})
 
-    totalSessions.value = response.data.total_sessions
     avgRating.value = response.data.rating_average
-    earnings.value = response.data.total_earnings
     acceptedSessionLoad.value = response.data.accepted_session_load ?? 0
     sessionLoadLimit.value = response.data.session_load_limit ?? 10
 
@@ -266,75 +296,89 @@ const getBookingId = (booking) =>
 const formatCurrency = (value) => {
   const amount = Number(value || 0)
 
-  if (!Number.isFinite(amount)) {
-    return 'PHP 0'
-  }
-
-  return `PHP ${amount.toLocaleString('en-US', { maximumFractionDigits: 0 })}`
+  return Number.isFinite(amount)
+    ? `PHP ${amount.toLocaleString('en-US', { maximumFractionDigits: 0 })}`
+    : 'PHP 0'
 }
 
 const formatRating = (value) => {
   const rating = Number(value || 0)
 
-  if (!Number.isFinite(rating) || rating <= 0) {
-    return '0.0'
-  }
-
-  return rating.toFixed(1)
+  return Number.isFinite(rating) && rating > 0 ? rating.toFixed(1) : '0.0'
 }
 
-const formatDate = (value, style = 'long') => {
-  if (!value) {
-    return 'Date TBD'
-  }
-
-  const normalized = String(value)
-  const date = new Date(/^\d{4}-\d{2}-\d{2}$/.test(normalized) ? `${normalized}T00:00:00` : normalized)
+const formatDate = (value, options) => {
+  const normalized = String(value || '')
+  const date = new Date(
+    /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? `${normalized}T00:00:00` : normalized,
+  )
 
   if (Number.isNaN(date.getTime())) {
     return 'Date TBD'
   }
 
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: style === 'short' ? undefined : 'numeric',
-  }).format(date)
+  return new Intl.DateTimeFormat('en-US', options).format(date)
 }
+
+const formatScheduleDate = (value) =>
+  formatDate(value, { weekday: 'short', month: 'short', day: 'numeric' })
 
 const formatClock = (value) => {
   if (!value) {
-    return ''
+    return 'Time TBD'
   }
 
   const normalized = String(value).trim()
   const timeOnly = normalized.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/)
   const date = timeOnly ? new Date(`1970-01-01T${normalized}`) : new Date(normalized)
 
-  if (Number.isNaN(date.getTime())) {
-    return normalized
-  }
-
-  return new Intl.DateTimeFormat('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-  }).format(date)
+  return Number.isNaN(date.getTime())
+    ? normalized
+    : new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' }).format(date)
 }
 
-const formatBookingTime = (booking) => {
-  const start = booking?.startTime || booking?.start_time || booking?.time_start || booking?.start
-  const end = booking?.endTime || booking?.end_time || booking?.time_end || booking?.end
-  const time = booking?.time || booking?.schedule_time
+const getBookingStart = (booking) =>
+  booking?.startTime ||
+  booking?.start_time ||
+  booking?.time_start ||
+  booking?.start ||
+  booking?.time
 
-  if (start && end) {
-    return `${formatClock(start)} - ${formatClock(end)}`
+const formatBookingStartTime = (booking) => formatClock(getBookingStart(booking))
+
+const formatDuration = (booking) => {
+  const hours = Number(booking?.duration_hours)
+
+  return Number.isFinite(hours) && hours > 0
+    ? `${hours} ${hours === 1 ? 'hr' : 'hrs'}`
+    : 'Duration TBD'
+}
+
+const formatSessionCount = (count) => `${count} ${count === 1 ? 'session' : 'sessions'}`
+
+const formatAttentionTime = (booking) =>
+  `${formatDate(booking?.date, { month: 'short', day: 'numeric' })}, ${formatBookingStartTime(booking)}`
+
+// Built from local date parts on purpose: toISOString() converts to UTC, which would
+// mislabel Today/Tomorrow for every Manila morning before 08:00 (UTC+8).
+const toLocalDateKey = (date) => {
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+
+  return `${date.getFullYear()}-${month}-${day}`
+}
+
+const getDateAccent = (value) => {
+  const normalized = String(value || '')
+  const today = new Date()
+  const tomorrow = new Date(today)
+  tomorrow.setDate(today.getDate() + 1)
+
+  if (normalized === toLocalDateKey(today)) {
+    return 'Today'
   }
 
-  if (start || time) {
-    return formatClock(start || time)
-  }
-
-  return 'Time TBD'
+  return normalized === toLocalDateKey(tomorrow) ? 'Tomorrow' : ''
 }
 
 const getStatusClass = (status) => {
@@ -359,334 +403,214 @@ const getStatusClass = (status) => {
   }
 }
 
+watch(schedulePages, (pages) => {
+  currentPage.value = Math.min(Math.max(currentPage.value, 1), Math.max(pages.length, 1))
+})
+
 onMounted(loadTutorDashboard)
 
 watch(
   () => route.query.refresh,
   () => {
     loadTutorDashboard()
-  }
+  },
 )
 </script>
 
 <style scoped>
 .tutor-dashboard {
-  --dashboard-glass: color-mix(in srgb, var(--sb-card-bg) 85%, transparent);
-  --dashboard-glass-strong: color-mix(in srgb, var(--sb-card-bg) 92%, transparent);
   --dashboard-border: color-mix(in srgb, var(--sb-card-border) 82%, transparent);
   --dashboard-muted: var(--sb-text-muted);
   --dashboard-ink: var(--sb-text-main);
   color: var(--dashboard-ink);
   display: grid;
   gap: 1rem;
-  position: relative;
 }
 
-.tutor-dashboard::before {
-  content: '';
-  position: absolute;
-  inset: -1rem -0.75rem auto auto;
-  width: min(360px, 48vw);
-  height: 220px;
-  border-radius: 999px;
-  background:
-    radial-gradient(circle at 30% 35%, color-mix(in srgb, var(--sb-primary) 14%, transparent), transparent 58%),
-    radial-gradient(circle at 72% 48%, rgba(56, 189, 248, 0.1), transparent 56%);
-  opacity: 0.55;
-  pointer-events: none;
-}
-
-.metric-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-  gap: 1rem;
-  position: relative;
-  z-index: 1;
-}
-
-.metric-card,
-.booking-card {
+.metric-strip,
+.schedule-column,
+.attention-panel {
   border: 1px solid var(--dashboard-border);
-  background: var(--dashboard-glass-strong);
-  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.04);
+  background: var(--sb-card-bg);
 }
 
-.bookings-panel {
-  border: 1px solid var(--dashboard-border);
-  background: var(--dashboard-glass);
-  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.08);
-}
-
-.metric-card {
-  min-height: 142px;
-  border-radius: 24px;
-  padding: 1rem;
+.metric-strip {
   display: flex;
-  justify-content: space-between;
-  gap: 0.85rem;
+  border-radius: 0.75rem;
   overflow: hidden;
-  position: relative;
 }
 
-.metric-card::after {
-  content: '';
-  position: absolute;
-  inset: auto -24px -40px auto;
-  width: 98px;
-  height: 98px;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--sb-primary) 12%, transparent);
-  pointer-events: none;
-}
-
-.metric-copy {
-  display: grid;
-  align-content: space-between;
-  gap: 0.4rem;
+.metric-cell {
+  flex: 1;
   min-width: 0;
-  position: relative;
-  z-index: 1;
+  padding: 0.7rem 0.9rem;
+  border-right: 1px solid var(--dashboard-border);
 }
 
-.metric-icon,
-.booking-avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: color-mix(in srgb, var(--sb-primary) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--sb-primary) 22%, transparent);
-  color: var(--sb-primary);
-  flex: 0 0 auto;
+.metric-cell:last-child {
+  border-right: 0;
 }
 
-.metric-icon-gold {
-  background: rgba(255, 193, 7, 0.14);
-  border-color: rgba(255, 193, 7, 0.28);
-  color: #a66d00;
-}
-
-.metric-icon-blue {
-  background: rgba(56, 189, 248, 0.12);
-  border-color: rgba(56, 189, 248, 0.24);
-  color: #087da4;
+.metric-cell-capacity {
+  background: color-mix(in srgb, var(--bs-warning) 10%, var(--sb-card-bg));
 }
 
 .metric-label,
-.metric-note,
-.panel-kicker,
-.booking-meta-item span {
+.capacity-note,
+.panel-header span,
+.date-header,
+.pager,
+.attention-when {
   color: var(--dashboard-muted);
+  font-size: 0.72rem;
+  font-weight: 800;
 }
 
 .metric-label,
-.panel-kicker,
-.booking-meta-item span {
-  font-size: 0.74rem;
-  font-weight: 700;
+.capacity-note,
+.attention-section-header {
+  display: block;
   text-transform: uppercase;
-  letter-spacing: 0;
+  letter-spacing: 0.04em;
 }
 
 .metric-value {
-  font-size: clamp(1.45rem, 1.9vw, 2.05rem);
-  line-height: 1;
-  letter-spacing: 0;
-  position: relative;
-  z-index: 1;
-  overflow-wrap: anywhere;
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 1.25rem;
+  line-height: 1.1;
 }
 
-.metric-note {
-  font-size: 0.82rem;
-  position: relative;
-  z-index: 1;
-  overflow-wrap: anywhere;
+.metric-value small {
+  color: var(--dashboard-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
 }
 
-.metric-visual {
-  width: 70px;
-  min-width: 70px;
-  align-self: center;
-  display: flex;
-  justify-content: center;
-  position: relative;
-  z-index: 1;
+.metric-value-capacity,
+.capacity-note,
+.attention-section-header {
+  color: var(--bs-warning-text-emphasis);
 }
 
-.metric-ring {
-  width: 68px;
-  height: 68px;
-  transform: rotate(-90deg);
+.capacity-note {
+  margin-top: 0.18rem;
 }
 
-.metric-ring-track,
-.metric-ring-fill {
-  fill: none;
-  stroke-width: 7;
+.dashboard-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.875rem;
+  align-items: start;
 }
 
-.metric-ring-track {
-  stroke: color-mix(in srgb, var(--sb-primary) 12%, transparent);
+.dashboard-layout-with-rail {
+  grid-template-columns: 1fr 300px;
 }
 
-.metric-ring-fill {
-  --metric-circumference: 175.93;
-  stroke: color-mix(in srgb, var(--sb-primary) 84%, white);
-  stroke-linecap: round;
-  stroke-dasharray: var(--metric-circumference);
-  stroke-dashoffset: calc(var(--metric-circumference) - (var(--metric-circumference) * var(--metric-progress) / 100));
+.schedule-column,
+.attention-panel {
+  border-radius: 0.75rem;
+  overflow: hidden;
 }
 
-.metric-bars {
-  width: 68px;
-  height: 54px;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  gap: 0.28rem;
-}
-
-.metric-bars span {
-  width: 0.44rem;
-  min-height: 20%;
-  border-radius: 999px;
-  background: linear-gradient(
-    to top,
-    color-mix(in srgb, var(--sb-primary) 18%, transparent),
-    color-mix(in srgb, var(--sb-primary) 76%, white)
-  );
-}
-
-.bookings-panel {
-  border-radius: 28px;
-  padding: 1.25rem;
-  position: relative;
-  z-index: 1;
+.schedule-column {
+  padding: 1rem;
 }
 
 .panel-header {
   display: flex;
+  align-items: baseline;
   justify-content: space-between;
-  align-items: center;
-  gap: 1rem;
-  padding: 0.35rem 0.35rem 1.2rem;
+  gap: 0.75rem;
+  margin-bottom: 0.65rem;
 }
 
-.panel-kicker {
-  margin: 0 0 0.35rem;
-}
-
-.panel-title {
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
+.panel-header h2 {
   margin: 0;
+  font-size: 0.95rem;
   font-weight: 800;
-  letter-spacing: 0;
 }
 
-.panel-title i {
-  color: var(--sb-primary);
+.attention-rail .panel-header h2 {
+  color: var(--bs-warning-text-emphasis);
 }
 
-.booking-count {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
+.schedule-groups {
   border: 1px solid var(--dashboard-border);
-  background: var(--dashboard-glass-strong);
-  border-radius: 999px;
-  color: var(--dashboard-muted);
-  font-size: 0.88rem;
-  font-weight: 800;
-  padding: 0.55rem 0.85rem;
-  white-space: nowrap;
+  border-radius: 0.75rem;
+  overflow: hidden;
 }
 
-.booking-count i {
-  color: var(--sb-primary);
-}
-
-.booking-list {
+.schedule-group + .schedule-group .date-header {
   border-top: 1px solid var(--dashboard-border);
-  display: grid;
-  gap: 0.75rem;
-  padding-top: 1rem;
 }
 
-.booking-card {
-  border-radius: 20px;
-  padding: 1rem;
-  display: grid;
-  grid-template-columns: minmax(180px, 1.1fr) minmax(320px, 1.6fr) auto;
-  align-items: center;
-  gap: 1rem;
-}
-
-.booking-main {
+.date-header,
+.attention-section-header {
   display: flex;
   align-items: center;
-  gap: 0.85rem;
-  min-width: 0;
-}
-
-.booking-title-group {
-  min-width: 0;
-}
-
-.booking-title-group h5 {
-  margin: 0;
-  font-size: 1rem;
-  font-weight: 800;
-  letter-spacing: 0;
-  overflow-wrap: anywhere;
-}
-
-.subject-pill {
-  display: inline-flex;
-  align-items: center;
-  max-width: 100%;
-  margin-top: 0.38rem;
-  border: 1px solid color-mix(in srgb, var(--sb-primary) 24%, transparent);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--sb-primary) 11%, transparent);
-  color: var(--sb-primary);
-  font-size: 0.78rem;
-  font-weight: 800;
-  padding: 0.28rem 0.62rem;
-  overflow-wrap: anywhere;
-}
-
-.booking-meta-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  justify-content: space-between;
   gap: 0.75rem;
+  padding: 0.45rem 0.75rem;
+  background: color-mix(in srgb, var(--sb-primary) 5%, var(--sb-card-bg));
 }
 
-.booking-meta-item {
+.date-header em {
+  color: var(--sb-primary);
+  font-style: normal;
+}
+
+.schedule-row {
+  display: grid;
+  grid-template-columns: 70px minmax(0, 1fr) 122px auto;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.65rem 0.75rem;
+  border-top: 1px solid var(--dashboard-border);
+}
+
+.schedule-group .date-header + .schedule-row {
+  border-top: 0;
+}
+
+.schedule-time,
+.schedule-details strong,
+.attention-row > strong {
+  font-size: 0.78rem;
+}
+
+.schedule-details {
   min-width: 0;
 }
 
-.booking-meta-item strong {
+.schedule-details strong,
+.schedule-details span,
+.attention-row > strong,
+.attention-subject,
+.attention-when {
   display: block;
-  margin-top: 0.24rem;
-  color: var(--dashboard-ink);
-  font-size: 0.92rem;
+}
+
+.schedule-details span,
+.attention-subject {
+  margin-top: 0.18rem;
+  color: var(--sb-primary);
+  font-size: 0.72rem;
+  font-weight: 700;
   overflow-wrap: anywhere;
 }
 
 .status-badge {
   display: inline-flex;
   align-items: center;
+  width: fit-content;
   border: 1px solid transparent;
   border-radius: 999px;
-  font-size: 0.78rem;
+  font-size: 0.7rem;
   font-weight: 800;
   line-height: 1.2;
-  padding: 0.32rem 0.65rem;
+  padding: 0.3rem 0.55rem;
 }
 
 .status-badge-completed,
@@ -698,15 +622,15 @@ watch(
 }
 
 .status-badge-warning {
-  color: #9a6500;
-  background: rgba(255, 193, 7, 0.14);
-  border-color: rgba(255, 193, 7, 0.28);
+  color: var(--bs-warning-text-emphasis);
+  background: color-mix(in srgb, var(--bs-warning) 14%, transparent);
+  border-color: color-mix(in srgb, var(--bs-warning) 28%, transparent);
 }
 
 .status-badge-danger {
-  color: var(--bs-danger, #dc3545);
-  background: rgba(220, 53, 69, 0.12);
-  border-color: rgba(220, 53, 69, 0.26);
+  color: var(--sb-danger-bs);
+  background: color-mix(in srgb, var(--sb-danger-bs) 12%, transparent);
+  border-color: color-mix(in srgb, var(--sb-danger-bs) 26%, transparent);
 }
 
 .status-badge-pending {
@@ -715,41 +639,87 @@ watch(
   border-color: var(--dashboard-border);
 }
 
-.details-btn,
+.view-btn,
+.page-btn,
+.availability-btn,
 .retry-btn {
-  border: 0;
-  transition: transform var(--sb-t-quick) var(--sb-spring);
-}
-
-.details-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.45rem;
-  border-radius: 999px;
-  padding: 0.55rem 0.85rem;
-  background: var(--sb-primary);
-  color: var(--sb-primary-contrast, #fff);
+  border: 1px solid var(--dashboard-border);
+  border-radius: 0.45rem;
+  background: var(--sb-card-bg);
+  color: var(--dashboard-ink);
+  font-size: 0.72rem;
   font-weight: 800;
-  white-space: nowrap;
+  padding: 0.3rem 0.55rem;
 }
 
-.details-btn:hover,
-.retry-btn:hover {
-  background: var(--sb-primary-hover);
-  color: var(--sb-primary-contrast, #fff);
+.availability-btn,
+.retry-btn,
+.page-btn-current {
+  border-color: var(--sb-primary);
+  background: var(--sb-primary);
+  color: var(--sb-primary-contrast);
 }
 
-.details-btn:active,
-.retry-btn:active {
-  transform: scale(0.97);
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-top: 0.7rem;
 }
 
-.state-panel {
-  min-height: 260px;
+.pager nav {
+  display: flex;
+  gap: 0.3rem;
+}
+
+.page-btn {
+  min-width: 1.65rem;
+  height: 1.65rem;
+  padding: 0;
+}
+
+.page-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.attention-panel {
+  border-color: color-mix(in srgb, var(--bs-warning) 35%, var(--dashboard-border));
+}
+
+.attention-section-header {
+  background: color-mix(in srgb, var(--bs-warning) 8%, var(--sb-card-bg));
+  border-bottom: 1px solid color-mix(in srgb, var(--bs-warning) 25%, var(--dashboard-border));
+  font-size: 0.68rem;
+}
+
+.attention-row {
+  padding: 0.7rem 0.75rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--bs-warning) 20%, var(--dashboard-border));
+}
+
+.attention-row:last-child {
+  border-bottom: 0;
+}
+
+.attention-when {
+  margin-top: 0.22rem;
+}
+
+.attention-row > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.55rem;
+}
+
+.state-panel,
+.empty-hero {
+  min-height: 240px;
   border: 1px dashed var(--dashboard-border);
-  border-radius: 22px;
-  background: color-mix(in srgb, var(--sb-card-bg) 54%, transparent);
+  border-radius: 0.75rem;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -759,81 +729,95 @@ watch(
   text-align: center;
 }
 
-.state-panel i {
-  color: var(--sb-primary);
-  font-size: 1.75rem;
-  margin-bottom: 0.8rem;
+.state-panel p,
+.empty-hero h3,
+.empty-hero p {
+  margin: 0;
 }
 
-.state-panel p {
-  margin: 0;
-  font-weight: 700;
+.empty-hero h3 {
+  color: var(--dashboard-ink);
+  font-size: 1rem;
+}
+
+.empty-hero p {
+  max-width: 31rem;
+  margin-top: 0.45rem;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.availability-btn,
+.retry-btn {
+  margin-top: 1rem;
+  border-radius: 999px;
+  padding: 0.5rem 0.85rem;
 }
 
 .state-panel-error {
-  color: var(--sb-danger-bs, #dc3545);
+  color: var(--sb-danger-bs);
 }
 
-.state-panel-error i {
-  color: var(--sb-danger-bs, #dc3545);
-}
-
-.retry-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  border-radius: 999px;
-  background: var(--sb-primary);
-  color: var(--sb-primary-contrast, #fff);
-  font-weight: 800;
-  margin-top: 1rem;
-  padding: 0.55rem 0.9rem;
-}
-
-.retry-btn i {
-  color: currentColor;
-  font-size: 1rem;
-  margin: 0;
-}
-
-@media (max-width: 1199.98px) {
-  .metric-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .booking-card {
+@media (max-width: 899.98px) {
+  .dashboard-layout-with-rail {
     grid-template-columns: 1fr;
   }
 
-  .details-btn {
-    width: 100%;
+  .attention-rail {
+    order: -1;
+  }
+
+  .schedule-row {
+    grid-template-columns: 70px minmax(0, 1fr) auto;
+  }
+
+  .schedule-row .status-badge {
+    grid-column: 2;
+  }
+
+  .schedule-row .view-btn {
+    grid-column: 3;
+    grid-row: 1 / span 2;
   }
 }
 
-@media (max-width: 767.98px) {
-  .metric-grid,
-  .booking-meta-grid {
-    grid-template-columns: 1fr;
+@media (max-width: 599.98px) {
+  .metric-cell {
+    padding: 0.65rem 0.55rem;
   }
 
-  .bookings-panel {
-    border-radius: 22px;
-    padding: 1rem;
+  .metric-value {
+    font-size: 1rem;
   }
 
-  .panel-header {
-    align-items: stretch;
+  .schedule-column {
+    padding: 0.75rem;
+  }
+
+  .schedule-row {
+    grid-template-columns: 1fr auto;
+  }
+
+  .schedule-time {
+    grid-column: 1;
+  }
+
+  .schedule-details {
+    grid-column: 1;
+  }
+
+  .schedule-row .status-badge {
+    grid-column: 1;
+  }
+
+  .schedule-row .view-btn {
+    grid-column: 2;
+    grid-row: 1 / span 3;
+  }
+
+  .pager {
+    align-items: flex-start;
     flex-direction: column;
   }
-
-  .booking-count {
-    justify-content: center;
-    width: 100%;
-  }
-
-  .metric-card {
-    min-height: 124px;
-  }
 }
-
 </style>

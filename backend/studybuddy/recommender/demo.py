@@ -5,7 +5,12 @@ from django.db.models import Q
 from ..models import Preference, UserProfile
 from .cbf import get_student_subject_codes, resolve_target_categories
 from .CF import build_rating_matrix, get_peer_student_ids, top_k
-from .hybrid import hybrid_prediction_breakdown, normalize_tutor_queryset
+from .hybrid import (
+    HYBRID_SCORE_PRECISION,
+    hybrid_prediction_breakdown,
+    normalize_tutor_queryset,
+)
+from .workload import get_upcoming_week_loads
 
 logger = logging.getLogger(__name__)
 
@@ -182,5 +187,49 @@ def build_algorithm_demo_recommendation(tutee, institution_id=None, overrides=No
             },
         })
 
-    rows.sort(key=lambda row: row["hybrid_score"], reverse=True)
+    loads = get_upcoming_week_loads([row["tutor_id"] for row in rows])
+    for row in rows:
+        row["upcoming_week_load"] = loads.get(row["tutor_id"], 0)
+
+    # Same ranking rule as recommend_tutors_hybrid, applied here because this tool
+    # scores candidates itself rather than going through that function.
+    rows.sort(
+        key=lambda row: (
+            -round(row["hybrid_score"], HYBRID_SCORE_PRECISION),
+            row["upcoming_week_load"],
+            row["tutor_id"],
+        )
+    )
+    _mark_tie_groups(rows)
+
     return {"reason": None, "rows": rows}
+
+
+def _mark_tie_groups(rows):
+    """Tag each row with the Tie Breaker group it belongs to, so the demo panel can
+    show which rows were ordered by Upcoming Week Load rather than by score. Rows are
+    assumed already sorted, so a group is a run of adjacent equal quantized scores.
+    tie_group_id is None for any tutor whose score is unique — the common case — and
+    the panel reads the group's other members off the rows sharing its id."""
+    group_id = 0
+    index = 0
+
+    while index < len(rows):
+        quantized = round(rows[index]["hybrid_score"], HYBRID_SCORE_PRECISION)
+        end = index + 1
+
+        while (
+            end < len(rows)
+            and round(rows[end]["hybrid_score"], HYBRID_SCORE_PRECISION) == quantized
+        ):
+            end += 1
+
+        tied = end - index > 1
+
+        for row in rows[index:end]:
+            row["tie_group_id"] = group_id if tied else None
+
+        if tied:
+            group_id += 1
+
+        index = end

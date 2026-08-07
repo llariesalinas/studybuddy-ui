@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>StudyBuddy Demo Data Testing Accounts</title>
+  <title>StudyBuddy Demo Data Testing Guide</title>
   <style>
     :root {
       color-scheme: light;
@@ -16,6 +16,7 @@
       --leaf-dark: #154b30;
       --gold: #f3b233;
       --blue: #2f6f9f;
+      --red: #b3392b;
       --shadow: 0 22px 70px rgba(23, 33, 27, 0.14);
     }
 
@@ -66,7 +67,7 @@
     }
 
     .summary {
-      max-width: 700px;
+      max-width: 720px;
       margin: 18px 0 0;
       color: var(--muted);
       font-size: 1.05rem;
@@ -148,6 +149,12 @@
       letter-spacing: -0.03em;
     }
 
+    section > p.lede {
+      margin: -8px 0 18px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
     .table-wrap {
       overflow-x: auto;
     }
@@ -201,6 +208,10 @@
       background: #7b5422;
     }
 
+    .role.super {
+      background: var(--red);
+    }
+
     .note {
       padding: 18px 20px;
       border-left: 5px solid var(--gold);
@@ -208,6 +219,27 @@
       background: #fff8e8;
       color: #5d4518;
       line-height: 1.6;
+    }
+
+    .note + .note {
+      margin-top: 14px;
+    }
+
+    .gone {
+      padding: 18px 20px;
+      border-left: 5px solid var(--red);
+      border-radius: 18px;
+      background: #fdecec;
+      color: #6b241c;
+      line-height: 1.6;
+    }
+
+    .gone + .gone {
+      margin-top: 14px;
+    }
+
+    .gone strong {
+      color: var(--red);
     }
 
     footer {
@@ -243,11 +275,14 @@
     <header>
       <div>
         <p class="eyebrow">Architecture reference / Local demo data</p>
-        <h1>Demo Data Testing Accounts</h1>
+        <h1>Demo Data Testing Guide</h1>
         <p class="summary">
-          Use these seeded accounts after running the local demo reset command. The accounts are
-          intentionally institution-scoped so admin flows can be tested for CPU and North University
-          without cross-institution bleed.
+          Rewritten for the <code>feat/subjects-reseed</code> data model (subject taxonomy, a single
+          curated tutor/tutee cohort, SuperAdmin-only access). Everything below reflects
+          <code>seed_data.py</code> and <code>reset_demo_data.py</code> as they exist today &mdash;
+          the pre-reseed personas (Bea Santos, Miguel Torres, Grace Domingo, Isabel Fernandez,
+          North University, and the institutional Admin role) no longer exist. See the
+          "No longer seeded" section below before promising a panel any of those scenarios.
         </p>
       </div>
       <aside class="password-card" aria-label="Shared demo password">
@@ -259,279 +294,288 @@
     <div class="grid" aria-label="Testing account rules">
       <article class="panel">
         <h2>Scope</h2>
-        <p>CPU and North admin accounts only see their own institution's data.</p>
+        <p>Single institution: Central Philippine University. No North University, no
+          institution-scoping demo.</p>
+      </article>
+      <article class="panel">
+        <h2>Admin tier</h2>
+        <p>The institutional Admin role was removed (migration <code>0072</code>). Only
+          <code>SuperAdmin</code> exists now &mdash; every admin endpoint is SuperAdmin-only.</p>
       </article>
       <article class="panel">
         <h2>Reset behavior</h2>
-        <p><code>reset_demo_data</code> preserves Admin and SuperAdmin logins while reseeding demo users.</p>
+        <p><code>reset_demo_data</code> is a wipe-only command: it deletes all non-staff users, the
+          subject catalog, and platform activity, and preserves SuperAdmin logins. It does
+          <strong>not</strong> reseed anything &mdash; run <code>seed_data</code> after it.</p>
       </article>
       <article class="panel">
-        <h2>SuperAdmin</h2>
-        <p>Local dev: <code>superadmin@studybuddy.test</code> (verified valid 2026-07-08). The reset command never creates or overwrites this account — it must already exist.</p>
-      </article>
-      <article class="panel">
-        <h2>Course catalog</h2>
-        <p><code>reset_demo_data</code> also seeds <code>InstitutionCourseCatalog</code> entries for both CPU and North University. Only catalogued subjects appear in tutee/tutor subject flows — there is no fallback to global subjects.</p>
+        <h2>Booking slots</h2>
+        <p>Availability slots are hourly-only (<code>SESSION_SLOT_MINUTES = 60</code>) as of
+          migration <code>0079</code>. Half-hour slot assumptions in older docs are stale.</p>
       </article>
     </div>
 
-    <section aria-labelledby="admin-logins">
-      <h2 id="admin-logins">Institution Admin Logins</h2>
+    <section aria-labelledby="superadmin-login">
+      <h2 id="superadmin-login">SuperAdmin Login</h2>
       <div class="table-wrap">
         <table>
           <thead>
             <tr>
               <th>Role</th>
               <th>Login</th>
-              <th>Institution Scope</th>
-              <th>Use For</th>
+              <th>Notes</th>
             </tr>
           </thead>
           <tbody>
             <tr>
-              <td><span class="role">Admin</span></td>
-              <td><code>demo.admin@cpu.edu.ph</code></td>
-              <td>Central Philippine University</td>
-              <td>CPU-scoped admin dashboard, course catalog, tutor/tutee/session data.</td>
-            </tr>
-            <tr>
-              <td><span class="role">Admin</span></td>
-              <td><code>demo.admin@north.edu.ph</code></td>
-              <td>North University</td>
-              <td>North-scoped admin dashboard and institution-specific course catalog behavior.</td>
+              <td><span class="role super">SuperAdmin</span></td>
+              <td><code>superadmin@studybuddy.test</code></td>
+              <td><code>reset_demo_data</code> never creates or overwrites this account &mdash; it
+                must already exist. See "Seeding a SuperAdmin" below if it doesn't.</td>
             </tr>
           </tbody>
         </table>
       </div>
     </section>
 
-    <section aria-labelledby="persona-logins">
-      <h2 id="persona-logins">Named CPU Personas</h2>
+    <section aria-labelledby="curated-tutors">
+      <h2 id="curated-tutors">Curated Tutors (all <code>@cpu.edu.ph</code>)</h2>
+      <p class="lede">
+        Surnames run alphabetically (Aquino &rarr; Hidalgo) so they're easy to spot among the 150
+        filler tutors. T1&ndash;T5 are the original taxonomy cohort; T6&ndash;T8 were added to give
+        the tier-1 tutees enough shared tutors for a believable Pearson spread. Full score
+        breakdowns live in the <a href="algorithm-demo-guide.html">Algorithm Demo Guide</a>.
+      </p>
       <div class="table-wrap">
         <table>
           <thead>
             <tr>
-              <th>Role</th>
-              <th>Persona</th>
+              <th>Key</th>
+              <th>Name</th>
               <th>Login</th>
-              <th>Scenario</th>
+              <th>Course/Year</th>
+              <th>What it proves</th>
             </tr>
           </thead>
           <tbody>
             <tr>
-              <td><span class="role tutee">Tutee</span></td>
-              <td>Bea Santos</td>
-              <td><code>bea.santos@cpu.edu.ph</code></td>
-              <td>Cold-start recommendation case with no rating history.</td>
+              <td>T1</td>
+              <td>Marisol Aquino</td>
+              <td><code>t1.marisol.aquino@cpu.edu.ph</code></td>
+              <td>BSCS, 4th yr</td>
+              <td>Strongest CBF fit for Python (exact match, expertise 5, same course as S1).</td>
             </tr>
             <tr>
-              <td><span class="role tutee">Tutee</span></td>
-              <td>Carlo Reyes</td>
-              <td><code>carlo.reyes@cpu.edu.ph</code></td>
-              <td>CBF and CF agree on Miguel Torres.</td>
+              <td>T2</td>
+              <td>Benigno Bautista</td>
+              <td><code>t2.benigno.bautista@cpu.edu.ph</code></td>
+              <td>BSCS, 3rd yr</td>
+              <td>General-category-only match (C++/Web Dev, no Python) &mdash; no Specific credit.</td>
             </tr>
             <tr>
-              <td><span class="role tutee">Tutee</span></td>
-              <td>Diane Cruz</td>
-              <td><code>diane.cruz@cpu.edu.ph</code></td>
-              <td>Collaborative filtering overrides CBF, lifting Elena Bautista.</td>
+              <td>T3</td>
+              <td>Corazon Cruz</td>
+              <td><code>t3.corazon.cruz@cpu.edu.ph</code></td>
+              <td>BSBA, 3rd yr</td>
+              <td>Worst match for a BSCS tutee, best match (0.95) for a BSBA tutee (course/strand
+                affinity).</td>
             </tr>
             <tr>
-              <td><span class="role tutor">Tutor</span></td>
-              <td>Miguel Torres</td>
-              <td><code>miguel.torres@cpu.edu.ph</code></td>
-              <td>Strongest CBF fit; loved by one cluster and panned by another. Also the
-                <strong>cash-payment / wallet-debt-banner</strong> persona — see below.</td>
+              <td>T4</td>
+              <td>Domingo Diaz</td>
+              <td><code>t4.domingo.diaz@cpu.edu.ph</code></td>
+              <td>BSCS, 4th yr</td>
+              <td>Exact Python match but lower expertise (3) &mdash; isolates the Expertise
+                sub-score.</td>
             </tr>
             <tr>
-              <td><span class="role tutor">Tutor</span></td>
-              <td>Elena Bautista</td>
-              <td><code>elena.bautista@cpu.edu.ph</code></td>
-              <td>Weaker CBF fit but favorite of the CF override cluster.</td>
+              <td>T5</td>
+              <td>Esperanza Elizalde</td>
+              <td><code>t5.esperanza.elizalde@cpu.edu.ph</code></td>
+              <td>SHS-STEM, grade 12</td>
+              <td>Level-ceiling demo: expertise 5 like T1, but High School level zeroes the Level
+                sub-score against a college tutee.</td>
             </tr>
             <tr>
-              <td><span class="role tutor">Tutor</span></td>
-              <td>Ramon Aquino</td>
-              <td><code>ramon.aquino@cpu.edu.ph</code></td>
-              <td>Collaborative-filtering anchor tutor.</td>
+              <td>T6</td>
+              <td>Fidel Fajardo</td>
+              <td><code>t6.fidel.fajardo@cpu.edu.ph</code></td>
+              <td>BSCS, 4th yr</td>
+              <td>Tier-1 CF cohort &mdash; Data Structures/Algorithms shared tutor.</td>
             </tr>
             <tr>
-              <td><span class="role tutor">Tutor</span></td>
-              <td>Cecilia Mercado</td>
-              <td><code>cecilia.mercado@cpu.edu.ph</code></td>
-              <td>Second CF anchor for Pearson similarity.</td>
+              <td>T7</td>
+              <td>Gemma Gatchalian</td>
+              <td><code>t7.gemma.gatchalian@cpu.edu.ph</code></td>
+              <td>BSCS, 3rd yr</td>
+              <td>Tier-1 CF cohort &mdash; Web Development shared tutor.</td>
             </tr>
             <tr>
-              <td><span class="role tutor">Tutor</span></td>
-              <td>Nico Villareal</td>
-              <td><code>nico.villareal@cpu.edu.ph</code></td>
-              <td>Brand-new tutor with zero sessions and zero ratings.</td>
-            </tr>
-            <tr>
-              <td><span class="role tutor">Tutor</span></td>
-              <td>Grace Domingo</td>
-              <td><code>grace.domingo@cpu.edu.ph</code></td>
-              <td>Fully booked at accepted session load 10/10.</td>
-            </tr>
-            <tr>
-              <td><span class="role tutor">Tutor</span></td>
-              <td>Paolo Ramirez</td>
-              <td><code>paolo.ramirez@cpu.edu.ph</code></td>
-              <td>Near load limit at 8/10 while still accepting.</td>
-            </tr>
-            <tr>
-              <td><span class="role tutor">Tutor</span></td>
-              <td>Isabel Fernandez</td>
-              <td><code>isabel.fernandez@cpu.edu.ph</code></td>
-              <td>High earner with top-ups and withdrawal states. Her balance also lands
-                negative most reseeds (a large pending withdrawal near the InstaPay cap
-                against session earnings) &mdash; incidental, not the debt-banner demo persona.</td>
+              <td>T8</td>
+              <td>Hector Hidalgo</td>
+              <td><code>t8.hector.hidalgo@cpu.edu.ph</code></td>
+              <td>BSCS, 4th yr</td>
+              <td>Tier-1 CF cohort &mdash; SQL shared tutor.</td>
             </tr>
           </tbody>
         </table>
       </div>
     </section>
 
-    <section aria-labelledby="additional-accounts">
-      <h2 id="additional-accounts">Additional Test Accounts</h2>
+    <section aria-labelledby="curated-tutees">
+      <h2 id="curated-tutees">Curated Tutees (all <code>@cpu.edu.ph</code>)</h2>
       <div class="table-wrap">
         <table>
           <thead>
             <tr>
-              <th>Role</th>
-              <th>Persona</th>
+              <th>Key</th>
+              <th>Name</th>
               <th>Login</th>
+              <th>Course/Year</th>
+              <th>What it proves</th>
             </tr>
           </thead>
           <tbody>
             <tr>
-              <td><span class="role tutor">Tutor</span></td>
-              <td>Shelby Waller</td>
-              <td><code>tutor.shelby.waller.cpu67@cpu.edu.ph</code></td>
+              <td>S1</td>
+              <td>Felipe Fernandez</td>
+              <td><code>s1.felipe.fernandez@cpu.edu.ph</code></td>
+              <td>BSCS, 2nd yr</td>
+              <td>Cold-start case &mdash; deliberately has no rating history, so CF stays absent.</td>
             </tr>
             <tr>
-              <td><span class="role tutor">Tutor</span></td>
-              <td>Grace Domingo</td>
-              <td><code>grace.domingo@cpu.edu.ph</code></td>
+              <td>S2&ndash;S4, S7&ndash;S10</td>
+              <td>Garcia, Herrera, Ignacio, Lazaro, Manalo, Navarro, Ocampo</td>
+              <td><code>s2</code>&ndash;<code>s4</code>, <code>s7</code>&ndash;<code>s10</code>
+                <code>.&hellip;@cpu.edu.ph</code></td>
+              <td>BSCS, various</td>
+              <td>Tier-1 CF cohort &mdash; opposed taste archetypes co-rating T1/T2/T6/T7/T8 so
+                Pearson similarity comes out as a real spread, not a wall of &plusmn;1.00.</td>
             </tr>
             <tr>
-              <td><span class="role tutor">Tutor</span></td>
-              <td>Paolo Ramirez</td>
-              <td><code>paolo.ramirez@cpu.edu.ph</code></td>
+              <td>S5</td>
+              <td>Jacinto Jimenez</td>
+              <td><code>s5.jacinto.jimenez@cpu.edu.ph</code></td>
+              <td>BSBA, 2nd yr</td>
+              <td>Course/strand affinity counterpart to S1 &mdash; requests Financial Accounting,
+                favors T3.</td>
+            </tr>
+            <tr>
+              <td>S6</td>
+              <td>Katrina Katigbak</td>
+              <td><code>s6.katrina.katigbak@cpu.edu.ph</code></td>
+              <td>BSCS, 2nd yr</td>
+              <td>CF protagonist &mdash; has a real rating history (unlike S1), so the algorithm demo
+                can show a live CF-predicted score against an already-rated tutor.</td>
             </tr>
           </tbody>
         </table>
+      </div>
+      <p class="note">
+        Every seeded tutor (curated and filler, 158 total) is guaranteed &ge;3 ratings; every tutee
+        except S1 (deliberate cold-start) is guaranteed &ge;2 ratings given. These guarantees are
+        asserted at the end of every <code>seed_data</code> run, not just hoped for &mdash; a run
+        that violates them fails loudly instead of shipping a broken demo.
+      </p>
+    </section>
+
+    <section aria-labelledby="removed-scenarios">
+      <h2 id="removed-scenarios">No Longer Seeded (do not promise these)</h2>
+      <p class="lede">
+        These scenarios existed under the pre-reseed <code>seed_data.py</code> and are documented
+        in the old (now removed) demo guide. The taxonomy reseed rewrote the seed script from
+        scratch and none of the following personas or setups currently exist. Re-adding any of them
+        is new seed-script work, not a lookup.
+      </p>
+      <div class="gone">
+        <strong>Multi-institution scoping.</strong> North University and its
+        <code>demo.admin@north.edu.ph</code> login are gone; only CPU is seeded. The institutional
+        Admin role itself was removed platform-wide (migration <code>0072</code>) &mdash; there is
+        no admin tier below SuperAdmin to demo scoping with.
+      </div>
+      <div class="gone">
+        <strong>Booking load limits.</strong> Grace Domingo (10/10 accepted sessions, blocked) and
+        Paolo Ramirez (8/10, still accepting) no longer exist. All curated bookings the current
+        seed creates are terminal (<code>Completed</code>) &mdash; there are no in-flight
+        accepted/pending session groups to demo the load-limit gate with.
+      </div>
+      <div class="gone">
+        <strong>Compensation / wallet states.</strong> Isabel Fernandez (top-ups, withdrawals in
+        every state, reconciled balance) and Miguel Torres (forced-negative wallet, debt banner,
+        cash-payment history) are gone. Every seeded wallet now starts and stays at
+        <code>0.00</code> balance and pending &mdash; there is no top-up/withdrawal/commission data
+        and no debt-banner demo persona.
+      </div>
+      <div class="gone">
+        <strong>Reporting gap subjects.</strong> The old demo's flagged supply gap
+        (<code>Disaster Readiness (GAS-DR)</code> / <code>Strategic Management (BUS-401)</code>)
+        referenced course-code subjects that don't exist in the new 121-subject taxonomy
+        (<code>backend/studybuddy/subject_taxonomy.py</code>).
       </div>
     </section>
 
-    <section aria-labelledby="cash-payments">
-      <h2 id="cash-payments">Cash Payments &amp; Wallet Debt Banner (added 2026-07-07)</h2>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Test case</th>
-              <th>Where to look</th>
-              <th>Expected result</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>Payment method is derived, not user-picked</td>
-              <td>Any booking confirmation / <code>submit_session_payment</code></td>
-              <td>F2F session &rarr; method is forced to <code>CASH</code>. Online session &rarr;
-                method is forced to <code>PAYMONGO</code>. Enforced server-side in both
-                <code>confirm_payment_and_book</code> and <code>submit_session_payment</code>; a
-                mismatched method in the request is rejected.</td>
-            </tr>
-            <tr>
-              <td>Cash receipt requirement</td>
-              <td>Paying for an F2F booking as a tutee</td>
-              <td>CASH requires a receipt photo only &mdash; no transaction reference field
-                (unlike PAYMONGO, which requires both a receipt and a transaction reference).</td>
-            </tr>
-            <tr>
-              <td>Wallet debt banner</td>
-              <td>Log in as <code>miguel.torres@cpu.edu.ph</code> (any page, banner is global)</td>
-              <td>A non-dismissible banner appears because his wallet balance is forced negative
-                by the seed (guaranteed &lt; 0; a clean reseed typically lands exactly
-                <code>-75.00</code>). Sourced from a boolean-only <code>wallet_negative</code>
-                field on <code>profile_status</code> &mdash; the banner never shows the actual
-                amount. Links to the Wallet page.</td>
-            </tr>
-            <tr>
-              <td>Debt banner absence</td>
-              <td>Log in as any tutor whose wallet balance is non-negative</td>
-              <td>Banner does not render. Note that Isabel Fernandez incidentally lands negative
-                on most reseeds too (see her persona row above), so she is not a reliable
-                "absence" check &mdash; use a tutor persona other than Miguel or Isabel, or check
-                the balance first.</td>
-            </tr>
-            <tr>
-              <td>Cash-paid session history</td>
-              <td>Miguel Torres's Wallet / transaction history</td>
-              <td>3 completed F2F sessions paid via CASH with receipt images attached, each
-                producing a <code>commission_deduction</code> transaction (no
-                <code>session_credit</code>, since cash never touches the platform's PayMongo
-                balance).</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+    <section aria-labelledby="algorithm-demo">
+      <h2 id="algorithm-demo">Recommendation Algorithm Demo</h2>
+      <p class="lede">
+        The Hybrid (CBF + CF) walkthrough &mdash; ranked lists, Compare Pair breakdowns, the
+        level-ceiling mechanic, course/strand affinity, and the tier-1 CF neighbor story &mdash; is
+        maintained separately with live numbers pulled from the seeded database. Use
+        <a href="algorithm-demo-guide.html">Algorithm Demo Guide</a> for the full script; it is kept
+        current with <code>seed_data.py</code>'s curated ratings matrix.
+      </p>
     </section>
 
     <section aria-labelledby="reset-command">
-      <h2 id="reset-command">Reset Command</h2>
+      <h2 id="reset-command">Reset &amp; Seed Commands</h2>
       <p class="note">
-        Local/dev only: from <code>backend/</code>, run
-        <code>venv\Scripts\python.exe manage.py reset_demo_data</code>. The command deletes
-        reseedable tutee/tutor demo data, preserves Admin and SuperAdmin logins, and recreates the
-        named scenarios with the shared password above. It also reseeds all
-        <code>InstitutionCourseCatalog</code> entries for CPU and North University so subject
-        visibility works correctly in every demo flow.
+        Local/dev only, from <code>backend/</code>:
+        <br /><code>venv\Scripts\python.exe manage.py reset_demo_data</code>
+        <br /><code>venv\Scripts\python.exe manage.py seed_data</code>
       </p>
-      <p class="note" style="margin-top: 14px;">
-        <strong>Catalog-only update</strong> — if you only need to populate the
-        <code>InstitutionCourseCatalog</code> without wiping tutee/tutor accounts, run
-        <code>venv\Scripts\python.exe manage.py populate_course_catalog</code> instead. This
-        matches each subject's <code>category</code> field to the corresponding course code and
-        creates catalog entries for every institution. Requires subjects to already have
-        <code>category</code> set (i.e. <code>reset_demo_data</code> must have been run at least
-        once, since <code>seed_data</code> does not set <code>category</code>).
+      <p class="note">
+        <code>reset_demo_data</code> deletes every non-staff user (cascading profiles, tutors,
+        bookings, wallets, ratings, applications, chat, &hellip;), the subject catalog, and platform
+        activity, while preserving SuperAdmin logins. <code>seed_data</code> refuses to run if any
+        non-staff data still exists, so the two commands always run in that order. Re-running the
+        pair is safe and reproduces the same personas and scores (fixed seed <code>20260716</code>).
       </p>
     </section>
 
     <section aria-labelledby="seed-superadmin">
       <h2 id="seed-superadmin">Seeding a SuperAdmin</h2>
       <p class="note">
-        <code>reset_demo_data</code> never creates or overwrites a SuperAdmin — it must already
-        exist before you run it. To promote (or create) one, use
+        <code>reset_demo_data</code> never creates or overwrites a SuperAdmin &mdash; it must
+        already exist before you run it. To promote (or create) one, use
         <code>make_superadmin</code> from <code>backend/</code>:
       </p>
-      <p class="note" style="margin-top: 14px;">
+      <p class="note">
         <strong>If the account already exists</strong> (e.g. local dev's
-        <code>superadmin@studybuddy.test</code>, verified valid 2026-07-08), just promote it —
-        this never touches the password:
+        <code>superadmin@studybuddy.test</code>), just promote it &mdash; this never touches the
+        password:
         <br /><code>venv\Scripts\python.exe manage.py make_superadmin superadmin@studybuddy.test</code>
       </p>
-      <p class="note" style="margin-top: 14px;">
+      <p class="note">
         <strong>If no account exists yet for that email</strong> (e.g. first-time setup on the
-        demo/production database), add <code>--create</code> — it prompts twice for a password via
-        hidden input (never logged or echoed):
+        demo/production database), add <code>--create</code> &mdash; it prompts twice for a
+        password via hidden input (never logged or echoed):
         <br /><code>venv\Scripts\python.exe manage.py make_superadmin superadmin@studybuddy.test --create --first-name Super --last-name Admin</code>
       </p>
-      <p class="note" style="margin-top: 14px;">
+      <p class="note">
         To run either form against the demo/production database instead of local dev, point the
         same session at the demo Supabase pooler first (see
         <a href="demo-deployment.md">demo deployment cheat sheet</a>, "Running a one-off command
-        against the demo database") — never hardcode that database's password into a single
+        against the demo database") &mdash; never hardcode that database's password into a single
         command; set it as a session env var and unset/close the terminal afterward.
       </p>
     </section>
 
     <footer>
-      Source of truth: <a href="../artifacts/2026-07-05-demo-data-testing-guide.md">demo data testing guide</a>
-      and <code>backend/studybuddy/management/commands/reset_demo_data.py</code>.
+      Source of truth: <code>backend/studybuddy/management/commands/seed_data.py</code> and
+      <code>reset_demo_data.py</code>. Recommendation-algorithm specifics:
+      <a href="algorithm-demo-guide.html">Algorithm Demo Guide</a> and
+      <a href="../learning/2026-07-16-algorithm-demo-cheat-sheet.md">algorithm demo cheat sheet</a>.
+      Reseed history: <a href="../plans/2026-07-16-subjects-taxonomy-reseed.md">subjects taxonomy
+      reseed plan</a>.
     </footer>
   </main>
 </body>

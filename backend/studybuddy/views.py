@@ -656,7 +656,7 @@ def create_login_otp_challenge(user):
         logger.exception("Failed to send login OTP email for user_id=%s", user.id)
         raise
 
-    if settings.DEBUG:
+    if settings.DEBUG or settings.OTP_DEBUG_CODE_ENABLED:
         challenge.debug_code = code
 
     return challenge
@@ -669,7 +669,7 @@ def build_otp_challenge_response(challenge, message):
         "message": message,
     }
 
-    if settings.DEBUG and hasattr(challenge, "debug_code"):
+    if (settings.DEBUG or settings.OTP_DEBUG_CODE_ENABLED) and hasattr(challenge, "debug_code"):
         payload["debug_code"] = challenge.debug_code
 
     return payload
@@ -1729,7 +1729,7 @@ def login_resend_otp(request):
     challenge.resend_count += 1
     challenge.save(update_fields=['code_hash', 'expires_at', 'attempt_count', 'resend_count'])
 
-    if settings.DEBUG:
+    if settings.DEBUG or settings.OTP_DEBUG_CODE_ENABLED:
         challenge.debug_code = code
 
     return Response(
@@ -2045,7 +2045,7 @@ def build_combined_block(group, profile=None):
     )
 
     if (
-        settings.DEBUG
+        settings.BOOKING_DEV_TOOLS_ENABLED
         and not has_dev_live_override
         and representative_booking.status == "Confirmed"
         and representative_booking.tutor_confirmed
@@ -3215,7 +3215,7 @@ def build_booking_detail_payload(session_group_bookings, request=None):
     )
 
     if (
-        settings.DEBUG
+        settings.BOOKING_DEV_TOOLS_ENABLED
         and not has_dev_live_override
         and representative_booking.status == "Confirmed"
         and representative_booking.tutor_confirmed
@@ -5088,7 +5088,7 @@ def initiate_online_payment(request):
                     "error": "Payment provider did not return a checkout URL.",
                 }
 
-                if settings.DEBUG:
+                if settings.DEBUG or settings.PAYMONGO_DEBUG_ERRORS_ENABLED:
                     error_response["provider_status"] = response.status_code
                     error_response["provider_error"] = res_data
 
@@ -5142,7 +5142,7 @@ def initiate_online_payment(request):
                 else status.HTTP_502_BAD_GATEWAY
             )
 
-        if settings.DEBUG:
+        if settings.DEBUG or settings.PAYMONGO_DEBUG_ERRORS_ENABLED:
             error_response["provider_status"] = response.status_code
             error_response["provider_error"] = res_data
 
@@ -5209,7 +5209,7 @@ def verify_online_payment(request, booking_id):
             )
             error_response = {"error": provider_message}
 
-            if settings.DEBUG:
+            if settings.DEBUG or settings.PAYMONGO_DEBUG_ERRORS_ENABLED:
                 error_response["provider_status"] = response.status_code
                 error_response["provider_error"] = res_data
 
@@ -5221,7 +5221,7 @@ def verify_online_payment(request, booking_id):
                 "provider_payment_statuses": get_paymongo_payment_statuses(res_data),
             }
 
-            if settings.DEBUG:
+            if settings.DEBUG or settings.PAYMONGO_DEBUG_ERRORS_ENABLED:
                 error_response["provider_status"] = response.status_code
                 error_response["provider_error"] = res_data
 

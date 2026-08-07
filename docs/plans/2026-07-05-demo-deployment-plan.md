@@ -31,6 +31,10 @@ new CORS regex env var is set on Render and login works from a fresh preview URL
 Free vs. paid tier for defense day, run the smoke-test checklist, and switch both platforms off the
 throwaway fork/branch onto `develop` once stable.
 
+**Update 2026-08-05:** the email blocker below is resolved — see the last Changelog entry. Render's
+SMTP block applies to *free* instances only, so the paid instance the demo now runs on can send via
+Gmail SMTP on 587, and login OTP is live again.
+
 A further blocker surfaced after the CORS fix: login OTP email delivery itself was failing.
 Forcing IPv4-only DNS resolution (to work around Render's missing outbound IPv6 route) changed
 the failure from an instant `Errno 101 Network is unreachable` to a `TimeoutError` connecting to
@@ -166,13 +170,12 @@ in the codebase, especially the PayMongo cash-out mock path.
   narrowed (or removed in favor of only the stable aliased URL) before this settings file is reused
   for real production, per the "Demo and production use separate environments and separate
   secrets" principle above.
-- **Login OTP is disabled on the demo deployment** (`LOGIN_OTP_DISABLED`,
-  `backend/backend/settings.py:183-188`) because Render blocks outbound SMTP and StudyBuddy has no
-  domain to verify with an HTTPS email API. This is a deliberate, scoped reduction — gated on the
-  same flag as the demo Basic Auth gate, so it cannot accidentally apply to local dev or real
-  production — but it does mean the demo does not exercise the real 2FA path end-to-end. Full OTP
-  flow remains reviewable on localhost. Revisit once a domain is available (unblocks Resend) or
-  Render's SMTP restriction is confirmed/worked around another way.
+- ~~**Login OTP is disabled on the demo deployment**~~ — **resolved 2026-08-05.** The SMTP block
+  was a *free-tier* Render restriction; moving the service to a paid instance type unblocks ports
+  465/587, so Gmail SMTP works and no verified domain is needed. Email suppression was split off
+  `IS_DEMO_DEPLOYMENT` onto a separate `EMAIL_DELIVERY_DISABLED` env flag that defaults to off, and
+  `LOGIN_OTP_DISABLED` now keys off that instead of demo-ness. The demo exercises the real 2FA path
+  again. See `docs/plans/2026-08-05-enable-demo-email-delivery.md`.
 
 ## Checks to run
 
@@ -219,3 +222,11 @@ in the codebase, especially the PayMongo cash-out mock path.
   when set, skipping OTP challenge creation; no frontend changes needed since `Login.vue` already
   handles a response without `requires_2fa`. Full OTP flow is untouched and still reviewable on
   localhost.
+- **2026-08-05** — Reversed the email reduction above. Render's SMTP block turned out to be a
+  *free-tier* restriction: any paid instance type unblocks ports 465 and 587 (25 stays blocked
+  platform-wide), which makes the no-owned-domain problem moot since Gmail SMTP needs no domain.
+  Split the suppression off `IS_DEMO_DEPLOYMENT` onto a new `EMAIL_DELIVERY_DISABLED` env flag
+  (default off) checked by the nine mail guards in `mailer.py`/`email_utils.py`;
+  `LOGIN_OTP_DISABLED` now keys off email delivery rather than demo-ness, so the demo runs the real
+  2FA path while retaining a one-env-var rollback. `IS_DEMO_DEPLOYMENT` keeps its Basic Auth duty.
+  See `docs/plans/2026-08-05-enable-demo-email-delivery.md`.

@@ -1,10 +1,17 @@
 <script setup>
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { HYBRID_SCORE_PRECISION, UPCOMING_WEEK_DAYS } from '@/config'
 
 const props = defineProps({
   row: {
     type: Object,
     default: null
+  },
+  // Every row sharing the selected tutor's tie group, already ranked. Empty when
+  // the selected tutor's score is unique, which is the common case.
+  tieGroup: {
+    type: Array,
+    default: () => []
   }
 })
 
@@ -47,11 +54,31 @@ function clearTimers() {
 
 const cf = computed(() => props.row?.cf || null)
 
+// Neighbours arrive sorted by similarity, which is live-recomputed on every what-if
+// edit — without freezing the order, dragging one slider reshuffles every row and the
+// panel becomes impossible to track mid-edit. The order is captured once per tutor
+// selection and held fixed; a neighbour that leaves or joins the co-rated set (advanced
+// editing, or a target tutor inside it) still appears/disappears, just without reordering
+// everyone else.
+const neighborOrder = ref([])
+
+const orderedNeighbors = computed(() => {
+  if (!cf.value) return []
+  const neighbors = cf.value.neighbors
+  const order = neighborOrder.value
+  if (!order.length) return neighbors
+
+  const byId = new Map(neighbors.map((n) => [n.neighbor_id, n]))
+  const ordered = order.filter((id) => byId.has(id)).map((id) => byId.get(id))
+  const newArrivals = neighbors.filter((n) => !order.includes(n.neighbor_id))
+  return [...ordered, ...newArrivals]
+})
+
 const steps = computed(() => {
   if (!cf.value || !cf.value.denominator) return []
 
   let cumulative = cf.value.student_avg
-  return cf.value.neighbors.map((neighbor) => {
+  return orderedNeighbors.value.map((neighbor) => {
     const from = cumulative
     const share = neighbor.weighted / cf.value.denominator
     cumulative += share
@@ -139,6 +166,7 @@ function animate(row, previous) {
 
   clearTimers()
   resetBars()
+  neighborOrder.value = row?.cf?.neighbors?.map((n) => n.neighbor_id) || []
   if (!row) return
 
   const sequence = CBF_PARTS.map(([key]) => () => {
@@ -209,17 +237,17 @@ onBeforeUnmount(clearTimers)
         <p v-if="cfMessage" class="cf-message">{{ cfMessage }}</p>
 
         <template v-else>
-          <div class="cf-zones">
+          <div class="cf-zone-headers">
+            <span class="cf-zone-label">Evidence — similarity &amp; rating</span>
             <span></span>
-            <span>Similarity</span>
-            <span>Rated this tutor</span>
-            <span>Effect on baseline</span>
+            <span class="cf-zone-label">Effect on baseline</span>
           </div>
 
           <div class="cf-row">
-            <div class="cf-name">Baseline<small>tutee's own average</small></div>
-            <div></div>
-            <div></div>
+            <div class="cf-evidence">
+              <div class="cf-name">Baseline<small>tutee's own average</small></div>
+            </div>
+            <div class="cf-divider"></div>
             <div class="cf-track">
               <div class="cf-seg base" :style="{ left: '0%', width: pct(cf.student_avg) + '%' }"></div>
               <span class="cf-segval" :style="{ left: `calc(${pct(cf.student_avg)}% + 6px)` }">
@@ -229,33 +257,39 @@ onBeforeUnmount(clearTimers)
           </div>
 
           <div v-for="step in steps" :key="step.neighbor.neighbor_id" class="cf-row">
-            <div class="cf-name">
-              {{ step.neighbor.name }}
-              <small v-if="step.neighbor.co_rated_count < MIN_MEANINGFUL_CO_RATED" class="warn">
-                only {{ step.neighbor.co_rated_count }} co-rated
-              </small>
-              <small v-else>{{ step.neighbor.co_rated_count }} co-rated</small>
-            </div>
-
-            <div class="cf-meter-cell">
-              <div class="cf-meter">
-                <i :style="{ width: Math.round(Math.abs(step.neighbor.similarity) * 100) + '%' }"></i>
+            <div class="cf-evidence">
+              <div class="cf-name">
+                {{ step.neighbor.name }}
+                <small v-if="step.neighbor.co_rated_count < MIN_MEANINGFUL_CO_RATED" class="warn">
+                  only {{ step.neighbor.co_rated_count }} co-rated
+                </small>
+                <small v-else>{{ step.neighbor.co_rated_count }} co-rated</small>
               </div>
-              <span class="cf-meterval">{{ step.neighbor.similarity.toFixed(2) }}</span>
+
+              <div class="cf-evidence-line">
+                <div class="cf-meter-cell">
+                  <div class="cf-meter">
+                    <i :style="{ width: Math.round(Math.abs(step.neighbor.similarity) * 100) + '%' }"></i>
+                  </div>
+                  <span class="cf-meterval">{{ step.neighbor.similarity.toFixed(2) }}</span>
+                </div>
+
+                <div class="cf-rate">
+                  <input
+                    type="range"
+                    min="1"
+                    max="5"
+                    step="1"
+                    :value="step.neighbor.rating"
+                    @input="onRatingInput(step.neighbor, $event.target.value)"
+                  />
+                  <span class="cf-rateval">{{ step.neighbor.rating.toFixed(1) }}</span>
+                </div>
+                <span class="cf-avg">avg {{ step.neighbor.neighbor_avg.toFixed(2) }}</span>
+              </div>
             </div>
 
-            <div class="cf-rate">
-              <input
-                type="range"
-                min="1"
-                max="5"
-                step="1"
-                :value="step.neighbor.rating"
-                @input="onRatingInput(step.neighbor, $event.target.value)"
-              />
-              <span class="cf-rateval">{{ step.neighbor.rating.toFixed(1) }}</span>
-              <span class="cf-avg">avg {{ step.neighbor.neighbor_avg.toFixed(2) }}</span>
-            </div>
+            <div class="cf-divider"></div>
 
             <div class="cf-track">
               <div
@@ -273,22 +307,22 @@ onBeforeUnmount(clearTimers)
             </div>
           </div>
 
-          <div class="cf-row">
-            <div class="cf-name total">CF score</div>
-            <div></div>
-            <div></div>
+          <div class="cf-row cf-row-total">
+            <div class="cf-evidence">
+              <div class="cf-name total">CF score</div>
+            </div>
+            <div class="cf-divider"></div>
             <div class="cf-track">
               <div class="cf-seg total" :style="{ left: '0%', width: pct(cf.score) + '%' }"></div>
               <span class="cf-segval total" :style="{ left: `calc(${pct(cf.score)}% + 6px)` }">
                 {{ cf.score.toFixed(2) }}
               </span>
+              <div class="cf-axis">
+                <span>{{ axis.lo.toFixed(1) }}</span>
+                <span>{{ ((axis.lo + axis.hi) / 2).toFixed(1) }}</span>
+                <span>{{ axis.hi.toFixed(1) }}</span>
+              </div>
             </div>
-          </div>
-
-          <div class="cf-axis">
-            <span>{{ axis.lo.toFixed(1) }}</span>
-            <span>{{ ((axis.lo + axis.hi) / 2).toFixed(1) }}</span>
-            <span>{{ axis.hi.toFixed(1) }}</span>
           </div>
 
           <p class="cf-formula">
@@ -306,6 +340,27 @@ onBeforeUnmount(clearTimers)
           <div class="bar-fill hybrid" :style="{ width: hybridBar.widthPct + '%' }"></div>
         </div>
       </div>
+
+      <section v-if="tieGroup.length > 1" class="tie-block">
+        <h5>Tie Breaker — Upcoming Week Load</h5>
+        <p class="tie-note">
+          {{ tieGroup.length }} tutors tied at
+          {{ row.hybrid_score.toFixed(HYBRID_SCORE_PRECISION) }}. Fewer sessions booked in the next
+          {{ UPCOMING_WEEK_DAYS }} days ranks higher.
+        </p>
+        <div
+          v-for="peer in tieGroup"
+          :key="peer.tutor_id"
+          class="tie-cmp"
+          :class="{ current: peer.tutor_id === row.tutor_id }"
+        >
+          <span>{{ peer.name }}</span>
+          <span>
+            {{ peer.upcoming_week_load }}
+            {{ peer.upcoming_week_load === 1 ? 'session' : 'sessions' }} → rank {{ peer.rank }}
+          </span>
+        </div>
+      </section>
     </template>
     <p v-else class="empty-state">Select a tutor to see the calculation.</p>
   </div>
@@ -314,6 +369,40 @@ onBeforeUnmount(clearTimers)
 <style scoped>
 .algo-breakdown {
   min-height: 320px;
+}
+
+.tie-block {
+  border: 1px dashed color-mix(in srgb, var(--sb-warning, #d29922) 50%, transparent);
+  background: color-mix(in srgb, var(--sb-warning, #d29922) 7%, transparent);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-top: 14px;
+}
+
+.tie-block h5 {
+  margin: 0 0 8px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sb-warning, #d29922);
+}
+
+.tie-note {
+  margin: 0 0 8px;
+  font-size: 11px;
+  color: var(--sb-text-muted);
+}
+
+.tie-cmp {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 3px 0;
+  font-size: 12px;
+}
+
+.tie-cmp.current {
+  font-weight: 700;
 }
 
 .sb-card {
@@ -409,35 +498,51 @@ onBeforeUnmount(clearTimers)
   line-height: 1.5;
 }
 
-.cf-zones,
+.cf-zone-headers,
 .cf-row {
   display: grid;
-  grid-template-columns: 130px 110px 190px 1fr;
-  gap: 10px;
+  grid-template-columns: minmax(220px, 320px) 1px 1fr;
+  gap: 20px;
   align-items: center;
 }
 
-.cf-zones {
-  font-size: 10px;
+.cf-zone-headers {
+  font-size: 10.5px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--sb-text-muted);
-  padding-bottom: 6px;
+  padding-bottom: 10px;
   border-bottom: 1px solid var(--sb-card-border);
 }
 
+.cf-zone-label {
+  display: block;
+}
+
 .cf-row {
-  padding: 8px 0;
+  padding: 14px 0;
   border-bottom: 1px solid var(--sb-card-border);
+  align-items: center;
 }
 
 .cf-row:last-of-type {
   border-bottom: none;
 }
 
+.cf-divider {
+  align-self: stretch;
+  background: var(--sb-card-border);
+}
+
+.cf-evidence {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .cf-name {
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 13.5px;
+  font-weight: 700;
 }
 
 .cf-name.total {
@@ -445,27 +550,35 @@ onBeforeUnmount(clearTimers)
 }
 
 .cf-name small {
-  display: block;
+  display: inline-block;
   font-weight: 400;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--sb-text-muted);
+  margin-left: 6px;
 }
 
 .cf-name small.warn {
   color: var(--sb-danger);
 }
 
+.cf-evidence-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .cf-meter-cell {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 
 .cf-meter {
-  flex: 1;
+  width: 80px;
   background: var(--sb-card-border);
   border-radius: 5px;
-  height: 9px;
+  height: 10px;
   overflow: hidden;
 }
 
@@ -478,9 +591,10 @@ onBeforeUnmount(clearTimers)
 }
 
 .cf-meterval {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--sb-primary);
+  min-width: 30px;
 }
 
 .cf-rate {
@@ -490,32 +604,32 @@ onBeforeUnmount(clearTimers)
 }
 
 .cf-rate input[type='range'] {
-  width: 80px;
+  width: 100px;
   accent-color: var(--sb-primary);
   cursor: pointer;
 }
 
 .cf-rateval {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
-  min-width: 22px;
+  min-width: 24px;
 }
 
 .cf-avg {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--sb-text-muted);
 }
 
 .cf-track {
   position: relative;
-  height: 20px;
+  height: 30px;
 }
 
 .cf-seg {
   position: absolute;
-  top: 3px;
-  height: 14px;
-  border-radius: 4px;
+  top: 7px;
+  height: 18px;
+  border-radius: 5px;
   background: var(--sb-primary);
   transition: left 0.28s ease, width 0.28s ease;
 }
@@ -531,14 +645,14 @@ onBeforeUnmount(clearTimers)
 
 .cf-seg.total {
   background: var(--sb-primary);
-  height: 16px;
-  top: 2px;
+  height: 22px;
+  top: 5px;
 }
 
 .cf-segval {
   position: absolute;
-  top: 3px;
-  font-size: 11px;
+  top: 7px;
+  font-size: 12.5px;
   font-weight: 700;
   color: var(--sb-primary);
   white-space: nowrap;
@@ -550,23 +664,29 @@ onBeforeUnmount(clearTimers)
 }
 
 .cf-segval.total {
-  font-size: 12px;
+  font-size: 14px;
+}
+
+.cf-row-total .cf-track {
+  height: 46px;
 }
 
 .cf-axis {
   display: flex;
   justify-content: space-between;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--sb-text-muted);
-  margin-left: calc(130px + 110px + 190px + 30px);
-  margin-top: 2px;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
 }
 
 .cf-formula {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--sb-text-muted);
-  margin: 12px 0 0;
-  padding-top: 10px;
+  margin: 16px 0 0;
+  padding-top: 12px;
   border-top: 1px solid var(--sb-card-border);
 }
 
