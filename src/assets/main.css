@@ -110,8 +110,7 @@
   max-height: calc(var(--sb-vh-fix) - 2.5rem);
 }
 
-[data-sb-density='compact'] .date-modal,
-[data-sb-density='compact'] .time-modal {
+[data-sb-density='compact'] .date-modal {
   max-height: calc(var(--sb-vh-fix) - 2rem);
 }
 

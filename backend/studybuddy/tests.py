@@ -889,6 +889,61 @@ class RecommendTutorsViewTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(self.response_ids(response), {tutor.profile_id})
 
+    # The time range is optional on the booking search UI -- a date with no times means "any time
+    # that day" and must land on the date-only candidate stage, not the broad subject-only
+    # fallback. The three tests below pin that contract.
+
+    def test_date_without_times_returns_only_tutors_free_that_weekday(self):
+        available = self.create_tutor("anytime")
+        no_slots_that_day = self.create_tutor("otherday")
+        self.add_slots(available, [time(9, 0)])
+        TutorAvailability.objects.create(
+            tutor=no_slots_that_day,
+            day="Tue",
+            time_slot=time(9, 0),
+            is_active=True,
+        )
+
+        response = self.recommend(start_time=None, end_time=None)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.response_ids(response), {available.profile_id})
+
+    def test_date_without_times_still_excludes_full_day_overrides(self):
+        available = self.create_tutor("openday")
+        blocked = self.create_tutor("blockedday")
+        self.add_slots(available, [time(9, 0)])
+        self.add_slots(blocked, [time(9, 0)])
+        TutorAvailabilityOverride.objects.create(
+            tutor=blocked,
+            override_date=self.search_date,
+            is_full_day=True,
+        )
+
+        response = self.recommend(start_time=None, end_time=None)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.response_ids(response), {available.profile_id})
+
+    def test_date_without_times_keeps_partially_booked_tutors(self):
+        partially_booked = self.create_tutor("partial")
+        slots = self.add_slots(partially_booked, [time(9, 0), time(14, 0)])
+        Booking.objects.create(
+            student=self.student_profile,
+            tutor=partially_booked,
+            availability=slots[0],
+            session_date=self.search_date,
+            session_mode="Online",
+            status="Confirmed",
+        )
+
+        response = self.recommend(start_time=None, end_time=None)
+
+        self.assertEqual(response.status_code, 200)
+        # Their 14:00 slot is still genuinely free, so a whole-day search must surface them --
+        # slot-level booking exclusions need a requested slot range to filter against.
+        self.assertEqual(self.response_ids(response), {partially_booked.profile_id})
+
 
 class ChatFeatureTests(APITestCase):
     def setUp(self):
