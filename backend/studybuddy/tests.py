@@ -7439,6 +7439,58 @@ class EmailUtilsRoleLabelTests(APITestCase):
         self.assertIn("Blurry scan.", message)
 
 
+class EmailDeliveryDisabledTests(APITestCase):
+    """EMAIL_DELIVERY_DISABLED is the single kill switch for outbound mail. It used to be implied
+    by IS_DEMO_DEPLOYMENT (Render's free tier blocked outbound SMTP); the demo now runs on a paid
+    instance, so delivery defaults to on and the switch is an explicit opt-out.
+    See docs/plans/2026-08-05-enable-demo-email-delivery.md."""
+
+    def setUp(self):
+        self.institution = PartnerInstitution.objects.create(
+            institution_name="CPU", school_email_domain="cpu.edu", is_active=True,
+        )
+        self.user = User.objects.create_user(
+            username="killswitch@cpu.edu", email="killswitch@cpu.edu", password="password",
+        )
+        self.profile = UserProfile.objects.create(
+            user=self.user, fname="Kill", mname="", lname="Switch", role="Tutor",
+            institution=self.institution,
+        )
+
+    @override_settings(EMAIL_DELIVERY_DISABLED=True)
+    def test_application_email_suppressed_when_disabled(self):
+        from .email_utils import send_application_received_email
+
+        with patch("studybuddy.email_utils.send_mail") as mock_send:
+            send_application_received_email(self.profile)
+        mock_send.assert_not_called()
+
+    @override_settings(EMAIL_DELIVERY_DISABLED=False)
+    def test_application_email_delivered_when_enabled(self):
+        from .email_utils import send_application_received_email
+
+        with patch("studybuddy.email_utils.send_mail") as mock_send:
+            send_application_received_email(self.profile)
+        mock_send.assert_called_once()
+
+    @override_settings(EMAIL_DELIVERY_DISABLED=True)
+    def test_login_otp_suppressed_when_disabled(self):
+        from . import mailer
+
+        with patch("studybuddy.mailer._deliver") as mock_deliver:
+            mailer.send_login_otp(self.user, "123456")
+        mock_deliver.assert_not_called()
+
+    @override_settings(EMAIL_DELIVERY_DISABLED=False)
+    def test_login_otp_delivered_when_enabled(self):
+        from . import mailer
+
+        with patch("studybuddy.mailer._deliver") as mock_deliver:
+            mailer.send_login_otp(self.user, "123456")
+        mock_deliver.assert_called_once()
+        self.assertEqual(mock_deliver.call_args.kwargs["recipient"], self.user.email)
+
+
 class RenewalReminderTests(APITestCase):
     """Opportunistic 7-day/1-day renewal reminders, triggered from get_document_review_context via
     profile_status. See docs/plans/2026-07-01-tutee-verification-phase4-email-devtools.md."""
@@ -8535,3 +8587,233 @@ class PendingProposedSubjectRemainsSelectableTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         codes = [row["subject_code"] for row in response.data]
         self.assertIn(self.pending_subject.subject_code, codes)
+
+
+def _make_tiebreak_profile(username, role):
+    user = User.objects.create_user(
+        username=username,
+        email=f"{username}@studybuddy.test",
+        password="password",
+    )
+    return UserProfile.objects.create(
+        user=user,
+        fname=username,
+        mname="",
+        lname=role,
+        role=role,
+        profile_completed=True,
+    )
+
+class UpcomingWeekLoadTests(APITestCase):
+    """Upcoming Week Load counts a tutor's booked sessions in the next 7 days
+    (see docs/adr/0009-tie-breaker-upcoming-week-load.md). Deliberately distinct
+    from Tutor.accepted_session_load(), which has no date bound."""
+
+    def setUp(self):
+        self.tutee_profile = _make_tiebreak_profile("load-tutee", "Tutee")
+        self.tutor = Tutor.objects.create(profile=_make_tiebreak_profile("load-tutor", "Tutor"))
+        self.availability = TutorAvailability.objects.create(
+            tutor=self.tutor,
+            day="Mon",
+            time_slot=time(9, 0),
+            is_active=True,
+        )
+        self.today = timezone.localdate()
+
+    def _book(self, day_offset, status="Confirmed"):
+        return Booking.objects.create(
+            student=self.tutee_profile,
+            tutor=self.tutor,
+            availability=self.availability,
+            session_date=self.today + timedelta(days=day_offset),
+            session_mode="Online",
+            status=status,
+        )
+
+    def _load(self):
+        from studybuddy.recommender.workload import get_upcoming_week_loads
+
+        return get_upcoming_week_loads([self.tutor.profile_id]).get(self.tutor.profile_id, 0)
+
+    def test_counts_sessions_inside_the_window(self):
+        self._book(0)
+        self._book(3)
+        self._book(6)
+
+        self.assertEqual(self._load(), 3)
+
+    def test_today_is_inside_the_window(self):
+        self._book(0)
+
+        self.assertEqual(self._load(), 1)
+
+    def test_day_seven_is_outside_the_window(self):
+        self._book(7)
+
+        self.assertEqual(self._load(), 0)
+
+    def test_past_sessions_are_excluded(self):
+        self._book(-1)
+
+        self.assertEqual(self._load(), 0)
+
+    def test_awaiting_payment_verification_counts(self):
+        self._book(2, status="Awaiting Payment Verification")
+
+        self.assertEqual(self._load(), 1)
+
+    def test_cancelled_rejected_and_completed_are_excluded(self):
+        self._book(1, status="Cancelled")
+        self._book(2, status="Rejected")
+        self._book(3, status="Completed")
+
+        self.assertEqual(self._load(), 0)
+
+    def test_sessions_in_one_group_count_individually(self):
+        # Unlike Accepted Session Load, a multi-session package is not collapsed:
+        # each dated occurrence inside the window is real burden that week.
+        group = uuid4()
+        for offset in (1, 2, 3):
+            booking = self._book(offset)
+            booking.session_group_id = group
+            booking.save()
+
+        self.assertEqual(self._load(), 3)
+
+    def test_tutor_with_no_bookings_is_absent_from_the_map(self):
+        from studybuddy.recommender.workload import get_upcoming_week_loads
+
+        loads = get_upcoming_week_loads([self.tutor.profile_id])
+
+        self.assertEqual(loads.get(self.tutor.profile_id, 0), 0)
+
+    def test_empty_tutor_id_list_makes_no_query(self):
+        from studybuddy.recommender.workload import get_upcoming_week_loads
+
+        with self.assertNumQueries(0):
+            self.assertEqual(get_upcoming_week_loads([]), {})
+
+    def test_loads_for_many_tutors_take_one_query(self):
+        from studybuddy.recommender.workload import get_upcoming_week_loads
+
+        other = Tutor.objects.create(profile=_make_tiebreak_profile("load-tutor-2", "Tutor"))
+        self._book(1)
+
+        with self.assertNumQueries(1):
+            loads = get_upcoming_week_loads([self.tutor.profile_id, other.profile_id])
+
+        self.assertEqual(loads.get(self.tutor.profile_id, 0), 1)
+        self.assertEqual(loads.get(other.profile_id, 0), 0)
+
+
+class TieBreakerOrderingTests(APITestCase):
+    """The Tie Breaker: equal Hybrid Score quantized to 3dp ranks by Upcoming
+    Week Load ascending, then profile_id ascending."""
+
+    def _rank(self, scored, loads):
+        """scored: list of (profile_id, hybrid_score). Returns ranked profile_ids."""
+        from studybuddy.recommender import hybrid
+
+        tutors = []
+        for profile_id, _score in scored:
+            tutor = Mock(profile_id=profile_id, tutorsubjects_set=Mock())
+            tutor.tutorsubjects_set.all.return_value = []
+            tutors.append(tutor)
+
+        score_by_id = dict(scored)
+        student_profile = Mock(id=1, course_id=None, year_level=None)
+
+        def fake_cbf(_student, tutor, *_args, **_kwargs):
+            # CF is coerced to 0 for this student, so hybrid = CBF_WEIGHT * cbf.
+            return score_by_id[tutor.profile_id] / hybrid.CBF_WEIGHT
+
+        with patch.object(hybrid, "get_student_subject_codes", return_value=[]), \
+             patch.object(hybrid, "compute_cbf_score", side_effect=fake_cbf), \
+             patch.object(hybrid, "get_upcoming_week_loads", return_value=loads), \
+             patch.object(hybrid, "normalize_tutor_queryset", return_value=tutors):
+            results = hybrid.recommend_tutors_hybrid({}, student_profile, None)
+
+        return [row["tutor"].profile_id for row in results]
+
+    def test_equal_scores_rank_by_fewer_upcoming_sessions(self):
+        order = self._rank([(1, 0.5), (2, 0.5)], {1: 7, 2: 2})
+
+        self.assertEqual(order, [2, 1])
+
+    def test_a_real_score_gap_is_never_overridden_by_load(self):
+        # 0.520 vs 0.500 is well outside the 3dp tie band: score wins despite
+        # the higher-scoring tutor being far busier.
+        order = self._rank([(1, 0.520), (2, 0.500)], {1: 9, 2: 0})
+
+        self.assertEqual(order, [1, 2])
+
+    def test_scores_differing_below_the_quantum_are_treated_as_tied(self):
+        # 0.5004 and 0.5001 both quantize to 0.500, so load decides.
+        order = self._rank([(1, 0.5004), (2, 0.5001)], {1: 5, 2: 1})
+
+        self.assertEqual(order, [2, 1])
+
+    def test_scores_differing_above_the_quantum_are_not_tied(self):
+        # 0.5014 -> 0.501 and 0.5001 -> 0.500: different buckets, score decides
+        # even though the winner is the busier tutor.
+        order = self._rank([(1, 0.5001), (2, 0.5014)], {1: 0, 2: 8})
+
+        self.assertEqual(order, [2, 1])
+
+    def test_equal_score_and_equal_load_fall_back_to_profile_id(self):
+        order = self._rank([(3, 0.5), (1, 0.5), (2, 0.5)], {1: 4, 2: 4, 3: 4})
+
+        self.assertEqual(order, [1, 2, 3])
+
+    def test_tutor_missing_from_the_load_map_is_treated_as_zero(self):
+        order = self._rank([(1, 0.5), (2, 0.5)], {1: 3})
+
+        self.assertEqual(order, [2, 1])
+
+    def test_upcoming_week_load_is_attached_to_each_recommendation(self):
+        from studybuddy.recommender import hybrid
+
+        tutor = Mock(profile_id=1, tutorsubjects_set=Mock())
+        tutor.tutorsubjects_set.all.return_value = []
+        student_profile = Mock(id=1, course_id=None, year_level=None)
+
+        with patch.object(hybrid, "get_student_subject_codes", return_value=[]), \
+             patch.object(hybrid, "compute_cbf_score", return_value=0.5), \
+             patch.object(hybrid, "get_upcoming_week_loads", return_value={1: 6}), \
+             patch.object(hybrid, "normalize_tutor_queryset", return_value=[tutor]):
+            results = hybrid.recommend_tutors_hybrid({}, student_profile, None)
+
+        self.assertEqual(results[0]["upcoming_week_load"], 6)
+
+
+class DemoTieGroupTests(APITestCase):
+    """The demo tool tags tie groups so the panel can show which rows the Tie
+    Breaker ordered — see _mark_tie_groups."""
+
+    def _mark(self, scores):
+        from studybuddy.recommender.demo import _mark_tie_groups
+
+        rows = [{"hybrid_score": score} for score in scores]
+        _mark_tie_groups(rows)
+        return [row["tie_group_id"] for row in rows]
+
+    def test_unique_scores_are_not_tagged(self):
+        self.assertEqual(self._mark([0.9, 0.8, 0.7]), [None, None, None])
+
+    def test_adjacent_equal_scores_share_a_group(self):
+        self.assertEqual(self._mark([0.9, 0.845, 0.845, 0.7]), [None, 0, 0, None])
+
+    def test_separate_ties_get_separate_groups(self):
+        self.assertEqual(
+            self._mark([0.9, 0.9, 0.845, 0.7, 0.7]),
+            [0, 0, None, 1, 1],
+        )
+
+    def test_scores_equal_only_below_the_quantum_still_tie(self):
+        self.assertEqual(self._mark([0.8452, 0.8449]), [0, 0])
+
+    def test_scores_differing_above_the_quantum_do_not_tie(self):
+        self.assertEqual(self._mark([0.846, 0.845]), [None, None])
+
+    def test_empty_rows_are_handled(self):
+        self.assertEqual(self._mark([]), [])

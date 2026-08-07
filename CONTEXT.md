@@ -197,6 +197,26 @@ exactly one General Subject. A Specific Subject match in CBF scoring means the t
 exact subject the Tutee requested.
 _Avoid_: "exact subject", "subject" alone when the General/Specific distinction matters
 
+**Tie Breaker**:
+The rule that orders Tutors whose Hybrid Scores are equal. Two scores count as equal when they
+agree to three decimals — the same precision the recommendation API returns, so a tie to the
+algorithm is also a tie on screen. Tied Tutors rank by Upcoming Week Load ascending, and a Tutor
+still tied after that ranks by profile id. Without it, equal scores were left in database row
+order, which is undefined; ties are common rather than rare, because most CBF sub-scores are
+discrete and CF is zero for every Cold-Start Tutee. Surfaced in the algorithm demo tool, never to
+Tutees. See ADR-0009.
+_Avoid_: "tiebreak rule", "secondary score", "Tier 1/2/3" (from the rejected multi-tier cascade)
+
+**Upcoming Week Load**:
+The number of sessions a Tutor has booked in the next seven days — `Confirmed` and
+`Awaiting Payment Verification`, counting today and excluding day seven, in Manila local time.
+The Tie Breaker's ranking input, on the principle that equally-matched Tutors should give way to
+the one with the lighter week. Distinct from Accepted Session Load in both window and counting:
+this one is date-bounded and counts each dated session separately rather than collapsing a
+multi-slot appointment into one commitment.
+_Avoid_: "workload" (ambiguous), "session load" alone (that is Accepted Session Load), "active
+bookings"
+
 ### Verification & booking gates
 
 **Booking Gate**:

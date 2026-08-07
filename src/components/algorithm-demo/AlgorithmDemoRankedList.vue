@@ -7,6 +7,7 @@ import {
   getAlgorithmDemoRecommendation,
   getAlgorithmDemoWhatIf
 } from '@/services/api/algorithmDemo'
+import { HYBRID_SCORE_PRECISION } from '@/config'
 
 // Rating edits are re-scored server-side so the numbers keep coming from the real
 // recommender, which costs a round trip — this paces them without feeling laggy.
@@ -40,6 +41,21 @@ let whatIfTimer = null
 const selectedRow = computed(
   () => rows.value.find((row) => row.tutor_id === selectedTutorId.value) || null
 )
+
+function isTied(row) {
+  return row?.tie_group_id !== null && row?.tie_group_id !== undefined
+}
+
+// The tied peers of the selected tutor, carrying the rank they were given, so the
+// breakdown panel can show the comparison the Tie Breaker actually made.
+const selectedTieGroup = computed(() => {
+  const row = selectedRow.value
+  if (!isTied(row)) return []
+
+  return rows.value
+    .map((item, index) => ({ ...item, rank: index + 1 }))
+    .filter((item) => item.tie_group_id === row.tie_group_id)
+})
 
 function clearWhatIf() {
   clearTimeout(whatIfTimer)
@@ -182,12 +198,17 @@ watch(
           <span>
             <span class="rank">{{ index + 1 }}.</span>{{ row.name }}
             <span v-if="row.cold_start" class="sb-badge cold">Cold Start</span>
+            <span v-if="isTied(row)" class="sb-badge tie">Tie Breaker</span>
           </span>
-          <span class="score">{{ row.hybrid_score.toFixed(2) }}</span>
+          <span class="score">{{ row.hybrid_score.toFixed(HYBRID_SCORE_PRECISION) }}</span>
         </div>
       </div>
 
-      <AlgorithmDemoBreakdown :row="selectedRow" @override="onOverride" />
+      <AlgorithmDemoBreakdown
+        :row="selectedRow"
+        :tie-group="selectedTieGroup"
+        @override="onOverride"
+      />
     </div>
   </div>
 </template>
@@ -292,6 +313,8 @@ watch(
 .score {
   font-weight: 700;
   color: var(--sb-primary);
+  /* 3 decimals now, so tied scores line up digit-for-digit rather than jittering. */
+  font-variant-numeric: tabular-nums;
 }
 
 .sb-badge {
@@ -310,5 +333,11 @@ watch(
   background: color-mix(in srgb, var(--sb-danger) 12%, transparent);
   color: var(--sb-danger);
   border-color: color-mix(in srgb, var(--sb-danger) 30%, transparent);
+}
+
+.sb-badge.tie {
+  background: color-mix(in srgb, var(--sb-warning, #d29922) 14%, transparent);
+  color: var(--sb-warning, #d29922);
+  border-color: color-mix(in srgb, var(--sb-warning, #d29922) 35%, transparent);
 }
 </style>

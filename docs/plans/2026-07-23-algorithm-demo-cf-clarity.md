@@ -4,18 +4,63 @@ date: 2026-07-23
 status: In Progress
 summary: Make the CF half of the algorithm demo legible for the panel with a derivation waterfall, a top-5 weight table, server-side what-if rating edits, and a denser programming rating seed.
 spec: ../mockups/2026-07-23-algorithm-demo-cf-waterfall.html
+follow-up-spec: ../mockups/2026-08-03-algorithm-demo-cf-waterfall-variant-b.html
 ---
 
 # Algorithm demo CF clarity, live what-if editing, and programming-core reseed
 
 ## Status & Progress Summary
 
-**In Progress — steps 1, 2, 4, 5, 7 done; 8 and 9 partly done; 3 and 6 outstanding.** Design settled in a grilling session
+**In Progress — steps 1, 2, 4, 5, 7 done (step 4 re-verified against the browser and reworked, see
+below); 8 and 9 partly done; 3 and 6 outstanding.** Design settled in a grilling session
 on 2026-07-23; the visual is locked and promoted to
 `docs/mockups/2026-07-23-algorithm-demo-cf-waterfall.html`, and the tier-1 rating matrix is
 numerically validated against a mirror of `CF.py`. No open questions remain — the last one,
 whether already-rated tutors should leave the demo candidate pool, resolved to **no** once both
 production paths were traced (see Risks).
+
+**2026-08-03 correction to step 4.** The 2026-07-24 implementation was never checked against the
+locked mockup in a browser — only lint/build. When actually opened, the CF section it built was
+functionally correct (same math, same computed properties) but visually cramped compared to the
+mockup, and it sat directly beneath the untouched legacy CBF sub-score bars with no visual
+separation, so the page read as "old bar-chart UI with a new section glued into the middle"
+rather than the mockup's clean two-zone layout. Ran a `ui-preview` session to compare three
+expanded layouts (scaled-up current grid, a true two-zone split matching the mockup, and a
+middle ground with a promoted formula band); the user picked the two-zone split. Chosen mockup
+promoted to `docs/mockups/2026-08-03-algorithm-demo-cf-waterfall-variant-b.html`. `CBF
+bars and the Hybrid Score bar were confirmed out of scope and left untouched per explicit
+instruction.
+
+Implemented in `AlgorithmDemoBreakdown.vue`: the CF section's template was restructured from a
+4-column grid (`cf-zones`/`cf-row` with separate similarity/rating/effect columns) into a
+2-column grid with a vertical divider (`cf-evidence` | `cf-divider` | `cf-track`), so each
+neighbour reads as one evidence block (name, co-rated count, similarity meter, rating slider,
+peer average) beside one effect block (waterfall segment on the shared axis) — matching the
+mockup's "Evidence" / "Effect on baseline" zone headers. No computed logic changed: `steps`,
+`axis`, `pct`, and `segmentStyle` are untouched, only the template markup and CSS around them.
+Row heights, meter/slider sizes, and font sizes were all scaled up per the "expanded" request.
+
+Verified in a live browser session (SuperAdmin login, Katrina Katigbak → Fidel Fajardo): layout
+matches the chosen mockup, and dragging a neighbour's rating slider correctly re-runs the real
+`recommend-whatif/` endpoint — similarity, effect segments, axis, CF score, the weight-table
+CF/Hybrid cells, and the Hybrid Score bar all updated together, including a neighbour's effect
+segment flipping to the negative/red treatment when its rating drop made the term go negative.
+`npm run build` succeeded (4.33s); `npm run lint` showed only pre-existing, unrelated errors in
+`make_algo_pptx.cjs`/`.js`.
+
+**2026-08-03 follow-up: row order was reshuffling mid-edit.** Neighbours come back from
+`compute_cf_breakdown` in `top_k`'s similarity-descending order (`CF.py:84`), and similarity is
+live-recomputed whenever the edited tutor is inside the co-rated set (the accuracy-callout case
+documented in Risks above) — so a single slider drag could resort every row underneath it,
+making the panel impossible to track mid-edit. Fixed in `AlgorithmDemoBreakdown.vue` by freezing
+row order per tutor selection: a new `neighborOrder` ref captures the neighbour-id order the
+first time a tutor is selected (in `animate()`'s tutor-change branch), and a new
+`orderedNeighbors` computed reorders every subsequent what-if response to match it, appending
+any neighbour that newly enters the co-rated set at the end. `steps` now derives from
+`orderedNeighbors` instead of `cf.value.neighbors` directly; no other computed logic changed.
+Verified live: dragging Olivia Ocampo's rating from 5.0 to 3.0 recalculated her similarity
+(0.97 → 0.94), CF (4.92 → 4.34), and her effect segment, while Olivia/Gloria/Hernan stayed in
+their original row order. `npm run build` succeeded (3.12s).
 
 Done so far:
 - **Step 1** — `compute_cf_breakdown` (`CF.py`) now returns every term of the prediction
@@ -302,3 +347,35 @@ CF for T1:    3.80 + (+2.811 / 2.983) = 4.742
   Checks run: ESLint clean on `src/components/algorithm-demo/`; `npm run build` succeeded in
   6.58s; guide tag balance verified (10 sections, 168 divs, all matched). Still not exercised
   in a browser.
+- **2026-08-03** — First browser check of the live page surfaced a real gap: the step-4 CF
+  section was mathematically correct but visually cramped, sitting undivided beneath the
+  untouched legacy CBF bars, so the page didn't read as the locked mockup at all. Ran a
+  `ui-preview` session with three expanded-layout options (scaled-up grid, mockup-style two-zone
+  split, middle ground with a promoted formula band); user picked the two-zone split. Reworked
+  `AlgorithmDemoBreakdown.vue`'s CF section template/CSS into a 2-column grid (evidence column
+  with name/co-rated-count/similarity meter/rating slider/peer average, divider, effect column
+  with the waterfall segment) — no computed-property changes, CBF bars and Hybrid Score bar left
+  untouched as instructed. Promoted the chosen mockup to
+  `docs/mockups/2026-08-03-algorithm-demo-cf-waterfall-variant-b.html` (linked as
+  `follow-up-spec` in this plan's frontmatter).
+
+  Checks run: `npm run build` succeeded in 4.33s; `npm run lint` showed only pre-existing,
+  unrelated `no-undef` errors in `make_algo_pptx.cjs`/`.js`. Verified live in a browser
+  (SuperAdmin session, Katrina Katigbak → Fidel Fajardo): layout matches the chosen mockup, and
+  dragging a neighbour's rating slider correctly re-ran the real `recommend-whatif/` endpoint —
+  similarity, effect segments, axis, CF score, the weight-table CF/Hybrid cells, and the Hybrid
+  Score bar all updated together, including the negative/red treatment when a rating drop made a
+  neighbour's term go negative.
+- **2026-08-03** — Fixed a UX regression surfaced immediately after the above: rows in the CF
+  waterfall reshuffled mid-edit whenever the edited neighbour's similarity was recomputed (any
+  target inside the co-rated set, per the accuracy-callout scenario in Risks), because
+  `compute_cf_breakdown` returns neighbours in `top_k`'s similarity-descending order
+  (`CF.py:84`) and the template rendered that order directly. Added a `neighborOrder` ref to
+  `AlgorithmDemoBreakdown.vue`, captured once per tutor selection in `animate()`, and an
+  `orderedNeighbors` computed that reorders every subsequent what-if response to match it
+  (new co-rated entrants appended at the end); `steps` now derives from `orderedNeighbors`
+  rather than the raw API order. No other computed logic touched.
+
+  Checks run: `npm run build` succeeded in 3.12s. Verified live: dragging Olivia Ocampo's rating
+  from 5.0 to 3.0 recalculated her similarity (0.97 → 0.94) and CF (4.92 → 4.34) correctly while
+  the Olivia/Gloria/Hernan row order stayed fixed.
