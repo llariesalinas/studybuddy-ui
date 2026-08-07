@@ -317,6 +317,12 @@
 
     <section aria-labelledby="superadmin-login">
       <h2 id="superadmin-login">SuperAdmin Login</h2>
+      <p class="lede">
+        As of the demo-seed consolidation (2026-08-08), <code>seed_data</code> seeds these two
+        accounts itself &mdash; no manual <code>make_superadmin</code> step needed. Both are
+        <code>is_staff=True</code>, so <code>reset_demo_data</code>'s existing deletion filter
+        already protects them on every future reset.
+      </p>
       <div class="table-wrap">
         <table>
           <thead>
@@ -329,9 +335,14 @@
           <tbody>
             <tr>
               <td><span class="role super">SuperAdmin</span></td>
-              <td><code>superadmin@studybuddy.test</code></td>
-              <td><code>reset_demo_data</code> never creates or overwrites this account &mdash; it
-                must already exist. See "Seeding a SuperAdmin" below if it doesn't.</td>
+              <td><code>superadmin.demo@cpu.edu.ph</code></td>
+              <td>Sonia Superadmin &mdash; primary demo login.</td>
+            </tr>
+            <tr>
+              <td><span class="role super">SuperAdmin</span></td>
+              <td><code>superadmin2.demo@cpu.edu.ph</code></td>
+              <td>Ramon Superadmin &mdash; second account, for demoing multi-admin behavior
+                (e.g. one admin resolving another's action).</td>
             </tr>
           </tbody>
         </table>
@@ -502,14 +513,13 @@
     </section>
 
     <section aria-labelledby="restored-scenarios">
-      <h2 id="restored-scenarios">Restored via opt-in seed commands</h2>
+      <h2 id="restored-scenarios">Additive demo cases (seeded automatically)</h2>
       <p class="lede">
-        These personas are not part of a base <code>seed_data</code> run. They exist only after
-        running the command below on top of it, same pattern as
-        <a href="algorithm-demo-guide.html">the Tie Breaker demo</a>&#39;s
-        <code>seed_tie_breaker_demo.py</code>. Both are additive and reversible with
-        <code>--remove</code>; neither modifies <code>seed_data.py</code>&#39;s reproducible
-        output.
+        As of the demo-seed consolidation (2026-08-08), a plain <code>seed_data</code> run seeds
+        these personas itself &mdash; it calls each command below internally at the end of its own
+        run, so no extra manual step is needed for a fresh <code>reset_demo_data &amp;&amp;
+        seed_data</code>. Each command still exists standalone and stays additive/reversible with
+        <code>--remove</code>, for tweaking a single demo case live without a full reseed.
       </p>
       <div class="note">
         <strong>Booking load limits.</strong> <code>python manage.py
@@ -523,6 +533,16 @@
         state, ledger reconciled to a &#8369;500.00 balance) and Miguel Torres (a forced-negative
         wallet via a Counted Strike deduction, plus cash-paid completed sessions), to demo the
         debt banner and wallet history views.
+      </div>
+      <div class="note">
+        <strong>Tie Breaker.</strong> <code>python manage.py seed_tie_breaker_demo</code> adds
+        Upcoming Week Load to one tutor in a real tie group, so the
+        <a href="algorithm-demo-guide.html">Tie Breaker</a> rule visibly reorders it above its
+        tied peer. <code>seed_data</code> discovers a real tie group itself (previously required
+        a hardcoded <code>--tutee</code> id that broke on every reseed since a fresh database
+        renumbers every profile) and runs this <em>before</em> the two commands above, since their
+        newly-created tutors have no CF signal of their own and can otherwise produce an
+        incidental, unrelated tie.
       </div>
     </section>
 
@@ -547,30 +567,31 @@
       <p class="note">
         <code>reset_demo_data</code> deletes every non-staff user (cascading profiles, tutors,
         bookings, wallets, ratings, applications, chat, &hellip;), the subject catalog, and platform
-        activity, while preserving SuperAdmin logins. <code>seed_data</code> refuses to run if any
-        non-staff data still exists, so the two commands always run in that order. Re-running the
-        pair is safe and reproduces the same personas and scores (fixed seed <code>20260716</code>).
+        activity, while preserving staff/SuperAdmin logins. <code>seed_data</code> refuses to run if
+        any non-staff data still exists, so the two commands always run in that order. Re-running
+        the pair is safe and reproduces the same personas and scores (fixed seed
+        <code>20260716</code>), plus the 2 SuperAdmin accounts and all 3 additive demo cases above
+        &mdash; a single <code>reset_demo_data &amp;&amp; seed_data</code> is now the complete
+        recipe for a fully demoable database, on local dev or the live Render demo deployment.
       </p>
     </section>
 
     <section aria-labelledby="seed-superadmin">
-      <h2 id="seed-superadmin">Seeding a SuperAdmin</h2>
+      <h2 id="seed-superadmin">Seeding an additional SuperAdmin</h2>
       <p class="note">
-        <code>reset_demo_data</code> never creates or overwrites a SuperAdmin &mdash; it must
-        already exist before you run it. To promote (or create) one, use
-        <code>make_superadmin</code> from <code>backend/</code>:
+        The 2 SuperAdmin accounts above are seeded automatically &mdash; you only need this section
+        for a <em>third</em> custom account (e.g. a named reviewer login), or to promote an
+        already-registered user. Use <code>make_superadmin</code> from <code>backend/</code>:
       </p>
       <p class="note">
-        <strong>If the account already exists</strong> (e.g. local dev's
-        <code>superadmin@studybuddy.test</code>), just promote it &mdash; this never touches the
-        password:
-        <br /><code>venv\Scripts\python.exe manage.py make_superadmin superadmin@studybuddy.test</code>
+        <strong>If the account already exists</strong>, just promote it &mdash; this never touches
+        the password:
+        <br /><code>venv\Scripts\python.exe manage.py make_superadmin someone@cpu.edu.ph</code>
       </p>
       <p class="note">
-        <strong>If no account exists yet for that email</strong> (e.g. first-time setup on the
-        demo/production database), add <code>--create</code> &mdash; it prompts twice for a
-        password via hidden input (never logged or echoed):
-        <br /><code>venv\Scripts\python.exe manage.py make_superadmin superadmin@studybuddy.test --create --first-name Super --last-name Admin</code>
+        <strong>If no account exists yet for that email</strong>, add <code>--create</code>
+        &mdash; it prompts twice for a password via hidden input (never logged or echoed):
+        <br /><code>venv\Scripts\python.exe manage.py make_superadmin someone@cpu.edu.ph --create --first-name First --last-name Last</code>
       </p>
       <p class="note">
         To run either form against the demo/production database instead of local dev, point the
