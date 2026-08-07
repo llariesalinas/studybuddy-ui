@@ -494,23 +494,35 @@
         no admin tier below SuperAdmin to demo scoping with.
       </div>
       <div class="gone">
-        <strong>Booking load limits.</strong> Grace Domingo (10/10 accepted sessions, blocked) and
-        Paolo Ramirez (8/10, still accepting) no longer exist. All curated bookings the current
-        seed creates are terminal (<code>Completed</code>) &mdash; there are no in-flight
-        accepted/pending session groups to demo the load-limit gate with.
-      </div>
-      <div class="gone">
-        <strong>Compensation / wallet states.</strong> Isabel Fernandez (top-ups, withdrawals in
-        every state, reconciled balance) and Miguel Torres (forced-negative wallet, debt banner,
-        cash-payment history) are gone. Every seeded wallet now starts and stays at
-        <code>0.00</code> balance and pending &mdash; there is no top-up/withdrawal/commission data
-        and no debt-banner demo persona.
-      </div>
-      <div class="gone">
         <strong>Reporting gap subjects.</strong> The old demo's flagged supply gap
         (<code>Disaster Readiness (GAS-DR)</code> / <code>Strategic Management (BUS-401)</code>)
         referenced course-code subjects that don't exist in the new 121-subject taxonomy
         (<code>backend/studybuddy/subject_taxonomy.py</code>).
+      </div>
+    </section>
+
+    <section aria-labelledby="restored-scenarios">
+      <h2 id="restored-scenarios">Restored via opt-in seed commands</h2>
+      <p class="lede">
+        These personas are not part of a base <code>seed_data</code> run. They exist only after
+        running the command below on top of it, same pattern as
+        <a href="algorithm-demo-guide.html">the Tie Breaker demo</a>&#39;s
+        <code>seed_tie_breaker_demo.py</code>. Both are additive and reversible with
+        <code>--remove</code>; neither modifies <code>seed_data.py</code>&#39;s reproducible
+        output.
+      </p>
+      <div class="note">
+        <strong>Booking load limits.</strong> <code>python manage.py
+        seed_booking_load_limit_demo</code> creates Grace Domingo (10/10 accepted sessions,
+        blocked and hidden from search) and Paolo Ramirez (8/10, still accepting), to demo the
+        Session Load Limit gate in <code>get_recommendation_candidate_tutors</code>.
+      </div>
+      <div class="note">
+        <strong>Compensation / wallet states.</strong> <code>python manage.py
+        seed_wallet_cases_demo</code> creates Isabel Fernandez (a top-up and withdrawal in every
+        state, ledger reconciled to a &#8369;500.00 balance) and Miguel Torres (a forced-negative
+        wallet via a Counted Strike deduction, plus cash-paid completed sessions), to demo the
+        debt banner and wallet history views.
       </div>
     </section>
 
