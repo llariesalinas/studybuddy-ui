@@ -12,7 +12,9 @@ its linked session-summary handoffs.
 | Frontend | `npm install` then `npm run dev` (repo root) | Vite dev server, default `http://localhost:5173` |
 | Backend | `cd backend && python manage.py runserver` | Django dev server, default `http://127.0.0.1:8000` |
 | Backend migrations | `cd backend && python manage.py migrate` | Run after pulling new migrations |
-| Seed/reset demo data | `cd backend && python manage.py reset_demo_data` | **Destructive, local/dev only** — wipes and reseeds all Tutee/Tutor users with fixed personas. Never touches Admin/SuperAdmin. |
+| Seed/reset demo data | `cd backend && python manage.py reset_demo_data && python manage.py seed_data` | **Destructive, local/dev only** — `reset_demo_data` wipes all Tutee/Tutor users, the subject catalog, and platform activity; `seed_data` then reseeds fixed curated + filler personas. `seed_data` refuses to run if non-staff data still exists, so the two always run in that order. Never touches Admin/SuperAdmin. |
+| Restore load-limit demo case | `cd backend && python manage.py seed_booking_load_limit_demo` | Additive, reversible (`--remove`). Run after `seed_data`. Creates Grace Domingo (at her Session Load Limit, hidden from search) and Paolo Ramirez (still accepting). See [demo-data-testing-accounts.html](demo-data-testing-accounts.html). |
+| Restore wallet demo cases | `cd backend && python manage.py seed_wallet_cases_demo` | Additive, reversible (`--remove`). Run after `seed_data`. Creates Isabel Fernandez (full wallet-state ledger) and Miguel Torres (forced-negative wallet, debt banner). See [demo-data-testing-accounts.html](demo-data-testing-accounts.html). |
 | Lint | `npm run lint` | oxlint + ESLint, both `--fix` |
 | Frontend tests | `npm run test` | Vitest |
 | Backend tests | `cd backend && python manage.py test` | Django test runner |
@@ -39,6 +41,15 @@ $env:DB_SSLMODE = "require"
 
 Then run whatever `manage.py` command you need from `backend/`. **Close the terminal / unset these
 vars afterward** so regular local dev doesn't keep pointing at the demo database.
+
+For a full reseed, run in this order (each step depends on the one before):
+
+```
+python manage.py reset_demo_data
+python manage.py seed_data
+python manage.py seed_booking_load_limit_demo
+python manage.py seed_wallet_cases_demo
+```
 
 ## Branches and remotes
 
