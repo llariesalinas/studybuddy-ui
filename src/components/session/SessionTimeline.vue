@@ -128,11 +128,6 @@ const steps = computed(() => [
   gap: 16px;
   min-height: 76px;
   padding-bottom: 0;
-  transition: transform var(--sb-t-normal) var(--sb-spring);
-}
-
-.session-timeline-step:hover {
-  transform: translateX(3px);
 }
 
 .session-timeline-step:last-child {
@@ -219,16 +214,6 @@ const steps = computed(() => [
 @media (prefers-reduced-motion: reduce) {
   .session-timeline-step-now .session-timeline-node::after {
     animation: none;
-  }
-
-  .session-card,
-  .session-timeline-step {
-    transition: none;
-  }
-
-  .session-card:hover,
-  .session-timeline-step:hover {
-    transform: none;
   }
 }
 

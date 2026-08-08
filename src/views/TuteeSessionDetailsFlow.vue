@@ -58,71 +58,6 @@
                 />
               </div>
 
-              <section v-if="isOngoing" class="session-progress-card glass-segment">
-                <div class="session-progress-head">
-                  <div>
-                    <h4>Mid-session pulse</h4>
-                    <p>
-                      A quick check helps us understand whether you are making progress while the session is still live.
-                    </p>
-                  </div>
-                  <span class="session-progress-chip">
-                    {{ heroClock.formattedElapsed }} elapsed
-                  </span>
-                </div>
-
-                <template v-if="midpointCheckIn">
-                  <div class="session-progress-status" :class="`is-${midpointCheckIn.response || 'saved'}`">
-                    <strong>{{ midpointStatusTitle }}</strong>
-                    <span>{{ midpointStatusCopy }}</span>
-                  </div>
-                </template>
-
-                <template v-else>
-                  <button
-                    class="session-progress-button session-progress-button-good sb-btn"
-                    :disabled="isQuickSubmitting"
-                    @click="openMidpointModal"
-                  >
-                    <strong>Answer progress check</strong>
-                    <span>Opens the mid-session popup so you can confirm things are on track or ask for help.</span>
-                  </button>
-                </template>
-              </section>
-
-              <section v-if="isOngoing" class="session-action-card glass-segment">
-                <h4>Quick actions</h4>
-                <div class="session-quick-grid">
-                  <button
-                    class="session-quick-button sb-btn"
-                    :disabled="isQuickSubmitting"
-                    @click="handleVenueQuickAction"
-                  >
-                    <i class="bi bi-geo-alt"></i>
-                    I've arrived
-                  </button>
-                  <button class="session-quick-button sb-btn" @click="handleLightAction(goToChat)">
-                    <i class="bi bi-chat-dots"></i>
-                    Message
-                  </button>
-                  <button
-                    class="session-quick-button sb-btn"
-                    :disabled="isQuickSubmitting"
-                    @click="openMidpointModal"
-                  >
-                    <i class="bi bi-activity"></i>
-                    Progress check
-                  </button>
-                  <button
-                    class="session-quick-button sb-btn"
-                    @click="handleLightAction(() => openSupport('Booking', sessionDetail?.session?.id))"
-                  >
-                    <i class="bi bi-flag"></i>
-                    Report
-                  </button>
-                </div>
-              </section>
-
               <div class="session-detail-pair">
                 <SessionInfoGrid class="glass-segment" :items="sessionInfoItems" />
 
@@ -139,84 +74,29 @@
             </div>
 
             <div class="session-alive-column session-alive-rail">
-              <section class="session-action-card session-next-action glass-segment">
-                <div class="session-action-head">
-                  <h4>{{ actionTitle }}</h4>
-                  <span v-if="isOngoing" class="session-live-pill">
-                    <span></span>
-                    Live
-                  </span>
-                </div>
-
-                <template v-if="isOngoing">
-                  <p>Your session is live. Use the progress pulse and quick actions to stay in sync.</p>
-                  <button
-                    class="session-cta sb-btn btn-primary-action sb-elevated sb-elevated--brand"
-                    @click="handleLightAction(goToChat)"
-                  >
-                    <i class="bi bi-chat-dots"></i>
-                    Open chat
-                  </button>
-                </template>
-
-                <template v-else-if="canSubmitPayment">
-                  <p>
-                    Your session has ended. Submit your post-session payment details so your tutor can verify them.
-                  </p>
-                  <button
-                    class="session-cta sb-btn btn-primary-action sb-elevated sb-elevated--brand"
-                    @click="handleLightAction(goToPayment)"
-                  >
-                    Submit Payment
-                  </button>
-                </template>
-
-                <template v-else-if="isAwaitingPaymentVerification">
-                  <p>Waiting for your tutor to review the submitted payment.</p>
-                  <button class="session-cta sb-btn btn-soft" disabled>
-                    Waiting for tutor verification...
-                  </button>
-                </template>
-
-                <template v-else-if="isCompleted && !sessionDetail.rating_submitted">
-                  <p>Your session is complete. A rating is optional, but it helps improve StudyBuddy matches.</p>
-                  <button
-                    class="session-cta sb-btn btn-primary-action sb-elevated sb-elevated--brand"
-                    @click="openRatingModal"
-                  >
-                    <i class="bi bi-star"></i>
-                    Leave a Rating
-                  </button>
-                </template>
-
-                <template v-else-if="showCancelAction">
-                  <p>{{ cancelActionMessage }}</p>
-                  <button
-                    class="session-cta sb-btn btn-danger-soft"
-                    :disabled="isCancelling || !canCancelSession"
-                    @click="handleLightAction(() => { isCancelModalOpen = true })"
-                  >
-                    {{ isCancelling ? 'Cancelling...' : isPending ? 'Withdraw request' : 'Cancel Session' }}
-                  </button>
-                </template>
-
-                <template v-else>
-                  <p>No pending action for this session right now.</p>
-                </template>
-              </section>
-
-              <section class="session-action-card glass-segment">
-                <h4>Support</h4>
-                <p>Something off with this session?</p>
-                <button
-                  class="session-cta sb-btn btn-danger-soft"
-                  @click="handleLightAction(() => openSupport('Booking', sessionDetail?.session?.id))"
-                >
-                  <i class="bi bi-exclamation-circle"></i>
-                  Report issue
-                </button>
-              </section>
-
+              <SessionActionRail
+                :is-ongoing="isOngoing"
+                :can-submit-payment="canSubmitPayment"
+                :is-awaiting-payment-verification="isAwaitingPaymentVerification"
+                :is-completed="isCompleted"
+                :rating-submitted="!!sessionDetail.rating_submitted"
+                :show-cancel-action="showCancelAction"
+                :can-cancel-session="canCancelSession"
+                :is-cancelling="isCancelling"
+                :is-pending="isPending"
+                :is-quick-submitting="isQuickSubmitting"
+                :cancel-action-message="cancelActionMessage"
+                :midpoint-check-in="midpointCheckIn"
+                :midpoint-status-title="midpointStatusTitle"
+                :midpoint-status-copy="midpointStatusCopy"
+                @open-chat="handleLightAction(goToChat)"
+                @open-progress="openMidpointModal"
+                @venue-arrived="handleVenueQuickAction"
+                @submit-payment="handleLightAction(goToPayment)"
+                @open-rating="openRatingModal"
+                @open-cancel="handleLightAction(() => { isCancelModalOpen = true })"
+                @report="handleLightAction(() => openSupport('Booking', sessionDetail?.session?.id))"
+              />
             </div>
           </div>
         </div>
@@ -241,69 +121,73 @@
 
     <div
       v-if="isCancelModalOpen"
-      class="modal fade show d-block"
-      tabindex="-1"
+      class="session-cancel-shell"
       role="dialog"
       aria-modal="true"
+      aria-labelledby="session-cancel-title"
+      @click.self="closeCancelModal"
     >
-      <div class="modal-dialog modal-dialog-centered" role="document">
-        <div class="modal-content border-0 shadow">
-          <div class="modal-header">
-            <h5 class="modal-title fw-bold">Cancel Session</h5>
-            <button
-              type="button"
-              class="btn-close"
-              aria-label="Close"
-              :disabled="isCancelling"
-              @click="closeCancelModal"
-            ></button>
+      <div class="session-cancel-card">
+        <div class="session-cancel-header">
+          <div>
+            <span class="session-cancel-eyebrow">Cancel session</span>
+            <h5 id="session-cancel-title" class="session-cancel-title">Are you sure?</h5>
           </div>
+          <button
+            type="button"
+            class="session-cancel-close sb-btn"
+            aria-label="Close"
+            :disabled="isCancelling"
+            @click="closeCancelModal"
+          >
+            <i class="bi bi-x-lg"></i>
+          </button>
+        </div>
 
-          <div class="modal-body">
-            <p class="mb-2">Are you sure you want to cancel this session?</p>
-            <label class="form-label fw-semibold small">Reason (required)</label>
-            <textarea
-              v-model="cancelReason"
-              class="form-control border-sb shadow-none sb-field"
-              rows="3"
-              placeholder="Let your tutor know why you're cancelling..."
-              :disabled="isCancelling"
-            ></textarea>
-            <p class="small text-muted mt-2 mb-0">
-              Please also
-              <a href="#" @click.prevent="goToChat">message your tutor in Chat</a>
-              to coordinate.
-            </p>
-          </div>
+        <div class="session-cancel-body">
+          <p class="session-cancel-lead">{{ cancelActionMessage }}</p>
+          <label class="session-cancel-label" for="session-cancel-reason">Reason (required)</label>
+          <textarea
+            id="session-cancel-reason"
+            v-model="cancelReason"
+            class="session-cancel-field"
+            rows="3"
+            placeholder="Let your tutor know why you're cancelling..."
+            :disabled="isCancelling"
+          ></textarea>
+          <p class="session-cancel-hint">
+            Please also
+            <a href="#" @click.prevent="goToChat">message your tutor in Chat</a>
+            to coordinate.
+          </p>
+        </div>
 
-          <div class="modal-footer">
-            <button
-              type="button"
-              class="btn btn-outline-secondary sb-btn"
-              :disabled="isCancelling"
-              @click="closeCancelModal"
-            >
-              Keep Session
-            </button>
-            <button
-              type="button"
-              class="btn btn-danger sb-btn"
-              :disabled="isCancelling || !reasonValid"
-              @click="handleCancelSession"
-            >
-              <span
-                v-if="isCancelling"
-                class="spinner-border spinner-border-sm me-2"
-                role="status"
-                aria-hidden="true"
-              ></span>
-              {{ isCancelling ? 'Cancelling...' : 'Yes, Cancel Session' }}
-            </button>
-          </div>
+        <div class="session-cancel-footer">
+          <button
+            type="button"
+            class="session-cancel-btn session-cancel-btn-soft sb-btn"
+            :disabled="isCancelling"
+            @click="closeCancelModal"
+          >
+            Keep session
+          </button>
+          <button
+            type="button"
+            class="session-cancel-btn session-cancel-btn-danger sb-btn"
+            :disabled="isCancelling || !reasonValid"
+            @click="handleCancelSession"
+          >
+            <span
+              v-if="isCancelling"
+              class="spinner-border spinner-border-sm"
+              role="status"
+              aria-hidden="true"
+            ></span>
+            {{ isCancelling ? 'Cancelling...' : 'Yes, cancel session' }}
+          </button>
         </div>
       </div>
     </div>
-    <div v-if="isCancelModalOpen" class="modal-backdrop fade show"></div>
     <SupportModal
       :open="isSupportModalOpen"
       :context-type="supportContextType"
@@ -337,6 +221,7 @@ import SessionAurora from '@/components/session/SessionAurora.vue'
 import SessionHero from '@/components/session/SessionHero.vue'
 import SessionInfoGrid from '@/components/session/SessionInfoGrid.vue'
 import SessionTimeline from '@/components/session/SessionTimeline.vue'
+import SessionActionRail from '@/components/session/SessionActionRail.vue'
 import SessionCheckInModal from '@/components/SessionCheckInModal.vue'
 
 const route = useRoute()
@@ -522,14 +407,6 @@ const midpointStatusCopy = computed(() => {
   }
 
   return 'You already confirmed the session is going well.'
-})
-
-const actionTitle = computed(() => {
-  if (isOngoing.value) return 'Happening now'
-  if (canSubmitPayment.value) return 'Next action'
-  if (isAwaitingPaymentVerification.value) return 'Payment review'
-  if (isCompleted.value) return sessionDetail.value?.rating_submitted ? 'All done' : 'All done'
-  return 'Next action'
 })
 
 const prefersReducedMotion = () => (
@@ -770,213 +647,6 @@ onMounted(async () => {
   gap: 16px;
 }
 
-.session-action-card {
-  display: grid;
-  align-content: start;
-  gap: 0;
-}
-
-.session-progress-card {
-  display: grid;
-  gap: 14px;
-}
-
-.session-progress-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.session-progress-head h4 {
-  margin: 0 0 6px;
-  color: var(--sb-text-main);
-  font-size: 1rem;
-  font-weight: 850;
-}
-
-.session-progress-head p {
-  margin: 0;
-  color: var(--sb-text-muted);
-  font-size: 0.8rem;
-  line-height: 1.5;
-}
-
-.session-progress-chip {
-  display: inline-flex;
-  align-items: center;
-  min-height: 32px;
-  padding: 0 12px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--sb-card-bg) 72%, transparent);
-  border: 1px solid color-mix(in srgb, var(--sb-card-border) 84%, transparent);
-  color: var(--sb-text-main);
-  font-size: 0.74rem;
-  font-weight: 800;
-  white-space: nowrap;
-}
-
-.session-progress-button,
-.session-progress-status {
-  position: relative;
-  display: grid;
-  gap: 5px;
-  padding: 16px 18px;
-  border-radius: 20px;
-  border: 1px solid color-mix(in srgb, var(--sb-card-border) 82%, transparent);
-  background: color-mix(in srgb, var(--sb-card-bg) 82%, transparent);
-}
-
-.session-progress-button {
-  text-align: left;
-  cursor: pointer;
-}
-
-.session-progress-button:hover {
-  box-shadow: 0 16px 30px rgba(15, 23, 42, 0.08);
-}
-
-.session-progress-button::after,
-.session-progress-status::after {
-  content: '';
-  position: absolute;
-  inset: auto 0 0;
-  height: 3px;
-  border-radius: 999px;
-}
-
-.session-progress-button-good::after,
-.session-progress-status.is-good::after {
-  background: linear-gradient(90deg, var(--sb-primary), var(--sb-primary-mid));
-}
-
-.session-progress-status.is-issues::after {
-  background: linear-gradient(90deg, var(--sb-pop-yellow), var(--sb-pop-orange));
-}
-
-.session-progress-button strong,
-.session-progress-status strong {
-  color: var(--sb-text-dark);
-  font-size: 0.94rem;
-  font-weight: 850;
-}
-
-.session-progress-button span,
-.session-progress-status span {
-  color: var(--sb-text-muted);
-  font-size: 0.8rem;
-  line-height: 1.45;
-}
-
-.session-action-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 11px;
-}
-
-.session-action-card h4 {
-  margin: 0 0 11px;
-  color: var(--sb-text-main);
-  font-size: 0.96rem;
-  font-weight: 850;
-  letter-spacing: 0;
-}
-
-.session-action-head h4 {
-  margin: 0;
-}
-
-.session-action-card p {
-  margin: 0 0 11px;
-  color: var(--sb-text-muted);
-  font-size: 0.8rem;
-  line-height: 1.5;
-}
-
-.session-live-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--sb-pop-pink) 16%, var(--sb-card-bg));
-  color: var(--sb-pop-pink-deep);
-  padding: 4px 10px;
-  font-size: 0.64rem;
-  font-weight: 800;
-  text-transform: uppercase;
-}
-
-.session-live-pill span {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: currentColor;
-  animation: session-live-beat 1.1s ease-in-out infinite;
-}
-
-/* Layout-only helper: the shared sb-btn tiers own the visuals. */
-.session-cta {
-  width: 100%;
-  font-size: 0.86rem;
-}
-
-.session-cta:focus-visible {
-  outline: 0;
-  box-shadow:
-    0 0 0 4px color-mix(in srgb, var(--sb-primary) 18%, transparent),
-    0 10px 24px var(--sb-shadow-soft);
-}
-
-.session-quick-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.session-quick-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  gap: 7px;
-  width: 100%;
-  min-height: 78px;
-  border: 1px solid var(--sb-card-border);
-  border-radius: 12px;
-  padding: 11px;
-  background: color-mix(in srgb, var(--sb-card-bg) 72%, transparent);
-  color: var(--sb-text-secondary);
-  font: inherit;
-  font-size: 0.72rem;
-  font-weight: 700;
-  line-height: 1.1;
-}
-
-.session-quick-button:focus-visible {
-  outline: 0;
-  box-shadow:
-    0 0 0 4px color-mix(in srgb, var(--sb-primary) 18%, transparent),
-    0 10px 24px var(--sb-shadow-soft);
-}
-
-.session-quick-button:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--sb-primary) 34%, var(--sb-card-border));
-  background: color-mix(in srgb, var(--sb-card-bg) 96%, transparent);
-  box-shadow: 0 16px 34px color-mix(in srgb, var(--sb-shadow-soft) 78%, rgba(15, 23, 42, 0.1));
-}
-
-.session-quick-button i {
-  color: var(--sb-primary);
-  font-size: 21px;
-  transition: transform var(--sb-t-normal) var(--sb-spring);
-}
-
-.session-quick-button:hover:not(:disabled) i {
-  transform: scale(1.12);
-}
-
 .session-confetti {
   position: absolute;
   inset: 0;
@@ -997,15 +667,139 @@ onMounted(async () => {
   animation-delay: calc(var(--session-confetti-index) * 14ms);
 }
 
-.modal {
-  background: rgba(17, 24, 39, 0.35);
+.session-cancel-shell {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.45);
 }
 
-@keyframes session-live-beat {
-  50% {
-    transform: scale(1.7);
-    opacity: 0.4;
-  }
+.session-cancel-card {
+  width: min(100%, 440px);
+  padding: 26px;
+  background:
+    radial-gradient(circle at 12% 16%, color-mix(in srgb, var(--sb-primary) 12%, transparent), transparent 34%),
+    radial-gradient(circle at 88% 84%, color-mix(in srgb, var(--sb-pop-orange) 12%, transparent), transparent 28%),
+    var(--sb-card-bg);
+  border: 1px solid var(--sb-card-border);
+  border-radius: 24px;
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.16);
+}
+
+.session-cancel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--sb-card-border);
+}
+
+.session-cancel-eyebrow {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--sb-danger);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.session-cancel-title {
+  margin: 0;
+  color: var(--sb-text-main);
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.session-cancel-close {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--sb-text-main) 8%, transparent);
+  color: var(--sb-text-muted);
+}
+
+.session-cancel-body {
+  padding: 18px 0;
+}
+
+.session-cancel-lead {
+  margin: 0 0 14px;
+  color: var(--sb-text-main);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.session-cancel-label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--sb-text-muted);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.session-cancel-field {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--sb-card-border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--sb-card-bg) 96%, transparent);
+  color: var(--sb-text-main);
+  font: inherit;
+  font-size: 14px;
+  resize: vertical;
+}
+
+.session-cancel-field:focus {
+  outline: 0;
+  border-color: color-mix(in srgb, var(--sb-danger) 40%, var(--sb-card-border));
+}
+
+.session-cancel-hint {
+  margin: 10px 0 0;
+  color: var(--sb-text-muted);
+  font-size: 12.5px;
+}
+
+.session-cancel-hint a {
+  color: var(--sb-primary);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.session-cancel-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 16px;
+  border-top: 1px solid var(--sb-card-border);
+}
+
+.session-cancel-btn {
+  min-height: 42px;
+  padding: 0 18px;
+}
+
+.session-cancel-btn-soft {
+  border: 1px solid var(--sb-card-border);
+  background: color-mix(in srgb, var(--sb-card-bg) 72%, transparent);
+  color: var(--sb-text-main);
+}
+
+.session-cancel-btn-danger {
+  border: 0;
+  background: var(--sb-danger);
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(239, 68, 68, 0.25);
 }
 
 @keyframes session-confetti-burst {
@@ -1027,27 +821,14 @@ onMounted(async () => {
 }
 
 @media (max-width: 575px) {
-  .session-quick-grid {
-    grid-template-columns: 1fr;
-  }
-
   .session-alive-stage {
     padding: 12px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .session-live-pill span,
   .session-confetti i {
     animation: none;
-  }
-
-  .session-quick-button i {
-    transition: none;
-  }
-
-  .session-quick-button:hover:not(:disabled) i {
-    transform: none;
   }
 }
 </style>

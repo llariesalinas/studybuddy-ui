@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Universal rail across statuses</title>
+<style>
+  :root {
+    --sb-dark: #0A1916;
+    --sb-primary: #00895A;
+    --sb-green-anchor: var(--sb-primary);
+    --sb-primary-mid: #18A36C;
+    --sb-bg: #F8F9FA;
+    --sb-pop-yellow: #FFC94D;
+    --sb-pop-pink: #FF8FA3;
+    --sb-pop-pink-deep: #E26D86;
+    --sb-card-bg: #ffffff;
+    --sb-card-border: #EAEAEA;
+    --sb-text-main: #163127;
+    --sb-text-muted: #6B7280;
+    --sb-text-secondary: #495057;
+    --sb-text-dark: #212529;
+    --sb-danger: #ef4444;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 28px 20px 80px;
+    background: var(--sb-bg);
+    color: var(--sb-text-main);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  }
+  .page-head { max-width: 1080px; margin: 0 auto 20px; }
+  .page-head h1 { margin: 0 0 6px; font-size: 1.35rem; font-weight: 850; }
+  .page-head p { margin: 0; color: var(--sb-text-muted); font-size: 0.88rem; max-width: 760px; }
+
+  .status-nav {
+    max-width: 1080px; margin: 0 auto 18px;
+    display: flex; gap: 8px; flex-wrap: wrap;
+  }
+  .status-nav button {
+    border: 1px solid var(--sb-card-border); background: var(--sb-card-bg);
+    color: var(--sb-text-secondary); border-radius: 999px; padding: 8px 14px;
+    font-weight: 800; font-size: 0.78rem; cursor: pointer;
+  }
+  .status-nav button.active { background: var(--sb-primary); border-color: var(--sb-primary); color: #fff; }
+
+  .status-block { display: none; max-width: 1080px; margin: 0 auto; }
+  .status-block.active { display: block; }
+
+  .session-alive-frame {
+    border: 1px solid var(--sb-card-border); border-radius: 28px;
+    background: color-mix(in srgb, var(--sb-card-bg) 84%, transparent);
+    box-shadow: 0 24px 70px rgba(15, 23, 42, 0.1); padding: 20px;
+  }
+  .glass-segment {
+    background: color-mix(in srgb, var(--sb-card-bg) 84%, transparent);
+    border: 1px solid color-mix(in srgb, var(--sb-card-border) 82%, transparent);
+    border-radius: 24px; box-shadow: 0 24px 70px rgba(15, 23, 42, 0.1); padding: 1.4rem;
+  }
+
+  .session-hero {
+    padding: 20px; border-radius: 24px;
+    background: linear-gradient(135deg, color-mix(in srgb, var(--sb-dark) 96%, transparent), color-mix(in srgb, var(--sb-green-anchor) 88%, var(--sb-dark)));
+    color: #fff;
+  }
+  .session-hero-top { display: flex; gap: 14px; align-items: flex-start; }
+  .session-avatar {
+    display: grid; place-items: center; flex: none; width: 62px; height: 62px;
+    border-radius: 999px; border: 3px solid rgba(255,255,255,0.42);
+    background: rgba(255,255,255,0.16); font-size: 1.05rem; font-weight: 850;
+  }
+  .session-hero-title-row { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; }
+  .session-hero h3 { margin: 0 0 2px; font-size: 1.3rem; font-weight: 850; }
+  .session-hero p.meta { margin: 0; color: rgba(255,255,255,0.74); font-size: 0.78rem; }
+  .session-status-badge {
+    display: inline-flex; align-items: center; gap: 6px; flex: none; padding: 6px 11px;
+    border-radius: 999px; border: 1px solid rgba(255,255,255,0.24); background: rgba(255,255,255,0.14);
+    font-size: 0.68rem; font-weight: 850; white-space: nowrap;
+  }
+  .session-status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .session-status-dot.live { animation: beat 1.1s ease-in-out infinite; }
+  .session-subject-pill {
+    display: inline-flex; margin-top: 8px; padding: 4px 10px; border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.24); background: rgba(255,255,255,0.14);
+    font-size: 0.7rem; font-weight: 800;
+  }
+  .session-live-panel {
+    display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end;
+    margin-top: 16px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.16);
+  }
+  .session-live-label { margin: 0 0 2px; color: rgba(255,255,255,0.68); font-size: 0.58rem; font-weight: 850; text-transform: uppercase; }
+  .session-live-timer { font-variant-numeric: tabular-nums; font-size: 1.9rem; font-weight: 800; line-height: 1; }
+  .session-live-progress { min-width: 140px; flex: 1; }
+  .session-live-track { height: 7px; border-radius: 999px; background: rgba(255,255,255,0.16); overflow: hidden; }
+  .session-live-fill { display: block; height: 100%; width: 46%; border-radius: inherit; background: linear-gradient(90deg, #8ef0c0, #fff2a8); }
+  .session-live-progress p { margin-top: 5px; color: rgba(255,255,255,0.68); font-size: 0.62rem; }
+  @keyframes beat { 50% { transform: scale(1.7); opacity: 0.4; } }
+
+  .b-grid { display: grid; grid-template-columns: minmax(0,1fr) minmax(230px, 0.36fr); gap: 16px; align-items: start; margin-top: 16px; }
+  .b-info-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 14px; font-size: 0.8rem; }
+  .b-info-grid div span.k { display: block; color: var(--sb-text-muted); font-size: 0.62rem; font-weight: 800; text-transform: uppercase; }
+  .b-timeline-track { height: 6px; border-radius: 999px; background: color-mix(in srgb, var(--sb-primary) 14%, transparent); overflow: hidden; }
+  .b-timeline-fill { display: block; height: 100%; border-radius: inherit; background: var(--sb-primary); }
+  .muted { color: var(--sb-text-muted); font-size: 0.78rem; line-height: 1.5; margin: 0 0 10px; }
+
+  h4 { margin: 0 0 10px; font-size: 0.92rem; font-weight: 850; }
+  .rail-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  .rail-head h4 { margin: 0; }
+  .live-pill {
+    display: inline-flex; align-items: center; gap: 6px; border-radius: 999px;
+    background: color-mix(in srgb, var(--sb-pop-pink) 16%, var(--sb-card-bg));
+    color: var(--sb-pop-pink-deep); padding: 3px 9px; font-size: 0.6rem; font-weight: 800; text-transform: uppercase;
+  }
+  .live-pill span { width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: beat 1.1s ease-in-out infinite; }
+
+  .sb-btn {
+    display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+    min-height: 44px; border-radius: 14px; border: 1px solid var(--sb-card-border);
+    background: color-mix(in srgb, var(--sb-card-bg) 72%, transparent);
+    color: var(--sb-text-secondary); font-weight: 800; font-size: 0.78rem; padding: 0 14px;
+    cursor: pointer;
+  }
+  .sb-btn.primary { border: 0; background: var(--sb-primary); color: #fff; }
+  .sb-btn.danger { border-color: color-mix(in srgb, var(--sb-danger) 40%, var(--sb-card-border)); color: var(--sb-danger); }
+  .sb-btn.disabled { opacity: 0.55; cursor: default; }
+  .rail-list { display: grid; gap: 8px; }
+  .rail-list hr { border: 0; border-top: 1px solid var(--sb-card-border); margin: 6px 0 2px; }
+  .rail-caption { margin: 0 0 4px; color: var(--sb-text-muted); font-size: 0.72rem; }
+</style>
+</head>
+<body>
+
+<div class="page-head">
+  <h1>Universal rail — same shape, different contents per status</h1>
+  <p>One ranked action list in the rail for every status. Support ("Report an issue") always
+    pinned at the bottom. Left column stays read-only: hero + merged info/timeline. Click a status
+    to preview its rail contents.</p>
+</div>
+
+<div class="status-nav">
+  <button class="status-tab active" data-s="upcoming" onclick="showStatus('upcoming')">Upcoming</button>
+  <button class="status-tab" data-s="ongoing" onclick="showStatus('ongoing')">Ongoing</button>
+  <button class="status-tab" data-s="payment" onclick="showStatus('payment')">Payment required</button>
+  <button class="status-tab" data-s="awaiting" onclick="showStatus('awaiting')">Awaiting verification</button>
+  <button class="status-tab" data-s="completed" onclick="showStatus('completed')">Completed (unrated)</button>
+</div>
+
+<!-- UPCOMING -->
+<div class="status-block active" id="s-upcoming">
+  <div class="session-alive-frame">
+    <div class="session-hero">
+      <div class="session-hero-top">
+        <div class="session-avatar">MR</div>
+        <div>
+          <div class="session-hero-title-row">
+            <div><h3>Mika Reyes</h3><p class="meta">Your tutor &middot; Rating 4.9</p></div>
+            <span class="session-status-badge"><span class="session-status-dot"></span>Upcoming</span>
+          </div>
+          <span class="session-subject-pill">Calculus II</span>
+        </div>
+      </div>
+    </div>
+    <div class="b-grid">
+      <div class="glass-segment">
+        <h4>Session info</h4>
+        <div class="b-info-grid">
+          <div><span class="k">Date</span>Aug 12, 2026</div>
+          <div><span class="k">Time</span>2:00 – 3:00 PM</div>
+          <div><span class="k">Mode</span>Online</div>
+        </div>
+        <p class="muted">Starts in 3 days.</p>
+      </div>
+      <div class="glass-segment">
+        <div class="rail-head"><h4>Next action</h4></div>
+        <div class="rail-list">
+          <button class="sb-btn">💬 Message tutor</button>
+          <button class="sb-btn danger">✕ Cancel session</button>
+          <hr>
+          <button class="sb-btn">🚩 Report an issue</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ONGOING -->
+<div class="status-block" id="s-ongoing">
+  <div class="session-alive-frame">
+    <div class="session-hero">
+      <div class="session-hero-top">
+        <div class="session-avatar">MR</div>
+        <div>
+          <div class="session-hero-title-row">
+            <div><h3>Mika Reyes</h3><p class="meta">Your tutor &middot; Rating 4.9</p></div>
+            <span class="session-status-badge"><span class="session-status-dot live"></span>Ongoing</span>
+          </div>
+          <span class="session-subject-pill">Calculus II</span>
+        </div>
+      </div>
+      <div class="session-live-panel">
+        <div><p class="session-live-label">Live &middot; elapsed</p><div class="session-live-timer">00:38:12</div></div>
+        <div class="session-live-progress">
+          <div class="session-live-track"><span class="session-live-fill"></span></div>
+          <p>Started 2:00 PM &middot; ends 3:00 PM &middot; 22 min left</p>
+        </div>
+      </div>
+    </div>
+    <div class="b-grid">
+      <div class="glass-segment">
+        <h4>Session info</h4>
+        <div class="b-info-grid">
+          <div><span class="k">Date</span>Aug 9, 2026</div>
+          <div><span class="k">Time</span>2:00 – 3:00 PM</div>
+          <div><span class="k">Mode</span>Online</div>
+        </div>
+        <div class="b-timeline-track"><span class="b-timeline-fill"></span></div>
+        <p class="muted" style="margin-top:8px;">00:38:12 elapsed of 1h scheduled</p>
+      </div>
+      <div class="glass-segment">
+        <div class="rail-head"><h4>Happening now</h4><span class="live-pill"><span></span>Live</span></div>
+        <div class="rail-list">
+          <button class="sb-btn primary">💬 Open chat</button>
+          <button class="sb-btn">📈 Progress check</button>
+          <button class="sb-btn">📍 I've arrived</button>
+          <hr>
+          <button class="sb-btn">🚩 Report an issue</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PAYMENT REQUIRED -->
+<div class="status-block" id="s-payment">
+  <div class="session-alive-frame">
+    <div class="session-hero">
+      <div class="session-hero-top">
+        <div class="session-avatar">MR</div>
+        <div>
+          <div class="session-hero-title-row">
+            <div><h3>Mika Reyes</h3><p class="meta">Your tutor &middot; Rating 4.9</p></div>
+            <span class="session-status-badge"><span class="session-status-dot"></span>Payment required</span>
+          </div>
+          <span class="session-subject-pill">Calculus II</span>
+        </div>
+      </div>
+    </div>
+    <div class="b-grid">
+      <div class="glass-segment">
+        <h4>Session info</h4>
+        <div class="b-info-grid">
+          <div><span class="k">Date</span>Aug 9, 2026</div>
+          <div><span class="k">Time</span>2:00 – 3:00 PM</div>
+          <div><span class="k">Mode</span>Online</div>
+        </div>
+        <p class="muted">Session ended. Submit payment so your tutor can verify it.</p>
+      </div>
+      <div class="glass-segment">
+        <div class="rail-head"><h4>Next action</h4></div>
+        <div class="rail-list">
+          <button class="sb-btn primary">Submit payment</button>
+          <button class="sb-btn">💬 Message tutor</button>
+          <hr>
+          <button class="sb-btn">🚩 Report an issue</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- AWAITING VERIFICATION -->
+<div class="status-block" id="s-awaiting">
+  <div class="session-alive-frame">
+    <div class="session-hero">
+      <div class="session-hero-top">
+        <div class="session-avatar">MR</div>
+        <div>
+          <div class="session-hero-title-row">
+            <div><h3>Mika Reyes</h3><p class="meta">Your tutor &middot; Rating 4.9</p></div>
+            <span class="session-status-badge"><span class="session-status-dot"></span>Awaiting verification</span>
+          </div>
+          <span class="session-subject-pill">Calculus II</span>
+        </div>
+      </div>
+    </div>
+    <div class="b-grid">
+      <div class="glass-segment">
+        <h4>Session info</h4>
+        <div class="b-info-grid">
+          <div><span class="k">Date</span>Aug 9, 2026</div>
+          <div><span class="k">Time</span>2:00 – 3:00 PM</div>
+          <div><span class="k">Mode</span>Online</div>
+        </div>
+        <p class="muted">Payment submitted. Waiting for your tutor to verify it.</p>
+      </div>
+      <div class="glass-segment">
+        <div class="rail-head"><h4>Next action</h4></div>
+        <div class="rail-list">
+          <button class="sb-btn disabled" disabled>Waiting for tutor verification&hellip;</button>
+          <button class="sb-btn">💬 Message tutor</button>
+          <hr>
+          <button class="sb-btn">🚩 Report an issue</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- COMPLETED (unrated) -->
+<div class="status-block" id="s-completed">
+  <div class="session-alive-frame">
+    <div class="session-hero">
+      <div class="session-hero-top">
+        <div class="session-avatar">MR</div>
+        <div>
+          <div class="session-hero-title-row">
+            <div><h3>Mika Reyes</h3><p class="meta">Your tutor &middot; Rating 4.9</p></div>
+            <span class="session-status-badge"><span class="session-status-dot"></span>Completed</span>
+          </div>
+          <span class="session-subject-pill">Calculus II</span>
+        </div>
+      </div>
+    </div>
+    <div class="b-grid">
+      <div class="glass-segment">
+        <h4>Session info</h4>
+        <div class="b-info-grid">
+          <div><span class="k">Date</span>Aug 9, 2026</div>
+          <div><span class="k">Time</span>2:00 – 3:00 PM</div>
+          <div><span class="k">Mode</span>Online</div>
+        </div>
+        <p class="muted">Session complete. A rating is optional but helps future matches.</p>
+      </div>
+      <div class="glass-segment">
+        <div class="rail-head"><h4>All done</h4></div>
+        <div class="rail-list">
+          <button class="sb-btn primary">⭐ Leave a rating</button>
+          <hr>
+          <button class="sb-btn">🚩 Report an issue</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/helper.js"></script>
+<script>
+  function showStatus(name) {
+    document.querySelectorAll('.status-block').forEach(el => el.classList.remove('active'));
+    document.getElementById('s-' + name).classList.add('active');
+    document.querySelectorAll('.status-tab').forEach(el => el.classList.toggle('active', el.dataset.s === name));
+  }
+</script>
+</body>
+</html>

@@ -3,7 +3,18 @@
 Every finalized plan lives in this folder as its own dated file, created from [`_template.md`](_template.md).
 Status moves Draft â†’ Approved â†’ In Progress â†’ Done. When a plan is complete, its summary is linked below.
 
-**Status & Progress Summary** (2026-08-08): Consolidate demo data seeding is In Progress —
+**Status & Progress Summary** (2026-08-09): Live session details view redesign is Done —
+grilled to 7 decisions (universal action rail across all statuses, folded progress check,
+separate info/timeline cards, `SessionActionRail` extraction, deferred mobile pass) and
+implemented on `feat/superadmin-reports-csv-export`. New `SessionActionRail.vue` replaces the old
+stacked progress/quick-actions/next-action/support cards in `TuteeSessionDetailsFlow.vue`;
+cancel-session modal restyled to the glass-card language; `SessionTimeline` hover-nudge removed.
+`npm run lint` and `npm run build` both pass. Mobile stacking deliberately deferred to a future
+pass. [Plan](2026-08-09-live-session-details-redesign.md),
+[Mockup](../mockups/2026-08-09-live-session-universal-rail.html),
+[Summary](../session-summaries/2026-08-09-live-session-details-redesign-summary.md).
+
+**Previous** (2026-08-08): Consolidate demo data seeding is In Progress —
 implemented and verified end-to-end on `chore/consolidate-demo-seed`, committed and pushed,
 [PR #116](https://github.com/llariesalinas/studybuddy-ui/pull/116) open against `origin/main`.
 
