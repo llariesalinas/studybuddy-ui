@@ -285,6 +285,7 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useAdminStore } from '@/stores/admin'
 import { Offcanvas } from 'bootstrap'
 import {
@@ -296,10 +297,16 @@ import {
 } from '@/services/tutorApplicationState'
 import { TAXONOMY_CATEGORIES } from '@/constants/subjectTaxonomy'
 
+const APPLICANT_ROLES = ['tutor', 'tutee']
+const APPLICATION_STATUSES = ['pending', 'approved', 'rejected']
+
 const adminStore = useAdminStore()
+const route = useRoute()
+// Deep links (e.g. the SuperAdmin dashboard's pending-review queue) may preselect the tab and
+// status; anything unrecognised falls back to the default pending-tutor view.
 const filters = reactive({
-  role: 'tutor',
-  status: 'pending',
+  role: APPLICANT_ROLES.includes(route.query.role) ? route.query.role : 'tutor',
+  status: APPLICATION_STATUSES.includes(route.query.status) ? route.query.status : 'pending',
   reviewType: ''
 })
 

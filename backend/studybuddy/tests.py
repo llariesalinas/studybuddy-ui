@@ -137,6 +137,27 @@ class SuperAdminRedesignApiTests(APITestCase):
             },
         )
 
+    def test_pending_actions_includes_pending_verifications(self):
+        application = TuteeApplication.objects.create(
+            profile=self.target_profile,
+            application_status="pending",
+        )
+        TuteeApplication.objects.create(
+            profile=self.domain_profile,
+            application_status="approved",
+        )
+
+        response = self.client.get("/api/admin/pending-actions/")
+
+        self.assertEqual(response.status_code, 200)
+        verification_items = [
+            item for item in response.data["items"]
+            if item["type"] == "tutee_application"
+        ]
+        self.assertEqual(len(verification_items), 1)
+        self.assertEqual(verification_items[0]["id"], application.id)
+        self.assertIn(self.target_user.email, verification_items[0]["meta"])
+
     def test_institution_request_approval_creates_active_partner_institution(self):
         request_obj = InstitutionRequest.objects.create(
             institution_name="West Visayas State University",

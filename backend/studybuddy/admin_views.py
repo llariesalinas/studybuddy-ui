@@ -974,6 +974,35 @@ class AdminPendingActionsView(APIView):
                     'created_at': profile.user.date_joined,
                 })
 
+        # Verification work items. Applications and document renewals are reviewed on the same
+        # Applications screen, so they share one item type per role and are told apart by meta.
+        # They carry no inline action here: approving one requires reading the uploaded documents.
+        # Application and renewal ids are independent sequences, so each gets its own item type to
+        # keep the client's (type, id) pairs unique.
+        verification_sources = (
+            ('tutor_application', 'Tutor verification review', TutorApplication, 'application_status'),
+            ('tutor_renewal', 'Tutor document renewal', TutorDocumentRenewalReview, 'status'),
+            ('tutee_application', 'Tutee verification review', TuteeApplication, 'application_status'),
+            ('tutee_renewal', 'Tutee document renewal', TuteeDocumentRenewalReview, 'status'),
+        )
+        for item_type, title, model, status_field in verification_sources:
+            pending_reviews = (
+                model.objects
+                .filter(**{status_field: 'pending'})
+                .select_related('profile__user')
+            )
+            for review in pending_reviews:
+                items.append({
+                    'type': item_type,
+                    'id': review.id,
+                    'title': title,
+                    'meta': (
+                        f"{review.profile.user.email} · "
+                        f"submitted {timesince(review.submitted_at)} ago"
+                    ),
+                    'created_at': review.submitted_at,
+                })
+
         items.sort(key=lambda item: item['created_at'])
         return Response({'count': len(items), 'items': items})
 

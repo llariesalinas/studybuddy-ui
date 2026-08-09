@@ -163,10 +163,22 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { useHaptics } from '@/composables/useHaptics'
 import { useSuperAdminStore } from '@/stores/superadmin'
 import { useToastStore } from '@/stores/toast'
 
+const APPLICATIONS_ROUTE = '/admin/tutor-applications'
+// Verification items open the Applications screen instead of resolving inline: approving one
+// requires reading the applicant's uploaded documents.
+const VERIFICATION_ITEM_ROLES = {
+  tutor_application: 'tutor',
+  tutor_renewal: 'tutor',
+  tutee_application: 'tutee',
+  tutee_renewal: 'tutee',
+}
+
+const router = useRouter()
 const store = useSuperAdminStore()
 const toastStore = useToastStore()
 const { vibrate, patterns } = useHaptics()
@@ -250,6 +262,13 @@ function refreshDashboard() {
 }
 
 async function handlePendingAction(item) {
+  const verificationRole = VERIFICATION_ITEM_ROLES[item.type]
+  if (verificationRole) {
+    vibrate(patterns.light)
+    router.push({ path: APPLICATIONS_ROUTE, query: { role: verificationRole, status: 'pending' } })
+    return
+  }
+
   actingKey.value = `${item.type}-${item.id}`
   vibrate(patterns.light)
 
@@ -282,6 +301,12 @@ function getPendingMeta(type) {
       return { icon: 'bi-toggle-on', tone: 'pending-blue', action: 'Activate' }
     case 'domain_exemption':
       return { icon: 'bi-shield-check', tone: 'pending-amber', action: 'Grant' }
+    case 'tutor_application':
+    case 'tutee_application':
+      return { icon: 'bi-person-check', tone: 'pending-blue', action: 'Review' }
+    case 'tutor_renewal':
+    case 'tutee_renewal':
+      return { icon: 'bi-arrow-repeat', tone: 'pending-amber', action: 'Review' }
     default:
       return { icon: 'bi-dot', tone: 'pending-green', action: 'Review' }
   }
