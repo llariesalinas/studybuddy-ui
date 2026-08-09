@@ -34,12 +34,12 @@
             v-model="locationDraft"
               class="chat-banner__location-input sb-field"
             placeholder="Enter location"
-            :disabled="saving || accepting || rejecting"
+            :disabled="saving"
           />
           <button
             type="button"
             class="chat-banner__btn chat-banner__btn--primary sb-btn"
-            :disabled="saving || accepting || rejecting"
+            :disabled="saving"
             @click="saveLocation"
           >
             {{ saving ? 'Saving...' : 'Save' }}
@@ -47,7 +47,7 @@
           <button
             type="button"
             class="chat-banner__btn sb-btn"
-            :disabled="saving || accepting || rejecting"
+            :disabled="saving"
             @click="editing = false"
           >
             Cancel
@@ -66,31 +66,11 @@
             <button
               type="button"
               class="chat-banner__btn chat-banner__btn--ghost sb-btn"
-              :disabled="accepting || rejecting"
               @click="startEditing"
             >
               {{ isTutor ? 'Edit' : 'Suggest change' }}
             </button>
           </div>
-        </div>
-
-        <div v-if="isTutor" class="chat-banner__action-row">
-          <button
-            type="button"
-            class="chat-banner__btn chat-banner__btn--primary sb-btn"
-            :disabled="saving || accepting || rejecting"
-            @click="confirmAndAccept"
-          >
-            {{ accepting ? 'Accepting...' : 'Confirm & Accept' }}
-          </button>
-          <button
-            type="button"
-            class="chat-banner__btn chat-banner__btn--danger-text sb-btn"
-            :disabled="saving || accepting || rejecting"
-            @click="reject"
-          >
-            {{ rejecting ? 'Rejecting...' : 'Reject' }}
-          </button>
         </div>
 
         <p v-if="locationError" class="chat-banner__error">{{ locationError }}</p>
@@ -115,27 +95,8 @@
         >
       </div>
 
-      <div v-if="isTutor" class="chat-banner__quick-actions">
-        <div class="chat-banner__action-row chat-banner__action-row--inline">
-          <button
-            type="button"
-            class="chat-banner__btn chat-banner__btn--primary sb-btn"
-            :disabled="accepting || rejecting"
-            @click="accept"
-          >
-            {{ accepting ? 'Accepting...' : 'Accept' }}
-          </button>
-          <button
-            type="button"
-            class="chat-banner__btn chat-banner__btn--danger-text sb-btn"
-            :disabled="accepting || rejecting"
-            @click="reject"
-          >
-            {{ rejecting ? 'Rejecting...' : 'Reject' }}
-          </button>
-        </div>
-        <p v-if="locationError" class="chat-banner__error">{{ locationError }}</p>
-      </div>
+      <!-- Accept/Reject removed: Instant Booking (ADR-0008) deleted those endpoints, so the
+           buttons could only ever 404. Only legacy Pending rows reach this branch. -->
     </template>
 
     <template
@@ -174,6 +135,57 @@
           :class="`chat-banner__badge--${statusBadge.variant}`"
           >{{ statusBadge.label }}</span
         >
+      </div>
+
+      <!-- Location stays correctable until the Grace Cutoff. Deliberately not folded into the
+           pending_location branch above, which also renders Accept/Reject buttons that call routes
+           deleted with the old request-to-book flow. -->
+      <div v-if="canEditLocation" class="chat-banner__action">
+        <div v-if="editing" class="chat-banner__decision-card">
+          <span class="chat-banner__field-label">Meeting place</span>
+          <div class="chat-banner__location-row">
+            <input
+              v-model="locationDraft"
+              class="chat-banner__location-input sb-field"
+              placeholder="Enter location"
+              :disabled="saving"
+            />
+            <button
+              type="button"
+              class="chat-banner__btn chat-banner__btn--primary sb-btn"
+              :disabled="saving"
+              @click="saveLocation"
+            >
+              {{ saving ? 'Saving...' : 'Save' }}
+            </button>
+            <button
+              type="button"
+              class="chat-banner__btn sb-btn"
+              :disabled="saving"
+              @click="editing = false"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+
+        <div v-else class="chat-banner__decision-card">
+          <span class="chat-banner__field-label">Meeting place</span>
+          <div class="chat-banner__location-display">
+            <span class="chat-banner__loc-chip">
+              {{ bannerContext.preferred_location || 'No location set' }}
+            </span>
+            <button
+              type="button"
+              class="chat-banner__btn chat-banner__btn--ghost sb-btn"
+              @click="startEditing"
+            >
+              Edit
+            </button>
+          </div>
+        </div>
+
+        <p v-if="locationError" class="chat-banner__error">{{ locationError }}</p>
       </div>
 
       <div class="chat-banner__action-row chat-banner__action-row--inline">
@@ -329,8 +341,6 @@ const statusBadge = computed(() => {
 const editing = ref(false)
 const locationDraft = ref(props.bannerContext?.preferred_location || '')
 const saving = ref(false)
-const accepting = ref(false)
-const rejecting = ref(false)
 const locationError = ref('')
 const dismissed = ref(false)
 
@@ -340,8 +350,6 @@ watch(
     dismissed.value = false
     editing.value = false
     locationError.value = ''
-    accepting.value = false
-    rejecting.value = false
     locationDraft.value = props.bannerContext?.preferred_location || ''
   },
 )
@@ -358,6 +366,16 @@ watch(
 const detailsTarget = computed(() => {
   if (!props.bannerContext) return ''
   return props.isTutor ? props.bannerContext.detail_url : props.bannerContext.tutee_detail_url
+})
+
+// Server decides the window (live status + before the Grace Cutoff); this only adds "and you are
+// the tutor", since the endpoint is tutor-only.
+const canEditLocation = computed(() => {
+  return Boolean(
+    props.isTutor &&
+      props.bannerContext?.session_mode === 'F2F' &&
+      props.bannerContext?.can_edit_location,
+  )
 })
 
 function startEditing() {
@@ -388,62 +406,6 @@ async function saveLocation() {
   }
 }
 
-function getActionError(error, fallback) {
-  return error?.response?.data?.error || fallback
-}
-
-async function confirmAndAccept() {
-  const trimmed = locationDraft.value.trim()
-
-  if (!trimmed) {
-    locationError.value = 'Location is required.'
-    return
-  }
-
-  accepting.value = true
-  locationError.value = ''
-
-  try {
-    if (trimmed !== (props.bannerContext?.preferred_location || '')) {
-      await chatStore.updatePendingLocation(props.bannerContext.booking_request_id, trimmed)
-    }
-
-    await chatStore.acceptBooking(props.bannerContext.id)
-    editing.value = false
-    emit('location-saved')
-  } catch (error) {
-    locationError.value = getActionError(error, 'Could not accept.')
-  } finally {
-    accepting.value = false
-  }
-}
-
-async function accept() {
-  accepting.value = true
-  locationError.value = ''
-
-  try {
-    await chatStore.acceptBooking(props.bannerContext.id)
-  } catch (error) {
-    locationError.value = getActionError(error, 'Could not accept.')
-  } finally {
-    accepting.value = false
-  }
-}
-
-async function reject() {
-  rejecting.value = true
-  locationError.value = ''
-
-  try {
-    await chatStore.rejectBooking(props.bannerContext.id)
-    editing.value = false
-  } catch (error) {
-    locationError.value = getActionError(error, 'Could not reject.')
-  } finally {
-    rejecting.value = false
-  }
-}
 </script>
 
 <style scoped>

@@ -85,12 +85,15 @@ watch(
   },
 )
 
+// The window itself is decided server-side (live status + before the Grace Cutoff) so this card and
+// the chat banner cannot drift apart. This used to require status === 'Pending', which Instant
+// Booking stopped producing -- the edit had silently become unreachable.
 const canEditLocation = computed(() => {
-  return (
+  return Boolean(
     props.isTutor &&
-    props.booking.session_mode === 'F2F' &&
-    props.booking.status === 'Pending' &&
-    props.booking.booking_request_id
+      props.booking.session_mode === 'F2F' &&
+      props.booking.can_edit_location &&
+      props.booking.booking_request_id,
   )
 })
 
