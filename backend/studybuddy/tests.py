@@ -274,8 +274,11 @@ class SuperAdminRedesignApiTests(APITestCase):
             session_date=date.today(),
             session_mode="Online",
             status="Completed",
+            subject=subject,
         )
-        payment_method = PaymentMethod.objects.create(code="online", method_name="Online Payment")
+        payment_method, _ = PaymentMethod.objects.get_or_create(
+            code="online", defaults={"method_name": "Online Payment"}
+        )
         Payment.objects.create(
             booking=booking,
             method=payment_method,
@@ -2802,6 +2805,7 @@ class TutorCashOutTests(APITestCase):
             ).exists()
         )
 
+    @override_settings(PAYMONGO_CASHOUT_MOCK=False)
     @patch("studybuddy.paymongo_money_movement.requests.post")
     def test_cashout_sends_centavos_and_normalizes_provider_amounts(self, mock_post):
         destination = self.destination_fields()
@@ -2839,6 +2843,7 @@ class TutorCashOutTests(APITestCase):
             mock_post.call_args.kwargs["json"]["data"]["attributes"]["callback_url"],
         )
 
+    @override_settings(PAYMONGO_CASHOUT_CALLBACK_SECRET="")
     @patch("studybuddy.views.create_wallet_transaction")
     def test_failed_callback_refunds_amount_and_fee_once(self, mock_create):
         destination = self.destination_fields()
@@ -3723,8 +3728,10 @@ class DevWalletFundsTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(self.wallet.balance, Decimal("200.00"))
 
-    @override_settings(DEBUG=False)
-    def test_dev_wallet_funds_404s_when_debug_disabled(self):
+    @override_settings(BOOKING_DEV_TOOLS_ENABLED=False)
+    def test_dev_wallet_funds_404s_when_dev_tools_disabled(self):
+        """Gated by BOOKING_DEV_TOOLS_ENABLED, not DEBUG -- see
+        test_force_live_returns_404_when_booking_dev_tools_disabled for the same pattern."""
         add_response = self.call_view(dev_add_wallet_funds, "300")
         remove_response = self.call_view(dev_remove_wallet_funds, "100")
 
@@ -3755,9 +3762,14 @@ class TuteeProfileTests(APITestCase):
         self.assertIn('profile_picture_url', response.data)
 
     def test_upload_avatar_success(self):
+        from io import BytesIO
+        from PIL import Image
         from django.core.files.uploadedfile import SimpleUploadedFile
         self.client.force_authenticate(user=self.tutee_user)
-        image = SimpleUploadedFile("avatar.jpg", b"file_content", content_type="image/jpeg")
+        buffer = BytesIO()
+        Image.new("RGB", (64, 64), (120, 80, 200)).save(buffer, format="JPEG")
+        buffer.seek(0)
+        image = SimpleUploadedFile("avatar.jpg", buffer.read(), content_type="image/jpeg")
         response = self.client.post('/api/tutee/profile/avatar/', {'avatar': image}, format='multipart')
         self.assertEqual(response.status_code, 200)
         self.assertIn('profile_picture_url', response.data)
@@ -3822,9 +3834,14 @@ class TutorProfileTests(APITestCase):
         self.assertIn('profile_picture_url', response.data)
 
     def test_upload_avatar_success(self):
+        from io import BytesIO
+        from PIL import Image
         from django.core.files.uploadedfile import SimpleUploadedFile
         self.client.force_authenticate(user=self.tutor_user)
-        image = SimpleUploadedFile("avatar.jpg", b"fake_image_content", content_type="image/jpeg")
+        buffer = BytesIO()
+        Image.new("RGB", (64, 64), (120, 80, 200)).save(buffer, format="JPEG")
+        buffer.seek(0)
+        image = SimpleUploadedFile("avatar.jpg", buffer.read(), content_type="image/jpeg")
         response = self.client.post('/api/tutor/profile/avatar/', {'avatar': image}, format='multipart')
         self.assertEqual(response.status_code, 200)
         self.assertIn('profile_picture_url', response.data)
@@ -7522,6 +7539,7 @@ class VerificationDevToolsTests(APITestCase):
 
     # --- Enforcement override -----------------------------------------------------------------
 
+    @override_settings(TUTEE_VERIFICATION_ENFORCEMENT_START_DATE=None)
     def test_enforcement_override_flips_gate(self):
         from .views import tutee_verification_enforced
         from . import _verification_dev
@@ -7981,6 +7999,7 @@ class VerificationDevToolsAdminEndpointTests(APITestCase):
         )
         self.assertEqual(response.status_code, 403)
 
+    @override_settings(VERIFICATION_DEV_TOOLS_ENABLED=False)
     def test_403_for_superadmin_when_flag_off(self):
         self.client.force_authenticate(user=self.super_user)
         response = self.client.post(
