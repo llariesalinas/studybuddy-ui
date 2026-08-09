@@ -18,7 +18,12 @@ from rest_framework.test import APITestCase, APIRequestFactory, force_authentica
 from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .chat.services import get_current_booking_context, get_current_booking_contexts, get_partner_context
+from .chat.services import (
+    get_current_booking_context,
+    get_current_booking_contexts,
+    get_partner_context,
+    serialize_booking_context,
+)
 from .paymongo_money_movement import PayMongoCashOutError
 from .views import credit_tutor_wallet, dev_add_wallet_funds, dev_remove_wallet_funds
 from .models import (
@@ -718,7 +723,10 @@ class RecommendTutorsViewTests(APITestCase):
             year_level=11,
         )
         self.client.force_authenticate(user=self.student_user)
-        self.search_date = date(2026, 5, 11)
+        # The next Monday (add_slots seeds "Mon"), always inside the booking window and never today,
+        # so past-time filtering cannot make these assertions flaky.
+        today = timezone.localdate()
+        self.search_date = today + timedelta(days=((0 - today.weekday()) % 7) or 7)
 
     def create_tutor(
         self,
@@ -792,7 +800,7 @@ class RecommendTutorsViewTests(APITestCase):
         return self.client.post("/api/recommend-tutors/", payload, format="json")
 
     def response_ids(self, response):
-        return {item["id"] for item in response.data}
+        return {item["id"] for item in response.data["tutors"]}
 
     def test_filters_by_subject_mode_and_budget(self):
         matching = self.create_tutor("matching")
@@ -830,13 +838,15 @@ class RecommendTutorsViewTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(self.response_ids(response), {matching.profile_id})
 
-    def test_fallback_excludes_known_booking_conflicts(self):
-        fallback = self.create_tutor("fallbacksafe")
-        booked = self.create_tutor("fallbackbooked")
-        booked_slots = self.add_slots(booked, [time(14, 0), time(14, 30)])
+    def test_partially_booked_tutor_is_offered_for_other_times_that_day(self):
+        # The requested window is taken but the tutor still has 14:30 free, so they belong in the
+        # date-only fallback. A tutor with no slots that weekday at all does not.
+        no_slots_that_day = self.create_tutor("fallbacksafe")
+        partially_booked = self.create_tutor("fallbackbooked")
+        booked_slots = self.add_slots(partially_booked, [time(14, 0), time(14, 30)])
         Booking.objects.create(
             student=self.student_profile,
-            tutor=booked,
+            tutor=partially_booked,
             availability=booked_slots[0],
             session_date=self.search_date,
             session_mode="Online",
@@ -846,7 +856,49 @@ class RecommendTutorsViewTests(APITestCase):
         response = self.recommend()
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(self.response_ids(response), {fallback.profile_id})
+        self.assertEqual(response.data["match_stage"], "date_only")
+        self.assertEqual(self.response_ids(response), {partially_booked.profile_id})
+        self.assertNotIn(no_slots_that_day.profile_id, self.response_ids(response))
+
+    def test_fully_booked_tutor_is_excluded_from_any_time_search(self):
+        free = self.create_tutor("stillfree")
+        fully_booked = self.create_tutor("solidlybooked")
+        self.add_slots(free, [time(14, 0)])
+        booked_slots = self.add_slots(fully_booked, [time(14, 0)])
+        Booking.objects.create(
+            student=self.student_profile,
+            tutor=fully_booked,
+            availability=booked_slots[0],
+            session_date=self.search_date,
+            session_mode="Online",
+            status="Confirmed",
+        )
+
+        # No time range at all -- the old code applied booking exclusions only when a range was
+        # given, so a tutor with nothing left still surfaced.
+        response = self.recommend(start_time=None, end_time=None)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.response_ids(response), {free.profile_id})
+
+    def test_mid_payment_booking_blocks_the_slot(self):
+        free = self.create_tutor("paymentfree")
+        mid_payment = self.create_tutor("paymentpending")
+        self.add_slots(free, [time(14, 0)])
+        booked_slots = self.add_slots(mid_payment, [time(14, 0)])
+        Booking.objects.create(
+            student=self.student_profile,
+            tutor=mid_payment,
+            availability=booked_slots[0],
+            session_date=self.search_date,
+            session_mode="Online",
+            status="Awaiting Payment Verification",
+        )
+
+        response = self.recommend(start_time=None, end_time=None)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.response_ids(response), {free.profile_id})
 
     def test_booked_slot_excludes_tutor(self):
         available = self.create_tutor("available")
@@ -891,13 +943,72 @@ class RecommendTutorsViewTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(self.response_ids(response), {available.profile_id})
 
-    def test_missing_date_time_fields_remain_supported(self):
-        tutor = self.create_tutor("legacy")
+    # A date is required. It used to be optional, and an unreadable one parsed to None and was
+    # treated as "no date given" -- silently dropping every date filter and exclusion and returning
+    # the widest possible result set with no signal to the caller.
+
+    def test_missing_date_is_rejected(self):
+        self.create_tutor("nodate")
 
         response = self.recommend(date=None, start_time=None, end_time=None)
 
+        self.assertEqual(response.status_code, 400)
+
+    def test_unparseable_date_is_rejected(self):
+        self.create_tutor("baddate")
+
+        response = self.recommend(date="tomorrow", start_time=None, end_time=None)
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_past_date_is_rejected(self):
+        self.create_tutor("pastdate")
+        yesterday = (timezone.localdate() - timedelta(days=1)).isoformat()
+
+        response = self.recommend(date=yesterday, start_time=None, end_time=None)
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_date_beyond_booking_horizon_is_rejected(self):
+        self.create_tutor("farfuture")
+        too_far = (timezone.localdate() + timedelta(days=30)).isoformat()
+
+        response = self.recommend(date=too_far, start_time=None, end_time=None)
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_response_reports_match_stage_and_card_fields(self):
+        tutor = self.create_tutor("carddata")
+        self.add_slots(tutor, [time(14, 0)])
+
+        response = self.recommend()
+
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(self.response_ids(response), {tutor.profile_id})
+        self.assertEqual(response.data["match_stage"], "exact")
+        row = response.data["tutors"][0]
+        self.assertEqual(row["available_days"], ["Mon"])
+        self.assertEqual(row["total_sessions"], 0)
+
+    def test_subject_only_stage_keeps_tutors_booked_on_that_date(self):
+        # The date has been dropped entirely, so filtering by it would be incoherent -- a tutor
+        # booked solid on the searched date may be the right choice for another one.
+        booked = self.create_tutor("solidbooked")
+        booked_slots = self.add_slots(booked, [time(14, 0)])
+        Booking.objects.create(
+            student=self.student_profile,
+            tutor=booked,
+            availability=booked_slots[0],
+            session_date=self.search_date,
+            session_mode="Online",
+            status="Confirmed",
+        )
+
+        response = self.recommend(start_time=None, end_time=None)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["match_stage"], "subject_only")
+        self.assertEqual(self.response_ids(response), {booked.profile_id})
+        self.assertEqual(response.data["tutors"][0]["available_days"], ["Mon"])
 
     # The time range is optional on the booking search UI -- a date with no times means "any time
     # that day" and must land on the date-only candidate stage, not the broad subject-only
@@ -1543,24 +1654,78 @@ class ChatFeatureTests(APITestCase):
         self.assertEqual(response.data[0]["sender_name"], "System")
         self.assertIsNone(response.data[0]["sender_profile_id"])
 
-    def test_pending_location_update_posts_booking_event_to_canonical_room(self):
+    def make_editable_f2f_booking(self, days_ahead=3, status="Confirmed"):
+        """A live face-to-face booking comfortably outside the Grace Cutoff."""
+        self.booking.status = "Cancelled"
+        self.booking.save(update_fields=["status"])
+
+        return Booking.objects.create(
+            student=self.tutee_profile,
+            tutor=self.tutor,
+            availability=self.availability,
+            session_date=timezone.localdate() + timedelta(days=days_ahead),
+            session_mode="F2F",
+            preferred_location="Library",
+            booking_request_id=uuid4(),
+            status=status,
+        )
+
+    def test_location_update_posts_booking_event_to_canonical_room(self):
+        booking = self.make_editable_f2f_booking()
         self.client.force_authenticate(user=self.tutor_user)
 
         response = self.client.patch(
-            f"/api/bookings/{self.booking_request_id}/location/",
+            f"/api/bookings/{booking.booking_request_id}/location/",
             {"preferred_location": "Study Hall 2"},
             format="json",
         )
 
-        self.booking.refresh_from_db()
+        booking.refresh_from_db()
         room = ChatRoom.objects.get(tutee=self.tutee_profile, tutor=self.tutor_profile)
         message = room.messages.latest("created_at")
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(self.booking.preferred_location, "Study Hall 2")
+        self.assertEqual(booking.preferred_location, "Study Hall 2")
         self.assertEqual(message.message_type, "booking_event")
         self.assertEqual(message.metadata["event_type"], "location_updated")
         self.assertEqual(message.metadata["booking"]["preferred_location"], "Study Hall 2")
+
+    def test_location_update_allowed_while_awaiting_payment_verification(self):
+        booking = self.make_editable_f2f_booking(status="Awaiting Payment Verification")
+        self.client.force_authenticate(user=self.tutor_user)
+
+        response = self.client.patch(
+            f"/api/bookings/{booking.booking_request_id}/location/",
+            {"preferred_location": "Room 204"},
+            format="json",
+        )
+
+        booking.refresh_from_db()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(booking.preferred_location, "Room 204")
+
+    def test_location_update_rejected_inside_grace_cutoff(self):
+        # The session is today at 14:00 and the cutoff is 12 hours out, so it has already passed.
+        # This is also the is_born_late case: such bookings are frozen from creation.
+        booking = self.make_editable_f2f_booking(days_ahead=0)
+        self.client.force_authenticate(user=self.tutor_user)
+
+        response = self.client.patch(
+            f"/api/bookings/{booking.booking_request_id}/location/",
+            {"preferred_location": "Too Late Hall"},
+            format="json",
+        )
+
+        booking.refresh_from_db()
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(booking.preferred_location, "Library")
+
+    def test_booking_context_exposes_can_edit_location(self):
+        booking = self.make_editable_f2f_booking()
+
+        context = serialize_booking_context(booking)
+
+        self.assertTrue(context["can_edit_location"])
 
     def test_tutee_can_send_message_via_rest(self):
         room = ChatRoom.objects.create(tutee=self.tutee_profile, tutor=self.tutor_profile)
@@ -7188,22 +7353,22 @@ class CrossInstitutionMatchingTests(APITestCase):
         self.client.force_authenticate(user=self.tutee.user)
         resp = self.client.post(
             "/api/recommend-tutors/",
-            {"subject": "SCOPE101"},
+            {"subject": "SCOPE101", "date": timezone.localdate().isoformat()},
             format="json",
         )
         self.assertEqual(resp.status_code, 200)
-        ids = {r["id"] for r in resp.data}
+        ids = {r["id"] for r in resp.data["tutors"]}
         self.assertIn(self.tutor_a.profile.id, ids)
 
     def test_recommend_includes_other_institution_tutor(self):
         self.client.force_authenticate(user=self.tutee.user)
         resp = self.client.post(
             "/api/recommend-tutors/",
-            {"subject": "SCOPE101"},
+            {"subject": "SCOPE101", "date": timezone.localdate().isoformat()},
             format="json",
         )
         self.assertEqual(resp.status_code, 200)
-        ids = {r["id"] for r in resp.data}
+        ids = {r["id"] for r in resp.data["tutors"]}
         self.assertIn(self.tutor_b.profile.id, ids)
 
     def test_recommend_tutee_no_institution_still_matches(self):
@@ -7217,22 +7382,22 @@ class CrossInstitutionMatchingTests(APITestCase):
         self.client.force_authenticate(user=no_inst_user)
         resp = self.client.post(
             "/api/recommend-tutors/",
-            {"subject": "SCOPE101"},
+            {"subject": "SCOPE101", "date": timezone.localdate().isoformat()},
             format="json",
         )
         self.assertEqual(resp.status_code, 200)
-        ids = {r["id"] for r in resp.data}
+        ids = {r["id"] for r in resp.data["tutors"]}
         self.assertIn(self.tutor_a.profile.id, ids)
 
     def test_recommend_includes_null_institution_tutor(self):
         self.client.force_authenticate(user=self.tutee.user)
         resp = self.client.post(
             "/api/recommend-tutors/",
-            {"subject": "SCOPE101"},
+            {"subject": "SCOPE101", "date": timezone.localdate().isoformat()},
             format="json",
         )
         self.assertEqual(resp.status_code, 200)
-        ids = {r["id"] for r in resp.data}
+        ids = {r["id"] for r in resp.data["tutors"]}
         self.assertIn(self.tutor_null.profile.id, ids)
 
     def test_dashboard_widget_includes_cross_institution_tutors(self):
@@ -8011,11 +8176,13 @@ class TutorOnboardingSearchVisibilityTests(APITestCase):
         self.client.force_authenticate(user=self.tutee.user)
 
         response = self.client.post(
-            "/api/recommend-tutors/", {"subject": self.subject.subject_code}, format="json",
+            "/api/recommend-tutors/",
+            {"subject": self.subject.subject_code, "date": timezone.localdate().isoformat()},
+            format="json",
         )
 
         self.assertEqual(response.status_code, 200)
-        tutor_ids = {row["id"] for row in response.data}
+        tutor_ids = {row["id"] for row in response.data["tutors"]}
         self.assertNotIn(no_application.profile_id, tutor_ids)
         self.assertNotIn(pending.profile_id, tutor_ids)
         self.assertNotIn(rejected.profile_id, tutor_ids)

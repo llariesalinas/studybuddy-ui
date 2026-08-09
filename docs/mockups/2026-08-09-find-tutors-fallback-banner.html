@@ -1,0 +1,215 @@
+<h2>Final: stage-specific banner + availability on card</h2>
+<p class="subtitle">
+  Generic copy &mdash; no reason given for why the date came up empty. Same wording works whether it was a
+  Sunday, a day everyone blocked off, or a fully-booked Wednesday.
+</p>
+
+<style>
+  .sb { --g: #2f7d4f; --g-dark: #276749; --ink: #1f2933; --muted: #6b7280; --line: #e5e7eb; }
+  .sb-strip { background: #fafafa; border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+  .sb-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .sb-card {
+    background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 14px;
+    box-shadow: 0 1px 2px rgba(0,0,0,.04);
+  }
+  .sb-top { display: flex; align-items: center; gap: 10px; }
+  .sb-avatar {
+    width: 34px; height: 34px; border-radius: 50%; background: #e8f0ea; color: var(--g-dark);
+    font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center;
+  }
+  .sb-name { font-size: 14px; font-weight: 700; color: var(--ink); line-height: 1.2; }
+  .sb-role { font-size: 11px; color: var(--muted); }
+  .sb-rate { margin-left: auto; font-size: 12px; font-weight: 700; color: #d69e2e; }
+  .sb-tags { display: flex; flex-wrap: wrap; gap: 5px; margin: 10px 0 0; }
+  .sb-badge {
+    font-size: 10px; font-weight: 600; color: #374151; background: #f3f4f6;
+    border: 1px solid var(--line); border-radius: 999px; padding: 3px 8px;
+  }
+  .sb-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; }
+  .sb-price { font-size: 13px; font-weight: 700; color: var(--ink); }
+  .sb-price span { font-weight: 400; color: var(--muted); font-size: 11px; }
+  .sb-btn-pill {
+    background: var(--g); color: #fff; border: 0; border-radius: 7px;
+    font-size: 12px; font-weight: 600; padding: 7px 16px;
+  }
+  .ban { border-radius: 9px; padding: 12px 14px; margin-bottom: 14px; display: flex; gap: 11px; }
+  .ban-warn { background: #fffaf0; border: 1px solid #f0d9a8; }
+  .ban-info { background: #eef5ff; border: 1px solid #c3d9f5; }
+  .ban-ok { background: #f0f8f3; border: 1px solid #bfe0cc; }
+  .ban-ico { font-size: 15px; line-height: 1.3; }
+  .ban-title { font-size: 13px; font-weight: 700; color: var(--ink); margin: 0 0 3px; }
+  .ban-body { font-size: 12px; color: #4b5563; margin: 0; line-height: 1.5; }
+  .ban-act {
+    background: none; border: 0; padding: 0; margin-top: 6px; font-size: 12px;
+    font-weight: 600; color: var(--g-dark); text-decoration: underline; cursor: pointer;
+  }
+  .avail-line {
+    margin-top: 9px; padding-top: 9px; border-top: 1px dashed var(--line);
+    font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 5px; flex-wrap: wrap;
+  }
+  .avail-chip {
+    background: #e8f0ea; color: var(--g-dark); border-radius: 4px;
+    padding: 2px 6px; font-size: 10px; font-weight: 700;
+  }
+  .stage-tag {
+    display: inline-block; font-family: ui-monospace, monospace; font-size: 10px;
+    background: #eef2f7; color: #475569; border-radius: 4px; padding: 2px 7px; margin-bottom: 8px;
+  }
+  .note { font-size: 12px; color: var(--muted); margin: 10px 0 22px; line-height: 1.55; }
+</style>
+
+<div class="section sb">
+
+  <div class="stage-tag">match_stage: "exact" &mdash; no banner, header unchanged</div>
+  <div class="sb-strip">
+    <div class="ban ban-ok">
+      <div class="ban-ico">&#10003;</div>
+      <div>
+        <p class="ban-title">Tutors available August 9, 2:00-4:00 PM</p>
+        <p class="ban-body">Every tutor below is free for your full time range.</p>
+      </div>
+    </div>
+  </div>
+  <p class="note">The one case that can keep a confident claim, because the query actually verified it.</p>
+
+  <div class="stage-tag">match_stage: "date_only" &mdash; date matched, time range missed</div>
+  <div class="sb-strip">
+    <div class="ban ban-info">
+      <div class="ban-ico">&#128337;</div>
+      <div>
+        <p class="ban-title">No tutors free 2:00-4:00 PM on August 9</p>
+        <p class="ban-body">Showing tutors available at other times that day.</p>
+        <button class="ban-act">Clear the time filter</button>
+      </div>
+    </div>
+    <div class="sb-grid">
+      <div class="sb-card">
+        <div class="sb-top">
+          <div class="sb-avatar">MA</div>
+          <div><div class="sb-name">Marisol Aquino</div><div class="sb-role">Tutor</div></div>
+          <div class="sb-rate">&#9733; 3.88</div>
+        </div>
+        <div class="sb-tags"><span class="sb-badge">Python</span><span class="sb-badge">Algorithms</span></div>
+        <div class="sb-foot">
+          <div class="sb-price">P350<span>/hr &middot; 12 sessions</span></div>
+          <button class="sb-btn-pill">Book Session</button>
+        </div>
+      </div>
+      <div class="sb-card">
+        <div class="sb-top">
+          <div class="sb-avatar">RH</div>
+          <div><div class="sb-name">Rose Hansen</div><div class="sb-role">Tutor</div></div>
+          <div class="sb-rate">&#9733; 3.67</div>
+        </div>
+        <div class="sb-tags"><span class="sb-badge">Python</span><span class="sb-badge">PHP</span></div>
+        <div class="sb-foot">
+          <div class="sb-price">P120<span>/hr &middot; 8 sessions</span></div>
+          <button class="sb-btn-pill">Book Session</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="note">The date still holds here, so no weekday chips &mdash; they would add noise. The tutee
+  just needs to know the time window is what failed.</p>
+
+  <div class="stage-tag">match_stage: "subject_only" &mdash; nothing on that date</div>
+  <div class="sb-strip">
+    <div class="ban ban-warn">
+      <div class="ban-ico">&#9888;</div>
+      <div>
+        <p class="ban-title">No tutors available on August 9</p>
+        <p class="ban-body">Showing your top Python matches and the days they usually teach.</p>
+        <button class="ban-act">Choose a different date</button>
+      </div>
+    </div>
+    <div class="sb-grid">
+      <div class="sb-card">
+        <div class="sb-top">
+          <div class="sb-avatar">MA</div>
+          <div><div class="sb-name">Marisol Aquino</div><div class="sb-role">Tutor</div></div>
+          <div class="sb-rate">&#9733; 3.88</div>
+        </div>
+        <div class="sb-tags"><span class="sb-badge">Python</span><span class="sb-badge">Algorithms</span></div>
+        <div class="sb-foot">
+          <div class="sb-price">P350<span>/hr &middot; 12 sessions</span></div>
+          <button class="sb-btn-pill">Book Session</button>
+        </div>
+        <div class="avail-line">
+          Usually teaches
+          <span class="avail-chip">Mon</span><span class="avail-chip">Wed</span><span class="avail-chip">Fri</span>
+        </div>
+      </div>
+      <div class="sb-card">
+        <div class="sb-top">
+          <div class="sb-avatar">RH</div>
+          <div><div class="sb-name">Rose Hansen</div><div class="sb-role">Tutor</div></div>
+          <div class="sb-rate">&#9733; 3.67</div>
+        </div>
+        <div class="sb-tags"><span class="sb-badge">Python</span><span class="sb-badge">PHP</span></div>
+        <div class="sb-foot">
+          <div class="sb-price">P120<span>/hr &middot; 8 sessions</span></div>
+          <button class="sb-btn-pill">Book Session</button>
+        </div>
+        <div class="avail-line">
+          Usually teaches
+          <span class="avail-chip">Tue</span><span class="avail-chip">Thu</span><span class="avail-chip">Sat</span>
+        </div>
+      </div>
+      <div class="sb-card">
+        <div class="sb-top">
+          <div class="sb-avatar">IF</div>
+          <div><div class="sb-name">Isabel Fernandez</div><div class="sb-role">Tutor</div></div>
+          <div class="sb-rate">New</div>
+        </div>
+        <div class="sb-tags"><span class="sb-badge">Python</span></div>
+        <div class="sb-foot">
+          <div class="sb-price">P300<span>/hr &middot; 0 sessions</span></div>
+          <button class="sb-btn-pill">Book Session</button>
+        </div>
+        <div class="avail-line">
+          Usually teaches <span class="avail-chip">Tue</span><span class="avail-chip">Thu</span>
+        </div>
+      </div>
+      <div class="sb-card">
+        <div class="sb-top">
+          <div class="sb-avatar">PR</div>
+          <div><div class="sb-name">Paolo Ramirez</div><div class="sb-role">Tutor</div></div>
+          <div class="sb-rate">New</div>
+        </div>
+        <div class="sb-tags"><span class="sb-badge">Python</span></div>
+        <div class="sb-foot">
+          <div class="sb-price">P300<span>/hr &middot; 0 sessions</span></div>
+          <button class="sb-btn-pill">Book Session</button>
+        </div>
+        <div class="avail-line">
+          <span style="color:#b42318">No published hours yet</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="note">
+    "Usually teaches" is deliberate hedging &mdash; the chips are the tutor's recurring weekly schedule,
+    which does not account for one-off blocks or already-booked slots. Claiming a specific free date would
+    need override-aware lookups, and getting that wrong would be the same class of bug we are fixing.
+    Paolo shows the honest empty case: Stage 3 ignores availability entirely, so a tutor with zero
+    published hours can land here.
+  </p>
+
+</div>
+
+<div class="options sb">
+  <div class="option" data-choice="ship" onclick="toggleSelect(this)">
+    <div class="letter">&#10003;</div>
+    <div class="content">
+      <h3>Ship this</h3>
+      <p>Save the mockup, write the plan, then implement.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="tweak" onclick="toggleSelect(this)">
+    <div class="letter">&#9998;</div>
+    <div class="content">
+      <h3>Copy still needs work</h3>
+      <p>Tell me which line and I will revise.</p>
+    </div>
+  </div>
+</div>

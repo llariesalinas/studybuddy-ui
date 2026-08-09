@@ -163,6 +163,9 @@ def serialize_booking_context(booking, grouped_bookings=None):
         'endTime': primary_block['endTime'],
         'duration_hours': len(bookings) * (SESSION_SLOT_MINUTES / 60),
         'preferred_location': representative.preferred_location,
+        # One server-side answer to "may the tutor still fix the meeting spot", read by both the
+        # chat banner and the booking card so they cannot drift apart.
+        'can_edit_location': representative.tutor_can_edit_location(),
         'session_mode': representative.session_mode,
         'meeting_link': representative.meeting_link,
         'student': full_name(representative.student),

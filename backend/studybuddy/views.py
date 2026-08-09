@@ -92,14 +92,15 @@ from .models import (
     Booking,
     PartnerInstitution,
     Tutor,
-    TutorSubjects
+    TutorSubjects,
+    ACTIVE_BOOKING_STATUSES,
+    GRACE_CUTOFF_HOURS,
 )
 
 logger = logging.getLogger(__name__)
 TUTOR_SUBJECT_LIMIT = 8
 DEFAULT_TUTOR_SUBJECT_EXPERTISE_LEVEL = 3
 BOOKING_HORIZON_DAYS = 14
-GRACE_CUTOFF_HOURS = 12
 COUNTED_STRIKE_WALLET_DEDUCTION = decimal.Decimal('50.00')
 MONTHLY_STRIKE_CAP = 3
 from rest_framework.decorators import api_view
@@ -2077,6 +2078,7 @@ def build_combined_block(group, profile=None):
         "endTime": end_time.strftime("%H:%M"),
         "duration_hours": duration,
         "preferred_location": first.preferred_location,
+        "can_edit_location": representative_booking.tutor_can_edit_location(),
         "session_mode": first.session_mode,
         "dashboard_hidden_by_current_user": get_dashboard_hidden_for_profile(sorted_group, profile),
     }
@@ -2345,7 +2347,7 @@ def tutor_availability(request, tutor_id):
     relevant_bookings = Booking.objects.filter(
         tutor=tutor,
         session_date__range=(calendar_start, calendar_end),
-        status__in=["Confirmed", "Pending", "Completed"]
+        status__in=ACTIVE_BOOKING_STATUSES
     )
     full_day_dates, slot_override_keys = get_override_maps(
         tutor,
@@ -2624,7 +2626,7 @@ def confirm_payment_and_book(request):
             conflict_exists = Booking.objects.filter(
                 availability=availability,
                 session_date=session_date,
-                status__in=["Confirmed", "Pending", "Completed"]
+                status__in=ACTIVE_BOOKING_STATUSES
             ).exists()
 
             if conflict_exists:
@@ -3771,12 +3773,15 @@ def accept_commission_terms(request):
     return Response({"commission_terms_accepted_at": tutor.commission_terms_accepted_at})
 
 
-RECOMMENDATION_BLOCKING_STATUSES = [
-    'Pending',
-    'Confirmed',
-    'Awaiting Payment Verification',
-    'Completed',
-]
+# Which filter actually produced a result set. The client cannot infer this from the tutor list, and
+# without it the results header claims date availability that was never checked.
+MATCH_STAGE_EXACT = 'exact'
+MATCH_STAGE_DATE_ONLY = 'date_only'
+MATCH_STAGE_SUBJECT_ONLY = 'subject_only'
+
+# Mon-first, matching how tutors read their own weekly schedule. Alphabetical order would be
+# meaningless to a tutee reading "usually teaches" chips.
+WEEKDAY_ORDER = [WEEKDAY_MAP[index] for index in sorted(WEEKDAY_MAP)]
 
 
 def parse_recommendation_time(time_string):
@@ -3808,6 +3813,73 @@ def get_recommendation_time_slots(start_time_string, end_time_string):
         current += timedelta(minutes=SESSION_SLOT_MINUTES)
 
     return slots
+
+
+def get_available_slot_times_by_tutor(tutor_ids, session_date):
+    """Map tutor_id -> set of time slots still bookable on session_date.
+
+    A slot drops out if it is booked, blocked by a full-day or single-slot override, or already in
+    the past. That is the same rule tutor_availability_calendar applies per day, so search and the
+    tutor's own calendar cannot disagree about whether a day has anything left. Tutors with nothing
+    left are simply absent from the returned map.
+
+    Bulk by design: the candidate loop above already runs per-tutor queries, so this must not add
+    another N+1 on top.
+    """
+    if not tutor_ids:
+        return {}
+
+    weekday = WEEKDAY_MAP[session_date.weekday()]
+    current_now = timezone.localtime(timezone.now())
+
+    slots = list(
+        TutorAvailability.objects.filter(
+            tutor_id__in=tutor_ids,
+            day=weekday,
+            is_active=True,
+        ).values_list('tutor_id', 'id', 'time_slot')
+    )
+
+    if not slots:
+        return {}
+
+    slot_ids = [slot_id for _, slot_id, _ in slots]
+
+    booked_slot_ids = set(
+        Booking.objects.filter(
+            availability_id__in=slot_ids,
+            session_date=session_date,
+            status__in=ACTIVE_BOOKING_STATUSES,
+        ).values_list('availability_id', flat=True)
+    )
+
+    overrides = TutorAvailabilityOverride.objects.filter(
+        tutor_id__in=tutor_ids,
+        override_date=session_date,
+    ).values_list('tutor_id', 'availability_id', 'is_full_day')
+
+    blocked_all_day = {tutor_id for tutor_id, _, is_full_day in overrides if is_full_day}
+    blocked_slot_ids = {
+        availability_id
+        for _, availability_id, is_full_day in overrides
+        if not is_full_day and availability_id is not None
+    }
+
+    available = {}
+
+    for tutor_id, slot_id, time_slot in slots:
+        if tutor_id in blocked_all_day:
+            continue
+
+        if slot_id in booked_slot_ids or slot_id in blocked_slot_ids:
+            continue
+
+        if session_date == current_now.date() and time_slot < current_now.time():
+            continue
+
+        available.setdefault(tutor_id, set()).add(time_slot)
+
+    return available
 
 
 def get_recommendation_candidate_tutors(
@@ -3849,81 +3921,40 @@ def get_recommendation_candidate_tutors(
     session_date = parse_request_date(requested_date)
     required_slots = get_recommendation_time_slots(start_time, end_time)
 
-    # Tutors with a known conflict for this date (an existing booking, a full-day
-    # override, or a slot override) must be excluded from every stage below — a
-    # booked/unavailable tutor should never surface, even in the broad fallbacks.
-    excluded_tutor_ids = set()
-    if session_date:
-        weekday = WEEKDAY_MAP[session_date.weekday()]
+    if not session_date:
+        return base_candidates.distinct(), MATCH_STAGE_SUBJECT_ONLY
 
-        if required_slots:
-            excluded_tutor_ids.update(
-                Booking.objects.filter(
-                    session_date=session_date,
-                    status__in=RECOMMENDATION_BLOCKING_STATUSES,
-                    availability__time_slot__in=required_slots,
-                ).values_list('tutor_id', flat=True)
-            )
-            excluded_tutor_ids.update(
-                TutorAvailabilityOverride.objects.filter(
-                    override_date=session_date,
-                    is_full_day=False,
-                    availability__day=weekday,
-                    availability__time_slot__in=required_slots,
-                ).values_list('tutor_id', flat=True)
+    # One availability read for the whole candidate set, already accounting for bookings, both
+    # override kinds, and past times. Tutors with nothing left on this date are absent from the map.
+    candidate_ids = list(base_candidates.values_list('profile_id', flat=True).distinct())
+    available_by_tutor = get_available_slot_times_by_tutor(candidate_ids, session_date)
+
+    # Stage 1: every requested slot is free.
+    if required_slots:
+        required = set(required_slots)
+        exact_ids = [
+            tutor_id
+            for tutor_id, available_times in available_by_tutor.items()
+            if required <= available_times
+        ]
+
+        if exact_ids:
+            return (
+                base_candidates.filter(profile_id__in=exact_ids).distinct(),
+                MATCH_STAGE_EXACT,
             )
 
-        excluded_tutor_ids.update(
-            TutorAvailabilityOverride.objects.filter(
-                override_date=session_date,
-                is_full_day=True,
-            ).values_list('tutor_id', flat=True)
+    # Stage 2: something is free that day, just not the requested window.
+    if available_by_tutor:
+        return (
+            base_candidates.filter(profile_id__in=list(available_by_tutor)).distinct(),
+            MATCH_STAGE_DATE_ONLY,
         )
 
-    # Stage 1: Exact Match (Date + All Time Slots)
-    if session_date and required_slots:
-        weekday = WEEKDAY_MAP[session_date.weekday()]
-
-        stage1_candidates = base_candidates.filter(
-            tutoravailability__day=weekday,
-            tutoravailability__time_slot__in=required_slots,
-            tutoravailability__is_active=True,
-        ).annotate(
-            matching_available_slots=Count(
-                "tutoravailability__time_slot",
-                filter=Q(
-                    tutoravailability__day=weekday,
-                    tutoravailability__time_slot__in=required_slots,
-                    tutoravailability__is_active=True,
-                ),
-                distinct=True,
-            )
-        ).filter(
-            matching_available_slots=len(required_slots)
-        ).exclude(
-            profile_id__in=excluded_tutor_ids
-        )
-
-        if stage1_candidates.exists():
-            return stage1_candidates
-
-    # Stage 2: Fallback (Date only, ignore time slots)
-    if session_date:
-        weekday = WEEKDAY_MAP[session_date.weekday()]
-        stage2_candidates = base_candidates.filter(
-            tutoravailability__day=weekday,
-            tutoravailability__is_active=True,
-        ).exclude(
-            profile_id__in=excluded_tutor_ids
-        ).distinct()
-
-        if stage2_candidates.exists():
-            return stage2_candidates
-
-    # Stage 3: Broad Fallback (Subject only, ignore date/time)
-    return base_candidates.exclude(
-        profile_id__in=excluded_tutor_ids
-    ).distinct()
+    # Stage 3: nothing on that date. The date is dropped entirely rather than used to exclude —
+    # filtering by a date we just abandoned would be incoherent, and a tutor booked solid on the 9th
+    # may be the best choice for the 10th. The caller surfaces this as a banner.
+    return base_candidates.distinct(), MATCH_STAGE_SUBJECT_ONLY
 
 
 @api_view(['POST'])
@@ -3952,8 +3983,29 @@ def recommend_tutors_view(request):
             status=400,
         )
 
+    # A date is required. Without this an unreadable date parsed to None and was treated as "no date
+    # given", which silently skipped both date stages and returned every tutor for the subject.
+    session_date = parse_request_date(requested_date)
+
+    if session_date is None:
+        return Response(
+            {"error": "A valid session date (YYYY-MM-DD) is required."},
+            status=400,
+        )
+
+    today = timezone.localtime(timezone.now()).date()
+
+    if session_date < today:
+        return Response({"error": "Cannot search a past date."}, status=400)
+
+    if session_date > today + timedelta(days=BOOKING_HORIZON_DAYS):
+        return Response(
+            {"error": f"Sessions can only be booked up to {BOOKING_HORIZON_DAYS} days ahead."},
+            status=400,
+        )
+
     ratings = build_rating_matrix()
-    candidate_qs = get_recommendation_candidate_tutors(
+    candidate_qs, match_stage = get_recommendation_candidate_tutors(
         subject,
         preferred_mode=preferred_mode,
         min_budget=min_budget,
@@ -3976,9 +4028,22 @@ def recommend_tutors_view(request):
         len(results),
     )
 
+    ranked = results[:10]
+
+    # The recurring weekly pattern, used for the "usually teaches" chips on fallback results. One
+    # query for the whole page rather than one per tutor.
+    ranked_tutor_ids = [r["tutor"].profile_id for r in ranked]
+    days_by_tutor = {}
+
+    for tutor_id, day in TutorAvailability.objects.filter(
+        tutor_id__in=ranked_tutor_ids,
+        is_active=True,
+    ).values_list('tutor_id', 'day').distinct():
+        days_by_tutor.setdefault(tutor_id, set()).add(day)
+
     data = []
 
-    for r in results[:10]:
+    for r in ranked:
 
         tutor = r["tutor"]
         score = r["score"]
@@ -3990,16 +4055,20 @@ def recommend_tutors_view(request):
             for ts in tutor_subjects
         ]
 
+        tutor_days = days_by_tutor.get(tutor.profile_id, set())
+
         data.append({
             "id": tutor.profile.id,
             "name": f"{tutor.profile.fname} {tutor.profile.lname}",
             "score": round(score, 3),
             "rating": tutor.rating_average,
             "hourly_rate": tutor.hourly_rate,
+            "total_sessions": tutor.total_sessions,
+            "available_days": [day for day in WEEKDAY_ORDER if day in tutor_days],
             "subjects": subjects
         })
 
-    return Response(data, status=200)
+    return Response({"match_stage": match_stage, "tutors": data}, status=200)
 
 #Setup Profile
 @api_view(['POST'])
@@ -4483,26 +4552,41 @@ def update_booking_location(request, booking_request_id):
     if not new_location:
         return Response({"error": "Location cannot be empty for Face-to-Face sessions."}, status=400)
 
-    pending_bookings = Booking.objects.filter(
+    # This used to require status="Pending", which Instant Booking (ADR-0008) stopped producing —
+    # so the edit had become unreachable and an audited value could never be corrected. The window
+    # is now the Grace Cutoff, evaluated per booking by Booking.tutor_can_edit_location().
+    editable_bookings = Booking.objects.filter(
         booking_request_id=booking_request_id,
         tutor=tutor,
-        status="Pending"
-    )
+    ).select_related('student', 'tutor__profile', 'availability')
 
-    booking = pending_bookings.select_related('student', 'tutor__profile', 'availability').first()
-    updated = pending_bookings.update(preferred_location=new_location)
+    booking = editable_bookings.first()
 
-    if not updated:
-        return Response({"error": "No matching pending bookings found."}, status=404)
+    if booking is None:
+        return Response({"error": "No matching bookings found."}, status=404)
 
-    if booking:
-        booking.preferred_location = new_location
-        create_booking_event(
-            booking,
-            request.user,
-            f"Face-to-face location updated to {new_location}.",
-            "location_updated"
+    if not booking.tutor_can_edit_location():
+        return Response(
+            {
+                "error": (
+                    "This location can no longer be changed. Face-to-face locations lock "
+                    f"{GRACE_CUTOFF_HOURS} hours before the session starts."
+                )
+            },
+            status=400,
         )
+
+    editable_bookings.update(preferred_location=new_location)
+
+    # Posts a live chat message into the shared room and refreshes both sides' booking context, so
+    # the tutee sees the change immediately rather than travelling to a stale address.
+    booking.preferred_location = new_location
+    create_booking_event(
+        booking,
+        request.user,
+        f"Face-to-face location updated to {new_location}.",
+        "location_updated"
+    )
 
     return Response({"message": "Location updated."})
 
