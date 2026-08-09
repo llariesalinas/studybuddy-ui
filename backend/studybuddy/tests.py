@@ -25,11 +25,18 @@ from .chat.services import (
     serialize_booking_context,
 )
 from .paymongo_money_movement import PayMongoCashOutError
-from .views import credit_tutor_wallet, dev_add_wallet_funds, dev_remove_wallet_funds
+from .views import (
+    COUNTED_STRIKE_WALLET_DEDUCTION,
+    credit_tutor_wallet,
+    dev_add_wallet_funds,
+    dev_remove_wallet_funds,
+    WEEKDAY_MAP,
+)
 from .models import (
     Booking,
     Course,
     EmailOTPChallenge,
+    GRACE_CUTOFF_HOURS,
     InstitutionRequest,
     PartnerInstitution,
     Payment,
@@ -9152,3 +9159,195 @@ class DemoTieGroupTests(APITestCase):
 
     def test_empty_rows_are_handled(self):
         self.assertEqual(self._mark([]), [])
+
+
+class LateCancellationSupportTicketTests(APITestCase):
+    """Cancelling inside the Grace Cutoff opens a Late_Cancellation SupportTicket
+    (backend/studybuddy/views.py:cancel_booking) which a SuperAdmin resolves via
+    admin_resolve_ticket. See docs/architecture/booking-flow.md."""
+
+    def setUp(self):
+        self.institution = PartnerInstitution.objects.create(
+            institution_name="CPU",
+            school_email_domain="cpu.edu.ph",
+            is_active=True,
+        )
+        self.super_user = User.objects.create_user(
+            username="lc-superadmin",
+            email="lc-superadmin@studybuddy.test",
+            password="password",
+        )
+        self.super_profile = UserProfile.objects.create(
+            user=self.super_user,
+            fname="Super",
+            mname="",
+            lname="Admin",
+            role="SuperAdmin",
+            profile_completed=True,
+            is_domain_exempt=True,
+        )
+        self.tutee_user = User.objects.create_user(
+            username="lc-tutee@cpu.edu.ph",
+            email="lc-tutee@cpu.edu.ph",
+            password="password",
+        )
+        self.tutee_profile = UserProfile.objects.create(
+            user=self.tutee_user,
+            fname="Lc",
+            mname="",
+            lname="Tutee",
+            role="Tutee",
+            institution=self.institution,
+        )
+        self.tutor_user = User.objects.create_user(
+            username="lc-tutor@cpu.edu.ph",
+            email="lc-tutor@cpu.edu.ph",
+            password="password",
+        )
+        self.tutor_profile = UserProfile.objects.create(
+            user=self.tutor_user,
+            fname="Lc",
+            mname="",
+            lname="Tutor",
+            role="Tutor",
+            institution=self.institution,
+        )
+        self.tutor = Tutor.objects.create(
+            profile=self.tutor_profile,
+            hourly_rate=Decimal("280.00"),
+            can_online=True,
+            can_f2f=True,
+            teaching_level="SHS",
+        )
+        self.wallet, _ = Wallet.objects.get_or_create(tutor=self.tutor)
+        self.wallet.balance = Decimal("500.00")
+        self.wallet.save(update_fields=["balance"])
+
+    def create_confirmed_booking(self, *, hours_from_now):
+        """A Confirmed booking whose session starts `hours_from_now` from now."""
+        session_start = timezone.localtime(timezone.now()) + timedelta(hours=hours_from_now)
+        availability = TutorAvailability.objects.create(
+            tutor=self.tutor,
+            day=WEEKDAY_MAP[session_start.weekday()],
+            time_slot=session_start.time(),
+            is_active=True,
+        )
+        group_id = uuid4()
+        return Booking.objects.create(
+            student=self.tutee_profile,
+            tutor=self.tutor,
+            availability=availability,
+            session_date=session_start.date(),
+            session_mode="Online",
+            booking_request_id=group_id,
+            session_group_id=group_id,
+            status="Confirmed",
+        )
+
+    def cancel_as(self, user, booking, *, reason="Something came up"):
+        self.client.force_authenticate(user=user)
+        return self.client.post(
+            f"/api/bookings/{booking.id}/cancel/",
+            {"reason": reason},
+            format="json",
+        )
+
+    def test_cancellation_before_grace_cutoff_does_not_open_a_ticket(self):
+        booking = self.create_confirmed_booking(hours_from_now=GRACE_CUTOFF_HOURS + 1)
+
+        response = self.cancel_as(self.tutee_user, booking)
+
+        self.assertEqual(response.status_code, 200)
+        booking.refresh_from_db()
+        self.assertEqual(booking.status, "Cancelled")
+        self.assertFalse(SupportTicket.objects.filter(booking=booking).exists())
+
+    def test_tutee_late_cancellation_opens_ticket_penalizing_the_tutee(self):
+        booking = self.create_confirmed_booking(hours_from_now=GRACE_CUTOFF_HOURS - 1)
+
+        response = self.cancel_as(self.tutee_user, booking, reason="Family emergency")
+
+        self.assertEqual(response.status_code, 200)
+        ticket = SupportTicket.objects.get(booking=booking)
+        self.assertEqual(ticket.category, "Late_Cancellation")
+        self.assertEqual(ticket.status, "Open")
+        self.assertTrue(ticket.reported_by_system)
+        self.assertEqual(ticket.user_id, self.tutor_profile.id)
+        self.assertEqual(ticket.penalized_user_id, self.tutee_profile.id)
+        self.assertIn("Family emergency", ticket.description)
+        self.assertIsNone(ticket.resolution_verdict)
+
+    def test_tutor_late_cancellation_opens_ticket_penalizing_the_tutor(self):
+        booking = self.create_confirmed_booking(hours_from_now=GRACE_CUTOFF_HOURS - 1)
+
+        response = self.cancel_as(self.tutor_user, booking, reason="Sudden illness")
+
+        self.assertEqual(response.status_code, 200)
+        ticket = SupportTicket.objects.get(booking=booking)
+        self.assertEqual(ticket.user_id, self.tutee_profile.id)
+        self.assertEqual(ticket.penalized_user_id, self.tutor_profile.id)
+
+    def test_superadmin_counted_verdict_deducts_tutor_wallet(self):
+        booking = self.create_confirmed_booking(hours_from_now=GRACE_CUTOFF_HOURS - 1)
+        self.cancel_as(self.tutor_user, booking, reason="Sudden illness")
+        ticket = SupportTicket.objects.get(booking=booking)
+
+        self.client.force_authenticate(user=self.super_user)
+        response = self.client.post(
+            f"/api/admin/support/tickets/{ticket.id}/resolve/",
+            {"verdict": "counted"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        ticket.refresh_from_db()
+        self.assertEqual(ticket.status, "Resolved")
+        self.assertEqual(ticket.resolution_verdict, "counted")
+        self.wallet.refresh_from_db()
+        self.assertEqual(self.wallet.balance, Decimal("500.00") - COUNTED_STRIKE_WALLET_DEDUCTION)
+        self.assertTrue(
+            Transaction.objects.filter(
+                wallet=self.wallet,
+                transaction_type="counted_strike",
+                reference_id=f"LT-{ticket.id}",
+            ).exists()
+        )
+        self.assertEqual(response.data["monthly_counted_strikes"], 1)
+
+    def test_superadmin_excused_verdict_leaves_wallet_untouched(self):
+        booking = self.create_confirmed_booking(hours_from_now=GRACE_CUTOFF_HOURS - 1)
+        self.cancel_as(self.tutor_user, booking, reason="Sudden illness")
+        ticket = SupportTicket.objects.get(booking=booking)
+
+        self.client.force_authenticate(user=self.super_user)
+        response = self.client.post(
+            f"/api/admin/support/tickets/{ticket.id}/resolve/",
+            {"verdict": "excused"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        ticket.refresh_from_db()
+        self.assertEqual(ticket.resolution_verdict, "excused")
+        self.wallet.refresh_from_db()
+        self.assertEqual(self.wallet.balance, Decimal("500.00"))
+        self.assertFalse(Transaction.objects.filter(wallet=self.wallet).exists())
+
+    def test_ticket_cannot_be_resolved_twice(self):
+        booking = self.create_confirmed_booking(hours_from_now=GRACE_CUTOFF_HOURS - 1)
+        self.cancel_as(self.tutor_user, booking, reason="Sudden illness")
+        ticket = SupportTicket.objects.get(booking=booking)
+
+        self.client.force_authenticate(user=self.super_user)
+        self.client.post(
+            f"/api/admin/support/tickets/{ticket.id}/resolve/",
+            {"verdict": "excused"},
+            format="json",
+        )
+        second_response = self.client.post(
+            f"/api/admin/support/tickets/{ticket.id}/resolve/",
+            {"verdict": "counted"},
+            format="json",
+        )
+
+        self.assertEqual(second_response.status_code, 400)
