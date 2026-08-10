@@ -1161,5 +1161,16 @@ class SupportTicket(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        indexes = [
+            # Serves the rolling strike-window query (get_active_strike_tickets), which runs once
+            # per candidate tutor inside the recommender loop and on every /profile/status/ hit.
+            # Equality columns first, range column last.
+            models.Index(
+                fields=['penalized_user', 'category', 'created_at'],
+                name='ticket_strike_window_idx',
+            ),
+        ]
+
     def __str__(self):
         return f"Ticket #{self.id} - {self.subject} ({self.status})"

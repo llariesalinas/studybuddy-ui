@@ -83,7 +83,7 @@
         <p class="session-rail-copy">{{ cancelActionMessage }}</p>
         <button
           class="session-rail-cta sb-btn btn-danger-soft"
-          :disabled="isCancelling || !canCancelSession"
+          :disabled="isCancelling"
           @click="emit('open-cancel')"
         >
           {{ isCancelling ? 'Cancelling...' : isPending ? 'Withdraw request' : 'Cancel Session' }}
@@ -114,7 +114,6 @@ const props = defineProps({
   isCompleted: { type: Boolean, default: false },
   ratingSubmitted: { type: Boolean, default: false },
   showCancelAction: { type: Boolean, default: false },
-  canCancelSession: { type: Boolean, default: false },
   isCancelling: { type: Boolean, default: false },
   isPending: { type: Boolean, default: false },
   isQuickSubmitting: { type: Boolean, default: false },

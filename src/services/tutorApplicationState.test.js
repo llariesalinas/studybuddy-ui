@@ -5,6 +5,7 @@ import {
   getTutorApplicationFlow,
   needsTutorApplicationAttention,
   needsTutorApplicationLockout,
+  needsTuteeBookingBlock,
   needsTuteeVerificationBlock,
 } from './tutorApplicationState'
 
@@ -159,5 +160,43 @@ describe('needsTuteeVerificationBlock', () => {
       application_status: 'approved',
       document_renewal_status: 'verified',
     })).toBe(false)
+  })
+})
+
+describe('needsTuteeBookingBlock', () => {
+  it('blocks a fully verified tutee who is at the strike cap', () => {
+    expect(needsTuteeBookingBlock({
+      tutee_verification_enforced: true,
+      application_status: 'approved',
+      document_renewal_status: 'verified',
+      strike_blocked: true,
+    })).toBe(true)
+  })
+
+  it('blocks a strike-free tutee who is unverified', () => {
+    expect(needsTuteeBookingBlock({
+      tutee_verification_enforced: true,
+      application_status: null,
+      document_renewal_status: null,
+      strike_blocked: false,
+    })).toBe(true)
+  })
+
+  it('does not block when neither cause applies', () => {
+    expect(needsTuteeBookingBlock({
+      tutee_verification_enforced: true,
+      application_status: 'approved',
+      document_renewal_status: 'verified',
+      strike_blocked: false,
+    })).toBe(false)
+  })
+
+  it('blocks on strikes even during the verification grace period', () => {
+    expect(needsTuteeBookingBlock({
+      tutee_verification_enforced: false,
+      application_status: null,
+      document_renewal_status: null,
+      strike_blocked: true,
+    })).toBe(true)
   })
 })

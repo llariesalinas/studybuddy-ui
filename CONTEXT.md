@@ -291,24 +291,37 @@ _Avoid_: "decline" (a pre-cutoff cancellation is still a cancellation, just untr
 (a different, more severe event — the session was never cancelled at all), "cancellation request"
 (nothing is requested — the cancellation takes effect immediately)
 
-**Counted Strike**:
-A Late Cancellation whose Support Ticket the admin resolved as counted rather than excused. For a
-Tutor it also costs a flat P50 wallet deduction (paid to the platform, not the wronged party; the
-deduction may push the wallet negative). Tutees pay no fee — they have no wallet to deduct from.
-Excused Late Cancellations and pre-cutoff cancellations are never Counted Strikes.
-_Avoid_: "penalty" alone (ambiguous between the fee and the cap), "fine" for Tutees (there is none)
+**Active Strike**:
+A Late Cancellation ticket that still counts against its Strike Cap: opened within the last 14
+days and not excused. An unresolved ticket is *provisional* — it counts from the moment it is
+opened, before any admin has looked at it. Only an explicit excused verdict relieves a strike;
+resolving as counted changes nothing about the count, because the ticket was already counting.
+_Avoid_: "pending strike" (it is not waiting to take effect — it already has)
 
-**Monthly Strike Cap**:
-The limit of 3 Counted Strikes per calendar month, applied per user to both roles. Reaching the
-cap suspends the role's core privilege for the remainder of that calendar month: a Tutee cannot
-create new bookings; a Tutor's availability is hidden from search. Existing confirmed sessions are
-untouched. The count resets at the start of the next calendar month.
-_Avoid_: "cancellation limit" (pre-cutoff and excused cancellations are unlimited and uncounted)
+**Counted Strike**:
+A Late Cancellation whose Support Ticket the admin resolved as counted rather than excused. The
+verdict's only remaining consequence is money: for a Tutor it costs a flat P50 wallet deduction
+(paid to the platform, not the wronged party; the deduction may push the wallet negative). Tutees
+pay no fee — they have no wallet to deduct from. The *block* is provisional; the *money* is not —
+a wallet debit cannot be undone, so it never fires on an unreviewed ticket. See ADR-0011.
+_Avoid_: "penalty" alone (ambiguous between the fee and the cap), "fine" for Tutees (there is
+none), treating it as the thing that causes a block (an Active Strike does that)
+
+**Strike Cap**:
+The limit of 3 Active Strikes, applied per user to both roles. Reaching the cap suspends the
+role's core privilege: a Tutee cannot create new bookings; a Tutor's availability is hidden from
+search. Existing confirmed sessions are untouched. Strikes expire individually, 14 days after
+each was issued — the block lifts the moment the count drops below 3, with no shared reset date.
+_Avoid_: "monthly cap" / "calendar reset" (the window is rolling per strike, not per month —
+the calendar-month rule was replaced), "cancellation limit" (pre-cutoff and excused cancellations
+are unlimited and uncounted)
 
 **Booking Horizon**:
 The farthest ahead a session can be instant-booked: 14 days from the moment of booking. Bounds
 the damage a stale recurring availability slot can cause (a forgotten weekly slot can accumulate
 at most two weeks of auto-confirmed sessions, not a semester's worth). A platform-wide constant.
+Not the strike window: the Strike Cap's rolling window is also 14 days, but the two are unrelated
+constants (`BOOKING_HORIZON_DAYS` vs `STRIKE_WINDOW_DAYS`) and either may change alone.
 _Avoid_: "advance booking limit" (one canonical term)
 
 **Meeting Link**:

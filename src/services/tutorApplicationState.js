@@ -231,3 +231,12 @@ export const needsTuteeVerificationBlock = (snapshot) => {
     snapshot?.document_renewal_status === 'verified'
   )
 }
+
+// The other half of the server gate: 3 active late-cancellation strikes in the rolling window
+// block new bookings regardless of verification state.
+export const needsTuteeStrikeBlock = (snapshot) => Boolean(snapshot?.strike_blocked)
+
+// Full mirror of the server's can_create_new_booking for a Tutee. The two causes are kept separate
+// above because they need different remedies in the UI -- one is "verify", one is "wait it out".
+export const needsTuteeBookingBlock = (snapshot) =>
+  needsTuteeStrikeBlock(snapshot) || needsTuteeVerificationBlock(snapshot)
