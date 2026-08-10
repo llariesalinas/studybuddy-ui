@@ -3,7 +3,20 @@
 Every finalized plan lives in this folder as its own dated file, created from [`_template.md`](_template.md).
 Status moves Draft â†’ Approved â†’ In Progress â†’ Done. When a plan is complete, its summary is linked below.
 
-**Status & Progress Summary** (2026-08-09): Live session details view redesign is Done —
+**Status & Progress Summary** (2026-08-10): Subject picker focus redesign is Done —
+grilled with `ui-preview` across four mockup rounds against the onboarding subject step. Two reported
+defects (three competing colour systems in the drill pane; a back control that reads as a heading)
+plus one found in code: `v-if="searchQuery"` destroys the browse view outright rather than overlaying
+it. Locked design: focus-one-category browsing behind a bordered `<- All categories` pill, category
+colour once per context, per-chip dots deleted, chips for browsing and today's descriptive rows for
+searching, with narrowed category cards above top-level results. Implemented as four explicit view
+states in `SubjectTaxonomyPicker.vue`; `subjectPicker.shared.js` untouched so `SubjectPickerModal.vue`
+is unaffected and now diverges visually pending a follow-up. eslint clean, 136/136 tests,
+`npm run build` succeeds. [Plan](2026-08-10-subject-picker-focus-redesign.md),
+[Mockup](../mockups/2026-08-10-subject-picker-focus-redesign.html),
+[Summary](../session-summaries/2026-08-10-subject-picker-focus-redesign-summary.md).
+
+**Previous** (2026-08-09): Live session details view redesign is Done —
 grilled to 7 decisions (universal action rail across all statuses, folded progress check,
 separate info/timeline cards, `SessionActionRail` extraction, deferred mobile pass) and
 implemented on `feat/superadmin-reports-csv-export`. New `SessionActionRail.vue` replaces the old
