@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Subject description search - 2026-08-10</title>
+<style>
+  body { margin: 0; padding: 32px 20px 60px; background: #F8F9FA; color: #163127;
+         font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .page { max-width: 900px; margin: 0 auto; }
+  h1 { font-size: 1.5rem; margin: 0 0 6px; }
+  .lede { color: #6B7280; font-size: .9rem; line-height: 1.5; margin: 0 0 28px; max-width: 68ch; }
+  .lbl { display: inline-block; font-size: .68rem; text-transform: uppercase; letter-spacing: .06em;
+         font-weight: 700; color: #6B7280; margin: 30px 0 10px; }
+  .cap { font-size: .8rem; color: #6B7280; margin: 10px 0 0; line-height: 1.55; max-width: 70ch; }
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 760px) { .split { grid-template-columns: 1fr; } }
+
+  .sb { --p: #00895A; --card: #ffffff; --border: #EAEAEA; --text: #163127; --muted: #6B7280;
+        --hint: #DCA21B; }
+  .pane { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 16px; }
+  .pane-title { font-size: .66rem; text-transform: uppercase; letter-spacing: .06em; font-weight: 700;
+                color: var(--muted); margin: 0 0 10px; }
+  .search { border: 1px solid var(--border); border-radius: 999px; padding: 9px 16px;
+            font-size: .82rem; color: var(--text); margin-bottom: 14px; }
+  .rows { display: flex; flex-direction: column; gap: 8px; }
+  .row { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
+         border: 1px solid var(--border); border-radius: 12px; padding: 11px 14px; }
+  .row .name { display: block; font-weight: 700; font-size: .87rem; line-height: 1.2; }
+  .row .cat { display: block; font-size: .68rem; color: var(--muted); margin-top: 3px; }
+  .row .desc { display: block; font-size: .75rem; color: var(--muted); margin-top: 5px; line-height: 1.45; }
+  .desc.clamp { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .badge { flex: none; font-size: .62rem; text-transform: uppercase; letter-spacing: .05em;
+           border: 1px solid var(--hint); color: var(--hint); border-radius: 999px; padding: 4px 10px;
+           white-space: nowrap; }
+  .tier { font-size: .66rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted);
+          margin: 4px 0 0; }
+  .note { font-size: .75rem; color: var(--muted); margin: 10px 0 0; }
+  .strike { color: #B4483F; }
+</style>
+</head>
+<body>
+<div class="page sb">
+  <h1>Subject search matches descriptions</h1>
+  <p class="lede">
+    Decided 2026-08-10. <code>searchSubjects()</code> gains <code>description</code> as a matched field, shared by both
+    pickers. A description-only match raises the existing hint badge, is explained by a visible description line, and
+    sorts below direct name/category matches. No term highlighting.
+  </p>
+
+  <span class="lbl">Before &mdash; a dead end</span>
+  <div class="pane">
+    <div class="search">derivatives</div>
+    <div class="row" style="border-style:dashed; justify-content:center; color:#6B7280; font-size:.8rem">
+      No matching subjects for &ldquo;derivatives&rdquo;. Can&rsquo;t find it? Propose it &rarr;
+    </div>
+    <p class="note strike">Calculus exists and its description reads &ldquo;Limits, derivatives, integrals&hellip;&rdquo; &mdash;
+      the tutor never sees it and may propose a duplicate.</p>
+  </div>
+
+  <span class="lbl">After &mdash; both pickers, two-tier ordering</span>
+  <div class="split">
+    <div class="pane">
+      <p class="pane-title">Registration &mdash; SubjectTaxonomyPicker</p>
+      <div class="search">data</div>
+      <div class="rows">
+        <div class="row"><span><span class="name">Data Structures</span><span class="cat">Technology &amp; Computer Science</span><span class="desc">Lists, trees, graphs, and complexity analysis.</span></span></div>
+        <div class="row"><span><span class="name">Data Science</span><span class="cat">Mathematics &amp; Data Sciences</span><span class="desc">Cleaning, modelling, and visualising datasets.</span></span></div>
+        <div class="row"><span><span class="name">Biology</span><span class="cat">Natural Sciences</span><span class="desc">Cells, genetics, and data handling in lab work.</span></span><span class="badge">via &ldquo;data&rdquo;</span></div>
+      </div>
+      <p class="note">Description row already existed here. Unchanged apart from ordering.</p>
+    </div>
+
+    <div class="pane">
+      <p class="pane-title">Tutee &mdash; SubjectPickerModal</p>
+      <div class="search">data</div>
+      <div class="rows">
+        <div class="row"><span><span class="name">Data Structures</span><span class="cat">Technology &amp; Computer Science</span><span class="desc clamp">Lists, trees, graphs, and complexity analysis.</span></span></div>
+        <div class="row"><span><span class="name">Data Science</span><span class="cat">Mathematics &amp; Data Sciences</span><span class="desc clamp">Cleaning, modelling, and visualising datasets.</span></span></div>
+        <div class="row"><span><span class="name">Biology</span><span class="cat">Natural Sciences</span><span class="desc clamp">Cells, genetics, and data handling in lab work.</span></span><span class="badge">via &ldquo;data&rdquo;</span></div>
+      </div>
+      <p class="note">New: a single clamped description line, so the badge has something on the row to point at.</p>
+    </div>
+  </div>
+
+  <p class="cap">
+    <strong>Ordering.</strong> Name and category matches keep catalog order at the top; keyword- and description-only
+    matches follow, also in catalog order. A stable partition, not a scoring system &mdash; the badge marks the second
+    tier, so no labelled break is drawn.
+  </p>
+  <p class="cap">
+    <strong>Flag rename.</strong> <code>matchedViaKeyword</code> becomes <code>matchedViaHint</code>: one badge covers
+    both keyword and description matches.
+  </p>
+</div>
+</body>
+</html>
