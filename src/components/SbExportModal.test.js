@@ -76,6 +76,14 @@ describe('SbExportModal', () => {
       .toBe(`studybuddy-report-${todayKey()}.csv`)
   })
 
+  it('honours fileExtension, so the analytics workbook previews as .xlsx', async () => {
+    const wrapper = mountModal({ fileExtension: 'xlsx' })
+    await flushPromises()
+
+    expect(wrapper.find('.sb-export-filename').text())
+      .toBe(`studybuddy-report-${todayKey()}.xlsx`)
+  })
+
   it('renders nothing while closed', () => {
     const wrapper = mountModal({ open: false })
     expect(wrapper.find('.sb-export-dialog').exists()).toBe(false)

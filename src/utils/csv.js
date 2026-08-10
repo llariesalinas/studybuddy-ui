@@ -42,6 +42,8 @@ export const downloadCsv = (filename, contents) => {
   window.URL.revokeObjectURL(url)
 }
 
-// studybuddy-<label>-YYYY-MM-DD.csv. Callers pass the single selected item's slug when exactly one
-// is selected, so a folder of exports stays self-describing.
-export const exportFilename = (label) => `studybuddy-${label}-${todayKey()}.csv`
+// studybuddy-<label>-YYYY-MM-DD.<ext>. Callers pass the single selected item's slug when exactly
+// one is selected, so a folder of exports stays self-describing. The analytics report comes back
+// from the server as an xlsx workbook; the user directory is still built here as csv.
+export const exportFilename = (label, extension = 'csv') =>
+  `studybuddy-${label}-${todayKey()}.${extension}`

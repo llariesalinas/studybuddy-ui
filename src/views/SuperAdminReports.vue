@@ -41,8 +41,9 @@
       :items="exportSections"
       :scope-line="exportScopeLine"
       :combined-file-label="REPORT_COMBINED_FILE_LABEL"
+      file-extension="xlsx"
       :busy="store.loading.export"
-      @confirm="exportCsv"
+      @confirm="exportWorkbook"
       @close="isExportOpen = false"
     />
 
@@ -346,17 +347,17 @@ function openExportModal() {
   isExportOpen.value = true
 }
 
-async function exportCsv({ ids, filename }) {
+async function exportWorkbook({ ids, filename }) {
   isExportOpen.value = false
   try {
-    await store.exportAnalyticsCsv({
+    await store.exportAnalyticsWorkbook({
       institutionId: selectedInstitutionId.value || null,
       period: period.value,
       sections: ids,
       filename,
     })
   } catch {
-    toastStore.push('Failed to export CSV.', 'error')
+    toastStore.push('Failed to export the report.', 'error')
   }
 }
 

@@ -18,3 +18,4 @@ channels==4.2.0
 channels-redis==4.2.1
 daphne==4.1.2
 Faker==40.19.1
+openpyxl==3.1.5

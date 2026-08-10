@@ -109,6 +109,12 @@ const props = defineProps({
     type: String,
     default: 'report'
   },
+  // Extension the download will carry. The analytics report is an xlsx workbook built server-side;
+  // the user directory is still a csv built in the browser.
+  fileExtension: {
+    type: String,
+    default: 'csv'
+  },
   busy: {
     type: Boolean,
     default: false
@@ -144,7 +150,7 @@ const previewFilename = computed(() => {
     ? selectedItems.value[0].fileLabel || selectedItems.value[0].id
     : props.combinedFileLabel
 
-  return exportFilename(label)
+  return exportFilename(label, props.fileExtension)
 })
 
 const exportLabel = computed(() =>

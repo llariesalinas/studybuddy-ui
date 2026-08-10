@@ -2,6 +2,10 @@ import logging
 import decimal
 import csv
 from decimal import Decimal
+from io import BytesIO
+from openpyxl import Workbook
+from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.utils import get_column_letter
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
@@ -53,8 +57,8 @@ ANALYTICS_PERIODS = {
     'all': None,
 }
 
-# Sections of the analytics CSV export, in the order they are written to the file. The keys are the
-# slugs accepted by the `sections` query param and must stay in step with REPORT_SECTIONS in
+# Sections of the analytics export, in the order their sheets appear in the workbook. The keys are
+# the slugs accepted by the `sections` query param and must stay in step with REPORT_SECTIONS in
 # src/constants/superadminExports.js; the values name the file when only that section is exported.
 ANALYTICS_EXPORT_SECTIONS = {
     'summary': 'summary',
@@ -65,6 +69,120 @@ ANALYTICS_EXPORT_SECTIONS = {
 }
 
 ANALYTICS_EXPORT_COMBINED_LABEL = 'report'
+
+# The platform's cut of a completed session. Payouts are the remainder, so the two always agree.
+PLATFORM_COMMISSION_RATE = Decimal('0.10')
+PLATFORM_PAYOUT_RATE = Decimal('1') - PLATFORM_COMMISSION_RATE
+
+XLSX_CONTENT_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+
+# Cell formats for the analytics workbook. Money keeps its underlying numeric value, so the sheets
+# stay computable even though the export is built to be read.
+XLSX_CURRENCY_FORMAT = '"₱"#,##0.00'
+XLSX_DATE_FORMAT = 'yyyy-mm-dd'
+XLSX_HEADER_FILL = 'FFEFEFEF'
+XLSX_MIN_COLUMN_WIDTH = 10
+XLSX_MAX_COLUMN_WIDTH = 40
+XLSX_COLUMN_PADDING = 2
+
+# Written under a sheet's header when the section has no rows, so an empty result is
+# distinguishable from a failed export.
+EMPTY_SECTION_NOTE = 'No data for this period.'
+
+
+def write_xlsx_cell(sheet, row, column, value, number_format=None):
+    """Write one cell, keeping strings as strings.
+
+    openpyxl treats a string starting with '=' as a live formula, so a display name like `=cmd()`
+    would execute when the workbook is opened. Every value here is user-controlled, so text cells
+    are pinned to the string type -- the workbook equivalent of `escapeCsvValue` on the frontend.
+    """
+    cell = sheet.cell(row=row, column=column, value=value)
+    if isinstance(value, str):
+        cell.data_type = 's'
+    if number_format:
+        cell.number_format = number_format
+    return cell
+
+
+def autosize_xlsx_columns(sheet):
+    """Width each column to its longest cell, clamped so one long name cannot swallow the sheet."""
+    for column_cells in sheet.columns:
+        longest = max((len(str(cell.value)) for cell in column_cells if cell.value is not None), default=0)
+        width = min(max(longest + XLSX_COLUMN_PADDING, XLSX_MIN_COLUMN_WIDTH), XLSX_MAX_COLUMN_WIDTH)
+        sheet.column_dimensions[get_column_letter(column_cells[0].column)].width = width
+
+
+def add_xlsx_sheet(workbook, title, headers, rows, formats=None):
+    """Add one section sheet: bold frozen header, then rows, then an empty-state note if needed.
+
+    `formats` maps a zero-based column index to a number format, so money and dates read as money
+    and dates rather than as bare floats.
+    """
+    sheet = workbook.create_sheet(title=title)
+    header_fill = PatternFill('solid', fgColor=XLSX_HEADER_FILL)
+
+    for index, header in enumerate(headers, start=1):
+        cell = write_xlsx_cell(sheet, 1, index, header)
+        cell.font = Font(bold=True)
+        cell.fill = header_fill
+    sheet.freeze_panes = 'A2'
+
+    for row_offset, row in enumerate(rows, start=2):
+        for index, value in enumerate(row):
+            write_xlsx_cell(sheet, row_offset, index + 1, value, (formats or {}).get(index))
+
+    if not rows:
+        note = write_xlsx_cell(sheet, 2, 1, EMPTY_SECTION_NOTE)
+        note.font = Font(italic=True)
+        note.alignment = Alignment(horizontal='left')
+
+    autosize_xlsx_columns(sheet)
+    return sheet
+
+
+def subject_popularity_rows(completed_bookings, limit=10):
+    """Bookings grouped by the subject the booking was actually for.
+
+    Counts `Booking.subject` directly. The earlier version joined through `TutorSubjects`, which
+    paired every subject a tutor teaches with every booking that tutor completed -- so one Java
+    session also counted towards every other subject that tutor happened to list.
+    """
+    return (
+        completed_bookings
+        .values('subject__subject_name')
+        .annotate(booking_count=Count('id'))
+        .order_by('-booking_count')[:limit]
+    )
+
+
+def top_tutor_rows(completed_bookings, limit=5):
+    """Top tutors by sessions completed *in the reported period*.
+
+    Every column comes from the same window, so sessions, rating and earnings are comparable to
+    each other -- previously `sessions` and `rating` were lifetime fields on `Tutor` sitting beside
+    period-scoped earnings. `Payment` and `Rating` are both OneToOne to `Booking`, so joining them
+    here cannot fan the session count out.
+    """
+    rows = (
+        completed_bookings
+        .values('tutor', 'tutor__profile__fname', 'tutor__profile__lname')
+        .annotate(
+            sessions=Count('id'),
+            rating=Avg('rating__rating_score'),
+            gross=Sum('payment__amount', filter=Q(payment__payment_status='Paid')),
+        )
+        .order_by('-sessions')[:limit]
+    )
+    return [
+        {
+            'name': f"{row['tutor__profile__fname']} {row['tutor__profile__lname']}",
+            'sessions': row['sessions'],
+            'rating': round(row['rating'], 2) if row['rating'] is not None else None,
+            'earnings': float((row['gross'] or Decimal('0')) * PLATFORM_PAYOUT_RATE),
+        }
+        for row in rows
+    ]
 
 
 def parse_bool(value):
@@ -1098,15 +1216,14 @@ class AdminAnalyticsView(APIView):
         session_counts = []
 
         qs_bookings = Booking.objects.all()
-        qs_tutors = Tutor.objects.all()
 
-        # SuperAdmin can optionally filter by a specific institution.
+        # SuperAdmin can optionally filter by a specific institution. Every figure below derives
+        # from the bookings queryset, so filtering it here scopes the whole response.
         institution_id = request.query_params.get('institution_id')
         if institution_id:
             try:
                 inst = PartnerInstitution.objects.get(pk=institution_id)
                 qs_bookings = qs_bookings.filter(tutor__profile__institution=inst)
-                qs_tutors = qs_tutors.filter(profile__institution=inst)
             except PartnerInstitution.DoesNotExist:
                 pass
 
@@ -1139,39 +1256,21 @@ class AdminAnalyticsView(APIView):
             booking__in=completed_bookings
         )
         gross_revenue = qs_payments.aggregate(total=Sum('amount'))['total'] or Decimal('0')
-        commission = gross_revenue * Decimal('0.10')
+        commission = gross_revenue * PLATFORM_COMMISSION_RATE
         tutor_payouts = gross_revenue - commission
 
         total_sessions = period_bookings.count()
         completed_sessions = completed_bookings.count()
         completion_rate = round((completed_sessions / total_sessions) * 100, 1) if total_sessions else 0
 
-        top_tutors = qs_tutors.order_by('-total_sessions')[:5]
-        top_tutors_data = []
-        for tutor in top_tutors:
-            tutor_gross = qs_payments.filter(booking__tutor=tutor).aggregate(total=Sum('amount'))['total'] or Decimal('0')
-            top_tutors_data.append({
-                'name': f"{tutor.profile.fname} {tutor.profile.lname}",
-                'sessions': tutor.total_sessions,
-                'rating': tutor.rating_average,
-                'earnings': float(tutor_gross * Decimal('0.90')),
-            })
+        top_tutors_data = top_tutor_rows(completed_bookings)
 
-        subject_popularity = list(
-            TutorSubjects.objects.filter(
-                tutor__in=qs_tutors,
-                tutor__tutor_bookings__in=completed_bookings
-            )
-            .values('subject__subject_name')
-            .annotate(booking_count=Count('tutor__tutor_bookings'))
-            .order_by('-booking_count')[:10]
-        )
         subject_popularity = [
             {
                 'subject_name': item['subject__subject_name'] or 'General',
                 'booking_count': item['booking_count'],
             }
-            for item in subject_popularity
+            for item in subject_popularity_rows(completed_bookings)
         ]
 
         return Response({
@@ -1201,7 +1300,6 @@ class AdminAnalyticsExportView(APIView):
 
         days = ANALYTICS_PERIODS[period]
         qs_bookings = Booking.objects.all()
-        qs_tutors = Tutor.objects.all()
 
         institution_id = request.query_params.get('institution_id')
         institution_label = 'All institutions'
@@ -1209,7 +1307,6 @@ class AdminAnalyticsExportView(APIView):
             try:
                 inst = PartnerInstitution.objects.get(pk=institution_id)
                 qs_bookings = qs_bookings.filter(tutor__profile__institution=inst)
-                qs_tutors = qs_tutors.filter(profile__institution=inst)
                 institution_label = inst.institution_name
             except PartnerInstitution.DoesNotExist:
                 pass
@@ -1231,25 +1328,26 @@ class AdminAnalyticsExportView(APIView):
 
         selected_sections = self._resolve_sections(request.query_params.get('sections'))
 
-        response = HttpResponse(content_type='text/csv')
-        response['Content-Disposition'] = (
-            f'attachment; filename="{self._build_filename(selected_sections, today)}"'
-        )
-        writer = csv.writer(response)
+        workbook = Workbook()
+        # Workbook() opens with a default sheet; the Report Info sheet takes its place.
+        workbook.remove(workbook.active)
 
         # Export metadata, not one of the tickable sections -- it says what the file is scoped to,
-        # which matters whichever sections were asked for.
-        writer.writerow(['Report', 'Studybuddy Platform Analytics'])
-        writer.writerow(['Period', period])
-        writer.writerow(['Date range', f'{start_date.isoformat()} to {today.isoformat()}'])
-        writer.writerow(['Institution filter', institution_label])
-        writer.writerow(['Generated at', timezone.localtime(timezone.now()).isoformat()])
+        # which matters whichever sections were asked for. It sits on its own sheet so every data
+        # sheet can start with its header row at A1.
+        add_xlsx_sheet(workbook, 'Report Info', ['Field', 'Value'], [
+            ['Report', 'Studybuddy Platform Analytics'],
+            ['Period', period],
+            ['Date range', f'{start_date.isoformat()} to {today.isoformat()}'],
+            ['Institution filter', institution_label],
+            ['Generated at', timezone.localtime(timezone.now()).isoformat()],
+        ])
 
         # Each block queries only when its section was asked for, so a transactions-only export
         # does not pay for the top-tutors and subject-popularity aggregates.
         if 'summary' in selected_sections:
             gross_revenue = qs_payments.aggregate(total=Sum('amount'))['total'] or Decimal('0')
-            commission_total = gross_revenue * Decimal('0.10')
+            commission_total = gross_revenue * PLATFORM_COMMISSION_RATE
             payout_total = gross_revenue - commission_total
             total_sessions = period_bookings.count()
             completed_sessions = completed_bookings.count()
@@ -1257,15 +1355,14 @@ class AdminAnalyticsExportView(APIView):
                 round((completed_sessions / total_sessions) * 100, 1) if total_sessions else 0
             )
 
-            writer.writerow([])
-            writer.writerow(['Summary'])
-            writer.writerow([
-                'total_sessions', 'completed_sessions', 'completion_rate',
-                'gross_revenue', 'commissions', 'tutor_payouts',
-            ])
-            writer.writerow([
-                total_sessions, completed_sessions, completion_rate,
-                float(gross_revenue), float(commission_total), float(payout_total),
+            # Transposed to label/value rows: a summary is read down the page, not across it.
+            add_xlsx_sheet(workbook, 'Summary', ['Metric', 'Value'], [
+                ['Total Sessions', total_sessions],
+                ['Completed Sessions', completed_sessions],
+                ['Completion Rate (%)', completion_rate],
+                ['Gross Revenue', float(gross_revenue)],
+                ['Commissions', float(commission_total)],
+                ['Tutor Payouts', float(payout_total)],
             ])
 
         if 'sessions_over_time' in selected_sections:
@@ -1274,42 +1371,39 @@ class AdminAnalyticsExportView(APIView):
                 for item in completed_bookings.values('session_date').annotate(count=Count('id'))
             }
 
-            writer.writerow([])
-            writer.writerow(['Sessions Over Time'])
-            writer.writerow(['date', 'completed_sessions'])
-            for i in range(chart_days - 1, -1, -1):
-                day = today - timedelta(days=i)
-                writer.writerow([day.isoformat(), counts_dict.get(day, 0)])
-
-        if 'top_tutors' in selected_sections:
-            writer.writerow([])
-            writer.writerow(['Top Tutors'])
-            writer.writerow(['name', 'sessions', 'rating', 'earnings'])
-            for tutor in qs_tutors.order_by('-total_sessions')[:5]:
-                tutor_gross = qs_payments.filter(booking__tutor=tutor).aggregate(total=Sum('amount'))['total'] or Decimal('0')
-                writer.writerow([
-                    f"{tutor.profile.fname} {tutor.profile.lname}",
-                    tutor.total_sessions,
-                    tutor.rating_average,
-                    float(tutor_gross * Decimal('0.90')),
-                ])
-
-        if 'subject_popularity' in selected_sections:
-            subject_popularity = (
-                TutorSubjects.objects.filter(
-                    tutor__in=qs_tutors,
-                    tutor__tutor_bookings__in=completed_bookings
-                )
-                .values('subject__subject_name')
-                .annotate(booking_count=Count('tutor__tutor_bookings'))
-                .order_by('-booking_count')[:10]
+            add_xlsx_sheet(
+                workbook,
+                'Sessions Over Time',
+                ['Date', 'Completed Sessions'],
+                [
+                    [today - timedelta(days=i), counts_dict.get(today - timedelta(days=i), 0)]
+                    for i in range(chart_days - 1, -1, -1)
+                ],
+                formats={0: XLSX_DATE_FORMAT},
             )
 
-            writer.writerow([])
-            writer.writerow(['Subject Popularity'])
-            writer.writerow(['subject', 'booking_count'])
-            for item in subject_popularity:
-                writer.writerow([item['subject__subject_name'] or 'General', item['booking_count']])
+        if 'top_tutors' in selected_sections:
+            add_xlsx_sheet(
+                workbook,
+                'Top Tutors',
+                ['Name', 'Sessions', 'Rating', 'Earnings'],
+                [
+                    [row['name'], row['sessions'], row['rating'] if row['rating'] is not None else '', row['earnings']]
+                    for row in top_tutor_rows(completed_bookings)
+                ],
+                formats={3: XLSX_CURRENCY_FORMAT},
+            )
+
+        if 'subject_popularity' in selected_sections:
+            add_xlsx_sheet(
+                workbook,
+                'Subject Popularity',
+                ['Subject', 'Bookings'],
+                [
+                    [item['subject__subject_name'] or 'General', item['booking_count']]
+                    for item in subject_popularity_rows(completed_bookings)
+                ],
+            )
 
         if 'transactions' in selected_sections:
             transactions = (
@@ -1319,28 +1413,45 @@ class AdminAnalyticsExportView(APIView):
                 .order_by('session_date')
             )
 
-            writer.writerow([])
-            writer.writerow(['Booking Transactions'])
-            writer.writerow([
-                'session_date', 'institution', 'tutor', 'tutee', 'subject',
-                'amount', 'commission', 'payout',
-            ])
+            rows = []
             for booking in transactions:
                 amount = booking.payment.amount
-                commission = amount * Decimal('0.10')
-                payout = amount - commission
+                commission = amount * PLATFORM_COMMISSION_RATE
                 tutor_institution = booking.tutor.profile.institution
-                writer.writerow([
-                    booking.session_date.isoformat(),
+                rows.append([
+                    booking.session_date,
                     tutor_institution.institution_name if tutor_institution else '',
                     f"{booking.tutor.profile.fname} {booking.tutor.profile.lname}",
                     f"{booking.student.fname} {booking.student.lname}",
                     booking.subject.subject_name if booking.subject else 'General',
                     float(amount),
                     float(commission),
-                    float(payout),
+                    float(amount - commission),
                 ])
 
+            add_xlsx_sheet(
+                workbook,
+                'Booking Transactions',
+                [
+                    'Session Date', 'Institution', 'Tutor', 'Tutee', 'Subject',
+                    'Amount', 'Commission', 'Payout',
+                ],
+                rows,
+                formats={
+                    0: XLSX_DATE_FORMAT,
+                    5: XLSX_CURRENCY_FORMAT,
+                    6: XLSX_CURRENCY_FORMAT,
+                    7: XLSX_CURRENCY_FORMAT,
+                },
+            )
+
+        # openpyxl cannot stream, so the workbook is built in memory before it is handed over.
+        buffer = BytesIO()
+        workbook.save(buffer)
+        response = HttpResponse(buffer.getvalue(), content_type=XLSX_CONTENT_TYPE)
+        response['Content-Disposition'] = (
+            f'attachment; filename="{self._build_filename(selected_sections, today)}"'
+        )
         return response
 
     @staticmethod
@@ -1362,7 +1473,7 @@ class AdminAnalyticsExportView(APIView):
             if len(selected_sections) == 1
             else ANALYTICS_EXPORT_COMBINED_LABEL
         )
-        return f'studybuddy-{label}-{today.isoformat()}.csv'
+        return f'studybuddy-{label}-{today.isoformat()}.xlsx'
 
 
 class SuperAdminInstitutionPerformanceView(APIView):

@@ -289,9 +289,10 @@ export const useSuperAdminStore = defineStore('superadmin', () => {
     }
   }
 
-  // `sections` narrows which blocks the server writes. Omitting it keeps the endpoint's
-  // all-sections default, so an existing caller that does not pass it is unaffected.
-  const exportAnalyticsCsv = async ({
+  // `sections` narrows which sheets the server writes. Omitting it keeps the endpoint's
+  // all-sections default, so an existing caller that does not pass it is unaffected. The response
+  // is an xlsx workbook; downloadCsv passes the blob through with the server's content type.
+  const exportAnalyticsWorkbook = async ({
     institutionId = null,
     period = '30d',
     sections = [],
@@ -309,7 +310,7 @@ export const useSuperAdminStore = defineStore('superadmin', () => {
         params,
         responseType: 'blob',
       })
-      downloadCsv(filename || exportFilename(REPORT_COMBINED_FILE_LABEL), res.data)
+      downloadCsv(filename || exportFilename(REPORT_COMBINED_FILE_LABEL, 'xlsx'), res.data)
     } catch {
       error.value.export = 'Failed to export analytics.'
       throw new Error(error.value.export)
@@ -419,7 +420,7 @@ export const useSuperAdminStore = defineStore('superadmin', () => {
     approveInstitutionRequest,
     rejectInstitutionRequest,
     fetchAnalytics,
-    exportAnalyticsCsv,
+    exportAnalyticsWorkbook,
     exportUsersCsv,
     fetchUserBookings,
     exportUserBookingsCsv,

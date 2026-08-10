@@ -47,4 +47,8 @@ describe('exportFilename', () => {
   it('stamps the local date, not the UTC one', () => {
     expect(exportFilename('users')).toBe(`studybuddy-users-${todayKey()}.csv`)
   })
+
+  it('takes an extension, so the analytics workbook is not named .csv', () => {
+    expect(exportFilename('report', 'xlsx')).toBe(`studybuddy-report-${todayKey()}.xlsx`)
+  })
 })

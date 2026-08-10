@@ -1,7 +1,8 @@
 import csv
 import math
 import re
-from io import StringIO
+from io import BytesIO, StringIO
+from openpyxl import load_workbook
 from datetime import date, time, timedelta
 from decimal import Decimal
 from unittest.mock import Mock, patch
@@ -234,7 +235,16 @@ class SuperAdminRedesignApiTests(APITestCase):
         self.assertEqual(tutor.session_load_limit, 14)
         self.assertEqual(response.data["tutor_session_load_limit"], 14)
 
-    def test_analytics_includes_completion_subject_popularity_and_csv(self):
+    @staticmethod
+    def _export_workbook(response):
+        """Load the exported workbook, so tests assert on sheets and cells rather than raw text."""
+        return load_workbook(BytesIO(response.content))
+
+    @staticmethod
+    def _sheet_rows(workbook, title):
+        return list(workbook[title].values)
+
+    def test_analytics_includes_completion_subject_popularity_and_workbook(self):
         course = Course.objects.create(course_code="MATH", course_name="Mathematics")
         subject = Subjects.objects.create(
             subject_code="ALG101",
@@ -296,18 +306,45 @@ class SuperAdminRedesignApiTests(APITestCase):
 
         export_response = self.client.get("/api/admin/analytics/export/?period=7d")
         self.assertEqual(export_response.status_code, 200)
-        self.assertEqual(export_response["Content-Type"], "text/csv")
-        export_content = export_response.content.decode()
-        self.assertIn("Sessions Over Time", export_content)
-        self.assertIn("Top Tutors", export_content)
-        self.assertIn("Subject Popularity", export_content)
-        self.assertIn("Booking Transactions", export_content)
-        self.assertIn(
-            "session_date,institution,tutor,tutee,subject,amount,commission,payout",
-            export_content,
+        self.assertEqual(
+            export_response["Content-Type"],
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
-        self.assertIn(f"{self.institution.institution_name},Tutor One,", export_content)
-        self.assertIn("College Algebra,500.0,50.0,450.0", export_content)
+        self.assertIn('filename="studybuddy-report-', export_response["Content-Disposition"])
+        self.assertTrue(export_response["Content-Disposition"].endswith('.xlsx"'))
+
+        workbook = self._export_workbook(export_response)
+        self.assertEqual(workbook.sheetnames, [
+            "Report Info", "Summary", "Sessions Over Time",
+            "Top Tutors", "Subject Popularity", "Booking Transactions",
+        ])
+
+        # Scope metadata lives on its own sheet, so each data sheet starts at A1 with its header.
+        info = dict(self._sheet_rows(workbook, "Report Info")[1:])
+        self.assertEqual(info["Period"], "7d")
+        self.assertEqual(info["Institution filter"], "All institutions")
+
+        # Summary is transposed to label/value rows.
+        summary = dict(self._sheet_rows(workbook, "Summary")[1:])
+        self.assertEqual(summary["Completed Sessions"], 1)
+        self.assertEqual(summary["Gross Revenue"], 500.0)
+        self.assertEqual(summary["Commissions"], 50.0)
+        self.assertEqual(summary["Tutor Payouts"], 450.0)
+
+        transactions = self._sheet_rows(workbook, "Booking Transactions")
+        self.assertEqual(transactions[0], (
+            "Session Date", "Institution", "Tutor", "Tutee", "Subject",
+            "Amount", "Commission", "Payout",
+        ))
+        self.assertEqual(transactions[1][1:5], (
+            self.institution.institution_name, "Tutor One", "Target User", "College Algebra",
+        ))
+        self.assertEqual(transactions[1][5:], (500.0, 50.0, 450.0))
+
+        self.assertEqual(
+            self._sheet_rows(workbook, "Subject Popularity")[1], ("College Algebra", 1)
+        )
+        self.assertEqual(self._sheet_rows(workbook, "Top Tutors")[1][:2], ("Tutor One", 1))
 
     def test_analytics_export_writes_only_the_requested_sections(self):
         self.client.force_authenticate(user=self.super_user)
@@ -315,28 +352,30 @@ class SuperAdminRedesignApiTests(APITestCase):
         response = self.client.get("/api/admin/analytics/export/?period=7d&sections=summary")
 
         self.assertEqual(response.status_code, 200)
-        content = response.content.decode()
         # A single section names the file after itself, so a folder of exports stays readable.
         self.assertIn('filename="studybuddy-summary-', response["Content-Disposition"])
-        self.assertIn("Summary", content)
-        for omitted in ("Sessions Over Time", "Top Tutors", "Subject Popularity", "Booking Transactions"):
-            self.assertNotIn(omitted, content)
+        # Report Info is metadata rather than a tickable section, so it is always present.
+        self.assertEqual(
+            self._export_workbook(response).sheetnames, ["Report Info", "Summary"]
+        )
 
     def test_analytics_export_ignores_unknown_sections_and_defaults_to_all(self):
         self.client.force_authenticate(user=self.super_user)
 
+        all_sheets = [
+            "Report Info", "Summary", "Sessions Over Time",
+            "Top Tutors", "Subject Popularity", "Booking Transactions",
+        ]
+
         # Omitted entirely: the pre-`sections` caller shape must keep working.
-        default_content = self.client.get("/api/admin/analytics/export/?period=7d").content.decode()
-        # Only unrecognised slugs: falls back rather than emitting a file with no data sections.
+        default_response = self.client.get("/api/admin/analytics/export/?period=7d")
+        # Only unrecognised slugs: falls back rather than emitting a file with no data sheets.
         bogus_response = self.client.get(
             "/api/admin/analytics/export/?period=7d&sections=nonsense"
         )
-        bogus_content = bogus_response.content.decode()
 
-        for section in ("Summary", "Sessions Over Time", "Top Tutors", "Subject Popularity", "Booking Transactions"):
-            self.assertIn(section, default_content)
-            self.assertIn(section, bogus_content)
-
+        self.assertEqual(self._export_workbook(default_response).sheetnames, all_sheets)
+        self.assertEqual(self._export_workbook(bogus_response).sheetnames, all_sheets)
         self.assertIn('filename="studybuddy-report-', bogus_response["Content-Disposition"])
 
     def test_analytics_export_writes_multiple_sections_in_file_order(self):
@@ -345,11 +384,38 @@ class SuperAdminRedesignApiTests(APITestCase):
         response = self.client.get(
             "/api/admin/analytics/export/?period=7d&sections=transactions,summary"
         )
-        content = response.content.decode()
 
-        self.assertLess(content.index("Summary"), content.index("Booking Transactions"))
-        self.assertNotIn("Top Tutors", content)
+        self.assertEqual(
+            self._export_workbook(response).sheetnames,
+            ["Report Info", "Summary", "Booking Transactions"],
+        )
         self.assertIn('filename="studybuddy-report-', response["Content-Disposition"])
+
+    def test_analytics_export_marks_empty_sections_rather_than_leaving_them_blank(self):
+        """An empty result must be distinguishable from a broken export."""
+        self.client.force_authenticate(user=self.super_user)
+
+        response = self.client.get(
+            "/api/admin/analytics/export/?period=7d&sections=transactions"
+        )
+        rows = self._sheet_rows(self._export_workbook(response), "Booking Transactions")
+
+        self.assertEqual(rows[0][0], "Session Date")
+        self.assertEqual(rows[1][0], "No data for this period.")
+
+    def test_analytics_export_keeps_formula_like_names_as_text(self):
+        """openpyxl writes '='-prefixed strings as live formulas unless the type is pinned."""
+        self.client.force_authenticate(user=self.super_user)
+        self.institution.institution_name = "=cmd()"
+        self.institution.save(update_fields=["institution_name"])
+
+        response = self.client.get(
+            f"/api/admin/analytics/export/?period=7d&institution_id={self.institution.pk}"
+        )
+        cell = self._export_workbook(response)["Report Info"]["B5"]
+
+        self.assertEqual(cell.value, "=cmd()")
+        self.assertEqual(cell.data_type, "s")
 
 
 class SuperAdminUserDetailApiTests(APITestCase):
