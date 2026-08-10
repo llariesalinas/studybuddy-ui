@@ -25,11 +25,18 @@ from .chat.services import (
     serialize_booking_context,
 )
 from .paymongo_money_movement import PayMongoCashOutError
-from .views import credit_tutor_wallet, dev_add_wallet_funds, dev_remove_wallet_funds
+from .views import (
+    COUNTED_STRIKE_WALLET_DEDUCTION,
+    credit_tutor_wallet,
+    dev_add_wallet_funds,
+    dev_remove_wallet_funds,
+    WEEKDAY_MAP,
+)
 from .models import (
     Booking,
     Course,
     EmailOTPChallenge,
+    GRACE_CUTOFF_HOURS,
     InstitutionRequest,
     PartnerInstitution,
     Payment,
@@ -267,8 +274,11 @@ class SuperAdminRedesignApiTests(APITestCase):
             session_date=date.today(),
             session_mode="Online",
             status="Completed",
+            subject=subject,
         )
-        payment_method = PaymentMethod.objects.create(code="online", method_name="Online Payment")
+        payment_method, _ = PaymentMethod.objects.get_or_create(
+            code="online", defaults={"method_name": "Online Payment"}
+        )
         Payment.objects.create(
             booking=booking,
             method=payment_method,
@@ -2795,6 +2805,7 @@ class TutorCashOutTests(APITestCase):
             ).exists()
         )
 
+    @override_settings(PAYMONGO_CASHOUT_MOCK=False)
     @patch("studybuddy.paymongo_money_movement.requests.post")
     def test_cashout_sends_centavos_and_normalizes_provider_amounts(self, mock_post):
         destination = self.destination_fields()
@@ -2832,6 +2843,7 @@ class TutorCashOutTests(APITestCase):
             mock_post.call_args.kwargs["json"]["data"]["attributes"]["callback_url"],
         )
 
+    @override_settings(PAYMONGO_CASHOUT_CALLBACK_SECRET="")
     @patch("studybuddy.views.create_wallet_transaction")
     def test_failed_callback_refunds_amount_and_fee_once(self, mock_create):
         destination = self.destination_fields()
@@ -3716,8 +3728,10 @@ class DevWalletFundsTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(self.wallet.balance, Decimal("200.00"))
 
-    @override_settings(DEBUG=False)
-    def test_dev_wallet_funds_404s_when_debug_disabled(self):
+    @override_settings(BOOKING_DEV_TOOLS_ENABLED=False)
+    def test_dev_wallet_funds_404s_when_dev_tools_disabled(self):
+        """Gated by BOOKING_DEV_TOOLS_ENABLED, not DEBUG -- see
+        test_force_live_returns_404_when_booking_dev_tools_disabled for the same pattern."""
         add_response = self.call_view(dev_add_wallet_funds, "300")
         remove_response = self.call_view(dev_remove_wallet_funds, "100")
 
@@ -3748,9 +3762,14 @@ class TuteeProfileTests(APITestCase):
         self.assertIn('profile_picture_url', response.data)
 
     def test_upload_avatar_success(self):
+        from io import BytesIO
+        from PIL import Image
         from django.core.files.uploadedfile import SimpleUploadedFile
         self.client.force_authenticate(user=self.tutee_user)
-        image = SimpleUploadedFile("avatar.jpg", b"file_content", content_type="image/jpeg")
+        buffer = BytesIO()
+        Image.new("RGB", (64, 64), (120, 80, 200)).save(buffer, format="JPEG")
+        buffer.seek(0)
+        image = SimpleUploadedFile("avatar.jpg", buffer.read(), content_type="image/jpeg")
         response = self.client.post('/api/tutee/profile/avatar/', {'avatar': image}, format='multipart')
         self.assertEqual(response.status_code, 200)
         self.assertIn('profile_picture_url', response.data)
@@ -3815,9 +3834,14 @@ class TutorProfileTests(APITestCase):
         self.assertIn('profile_picture_url', response.data)
 
     def test_upload_avatar_success(self):
+        from io import BytesIO
+        from PIL import Image
         from django.core.files.uploadedfile import SimpleUploadedFile
         self.client.force_authenticate(user=self.tutor_user)
-        image = SimpleUploadedFile("avatar.jpg", b"fake_image_content", content_type="image/jpeg")
+        buffer = BytesIO()
+        Image.new("RGB", (64, 64), (120, 80, 200)).save(buffer, format="JPEG")
+        buffer.seek(0)
+        image = SimpleUploadedFile("avatar.jpg", buffer.read(), content_type="image/jpeg")
         response = self.client.post('/api/tutor/profile/avatar/', {'avatar': image}, format='multipart')
         self.assertEqual(response.status_code, 200)
         self.assertIn('profile_picture_url', response.data)
@@ -7515,6 +7539,7 @@ class VerificationDevToolsTests(APITestCase):
 
     # --- Enforcement override -----------------------------------------------------------------
 
+    @override_settings(TUTEE_VERIFICATION_ENFORCEMENT_START_DATE=None)
     def test_enforcement_override_flips_gate(self):
         from .views import tutee_verification_enforced
         from . import _verification_dev
@@ -7974,6 +7999,7 @@ class VerificationDevToolsAdminEndpointTests(APITestCase):
         )
         self.assertEqual(response.status_code, 403)
 
+    @override_settings(VERIFICATION_DEV_TOOLS_ENABLED=False)
     def test_403_for_superadmin_when_flag_off(self):
         self.client.force_authenticate(user=self.super_user)
         response = self.client.post(
@@ -8519,13 +8545,24 @@ class AdminProposedSubjectReviewTests(APITestCase):
         )
         self.client.force_authenticate(user=self.admin_user)
 
-    def make_proposal(self, code, keywords=""):
+    def make_proposal(self, code, keywords="", tutor_note=""):
         subject = Subjects.objects.create(
             subject_code=code, subject_name=f"Proposal {code}", department="Mathematics",
             status="pending", proposed_by_tutor=self.tutor,
             proposed_application=self.application, keywords=keywords,
         )
-        TutorSubjects.objects.create(tutor=self.tutor, subject=subject, expertise_level=3)
+        TutorSubjects.objects.create(
+            tutor=self.tutor, subject=subject, expertise_level=3, description=tutor_note,
+        )
+        return subject
+
+    def make_selected_subject(self, code, name, category="Natural Sciences"):
+        """An approved catalog subject the tutor picked, as opposed to proposed."""
+        subject = Subjects.objects.create(
+            subject_code=code, subject_name=name, department="Sciences",
+            category=category, status="approved",
+        )
+        TutorSubjects.objects.create(tutor=self.tutor, subject=subject, expertise_level=4)
         return subject
 
     def test_application_detail_includes_pending_proposed_subjects(self):
@@ -8556,8 +8593,11 @@ class AdminProposedSubjectReviewTests(APITestCase):
         self.application.refresh_from_db()
         self.assertEqual(self.application.application_status, "rejected")
 
-    def test_update_action_edits_pending_proposal_fields_and_description(self):
-        proposal = self.make_proposal("UPDATE-PROP")
+    def test_update_action_writes_catalog_description_not_the_tutor_note(self):
+        """The admin form edits Subjects.description (global catalog copy, which
+        the subject pickers search). The tutor's own note is evidence, not copy,
+        and must survive the edit untouched."""
+        proposal = self.make_proposal("UPDATE-PROP", tutor_note="I tutored this for two terms.")
 
         response = self.client.patch(
             f"/api/admin/tutor-applications/{self.application.id}/subjects/"
@@ -8567,7 +8607,7 @@ class AdminProposedSubjectReviewTests(APITestCase):
                 "subject_name": "Updated Proposal Name",
                 "category": "Mathematics & Data Sciences",
                 "keywords": "algebra, math",
-                "description": "Refined by admin.",
+                "catalog_description": "Refined by admin.",
             },
             format="json",
         )
@@ -8578,8 +8618,63 @@ class AdminProposedSubjectReviewTests(APITestCase):
         self.assertEqual(proposal.category, "Mathematics & Data Sciences")
         self.assertEqual(proposal.keywords, "algebra, math")
         self.assertEqual(proposal.status, "pending")
+        self.assertEqual(proposal.description, "Refined by admin.")
         link = TutorSubjects.objects.get(tutor=self.tutor, subject=proposal)
-        self.assertEqual(link.description, "Refined by admin.")
+        self.assertEqual(link.description, "I tutored this for two terms.")
+        self.assertEqual(response.data["tutor_note"], "I tutored this for two terms.")
+
+    def test_update_action_leaves_catalog_description_alone_when_omitted(self):
+        proposal = self.make_proposal("UPDATE-NO-DESC")
+        proposal.description = "Existing catalog copy."
+        proposal.save(update_fields=["description"])
+
+        response = self.client.patch(
+            f"/api/admin/tutor-applications/{self.application.id}/subjects/"
+            f"{proposal.subject_code}/",
+            {
+                "action": "update",
+                "subject_name": "Renamed Only",
+                "category": "Mathematics & Data Sciences",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        proposal.refresh_from_db()
+        self.assertEqual(proposal.description, "Existing catalog copy.")
+
+    def test_application_detail_separates_catalog_description_from_tutor_note(self):
+        proposal = self.make_proposal("SPLIT-PROP", tutor_note="My own note.")
+        proposal.description = "Catalog copy."
+        proposal.save(update_fields=["description"])
+
+        response = self.client.get(f"/api/admin/tutor-applications/{self.application.id}/")
+
+        self.assertEqual(response.status_code, 200)
+        row = response.data["proposed_subjects"][0]
+        self.assertEqual(row["catalog_description"], "Catalog copy.")
+        self.assertEqual(row["tutor_note"], "My own note.")
+
+    def test_application_detail_includes_selected_catalog_subjects(self):
+        self.make_proposal("SELECTED-PROP")
+        selected = self.make_selected_subject("BIO-101", "General Biology")
+
+        response = self.client.get(f"/api/admin/tutor-applications/{self.application.id}/")
+
+        self.assertEqual(response.status_code, 200)
+        codes = [row["subject_code"] for row in response.data["selected_subjects"]]
+        self.assertEqual(codes, [selected.subject_code])
+        self.assertEqual(response.data["selected_subjects"][0]["subject_name"], "General Biology")
+        # Pending proposals are the complement and must not leak into this list.
+        self.assertNotIn("SELECTED-PROP", codes)
+
+    def test_selected_subjects_is_empty_when_the_tutor_only_proposed(self):
+        self.make_proposal("ONLY-PROP")
+
+        response = self.client.get(f"/api/admin/tutor-applications/{self.application.id}/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["selected_subjects"], [])
 
     def test_update_action_rejects_unknown_category(self):
         proposal = self.make_proposal("UPDATE-BAD-CAT")
@@ -9152,3 +9247,195 @@ class DemoTieGroupTests(APITestCase):
 
     def test_empty_rows_are_handled(self):
         self.assertEqual(self._mark([]), [])
+
+
+class LateCancellationSupportTicketTests(APITestCase):
+    """Cancelling inside the Grace Cutoff opens a Late_Cancellation SupportTicket
+    (backend/studybuddy/views.py:cancel_booking) which a SuperAdmin resolves via
+    admin_resolve_ticket. See docs/architecture/booking-flow.md."""
+
+    def setUp(self):
+        self.institution = PartnerInstitution.objects.create(
+            institution_name="CPU",
+            school_email_domain="cpu.edu.ph",
+            is_active=True,
+        )
+        self.super_user = User.objects.create_user(
+            username="lc-superadmin",
+            email="lc-superadmin@studybuddy.test",
+            password="password",
+        )
+        self.super_profile = UserProfile.objects.create(
+            user=self.super_user,
+            fname="Super",
+            mname="",
+            lname="Admin",
+            role="SuperAdmin",
+            profile_completed=True,
+            is_domain_exempt=True,
+        )
+        self.tutee_user = User.objects.create_user(
+            username="lc-tutee@cpu.edu.ph",
+            email="lc-tutee@cpu.edu.ph",
+            password="password",
+        )
+        self.tutee_profile = UserProfile.objects.create(
+            user=self.tutee_user,
+            fname="Lc",
+            mname="",
+            lname="Tutee",
+            role="Tutee",
+            institution=self.institution,
+        )
+        self.tutor_user = User.objects.create_user(
+            username="lc-tutor@cpu.edu.ph",
+            email="lc-tutor@cpu.edu.ph",
+            password="password",
+        )
+        self.tutor_profile = UserProfile.objects.create(
+            user=self.tutor_user,
+            fname="Lc",
+            mname="",
+            lname="Tutor",
+            role="Tutor",
+            institution=self.institution,
+        )
+        self.tutor = Tutor.objects.create(
+            profile=self.tutor_profile,
+            hourly_rate=Decimal("280.00"),
+            can_online=True,
+            can_f2f=True,
+            teaching_level="SHS",
+        )
+        self.wallet, _ = Wallet.objects.get_or_create(tutor=self.tutor)
+        self.wallet.balance = Decimal("500.00")
+        self.wallet.save(update_fields=["balance"])
+
+    def create_confirmed_booking(self, *, hours_from_now):
+        """A Confirmed booking whose session starts `hours_from_now` from now."""
+        session_start = timezone.localtime(timezone.now()) + timedelta(hours=hours_from_now)
+        availability = TutorAvailability.objects.create(
+            tutor=self.tutor,
+            day=WEEKDAY_MAP[session_start.weekday()],
+            time_slot=session_start.time(),
+            is_active=True,
+        )
+        group_id = uuid4()
+        return Booking.objects.create(
+            student=self.tutee_profile,
+            tutor=self.tutor,
+            availability=availability,
+            session_date=session_start.date(),
+            session_mode="Online",
+            booking_request_id=group_id,
+            session_group_id=group_id,
+            status="Confirmed",
+        )
+
+    def cancel_as(self, user, booking, *, reason="Something came up"):
+        self.client.force_authenticate(user=user)
+        return self.client.post(
+            f"/api/bookings/{booking.id}/cancel/",
+            {"reason": reason},
+            format="json",
+        )
+
+    def test_cancellation_before_grace_cutoff_does_not_open_a_ticket(self):
+        booking = self.create_confirmed_booking(hours_from_now=GRACE_CUTOFF_HOURS + 1)
+
+        response = self.cancel_as(self.tutee_user, booking)
+
+        self.assertEqual(response.status_code, 200)
+        booking.refresh_from_db()
+        self.assertEqual(booking.status, "Cancelled")
+        self.assertFalse(SupportTicket.objects.filter(booking=booking).exists())
+
+    def test_tutee_late_cancellation_opens_ticket_penalizing_the_tutee(self):
+        booking = self.create_confirmed_booking(hours_from_now=GRACE_CUTOFF_HOURS - 1)
+
+        response = self.cancel_as(self.tutee_user, booking, reason="Family emergency")
+
+        self.assertEqual(response.status_code, 200)
+        ticket = SupportTicket.objects.get(booking=booking)
+        self.assertEqual(ticket.category, "Late_Cancellation")
+        self.assertEqual(ticket.status, "Open")
+        self.assertTrue(ticket.reported_by_system)
+        self.assertEqual(ticket.user_id, self.tutor_profile.id)
+        self.assertEqual(ticket.penalized_user_id, self.tutee_profile.id)
+        self.assertIn("Family emergency", ticket.description)
+        self.assertIsNone(ticket.resolution_verdict)
+
+    def test_tutor_late_cancellation_opens_ticket_penalizing_the_tutor(self):
+        booking = self.create_confirmed_booking(hours_from_now=GRACE_CUTOFF_HOURS - 1)
+
+        response = self.cancel_as(self.tutor_user, booking, reason="Sudden illness")
+
+        self.assertEqual(response.status_code, 200)
+        ticket = SupportTicket.objects.get(booking=booking)
+        self.assertEqual(ticket.user_id, self.tutee_profile.id)
+        self.assertEqual(ticket.penalized_user_id, self.tutor_profile.id)
+
+    def test_superadmin_counted_verdict_deducts_tutor_wallet(self):
+        booking = self.create_confirmed_booking(hours_from_now=GRACE_CUTOFF_HOURS - 1)
+        self.cancel_as(self.tutor_user, booking, reason="Sudden illness")
+        ticket = SupportTicket.objects.get(booking=booking)
+
+        self.client.force_authenticate(user=self.super_user)
+        response = self.client.post(
+            f"/api/admin/support/tickets/{ticket.id}/resolve/",
+            {"verdict": "counted"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        ticket.refresh_from_db()
+        self.assertEqual(ticket.status, "Resolved")
+        self.assertEqual(ticket.resolution_verdict, "counted")
+        self.wallet.refresh_from_db()
+        self.assertEqual(self.wallet.balance, Decimal("500.00") - COUNTED_STRIKE_WALLET_DEDUCTION)
+        self.assertTrue(
+            Transaction.objects.filter(
+                wallet=self.wallet,
+                transaction_type="counted_strike",
+                reference_id=f"LT-{ticket.id}",
+            ).exists()
+        )
+        self.assertEqual(response.data["monthly_counted_strikes"], 1)
+
+    def test_superadmin_excused_verdict_leaves_wallet_untouched(self):
+        booking = self.create_confirmed_booking(hours_from_now=GRACE_CUTOFF_HOURS - 1)
+        self.cancel_as(self.tutor_user, booking, reason="Sudden illness")
+        ticket = SupportTicket.objects.get(booking=booking)
+
+        self.client.force_authenticate(user=self.super_user)
+        response = self.client.post(
+            f"/api/admin/support/tickets/{ticket.id}/resolve/",
+            {"verdict": "excused"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        ticket.refresh_from_db()
+        self.assertEqual(ticket.resolution_verdict, "excused")
+        self.wallet.refresh_from_db()
+        self.assertEqual(self.wallet.balance, Decimal("500.00"))
+        self.assertFalse(Transaction.objects.filter(wallet=self.wallet).exists())
+
+    def test_ticket_cannot_be_resolved_twice(self):
+        booking = self.create_confirmed_booking(hours_from_now=GRACE_CUTOFF_HOURS - 1)
+        self.cancel_as(self.tutor_user, booking, reason="Sudden illness")
+        ticket = SupportTicket.objects.get(booking=booking)
+
+        self.client.force_authenticate(user=self.super_user)
+        self.client.post(
+            f"/api/admin/support/tickets/{ticket.id}/resolve/",
+            {"verdict": "excused"},
+            format="json",
+        )
+        second_response = self.client.post(
+            f"/api/admin/support/tickets/{ticket.id}/resolve/",
+            {"verdict": "counted"},
+            format="json",
+        )
+
+        self.assertEqual(second_response.status_code, 400)

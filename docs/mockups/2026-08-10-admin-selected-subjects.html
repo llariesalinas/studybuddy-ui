@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin selected subjects and description plumbing - 2026-08-10</title>
+<style>
+  body { margin: 0; padding: 32px 20px 60px; background: #F8F9FA; color: #163127;
+         font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .page { max-width: 760px; margin: 0 auto; }
+  h1 { font-size: 1.5rem; margin: 0 0 6px; }
+  .lede { color: #6B7280; font-size: .9rem; line-height: 1.5; margin: 0 0 28px; max-width: 68ch; }
+  .lbl { display: inline-block; font-size: .68rem; text-transform: uppercase; letter-spacing: .06em;
+         font-weight: 700; color: #6B7280; margin: 30px 0 10px; }
+  .cap { font-size: .8rem; color: #6B7280; margin: 10px 0 0; line-height: 1.55; max-width: 70ch; }
+
+  .sb { --p: #00895A; --card: #ffffff; --border: #EAEAEA; --text: #163127; --muted: #6B7280;
+        --hint: #DCA21B; --ok: #00895A; --no: #B4483F; }
+  .oc { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 18px; }
+  .oc-label { font-size: .66rem; text-transform: uppercase; letter-spacing: .06em; font-weight: 700;
+              color: var(--muted); margin: 0 0 10px; }
+  .srow { display: flex; justify-content: space-between; align-items: center; gap: 12px;
+          border: 1px solid var(--border); border-radius: 12px; padding: 11px 14px; margin-bottom: 8px; }
+  .srow.muted { background: #FBFBFB; border-style: dashed; }
+  .sname { font-weight: 700; font-size: .87rem; }
+  .scat { font-size: .7rem; color: var(--muted); margin-top: 2px; }
+  .acts { display: flex; gap: 6px; flex: none; }
+  .btn { font-size: .68rem; border-radius: 999px; padding: 4px 11px; border: 1px solid var(--border);
+         color: var(--muted); white-space: nowrap; }
+  .btn.ok { border-color: var(--ok); color: var(--ok); }
+  .btn.no { border-color: var(--no); color: var(--no); }
+  .empty { border: 1px dashed var(--border); border-radius: 12px; padding: 14px; text-align: center;
+           font-size: .78rem; color: var(--muted); }
+  .divider { height: 1px; background: var(--border); margin: 18px 0; }
+  .fl { display: block; font-size: .68rem; font-weight: 700; color: var(--muted); margin: 12px 0 4px; }
+  .fld { border: 1px solid var(--border); border-radius: 8px; padding: 8px 11px; font-size: .78rem; }
+  .fld.new { border-color: var(--hint); box-shadow: 0 0 0 3px rgba(220,162,27,.14); }
+  .ro { border: 1px dashed var(--border); border-radius: 8px; padding: 8px 11px; font-size: .78rem;
+        color: var(--muted); font-style: italic; background: #FBFBFB; }
+  .hint { font-size: .7rem; color: var(--muted); margin-top: 4px; }
+  .flag { font-size: .62rem; font-weight: 700; letter-spacing: .05em; color: var(--hint); }
+</style>
+</head>
+<body>
+<div class="page sb">
+  <h1>Admin review drawer &mdash; selected subjects and description plumbing</h1>
+  <p class="lede">
+    Decided 2026-08-10, <code>AdminTutorApplications.vue</code>. The tutor&rsquo;s catalog picks render read-only below the
+    proposal queue, and the edit form&rsquo;s Description is repointed from the tutor&rsquo;s note to the catalog field that
+    search actually reads.
+  </p>
+
+  <span class="lbl">Review drawer &mdash; two sections</span>
+  <div class="oc">
+    <p class="oc-label">Proposed Subjects</p>
+    <div class="srow">
+      <div><div class="sname">Calculus 2</div><div class="scat">Mathematics &amp; Data Sciences</div></div>
+      <div class="acts"><span class="btn">Edit</span><span class="btn ok">Approve</span><span class="btn no">Reject</span></div>
+    </div>
+    <div class="srow">
+      <div><div class="sname">Competitive Programming</div><div class="scat">Technology &amp; Computer Science</div></div>
+      <div class="acts"><span class="btn">Edit</span><span class="btn ok">Approve</span><span class="btn no">Reject</span></div>
+    </div>
+
+    <div class="divider"></div>
+
+    <p class="oc-label">Selected from catalog</p>
+    <div class="srow muted"><div><div class="sname">Calculus</div><div class="scat">Mathematics &amp; Data Sciences</div></div></div>
+    <div class="srow muted"><div><div class="sname">Data Structures</div><div class="scat">Technology &amp; Computer Science</div></div></div>
+    <div class="srow muted"><div><div class="sname">Physics 1</div><div class="scat">Natural Sciences</div></div></div>
+  </div>
+  <p class="cap">
+    Read-only, name and category only &mdash; a catalog pick never carries a tutor note, because registration adds
+    subjects without one. Same visibility gate as the proposed block: tutor role, initial review.
+  </p>
+
+  <span class="lbl">Empty state &mdash; picked nothing, proposed everything</span>
+  <div class="oc">
+    <p class="oc-label">Selected from catalog</p>
+    <div class="empty">No catalog subjects selected</div>
+  </div>
+  <p class="cap">
+    Rendered rather than hidden: an applicant who proposed everything and picked nothing is itself a signal, and silence
+    would read as a loading failure.
+  </p>
+
+  <span class="lbl">Edit form &mdash; description repointed</span>
+  <div class="oc">
+    <span class="fl">Tutor&rsquo;s note <span style="font-weight:400">(read-only)</span></span>
+    <div class="ro">&ldquo;I&rsquo;ve joined ICPC twice and coach the campus team &mdash; can teach greedy, DP, graphs.&rdquo;</div>
+    <span class="fl">Catalog description <span class="flag">SAVES TO Subjects.description</span></span>
+    <div class="fld new">Algorithmic problem solving under contest constraints: greedy, dynamic programming, graphs.</div>
+    <p class="hint">Prefilled from the tutor&rsquo;s note when the catalog description is blank. This is what search reads.</p>
+  </div>
+  <p class="cap">
+    <strong>The gap this closes.</strong> <code>propose_tutor_subject</code> creates the <code>Subjects</code> row without a
+    description, and the form previously wrote to <code>TutorSubjects.description</code>. Seeded subjects all carry catalog
+    descriptions; approved proposals never did &mdash; so they entered the catalog permanently invisible to description
+    search. Note this removes the admin&rsquo;s ability to edit a tutor&rsquo;s own words, which is intended.
+  </p>
+</div>
+</body>
+</html>

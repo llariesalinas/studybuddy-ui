@@ -5,7 +5,6 @@ export function useSubjectCatalog({
   subjectSearch,
   activeCategory,
   selectedSubjectCodes,
-  draftSubjectCodes,
   isSubjectModalOpen,
 }) {
   const levelScopedSubjects = computed(() => subjects.value)

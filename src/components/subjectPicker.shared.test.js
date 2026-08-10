@@ -7,24 +7,28 @@ const subjects = [
     subject_name: 'Calculus II',
     category: 'Mathematics & Data Sciences',
     keywords: 'derivatives, integrals, limits',
+    description: 'Techniques of integration and infinite series.',
   },
   {
     subject_code: 'physics-1',
     subject_name: 'Physics I',
     category: 'Natural Sciences',
     keywords: 'mechanics, calculus based',
+    description: 'Newtonian mechanics for engineering students.',
   },
   {
     subject_code: 'programming-fundamentals',
     subject_name: 'Programming Fundamentals',
     category: 'Technology & Computer Science',
     keywords: 'coding, python, java',
+    description: 'Variables, control flow, and functions from scratch.',
   },
   {
     subject_code: 'no-keywords',
     subject_name: 'Keywordless Subject',
     category: 'Hobbies & Arts',
     keywords: null,
+    description: null,
   },
 ]
 
@@ -48,7 +52,14 @@ describe('searchSubjects', () => {
     const results = searchSubjects(subjects, 'coding')
     expect(results).toHaveLength(1)
     expect(results[0].subject_code).toBe('programming-fundamentals')
-    expect(results[0].matchedViaKeyword).toBe(true)
+    expect(results[0].matchedViaHint).toBe(true)
+  })
+
+  it('matches by description and flags description-only matches', () => {
+    const results = searchSubjects(subjects, 'newtonian')
+    expect(results).toHaveLength(1)
+    expect(results[0].subject_code).toBe('physics-1')
+    expect(results[0].matchedViaHint).toBe(true)
   })
 
   it('does not leak internal matching fields onto results', () => {
@@ -56,16 +67,37 @@ describe('searchSubjects', () => {
     expect(results[0]).not.toHaveProperty('isMatch')
   })
 
-  it('does not flag matchedViaKeyword when the name also matches', () => {
+  it('does not flag matchedViaHint when the name also matches', () => {
     const results = searchSubjects(subjects, 'calculus')
     const calculus = results.find((subject) => subject.subject_code === 'calculus-2')
     const physics = results.find((subject) => subject.subject_code === 'physics-1')
-    expect(calculus.matchedViaKeyword).toBe(false)
-    expect(physics.matchedViaKeyword).toBe(true)
+    expect(calculus.matchedViaHint).toBe(false)
+    expect(physics.matchedViaHint).toBe(true)
   })
 
-  it('tolerates subjects with missing keywords or category', () => {
-    const sparse = [{ subject_code: 'x', subject_name: 'X Marks', category: null, keywords: null }]
+  it('orders direct name/category matches ahead of hint matches', () => {
+    // 'calculus' hits Calculus II by name and Physics I by keyword only; the
+    // named subject must lead regardless of catalog order.
+    const reversed = [...subjects].reverse()
+    const results = searchSubjects(reversed, 'calculus')
+    expect(results.map((subject) => subject.subject_code)).toEqual(['calculus-2', 'physics-1'])
+  })
+
+  it('preserves catalog order within each tier', () => {
+    const catalog = [
+      { subject_code: 'a', subject_name: 'Data Structures', category: 'Tech' },
+      { subject_code: 'b', subject_name: 'Statistics', description: 'Working with data sets.' },
+      { subject_code: 'c', subject_name: 'Data Mining', category: 'Tech' },
+      { subject_code: 'd', subject_name: 'Ethics', keywords: 'data privacy' },
+    ]
+    const results = searchSubjects(catalog, 'data')
+    expect(results.map((subject) => subject.subject_code)).toEqual(['a', 'c', 'b', 'd'])
+  })
+
+  it('tolerates subjects with missing keywords, description, or category', () => {
+    const sparse = [
+      { subject_code: 'x', subject_name: 'X Marks', category: null, keywords: null, description: null },
+    ]
     expect(searchSubjects(sparse, 'marks')).toHaveLength(1)
     expect(searchSubjects(sparse, 'zzz')).toHaveLength(0)
   })

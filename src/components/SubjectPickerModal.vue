@@ -73,8 +73,11 @@
               <span class="subject-row-copy">
                 <span class="subject-row-name">{{ subject.subject_name }}</span>
                 <span class="subject-row-meta">{{ subject.category }}</span>
+                <span v-if="subject.description" class="subject-row-desc">
+                  {{ subject.description }}
+                </span>
               </span>
-              <span v-if="subject.matchedViaKeyword" class="subject-via-badge">
+              <span v-if="subject.matchedViaHint" class="subject-via-badge">
                 via "{{ searchQuery }}"
               </span>
               <span v-else-if="isSelected(subject.subject_code)" class="subject-check" aria-hidden="true">
@@ -505,6 +508,18 @@ onBeforeUnmount(() => {
 .subject-row-meta {
   color: var(--sb-text-muted);
   font-size: 0.72rem;
+}
+
+/* Single clamped line, so a description-only match can show why it matched. */
+.subject-row-desc {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+  overflow: hidden;
+  color: var(--sb-text-muted);
+  font-size: 0.72rem;
+  opacity: 0.85;
 }
 
 .subject-via-badge {
