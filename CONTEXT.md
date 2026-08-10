@@ -164,6 +164,18 @@ the Tutee being scored. Found by `top_k` (`backend/studybuddy/recommender/CF.py`
 lists are computed once per recommendation request and reused across every candidate Tutor: the
 Peer Pool and the global pool.
 
+**Co-rated Set**:
+The Tutors that two Tutees have both rated. Pearson similarity is computed over this intersection
+and nothing else (`sim` in `backend/studybuddy/recommender/CF.py`), so a pair sharing one Tutor
+scores 0 and is dropped, and a pair sharing exactly two always scores exactly +/-1 whatever the
+values are — three or more is the point below which a similarity is degenerate rather than merely
+weak. Note the average taken over the Co-rated Set is not the same number as the Tutee's overall
+rating average: the former is what Pearson measures deviation from, the latter is what the CF
+prediction's deviation term uses, and they diverge whenever either Tutee has rated a Tutor the
+other has not. The algorithm demo tool shows the set expanded per neighbour, labelling both.
+_Avoid_: "shared ratings" (ambiguous — the Tutors are shared, the scores are each Tutee's own),
+"overlap" (used elsewhere for schedule overlap)
+
 **Peer Pool**:
 The Top-K Neighbors drawn only from Tutees with exactly the same course as the Tutee being scored
 (no strand tier). CF prefers the Peer Pool per candidate Tutor ("peer ratings"); when no peer has

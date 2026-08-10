@@ -1,4 +1,5 @@
 import csv
+import math
 import re
 from io import StringIO
 from datetime import date, time, timedelta
@@ -5243,6 +5244,77 @@ class CfPeerNeighborTests(APITestCase):
         self.assertEqual(global_breakdown["pool"], "global")
         self.assertEqual(global_breakdown["neighbors"][0]["neighbor_id"], 3)
         self.assertEqual(empty_peer_breakdown["pool"], "global")
+
+
+class CoRatedDetailTests(APITestCase):
+    """co_rated_detail feeds the algorithm demo's expandable co-rated panel, which
+    exists so a similarity can be checked by hand rather than taken on faith. These
+    lock the curated S6/T-cast numbers documented in the algorithm demo guide."""
+
+    # Tutor ids 1/2/6/7/8 stand in for the curated T1/T2/T6/T7/T8, tutee keys for
+    # S6 and her neighbours — the same matrix as seed_data.CURATED_RATINGS.
+    RATINGS = {
+        6: {1: 5, 2: 3, 6: 5, 7: 2, 8: 4},   # S6 Katrina, overall avg 3.80
+        2: {1: 5, 2: 3, 6: 4, 8: 4},         # S2 Gloria
+        5: {3: 4, 4: 5},                     # shares nothing with S6
+    }
+
+    def test_returns_shared_tutors_with_both_students_scores(self):
+        from studybuddy.recommender.CF import co_rated_detail
+
+        detail = co_rated_detail(self.RATINGS, 6, 2)
+
+        self.assertEqual([e["tutor_id"] for e in detail["shared"]], [1, 2, 6, 8])
+        self.assertEqual([e["u_rating"] for e in detail["shared"]], [5, 3, 5, 4])
+        self.assertEqual([e["v_rating"] for e in detail["shared"]], [5, 3, 4, 4])
+
+    def test_averages_are_over_the_co_rated_set_not_all_ratings(self):
+        """The trap the panel has to survive: the average Pearson uses is not the
+        average the deviation term uses. S6's mean over the four tutors she shares
+        with S2 is 4.25, while her CF baseline over all five of her ratings is
+        3.80 — a panelist adding up the visible row must not land on 3.80."""
+        from studybuddy.recommender.CF import co_rated_detail
+
+        detail = co_rated_detail(self.RATINGS, 6, 2)
+        overall_avg = sum(self.RATINGS[6].values()) / len(self.RATINGS[6])
+
+        self.assertAlmostEqual(detail["u_avg"], 4.25)
+        self.assertAlmostEqual(detail["v_avg"], 4.0)
+        self.assertAlmostEqual(overall_avg, 3.8)
+        self.assertNotAlmostEqual(detail["u_avg"], overall_avg)
+
+    def test_shared_ratings_reproduce_the_reported_similarity(self):
+        """The panel's whole claim is that the expanded cells derive the number on
+        the collapsed row, so recomputing Pearson from those cells must agree with
+        sim()."""
+        from studybuddy.recommender.CF import co_rated_detail, sim
+
+        detail = co_rated_detail(self.RATINGS, 6, 2)
+        u_dev = [e["u_rating"] - detail["u_avg"] for e in detail["shared"]]
+        v_dev = [e["v_rating"] - detail["v_avg"] for e in detail["shared"]]
+
+        numerator = sum(a * b for a, b in zip(u_dev, v_dev))
+        denominator = (
+            math.sqrt(sum(a * a for a in u_dev)) * math.sqrt(sum(b * b for b in v_dev))
+        )
+
+        self.assertAlmostEqual(numerator / denominator, sim(self.RATINGS, 6, 2))
+        self.assertAlmostEqual(sim(self.RATINGS, 6, 2), 0.853, places=3)
+
+    def test_no_overlap_returns_empty_set_and_no_averages(self):
+        from studybuddy.recommender.CF import co_rated_detail
+
+        detail = co_rated_detail(self.RATINGS, 6, 5)
+
+        self.assertEqual(detail["shared"], [])
+        self.assertIsNone(detail["u_avg"])
+        self.assertIsNone(detail["v_avg"])
+
+    def test_unknown_student_is_tolerated(self):
+        """Cold-Start tutees are absent from the rating matrix entirely."""
+        from studybuddy.recommender.CF import co_rated_detail
+
+        self.assertEqual(co_rated_detail(self.RATINGS, 999, 2)["shared"], [])
 
 
 class CbfGraduatedSubjectMatchTests(APITestCase):
