@@ -2,9 +2,13 @@
 // (SubjectTaxonomyPicker, SubjectPickerModal). Pure functions, no reactivity.
 
 /**
- * Filter subjects by a free-text query against name, category, and keywords.
- * Returns matches annotated with `matchedViaKeyword` when only the keywords
- * field matched (used to render the "via keyword" badge).
+ * Filter subjects by a free-text query against name, category, keywords, and
+ * description. Returns matches annotated with `matchedViaHint` when only the
+ * keywords or description matched (used to render the "via ..." badge).
+ *
+ * Results are partitioned into two tiers - direct name/category matches first,
+ * hint matches after - so broadening the match to descriptions cannot bury the
+ * subjects the query names outright. Catalog order is preserved within a tier.
  */
 export function searchSubjects(subjects, query) {
   const normalized = String(query || '')
@@ -12,13 +16,21 @@ export function searchSubjects(subjects, query) {
     .toLowerCase()
   if (!normalized) return []
 
-  return subjects.flatMap((subject) => {
+  const direct = []
+  const hinted = []
+
+  subjects.forEach((subject) => {
     const nameMatch = subject.subject_name?.toLowerCase().includes(normalized) || false
     const categoryMatch = subject.category?.toLowerCase().includes(normalized) || false
     const keywordMatch = subject.keywords?.toLowerCase().includes(normalized) || false
-    if (!nameMatch && !categoryMatch && !keywordMatch) return []
-    return [{ ...subject, matchedViaKeyword: !nameMatch && !categoryMatch && keywordMatch }]
+    const descriptionMatch = subject.description?.toLowerCase().includes(normalized) || false
+    if (!nameMatch && !categoryMatch && !keywordMatch && !descriptionMatch) return
+
+    const isDirect = nameMatch || categoryMatch
+    ;(isDirect ? direct : hinted).push({ ...subject, matchedViaHint: !isDirect })
   })
+
+  return [...direct, ...hinted]
 }
 
 /**

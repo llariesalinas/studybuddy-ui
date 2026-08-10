@@ -76,7 +76,7 @@
             <span v-if="subject.description" class="desc">{{ subject.description }}</span>
           </span>
           <span v-if="modelValue.includes(subject.subject_code)" class="check">&#10003; Added</span>
-          <span v-else-if="subject.matchedViaKeyword" class="via-badge">via &ldquo;{{ searchQuery }}&rdquo;</span>
+          <span v-else-if="subject.matchedViaHint" class="via-badge">via &ldquo;{{ searchQuery }}&rdquo;</span>
         </button>
       </div>
       <div v-else class="empty-state">
