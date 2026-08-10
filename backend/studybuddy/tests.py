@@ -1,7 +1,7 @@
 import csv
 import re
 from io import StringIO
-from datetime import date, time, timedelta
+from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from unittest.mock import Mock, patch
 from uuid import uuid4
@@ -11,7 +11,7 @@ from django.core import mail
 from django.core.management import call_command
 from django.contrib.auth.models import User
 from django.db import connection
-from django.test import override_settings
+from django.test import TransactionTestCase, override_settings
 from django.utils import timezone
 from django.test.utils import CaptureQueriesContext
 from rest_framework.test import APITestCase, APIRequestFactory, force_authenticate
@@ -539,7 +539,17 @@ class SuperAdminUserDetailApiTests(APITestCase):
         self.assertEqual(response.data["rating_distribution"]["5"], 3)
         self.assertEqual(response.data["recent_reviews"][0]["reviewer_name"], "Taylor Tutee")
         self.assertEqual(response.data["subjects"], [{"name": "Detail Testing", "expertise_level": 4}])
-        self.assertEqual(response.data["cancellations"], {"by_user": 2, "by_counterpart": 4})
+        self.assertEqual(
+            response.data["cancellations"],
+            {
+                "by_user": 2,
+                "by_counterpart": 4,
+                "active_strikes": 0,
+                "strike_cap": 3,
+                "strike_window_days": 14,
+                "strike_blocked": False,
+            },
+        )
         self.assertEqual(
             response.data["top_counterparts"],
             [
@@ -563,6 +573,56 @@ class SuperAdminUserDetailApiTests(APITestCase):
             [{"name": "Robin Tutor", "session_count": 12}],
         )
 
+    def test_stats_report_active_strikes_from_the_rolling_window(self):
+        """The admin desk reads current gate state, not cancellation history: an expired strike
+        stops showing even though the cancellation that caused it is still counted above."""
+        for verdict in (None, 'counted', 'excused'):
+            SupportTicket.objects.create(
+                user=self.tutor_profile,
+                category='Late_Cancellation',
+                subject='Late Cancellation review',
+                description='Cancelled after the Grace Cutoff.',
+                reported_by_system=True,
+                penalized_user=self.tutee_profile,
+                resolution_verdict=verdict,
+            )
+        expired = SupportTicket.objects.create(
+            user=self.tutor_profile,
+            category='Late_Cancellation',
+            subject='Late Cancellation review',
+            description='Cancelled after the Grace Cutoff.',
+            reported_by_system=True,
+            penalized_user=self.tutee_profile,
+        )
+        SupportTicket.objects.filter(pk=expired.pk).update(
+            created_at=timezone.now() - timedelta(days=15)
+        )
+
+        response = self.client.get(f"/api/admin/users/{self.tutee_profile.id}/stats/")
+
+        self.assertEqual(response.status_code, 200)
+        cancellations = response.data["cancellations"]
+        self.assertEqual(cancellations["active_strikes"], 2)
+        self.assertEqual(cancellations["strike_cap"], 3)
+        self.assertEqual(cancellations["strike_window_days"], 14)
+        self.assertFalse(cancellations["strike_blocked"])
+
+    def test_stats_flag_a_user_who_is_at_the_strike_cap(self):
+        for _ in range(3):
+            SupportTicket.objects.create(
+                user=self.tutor_profile,
+                category='Late_Cancellation',
+                subject='Late Cancellation review',
+                description='Cancelled after the Grace Cutoff.',
+                reported_by_system=True,
+                penalized_user=self.tutee_profile,
+            )
+
+        response = self.client.get(f"/api/admin/users/{self.tutee_profile.id}/stats/")
+
+        self.assertEqual(response.data["cancellations"]["active_strikes"], 3)
+        self.assertTrue(response.data["cancellations"]["strike_blocked"])
+
     def test_stats_export_flattens_computed_values(self):
         Rating.objects.create(
             booking=self.bookings[0],
@@ -582,6 +642,7 @@ class SuperAdminUserDetailApiTests(APITestCase):
         self.assertEqual(csv_rows[0], ["stat name", "value"])
         self.assertIn(["rating 5 stars", "1"], csv_rows)
         self.assertIn(["counterpart 1", "Taylor Tutee (12 sessions)"], csv_rows)
+        self.assertIn(["active late-cancellation strikes", "0"], csv_rows)
 
     def _create_tutee(self, first_name, last_name):
         username = f"{first_name.lower()}-{last_name.lower()}"
@@ -4401,6 +4462,514 @@ class BookingVerificationGateTests(APITestCase):
         self.assertEqual(response.data.get("code"), "session_load_limit_reached")
         self.assertEqual(response.data.get("accepted_session_load"), 10)
         self.assertEqual(response.data.get("session_load_limit"), 10)
+
+    # --- Strike cap x verification gate interaction ------------------------------------------
+
+    def make_strikes(self, profile, count, verdict=None):
+        for index in range(count):
+            SupportTicket.objects.create(
+                user=self.tutor_profile if profile == self.tutee_profile else self.tutee_profile,
+                category='Late_Cancellation',
+                subject=f'Late Cancellation review {index}',
+                description='Cancelled after the Grace Cutoff.',
+                reported_by_system=True,
+                penalized_user=profile,
+                resolution_verdict=verdict,
+            )
+
+    @override_settings(**NOT_YET_ENFORCED)
+    def test_capped_tutee_blocked_even_while_verification_unenforced(self):
+        """The bug this change fixes: the strike cap used to sit behind the verification early
+        return, so a tutee in the grace period could late-cancel without limit."""
+        self.make_strikes(self.tutee_profile, 3)
+
+        response = self.post_confirm_booking()
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.data.get("code"), "strike_cap_reached")
+        self.assertEqual(response.data["strikes"]["count"], 3)
+        self.assertTrue(response.data["strikes"]["blocked"])
+        self.assertIsNotNone(response.data["strikes"]["expires_at"])
+
+    @override_settings(**ENFORCED)
+    def test_unverified_tutee_without_strikes_still_reports_verification(self):
+        """Ordering check: the strike branch must not swallow the verification cause."""
+        response = self.post_confirm_booking()
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.data.get("code"), "verification_required")
+
+    @override_settings(**ENFORCED)
+    def test_capped_tutee_reports_strike_cause_before_verification(self):
+        self.make_strikes(self.tutee_profile, 3)
+
+        response = self.post_confirm_booking()
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.data.get("code"), "strike_cap_reached")
+
+    @override_settings(**ENFORCED)
+    def test_verified_tutee_without_strikes_books_when_enforced(self):
+        self.make_verified_application(TuteeApplication, self.tutee_profile)
+
+        response = self.post_confirm_booking()
+
+        self.assertEqual(response.status_code, 200)
+
+    @override_settings(**NOT_YET_ENFORCED)
+    def test_verified_tutee_without_strikes_books_when_unenforced(self):
+        self.make_verified_application(TuteeApplication, self.tutee_profile)
+
+        response = self.post_confirm_booking()
+
+        self.assertEqual(response.status_code, 200)
+
+    @override_settings(**ENFORCED)
+    def test_two_strikes_do_not_block_booking(self):
+        self.make_verified_application(TuteeApplication, self.tutee_profile)
+        self.make_strikes(self.tutee_profile, 2)
+
+        response = self.post_confirm_booking()
+
+        self.assertEqual(response.status_code, 200)
+
+    @override_settings(**ENFORCED)
+    def test_capped_tutor_closes_the_availability_gate(self):
+        self.make_strikes(self.tutor_profile, 3)
+        self.client.force_authenticate(user=self.tutee_user)
+
+        response = self.client.get(f"/api/tutors/{self.tutor_profile.id}/availability/")
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.data.get("code"), "tutor_booking_gate_closed")
+
+    @override_settings(**ENFORCED)
+    def test_capped_tutor_excluded_from_recommendation_candidates(self):
+        from .views import get_recommendation_candidate_tutors
+
+        candidates, _ = get_recommendation_candidate_tutors(self.subject.subject_code)
+        self.assertIn(self.tutor, list(candidates))
+
+        self.make_strikes(self.tutor_profile, 3)
+
+        candidates, _ = get_recommendation_candidate_tutors(self.subject.subject_code)
+        self.assertNotIn(self.tutor, list(candidates))
+
+
+class LateCancellationStrikeWindowTests(APITestCase):
+    """The rolling 14-day strike window: strikes expire individually, unresolved tickets count
+    provisionally, and only an `excused` verdict relieves one. Replaces the old calendar-month cap.
+    """
+
+    def setUp(self):
+        self.institution = PartnerInstitution.objects.create(
+            institution_name="CPU",
+            school_email_domain="cpu.edu",
+            is_active=True,
+        )
+        self.tutee_user = User.objects.create_user(
+            username="strike-tutee@cpu.edu",
+            email="strike-tutee@cpu.edu",
+            password="password",
+        )
+        self.tutee_profile = UserProfile.objects.create(
+            user=self.tutee_user,
+            fname="Strike",
+            mname="",
+            lname="Tutee",
+            role="Tutee",
+            institution=self.institution,
+        )
+        self.tutor_user = User.objects.create_user(
+            username="strike-tutor@cpu.edu",
+            email="strike-tutor@cpu.edu",
+            password="password",
+        )
+        self.tutor_profile = UserProfile.objects.create(
+            user=self.tutor_user,
+            fname="Strike",
+            mname="",
+            lname="Tutor",
+            role="Tutor",
+            institution=self.institution,
+        )
+        self.tutor = Tutor.objects.create(
+            profile=self.tutor_profile,
+            hourly_rate=Decimal("300.00"),
+            can_online=True,
+            can_f2f=True,
+            teaching_level="SHS",
+        )
+        self.super_user = User.objects.create_user(
+            username="strike-super@studybuddy.test",
+            email="strike-super@studybuddy.test",
+            password="password",
+        )
+        self.super_profile = UserProfile.objects.create(
+            user=self.super_user,
+            fname="Sam",
+            mname="",
+            lname="Super",
+            role="SuperAdmin",
+            is_domain_exempt=True,
+        )
+
+    def make_ticket(self, profile=None, verdict=None):
+        return SupportTicket.objects.create(
+            user=self.tutor_profile,
+            category='Late_Cancellation',
+            subject='Late Cancellation review',
+            description='Cancelled after the Grace Cutoff.',
+            reported_by_system=True,
+            penalized_user=profile or self.tutee_profile,
+            resolution_verdict=verdict,
+        )
+
+    def backdate(self, ticket, **delta):
+        """created_at is auto_now_add, so an assignment would be discarded on save(). A queryset
+        update writes the column directly and bypasses it."""
+        SupportTicket.objects.filter(pk=ticket.pk).update(
+            created_at=timezone.now() - timedelta(**delta)
+        )
+        ticket.refresh_from_db()
+        return ticket
+
+    # --- Window boundary ----------------------------------------------------------------------
+
+    def test_ticket_just_inside_window_counts(self):
+        from .views import get_strike_snapshot
+
+        self.backdate(self.make_ticket(), days=13, hours=23)
+
+        self.assertEqual(get_strike_snapshot(self.tutee_profile)['count'], 1)
+
+    def test_ticket_at_exactly_fourteen_days_has_expired(self):
+        """`__gt` is strict on purpose -- the window is 14 days, not 14 days inclusive."""
+        from .views import get_strike_snapshot
+
+        self.backdate(self.make_ticket(), days=14)
+
+        self.assertEqual(get_strike_snapshot(self.tutee_profile)['count'], 0)
+
+    def test_ticket_past_the_window_does_not_count(self):
+        from .views import get_strike_snapshot
+
+        self.backdate(self.make_ticket(), days=14, minutes=1)
+
+        self.assertEqual(get_strike_snapshot(self.tutee_profile)['count'], 0)
+
+    def test_window_is_insensitive_to_calendar_month_boundaries(self):
+        """Regression guard for the whole change: three strikes spanning a month rollover used to
+        count as one under the calendar-month rule."""
+        from .views import get_strike_snapshot, has_reached_strike_cap
+
+        reference = timezone.make_aware(datetime(2026, 2, 2, 9, 0), timezone.get_current_timezone())
+        for day in (30, 31, 1):
+            month = 1 if day in (30, 31) else 2
+            ticket = self.make_ticket()
+            SupportTicket.objects.filter(pk=ticket.pk).update(
+                created_at=timezone.make_aware(
+                    datetime(2026, month, day, 9, 0), timezone.get_current_timezone()
+                )
+            )
+
+        snapshot = get_strike_snapshot(self.tutee_profile, reference_time=reference)
+
+        self.assertEqual(snapshot['count'], 3)
+        self.assertTrue(has_reached_strike_cap(self.tutee_profile, reference_time=reference))
+
+    # --- Provisional counting -----------------------------------------------------------------
+
+    def test_unresolved_ticket_counts_provisionally(self):
+        from .views import get_strike_snapshot
+
+        self.make_ticket()
+
+        snapshot = get_strike_snapshot(self.tutee_profile)
+        self.assertEqual(snapshot['count'], 1)
+        self.assertEqual(snapshot['provisional_count'], 1)
+
+    def test_excused_ticket_does_not_count(self):
+        from .views import get_strike_snapshot
+
+        self.make_ticket(verdict='excused')
+
+        self.assertEqual(get_strike_snapshot(self.tutee_profile)['count'], 0)
+
+    def test_counted_ticket_counts_and_is_not_provisional(self):
+        from .views import get_strike_snapshot
+
+        self.make_ticket(verdict='counted')
+
+        snapshot = get_strike_snapshot(self.tutee_profile)
+        self.assertEqual(snapshot['count'], 1)
+        self.assertEqual(snapshot['provisional_count'], 0)
+
+    def test_two_counted_plus_one_unresolved_blocks_until_excused(self):
+        from .views import has_reached_strike_cap
+
+        self.make_ticket(verdict='counted')
+        self.make_ticket(verdict='counted')
+        provisional = self.make_ticket()
+
+        self.assertTrue(has_reached_strike_cap(self.tutee_profile))
+
+        provisional.resolution_verdict = 'excused'
+        provisional.save(update_fields=['resolution_verdict'])
+
+        self.assertFalse(has_reached_strike_cap(self.tutee_profile))
+
+    # --- expires_at ---------------------------------------------------------------------------
+
+    def test_expires_at_is_null_when_not_blocked(self):
+        from .views import get_strike_snapshot
+
+        self.make_ticket()
+
+        self.assertIsNone(get_strike_snapshot(self.tutee_profile)['expires_at'])
+
+    def test_expires_at_is_the_strike_that_drops_the_count_below_the_cap(self):
+        from .views import STRIKE_WINDOW_DAYS, get_strike_snapshot
+
+        oldest = self.backdate(self.make_ticket(), days=10)
+        self.backdate(self.make_ticket(), days=5)
+        self.make_ticket()
+
+        snapshot = get_strike_snapshot(self.tutee_profile)
+
+        self.assertTrue(snapshot['blocked'])
+        self.assertEqual(
+            snapshot['expires_at'],
+            oldest.created_at + timedelta(days=STRIKE_WINDOW_DAYS),
+        )
+
+    def test_expires_at_shifts_forward_with_a_fourth_strike(self):
+        """With 4 active strikes the oldest expiring still leaves 3 -- the promise must be the
+        second-oldest, or we tell the user a date that does not unblock them."""
+        from .views import STRIKE_WINDOW_DAYS, get_strike_snapshot
+
+        self.backdate(self.make_ticket(), days=12)
+        second_oldest = self.backdate(self.make_ticket(), days=10)
+        self.backdate(self.make_ticket(), days=5)
+        self.make_ticket()
+
+        snapshot = get_strike_snapshot(self.tutee_profile)
+
+        self.assertEqual(snapshot['count'], 4)
+        self.assertEqual(
+            snapshot['expires_at'],
+            second_oldest.created_at + timedelta(days=STRIKE_WINDOW_DAYS),
+        )
+
+    # --- profile_status -----------------------------------------------------------------------
+
+    def test_profile_status_reports_the_strike_snapshot(self):
+        self.make_ticket(verdict='counted')
+        self.make_ticket()
+        self.client.force_authenticate(user=self.tutee_user)
+
+        response = self.client.get("/api/profile/status/")
+
+        self.assertEqual(response.status_code, 200)
+        strikes = response.data['late_cancellation_strikes']
+        self.assertEqual(strikes['count'], 2)
+        self.assertEqual(strikes['provisional_count'], 1)
+        self.assertEqual(strikes['cap'], 3)
+        self.assertEqual(strikes['window_days'], 14)
+        self.assertFalse(strikes['blocked'])
+
+    def test_profile_status_reports_zeros_for_a_clean_user(self):
+        self.client.force_authenticate(user=self.tutee_user)
+
+        response = self.client.get("/api/profile/status/")
+
+        strikes = response.data['late_cancellation_strikes']
+        self.assertEqual(strikes['count'], 0)
+        self.assertEqual(strikes['provisional_count'], 0)
+        self.assertFalse(strikes['blocked'])
+        self.assertIsNone(strikes['expires_at'])
+
+    # --- Admin verdict path -------------------------------------------------------------------
+
+    def resolve(self, ticket, verdict):
+        self.client.force_authenticate(user=self.super_user)
+        return self.client.post(
+            f"/api/admin/support/tickets/{ticket.id}/resolve/",
+            {"verdict": verdict},
+            format="json",
+        )
+
+    def test_strike_ticket_is_visible_in_the_superadmin_queue(self):
+        ticket = self.make_ticket()
+        self.client.force_authenticate(user=self.super_user)
+
+        response = self.client.get("/api/admin/support/tickets/")
+
+        self.assertEqual(response.status_code, 200)
+        row = next(item for item in response.data if item['id'] == ticket.id)
+        self.assertEqual(row['status'], 'Open')
+        self.assertIsNone(row['resolution_verdict'])
+        self.assertTrue(row['reported_by_system'])
+        self.assertEqual(row['penalized_user']['id'], self.tutee_profile.id)
+        self.assertEqual(row['penalized_user']['role'], 'Tutee')
+
+    def test_counting_a_provisional_strike_leaves_the_count_unchanged(self):
+        from .views import get_strike_snapshot
+
+        ticket = self.make_ticket()
+        self.assertEqual(get_strike_snapshot(self.tutee_profile)['count'], 1)
+
+        response = self.resolve(ticket, 'counted')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['active_strikes'], 1)
+        self.assertEqual(get_strike_snapshot(self.tutee_profile)['count'], 1)
+
+    def test_counting_a_tutee_strike_does_not_touch_a_wallet(self):
+        ticket = self.make_ticket(profile=self.tutee_profile)
+
+        self.resolve(ticket, 'counted')
+
+        self.assertFalse(Transaction.objects.filter(transaction_type='counted_strike').exists())
+
+    def test_counting_a_tutor_strike_deducts_fifty_once(self):
+        from .views import COUNTED_STRIKE_WALLET_DEDUCTION
+
+        # A post_save signal on Tutor already created the wallet.
+        wallet = Wallet.objects.get(tutor=self.tutor)
+        wallet.balance = Decimal('500.00')
+        wallet.save(update_fields=['balance'])
+        ticket = self.make_ticket(profile=self.tutor_profile)
+
+        self.resolve(ticket, 'counted')
+
+        wallet.refresh_from_db()
+        self.assertEqual(wallet.balance, Decimal('500.00') - COUNTED_STRIKE_WALLET_DEDUCTION)
+        self.assertEqual(Transaction.objects.filter(transaction_type='counted_strike').count(), 1)
+
+    def test_second_resolve_attempt_is_rejected(self):
+        ticket = self.make_ticket()
+
+        self.assertEqual(self.resolve(ticket, 'counted').status_code, 200)
+
+        response = self.resolve(ticket, 'excused')
+
+        self.assertEqual(response.status_code, 400)
+        ticket.refresh_from_db()
+        self.assertEqual(ticket.resolution_verdict, 'counted')
+
+    def test_excusing_a_strike_relieves_the_block(self):
+        from .views import has_reached_strike_cap
+
+        self.make_ticket(verdict='counted')
+        self.make_ticket(verdict='counted')
+        ticket = self.make_ticket()
+        self.assertTrue(has_reached_strike_cap(self.tutee_profile))
+
+        response = self.resolve(ticket, 'excused')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['active_strikes'], 2)
+        self.assertFalse(has_reached_strike_cap(self.tutee_profile))
+
+    # --- cancel_booking end to end ------------------------------------------------------------
+
+    def test_late_cancellation_counts_without_any_admin_action(self):
+        from .views import WEEKDAY_MAP, get_strike_snapshot
+
+        session_start = timezone.localtime(timezone.now()) + timedelta(hours=2)
+        availability = TutorAvailability.objects.create(
+            tutor=self.tutor,
+            day=WEEKDAY_MAP[session_start.date().weekday()],
+            time_slot=time(session_start.hour, 0),
+            is_active=True,
+        )
+        booking = Booking.objects.create(
+            student=self.tutee_profile,
+            tutor=self.tutor,
+            availability=availability,
+            session_date=session_start.date(),
+            session_mode="Online",
+            booking_request_id=uuid4(),
+            session_group_id=uuid4(),
+            status="Confirmed",
+        )
+        self.client.force_authenticate(user=self.tutee_user)
+
+        response = self.client.post(
+            f"/api/bookings/{booking.id}/cancel/",
+            {"reason": "Something urgent came up."},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        ticket = SupportTicket.objects.get(category='Late_Cancellation')
+        self.assertEqual(ticket.penalized_user, self.tutee_profile)
+        self.assertIsNone(ticket.resolution_verdict)
+        self.assertEqual(get_strike_snapshot(self.tutee_profile)['count'], 1)
+
+
+class LateCancellationStrikeMigrationTests(TransactionTestCase):
+    """The cutover backfill: provisional counting must not be retroactive."""
+
+    migrate_from = '0080_subjects_description_and_more'
+    migrate_to = '0081_strike_window_index'
+
+    def test_pre_cutover_unresolved_strikes_are_excused_and_resolved_ones_left_alone(self):
+        from django.db.migrations.executor import MigrationExecutor
+        from django.db import connection
+
+        executor = MigrationExecutor(connection)
+        executor.migrate([('studybuddy', self.migrate_from)])
+        executor.loader.build_graph()
+
+        old_apps = executor.loader.project_state([('studybuddy', self.migrate_from)]).apps
+        SupportTicket = old_apps.get_model('studybuddy', 'SupportTicket')
+        UserProfile = old_apps.get_model('studybuddy', 'UserProfile')
+        User = old_apps.get_model('auth', 'User')
+
+        user = User.objects.create(username='migration-tutee@cpu.edu')
+        profile = UserProfile.objects.create(
+            user_id=user.id,
+            fname='Mig',
+            mname='',
+            lname='Tutee',
+            role='Tutee',
+        )
+        unresolved = SupportTicket.objects.create(
+            user_id=profile.id,
+            category='Late_Cancellation',
+            subject='Late Cancellation review',
+            description='Pre-cutover.',
+            penalized_user_id=profile.id,
+        )
+        counted = SupportTicket.objects.create(
+            user_id=profile.id,
+            category='Late_Cancellation',
+            subject='Late Cancellation review',
+            description='Already judged.',
+            penalized_user_id=profile.id,
+            resolution_verdict='counted',
+        )
+        other_category = SupportTicket.objects.create(
+            user_id=profile.id,
+            category='Technical',
+            subject='Unrelated',
+            description='Not a strike.',
+        )
+
+        executor = MigrationExecutor(connection)
+        executor.loader.build_graph()
+        executor.migrate([('studybuddy', self.migrate_to)])
+
+        new_apps = executor.loader.project_state([('studybuddy', self.migrate_to)]).apps
+        SupportTicket = new_apps.get_model('studybuddy', 'SupportTicket')
+
+        self.assertEqual(
+            SupportTicket.objects.get(pk=unresolved.pk).resolution_verdict, 'excused'
+        )
+        self.assertEqual(SupportTicket.objects.get(pk=counted.pk).resolution_verdict, 'counted')
+        self.assertIsNone(SupportTicket.objects.get(pk=other_category.pk).resolution_verdict)
 
 
 class TuteeVerificationPhase3Tests(APITestCase):

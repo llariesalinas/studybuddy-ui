@@ -1,5 +1,12 @@
 # Brief: Instant Booking
 
+> **Partly superseded (2026-08-10).** The strike system this brief specifies — `MONTHLY_STRIKE_CAP`,
+> 3 *counted* strikes per calendar month — was replaced by a rolling 14-day window of *active*
+> strikes, where an unresolved ticket counts provisionally and only an `excused` verdict relieves
+> it. See [ADR-0011](../adr/0011-provisional-late-cancellation-strikes.md). Everything else here
+> (instant confirmation, Grace Cutoff, P50 tutor deduction on a counted verdict, search-visibility
+> gating) still describes the shipped system.
+
 Follow this brief exactly. Standing rules are in AGENTS.md. Reference:
 `docs/plans/2026-07-15-instant-booking.md` (plan) and `docs/adr/0008-instant-booking-replaces-request-to-book.md`
 (ADR — read this first, it's short and states every rejected alternative and why).

@@ -18,6 +18,11 @@ export const useProfileStore = defineStore('profile', {
     tutorSubjectsCompleted: false,
     walletNegative: false,
     commissionTermsAccepted: true,
+    strikeCount: 0,
+    strikeCap: 3,
+    strikeProvisionalCount: 0,
+    strikeBlocked: false,
+    strikeExpiresAt: null,
     loaded: false
   }),
 
@@ -37,6 +42,11 @@ export const useProfileStore = defineStore('profile', {
       this.tutorSubjectsCompleted = false
       this.walletNegative = false
       this.commissionTermsAccepted = true
+      this.strikeCount = 0
+      this.strikeCap = 3
+      this.strikeProvisionalCount = 0
+      this.strikeBlocked = false
+      this.strikeExpiresAt = null
       this.loaded = false
     },
 
@@ -67,6 +77,13 @@ export const useProfileStore = defineStore('profile', {
       this.tutorSubjectsCompleted = Boolean(res.data.tutor_subjects_completed)
       this.walletNegative = Boolean(res.data.wallet_negative)
       this.commissionTermsAccepted = res.data.commission_terms_accepted !== false
+      // Defaulted per field so a backend that predates late_cancellation_strikes can't NaN the UI.
+      const strikes = res.data.late_cancellation_strikes || {}
+      this.strikeCount = strikes.count || 0
+      this.strikeCap = strikes.cap || 3
+      this.strikeProvisionalCount = strikes.provisional_count || 0
+      this.strikeBlocked = Boolean(strikes.blocked)
+      this.strikeExpiresAt = strikes.expires_at || null
       this.loaded = true
 
       return res.data

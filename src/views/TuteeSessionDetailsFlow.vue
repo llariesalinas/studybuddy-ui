@@ -81,7 +81,6 @@
                 :is-completed="isCompleted"
                 :rating-submitted="!!sessionDetail.rating_submitted"
                 :show-cancel-action="showCancelAction"
-                :can-cancel-session="canCancelSession"
                 :is-cancelling="isCancelling"
                 :is-pending="isPending"
                 :is-quick-submitting="isQuickSubmitting"
@@ -94,7 +93,7 @@
                 @venue-arrived="handleVenueQuickAction"
                 @submit-payment="handleLightAction(goToPayment)"
                 @open-rating="openRatingModal"
-                @open-cancel="handleLightAction(() => { isCancelModalOpen = true })"
+                @open-cancel="handleLightAction(handleOpenCancel)"
                 @report="handleLightAction(() => openSupport('Booking', sessionDetail?.session?.id))"
               />
             </div>
@@ -119,75 +118,21 @@
       @rated="handleRated"
     />
 
-    <div
-      v-if="isCancelModalOpen"
-      class="session-cancel-shell"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="session-cancel-title"
-      @click.self="closeCancelModal"
-    >
-      <div class="session-cancel-card">
-        <div class="session-cancel-header">
-          <div>
-            <span class="session-cancel-eyebrow">Cancel session</span>
-            <h5 id="session-cancel-title" class="session-cancel-title">Are you sure?</h5>
-          </div>
-          <button
-            type="button"
-            class="session-cancel-close sb-btn"
-            aria-label="Close"
-            :disabled="isCancelling"
-            @click="closeCancelModal"
-          >
-            <i class="bi bi-x-lg"></i>
-          </button>
-        </div>
-
-        <div class="session-cancel-body">
-          <p class="session-cancel-lead">{{ cancelActionMessage }}</p>
-          <label class="session-cancel-label" for="session-cancel-reason">Reason (required)</label>
-          <textarea
-            id="session-cancel-reason"
-            v-model="cancelReason"
-            class="session-cancel-field"
-            rows="3"
-            placeholder="Let your tutor know why you're cancelling..."
-            :disabled="isCancelling"
-          ></textarea>
-          <p class="session-cancel-hint">
-            Please also
-            <a href="#" @click.prevent="goToChat">message your tutor in Chat</a>
-            to coordinate.
-          </p>
-        </div>
-
-        <div class="session-cancel-footer">
-          <button
-            type="button"
-            class="session-cancel-btn session-cancel-btn-soft sb-btn"
-            :disabled="isCancelling"
-            @click="closeCancelModal"
-          >
-            Keep session
-          </button>
-          <button
-            type="button"
-            class="session-cancel-btn session-cancel-btn-danger sb-btn"
-            :disabled="isCancelling || !reasonValid"
-            @click="handleCancelSession"
-          >
-            <span
-              v-if="isCancelling"
-              class="spinner-border spinner-border-sm"
-              role="status"
-              aria-hidden="true"
-            ></span>
-            {{ isCancelling ? 'Cancelling...' : 'Yes, cancel session' }}
-          </button>
-        </div>
-      </div>
-    </div>
+    <CancelSessionModal
+      :open="isCancelModalOpen"
+      :submitting="isCancelling"
+      :is-pending="isPending"
+      :is-late="isLateCancellation"
+      :cutoff-label="cutoffLabel"
+      :strike-count="profileStore.strikeCount"
+      :strike-cap="profileStore.strikeCap"
+      :strike-provisional-count="profileStore.strikeProvisionalCount"
+      :strikes-loading="strikesLoading"
+      :strikes-unavailable="strikesUnavailable"
+      @close="closeCancelModal"
+      @confirm="handleCancelSession"
+      @go-to-chat="goToChat"
+    />
     <SupportModal
       :open="isSupportModalOpen"
       :context-type="supportContextType"
@@ -208,11 +153,13 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useSessionsStore } from '@/stores/completedSessions'
 import { useNotificationsStore } from '@/stores/notifications'
+import { useProfileStore } from '@/stores/profile'
 import { useToastStore } from '@/stores/toast'
 import { useHaptics } from '@/composables/useHaptics'
 import { useOrbitStrip } from '@/composables/useOrbitStrip'
 import { resolveMidpointCheckInOutcome } from '@/composables/useMidpointCheckIn'
 import { useSessionClock } from '@/composables/useSessionClock'
+import { useCancellationWindow } from '@/composables/useCancellationWindow'
 import RatingStackModal from '@/components/RatingStackModal.vue'
 import SupportModal from '@/components/SupportModal.vue'
 import DevSessionQaPanel from '@/components/DevSessionQaPanel.vue'
@@ -223,11 +170,13 @@ import SessionInfoGrid from '@/components/session/SessionInfoGrid.vue'
 import SessionTimeline from '@/components/session/SessionTimeline.vue'
 import SessionActionRail from '@/components/session/SessionActionRail.vue'
 import SessionCheckInModal from '@/components/SessionCheckInModal.vue'
+import CancelSessionModal from '@/components/session/CancelSessionModal.vue'
 
 const route = useRoute()
 const router = useRouter()
 const sessionsStore = useSessionsStore()
 const notificationsStore = useNotificationsStore()
+const profileStore = useProfileStore()
 const toastStore = useToastStore()
 const { vibrate, patterns } = useHaptics()
 
@@ -238,7 +187,8 @@ const isRatingModalOpen = ref(false)
 const isCancelModalOpen = ref(false)
 const isCancelling = ref(false)
 const isQuickSubmitting = ref(false)
-const cancelReason = ref('')
+const strikesLoading = ref(false)
+const strikesUnavailable = ref(false)
 const paymentSyncing = ref(false)
 const paymentReturnMessage = ref('')
 const paymentReturnState = ref('info')
@@ -272,28 +222,19 @@ const isCompleted = computed(() => normalizedStatus.value === 'completed')
 const statusOngoing = computed(() => normalizedStatus.value === 'ongoing')
 const isUpcoming = computed(() => normalizedStatus.value === 'upcoming')
 const isPending = computed(() => normalizedStatus.value === 'pending')
-const reasonValid = computed(() => cancelReason.value.trim().length >= 5)
-const tomorrowKey = computed(() => {
-  const d = new Date()
-  d.setDate(d.getDate() + 1)
-  const year = d.getFullYear()
-  const month = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-})
 const showCancelAction = computed(() => isUpcoming.value || isPending.value)
-const canCancelSession = computed(() => (
-  (isUpcoming.value || isPending.value)
-  && String(sessionDetail.value?.session?.date || '') > tomorrowKey.value
-))
+// Cancelling is never blocked by the UI -- the backend accepts it either way and only differs in
+// whether it opens a Late Cancellation ticket. See useCancellationWindow.
 const cancelActionMessage = computed(() => {
-  if (canCancelSession.value) {
-    return isPending.value
-      ? 'You can withdraw this pending request before it is confirmed.'
-      : 'This upcoming session can still be cancelled.'
+  if (isPending.value) {
+    return 'You can withdraw this pending request.'
   }
 
-  return 'Sessions can only be cancelled at least two days before the session date.'
+  if (!isLateCancellation.value) {
+    return `Free to cancel until ${cutoffLabel.value}.`
+  }
+
+  return 'Past the Grace Cutoff — cancelling now counts as a strike.'
 })
 const paymentReturnAlertClass = computed(() => {
   if (paymentReturnState.value === 'success') return 'alert-success'
@@ -368,6 +309,12 @@ const clock = useSessionClock({
   startTime: computed(() => sessionDetail.value?.session?.start_time),
   endTime: computed(() => sessionDetail.value?.session?.end_time),
   isOngoing: statusOngoing,
+})
+// Anchored on the session's first slot, matching is_late_cancellation in the backend, which
+// measures from the first booking of the group.
+const { isLate: isLateCancellation, cutoffLabel } = useCancellationWindow({
+  date: computed(() => sessionDetail.value?.session?.date),
+  startTime: computed(() => sessionDetail.value?.session?.start_time),
 })
 const { presentation: detailOrbitPresentation, hasOrbit: showDetailOrbit } = useOrbitStrip({
   session: sessionDetail,
@@ -549,8 +496,24 @@ const closeCancelModal = () => {
     return
   }
 
-  cancelReason.value = ''
   isCancelModalOpen.value = false
+}
+
+// The store is hydrated at app load, so the count would be stale by the time someone cancels.
+// Refresh on open -- but never block opening the modal on it: a failed refresh must not stop
+// someone from cancelling, it only costs us the strike line in the warning.
+const handleOpenCancel = async () => {
+  isCancelModalOpen.value = true
+  strikesLoading.value = true
+  strikesUnavailable.value = false
+
+  try {
+    await profileStore.checkProfileStatus()
+  } catch {
+    strikesUnavailable.value = true
+  } finally {
+    strikesLoading.value = false
+  }
 }
 
 const goToPayment = () => {
@@ -561,18 +524,13 @@ const goToChat = () => {
   router.push({ name: 'chat' })
 }
 
-const handleCancelSession = async () => {
-  if (!canCancelSession.value || !reasonValid.value) {
-    return
-  }
-
+const handleCancelSession = async (reason) => {
   isCancelling.value = true
 
   try {
-    const updatedDetail = await sessionsStore.cancelSession(route.params.id, cancelReason.value.trim())
+    const updatedDetail = await sessionsStore.cancelSession(route.params.id, reason)
     sessionDetail.value = updatedDetail
     isCancelModalOpen.value = false
-    cancelReason.value = ''
     await notificationsStore.fetchNotifications()
     toastStore.push('Session cancelled successfully.')
   } catch (error) {
@@ -665,141 +623,6 @@ onMounted(async () => {
   background: var(--session-confetti-color);
   animation: session-confetti-burst 1.2s ease-out forwards;
   animation-delay: calc(var(--session-confetti-index) * 14ms);
-}
-
-.session-cancel-shell {
-  position: fixed;
-  inset: 0;
-  z-index: 1200;
-  display: grid;
-  place-items: center;
-  padding: 24px;
-  background: rgba(15, 23, 42, 0.45);
-}
-
-.session-cancel-card {
-  width: min(100%, 440px);
-  padding: 26px;
-  background:
-    radial-gradient(circle at 12% 16%, color-mix(in srgb, var(--sb-primary) 12%, transparent), transparent 34%),
-    radial-gradient(circle at 88% 84%, color-mix(in srgb, var(--sb-pop-orange) 12%, transparent), transparent 28%),
-    var(--sb-card-bg);
-  border: 1px solid var(--sb-card-border);
-  border-radius: 24px;
-  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.16);
-}
-
-.session-cancel-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  padding-bottom: 14px;
-  border-bottom: 1px solid var(--sb-card-border);
-}
-
-.session-cancel-eyebrow {
-  display: block;
-  margin-bottom: 4px;
-  color: var(--sb-danger);
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0;
-  text-transform: uppercase;
-}
-
-.session-cancel-title {
-  margin: 0;
-  color: var(--sb-text-main);
-  font-size: 18px;
-  font-weight: 800;
-}
-
-.session-cancel-close {
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  border: 0;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--sb-text-main) 8%, transparent);
-  color: var(--sb-text-muted);
-}
-
-.session-cancel-body {
-  padding: 18px 0;
-}
-
-.session-cancel-lead {
-  margin: 0 0 14px;
-  color: var(--sb-text-main);
-  font-size: 14px;
-  line-height: 1.5;
-}
-
-.session-cancel-label {
-  display: block;
-  margin-bottom: 6px;
-  color: var(--sb-text-muted);
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0;
-  text-transform: uppercase;
-}
-
-.session-cancel-field {
-  width: 100%;
-  padding: 12px 14px;
-  border: 1px solid var(--sb-card-border);
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--sb-card-bg) 96%, transparent);
-  color: var(--sb-text-main);
-  font: inherit;
-  font-size: 14px;
-  resize: vertical;
-}
-
-.session-cancel-field:focus {
-  outline: 0;
-  border-color: color-mix(in srgb, var(--sb-danger) 40%, var(--sb-card-border));
-}
-
-.session-cancel-hint {
-  margin: 10px 0 0;
-  color: var(--sb-text-muted);
-  font-size: 12.5px;
-}
-
-.session-cancel-hint a {
-  color: var(--sb-primary);
-  font-weight: 700;
-  text-decoration: none;
-}
-
-.session-cancel-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  padding-top: 16px;
-  border-top: 1px solid var(--sb-card-border);
-}
-
-.session-cancel-btn {
-  min-height: 42px;
-  padding: 0 18px;
-}
-
-.session-cancel-btn-soft {
-  border: 1px solid var(--sb-card-border);
-  background: color-mix(in srgb, var(--sb-card-bg) 72%, transparent);
-  color: var(--sb-text-main);
-}
-
-.session-cancel-btn-danger {
-  border: 0;
-  background: var(--sb-danger);
-  color: #fff;
-  box-shadow: 0 8px 18px rgba(239, 68, 68, 0.25);
 }
 
 @keyframes session-confetti-burst {

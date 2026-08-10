@@ -102,7 +102,10 @@ TUTOR_SUBJECT_LIMIT = 8
 DEFAULT_TUTOR_SUBJECT_EXPERTISE_LEVEL = 3
 BOOKING_HORIZON_DAYS = 14
 COUNTED_STRIKE_WALLET_DEDUCTION = decimal.Decimal('50.00')
-MONTHLY_STRIKE_CAP = 3
+# Rolling window: each Late Cancellation strike expires on its own, STRIKE_WINDOW_DAYS after it was
+# issued. Coincidentally equal to BOOKING_HORIZON_DAYS above -- they are unrelated, do not merge.
+STRIKE_WINDOW_DAYS = 14
+STRIKE_CAP = 3
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
@@ -316,6 +319,11 @@ def can_create_new_booking(profile):
     """Source-of-truth check for the forward-only booking gate: can this profile take on NEW work
     (a tutee creating a booking, a tutor accepting a pending booking request)? Existing bookings,
     wallet, and dashboard access are never affected by this check."""
+    # The strike cap applies to both roles unconditionally. It must not be short-circuited by the
+    # tutee verification grace period below -- that early return is about verification only.
+    if has_reached_strike_cap(profile):
+        return False
+
     if profile.role == 'Tutee' and not tutee_verification_enforced():
         return True
 
@@ -323,28 +331,57 @@ def can_create_new_booking(profile):
     if application is None:
         return False
 
-    if not (
+    return (
         application.application_status == 'approved'
         and application.document_renewal_status() == 'verified'
-    ):
-        return False
-
-    return not has_reached_monthly_strike_cap(profile)
+    )
 
 
-def get_monthly_counted_strike_count(profile, reference_time=None):
-    reference_time = timezone.localtime(reference_time or timezone.now())
+def get_active_strike_tickets(profile, reference_time=None):
+    """Late Cancellation tickets still counting against `profile`: opened inside the rolling
+    window and not excused. An unresolved ticket counts provisionally -- only an explicit
+    `excused` verdict relieves it.
+
+    No timezone.localtime() normalization here: a timedelta between two aware datetimes is
+    timezone-invariant. Manila only matters for *display* of expires_at, which the client formats.
+    """
+    if profile is None:
+        return SupportTicket.objects.none()
+
+    reference_time = reference_time or timezone.now()
     return SupportTicket.objects.filter(
         category='Late_Cancellation',
-        resolution_verdict='counted',
         penalized_user=profile,
-        created_at__year=reference_time.year,
-        created_at__month=reference_time.month,
-    ).count()
+        # Strict: a ticket at exactly STRIKE_WINDOW_DAYS has expired.
+        created_at__gt=reference_time - timedelta(days=STRIKE_WINDOW_DAYS),
+    ).exclude(resolution_verdict='excused')
 
 
-def has_reached_monthly_strike_cap(profile, reference_time=None):
-    return get_monthly_counted_strike_count(profile, reference_time) >= MONTHLY_STRIKE_CAP
+def has_reached_strike_cap(profile, reference_time=None):
+    return get_active_strike_tickets(profile, reference_time).count() >= STRIKE_CAP
+
+
+def get_strike_snapshot(profile, reference_time=None):
+    """Display-shaped strike state for /profile/status/ and the 403 payload."""
+    reference_time = reference_time or timezone.now()
+    rows = list(
+        get_active_strike_tickets(profile, reference_time)
+        .order_by('created_at')
+        .values_list('created_at', 'resolution_verdict')
+    )
+    count = len(rows)
+    blocked = count >= STRIKE_CAP
+    return {
+        'count': count,
+        'cap': STRIKE_CAP,
+        'provisional_count': sum(1 for _, verdict in rows if not verdict),
+        'window_days': STRIKE_WINDOW_DAYS,
+        'blocked': blocked,
+        # The strike whose expiry actually drops the count below the cap -- NOT simply the oldest,
+        # which would under-promise once a 4th strike lands.
+        'expires_at': rows[count - STRIKE_CAP][0] + timedelta(days=STRIKE_WINDOW_DAYS)
+        if blocked else None,
+    }
 
 
 # --- Verification dev tools (self-service) ---------------------------------------------------------
@@ -1455,6 +1492,8 @@ def profile_status(request):
         "tutor_subject_count": tutor_subject_count,
         "tutor_subjects_completed": tutor_subject_count > 0,
         "commission_terms_accepted": commission_terms_accepted,
+        # Role-agnostic: the tutee cancel modal consumes this today, the tutor UI can later.
+        "late_cancellation_strikes": get_strike_snapshot(profile),
         **document_context
     })
 
@@ -2479,14 +2518,28 @@ def confirm_payment_and_book(request):
 
     user_profile = get_object_or_404(UserProfile, user=request.user)
 
-    if user_profile.role == 'Tutee' and not can_create_new_booking(user_profile):
-        return Response(
-            {
-                "error": "Please verify your enrollment before booking a new session.",
-                "code": "verification_required",
-            },
-            status=403,
-        )
+    if user_profile.role == 'Tutee':
+        # Report the strike block first: it's the more actionable of the two causes, and a capped
+        # tutee would otherwise be told to verify an enrollment that is already fine.
+        strikes = get_strike_snapshot(user_profile)
+        if strikes['blocked']:
+            return Response(
+                {
+                    "error": "Late-cancellation strike limit reached.",
+                    "code": "strike_cap_reached",
+                    "strikes": strikes,
+                },
+                status=403,
+            )
+
+        if not can_create_new_booking(user_profile):
+            return Response(
+                {
+                    "error": "Please verify your enrollment before booking a new session.",
+                    "code": "verification_required",
+                },
+                status=403,
+            )
 
     tutor_id = request.data.get("tutor_id")
     slots = request.data.get("slots")
@@ -3902,7 +3955,7 @@ def get_recommendation_candidate_tutors(
         if (
             wallet.balance >= 0
             and load_snapshot['accepted_session_load'] < load_snapshot['session_load_limit']
-            and not has_reached_monthly_strike_cap(candidate.profile)
+            and not has_reached_strike_cap(candidate.profile)
         ):
             eligible_candidate_ids.append(candidate.profile_id)
     base_candidates = base_candidates.filter(profile_id__in=eligible_candidate_ids)
@@ -5790,10 +5843,19 @@ def admin_list_tickets(request):
         return Response(status=403)
 
     from .models import SupportTicket
-    tickets = SupportTicket.objects.select_related('user', 'assigned_agent', 'escalated_by').all().order_by('-created_at')
+    tickets = SupportTicket.objects.select_related(
+        'user', 'assigned_agent', 'escalated_by', 'penalized_user'
+    ).all().order_by('-created_at')
 
     if profile.role == 'SuperAdmin':
-        tickets = tickets.filter(Q(status='Escalated') | Q(escalated_at__isnull=False))
+        # Late Cancellation tickets are opened by the system as Open/unescalated, so they would
+        # never surface under the escalation-only filter. Widened here rather than auto-escalating
+        # at creation, which would fabricate escalation metadata (escalated_by, escalated_at).
+        tickets = tickets.filter(
+            Q(status='Escalated')
+            | Q(escalated_at__isnull=False)
+            | Q(category='Late_Cancellation')
+        )
     else:
         tickets = tickets.filter(user__institution=profile.institution).exclude(status='Escalated')
 
@@ -5810,6 +5872,14 @@ def admin_list_tickets(request):
             "subject": ticket.subject,
             "description": ticket.description,
             "status": ticket.status,
+            "resolution_verdict": ticket.resolution_verdict,
+            "reported_by_system": ticket.reported_by_system,
+            # Who the strike lands on -- not the same person as `user`, who is the aggrieved party.
+            "penalized_user": {
+                "id": ticket.penalized_user.id,
+                "name": f"{ticket.penalized_user.fname} {ticket.penalized_user.lname}",
+                "role": ticket.penalized_user.role,
+            } if ticket.penalized_user else None,
             "booking_id": ticket.booking_id,
             "transaction_id": ticket.transaction_id,
             "chatroom_id": ticket.chatroom_id,
@@ -5875,7 +5945,7 @@ def admin_resolve_ticket(request, ticket_id):
         'message': 'Ticket resolved',
         'status': 'Resolved',
         'resolution_verdict': ticket.resolution_verdict,
-        'monthly_counted_strikes': get_monthly_counted_strike_count(ticket.penalized_user)
+        'active_strikes': get_strike_snapshot(ticket.penalized_user)['count']
         if ticket.penalized_user else 0,
     })
 

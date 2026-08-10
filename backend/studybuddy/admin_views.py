@@ -40,7 +40,7 @@ from .email_utils import (
     enqueue_application_rejected_email,
     enqueue_document_renewal_result_email,
 )
-from .views import get_verification_application
+from .views import get_strike_snapshot, get_verification_application
 from . import _verification_dev
 from . import mailer
 
@@ -664,9 +664,16 @@ def _user_stats(profile):
 
     user_role = profile.role.lower()
     cancelled = bookings.filter(status='Cancelled')
+    # Lifetime counts, unlike active_strikes -- which is the current rolling-window state driving
+    # the booking gate right now, not a history. See ADR-0011.
+    strikes = get_strike_snapshot(profile)
     cancellations = {
         'by_user': cancelled.filter(cancelled_by_role=user_role).count(),
         'by_counterpart': cancelled.exclude(cancelled_by_role=user_role).count(),
+        'active_strikes': strikes['count'],
+        'strike_cap': strikes['cap'],
+        'strike_window_days': strikes['window_days'],
+        'strike_blocked': strikes['blocked'],
     }
 
     counterpart_counts = {}
@@ -742,6 +749,7 @@ class AdminUserStatsExportView(APIView):
             writer.writerow(['subject', value])
         writer.writerow(['cancellations by user', data['cancellations']['by_user']])
         writer.writerow(['cancellations by counterpart', data['cancellations']['by_counterpart']])
+        writer.writerow(['active late-cancellation strikes', data['cancellations']['active_strikes']])
         for index, counterpart in enumerate(data['top_counterparts'], start=1):
             writer.writerow([
                 f'counterpart {index}',

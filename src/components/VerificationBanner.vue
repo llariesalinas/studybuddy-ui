@@ -43,7 +43,8 @@
 import { computed, ref, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useProfileStore } from '@/stores/profile'
-import { needsTuteeVerificationBlock } from '@/services/tutorApplicationState'
+import { needsTuteeStrikeBlock, needsTuteeVerificationBlock } from '@/services/tutorApplicationState'
+import { formatCutoffLabel } from '@/composables/useCancellationWindow'
 
 const emit = defineEmits(['navigate'])
 
@@ -59,6 +60,8 @@ const tuteeVerificationSnapshot = computed(() => ({
   application_status: profileStore.applicationStatus || null,
   document_renewal_status: profileStore.renewalStatus || null,
   tutee_verification_enforced: profileStore.tuteeVerificationEnforced,
+  strike_blocked: profileStore.strikeBlocked,
+  strike_expires_at: profileStore.strikeExpiresAt,
 }))
 
 const showTuteeBanner = computed(() =>
@@ -66,6 +69,24 @@ const showTuteeBanner = computed(() =>
   normalizedUserRole.value === 'tutee' &&
   needsTuteeVerificationBlock(tuteeVerificationSnapshot.value)
 )
+
+// Deliberately a separate banner from the verification one: the remedy is different. There is
+// nothing to submit here, you wait for the strike to age out.
+const showTuteeStrikeBanner = computed(() =>
+  profileStore.loaded &&
+  normalizedUserRole.value === 'tutee' &&
+  needsTuteeStrikeBlock(tuteeVerificationSnapshot.value)
+)
+
+const strikeExpiryLabel = computed(() => {
+  const expiresAt = profileStore.strikeExpiresAt
+
+  if (!expiresAt) {
+    return 'once your oldest strike expires'
+  }
+
+  return `on ${formatCutoffLabel(new Date(expiresAt))}`
+})
 
 const showTutorBanner = computed(() =>
   profileStore.loaded &&
@@ -81,6 +102,20 @@ const showTutorInitialVerificationBanner = computed(() =>
 )
 
 const bannerContent = computed(() => {
+  // Ahead of the verification banner: verifying does not lift a strike block, so showing the
+  // "Verify Now" remedy first would send a blocked tutee somewhere that can't help them.
+  if (showTuteeStrikeBanner.value) {
+    return {
+      tone: 'strike',
+      icon: 'bi bi-slash-circle',
+      eyebrow: 'Booking paused',
+      title: `You have ${profileStore.strikeCap} late-cancellation strikes.`,
+      text: `Strikes expire 14 days after they are issued. You can book again ${strikeExpiryLabel.value}.`,
+      cta: 'View my sessions',
+      navigateTo: '/tuteeSessions',
+    }
+  }
+
   if (showTuteeBanner.value) {
     return {
       tone: 'tutee',
@@ -173,6 +208,11 @@ const dismissBanner = () => {
   border-color: #d8cdf7;
 }
 
+.verification-banner--strike {
+  background: linear-gradient(135deg, #fef2f2 0%, #ffffff 85%);
+  border-color: #f5c2c2;
+}
+
 .verification-banner__body {
   display: flex;
   align-items: flex-start;
@@ -193,6 +233,11 @@ const dismissBanner = () => {
 .verification-banner--tutee .verification-banner__icon {
   background: rgba(217, 119, 6, 0.12);
   color: #b45309;
+}
+
+.verification-banner--strike .verification-banner__icon {
+  background: rgba(239, 68, 68, 0.12);
+  color: #b91c1c;
 }
 
 .verification-banner--tutor .verification-banner__icon {

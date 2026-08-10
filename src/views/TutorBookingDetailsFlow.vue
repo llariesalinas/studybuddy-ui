@@ -162,19 +162,10 @@
                 </button>
               </template>
 
-              <template v-else-if="showDevReadyForPayment">
-                <p>Dev option: end this session now so the tutee can open the post-session payment flow.</p>
-                <button
-                  class="session-cta sb-btn btn-soft"
-                  :disabled="isDevSubmitting"
-                  @click="handleMediumAction(handleDevReadyForPayment)"
-                >
-                  {{ isDevSubmitting ? 'Updating...' : 'Dev: End Session Now' }}
-                </button>
-              </template>
-
+              <!-- Ahead of the dev branch below: its condition is true for every upcoming session
+                   in dev, so ordering it first hid the real Cancel Session button entirely. -->
               <template v-else-if="showCancelButton">
-                <p>Confirmed. Coordinate with your tutee or cancel 2+ days ahead.</p>
+                <p>{{ cancelActionMessage }}</p>
                 <button
                   class="session-cta sb-btn btn-primary-action sb-elevated sb-elevated--brand"
                   @click="handleLightAction(goToChat)"
@@ -184,14 +175,30 @@
                 </button>
                 <button
                   class="session-cta sb-btn btn-danger-soft"
-                  :disabled="isCancelling || !canCancel"
-                  @click="handleLightAction(() => { isCancelModalOpen = true })"
+                  :disabled="isCancelling"
+                  @click="handleLightAction(handleOpenCancel)"
                 >
                   {{ isCancelling ? 'Cancelling...' : 'Cancel Session' }}
                 </button>
-                <p v-if="!canCancel" class="session-note">
-                  Sessions can only be cancelled at least two days before the session date.
-                </p>
+                <button
+                  v-if="showDevReadyForPayment"
+                  class="session-cta sb-btn btn-soft"
+                  :disabled="isDevSubmitting"
+                  @click="handleMediumAction(handleDevReadyForPayment)"
+                >
+                  {{ isDevSubmitting ? 'Updating...' : 'Dev: End Session Now' }}
+                </button>
+              </template>
+
+              <template v-else-if="showDevReadyForPayment">
+                <p>Dev option: end this session now so the tutee can open the post-session payment flow.</p>
+                <button
+                  class="session-cta sb-btn btn-soft"
+                  :disabled="isDevSubmitting"
+                  @click="handleMediumAction(handleDevReadyForPayment)"
+                >
+                  {{ isDevSubmitting ? 'Updating...' : 'Dev: End Session Now' }}
+                </button>
               </template>
 
               <template v-else>
@@ -261,71 +268,22 @@
       @refresh="refreshBookingDetails"
     />
 
-    <div
-      v-if="isCancelModalOpen"
-      class="modal fade show d-block"
-      tabindex="-1"
-      role="dialog"
-      aria-modal="true"
-    >
-      <div class="modal-dialog modal-dialog-centered" role="document">
-        <div class="modal-content border-0 shadow">
-          <div class="modal-header">
-            <h5 class="modal-title fw-bold">Cancel Session</h5>
-            <button
-              type="button"
-              class="btn-close"
-              aria-label="Close"
-              :disabled="isCancelling"
-              @click="closeCancelModal"
-            ></button>
-          </div>
-
-          <div class="modal-body">
-            <p class="mb-2">Are you sure you want to cancel this session?</p>
-            <label class="form-label fw-semibold small">Reason (required)</label>
-            <textarea
-              v-model="cancelReason"
-              class="form-control shadow-none sb-field"
-              rows="3"
-              placeholder="Let your tutee know why you're cancelling..."
-              :disabled="isCancelling"
-            ></textarea>
-            <p class="small text-muted mt-2 mb-0">
-              Please also
-              <a href="#" @click.prevent="goToChat">message your tutee in Chat</a>
-              to coordinate.
-            </p>
-          </div>
-
-          <div class="modal-footer">
-            <button
-              type="button"
-              class="btn btn-outline-secondary sb-btn"
-              :disabled="isCancelling"
-              @click="closeCancelModal"
-            >
-              Keep Session
-            </button>
-            <button
-              type="button"
-              class="btn btn-danger sb-btn"
-              :disabled="isCancelling || !reasonValid"
-              @click="handleCancel"
-            >
-              <span
-                v-if="isCancelling"
-                class="spinner-border spinner-border-sm me-2"
-                role="status"
-                aria-hidden="true"
-              ></span>
-              {{ isCancelling ? 'Cancelling...' : 'Yes, Cancel Session' }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div v-if="isCancelModalOpen" class="modal-backdrop fade show"></div>
+    <CancelSessionModal
+      :open="isCancelModalOpen"
+      :submitting="isCancelling"
+      :is-late="isLateCancellation"
+      :cutoff-label="cutoffLabel"
+      :strike-count="profileStore.strikeCount"
+      :strike-cap="profileStore.strikeCap"
+      :strike-provisional-count="profileStore.strikeProvisionalCount"
+      :strikes-loading="strikesLoading"
+      :strikes-unavailable="strikesUnavailable"
+      counterpart-label="tutee"
+      wallet-penalty
+      @close="closeCancelModal"
+      @confirm="handleCancel"
+      @go-to-chat="goToChat"
+    />
     <SupportModal
       :open="isSupportModalOpen"
       :context-type="supportContextType"
@@ -339,14 +297,17 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useNotificationsStore } from '@/stores/notifications'
+import { useProfileStore } from '@/stores/profile'
 import { useTutorBookingDetailStore } from '@/stores/tutorBookingDetails'
 import { useToastStore } from '@/stores/toast'
 import { useHaptics } from '@/composables/useHaptics'
 import { useOrbitStrip } from '@/composables/useOrbitStrip'
 import { useSessionClock } from '@/composables/useSessionClock'
+import { useCancellationWindow } from '@/composables/useCancellationWindow'
 import { BOOKING_DEV_TOOLS_ENABLED } from '@/config.js'
 import DevSessionQaPanel from '@/components/DevSessionQaPanel.vue'
 import SupportModal from '@/components/SupportModal.vue'
+import CancelSessionModal from '@/components/session/CancelSessionModal.vue'
 import SessionCountdownBar from '@/components/session/SessionCountdownBar.vue'
 import SessionAurora from '@/components/session/SessionAurora.vue'
 import SessionHero from '@/components/session/SessionHero.vue'
@@ -357,6 +318,7 @@ const route = useRoute()
 const router = useRouter()
 const bookingDetailsStore = useTutorBookingDetailStore()
 const notificationsStore = useNotificationsStore()
+const profileStore = useProfileStore()
 const toastStore = useToastStore()
 const { vibrate, patterns } = useHaptics()
 const isSubmitting = ref(false)
@@ -366,7 +328,8 @@ const isCancelModalOpen = ref(false)
 const isSupportModalOpen = ref(false)
 const supportContextType = ref('Booking')
 const supportContextId = ref(null)
-const cancelReason = ref('')
+const strikesLoading = ref(false)
+const strikesUnavailable = ref(false)
 const showConfetti = ref(false)
 const isDev = import.meta.env.DEV || BOOKING_DEV_TOOLS_ENABLED
 
@@ -396,18 +359,22 @@ const showDevReadyForPayment = computed(
     !bookingDetailsStore.booking?.tutor_confirmed,
 )
 
-const reasonValid = computed(() => cancelReason.value.trim().length >= 5)
-const tomorrowKey = computed(() => {
-  const d = new Date()
-  d.setDate(d.getDate() + 1)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-})
 const showCancelButton = computed(() => normalizedStatus.value === 'upcoming')
-const canCancel = computed(
-  () =>
-    normalizedStatus.value === 'upcoming' &&
-    String(bookingDetailsStore.sessionInfo?.date || '') > tomorrowKey.value,
-)
+
+// Cancelling is never blocked by the UI -- the backend accepts it either way and only differs in
+// whether it opens a Late Cancellation ticket. See useCancellationWindow and ADR-0011.
+const { isLate: isLateCancellation, cutoffLabel } = useCancellationWindow({
+  date: computed(() => bookingDetailsStore.sessionInfo?.date),
+  startTime: computed(() => bookingDetailsStore.sessionInfo?.start_time),
+})
+
+const cancelActionMessage = computed(() => {
+  if (!isLateCancellation.value) {
+    return `Confirmed. Coordinate with your tutee, or cancel free until ${cutoffLabel.value}.`
+  }
+
+  return 'Confirmed. Past the Grace Cutoff — cancelling now counts as a strike.'
+})
 
 const amountPaid = computed(() => {
   const value = Number(bookingDetailsStore.paymentInfo?.amount_paid || 0)
@@ -658,22 +625,33 @@ const closeCancelModal = () => {
     return
   }
 
-  cancelReason.value = ''
   isCancelModalOpen.value = false
 }
 
-const handleCancel = async () => {
-  if (!canCancel.value || !reasonValid.value) {
-    return
-  }
+// The store is hydrated at app load, so the count would be stale by the time someone cancels.
+// Refresh on open -- but never block opening the modal on it: a failed refresh must not stop
+// someone from cancelling, it only costs us the strike line in the warning.
+const handleOpenCancel = async () => {
+  isCancelModalOpen.value = true
+  strikesLoading.value = true
+  strikesUnavailable.value = false
 
+  try {
+    await profileStore.checkProfileStatus()
+  } catch {
+    strikesUnavailable.value = true
+  } finally {
+    strikesLoading.value = false
+  }
+}
+
+const handleCancel = async (reason) => {
   isCancelling.value = true
 
   try {
-    await bookingDetailsStore.cancelBooking(cancelReason.value.trim())
+    await bookingDetailsStore.cancelBooking(reason)
     await notificationsStore.fetchNotifications()
     isCancelModalOpen.value = false
-    cancelReason.value = ''
     toastStore.push('Session cancelled. Your tutee has been notified.')
   } catch (error) {
     toastStore.push(error.response?.data?.error || 'Failed to cancel session.', 'error')

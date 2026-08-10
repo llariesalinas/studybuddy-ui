@@ -155,6 +155,15 @@
               <article class="stats-card cancellation-grid">
                 <div><strong>{{ userStats.cancellations.by_user }}</strong><span>By user</span></div>
                 <div><strong>{{ userStats.cancellations.by_counterpart }}</strong><span>By counterpart</span></div>
+                <div :class="{ 'is-blocked': userStats.cancellations.strike_blocked }">
+                  <strong>
+                    {{ userStats.cancellations.active_strikes ?? 0 }}<span class="of-cap">/{{ userStats.cancellations.strike_cap ?? 3 }}</span>
+                  </strong>
+                  <span>
+                    Active strikes
+                    <small>last {{ userStats.cancellations.strike_window_days ?? 14 }} days</small>
+                  </span>
+                </div>
               </article>
 
               <div class="section-heading">
@@ -1064,7 +1073,7 @@ h2 {
 
 .cancellation-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -1082,6 +1091,23 @@ h2 {
 .cancellation-grid span {
   color: var(--sb-text-muted);
   font-size: 12px;
+}
+
+.cancellation-grid small {
+  display: block;
+  font-size: 11px;
+  opacity: 0.75;
+}
+
+/* The cap is what matters at a glance -- a user sitting at 3/3 is blocked from booking right now. */
+.cancellation-grid .is-blocked strong {
+  color: var(--sb-danger);
+}
+
+.cancellation-grid .of-cap {
+  color: var(--sb-text-muted);
+  font-size: 15px;
+  font-weight: 700;
 }
 
 .empty-state {

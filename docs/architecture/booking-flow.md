@@ -6,13 +6,17 @@ This document describes the end-to-end tutee booking flow in StudyBuddy. It is t
 
 `POST bookings/confirm/` confirms a booking immediately; new rows are never Pending. It enforces
 the Booking Horizon (14 days), tutor verification, non-negative wallet balance, Accepted Session
-Load Limit, and Monthly Strike Cap. Online session groups receive one server-generated Meeting
+Load Limit, and Strike Cap. Online session groups receive one server-generated Meeting
 Link; a chat room is opened with a neutral system message and both parties are notified.
 
-Cancellation remains self-serve. Before the Grace Cutoff (12 hours before the session) it is
-penalty-free. A Late Cancellation cancels immediately but creates a system-opened Support Ticket.
-An admin resolves it as excused or counted; a Counted Strike deducts P50 from a tutor wallet and
-three counted strikes in a calendar month suspend a tutee from booking or hide a tutor from search.
+Cancellation remains self-serve and is never blocked by the UI. Before the Grace Cutoff (12 hours
+before the session) it is penalty-free; a tutee sees a warning modal either way, which names the
+cutoff and — when the cancellation is late — the strike it will cost. A Late Cancellation cancels
+immediately and creates a system-opened Support Ticket that counts against the canceller's Strike
+Cap from the moment it is opened, before any admin review (see ADR-0011). An admin resolves it as
+excused (which relieves the strike) or counted (which only triggers the P50 tutor wallet
+deduction). Three active strikes inside the rolling 14-day window suspend a tutee from booking or
+hide a tutor from search, and each strike expires on its own 14 days after it was issued.
 The old approve/reject step and requested-sessions route are removed.
 
 ## Overview
