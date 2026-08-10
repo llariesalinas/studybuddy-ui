@@ -8545,13 +8545,24 @@ class AdminProposedSubjectReviewTests(APITestCase):
         )
         self.client.force_authenticate(user=self.admin_user)
 
-    def make_proposal(self, code, keywords=""):
+    def make_proposal(self, code, keywords="", tutor_note=""):
         subject = Subjects.objects.create(
             subject_code=code, subject_name=f"Proposal {code}", department="Mathematics",
             status="pending", proposed_by_tutor=self.tutor,
             proposed_application=self.application, keywords=keywords,
         )
-        TutorSubjects.objects.create(tutor=self.tutor, subject=subject, expertise_level=3)
+        TutorSubjects.objects.create(
+            tutor=self.tutor, subject=subject, expertise_level=3, description=tutor_note,
+        )
+        return subject
+
+    def make_selected_subject(self, code, name, category="Natural Sciences"):
+        """An approved catalog subject the tutor picked, as opposed to proposed."""
+        subject = Subjects.objects.create(
+            subject_code=code, subject_name=name, department="Sciences",
+            category=category, status="approved",
+        )
+        TutorSubjects.objects.create(tutor=self.tutor, subject=subject, expertise_level=4)
         return subject
 
     def test_application_detail_includes_pending_proposed_subjects(self):
@@ -8582,8 +8593,11 @@ class AdminProposedSubjectReviewTests(APITestCase):
         self.application.refresh_from_db()
         self.assertEqual(self.application.application_status, "rejected")
 
-    def test_update_action_edits_pending_proposal_fields_and_description(self):
-        proposal = self.make_proposal("UPDATE-PROP")
+    def test_update_action_writes_catalog_description_not_the_tutor_note(self):
+        """The admin form edits Subjects.description (global catalog copy, which
+        the subject pickers search). The tutor's own note is evidence, not copy,
+        and must survive the edit untouched."""
+        proposal = self.make_proposal("UPDATE-PROP", tutor_note="I tutored this for two terms.")
 
         response = self.client.patch(
             f"/api/admin/tutor-applications/{self.application.id}/subjects/"
@@ -8593,7 +8607,7 @@ class AdminProposedSubjectReviewTests(APITestCase):
                 "subject_name": "Updated Proposal Name",
                 "category": "Mathematics & Data Sciences",
                 "keywords": "algebra, math",
-                "description": "Refined by admin.",
+                "catalog_description": "Refined by admin.",
             },
             format="json",
         )
@@ -8604,8 +8618,63 @@ class AdminProposedSubjectReviewTests(APITestCase):
         self.assertEqual(proposal.category, "Mathematics & Data Sciences")
         self.assertEqual(proposal.keywords, "algebra, math")
         self.assertEqual(proposal.status, "pending")
+        self.assertEqual(proposal.description, "Refined by admin.")
         link = TutorSubjects.objects.get(tutor=self.tutor, subject=proposal)
-        self.assertEqual(link.description, "Refined by admin.")
+        self.assertEqual(link.description, "I tutored this for two terms.")
+        self.assertEqual(response.data["tutor_note"], "I tutored this for two terms.")
+
+    def test_update_action_leaves_catalog_description_alone_when_omitted(self):
+        proposal = self.make_proposal("UPDATE-NO-DESC")
+        proposal.description = "Existing catalog copy."
+        proposal.save(update_fields=["description"])
+
+        response = self.client.patch(
+            f"/api/admin/tutor-applications/{self.application.id}/subjects/"
+            f"{proposal.subject_code}/",
+            {
+                "action": "update",
+                "subject_name": "Renamed Only",
+                "category": "Mathematics & Data Sciences",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        proposal.refresh_from_db()
+        self.assertEqual(proposal.description, "Existing catalog copy.")
+
+    def test_application_detail_separates_catalog_description_from_tutor_note(self):
+        proposal = self.make_proposal("SPLIT-PROP", tutor_note="My own note.")
+        proposal.description = "Catalog copy."
+        proposal.save(update_fields=["description"])
+
+        response = self.client.get(f"/api/admin/tutor-applications/{self.application.id}/")
+
+        self.assertEqual(response.status_code, 200)
+        row = response.data["proposed_subjects"][0]
+        self.assertEqual(row["catalog_description"], "Catalog copy.")
+        self.assertEqual(row["tutor_note"], "My own note.")
+
+    def test_application_detail_includes_selected_catalog_subjects(self):
+        self.make_proposal("SELECTED-PROP")
+        selected = self.make_selected_subject("BIO-101", "General Biology")
+
+        response = self.client.get(f"/api/admin/tutor-applications/{self.application.id}/")
+
+        self.assertEqual(response.status_code, 200)
+        codes = [row["subject_code"] for row in response.data["selected_subjects"]]
+        self.assertEqual(codes, [selected.subject_code])
+        self.assertEqual(response.data["selected_subjects"][0]["subject_name"], "General Biology")
+        # Pending proposals are the complement and must not leak into this list.
+        self.assertNotIn("SELECTED-PROP", codes)
+
+    def test_selected_subjects_is_empty_when_the_tutor_only_proposed(self):
+        self.make_proposal("ONLY-PROP")
+
+        response = self.client.get(f"/api/admin/tutor-applications/{self.application.id}/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["selected_subjects"], [])
 
     def test_update_action_rejects_unknown_category(self):
         proposal = self.make_proposal("UPDATE-BAD-CAT")

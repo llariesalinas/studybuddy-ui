@@ -1525,7 +1525,10 @@ class AdminTutorProposedSubjectDetailView(APIView):
             subject_name = str(request.data.get('subject_name') or '').strip()
             category = str(request.data.get('category') or '').strip()
             keywords = request.data.get('keywords')
-            description = request.data.get('description')
+            # Writes the global catalog copy (Subjects.description), not the
+            # tutor's own note. Proposals are created without one, so without
+            # this an approved proposal enters the catalog unsearchable.
+            catalog_description = request.data.get('catalog_description')
 
             if not subject_name or not category:
                 return Response(
@@ -1542,15 +1545,18 @@ class AdminTutorProposedSubjectDetailView(APIView):
             subject.category = category
             if keywords is not None:
                 subject.keywords = str(keywords).strip()
-            subject.save(update_fields=['subject_name', 'category', 'keywords'])
+            update_fields = ['subject_name', 'category', 'keywords']
+            if catalog_description is not None:
+                subject.description = str(catalog_description).strip()
+                update_fields.append('description')
+            subject.save(update_fields=update_fields)
 
-            if description is not None:
-                TutorSubjects.objects.filter(
-                    tutor=subject.proposed_by_tutor,
-                    subject=subject,
-                ).update(description=str(description).strip())
+            tutor_note = TutorSubjects.objects.filter(
+                tutor=subject.proposed_by_tutor,
+                subject=subject,
+            ).values_list('description', flat=True).first()
 
-            return Response(SubjectSerializer(subject).data)
+            return Response({**SubjectSerializer(subject).data, 'tutor_note': tutor_note or ''})
 
         return Response(
             {"error": "Invalid action. Must be 'approve', 'reject', or 'update'."},

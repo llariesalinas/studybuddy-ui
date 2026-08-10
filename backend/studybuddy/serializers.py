@@ -463,6 +463,7 @@ class TutorApplicationSerializer(serializers.ModelSerializer):
     latest_document_renewal_school_id_url = serializers.SerializerMethodField()
     latest_document_renewal_enrollment_proof_url = serializers.SerializerMethodField()
     proposed_subjects = serializers.SerializerMethodField()
+    selected_subjects = serializers.SerializerMethodField()
 
     class Meta:
         model = TutorApplication
@@ -479,6 +480,7 @@ class TutorApplicationSerializer(serializers.ModelSerializer):
             'latest_document_renewal_school_id_url',
             'latest_document_renewal_enrollment_proof_url',
             'proposed_subjects',
+            'selected_subjects',
         ]
 
     def get_review_type(self, obj):
@@ -489,7 +491,10 @@ class TutorApplicationSerializer(serializers.ModelSerializer):
 
     def get_proposed_subjects(self, obj):
         subjects = list(obj.proposed_subjects.filter(status='pending'))
-        descriptions = {
+        # Two distinct fields are both called "description": the global catalog
+        # copy on Subjects, and the tutor's own note on TutorSubjects. They are
+        # returned under separate keys so neither can be mistaken for the other.
+        tutor_notes = {
             tutor_subject.subject_id: tutor_subject.description
             for tutor_subject in TutorSubjects.objects.filter(
                 tutor__profile=obj.profile,
@@ -502,10 +507,27 @@ class TutorApplicationSerializer(serializers.ModelSerializer):
                 'subject_name': subject.subject_name,
                 'category': subject.category,
                 'keywords': subject.keywords,
-                'description': descriptions.get(subject.subject_code, ''),
+                'catalog_description': subject.description or '',
+                'tutor_note': tutor_notes.get(subject.subject_code, ''),
                 'status': subject.status,
             }
             for subject in subjects
+        ]
+
+    def get_selected_subjects(self, obj):
+        """Catalog subjects this applicant already picked, as review context for
+        their pending proposals. The complement of get_proposed_subjects."""
+        tutor_subjects = TutorSubjects.objects.filter(
+            tutor__profile=obj.profile,
+            subject__status='approved',
+        ).select_related('subject')
+        return [
+            {
+                'subject_code': tutor_subject.subject.subject_code,
+                'subject_name': tutor_subject.subject.subject_name,
+                'category': tutor_subject.subject.category,
+            }
+            for tutor_subject in tutor_subjects
         ]
 
     def get_applicant_name(self, obj):
