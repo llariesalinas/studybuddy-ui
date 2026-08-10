@@ -308,6 +308,48 @@ class SuperAdminRedesignApiTests(APITestCase):
         self.assertIn(f"{self.institution.institution_name},Tutor One,", export_content)
         self.assertIn("College Algebra,500.0,50.0,450.0", export_content)
 
+    def test_analytics_export_writes_only_the_requested_sections(self):
+        self.client.force_authenticate(user=self.super_user)
+
+        response = self.client.get("/api/admin/analytics/export/?period=7d&sections=summary")
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        # A single section names the file after itself, so a folder of exports stays readable.
+        self.assertIn('filename="studybuddy-summary-', response["Content-Disposition"])
+        self.assertIn("Summary", content)
+        for omitted in ("Sessions Over Time", "Top Tutors", "Subject Popularity", "Booking Transactions"):
+            self.assertNotIn(omitted, content)
+
+    def test_analytics_export_ignores_unknown_sections_and_defaults_to_all(self):
+        self.client.force_authenticate(user=self.super_user)
+
+        # Omitted entirely: the pre-`sections` caller shape must keep working.
+        default_content = self.client.get("/api/admin/analytics/export/?period=7d").content.decode()
+        # Only unrecognised slugs: falls back rather than emitting a file with no data sections.
+        bogus_response = self.client.get(
+            "/api/admin/analytics/export/?period=7d&sections=nonsense"
+        )
+        bogus_content = bogus_response.content.decode()
+
+        for section in ("Summary", "Sessions Over Time", "Top Tutors", "Subject Popularity", "Booking Transactions"):
+            self.assertIn(section, default_content)
+            self.assertIn(section, bogus_content)
+
+        self.assertIn('filename="studybuddy-report-', bogus_response["Content-Disposition"])
+
+    def test_analytics_export_writes_multiple_sections_in_file_order(self):
+        self.client.force_authenticate(user=self.super_user)
+
+        response = self.client.get(
+            "/api/admin/analytics/export/?period=7d&sections=transactions,summary"
+        )
+        content = response.content.decode()
+
+        self.assertLess(content.index("Summary"), content.index("Booking Transactions"))
+        self.assertNotIn("Top Tutors", content)
+        self.assertIn('filename="studybuddy-report-', response["Content-Disposition"])
+
 
 class SuperAdminUserDetailApiTests(APITestCase):
     def setUp(self):

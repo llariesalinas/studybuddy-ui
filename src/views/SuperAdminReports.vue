@@ -28,12 +28,23 @@
           clear-label="All institutions"
           trigger-class="institution-trigger"
         />
-        <button type="button" class="export-button" :disabled="store.loading.export" @click="exportCsv">
+        <button type="button" class="export-button" :disabled="store.loading.export" @click="openExportModal">
           <i class="bi bi-download"></i>
           Export
         </button>
       </div>
     </header>
+
+    <SbExportModal
+      :open="isExportOpen"
+      title="Export report"
+      :items="exportSections"
+      :scope-line="exportScopeLine"
+      :combined-file-label="REPORT_COMBINED_FILE_LABEL"
+      :busy="store.loading.export"
+      @confirm="exportCsv"
+      @close="isExportOpen = false"
+    />
 
     <section class="metric-grid">
       <article v-for="metric in metrics" :key="metric.label" class="metric-card sb-card-lift" :class="{ primary: metric.primary }">
@@ -187,10 +198,12 @@
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
+import SbExportModal from '@/components/SbExportModal.vue'
 import SbSelectModal from '@/components/SbSelectModal.vue'
 import { useHaptics } from '@/composables/useHaptics'
 import { useSuperAdminStore } from '@/stores/superadmin'
 import { useToastStore } from '@/stores/toast'
+import { REPORT_COMBINED_FILE_LABEL, REPORT_SECTIONS } from '@/constants/superadminExports'
 
 const store = useSuperAdminStore()
 const toastStore = useToastStore()
@@ -198,6 +211,9 @@ const { vibrate, patterns } = useHaptics()
 
 const selectedInstitutionId = ref('')
 const period = ref('30d')
+const isExportOpen = ref(false)
+
+const exportSections = REPORT_SECTIONS
 
 const periodOptions = [
   { label: '7D', value: '7d' },
@@ -205,6 +221,15 @@ const periodOptions = [
   { label: '3M', value: '3m' },
   { label: 'All', value: 'all' },
 ]
+
+// Spelled-out forms of periodOptions, for the export modal's scope line where the terse
+// toggle labels (7D, 3M) would read as jargon.
+const periodScopeLabels = {
+  '7d': 'Last 7 days',
+  '30d': 'Last 30 days',
+  '3m': 'Last 3 months',
+  all: 'All time',
+}
 
 const subjectColors = ['#00895a', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899']
 
@@ -222,6 +247,13 @@ const selectedInstitutionName = computed(() => {
   const inst = store.institutionPerformance.find((item) => String(item.id) === String(selectedInstitutionId.value))
   return inst?.institution_name || null
 })
+
+const exportScopeLine = computed(() =>
+  [
+    periodScopeLabels[period.value] || period.value,
+    selectedInstitutionName.value || 'All institutions',
+  ].join(' · '),
+)
 
 const metrics = computed(() => [
   {
@@ -309,12 +341,19 @@ function loadAnalytics() {
   store.fetchAnalytics(selectedInstitutionId.value || null, period.value)
 }
 
-async function exportCsv() {
+function openExportModal() {
   vibrate(patterns.light)
+  isExportOpen.value = true
+}
+
+async function exportCsv({ ids, filename }) {
+  isExportOpen.value = false
   try {
     await store.exportAnalyticsCsv({
       institutionId: selectedInstitutionId.value || null,
       period: period.value,
+      sections: ids,
+      filename,
     })
   } catch {
     toastStore.push('Failed to export CSV.', 'error')

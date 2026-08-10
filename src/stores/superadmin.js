@@ -1,6 +1,12 @@
 import api from '@/services/api/api'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { buildCsv, downloadCsv, exportFilename } from '@/utils/csv'
+import {
+  REPORT_COMBINED_FILE_LABEL,
+  USERS_FILE_LABEL,
+  USER_COLUMN_GROUPS,
+} from '@/constants/superadminExports'
 
 export const useSuperAdminStore = defineStore('superadmin', () => {
   const stats = ref(null)
@@ -283,31 +289,48 @@ export const useSuperAdminStore = defineStore('superadmin', () => {
     }
   }
 
-  const exportAnalyticsCsv = async ({ institutionId = null, period = '30d' } = {}) => {
+  // `sections` narrows which blocks the server writes. Omitting it keeps the endpoint's
+  // all-sections default, so an existing caller that does not pass it is unaffected.
+  const exportAnalyticsCsv = async ({
+    institutionId = null,
+    period = '30d',
+    sections = [],
+    filename = '',
+  } = {}) => {
     loading.value.export = true
     error.value.export = null
 
     try {
       const params = { period }
       if (institutionId) params.institution_id = institutionId
+      if (sections.length) params.sections = sections.join(',')
+
       const res = await api.get('/admin/analytics/export/', {
         params,
         responseType: 'blob',
       })
-      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'text/csv' }))
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `studybuddy-report-${new Date().toISOString().slice(0, 10)}.csv`
-      document.body.appendChild(link)
-      link.click()
-      link.remove()
-      window.URL.revokeObjectURL(url)
+      downloadCsv(filename || exportFilename(REPORT_COMBINED_FILE_LABEL), res.data)
     } catch {
       error.value.export = 'Failed to export analytics.'
       throw new Error(error.value.export)
     } finally {
       loading.value.export = false
     }
+  }
+
+  // Built client-side: /admin/users/ already returns the whole directory, so the rows the admin
+  // sees are the rows we write. `groupIds` selects column groups, in declaration order.
+  const exportUsersCsv = (rows, groupIds = [], filename = '') => {
+    const groups = USER_COLUMN_GROUPS.filter((group) => groupIds.includes(group.id))
+    if (!groups.length) return
+
+    const columns = groups.flatMap((group) => group.columns)
+    const csv = buildCsv([
+      columns.map((column) => column.header),
+      ...rows.map((row) => columns.map((column) => column.value(row))),
+    ])
+
+    downloadCsv(filename || exportFilename(USERS_FILE_LABEL), csv)
   }
 
   const fetchUserBookings = async (
@@ -327,14 +350,7 @@ export const useSuperAdminStore = defineStore('superadmin', () => {
 
     try {
       const res = await api.get(endpoint, { params, responseType: 'blob' })
-      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'text/csv' }))
-      const link = document.createElement('a')
-      link.href = url
-      link.download = filename
-      document.body.appendChild(link)
-      link.click()
-      link.remove()
-      window.URL.revokeObjectURL(url)
+      downloadCsv(filename, res.data)
     } catch {
       error.value.userExport = 'Failed to export user data.'
       throw new Error(error.value.userExport)
@@ -404,6 +420,7 @@ export const useSuperAdminStore = defineStore('superadmin', () => {
     rejectInstitutionRequest,
     fetchAnalytics,
     exportAnalyticsCsv,
+    exportUsersCsv,
     fetchUserBookings,
     exportUserBookingsCsv,
     fetchUserAvailability,

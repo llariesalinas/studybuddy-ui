@@ -53,6 +53,19 @@ ANALYTICS_PERIODS = {
     'all': None,
 }
 
+# Sections of the analytics CSV export, in the order they are written to the file. The keys are the
+# slugs accepted by the `sections` query param and must stay in step with REPORT_SECTIONS in
+# src/constants/superadminExports.js; the values name the file when only that section is exported.
+ANALYTICS_EXPORT_SECTIONS = {
+    'summary': 'summary',
+    'sessions_over_time': 'sessions',
+    'top_tutors': 'top-tutors',
+    'subject_popularity': 'subjects',
+    'transactions': 'transactions',
+}
+
+ANALYTICS_EXPORT_COMBINED_LABEL = 'report'
+
 
 def parse_bool(value):
     if isinstance(value, bool):
@@ -1216,108 +1229,140 @@ class AdminAnalyticsExportView(APIView):
             payment_status='Paid',
         )
 
-        gross_revenue = qs_payments.aggregate(total=Sum('amount'))['total'] or Decimal('0')
-        commission_total = gross_revenue * Decimal('0.10')
-        payout_total = gross_revenue - commission_total
-        total_sessions = period_bookings.count()
-        completed_sessions = completed_bookings.count()
-        completion_rate = round((completed_sessions / total_sessions) * 100, 1) if total_sessions else 0
-
-        daily_counts = (
-            completed_bookings
-            .values('session_date')
-            .annotate(count=Count('id'))
-        )
-        counts_dict = {item['session_date']: item['count'] for item in daily_counts}
-
-        top_tutors = qs_tutors.order_by('-total_sessions')[:5]
-
-        subject_popularity = list(
-            TutorSubjects.objects.filter(
-                tutor__in=qs_tutors,
-                tutor__tutor_bookings__in=completed_bookings
-            )
-            .values('subject__subject_name')
-            .annotate(booking_count=Count('tutor__tutor_bookings'))
-            .order_by('-booking_count')[:10]
-        )
-
-        transactions = (
-            completed_bookings
-            .filter(payment__payment_status='Paid')
-            .select_related('payment', 'student', 'tutor__profile__institution', 'subject')
-            .order_by('session_date')
-        )
+        selected_sections = self._resolve_sections(request.query_params.get('sections'))
 
         response = HttpResponse(content_type='text/csv')
-        response['Content-Disposition'] = 'attachment; filename="studybuddy-analytics.csv"'
+        response['Content-Disposition'] = (
+            f'attachment; filename="{self._build_filename(selected_sections, today)}"'
+        )
         writer = csv.writer(response)
 
+        # Export metadata, not one of the tickable sections -- it says what the file is scoped to,
+        # which matters whichever sections were asked for.
         writer.writerow(['Report', 'Studybuddy Platform Analytics'])
         writer.writerow(['Period', period])
         writer.writerow(['Date range', f'{start_date.isoformat()} to {today.isoformat()}'])
         writer.writerow(['Institution filter', institution_label])
         writer.writerow(['Generated at', timezone.localtime(timezone.now()).isoformat()])
 
-        writer.writerow([])
-        writer.writerow(['Summary'])
-        writer.writerow([
-            'total_sessions', 'completed_sessions', 'completion_rate',
-            'gross_revenue', 'commissions', 'tutor_payouts',
-        ])
-        writer.writerow([
-            total_sessions, completed_sessions, completion_rate,
-            float(gross_revenue), float(commission_total), float(payout_total),
-        ])
+        # Each block queries only when its section was asked for, so a transactions-only export
+        # does not pay for the top-tutors and subject-popularity aggregates.
+        if 'summary' in selected_sections:
+            gross_revenue = qs_payments.aggregate(total=Sum('amount'))['total'] or Decimal('0')
+            commission_total = gross_revenue * Decimal('0.10')
+            payout_total = gross_revenue - commission_total
+            total_sessions = period_bookings.count()
+            completed_sessions = completed_bookings.count()
+            completion_rate = (
+                round((completed_sessions / total_sessions) * 100, 1) if total_sessions else 0
+            )
 
-        writer.writerow([])
-        writer.writerow(['Sessions Over Time'])
-        writer.writerow(['date', 'completed_sessions'])
-        for i in range(chart_days - 1, -1, -1):
-            day = today - timedelta(days=i)
-            writer.writerow([day.isoformat(), counts_dict.get(day, 0)])
-
-        writer.writerow([])
-        writer.writerow(['Top Tutors'])
-        writer.writerow(['name', 'sessions', 'rating', 'earnings'])
-        for tutor in top_tutors:
-            tutor_gross = qs_payments.filter(booking__tutor=tutor).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+            writer.writerow([])
+            writer.writerow(['Summary'])
             writer.writerow([
-                f"{tutor.profile.fname} {tutor.profile.lname}",
-                tutor.total_sessions,
-                tutor.rating_average,
-                float(tutor_gross * Decimal('0.90')),
+                'total_sessions', 'completed_sessions', 'completion_rate',
+                'gross_revenue', 'commissions', 'tutor_payouts',
+            ])
+            writer.writerow([
+                total_sessions, completed_sessions, completion_rate,
+                float(gross_revenue), float(commission_total), float(payout_total),
             ])
 
-        writer.writerow([])
-        writer.writerow(['Subject Popularity'])
-        writer.writerow(['subject', 'booking_count'])
-        for item in subject_popularity:
-            writer.writerow([item['subject__subject_name'] or 'General', item['booking_count']])
+        if 'sessions_over_time' in selected_sections:
+            counts_dict = {
+                item['session_date']: item['count']
+                for item in completed_bookings.values('session_date').annotate(count=Count('id'))
+            }
 
-        writer.writerow([])
-        writer.writerow(['Booking Transactions'])
-        writer.writerow([
-            'session_date', 'institution', 'tutor', 'tutee', 'subject',
-            'amount', 'commission', 'payout',
-        ])
-        for booking in transactions:
-            amount = booking.payment.amount
-            commission = amount * Decimal('0.10')
-            payout = amount - commission
-            tutor_institution = booking.tutor.profile.institution
+            writer.writerow([])
+            writer.writerow(['Sessions Over Time'])
+            writer.writerow(['date', 'completed_sessions'])
+            for i in range(chart_days - 1, -1, -1):
+                day = today - timedelta(days=i)
+                writer.writerow([day.isoformat(), counts_dict.get(day, 0)])
+
+        if 'top_tutors' in selected_sections:
+            writer.writerow([])
+            writer.writerow(['Top Tutors'])
+            writer.writerow(['name', 'sessions', 'rating', 'earnings'])
+            for tutor in qs_tutors.order_by('-total_sessions')[:5]:
+                tutor_gross = qs_payments.filter(booking__tutor=tutor).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+                writer.writerow([
+                    f"{tutor.profile.fname} {tutor.profile.lname}",
+                    tutor.total_sessions,
+                    tutor.rating_average,
+                    float(tutor_gross * Decimal('0.90')),
+                ])
+
+        if 'subject_popularity' in selected_sections:
+            subject_popularity = (
+                TutorSubjects.objects.filter(
+                    tutor__in=qs_tutors,
+                    tutor__tutor_bookings__in=completed_bookings
+                )
+                .values('subject__subject_name')
+                .annotate(booking_count=Count('tutor__tutor_bookings'))
+                .order_by('-booking_count')[:10]
+            )
+
+            writer.writerow([])
+            writer.writerow(['Subject Popularity'])
+            writer.writerow(['subject', 'booking_count'])
+            for item in subject_popularity:
+                writer.writerow([item['subject__subject_name'] or 'General', item['booking_count']])
+
+        if 'transactions' in selected_sections:
+            transactions = (
+                completed_bookings
+                .filter(payment__payment_status='Paid')
+                .select_related('payment', 'student', 'tutor__profile__institution', 'subject')
+                .order_by('session_date')
+            )
+
+            writer.writerow([])
+            writer.writerow(['Booking Transactions'])
             writer.writerow([
-                booking.session_date.isoformat(),
-                tutor_institution.institution_name if tutor_institution else '',
-                f"{booking.tutor.profile.fname} {booking.tutor.profile.lname}",
-                f"{booking.student.fname} {booking.student.lname}",
-                booking.subject.subject_name if booking.subject else 'General',
-                float(amount),
-                float(commission),
-                float(payout),
+                'session_date', 'institution', 'tutor', 'tutee', 'subject',
+                'amount', 'commission', 'payout',
             ])
+            for booking in transactions:
+                amount = booking.payment.amount
+                commission = amount * Decimal('0.10')
+                payout = amount - commission
+                tutor_institution = booking.tutor.profile.institution
+                writer.writerow([
+                    booking.session_date.isoformat(),
+                    tutor_institution.institution_name if tutor_institution else '',
+                    f"{booking.tutor.profile.fname} {booking.tutor.profile.lname}",
+                    f"{booking.student.fname} {booking.student.lname}",
+                    booking.subject.subject_name if booking.subject else 'General',
+                    float(amount),
+                    float(commission),
+                    float(payout),
+                ])
 
         return response
+
+    @staticmethod
+    def _resolve_sections(raw):
+        """Section slugs from the `sections` param, always in file order.
+
+        Unknown slugs are ignored, and an absent or fully unrecognised value falls back to every
+        section -- so a caller that predates this param keeps getting the whole report.
+        """
+        requested = {value.strip() for value in (raw or '').split(',') if value.strip()}
+        selected = [slug for slug in ANALYTICS_EXPORT_SECTIONS if slug in requested]
+        return selected or list(ANALYTICS_EXPORT_SECTIONS)
+
+    @staticmethod
+    def _build_filename(selected_sections, today):
+        """Name the file after the section when only one was asked for, mirroring the frontend."""
+        label = (
+            ANALYTICS_EXPORT_SECTIONS[selected_sections[0]]
+            if len(selected_sections) == 1
+            else ANALYTICS_EXPORT_COMBINED_LABEL
+        )
+        return f'studybuddy-{label}-{today.isoformat()}.csv'
 
 
 class SuperAdminInstitutionPerformanceView(APIView):
