@@ -14,7 +14,10 @@ category rail as "too crowded" in favour of focus-one-category browsing, chose t
 over a text link, and asked to preserve today's descriptive search rows. All six steps implemented in
 `src/components/SubjectTaxonomyPicker.vue` (rewritten into four explicit view states);
 `subjectPicker.shared.js` untouched, so `SubjectPickerModal.vue` is unaffected and now visually
-diverges pending a follow-up. `npx eslint` clean, `npm run test` 136/136, `npm run build` succeeds.
+diverges pending a follow-up. Two post-review corrections folded in: the search field's emoji
+magnifier replaced with Bootstrap Icons (house convention), and the original rich category card
+(gradient, monogram) restored, with a `.compact` modifier of it used in the search band.
+`npx eslint` clean, `npm run test` 136/136, `npm run build` succeeds.
 [Summary](../session-summaries/2026-08-10-subject-picker-focus-redesign-summary.md).
 
 ## Goal
@@ -119,3 +122,12 @@ description is what distinguishes Java from JavaScript. Search no longer discard
   in the in-category no-results state when matches exist elsewhere, so the "search all categories"
   hint is the single obvious next action. Checks: eslint clean, 136/136 tests, build succeeds. No
   existing test referenced the removed markup, so that risk did not materialise.
+- **2026-08-10 (follow-up)** — Two corrections after review. (1) The search field's magnifier was
+  `&#128269;`, a literal emoji carried over from the pre-redesign component, violating the repo's
+  no-emoji rule; swapped to Bootstrap Icons (`bi-search`, `bi-x-lg`, `bi-arrow-left`), which is the
+  existing house convention and already bundled. (2) The flat left-bar category card was reverted to
+  the original rich card (gradient tint, monogram watermark, 112px, 16px radius) at the user's
+  request; the search band uses a `.compact` modifier of the same card (no monogram, reduced height)
+  so results stay the focus. Selected-count moved from trailing text to a green corner pill to avoid
+  colliding with the monogram. Promoted mockup rewritten to show all four states with the final card
+  treatment. Re-checked: eslint clean, 136/136 tests, build succeeds.

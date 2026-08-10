@@ -1,7 +1,7 @@
 <template>
   <section class="taxonomy-picker">
     <div class="search-wrap">
-      <span class="search-icon" aria-hidden="true">&#128269;</span>
+      <i class="bi bi-search search-icon" aria-hidden="true"></i>
       <input
         v-model.trim="searchQuery"
         type="text"
@@ -16,14 +16,14 @@
         aria-label="Clear search"
         @click="searchQuery = ''"
       >
-        &#10005;
+        <i class="bi bi-x-lg" aria-hidden="true"></i>
       </button>
     </div>
 
     <!-- Focused category header: back control + identity. Shared by browse and in-category search. -->
     <template v-if="activeCategory">
       <button type="button" class="back-pill" @click="activeCategory = ''">
-        <span aria-hidden="true">&#8592;</span> All categories
+        <i class="bi bi-arrow-left" aria-hidden="true"></i> All categories
       </button>
       <div class="head-rule"></div>
       <h4 class="category-title" :class="categoryClass(activeCategory)">
@@ -44,11 +44,10 @@
           v-for="entry in matchedCategories"
           :key="entry.category"
           type="button"
-          class="category-card"
+          class="category-card compact"
           :class="categoryClass(entry.category)"
           @click="activeCategory = entry.category"
         >
-          <span class="card-bar"></span>
           <strong>{{ entry.category }}</strong>
           <small class="card-hit">{{ entry.count }} {{ entry.count === 1 ? 'match' : 'matches' }}</small>
         </button>
@@ -118,7 +117,7 @@
         :class="categoryClass(category)"
         @click="activeCategory = category"
       >
-        <span class="card-bar"></span>
+        <span class="monogram" aria-hidden="true">{{ category[0] }}</span>
         <strong>{{ category }}</strong>
         <small>{{ subjectsFor(category).length }} subjects</small>
         <span v-if="selectedFor(category)" class="card-selected">{{ selectedFor(category) }}</span>
@@ -196,7 +195,7 @@ const countLine = computed(() => {
 <style scoped>
 .taxonomy-picker { --cat: var(--sb-primary); }
 .search-wrap { position: relative; margin-bottom: 14px; }
-.search-icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--sb-text-muted); font-size: .85rem; }
+.search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--sb-text-muted); font-size: .82rem; line-height: 1; }
 .search-input { width: 100%; padding: 10px 32px 10px 34px; border: 1.5px solid var(--sb-card-border); border-radius: 10px; font-size: .9rem; background: var(--sb-bg); color: var(--sb-text-main); font-family: inherit; box-sizing: border-box; }
 .search-input:focus { border-color: var(--sb-primary); background: var(--sb-card-bg); outline: none; }
 .search-clear { position: absolute; right: 9px; top: 50%; transform: translateY(-50%); border: 0; background: transparent; color: var(--sb-text-muted); font-size: .8rem; line-height: 1; padding: 4px; }
@@ -212,15 +211,19 @@ const countLine = computed(() => {
 .section-label { font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; font-weight: 700; color: var(--sb-text-muted); margin: 0 0 8px; }
 
 /* Category grid */
-.category-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.category-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .jump-grid { margin-bottom: 16px; }
-.category-card { position: relative; overflow: hidden; padding: 13px 14px 13px 16px; text-align: left; border: 1px solid var(--sb-card-border); border-radius: 12px; background: var(--sb-card-bg); color: var(--sb-text-main); }
-.category-card:hover { border-color: var(--sb-primary); }
-.card-bar { position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--cat); }
-.category-card strong { display: block; font-size: .83rem; margin-bottom: 3px; }
-.category-card small { display: block; font-size: .7rem; color: var(--sb-text-muted); }
+.category-card { position: relative; overflow: hidden; min-height: 112px; padding: 16px; text-align: left; border: 1px solid color-mix(in srgb, var(--cat) 30%, var(--sb-card-border)); border-radius: 16px; background: linear-gradient(135deg, color-mix(in srgb, var(--cat) 12%, var(--sb-card-bg)), var(--sb-card-bg) 65%); color: var(--sb-text-main); }
+.category-card:hover { border-color: var(--cat); }
+.category-card strong, .category-card small { display: block; position: relative; }
+.category-card strong { font-size: .86rem; }
+.category-card small { font-size: .72rem; color: var(--sb-text-muted); margin-top: 4px; }
+.monogram { position: absolute; right: -8px; bottom: -35px; font: 700 6rem Georgia, serif; line-height: 1; color: color-mix(in srgb, var(--cat) 20%, transparent); }
+/* Search band reuses the card language at a lower weight so results stay the focus. */
+.category-card.compact { min-height: 0; padding: 12px 14px; border-radius: 13px; }
+.category-card.compact strong { font-size: .81rem; }
 .card-hit { color: var(--sb-primary) !important; font-weight: 700; }
-.card-selected { position: absolute; top: 9px; right: 9px; font-size: .64rem; font-weight: 700; background: var(--sb-primary); color: var(--sb-primary-contrast); border-radius: 999px; padding: 1px 6px; }
+.card-selected { position: absolute; top: 11px; right: 11px; z-index: 2; font-size: .64rem; font-weight: 700; background: var(--sb-primary); color: var(--sb-primary-contrast); border-radius: 999px; padding: 1px 7px; }
 
 /* Chips: browsing. No per-chip category dot -- the heading already declares the category. */
 .chips { margin-top: 2px; }

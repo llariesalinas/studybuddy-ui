@@ -36,6 +36,25 @@ New derived state in `<script setup>`: `scopedResults`, `outsideMatchCount`, `ma
 `countLine`, `searchPlaceholder`. `subjectPicker.shared.js` was not touched — `searchSubjects`,
 `subjectCategories`, and `categoryClass` are reused as-is, so `SubjectPickerModal.vue` is unaffected.
 
+## Post-review corrections
+
+Two changes after the first pass was reviewed:
+
+- **Emoji in the search field.** The magnifier was `&#128269;` (a literal emoji), carried over from the
+  pre-redesign component and in breach of the repo's no-emoji rule. Replaced with Bootstrap Icons —
+  `bi-search`, plus `bi-x-lg` for the clear button and `bi-arrow-left` for the back pill. Bootstrap
+  Icons is already the house convention (`FindTutors.vue:99`, `AdminSupport.vue:25`) and bundled, so
+  this matches existing style rather than introducing an SVG of its own. The two replaced glyphs were
+  typographic dingbats rather than emoji, but hand-rolled glyphs sitting beside an icon font is the
+  same inconsistency in miniature. Grepped repo-wide: this was the only emoji occurrence in `src/`.
+- **Category card design restored.** The flat left-bar card was reverted to the original rich card —
+  gradient tint from the category accent, monogram watermark, 112px min-height, 16px radius. The
+  gradient and monogram are category *identity*, so they do not reopen the colour conflict; what was
+  removed for that (the dot repeated on every chip) stays removed. The search band uses a `.compact`
+  modifier of the same card — same gradient, border and radius, monogram dropped and height cut — so
+  the results lead rather than competing with two full-height cards above them. Selected-count moved
+  from trailing text into a green corner pill, since the monogram now occupies the bottom-right.
+
 ## Deviations from plan
 
 None in substance. One judgement call not spelled out in the plan: in the in-category no-results state
