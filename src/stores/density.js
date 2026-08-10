@@ -1,8 +1,8 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
 
-// Roles that render at 80% density. Admin/SuperAdmin stay at 100%.
-const COMPACT_ROLES = new Set(['tutee', 'tutor'])
+// Roles that render at 80% density. Admin stays at 100%.
+const COMPACT_ROLES = new Set(['tutee', 'tutor', 'superadmin'])
 
 export const useDensityStore = defineStore('density', () => {
   const density = ref('comfortable')
