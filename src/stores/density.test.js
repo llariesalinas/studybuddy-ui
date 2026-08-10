@@ -26,9 +26,9 @@ describe('density store', () => {
     expect(densityAttr()).toBeNull()
   })
 
-  it('syncFromRole puts tutee and tutor at compact density', () => {
+  it('syncFromRole puts tutee, tutor and superadmin at compact density', () => {
     const store = useDensityStore()
-    for (const role of ['tutee', 'tutor']) {
+    for (const role of ['tutee', 'tutor', 'superadmin']) {
       store.setDensity('comfortable')
       store.syncFromRole(role)
       expect(store.density, role).toBe('compact')
@@ -36,14 +36,12 @@ describe('density store', () => {
     }
   })
 
-  it('syncFromRole leaves admin and superadmin at comfortable density', () => {
+  it('syncFromRole leaves admin at comfortable density', () => {
     const store = useDensityStore()
-    for (const role of ['admin', 'superadmin']) {
-      store.setDensity('compact')
-      store.syncFromRole(role)
-      expect(store.density, role).toBe('comfortable')
-      expect(densityAttr(), role).toBeNull()
-    }
+    store.setDensity('compact')
+    store.syncFromRole('admin')
+    expect(store.density).toBe('comfortable')
+    expect(densityAttr()).toBeNull()
   })
 
   it('syncFromRole handles a logged-out role without throwing', () => {
@@ -60,7 +58,9 @@ describe('density store', () => {
     const store = useDensityStore()
     store.syncFromRole('Tutor')
     expect(store.density).toBe('compact')
-    store.syncFromRole('SuperAdmin')
+    store.syncFromRole('Admin')
     expect(store.density).toBe('comfortable')
+    store.syncFromRole('SuperAdmin')
+    expect(store.density).toBe('compact')
   })
 })

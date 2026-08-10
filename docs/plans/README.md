@@ -3,7 +3,21 @@
 Every finalized plan lives in this folder as its own dated file, created from [`_template.md`](_template.md).
 Status moves Draft â†’ Approved â†’ In Progress â†’ Done. When a plan is complete, its summary is linked below.
 
-**Status & Progress Summary** (2026-08-10): Subject description search and admin selected subjects is
+**Status & Progress Summary** (2026-08-10): SuperAdmin-side UI at 80% density is In Progress —
+code landed, manual verification outstanding. Third pass of the density system after Tutee
+(2026-08-04) and Tutor (2026-08-05); no new mechanism, just `'superadmin'` added to `COMPACT_ROLES`
+in `src/stores/density.js` plus a fresh `vh` consumer audit. Only two selectors became reachable at
+compact density and needed compensation in `main.css`: `.admin-applications`
+(`AdminTutorApplications.vue`) and `.superadmin-user-modal` (`SuperAdminUserModal.vue`); everything
+else on the SuperAdmin surface either uses `min-height: 100%`/Bootstrap padding or is already covered
+by the existing global rules (`.vh-100`, `.sb-sidebar`, `.sb-select-dialog`, `.subject-dialog`).
+Admin deliberately stays at 100%, so the three views shared with SuperAdmin now render at two
+densities — safe, since every rule is gated on the `data-sb-density` attribute. `density.test.js`
+updated (its old cases asserted SuperAdmin stays comfortable). 163/163 tests, `npm run build` and
+`npm run lint:eslint` clean. DOM measurement and the logged-in walkthrough still to do.
+[Plan](2026-08-10-superadmin-ui-80-percent-density.md).
+
+**Previous** (2026-08-10): Subject description search and admin selected subjects is
 Done — grilled to eight decisions across four `ui-preview` rounds, then implemented in a single pass
 with no design deviations. `searchSubjects()` now matches `description` for both pickers
 (`useSubjectCatalog.js` left alone), `matchedViaKeyword` became `matchedViaHint`, `SubjectPickerModal`

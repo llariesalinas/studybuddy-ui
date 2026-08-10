@@ -149,6 +149,17 @@
   max-height: min(calc(86vh / var(--sb-density-scale)), 780px);
 }
 
+/* SuperAdmin-reachable vh consumers. `.admin-applications` is also an Admin route
+   (`/admin/tutor-applications`, role `['Admin','SuperAdmin']`); the rule is attribute-gated,
+   so Admin at 100% is unaffected. */
+[data-sb-density='compact'] .admin-applications {
+  min-height: var(--sb-vh-fix);
+}
+
+[data-sb-density='compact'] .superadmin-user-modal {
+  max-height: min(760px, calc(var(--sb-vh-fix) - 48px));
+}
+
 @media (max-width: 640px) {
   [data-sb-density='compact'] .sb-select-dialog,
   [data-sb-density='compact'] .subject-dialog {
