@@ -1,14 +1,22 @@
 ---
 title: Co-rated set visualization in the algorithm demo
 date: 2026-08-10
-status: Approved
+status: Done
 summary: Make the "N co-rated" chip in the CF waterfall openable, revealing which tutors two students both rated and what each gave them, so Pearson similarity is visibly derived rather than asserted.
 spec: ../mockups/2026-08-10-corated-set-panel.html
 ---
 
 # Co-rated set visualization in the algorithm demo
 
-**Status & Progress Summary** (2026-08-10): Approved, implementation not yet started. Scope settled
+**Status & Progress Summary** (2026-08-10): Done, pending manual verification in the running app.
+All nine steps shipped on `feat/corated-set-visualization` (commit `909f00e`): `co_rated_detail` in
+`CF.py`, a top-level `co_rated` map in the demo payload, the disclosure grid in
+`AlgorithmDemoBreakdown.vue` threaded through both tabs, the guide section, and the glossary entry.
+5/5 new backend tests, 37/37 recommender and demo tests, 14/14 frontend algorithm-demo tests (9
+new), lint and build clean; the one failure in the full frontend suite was confirmed pre-existing at
+HEAD. Backend ran with `--keepdb` because `DB_HOST` is the remote Supabase instance and its stale
+`test_postgres` was held open by another session.
+[Summary](../session-summaries/2026-08-10-corated-set-visualization-summary.md). Scope settled
 through a grilling + `ui-preview` session: the request began as "add a similarity visualization to
 the demo testing guide" and resolved into a live tool change in the algorithm demo, documented
 afterwards in `algorithm-demo-guide.html`. Three gaps were identified (expand the co-rated set, show
@@ -125,3 +133,8 @@ Key decisions:
   the co-rated set is a property of the (tutee, neighbour) pair and constant across candidate rows.
   No ADR — reversible, unsurprising, no real trade-off. Mockup corrected after fabricated tutor
   names were caught and replaced with the real `CURATED_TUTORS` values.
+- **2026-08-10** — Implemented and committed as `909f00e`; status Approved to Done. Four deviations
+  recorded in the summary: `--keepdb` for the remote test database, `"co_rated": {}` added to the
+  two early returns for shape consistency, the tutee row labelled "This tutee" since the component
+  has no tutee name, and a container query rather than a media query for the Compare Pair
+  tightening. Manual in-app verification still outstanding.
