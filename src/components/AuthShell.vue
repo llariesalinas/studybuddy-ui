@@ -54,12 +54,7 @@ const router = useRouter()
   flex-direction: column;
   align-items: center;
   padding: 24px 16px 48px;
-  font-family:
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    sans-serif;
+  font-family: var(--sb-font-base);
   box-sizing: border-box;
 }
 

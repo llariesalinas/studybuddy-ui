@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Typography system: before / after</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  body {
+    margin: 0;
+    padding: 32px 24px 64px;
+    background: #F8F9FA;
+    font-family: system-ui, -apple-system, sans-serif;
+  }
+  h1 { font-size: 1.3rem; margin: 0 0 6px; color: #163127; }
+  .subtitle { color: #6B7280; font-size: 0.9rem; margin: 0 0 28px; max-width: 60em; }
+  :root {
+    --sb-primary: #00895A;
+    --sb-primary-light: #edf6f1;
+    --sb-bg: #F8F9FA;
+    --sb-card-bg: #ffffff;
+    --sb-card-border: #EAEAEA;
+    --sb-text-main: #163127;
+    --sb-text-muted: #6B7280;
+    --sb-text-secondary: #495057;
+    --sb-border-light: #e0e7e3;
+    --sb-shadow-soft: rgba(10, 25, 22, 0.06);
+    --sb-font-base: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  }
+  .ba-row { margin-bottom: 34px; }
+  .ba-row-label { font-weight: 700; font-size: 0.95rem; color: var(--sb-text-main); margin-bottom: 4px; }
+  .ba-row-sub { font-size: 0.8rem; color: var(--sb-text-muted); margin-bottom: 12px; }
+  .ba-split { display: flex; gap: 18px; flex-wrap: wrap; }
+  .ba-col { flex: 1 1 320px; min-width: 280px; }
+  .ba-tag {
+    display: inline-block; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.68rem;
+    text-transform: uppercase; letter-spacing: 0.05em; padding: 3px 9px; border-radius: 999px; margin-bottom: 8px;
+  }
+  .ba-tag.before { background: #fdecec; color: #b42318; }
+  .ba-tag.after { background: var(--sb-primary-light); color: var(--sb-primary); }
+  .ba-panel { background: var(--sb-bg); border: 1px solid var(--sb-card-border); border-radius: 14px; padding: 20px; height: 100%; box-sizing: border-box; }
+  .ba-panel.before-declared { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+  .ba-panel.before-system { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+  .ba-panel.after { font-family: var(--sb-font-base); }
+  .ba-h { font-weight: 700; font-size: 1.25rem; color: var(--sb-text-main); margin: 0 0 6px; }
+  .ba-p { font-size: 0.88rem; color: var(--sb-text-secondary); line-height: 1.55; margin: 0 0 14px; }
+  .ba-card { background: var(--sb-card-bg); border: 1px solid var(--sb-card-border); border-radius: 12px; padding: 14px 16px; box-shadow: 0 6px 16px var(--sb-shadow-soft); }
+  .ba-name { font-weight: 600; font-size: 0.92rem; color: var(--sb-text-main); margin-bottom: 2px; }
+  .ba-sub2 { font-size: 0.78rem; color: var(--sb-text-muted); margin-bottom: 8px; }
+  .ba-badge { display: inline-block; font-size: 0.7rem; font-weight: 600; color: var(--sb-primary); background: var(--sb-primary-light); border-radius: 999px; padding: 3px 10px; }
+  .ba-balance { font-weight: 800; font-size: 1.8rem; color: var(--sb-primary); margin: 4px 0; }
+  .ba-btn { display: inline-block; margin-top: 12px; background: var(--sb-primary); color: #fff; font-weight: 600; font-size: 0.85rem; border: none; border-radius: 999px; padding: 9px 20px; }
+  .ba-note { font-size: 0.78rem; color: var(--sb-text-muted); margin-top: 10px; line-height: 1.5; font-family: system-ui, sans-serif; }
+  .footnote { font-size: 0.82rem; color: var(--sb-text-muted); max-width: 60em; }
+</style>
+</head>
+<body>
+<h1>Typography system: before / after (Plus Jakarta Sans)</h1>
+<p class="subtitle">Decision record for ADR-0011. "Before" renders each sample using the font-family exactly as declared in that file's CSS today. "After" is every sample repointed to the new --sb-font-base token (Plus Jakarta Sans, self-hosted via @fontsource). Note: the landing page is explicitly excluded from this rollout by decision and is not shown here.</p>
+
+<div class="ba-row">
+  <div class="ba-row-label">Dashboard summary card</div>
+  <div class="ba-row-sub">Dashboard.vue:714 &mdash; declares system-ui stack, no Inter at all</div>
+  <div class="ba-split">
+    <div class="ba-col">
+      <span class="ba-tag before">Before &middot; as declared</span>
+      <div class="ba-panel before-system">
+        <div class="ba-h">Your Tutoring Dashboard</div>
+        <div class="ba-card">
+          <div class="ba-name">Maria Santos</div>
+          <div class="ba-sub2">BS Computer Science &middot; Year 3</div>
+          <span class="ba-badge">Verified Tutor</span>
+        </div>
+        <div class="ba-note">Declares system-ui directly.</div>
+      </div>
+    </div>
+    <div class="ba-col">
+      <span class="ba-tag after">After</span>
+      <div class="ba-panel after">
+        <div class="ba-h">Your Tutoring Dashboard</div>
+        <div class="ba-card">
+          <div class="ba-name">Maria Santos</div>
+          <div class="ba-sub2">BS Computer Science &middot; Year 3</div>
+          <span class="ba-badge">Verified Tutor</span>
+        </div>
+        <div class="ba-note">Now matches every other screen in the app, on every OS/browser, on purpose.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="ba-row">
+  <div class="ba-row-label">Auth screens</div>
+  <div class="ba-row-sub">AuthShell.vue:57 &mdash; declares system-ui stack</div>
+  <div class="ba-split">
+    <div class="ba-col">
+      <span class="ba-tag before">Before &middot; as declared</span>
+      <div class="ba-panel before-system">
+        <div class="ba-h">Welcome back</div>
+        <p class="ba-p">Log in with your CPU email to continue.</p>
+        <button class="ba-btn">Log In</button>
+      </div>
+    </div>
+    <div class="ba-col">
+      <span class="ba-tag after">After</span>
+      <div class="ba-panel after">
+        <div class="ba-h">Welcome back</div>
+        <p class="ba-p">Log in with your CPU email to continue.</p>
+        <button class="ba-btn">Log In</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="ba-row">
+  <div class="ba-row-label">Tutor wallet balance</div>
+  <div class="ba-row-sub">TutorWallet.vue:729 &mdash; declares system-ui stack</div>
+  <div class="ba-split">
+    <div class="ba-col">
+      <span class="ba-tag before">Before &middot; as declared</span>
+      <div class="ba-panel before-system">
+        <div class="ba-h">Wallet Balance</div>
+        <div class="ba-balance">&#8369;2,450.00</div>
+        <p class="ba-p">Available for withdrawal via InstaPay.</p>
+        <button class="ba-btn">Cash Out</button>
+      </div>
+    </div>
+    <div class="ba-col">
+      <span class="ba-tag after">After</span>
+      <div class="ba-panel after">
+        <div class="ba-h">Wallet Balance</div>
+        <div class="ba-balance">&#8369;2,450.00</div>
+        <p class="ba-p">Available for withdrawal via InstaPay.</p>
+        <button class="ba-btn">Cash Out</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="footnote">Chosen font: Plus Jakarta Sans, self-hosted via @fontsource-variable/plus-jakarta-sans, exposed as --sb-font-base. Monospace panels (SbExportModal.vue, VerificationDevPanel.vue) get a separate --sb-font-mono token, unaffected by this choice. LandingPage.vue (including its Georgia decorative step-numbers) is out of scope by decision.</p>
+</body>
+</html>

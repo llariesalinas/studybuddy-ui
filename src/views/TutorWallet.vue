@@ -726,7 +726,7 @@ watch(showCashoutModal, async (isOpen) => {
   min-height: calc(100vh - 7rem);
   padding: 4px;
   color: var(--wallet-ink);
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--sb-font-base);
 }
 
 .wallet-shell::before {

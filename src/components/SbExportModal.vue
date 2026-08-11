@@ -389,7 +389,7 @@ function unlockBodyScroll() {
   margin: 0.7rem 0 0;
   padding-top: 0.6rem;
   border-top: 1px solid color-mix(in srgb, var(--sb-card-border) 60%, transparent);
-  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-family: var(--sb-font-mono);
   font-size: 0.72rem;
   color: var(--sb-text-muted);
   word-break: break-all;

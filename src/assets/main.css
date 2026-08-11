@@ -70,6 +70,9 @@
   --sb-shadow-rest-brand: 0 8px 18px rgba(0, 137, 90, 0.20);
   --sb-shadow-hover-brand: 0 14px 30px rgba(0, 137, 90, 0.28);
   --sb-density-scale: 1;
+  /* Typography system — see ADR-0012 */
+  --sb-font-base: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --sb-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 :root[data-sb-density='compact'] {
@@ -223,7 +226,7 @@ body {
 
 body {
   background: var(--sb-bg);
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: var(--sb-font-base);
 }
 
 body > #app {

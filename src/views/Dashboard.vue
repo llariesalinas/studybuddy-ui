@@ -711,7 +711,7 @@ const viewMoreTutors = () => router.push({ name: 'tutors' })
   overflow: visible;
   padding: 0;
   color: var(--sb-ink);
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--sb-font-base);
   background: transparent;
 }
 
