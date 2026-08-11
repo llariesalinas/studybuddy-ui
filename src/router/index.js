@@ -245,6 +245,20 @@ const router = createRouter({
       component: () => import('@/views/SuperAdminReports.vue'),
       meta: { requiresAuth: true, role: 'SuperAdmin' }
     },
+    // Drill-downs behind the reports dashboard's ranked cards. One component serves both; `dataset`
+    // selects the entry in REPORT_DETAIL_DATASETS that describes its columns and copy.
+    {
+      path: '/superadmin/reports/tutors',
+      name: 'superadmin-report-tutors',
+      component: () => import('@/views/SuperAdminReportDetail.vue'),
+      meta: { requiresAuth: true, role: 'SuperAdmin', dataset: 'tutors' }
+    },
+    {
+      path: '/superadmin/reports/subjects',
+      name: 'superadmin-report-subjects',
+      component: () => import('@/views/SuperAdminReportDetail.vue'),
+      meta: { requiresAuth: true, role: 'SuperAdmin', dataset: 'subjects' }
+    },
     {
       path: '/superadmin/support',
       name: 'superadmin-support',

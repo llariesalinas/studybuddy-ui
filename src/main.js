@@ -11,6 +11,8 @@ import piniaPluginPersistedstate from 'pinia-plugin-persistedstate'
 import 'bootstrap/dist/css/bootstrap.min.css'
 // 2. Import Bootstrap Icons
 import 'bootstrap-icons/font/bootstrap-icons.css'
+// 3. Import Plus Jakarta Sans (variable font, full weight range) — see ADR-0012
+import '@fontsource-variable/plus-jakarta-sans'
 import './assets/main.css'
 
 const app = createApp(App)

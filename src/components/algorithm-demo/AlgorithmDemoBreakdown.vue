@@ -12,6 +12,13 @@ const props = defineProps({
   tieGroup: {
     type: Array,
     default: () => []
+  },
+  // The co-rated set behind each neighbour's similarity, keyed by neighbour id.
+  // Keyed rather than carried on the row because it belongs to the (tutee,
+  // neighbour) pair and does not vary by candidate tutor — see _build_co_rated_map.
+  coRated: {
+    type: Object,
+    default: () => ({})
   }
 })
 
@@ -34,6 +41,8 @@ const MIN_MEANINGFUL_CO_RATED = 3
 // draw, so a tiny shift doesn't render as a full-width bar.
 const AXIS_PAD = 0.25
 const AXIS_MIN_SPAN = 1
+// How long a co-rated cell stays highlighted after a what-if edit changed it.
+const FLASH_MS = 1400
 
 const bars = reactive(
   Object.fromEntries(CBF_PARTS.map(([key]) => [key, { widthPct: 0, label: '–' }]))
@@ -137,6 +146,79 @@ const accuracy = computed(() => {
   }
 })
 
+// --- Co-rated set ------------------------------------------------------------------
+// The collapsed row asserts a similarity; this expansion shows the shared ratings it
+// was computed from, so the panel can check it by hand. Single-open: two neighbours
+// side by side invite comparing rows that are measured against different averages.
+// See docs/mockups/2026-08-10-corated-set-panel.html
+
+const openNeighborId = ref(null)
+const flashedCells = ref(new Set())
+let flashTimer = null
+// Seeded from the initial prop rather than null: the watcher needs a previous
+// snapshot to diff against, and the very first what-if edit is the one most worth
+// highlighting.
+let lastCoRated = props.coRated
+
+function toggleCoRated(neighborId) {
+  openNeighborId.value = openNeighborId.value === neighborId ? null : neighborId
+}
+
+const openCoRated = computed(() => {
+  if (openNeighborId.value === null) return null
+  return props.coRated[openNeighborId.value] || null
+})
+
+function isFlashed(key) {
+  return flashedCells.value.has(key)
+}
+
+// A what-if edit lands on a co-rated cell whenever the tutee has also rated the
+// candidate tutor. Highlighting exactly what moved is what makes the chain from
+// cell to average to similarity followable at demo speed.
+watch(
+  () => props.coRated,
+  (next) => {
+    const previous = lastCoRated
+    lastCoRated = next
+    if (!previous || previous === next) return
+
+    const changed = new Set()
+
+    Object.entries(next).forEach(([neighborId, detail]) => {
+      const before = previous[neighborId]
+      if (!before) return
+
+      const beforeByTutor = new Map(before.shared.map((e) => [e.tutor_id, e]))
+      detail.shared.forEach((entry) => {
+        const was = beforeByTutor.get(entry.tutor_id)
+        if (!was) return
+        if (was.student_rating !== entry.student_rating) {
+          changed.add(`${neighborId}:${entry.tutor_id}:student`)
+        }
+        if (was.neighbor_rating !== entry.neighbor_rating) {
+          changed.add(`${neighborId}:${entry.tutor_id}:neighbor`)
+        }
+      })
+
+      if (before.student_avg_over_set !== detail.student_avg_over_set) {
+        changed.add(`${neighborId}:avg:student`)
+      }
+      if (before.neighbor_avg_over_set !== detail.neighbor_avg_over_set) {
+        changed.add(`${neighborId}:avg:neighbor`)
+      }
+    })
+
+    if (!changed.size) return
+
+    flashedCells.value = changed
+    clearTimeout(flashTimer)
+    flashTimer = setTimeout(() => {
+      flashedCells.value = new Set()
+    }, FLASH_MS)
+  }
+)
+
 function onRatingInput(neighbor, value) {
   emit('override', {
     studentId: neighbor.neighbor_id,
@@ -167,6 +249,9 @@ function animate(row, previous) {
   clearTimers()
   resetBars()
   neighborOrder.value = row?.cf?.neighbors?.map((n) => n.neighbor_id) || []
+  // Only on a genuine tutor change — the early return above keeps the panel open
+  // across what-if refetches, which is where the flashed cell has to be visible.
+  openNeighborId.value = null
   if (!row) return
 
   const sequence = CBF_PARTS.map(([key]) => () => {
@@ -194,7 +279,10 @@ function applyBars(row) {
 }
 
 watch(() => props.row, animate, { immediate: true })
-onBeforeUnmount(clearTimers)
+onBeforeUnmount(() => {
+  clearTimers()
+  clearTimeout(flashTimer)
+})
 </script>
 
 <template>
@@ -256,14 +344,26 @@ onBeforeUnmount(clearTimers)
             </div>
           </div>
 
-          <div v-for="step in steps" :key="step.neighbor.neighbor_id" class="cf-row">
+          <template v-for="step in steps" :key="step.neighbor.neighbor_id">
+          <div class="cf-row">
             <div class="cf-evidence">
               <div class="cf-name">
                 {{ step.neighbor.name }}
-                <small v-if="step.neighbor.co_rated_count < MIN_MEANINGFUL_CO_RATED" class="warn">
-                  only {{ step.neighbor.co_rated_count }} co-rated
-                </small>
-                <small v-else>{{ step.neighbor.co_rated_count }} co-rated</small>
+                <button
+                  type="button"
+                  class="cf-corated-toggle"
+                  :class="{ warn: step.neighbor.co_rated_count < MIN_MEANINGFUL_CO_RATED }"
+                  :aria-expanded="openNeighborId === step.neighbor.neighbor_id"
+                  @click="toggleCoRated(step.neighbor.neighbor_id)"
+                >
+                  <span aria-hidden="true">{{
+                    openNeighborId === step.neighbor.neighbor_id ? '▾' : '▸'
+                  }}</span>
+                  <template v-if="step.neighbor.co_rated_count < MIN_MEANINGFUL_CO_RATED">
+                    only {{ step.neighbor.co_rated_count }} co-rated
+                  </template>
+                  <template v-else>{{ step.neighbor.co_rated_count }} co-rated</template>
+                </button>
               </div>
 
               <div class="cf-evidence-line">
@@ -306,6 +406,72 @@ onBeforeUnmount(clearTimers)
               </span>
             </div>
           </div>
+
+          <!-- The evidence behind the similarity meter above: the tutors both
+               students rated, and what each gave them. -->
+          <div
+            v-if="openNeighborId === step.neighbor.neighbor_id && openCoRated"
+            class="cf-corated"
+          >
+            <div
+              class="cf-corated-grid"
+              :style="{ '--shared-count': openCoRated.shared.length }"
+            >
+              <div class="cf-corated-head cf-corated-rowlabel">shared tutor</div>
+              <div
+                v-for="entry in openCoRated.shared"
+                :key="`h-${entry.tutor_id}`"
+                class="cf-corated-head"
+                :title="entry.name"
+              >
+                {{ entry.last_name }}
+              </div>
+              <div class="cf-corated-head cf-corated-avg">avg over these</div>
+
+              <div class="cf-corated-rowlabel me">This tutee</div>
+              <div
+                v-for="entry in openCoRated.shared"
+                :key="`s-${entry.tutor_id}`"
+                class="cf-corated-cell me"
+                :class="{ flash: isFlashed(`${step.neighbor.neighbor_id}:${entry.tutor_id}:student`) }"
+              >
+                {{ entry.student_rating }}
+              </div>
+              <div
+                class="cf-corated-cell cf-corated-avg me"
+                :class="{ flash: isFlashed(`${step.neighbor.neighbor_id}:avg:student`) }"
+              >
+                {{ openCoRated.student_avg_over_set.toFixed(2) }}
+                <small>feeds similarity</small>
+              </div>
+
+              <div class="cf-corated-rowlabel">{{ step.neighbor.name }}</div>
+              <div
+                v-for="entry in openCoRated.shared"
+                :key="`n-${entry.tutor_id}`"
+                class="cf-corated-cell"
+                :class="{ flash: isFlashed(`${step.neighbor.neighbor_id}:${entry.tutor_id}:neighbor`) }"
+              >
+                {{ entry.neighbor_rating }}
+              </div>
+              <div
+                class="cf-corated-cell cf-corated-avg"
+                :class="{ flash: isFlashed(`${step.neighbor.neighbor_id}:avg:neighbor`) }"
+              >
+                {{ openCoRated.neighbor_avg_over_set.toFixed(2) }}
+                <small>feeds similarity</small>
+              </div>
+            </div>
+
+            <p class="cf-corated-note">
+              Similarity is measured over these shared tutors only, against each student's
+              average across them. That is a different baseline from the deviation term,
+              which uses this neighbour's average over
+              <b>all</b> their ratings ({{ step.neighbor.neighbor_avg.toFixed(2) }}) and this
+              tutee's baseline of <b>{{ cf.student_avg.toFixed(2) }}</b>.
+            </p>
+          </div>
+          </template>
 
           <div class="cf-row cf-row-total">
             <div class="cf-evidence">
@@ -369,6 +535,9 @@ onBeforeUnmount(clearTimers)
 <style scoped>
 .algo-breakdown {
   min-height: 320px;
+  /* Compare Pair renders this component at half width; the co-rated grid tightens
+     against the component's own width, not the viewport's. */
+  container-type: inline-size;
 }
 
 .tie-block {
@@ -559,6 +728,117 @@ onBeforeUnmount(clearTimers)
 
 .cf-name small.warn {
   color: var(--sb-danger);
+}
+
+/* Co-rated set: disclosure control on the neighbour row, and the grid it opens. */
+.cf-corated-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 400;
+  font-size: 11px;
+  color: var(--sb-text-muted);
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}
+
+.cf-corated-toggle:hover,
+.cf-corated-toggle:focus-visible {
+  color: var(--sb-primary);
+}
+
+.cf-corated-toggle.warn {
+  color: var(--sb-danger);
+}
+
+.cf-corated {
+  margin: 2px 0 10px 10px;
+  padding: 10px 0 4px 14px;
+  border-left: 2px solid var(--sb-primary);
+}
+
+.cf-corated-grid {
+  display: grid;
+  grid-template-columns: auto repeat(var(--shared-count), minmax(0, 1fr)) auto;
+  gap: 0 10px;
+  align-items: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.cf-corated-grid > div {
+  padding: 4px 0;
+  text-align: center;
+}
+
+.cf-corated-head {
+  font-size: 11px;
+  color: var(--sb-text-muted);
+  border-bottom: 1px solid var(--sb-card-border);
+}
+
+.cf-corated-head[title] {
+  cursor: help;
+}
+
+.cf-corated-rowlabel {
+  text-align: left;
+  font-size: 12px;
+  color: var(--sb-text-muted);
+  white-space: nowrap;
+}
+
+.cf-corated-cell.me,
+.cf-corated-rowlabel.me {
+  color: var(--sb-primary);
+}
+
+.cf-corated-avg {
+  text-align: right;
+  font-weight: 700;
+}
+
+.cf-corated-avg small {
+  display: block;
+  font-weight: 400;
+  font-size: 10px;
+  color: var(--sb-warning, #d29922);
+}
+
+/* A what-if edit can land inside the co-rated set; highlight exactly what moved. */
+.cf-corated-cell.flash {
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px var(--sb-primary);
+  transition: box-shadow 0.3s ease;
+}
+
+.cf-corated-note {
+  margin: 8px 0 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--sb-text-muted);
+}
+
+/* Compare Pair renders this component two-up, so the grid has to survive half
+   width rather than fork into a second layout. */
+@container (max-width: 560px) {
+  .cf-corated-grid {
+    gap: 0 4px;
+    font-size: 12px;
+  }
+
+  .cf-corated-head {
+    font-size: 10px;
+  }
+
+  .cf-corated-rowlabel {
+    font-size: 11px;
+  }
 }
 
 .cf-evidence-line {

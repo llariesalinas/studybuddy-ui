@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Co-rated set panel &mdash; chosen design (A)</title>
+<style>
+  body { margin:0; padding:32px; background:#0d1117; color:#e6edf3;
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; font-size:14px; }
+  .wrap { max-width:900px; margin:0 auto; }
+  h1 { font-size:20px; margin:0 0 6px; }
+  .lede { color:#8b949e; font-size:13px; line-height:1.6; margin:0 0 24px; }
+  .panel { background:#161b22; border:1px solid #2a3038; border-radius:10px; padding:14px 16px; margin-bottom:20px; }
+  .caption { color:#8b949e; font-size:12px; margin:0 0 8px; text-transform:uppercase; letter-spacing:.06em; }
+
+  .nrow { display:flex; align-items:center; gap:12px; padding:8px 0; }
+  .nname { min-width:170px; font-weight:600; }
+  .nname small { display:block; font-weight:400; color:#8b949e; font-size:11px; }
+  .meter { flex:1; height:6px; background:#20262e; border-radius:99px; overflow:hidden; max-width:150px; }
+  .meter i { display:block; height:100%; background:#5b8cff; }
+  .mval { font-variant-numeric:tabular-nums; min-width:52px; color:#5b8cff; font-weight:600; }
+  .navg { color:#8b949e; font-size:12px; min-width:70px; }
+  .chev { color:#5b8cff; font-size:11px; cursor:pointer; }
+
+  .acc { border-left:2px solid #5b8cff; margin:6px 0 4px 8px; padding:10px 0 6px 14px; }
+  .cgrid { display:grid; grid-template-columns:auto repeat(4,1fr) auto; gap:0 10px; align-items:center; }
+  .cgrid > div { padding:5px 0; font-variant-numeric:tabular-nums; text-align:center; }
+  .cgrid .lbl { text-align:left; color:#8b949e; font-size:12px; white-space:nowrap; }
+  .cgrid .hd { color:#8b949e; font-size:11px; border-bottom:1px solid #2a3038; cursor:help; }
+  .cgrid .av { text-align:right; font-weight:600; }
+  .cgrid .me { color:#c9d6ff; }
+  .avlabel { font-size:10px; color:#d29922; display:block; font-weight:400; }
+  .flash { background:#2d3b1f; border-radius:3px; box-shadow:0 0 0 1px #4d7c2a; }
+  .foot { margin-top:8px; font-size:11px; color:#8b949e; line-height:1.5; }
+  .foot b { color:#e6edf3; }
+  .half { max-width:420px; }
+  .half .cgrid { grid-template-columns:auto repeat(4,1fr) auto; gap:0 5px; font-size:12px; }
+  .half .cgrid .hd { font-size:10px; }
+  .note { border-left:2px solid #d29922; padding-left:12px; color:#8b949e; font-size:12px; line-height:1.6; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Co-rated set panel &mdash; chosen design</h1>
+  <p class="lede">
+    Decision artifact for <b>docs/plans/2026-08-10-corated-set-visualization.md</b>. Design A of three,
+    chosen 2026-08-10. Makes the <code>4 co-rated</code> chip in the CF waterfall openable so Pearson
+    similarity is visibly derived rather than asserted. Numbers are real, taken from
+    <code>seed_data.py</code> <code>CURATED_RATINGS</code> for S6 Katrina Katigbak &rarr; T1 Marisol Aquino.
+  </p>
+
+  <p class="caption">Ranked List tab &mdash; full width, one neighbour open</p>
+  <div class="panel">
+    <div class="nrow">
+      <div class="nname">Gloria Garcia<small>4 co-rated</small></div>
+      <div class="meter"><i style="width:85%"></i></div>
+      <div class="mval">+0.853</div>
+      <div class="navg">avg 4.00</div>
+      <div class="chev">&#9660; hide</div>
+    </div>
+    <div class="acc">
+      <div class="cgrid">
+        <div class="lbl hd">shared tutor</div>
+        <div class="hd" title="Marisol Aquino">Aquino</div>
+        <div class="hd" title="Benigno Bautista">Bautista</div>
+        <div class="hd" title="Fidel Fajardo">Fajardo</div>
+        <div class="hd" title="Hector Hidalgo">Hidalgo</div>
+        <div class="hd av">avg over these</div>
+
+        <div class="lbl me">Katrina Katigbak (tutee)</div>
+        <div class="me">5</div><div class="me">3</div><div class="me">5</div><div class="me">4</div>
+        <div class="av me">4.25<span class="avlabel">feeds Pearson</span></div>
+
+        <div class="lbl">Gloria Garcia</div>
+        <div>5</div><div>3</div><div>4</div><div>4</div>
+        <div class="av">4.00<span class="avlabel">feeds Pearson</span></div>
+      </div>
+      <div class="foot">
+        Katrina also rated <b>Gatchalian = 2</b>, not shared with Gloria &mdash; excluded from this comparison.<br>
+        Gloria&rsquo;s overall average <b>4.00</b> feeds the deviation term; Katrina&rsquo;s CF baseline
+        is <b>3.80</b>, not the 4.25 above.
+      </div>
+    </div>
+    <div class="nrow" style="border-top:1px solid #2a3038">
+      <div class="nname">Olivia Ocampo<small>5 co-rated</small></div>
+      <div class="meter"><i style="width:97%"></i></div>
+      <div class="mval">+0.970</div>
+      <div class="navg">avg 3.00</div>
+      <div class="chev">&#9654; show</div>
+    </div>
+    <div class="nrow">
+      <div class="nname">Imelda Ignacio<small>4 co-rated</small></div>
+      <div class="meter"><i style="width:31%"></i></div>
+      <div class="mval">+0.308</div>
+      <div class="navg">avg 3.25</div>
+      <div class="chev">&#9654; show</div>
+    </div>
+  </div>
+
+  <p class="caption">What-if drag &mdash; panel stays open, changed cell flashes</p>
+  <div class="panel">
+    <div class="acc">
+      <div class="cgrid">
+        <div class="lbl hd">shared tutor</div>
+        <div class="hd" title="Marisol Aquino">Aquino</div>
+        <div class="hd" title="Benigno Bautista">Bautista</div>
+        <div class="hd" title="Fidel Fajardo">Fajardo</div>
+        <div class="hd" title="Hector Hidalgo">Hidalgo</div>
+        <div class="hd av">avg over these</div>
+
+        <div class="lbl me">Katrina Katigbak (tutee)</div>
+        <div class="me">5</div><div class="me">3</div><div class="me">5</div><div class="me">4</div>
+        <div class="av me">4.25<span class="avlabel">feeds Pearson</span></div>
+
+        <div class="lbl">Gloria Garcia</div>
+        <div class="flash">2</div><div>3</div><div>4</div><div>4</div>
+        <div class="av flash">3.25<span class="avlabel">feeds Pearson</span></div>
+      </div>
+      <div class="foot">
+        Dragging Gloria&rsquo;s rating of the candidate tutor changes a cell <em>inside</em> the
+        co-rated set &mdash; because Katrina has rated Aquino too. The cell and the recomputed
+        average flash, then similarity and the CF total follow.
+      </div>
+    </div>
+  </div>
+
+  <p class="caption">Compare Pair tab &mdash; half width, grid tightened</p>
+  <div class="panel half">
+    <div class="acc">
+      <div class="cgrid">
+        <div class="lbl hd">shared</div>
+        <div class="hd" title="Marisol Aquino">Aqu.</div>
+        <div class="hd" title="Benigno Bautista">Bau.</div>
+        <div class="hd" title="Fidel Fajardo">Faj.</div>
+        <div class="hd" title="Hector Hidalgo">Hid.</div>
+        <div class="hd av">avg</div>
+
+        <div class="lbl me">Katigbak</div>
+        <div class="me">5</div><div class="me">3</div><div class="me">5</div><div class="me">4</div>
+        <div class="av me">4.25</div>
+
+        <div class="lbl">Garcia</div>
+        <div>5</div><div>3</div><div>4</div><div>4</div>
+        <div class="av">4.00</div>
+      </div>
+    </div>
+  </div>
+
+  <p class="note">
+    <b>Decisions this artifact records.</b> Inline accordion, single-open. Read-only cells &mdash; the
+    existing neighbour slider stays the only control. Both averages shown and labelled by what each
+    feeds: the co-rated-set average drives Pearson, the overall average drives the deviation term.
+    Surname-only column headers with the full name on hover. Panel persists across what-if refetches
+    with the changed cell flashed. Compare Pair inherits the same component with a tightened grid
+    rather than a second layout.
+  </p>
+</div>
+</body>
+</html>

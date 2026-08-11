@@ -1119,6 +1119,8 @@
         the ranking stand out.</li>
       <li>Below it, every subject-matching tutor ranked by Hybrid Score.</li>
       <li>Click any row, in the table or the list, to open its CBF bars and the CF waterfall.</li>
+      <li>In the waterfall, click a neighbour's <code>N co-rated</code> chip to expand the shared
+        ratings behind its similarity &mdash; see &ldquo;Co-rated set&rdquo; below.</li>
     </ol>
 
     <h3>Compare Pair tab</h3>
@@ -1127,6 +1129,34 @@
       <li>See stat cards for both sides: subject preferences/expertise and tutor rating history.</li>
       <li>Watch the same animated CBF/CF/Hybrid breakdown, side by side.</li>
     </ol>
+
+    <h3>Co-rated set <span class="h2-tag">where a similarity comes from</span></h3>
+    <p>
+      Each neighbour row carries a <code>N co-rated</code> chip. Click it to expand the tutors both
+      students rated, with each student's score for every one of them and the average taken over
+      just those tutors. The similarity meter above stops being a number to take on faith: the
+      expanded cells are the inputs Pearson ran on, and a panelist can check them by hand. One
+      neighbour opens at a time, and the cells are read-only &mdash; the neighbour's rating slider
+      stays the only control.
+    </p>
+    <p class="note">
+      <strong>Two different averages are on screen, and they are labelled.</strong> The one inside
+      the expanded panel is taken over the co-rated set only, because that is what Pearson measures
+      deviation from (<code>CF.py</code>, <code>sim</code>). The <code>avg</code> on the collapsed
+      row is the neighbour's mean over <em>all</em> their ratings, which is what the deviation term
+      uses. They are different numbers whenever a student has rated a tutor the other has not
+      &mdash; and the divergence usually shows up on the <em>tutee's</em> side, not the
+      neighbour's. On the curated cast, S6 Katrina Katigbak has a different average against every
+      neighbour she is compared with (4.25 vs S2, 3.75 vs S3, 3.50 vs S4, 3.80 vs S10), none of
+      which is the 3.80 baseline the prediction actually starts from.
+    </p>
+    <p class="note">
+      Values move on a reseed. The pattern is the durable part: expand <strong>S4 Imelda
+      Ignacio</strong> on T1, the lowest-similarity contributing neighbour, and her shared ratings
+      show why she barely counts and why she drags the prediction down &mdash; she rated T1 below
+      her own average while the other three rated him above theirs. Design recorded in
+      <a href="../mockups/2026-08-10-corated-set-panel.html">the co-rated set mockup</a>.
+    </p>
 
     <h3>What-if rating edits <span class="h2-tag">nothing is saved</span></h3>
     <p>
