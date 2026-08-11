@@ -1,7 +1,7 @@
 ---
 title: SuperAdmin report drill-down pages
 date: 2026-08-11
-status: In Progress
+status: Done
 summary: Give the Top performers and Subject popularity cards a "View all" link to dedicated, filterable pages showing every row, and align the xlsx export with them.
 spec: ../mockups/2026-08-11-superadmin-report-drilldown.html
 ---
@@ -10,18 +10,25 @@ spec: ../mockups/2026-08-11-superadmin-report-drilldown.html
 
 ## Status & Progress Summary
 
-**In Progress** — implemented, not yet committed.
+**Done.** Implemented, committed (`5761627`), pushed, PR #123 open against `main`.
 
-Backend and frontend are both done and green: `SuperAdminRedesignApiTests` 16/16 (up from 11),
-frontend 179/179 (up from 166), lint at its documented baseline, build clean. Verified against the
+Backend and frontend are both green: `SuperAdminRedesignApiTests` 16/16 (up from 11), frontend
+179/179 (up from 166), lint at its documented baseline, build clean. Verified against the
 development database: the cards still truncate at 5 and 10, `view=full` returns 159 tutors and 106
-subjects, and the totals match those lists exactly. The full backend suite has **not** produced a
-verdict — three attempts across two sessions were all killed by background teardown rather than
-finishing, so it needs a foreground run.
+subjects, and the totals match those lists exactly.
+
+The full backend suite question is resolved: 417 tests, 4 failures, all confirmed pre-existing and
+unrelated to this plan's diff (analytics/reporting code only; no bookings, sessions, dev-live
+overrides, or cache touched). Full evidence and the disproved "order-dependent" theory are recorded
+in the xlsx-export plan's Checks to run, since that is where the question originated. Root cause not
+found; left for a dedicated `diagnosing-bugs` session, not a blocker here.
 
 One incident to record: `CONTEXT.md` was overwritten during this work after a bad existence check,
 then restored from `HEAD` with the new terms appended in the file's own style. The committed 376
-lines are intact; uncommitted working-tree edits to that file were lost.
+lines are intact; uncommitted working-tree edits to that file were lost. A separate, unrelated
+uncommitted addition (Catalog Description / Tutor Note / Selected Subjects, for the in-flight
+subject-picker work) was drafted afterward and is still awaiting the user's review before it is
+committed on its own.
 
 Shape is settled (drill-down, one page per dataset) and recorded in the mockup linked above. A
 second grilling round then settled three more points: the page shows **Period-Active Tutors** and
@@ -36,10 +43,8 @@ popularity**, there is **no rank column**, **null ratings sort last**, and undef
 
 Session summary written:
 [`2026-08-11-superadmin-report-drilldown-pages-summary.md`](../session-summaries/2026-08-11-superadmin-report-drilldown-pages-summary.md).
-Remaining before this can be marked Done: a foreground full-suite run (three attempts have now been
-killed by background teardown rather than producing a result) and a decision on the lost
-`CONTEXT.md` edits. Proceeding to open a PR with status left at In Progress and both gaps stated in
-the PR body, per the user's request to open one now.
+The full-suite question that kept this at In Progress is now resolved (see above); nothing left
+open for this plan specifically.
 
 ## Goal
 
@@ -194,7 +199,8 @@ Key decisions:
 |---|---|
 | 2026-08-11 | Created. Design settled through a grilling session; drill-down chosen over four mocked alternatives. Mockup saved to `docs/mockups/2026-08-11-superadmin-report-drilldown.html`. |
 | 2026-08-11 | Implemented. Backend: `TOP_TUTORS_CARD_LIMIT` / `SUBJECT_POPULARITY_CARD_LIMIT` replace the magic 5 and 10, both row helpers accept `limit=None`, `AdminAnalyticsView` gains `view=full` and returns `tutor_total` / `subject_total`, and the export calls both helpers uncapped. Frontend: two routes onto one `SuperAdminReportDetail.vue` driven by `REPORT_DETAIL_DATASETS`, a `fetchAnalyticsDetail` store action with its own state and flags, "View all" pills on both cards, and the redundant `.slice(0, 5)` replaced by the shared constant. The null-last comparator was extracted to `sortReportRows` so it could be tested rather than buried in the component. Checks: backend 16/16, frontend 179/179, lint at baseline, build clean, dev-DB spot check 5/10 card and 159/106 full with matching totals. Full backend suite still unresolved after three killed runs. **Incident:** `CONTEXT.md` was overwritten by a Write that followed a Glob wrongly reporting the file absent; restored from `HEAD` and the new terms re-added in the file's existing `**Term**:` / `_Avoid_:` style, but uncommitted edits to it were lost. |
-| 2026-08-11 | Session summary written; PR being opened at the user's request with the plan left In Progress, since the full backend suite still has no verdict after three killed runs. |
+| 2026-08-11 | Session summary written; PR #123 opened with the plan left In Progress, since the full backend suite still had no verdict after three killed runs. |
+| 2026-08-12 | Full backend suite ran to completion: 417 tests, 4 failures, all confirmed pre-existing and unrelated to this plan's diff. Full evidence recorded in the xlsx-export plan, where the question originated. Status set to Done. Drafted (uncommitted) three `CONTEXT.md` entries -- Catalog Description, Tutor Note, Selected Subjects -- for the unrelated in-flight subject-picker work, as a reconstruction attempt after the earlier `CONTEXT.md` incident; awaiting the user's review, not part of this plan. |
 | 2026-08-11 | Dropped the count from the drill-down link: it is now a plain "View all" pill rather than "View all 159 →". The totals stay in the payload because they gate whether the pill renders at all. |
 | 2026-08-11 | Third grilling round, closing the plan. Pages titled **Tutor performance** and **Subject popularity** — neither claims completeness, subtitles carry the population and window. **No rank column**: the sessions figure is already visible and sortable, and rank is the only column whose meaning breaks on re-sort. **Null ratings sort last** in both directions rather than coercing to 0, which would rank the one unrated tutor below a genuine 1-star one. **Tie-breaking left undefined by explicit decision** — surfaced as a live defect (`.order_by('-sessions')` alone, with ties at 13/13/9/9/9, so the bottom of the top-5 can shift between identical refreshes) and ruled out of scope as irrelevant to tutor screening; recorded under Risks with the one-line fix. Drill-down shape confirmed. Mockup updated to match; its earlier "All tutors / 159 at 30d" labels were wrong on both counts. |
 | 2026-08-11 | Second grilling round. Killed the zero-filled 163-tutor roster option — the Users tab already is the full roster (all 163, filterable by role and institution, with lifetime sessions and rating), so Reports would have been a worse copy; Reports earns its place on earnings and period scoping, which Users lacks entirely. Recorded that the page shows Period-Active Tutors and must not be titled "All tutors", since the booking-driven query at `admin_views.py:168` omits anyone idle in the window. Added step 2b: the API must return `tutor_total` / `subject_total`, because the summary payload has no count today and the figure is period-dependent (23 at 7d, 125 at 30d, 159 at 90d and all time) — the mockup's hardcoded "159" was wrong on the page's own default period. Vocabulary pinned in a new root `CONTEXT.md`. |

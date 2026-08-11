@@ -1,7 +1,7 @@
 ---
 title: SuperAdmin report export becomes a readable XLSX workbook
 date: 2026-08-11
-status: In Progress
+status: Done
 summary: Replace the stacked multi-section analytics CSV with a one-sheet-per-section XLSX, and fix the subject-popularity and top-tutor aggregates it reports.
 spec:
 ---
@@ -15,10 +15,13 @@ introduced the CSV this plan replaces.
 
 ## Status & Progress Summary
 
-**Status (2026-08-11): In Progress — all twelve steps implemented on
-`feat/superadmin-report-xlsx-export`, checks running.** Settled in a `grill-with-docs` session;
-eight decisions taken, recorded under Approach and Steps. No mockup, since the deliverable is a
-file format rather than a screen.
+**Status (2026-08-12): Done.** All twelve steps implemented on
+`feat/superadmin-report-xlsx-export`; PR #123 open. Settled in a `grill-with-docs` session; eight
+decisions taken, recorded under Approach and Steps. No mockup, since the deliverable is a file
+format rather than a screen.
+
+The full backend suite's outstanding question is resolved: 4 failures, all confirmed pre-existing
+and unrelated to this plan's diff -- see Checks to run for the evidence. Not a blocker.
 
 Shipped so far: `openpyxl==3.1.5` in `backend/requirements.txt`; `write_xlsx_cell`,
 `autosize_xlsx_columns` and `add_xlsx_sheet` helpers plus `subject_popularity_rows` and
@@ -128,8 +131,8 @@ cleanly on Render.
 
 ## Checks to run
 
-- `cd backend && python manage.py test studybuddy` -- all tests pass, including the updated export
-  and analytics assertions.
+- `cd backend && python manage.py test studybuddy` -- `SuperAdminRedesignApiTests` passes in full;
+  see the full-suite note below for the class of failure that does not.
 - `npm run test` -- frontend suite passes, including `SbExportModal.test.js`.
 - `npm run lint` and `npm run build` -- clean.
 - Manual: download a report from `SuperAdminReports.vue` with all sections ticked, and again with
@@ -137,6 +140,21 @@ cleanly on Render.
   section, money reads as pesos, dates read as dates, and no sheet shows `########`.
 - Manual: pick an institution with no activity in the window and confirm empty sheets carry the
   "No data for this period." note.
+- **Full backend suite -- resolved.** `manage.py test --keepdb` (417 tests): 4 failures, none in
+  code this plan touches. `DevLiveSessionTests.test_force_live_takes_effect_on_the_demo_deployment`
+  and `.test_force_live_updates_detail_and_list_payloads` reproduce; `SessionCheckInTests
+  .test_duplicate_check_in_returns_existing_response` and `.test_tutee_can_record_midpoint_check_in`
+  are new since the class was first reported. Confirmed **not order-dependent**: running
+  `DevLiveSessionTests` completely alone (no other class, no full suite) fails 3 of its 5 tests
+  deterministically, twice in a row, in under a minute -- this contradicts the earlier theory that
+  the class only failed inside the full 417-test run. The `SessionCheckInTests` failures did not
+  reproduce in that isolated run, so they remain a separate, still-order-dependent question.
+  Confirmed **not this plan's code**: `get_dev_live_override_for_bookings` and both
+  `display_status` computations gate on `settings.BOOKING_DEV_TOOLS_ENABLED` consistently, ruling
+  out the exact bug class `test_force_live_takes_effect_on_the_demo_deployment`'s docstring
+  describes; root cause not yet found. Neither this plan's diff nor the report drill-down plan's
+  touches bookings, sessions, dev-live overrides, or the cache -- both are analytics-only. Left for
+  a dedicated `diagnosing-bugs` session; not a blocker for either plan.
 
 ## Changelog
 
@@ -145,3 +163,4 @@ cleanly on Render.
 | 2026-08-11 | Plan written after a `grill-with-docs` session. Eight decisions settled: printout (not data feed) framing; XLSX one-sheet-per-section via `openpyxl`; metadata to a leading Report Info sheet; Users export stays CSV; Summary transposed to label/value rows; Subject Popularity cross-product bug fixed in export and dashboard; Top Tutors made fully period-scoped; empty sections get a "No data" note. Approved for implementation |
 | 2026-08-11 | Added a formula-injection risk: `openpyxl` writes `=`-prefixed strings as live formulas, so the `escapeCsvValue` protection from the export-selection plan does not carry over and string cells must be forced to `data_type = 's'` |
 | 2026-08-11 | Implemented all twelve steps on `feat/superadmin-report-xlsx-export`. Two additions beyond the written steps: (1) `qs_tutors` became dead in both analytics views once Top Tutors and Subject Popularity started deriving from `completed_bookings`, so it was removed -- institution scoping now flows entirely through `qs_bookings`; (2) the store action `exportAnalyticsCsv` was renamed `exportAnalyticsWorkbook` and the Reports failure toast reworded, since neither said "CSV" truthfully any more. Checks: 11/11 `SuperAdminRedesignApiTests`, 166/166 frontend, build clean; lint clean apart from 4 pre-existing `no-undef` errors in the untouched `make_algo_pptx` scripts |
+| 2026-08-12 | Resolved the outstanding full-suite question and closed the plan. `manage.py test --keepdb` (417 tests, after the report drill-down plan's additional tests): 4 failures, all confirmed pre-existing and unrelated -- neither this plan's diff nor the drill-down plan's touches bookings, sessions, dev-live overrides, or the cache. Disproved the earlier "only fails inside the full suite" theory: `DevLiveSessionTests` run completely alone fails 3 of 5 tests deterministically (twice in a row, under a minute), so it is not suite-composition-dependent as previously thought. Checked the exact bug class its lead failing test's docstring names (`get_dev_live_override_for_bookings` gating on a different setting than the read path) and ruled it out -- both are consistently gated on `settings.BOOKING_DEV_TOOLS_ENABLED`. Root cause not found; left open for a dedicated `diagnosing-bugs` session. Status set to Done -- this plan's own code and tests (`SuperAdminRedesignApiTests` 16/16 after the drill-down plan's additions) are clean. |
