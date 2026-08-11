@@ -98,6 +98,9 @@
             <p class="eyebrow">Tutors</p>
             <h2>Top performers</h2>
           </div>
+          <RouterLink v-if="tutorTotal > REPORT_CARD_ROW_LIMIT" :to="tutorsDetailTo" class="view-all">
+            View all
+          </RouterLink>
         </div>
         <div class="table-responsive">
           <table class="table align-middle mb-0">
@@ -135,6 +138,13 @@
             <p class="eyebrow">Demand</p>
             <h2>Subject popularity</h2>
           </div>
+          <RouterLink
+            v-if="subjectTotal > REPORT_CARD_ROW_LIMIT"
+            :to="subjectsDetailTo"
+            class="view-all"
+          >
+            View all
+          </RouterLink>
         </div>
         <div v-if="subjectPopularity.length" class="subject-list">
           <div v-for="(subject, index) in subjectPopularity" :key="subject.subject_name" class="subject-row">
@@ -199,38 +209,41 @@
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
+import { RouterLink, useRoute } from 'vue-router'
 import SbExportModal from '@/components/SbExportModal.vue'
 import SbSelectModal from '@/components/SbSelectModal.vue'
 import { useHaptics } from '@/composables/useHaptics'
 import { useSuperAdminStore } from '@/stores/superadmin'
 import { useToastStore } from '@/stores/toast'
 import { REPORT_COMBINED_FILE_LABEL, REPORT_SECTIONS } from '@/constants/superadminExports'
+import {
+  ALL_INSTITUTIONS_LABEL,
+  REPORT_CARD_ROW_LIMIT,
+  REPORT_DEFAULT_PERIOD,
+  REPORT_DETAIL_DATASETS,
+  REPORT_PERIOD_OPTIONS,
+  reportPeriodScopeLabel,
+} from '@/constants/superadminReports'
 
 const store = useSuperAdminStore()
 const toastStore = useToastStore()
 const { vibrate, patterns } = useHaptics()
 
-const selectedInstitutionId = ref('')
-const period = ref('30d')
+const route = useRoute()
+
+// Seeded from the query string so returning from a drill-down page restores the filters the user
+// left with, rather than snapping back to the defaults.
+const selectedInstitutionId = ref(route.query.institution ? String(route.query.institution) : '')
+const period = ref(
+  REPORT_PERIOD_OPTIONS.some((option) => option.value === route.query.period)
+    ? String(route.query.period)
+    : REPORT_DEFAULT_PERIOD,
+)
 const isExportOpen = ref(false)
 
 const exportSections = REPORT_SECTIONS
 
-const periodOptions = [
-  { label: '7D', value: '7d' },
-  { label: '30D', value: '30d' },
-  { label: '3M', value: '3m' },
-  { label: 'All', value: 'all' },
-]
-
-// Spelled-out forms of periodOptions, for the export modal's scope line where the terse
-// toggle labels (7D, 3M) would read as jargon.
-const periodScopeLabels = {
-  '7d': 'Last 7 days',
-  '30d': 'Last 30 days',
-  '3m': 'Last 3 months',
-  all: 'All time',
-}
+const periodOptions = REPORT_PERIOD_OPTIONS
 
 const subjectColors = ['#00895a', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899']
 
@@ -251,10 +264,33 @@ const selectedInstitutionName = computed(() => {
 
 const exportScopeLine = computed(() =>
   [
-    periodScopeLabels[period.value] || period.value,
-    selectedInstitutionName.value || 'All institutions',
+    reportPeriodScopeLabel(period.value),
+    selectedInstitutionName.value || ALL_INSTITUTIONS_LABEL,
   ].join(' · '),
 )
+
+// Carried into the drill-down routes so a detail page opens on the slice that was clicked, and so
+// the crumb back from it restores these same filters.
+const detailQuery = computed(() => {
+  const query = { period: period.value }
+  if (selectedInstitutionId.value) query.institution = selectedInstitutionId.value
+  return query
+})
+
+// Totals come from the API rather than the rendered rows: the cards are truncated, so the row
+// count cannot say how many exist behind them, and the figure moves with the period.
+const tutorTotal = computed(() => store.analytics?.tutor_total ?? 0)
+const subjectTotal = computed(() => store.analytics?.subject_total ?? 0)
+
+const tutorsDetailTo = computed(() => ({
+  name: REPORT_DETAIL_DATASETS.tutors.routeName,
+  query: detailQuery.value,
+}))
+
+const subjectsDetailTo = computed(() => ({
+  name: REPORT_DETAIL_DATASETS.subjects.routeName,
+  query: detailQuery.value,
+}))
 
 const metrics = computed(() => [
   {
@@ -311,7 +347,12 @@ const topSessionCount = computed(() => {
   return Math.max(...tutors.map((tutor) => tutor.sessions || 0), 1)
 })
 
-const subjectPopularity = computed(() => (store.analytics?.subject_popularity || []).slice(0, 5))
+// The server also truncates, at its own larger cap. Slicing again here is what made the card show
+// five subjects while the export sheet carried ten; the shared constant keeps the card's summary
+// length stated once.
+const subjectPopularity = computed(() =>
+  (store.analytics?.subject_popularity || []).slice(0, REPORT_CARD_ROW_LIMIT),
+)
 const maxSubjectCount = computed(() => {
   if (!subjectPopularity.value.length) return 1
   return Math.max(...subjectPopularity.value.map((subject) => subject.booking_count || 0), 1)
@@ -533,6 +574,28 @@ h2 {
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 18px;
+}
+
+.view-all {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  padding: 5px 14px;
+  border: 1px solid var(--sb-card-border);
+  border-radius: 999px;
+  background: #fff;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--sb-primary);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.view-all:hover {
+  background: var(--sb-primary);
+  border-color: var(--sb-primary);
+  color: #fff;
 }
 
 .chart-skeleton {

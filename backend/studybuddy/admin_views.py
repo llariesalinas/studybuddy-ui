@@ -70,6 +70,19 @@ ANALYTICS_EXPORT_SECTIONS = {
 
 ANALYTICS_EXPORT_COMBINED_LABEL = 'report'
 
+# How many rows each ranked card shows on the SuperAdmin reports dashboard. The drill-down pages
+# and the workbook export pass `limit=None` to the row helpers instead, so nothing is truncated
+# where the admin has asked to see everything.
+TOP_TUTORS_CARD_LIMIT = 5
+SUBJECT_POPULARITY_CARD_LIMIT = 10
+
+# Row scope for the analytics response. `summary` feeds the dashboard cards and stays truncated;
+# `full` feeds the drill-down pages. Both carry the totals, since a truncated list cannot say how
+# many rows exist behind it.
+ANALYTICS_VIEW_SUMMARY = 'summary'
+ANALYTICS_VIEW_FULL = 'full'
+ANALYTICS_VIEWS = (ANALYTICS_VIEW_SUMMARY, ANALYTICS_VIEW_FULL)
+
 # The platform's cut of a completed session. Payouts are the remainder, so the two always agree.
 PLATFORM_COMMISSION_RATE = Decimal('0.10')
 PLATFORM_PAYOUT_RATE = Decimal('1') - PLATFORM_COMMISSION_RATE
@@ -141,28 +154,35 @@ def add_xlsx_sheet(workbook, title, headers, rows, formats=None):
     return sheet
 
 
-def subject_popularity_rows(completed_bookings, limit=10):
+def subject_popularity_rows(completed_bookings, limit=SUBJECT_POPULARITY_CARD_LIMIT):
     """Bookings grouped by the subject the booking was actually for.
 
     Counts `Booking.subject` directly. The earlier version joined through `TutorSubjects`, which
     paired every subject a tutor teaches with every booking that tutor completed -- so one Java
     session also counted towards every other subject that tutor happened to list.
+
+    `limit=None` returns every subject, for the drill-down page and the export.
     """
-    return (
+    rows = (
         completed_bookings
         .values('subject__subject_name')
         .annotate(booking_count=Count('id'))
-        .order_by('-booking_count')[:limit]
+        .order_by('-booking_count')
     )
+    return rows if limit is None else rows[:limit]
 
 
-def top_tutor_rows(completed_bookings, limit=5):
+def top_tutor_rows(completed_bookings, limit=TOP_TUTORS_CARD_LIMIT):
     """Top tutors by sessions completed *in the reported period*.
 
     Every column comes from the same window, so sessions, rating and earnings are comparable to
     each other -- previously `sessions` and `rating` were lifetime fields on `Tutor` sitting beside
     period-scoped earnings. `Payment` and `Rating` are both OneToOne to `Booking`, so joining them
     here cannot fan the session count out.
+
+    `limit=None` returns every tutor who completed a session in the window, for the drill-down page
+    and the export. Tutors idle in the window are absent entirely -- this is a booking-driven
+    query, not a roster; see CONTEXT.md.
     """
     rows = (
         completed_bookings
@@ -172,8 +192,10 @@ def top_tutor_rows(completed_bookings, limit=5):
             rating=Avg('rating__rating_score'),
             gross=Sum('payment__amount', filter=Q(payment__payment_status='Paid')),
         )
-        .order_by('-sessions')[:limit]
+        .order_by('-sessions')
     )
+    if limit is not None:
+        rows = rows[:limit]
     return [
         {
             'name': f"{row['tutor__profile__fname']} {row['tutor__profile__lname']}",
@@ -1263,15 +1285,32 @@ class AdminAnalyticsView(APIView):
         completed_sessions = completed_bookings.count()
         completion_rate = round((completed_sessions / total_sessions) * 100, 1) if total_sessions else 0
 
-        top_tutors_data = top_tutor_rows(completed_bookings)
+        # `full` backs the drill-down pages; the dashboard cards stay on the truncated default.
+        view = request.query_params.get('view', ANALYTICS_VIEW_SUMMARY)
+        if view not in ANALYTICS_VIEWS:
+            view = ANALYTICS_VIEW_SUMMARY
+        is_full = view == ANALYTICS_VIEW_FULL
+
+        top_tutors_data = top_tutor_rows(
+            completed_bookings,
+            limit=None if is_full else TOP_TUTORS_CARD_LIMIT,
+        )
 
         subject_popularity = [
             {
                 'subject_name': item['subject__subject_name'] or 'General',
                 'booking_count': item['booking_count'],
             }
-            for item in subject_popularity_rows(completed_bookings)
+            for item in subject_popularity_rows(
+                completed_bookings,
+                limit=None if is_full else SUBJECT_POPULARITY_CARD_LIMIT,
+            )
         ]
+
+        # Counted off the same queryset and grouped the same way as the rows above, so a card's
+        # "View all N" label can never disagree with the list it opens.
+        tutor_total = completed_bookings.values('tutor').distinct().count()
+        subject_total = completed_bookings.values('subject__subject_name').distinct().count()
 
         return Response({
             'sessions_over_time': {
@@ -1285,7 +1324,9 @@ class AdminAnalyticsView(APIView):
             },
             'completion_rate': completion_rate,
             'subject_popularity': subject_popularity,
-            'top_tutors': top_tutors_data
+            'subject_total': subject_total,
+            'top_tutors': top_tutors_data,
+            'tutor_total': tutor_total
         })
 
 
@@ -1389,7 +1430,9 @@ class AdminAnalyticsExportView(APIView):
                 ['Name', 'Sessions', 'Rating', 'Earnings'],
                 [
                     [row['name'], row['sessions'], row['rating'] if row['rating'] is not None else '', row['earnings']]
-                    for row in top_tutor_rows(completed_bookings)
+                    # Uncapped: a workbook that silently disagreed with the screen it came from
+                    # was the confusion this export set out to remove.
+                    for row in top_tutor_rows(completed_bookings, limit=None)
                 ],
                 formats={3: XLSX_CURRENCY_FORMAT},
             )
@@ -1401,7 +1444,7 @@ class AdminAnalyticsExportView(APIView):
                 ['Subject', 'Bookings'],
                 [
                     [item['subject__subject_name'] or 'General', item['booking_count']]
-                    for item in subject_popularity_rows(completed_bookings)
+                    for item in subject_popularity_rows(completed_bookings, limit=None)
                 ],
             )
 

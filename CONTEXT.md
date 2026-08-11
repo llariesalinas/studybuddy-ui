@@ -374,3 +374,41 @@ A Subject owned by one Partner Institution and visible only to users and admins 
 institution. Custom Subjects can be curated into the owning institution's Institution Course
 Catalog, but cannot be curated by other institutions.
 _Avoid_: global subject, shared subject
+
+### Reporting population
+
+**Tutor Roster**:
+Every Tutor account that exists, regardless of activity. This is what the SuperAdmin Users tab
+lists — filterable by role, institution and status, but never by time.
+_Avoid_: "all tutors" on any Reports surface (see Period-Active Tutor)
+
+**Period-Active Tutor**:
+A Tutor with at least one Completed session inside the reporting window. A strict subset of the
+Tutor Roster, and the population every figure on the SuperAdmin Reports screen is drawn from. A
+Tutor who taught nothing in the window is absent from Reports entirely — they are not shown as a
+zero row. The two populations differ, and differ by period, so no Reports surface may be titled
+"All tutors".
+_Avoid_: all tutors, tutor list, roster (a roster includes the idle; this does not)
+
+**Lifetime Sessions**:
+A Tutor's total Completed sessions since joining. A stored field, surfaced on the Users tab and in
+the user export.
+_Avoid_: "sessions" unqualified when a Period Sessions figure is anywhere nearby
+
+**Period Sessions**:
+Completed sessions inside the selected reporting window, for the selected institution. Computed
+per request on the Reports screen and its exports. Different from Lifetime Sessions for the same
+Tutor; placing the two in one row without distinguishing labels has already produced one shipped
+defect.
+_Avoid_: total sessions (that phrasing means Lifetime Sessions)
+
+**Earnings**:
+A Tutor's share of Gross Revenue in the reporting window, from Paid payments only. Always
+period-scoped — there is no lifetime earnings figure anywhere in the product.
+_Avoid_: total earnings, wallet balance (a wallet balance is current funds, not period income)
+
+**Period**:
+The reporting window every Reports figure is scoped to (7d / 30d / 3m / all time). Changing it
+changes the *population*, not just the totals: the set of Period-Active Tutors and the set of
+Subjects with any bookings both shrink and grow with it.
+_Avoid_: date range (the window is chosen from fixed options, not arbitrary endpoints)

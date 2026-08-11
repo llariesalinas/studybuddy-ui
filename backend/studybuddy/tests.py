@@ -346,6 +346,108 @@ class SuperAdminRedesignApiTests(APITestCase):
         )
         self.assertEqual(self._sheet_rows(workbook, "Top Tutors")[1][:2], ("Tutor One", 1))
 
+    def _seed_completed_bookings(self, count):
+        """Create `count` tutors, each with one paid Completed booking on a subject of its own.
+
+        Enough rows for the dashboard caps to bite: the default response truncates tutors at 5 and
+        subjects at 10, so a `count` above both makes the truncation observable rather than
+        incidental.
+        """
+        payment_method, _ = PaymentMethod.objects.get_or_create(
+            code="online", defaults={"method_name": "Online Payment"}
+        )
+        for index in range(count):
+            subject = Subjects.objects.create(
+                subject_code=f"SUB{index:03d}",
+                subject_name=f"Subject {index:02d}",
+                department="Math",
+            )
+            tutor_user = User.objects.create_user(
+                username=f"bulk-tutor-{index}",
+                email=f"bulk-tutor-{index}@cpu.edu.ph",
+                password="password",
+            )
+            tutor_profile = UserProfile.objects.create(
+                user=tutor_user,
+                fname="Bulk",
+                mname="",
+                lname=f"Tutor {index:02d}",
+                role="Tutor",
+                institution=self.institution,
+                profile_completed=True,
+            )
+            tutor = Tutor.objects.create(profile=tutor_profile, hourly_rate=Decimal("500.00"))
+            availability = TutorAvailability.objects.create(
+                tutor=tutor,
+                day="Mon",
+                time_slot=time(9, 0),
+                is_active=True,
+            )
+            booking = Booking.objects.create(
+                student=self.target_profile,
+                tutor=tutor,
+                availability=availability,
+                session_date=date.today(),
+                session_mode="Online",
+                status="Completed",
+                subject=subject,
+            )
+            Payment.objects.create(
+                booking=booking,
+                method=payment_method,
+                amount=Decimal("500.00"),
+                payment_status="Paid",
+            )
+
+    def test_analytics_truncates_to_the_dashboard_caps_by_default(self):
+        self._seed_completed_bookings(11)
+
+        response = self.client.get("/api/admin/analytics/?period=7d")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data["top_tutors"]), 5)
+        self.assertEqual(len(response.data["subject_popularity"]), 10)
+
+    def test_analytics_view_full_returns_every_row(self):
+        self._seed_completed_bookings(11)
+
+        response = self.client.get("/api/admin/analytics/?period=7d&view=full")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data["top_tutors"]), 11)
+        self.assertEqual(len(response.data["subject_popularity"]), 11)
+
+    def test_analytics_reports_totals_the_truncated_lists_cannot_convey(self):
+        """The card labels its own drill-down link, and the count is not inferable from the rows."""
+        self._seed_completed_bookings(11)
+
+        summary = self.client.get("/api/admin/analytics/?period=7d")
+        full = self.client.get("/api/admin/analytics/?period=7d&view=full")
+
+        self.assertEqual(summary.data["tutor_total"], 11)
+        self.assertEqual(summary.data["subject_total"], 11)
+        self.assertEqual(full.data["tutor_total"], 11)
+        self.assertEqual(full.data["subject_total"], 11)
+
+    def test_analytics_falls_back_to_summary_for_an_unknown_view(self):
+        self._seed_completed_bookings(11)
+
+        response = self.client.get("/api/admin/analytics/?period=7d&view=nonsense")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data["top_tutors"]), 5)
+
+    def test_analytics_export_writes_every_row_not_the_dashboard_caps(self):
+        """The workbook and the screen it came from must not disagree about how many rows exist."""
+        self._seed_completed_bookings(11)
+
+        response = self.client.get("/api/admin/analytics/export/?period=7d")
+        workbook = self._export_workbook(response)
+
+        # Less one for the header row on each sheet.
+        self.assertEqual(len(self._sheet_rows(workbook, "Top Tutors")) - 1, 11)
+        self.assertEqual(len(self._sheet_rows(workbook, "Subject Popularity")) - 1, 11)
+
     def test_analytics_export_writes_only_the_requested_sections(self):
         self.client.force_authenticate(user=self.super_user)
 

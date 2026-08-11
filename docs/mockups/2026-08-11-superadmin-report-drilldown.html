@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SuperAdmin report drill-down pages — decided design</title>
+<style>
+  :root { --p: #00895A; --bd: #EAEAEA; --mut: #6B7280; --ink: #1f2937; }
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink);
+         background: #f6f7f8; margin: 0; padding: 2rem 1.25rem 4rem; }
+  .wrap { max-width: 1000px; margin: 0 auto; }
+  h1 { font-size: 1.6rem; margin: 0 0 .3rem; }
+  .lede { color: var(--mut); margin: 0 0 .6rem; line-height: 1.55; max-width: 68ch; }
+  .meta { font-size: .78rem; color: var(--mut); margin: 0 0 2rem; }
+  .meta code { background: #fff; border: 1px solid var(--bd); border-radius: 4px; padding: .1rem .35rem; }
+  h2 { font-size: 1rem; margin: 2.2rem 0 .8rem; padding-bottom: .4rem; border-bottom: 1px solid var(--bd); }
+
+  .card { background: #fff; border: 1px solid var(--bd); border-radius: 14px; overflow: hidden; }
+  .card .ch { display: flex; justify-content: space-between; align-items: center;
+              padding: .75rem .9rem; border-bottom: 1px solid var(--bd); }
+  .eyebrow { font-size: .62rem; letter-spacing: .12em; text-transform: uppercase; color: var(--mut); margin: 0; }
+  .ch h3 { font-size: .88rem; margin: .15rem 0 0; }
+  .viewall { border: 1px solid var(--bd); background: #fff; color: var(--p); font-weight: 600; font-size: .74rem; cursor: pointer; white-space: nowrap; padding: .25rem .7rem; border-radius: 999px; }
+  .rows { padding: .35rem .9rem .7rem; }
+  .r { display: grid; grid-template-columns: 1fr auto auto auto; gap: .6rem; align-items: center;
+       padding: .36rem 0; border-bottom: 1px solid #f2f2f2; font-size: .78rem; }
+  .r:last-child { border-bottom: 0; }
+  .r .nm { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .r .num { color: var(--mut); font-variant-numeric: tabular-nums; min-width: 38px; text-align: right; }
+  .subj { padding: .36rem 0; border-bottom: 1px solid #f2f2f2; font-size: .78rem; }
+  .subj:last-child { border-bottom: 0; }
+  .subj .t { display: flex; justify-content: space-between; }
+  .bar { height: 6px; border-radius: 999px; background: #eef1f0; overflow: hidden; margin-top: .2rem; }
+  .bar > i { display: block; height: 100%; background: var(--p); border-radius: 999px; }
+  .grid2 { display: grid; grid-template-columns: 1.35fr 1fr; gap: 1rem; align-items: start; }
+
+  .browser { border: 1px solid #d8dedb; border-radius: 12px; overflow: hidden; background: #fff; margin-bottom: 1.4rem; }
+  .urlbar { display: flex; align-items: center; gap: .5rem; padding: .5rem .75rem; background: #eef1f0;
+            border-bottom: 1px solid #d8dedb; }
+  .urlbar .dot { width: 9px; height: 9px; border-radius: 50%; background: #cbd5d1; flex: none; }
+  .urlbar code { background: #fff; border: 1px solid #dfe5e2; border-radius: 999px;
+                 padding: .2rem .7rem; font-size: .72rem; color: #374151; }
+  .pagehead { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; padding: .9rem 1rem .7rem; }
+  .crumb { font-size: .74rem; color: var(--p); font-weight: 600; margin: 0 0 .3rem; }
+  .pagehead h4 { margin: 0; font-size: 1.05rem; }
+  .pagehead .sub { font-size: .74rem; color: var(--mut); margin: .22rem 0 0; }
+  .chips { display: flex; gap: .35rem; flex-wrap: wrap; }
+  .chip { border: 1px solid var(--bd); border-radius: 999px; font-size: .7rem; padding: .24rem .65rem; background: #fff; color: var(--mut); }
+  .chip.act { border-color: var(--p); color: var(--p); font-weight: 600; }
+  .chip.solid { background: var(--p); border-color: var(--p); color: #fff; font-weight: 600; }
+  .toolbar { display: flex; gap: .4rem; align-items: center; padding: .55rem 1rem;
+             border-top: 1px solid var(--bd); border-bottom: 1px solid var(--bd); background: #fbfcfc; }
+  .toolbar .inp { flex: 1; border: 1px solid var(--bd); border-radius: 999px; font-size: .72rem;
+                  padding: .28rem .7rem; color: var(--mut); background: #fff; }
+  .thead { display: grid; grid-template-columns: 1fr auto auto auto; gap: .6rem; font-size: .64rem;
+           letter-spacing: .07em; text-transform: uppercase; color: var(--mut);
+           padding: .4rem 1rem; border-bottom: 1px solid var(--bd); }
+  .thead span:not(:first-child) { min-width: 38px; text-align: right; }
+  .thead .sorted { color: var(--p); font-weight: 700; }
+  .body { padding: 0 1rem; }
+  .note { font-size: .72rem; color: var(--mut); text-align: center; padding: .6rem 0 .8rem; }
+  .thead2 { grid-template-columns: 1fr auto auto; }
+  .r2 { grid-template-columns: 1fr auto auto; }
+  .keys { background: #fff; border: 1px solid var(--bd); border-radius: 12px; padding: 1rem 1.25rem; }
+  .keys ul { margin: .3rem 0 0; padding-left: 1.15rem; line-height: 1.6; font-size: .87rem; }
+  .keys li { margin-bottom: .3rem; }
+  .keys code { background: #f4f6f5; border-radius: 4px; padding: .08rem .35rem; font-size: .84em; }
+  @media (max-width: 720px) { .grid2 { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>SuperAdmin report drill-down pages</h1>
+  <p class="lede">
+    Decided design. The dashboard cards keep their top-5 summary and gain a <em>View all</em> pill
+    that navigates to a dedicated, filterable page per dataset. Numbers shown are real values from
+    the development database (159 tutors, 106 subjects).
+  </p>
+  <p class="meta">
+    Decided 2026-08-11 · referenced by <code>docs/plans/2026-08-11-superadmin-report-drilldown-pages.md</code>
+    · rejected alternatives: expand-in-place, internal scroll, full-width in-card takeover, one combined report page
+  </p>
+
+  <h2>1 — The dashboard, unchanged apart from one link per card</h2>
+  <div class="grid2">
+    <div class="card">
+      <div class="ch">
+        <div><p class="eyebrow">Tutors</p><h3>Top performers</h3></div>
+        <button class="viewall">View all</button>
+      </div>
+      <div class="rows">
+        <div class="r"><span class="nm">Michael Mayer</span><span class="num">13</span><span class="num">3.77</span><span class="num">3,686</span></div>
+        <div class="r"><span class="nm">Brenda Anderson</span><span class="num">13</span><span class="num">3.54</span><span class="num">1,498</span></div>
+        <div class="r"><span class="nm">Sarah Gross</span><span class="num">9</span><span class="num">4.67</span><span class="num">1,693</span></div>
+        <div class="r"><span class="nm">Jeffrey Anderson</span><span class="num">9</span><span class="num">3.44</span><span class="num">2,835</span></div>
+        <div class="r"><span class="nm">Matthew Cole</span><span class="num">9</span><span class="num">3.67</span><span class="num">1,871</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ch">
+        <div><p class="eyebrow">Demand</p><h3>Subject popularity</h3></div>
+        <button class="viewall">View all</button>
+      </div>
+      <div class="rows">
+        <div class="subj"><div class="t"><span>Python</span><strong>32</strong></div><div class="bar"><i style="width:100%"></i></div></div>
+        <div class="subj"><div class="t"><span>Java</span><strong>18</strong></div><div class="bar"><i style="width:56%"></i></div></div>
+        <div class="subj"><div class="t"><span>SQL</span><strong>17</strong></div><div class="bar"><i style="width:53%"></i></div></div>
+        <div class="subj"><div class="t"><span>Algebra</span><strong>17</strong></div><div class="bar"><i style="width:53%"></i></div></div>
+        <div class="subj"><div class="t"><span>Calculus</span><strong>17</strong></div><div class="bar"><i style="width:53%"></i></div></div>
+      </div>
+    </div>
+  </div>
+
+  <h2>2 — <code>/superadmin/reports/tutors</code></h2>
+  <div class="browser">
+    <div class="urlbar"><span class="dot"></span><code>/superadmin/reports/tutors?period=all&amp;institution=3</code></div>
+    <div class="pagehead">
+      <div>
+        <p class="crumb">← Platform Reports</p>
+        <h4>Tutor performance</h4>
+        <p class="sub">159 tutors with sessions · All time · Central Philippine University</p>
+      </div>
+      <div class="chips"><span class="chip">7d</span><span class="chip">30d</span><span class="chip act">All time</span><span class="chip solid">Export</span></div>
+    </div>
+    <div class="toolbar">
+      <span class="inp">Search tutor…</span>
+      <span class="chip act">Sessions</span><span class="chip">Rating</span><span class="chip">Earnings</span>
+    </div>
+    <div class="thead"><span>Tutor</span><span class="sorted">Sessions ↓</span><span>Rating</span><span>Earnings</span></div>
+    <div class="body">
+      <div class="r"><span class="nm">Michael Mayer</span><span class="num">13</span><span class="num">3.77</span><span class="num">3,686</span></div>
+      <div class="r"><span class="nm">Brenda Anderson</span><span class="num">13</span><span class="num">3.54</span><span class="num">1,498</span></div>
+      <div class="r"><span class="nm">Sarah Gross</span><span class="num">9</span><span class="num">4.67</span><span class="num">1,693</span></div>
+      <div class="r"><span class="nm">Jeffrey Anderson</span><span class="num">9</span><span class="num">3.44</span><span class="num">2,835</span></div>
+      <div class="r"><span class="nm">Matthew Cole</span><span class="num">9</span><span class="num">3.67</span><span class="num">1,871</span></div>
+      <div class="r"><span class="nm">Elizabeth Mason</span><span class="num">8</span><span class="num">4.10</span><span class="num">2,214</span></div>
+      <div class="r"><span class="nm">Teresa Richard</span><span class="num">8</span><span class="num">3.90</span><span class="num">1,940</span></div>
+      <div class="r"><span class="nm">Chelsea Sandoval</span><span class="num">7</span><span class="num">4.22</span><span class="num">1,655</span></div>
+      <div class="r"><span class="nm">Adam Munoz</span><span class="num">7</span><span class="num">3.10</span><span class="num">1,488</span></div>
+      <div class="r"><span class="nm">Haley Ward</span><span class="num">6</span><span class="num">4.40</span><span class="num">1,302</span></div>
+    </div>
+    <div class="note">…149 more rows — full page scroll, no inner scrollbar</div>
+  </div>
+
+  <h2>3 — <code>/superadmin/reports/subjects</code></h2>
+  <div class="browser">
+    <div class="urlbar"><span class="dot"></span><code>/superadmin/reports/subjects?period=all&amp;institution=3</code></div>
+    <div class="pagehead">
+      <div>
+        <p class="crumb">← Platform Reports</p>
+        <h4>Subject popularity</h4>
+        <p class="sub">106 subjects with bookings · All time · Central Philippine University</p>
+      </div>
+      <div class="chips"><span class="chip">7d</span><span class="chip">30d</span><span class="chip act">All time</span><span class="chip solid">Export</span></div>
+    </div>
+    <div class="toolbar">
+      <span class="inp">Search subject…</span>
+      <span class="chip act">Bookings</span><span class="chip">Name</span>
+    </div>
+    <div class="thead thead2"><span>Subject</span><span class="sorted">Bookings ↓</span><span>Share</span></div>
+    <div class="body">
+      <div class="r r2"><span class="nm">Python</span><span class="num">32</span><span class="num">4.1%</span></div>
+      <div class="r r2"><span class="nm">Java</span><span class="num">18</span><span class="num">2.3%</span></div>
+      <div class="r r2"><span class="nm">SQL</span><span class="num">17</span><span class="num">2.2%</span></div>
+      <div class="r r2"><span class="nm">Algebra</span><span class="num">17</span><span class="num">2.2%</span></div>
+      <div class="r r2"><span class="nm">Calculus</span><span class="num">17</span><span class="num">2.2%</span></div>
+      <div class="r r2"><span class="nm">Relativity</span><span class="num">16</span><span class="num">2.1%</span></div>
+      <div class="r r2"><span class="nm">JavaScript</span><span class="num">15</span><span class="num">1.9%</span></div>
+      <div class="r r2"><span class="nm">Rhetoric</span><span class="num">14</span><span class="num">1.8%</span></div>
+      <div class="r r2"><span class="nm">Corporate Law</span><span class="num">14</span><span class="num">1.8%</span></div>
+      <div class="r r2"><span class="nm">World History</span><span class="num">14</span><span class="num">1.8%</span></div>
+    </div>
+    <div class="note">…96 more rows</div>
+  </div>
+
+  <h2>Decisions this mockup encodes</h2>
+  <div class="keys">
+    <ul>
+      <li><strong>Cards keep their top-5 summary.</strong> "Top performers" stays an honest name, and the destination is "Tutor performance" — deliberately <em>not</em> "All tutors". The query is booking-driven, so a tutor idle in the window is absent entirely. The count is period-dependent: 23 tutors at 7d, 125 at 30d, 159 at 90d and all time.</li>
+      <li><strong>No zero-filled roster.</strong> Showing all 163 tutors with zeros was rejected — the Users tab already is the full roster. Reports earns its place on earnings and period scoping, which Users has nowhere.</li>
+      <li><strong>No rank column.</strong> The sessions figure is already visible and sortable; a rank adds nothing and is the one column whose meaning breaks on re-sort.</li>
+      <li><strong>Null ratings sort last</strong> in both directions. One tutor has completed sessions but no rating; treating that as 0 would rank them below a genuine 1-star tutor, which the data does not support.</li>
+      <li><strong>Filters travel in the query string</strong> — <code>?period=&amp;institution=</code>. The destination shows the same slice as the card clicked, Back restores the dashboard's filters, refresh survives, and the URL is shareable.</li>
+      <li><strong>Period chips and Export repeat on the detail page</strong>, so the page is usable as a destination in its own right rather than only as a pop-out.</li>
+      <li><strong>Subjects become a sortable table</strong> with a share-of-bookings column. The dashboard's bar-track visual does not survive 106 rows; a percentage column carries the same meaning and sorts.</li>
+      <li><strong>Sorting is client-side</strong> over the loaded array. At 159 and 106 rows there is nothing to gain from server-side sort.</li>
+      <li><strong>Whole page scrolls</strong> — no inner scroll region, so Ctrl+F and printing both work.</li>
+    </ul>
+  </div>
+</div>
+</body>
+</html>

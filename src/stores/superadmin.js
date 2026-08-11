@@ -7,6 +7,7 @@ import {
   USERS_FILE_LABEL,
   USER_COLUMN_GROUPS,
 } from '@/constants/superadminExports'
+import { ANALYTICS_VIEW_FULL } from '@/constants/superadminReports'
 
 export const useSuperAdminStore = defineStore('superadmin', () => {
   const stats = ref(null)
@@ -14,6 +15,7 @@ export const useSuperAdminStore = defineStore('superadmin', () => {
   const institutions = ref([])
   const institutionPerformance = ref([])
   const analytics = ref(null)
+  const analyticsDetail = ref(null)
   const pendingActions = ref({ count: 0, items: [] })
   const institutionRequests = ref([])
 
@@ -23,6 +25,7 @@ export const useSuperAdminStore = defineStore('superadmin', () => {
     institutions: false,
     institutionPerformance: false,
     analytics: false,
+    analyticsDetail: false,
     pendingActions: false,
     institutionRequests: false,
     export: false,
@@ -35,6 +38,7 @@ export const useSuperAdminStore = defineStore('superadmin', () => {
     institutions: null,
     institutionPerformance: null,
     analytics: null,
+    analyticsDetail: null,
     pendingActions: null,
     institutionRequests: null,
     export: null,
@@ -289,6 +293,25 @@ export const useSuperAdminStore = defineStore('superadmin', () => {
     }
   }
 
+  // `view=full` returns every ranked row instead of the dashboard's truncated cards. Kept in its
+  // own state so a drill-down page never overwrites the dashboard's summary payload, and the two
+  // can be open in separate tabs without fighting over one ref.
+  const fetchAnalyticsDetail = async (institutionId = null, period = '30d') => {
+    loading.value.analyticsDetail = true
+    error.value.analyticsDetail = null
+
+    try {
+      const params = { period, view: ANALYTICS_VIEW_FULL }
+      if (institutionId) params.institution_id = institutionId
+      const res = await api.get('/admin/analytics/', { params })
+      analyticsDetail.value = res.data
+    } catch {
+      error.value.analyticsDetail = 'Failed to load analytics.'
+    } finally {
+      loading.value.analyticsDetail = false
+    }
+  }
+
   // `sections` narrows which sheets the server writes. Omitting it keeps the endpoint's
   // all-sections default, so an existing caller that does not pass it is unaffected. The response
   // is an xlsx workbook; downloadCsv passes the blob through with the server's content type.
@@ -399,6 +422,7 @@ export const useSuperAdminStore = defineStore('superadmin', () => {
     institutions,
     institutionPerformance,
     analytics,
+    analyticsDetail,
     pendingActions,
     institutionRequests,
     loading,
@@ -420,6 +444,7 @@ export const useSuperAdminStore = defineStore('superadmin', () => {
     approveInstitutionRequest,
     rejectInstitutionRequest,
     fetchAnalytics,
+    fetchAnalyticsDetail,
     exportAnalyticsWorkbook,
     exportUsersCsv,
     fetchUserBookings,
