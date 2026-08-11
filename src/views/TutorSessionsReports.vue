@@ -242,9 +242,16 @@ const viewTabs = [
   { label: 'Reports', value: 'reports', icon: 'bi-bar-chart' },
 ]
 
+// Rejected requests are not part of this page's session record, so they are filtered out
+// before anything else reads the list — the counts, the "All" tab and the report maths all
+// derive from this so they stay consistent with each other.
+const visibleSessions = computed(() =>
+  sessionStore.sessions.filter((session) => String(session?.status || '').toLowerCase() !== 'rejected')
+)
+
 const filters = computed(() => [
   {
-    label: `All (${sessionStore.sessions.length})`,
+    label: `All (${visibleSessions.value.length})`,
     value: 'all',
   },
   {
@@ -254,10 +261,6 @@ const filters = computed(() => [
   {
     label: `Upcoming (${sessionStore.upcomingSessions.length})`,
     value: 'upcoming',
-  },
-  {
-    label: `Rejected (${sessionStore.rejectedSessions.length})`,
-    value: 'rejected',
   },
 ])
 
@@ -269,7 +272,7 @@ const goToDetails = (sessionId) => {
   router.push(`/booking-details/${sessionId}`)
 }
 
-const totalSessions = computed(() => sessionStore.sessions.length)
+const totalSessions = computed(() => visibleSessions.value.length)
 
 const totalEarnings = computed(() =>
   sessionStore.completedSessions.reduce((sum, session) => sum + Number(session.earnings || 0), 0)
@@ -360,11 +363,6 @@ const statusBreakdown = computed(() => [
     count: sessionStore.upcomingSessions.length,
     percent: getPercent(sessionStore.upcomingSessions.length),
   },
-  {
-    label: 'Rejected',
-    count: sessionStore.rejectedSessions.length,
-    percent: getPercent(sessionStore.rejectedSessions.length),
-  },
 ])
 
 const reportSummaries = computed(() => [
@@ -394,10 +392,8 @@ const filteredSessions = computed(() => {
       return sessionStore.completedSessions
     case 'upcoming':
       return sessionStore.upcomingSessions
-    case 'rejected':
-      return sessionStore.rejectedSessions
     default:
-      return sessionStore.sessions
+      return visibleSessions.value
   }
 })
 
@@ -414,7 +410,6 @@ const getStatusClass = (status) => {
       return 'status-badge status-badge-warning'
     case 'completed':
       return 'status-badge status-badge-completed'
-    case 'rejected':
     case 'cancelled':
       return 'status-badge status-badge-danger'
     case 'pending':
@@ -844,6 +839,8 @@ const getStatusClass = (status) => {
 .analytics-summary {
   border-radius: 22px;
   padding: 1rem;
+  display: flex;
+  flex-direction: column;
 }
 
 .summary-header {
@@ -857,6 +854,21 @@ const getStatusClass = (status) => {
 .summary-list {
   display: grid;
   gap: 0.85rem;
+}
+
+/* Session Mix carries two rows against Tutor Summary's four, and the grid stretches both cards to
+   the taller one. Let the remaining statuses share that leftover height rather than leaving a gap
+   under the last bar. Collapses to natural height once the cards stack at 767.98px. */
+.status-bars {
+  flex-grow: 1;
+  grid-auto-rows: 1fr;
+}
+
+.status-bar-row {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.45rem;
 }
 
 .status-bar-label,
