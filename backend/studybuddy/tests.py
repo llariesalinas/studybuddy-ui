@@ -1,6 +1,8 @@
 import csv
+import math
 import re
-from io import StringIO
+from io import BytesIO, StringIO
+from openpyxl import load_workbook
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from unittest.mock import Mock, patch
@@ -233,7 +235,16 @@ class SuperAdminRedesignApiTests(APITestCase):
         self.assertEqual(tutor.session_load_limit, 14)
         self.assertEqual(response.data["tutor_session_load_limit"], 14)
 
-    def test_analytics_includes_completion_subject_popularity_and_csv(self):
+    @staticmethod
+    def _export_workbook(response):
+        """Load the exported workbook, so tests assert on sheets and cells rather than raw text."""
+        return load_workbook(BytesIO(response.content))
+
+    @staticmethod
+    def _sheet_rows(workbook, title):
+        return list(workbook[title].values)
+
+    def test_analytics_includes_completion_subject_popularity_and_workbook(self):
         course = Course.objects.create(course_code="MATH", course_name="Mathematics")
         subject = Subjects.objects.create(
             subject_code="ALG101",
@@ -295,18 +306,218 @@ class SuperAdminRedesignApiTests(APITestCase):
 
         export_response = self.client.get("/api/admin/analytics/export/?period=7d")
         self.assertEqual(export_response.status_code, 200)
-        self.assertEqual(export_response["Content-Type"], "text/csv")
-        export_content = export_response.content.decode()
-        self.assertIn("Sessions Over Time", export_content)
-        self.assertIn("Top Tutors", export_content)
-        self.assertIn("Subject Popularity", export_content)
-        self.assertIn("Booking Transactions", export_content)
-        self.assertIn(
-            "session_date,institution,tutor,tutee,subject,amount,commission,payout",
-            export_content,
+        self.assertEqual(
+            export_response["Content-Type"],
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
-        self.assertIn(f"{self.institution.institution_name},Tutor One,", export_content)
-        self.assertIn("College Algebra,500.0,50.0,450.0", export_content)
+        self.assertIn('filename="studybuddy-report-', export_response["Content-Disposition"])
+        self.assertTrue(export_response["Content-Disposition"].endswith('.xlsx"'))
+
+        workbook = self._export_workbook(export_response)
+        self.assertEqual(workbook.sheetnames, [
+            "Report Info", "Summary", "Sessions Over Time",
+            "Top Tutors", "Subject Popularity", "Booking Transactions",
+        ])
+
+        # Scope metadata lives on its own sheet, so each data sheet starts at A1 with its header.
+        info = dict(self._sheet_rows(workbook, "Report Info")[1:])
+        self.assertEqual(info["Period"], "7d")
+        self.assertEqual(info["Institution filter"], "All institutions")
+
+        # Summary is transposed to label/value rows.
+        summary = dict(self._sheet_rows(workbook, "Summary")[1:])
+        self.assertEqual(summary["Completed Sessions"], 1)
+        self.assertEqual(summary["Gross Revenue"], 500.0)
+        self.assertEqual(summary["Commissions"], 50.0)
+        self.assertEqual(summary["Tutor Payouts"], 450.0)
+
+        transactions = self._sheet_rows(workbook, "Booking Transactions")
+        self.assertEqual(transactions[0], (
+            "Session Date", "Institution", "Tutor", "Tutee", "Subject",
+            "Amount", "Commission", "Payout",
+        ))
+        self.assertEqual(transactions[1][1:5], (
+            self.institution.institution_name, "Tutor One", "Target User", "College Algebra",
+        ))
+        self.assertEqual(transactions[1][5:], (500.0, 50.0, 450.0))
+
+        self.assertEqual(
+            self._sheet_rows(workbook, "Subject Popularity")[1], ("College Algebra", 1)
+        )
+        self.assertEqual(self._sheet_rows(workbook, "Top Tutors")[1][:2], ("Tutor One", 1))
+
+    def _seed_completed_bookings(self, count):
+        """Create `count` tutors, each with one paid Completed booking on a subject of its own.
+
+        Enough rows for the dashboard caps to bite: the default response truncates tutors at 5 and
+        subjects at 10, so a `count` above both makes the truncation observable rather than
+        incidental.
+        """
+        payment_method, _ = PaymentMethod.objects.get_or_create(
+            code="online", defaults={"method_name": "Online Payment"}
+        )
+        for index in range(count):
+            subject = Subjects.objects.create(
+                subject_code=f"SUB{index:03d}",
+                subject_name=f"Subject {index:02d}",
+                department="Math",
+            )
+            tutor_user = User.objects.create_user(
+                username=f"bulk-tutor-{index}",
+                email=f"bulk-tutor-{index}@cpu.edu.ph",
+                password="password",
+            )
+            tutor_profile = UserProfile.objects.create(
+                user=tutor_user,
+                fname="Bulk",
+                mname="",
+                lname=f"Tutor {index:02d}",
+                role="Tutor",
+                institution=self.institution,
+                profile_completed=True,
+            )
+            tutor = Tutor.objects.create(profile=tutor_profile, hourly_rate=Decimal("500.00"))
+            availability = TutorAvailability.objects.create(
+                tutor=tutor,
+                day="Mon",
+                time_slot=time(9, 0),
+                is_active=True,
+            )
+            booking = Booking.objects.create(
+                student=self.target_profile,
+                tutor=tutor,
+                availability=availability,
+                session_date=date.today(),
+                session_mode="Online",
+                status="Completed",
+                subject=subject,
+            )
+            Payment.objects.create(
+                booking=booking,
+                method=payment_method,
+                amount=Decimal("500.00"),
+                payment_status="Paid",
+            )
+
+    def test_analytics_truncates_to_the_dashboard_caps_by_default(self):
+        self._seed_completed_bookings(11)
+
+        response = self.client.get("/api/admin/analytics/?period=7d")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data["top_tutors"]), 5)
+        self.assertEqual(len(response.data["subject_popularity"]), 10)
+
+    def test_analytics_view_full_returns_every_row(self):
+        self._seed_completed_bookings(11)
+
+        response = self.client.get("/api/admin/analytics/?period=7d&view=full")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data["top_tutors"]), 11)
+        self.assertEqual(len(response.data["subject_popularity"]), 11)
+
+    def test_analytics_reports_totals_the_truncated_lists_cannot_convey(self):
+        """The card labels its own drill-down link, and the count is not inferable from the rows."""
+        self._seed_completed_bookings(11)
+
+        summary = self.client.get("/api/admin/analytics/?period=7d")
+        full = self.client.get("/api/admin/analytics/?period=7d&view=full")
+
+        self.assertEqual(summary.data["tutor_total"], 11)
+        self.assertEqual(summary.data["subject_total"], 11)
+        self.assertEqual(full.data["tutor_total"], 11)
+        self.assertEqual(full.data["subject_total"], 11)
+
+    def test_analytics_falls_back_to_summary_for_an_unknown_view(self):
+        self._seed_completed_bookings(11)
+
+        response = self.client.get("/api/admin/analytics/?period=7d&view=nonsense")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data["top_tutors"]), 5)
+
+    def test_analytics_export_writes_every_row_not_the_dashboard_caps(self):
+        """The workbook and the screen it came from must not disagree about how many rows exist."""
+        self._seed_completed_bookings(11)
+
+        response = self.client.get("/api/admin/analytics/export/?period=7d")
+        workbook = self._export_workbook(response)
+
+        # Less one for the header row on each sheet.
+        self.assertEqual(len(self._sheet_rows(workbook, "Top Tutors")) - 1, 11)
+        self.assertEqual(len(self._sheet_rows(workbook, "Subject Popularity")) - 1, 11)
+
+    def test_analytics_export_writes_only_the_requested_sections(self):
+        self.client.force_authenticate(user=self.super_user)
+
+        response = self.client.get("/api/admin/analytics/export/?period=7d&sections=summary")
+
+        self.assertEqual(response.status_code, 200)
+        # A single section names the file after itself, so a folder of exports stays readable.
+        self.assertIn('filename="studybuddy-summary-', response["Content-Disposition"])
+        # Report Info is metadata rather than a tickable section, so it is always present.
+        self.assertEqual(
+            self._export_workbook(response).sheetnames, ["Report Info", "Summary"]
+        )
+
+    def test_analytics_export_ignores_unknown_sections_and_defaults_to_all(self):
+        self.client.force_authenticate(user=self.super_user)
+
+        all_sheets = [
+            "Report Info", "Summary", "Sessions Over Time",
+            "Top Tutors", "Subject Popularity", "Booking Transactions",
+        ]
+
+        # Omitted entirely: the pre-`sections` caller shape must keep working.
+        default_response = self.client.get("/api/admin/analytics/export/?period=7d")
+        # Only unrecognised slugs: falls back rather than emitting a file with no data sheets.
+        bogus_response = self.client.get(
+            "/api/admin/analytics/export/?period=7d&sections=nonsense"
+        )
+
+        self.assertEqual(self._export_workbook(default_response).sheetnames, all_sheets)
+        self.assertEqual(self._export_workbook(bogus_response).sheetnames, all_sheets)
+        self.assertIn('filename="studybuddy-report-', bogus_response["Content-Disposition"])
+
+    def test_analytics_export_writes_multiple_sections_in_file_order(self):
+        self.client.force_authenticate(user=self.super_user)
+
+        response = self.client.get(
+            "/api/admin/analytics/export/?period=7d&sections=transactions,summary"
+        )
+
+        self.assertEqual(
+            self._export_workbook(response).sheetnames,
+            ["Report Info", "Summary", "Booking Transactions"],
+        )
+        self.assertIn('filename="studybuddy-report-', response["Content-Disposition"])
+
+    def test_analytics_export_marks_empty_sections_rather_than_leaving_them_blank(self):
+        """An empty result must be distinguishable from a broken export."""
+        self.client.force_authenticate(user=self.super_user)
+
+        response = self.client.get(
+            "/api/admin/analytics/export/?period=7d&sections=transactions"
+        )
+        rows = self._sheet_rows(self._export_workbook(response), "Booking Transactions")
+
+        self.assertEqual(rows[0][0], "Session Date")
+        self.assertEqual(rows[1][0], "No data for this period.")
+
+    def test_analytics_export_keeps_formula_like_names_as_text(self):
+        """openpyxl writes '='-prefixed strings as live formulas unless the type is pinned."""
+        self.client.force_authenticate(user=self.super_user)
+        self.institution.institution_name = "=cmd()"
+        self.institution.save(update_fields=["institution_name"])
+
+        response = self.client.get(
+            f"/api/admin/analytics/export/?period=7d&institution_id={self.institution.pk}"
+        )
+        cell = self._export_workbook(response)["Report Info"]["B5"]
+
+        self.assertEqual(cell.value, "=cmd()")
+        self.assertEqual(cell.data_type, "s")
 
 
 class SuperAdminUserDetailApiTests(APITestCase):
@@ -5770,6 +5981,77 @@ class CfPeerNeighborTests(APITestCase):
         self.assertEqual(global_breakdown["pool"], "global")
         self.assertEqual(global_breakdown["neighbors"][0]["neighbor_id"], 3)
         self.assertEqual(empty_peer_breakdown["pool"], "global")
+
+
+class CoRatedDetailTests(APITestCase):
+    """co_rated_detail feeds the algorithm demo's expandable co-rated panel, which
+    exists so a similarity can be checked by hand rather than taken on faith. These
+    lock the curated S6/T-cast numbers documented in the algorithm demo guide."""
+
+    # Tutor ids 1/2/6/7/8 stand in for the curated T1/T2/T6/T7/T8, tutee keys for
+    # S6 and her neighbours — the same matrix as seed_data.CURATED_RATINGS.
+    RATINGS = {
+        6: {1: 5, 2: 3, 6: 5, 7: 2, 8: 4},   # S6 Katrina, overall avg 3.80
+        2: {1: 5, 2: 3, 6: 4, 8: 4},         # S2 Gloria
+        5: {3: 4, 4: 5},                     # shares nothing with S6
+    }
+
+    def test_returns_shared_tutors_with_both_students_scores(self):
+        from studybuddy.recommender.CF import co_rated_detail
+
+        detail = co_rated_detail(self.RATINGS, 6, 2)
+
+        self.assertEqual([e["tutor_id"] for e in detail["shared"]], [1, 2, 6, 8])
+        self.assertEqual([e["u_rating"] for e in detail["shared"]], [5, 3, 5, 4])
+        self.assertEqual([e["v_rating"] for e in detail["shared"]], [5, 3, 4, 4])
+
+    def test_averages_are_over_the_co_rated_set_not_all_ratings(self):
+        """The trap the panel has to survive: the average Pearson uses is not the
+        average the deviation term uses. S6's mean over the four tutors she shares
+        with S2 is 4.25, while her CF baseline over all five of her ratings is
+        3.80 — a panelist adding up the visible row must not land on 3.80."""
+        from studybuddy.recommender.CF import co_rated_detail
+
+        detail = co_rated_detail(self.RATINGS, 6, 2)
+        overall_avg = sum(self.RATINGS[6].values()) / len(self.RATINGS[6])
+
+        self.assertAlmostEqual(detail["u_avg"], 4.25)
+        self.assertAlmostEqual(detail["v_avg"], 4.0)
+        self.assertAlmostEqual(overall_avg, 3.8)
+        self.assertNotAlmostEqual(detail["u_avg"], overall_avg)
+
+    def test_shared_ratings_reproduce_the_reported_similarity(self):
+        """The panel's whole claim is that the expanded cells derive the number on
+        the collapsed row, so recomputing Pearson from those cells must agree with
+        sim()."""
+        from studybuddy.recommender.CF import co_rated_detail, sim
+
+        detail = co_rated_detail(self.RATINGS, 6, 2)
+        u_dev = [e["u_rating"] - detail["u_avg"] for e in detail["shared"]]
+        v_dev = [e["v_rating"] - detail["v_avg"] for e in detail["shared"]]
+
+        numerator = sum(a * b for a, b in zip(u_dev, v_dev))
+        denominator = (
+            math.sqrt(sum(a * a for a in u_dev)) * math.sqrt(sum(b * b for b in v_dev))
+        )
+
+        self.assertAlmostEqual(numerator / denominator, sim(self.RATINGS, 6, 2))
+        self.assertAlmostEqual(sim(self.RATINGS, 6, 2), 0.853, places=3)
+
+    def test_no_overlap_returns_empty_set_and_no_averages(self):
+        from studybuddy.recommender.CF import co_rated_detail
+
+        detail = co_rated_detail(self.RATINGS, 6, 5)
+
+        self.assertEqual(detail["shared"], [])
+        self.assertIsNone(detail["u_avg"])
+        self.assertIsNone(detail["v_avg"])
+
+    def test_unknown_student_is_tolerated(self):
+        """Cold-Start tutees are absent from the rating matrix entirely."""
+        from studybuddy.recommender.CF import co_rated_detail
+
+        self.assertEqual(co_rated_detail(self.RATINGS, 999, 2)["shared"], [])
 
 
 class CbfGraduatedSubjectMatchTests(APITestCase):

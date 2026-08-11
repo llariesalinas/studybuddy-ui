@@ -30,6 +30,10 @@ const tuteeOptions = computed(() =>
 
 const selectedTuteeId = ref(null)
 const rows = ref([])
+// The co-rated set behind each neighbour's similarity, keyed by neighbour id.
+// Returned once per response rather than per row, because it belongs to the
+// (tutee, neighbour) pair and is identical across every candidate tutor.
+const coRated = ref({})
 const reason = ref(null)
 const selectedTutorId = ref(null)
 const loading = ref(false)
@@ -66,6 +70,7 @@ function clearWhatIf() {
 async function onTuteeChange(tuteeId) {
   selectedTuteeId.value = tuteeId
   rows.value = []
+  coRated.value = {}
   reason.value = null
   selectedTutorId.value = null
   errorMessage.value = ''
@@ -77,6 +82,7 @@ async function onTuteeChange(tuteeId) {
   try {
     const { data } = await getAlgorithmDemoRecommendation(tuteeId, props.institutionId)
     rows.value = data.rows
+    coRated.value = data.co_rated || {}
     reason.value = data.reason
     if (data.rows.length) selectedTutorId.value = data.rows[0].tutor_id
   } catch (err) {
@@ -118,6 +124,9 @@ async function refreshWhatIf() {
     )
     // The selection is held by tutor_id, so a tutor that moves rank stays selected.
     rows.value = data.rows
+    // Recomputed on every what-if edit: overriding a rating inside a co-rated set
+    // moves both averages and the similarity, which is the point of the panel.
+    coRated.value = data.co_rated || {}
     reason.value = data.reason
     errorMessage.value = ''
   } catch (err) {
@@ -207,6 +216,7 @@ watch(
       <AlgorithmDemoBreakdown
         :row="selectedRow"
         :tie-group="selectedTieGroup"
+        :co-rated="coRated"
         @override="onOverride"
       />
     </div>

@@ -12,12 +12,22 @@
           class="search-input sb-field"
           placeholder="Search name or email"
         >
-        <button type="button" class="export-button" :disabled="store.loading.export" @click="exportUsers">
+        <button type="button" class="export-button" :disabled="!filteredUsers.length" @click="openExportModal">
           <i class="bi bi-download"></i>
           Export CSV
         </button>
       </div>
     </header>
+
+    <SbExportModal
+      :open="isExportOpen"
+      title="Export users"
+      :items="exportColumnGroups"
+      :scope-line="exportScopeLine"
+      :combined-file-label="USERS_FILE_LABEL"
+      @confirm="exportUsers"
+      @close="isExportOpen = false"
+    />
 
     <section class="filter-row" aria-label="User filters">
       <SbSelectModal
@@ -142,11 +152,13 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
+import SbExportModal from '@/components/SbExportModal.vue'
 import SbSelectModal from '@/components/SbSelectModal.vue'
 import SuperAdminUserModal from '@/components/SuperAdminUserModal.vue'
 import { useHaptics } from '@/composables/useHaptics'
 import { useSuperAdminStore } from '@/stores/superadmin'
 import { useToastStore } from '@/stores/toast'
+import { USERS_FILE_LABEL, USER_COLUMN_GROUPS } from '@/constants/superadminExports'
 
 const store = useSuperAdminStore()
 const toastStore = useToastStore()
@@ -154,6 +166,9 @@ const { vibrate, patterns } = useHaptics()
 
 const selectedUser = ref(null)
 const filters = reactive({ search: '', role: '', institution: '', status: '' })
+const isExportOpen = ref(false)
+
+const exportColumnGroups = USER_COLUMN_GROUPS
 
 const roleFilterOptions = [
   { label: 'All roles', value: '' },
@@ -194,6 +209,22 @@ const filteredUsers = computed(() => {
   })
 })
 
+// Spells out exactly which rows the export will contain, so "42 of 310" is never a surprise.
+const exportScopeLine = computed(() => {
+  const institution = institutionFilterOptions.value.find(
+    (option) => String(option.value) === String(filters.institution),
+  )
+  const activeFilters = [
+    filters.role,
+    institution && filters.institution ? institution.label : '',
+    filters.status,
+    filters.search ? `"${filters.search}"` : '',
+  ].filter(Boolean)
+
+  const count = `${filteredUsers.value.length} of ${store.users.length} users`
+  return activeFilters.length ? `${count} · ${activeFilters.join(' · ')}` : count
+})
+
 onMounted(() => {
   store.fetchUsers({}, true)
   store.fetchInstitutions()
@@ -208,10 +239,15 @@ function handleUserUpdated(updatedUser) {
   selectedUser.value = updatedUser
 }
 
-async function exportUsers() {
+function openExportModal() {
   vibrate(patterns.light)
+  isExportOpen.value = true
+}
+
+function exportUsers({ ids, filename }) {
+  isExportOpen.value = false
   try {
-    await store.exportAnalyticsCsv({ period: 'all' })
+    store.exportUsersCsv(filteredUsers.value, ids, filename)
   } catch {
     toastStore.push('Failed to export CSV.', 'error')
   }

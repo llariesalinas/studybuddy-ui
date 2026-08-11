@@ -4,7 +4,7 @@ from django.db.models import Q
 
 from ..models import Preference, UserProfile
 from .cbf import get_student_subject_codes, resolve_target_categories
-from .CF import build_rating_matrix, get_peer_student_ids, top_k
+from .CF import build_rating_matrix, co_rated_detail, get_peer_student_ids, top_k
 from .hybrid import (
     HYBRID_SCORE_PRECISION,
     hybrid_prediction_breakdown,
@@ -84,6 +84,64 @@ def _neighbor_name_map(neighbor_ids):
     return {profile.id: f"{profile.fname} {profile.lname}" for profile in profiles}
 
 
+def _shared_tutor_name_map(tutor_ids):
+    """Full and last name per shared tutor. The co-rated grid labels its columns
+    by surname to fit five of them across an accordion (and the curated cast has
+    deliberately alphabetical surnames), with the full name on hover — so both
+    are resolved here rather than splitting a display string in the frontend,
+    where a multi-part surname would break."""
+    profiles = UserProfile.objects.filter(id__in=tutor_ids)
+    return {
+        profile.id: {
+            "name": f"{profile.fname} {profile.lname}",
+            "last_name": profile.lname,
+        }
+        for profile in profiles
+    }
+
+
+def _build_co_rated_map(ratings, tutee, neighbor_ids):
+    """The co-rated set behind each neighbor's similarity, keyed by neighbor id.
+
+    Returned once at the top level rather than nested inside each candidate
+    tutor's row: the co-rated set is a property of the (tutee, neighbor) pair,
+    and the neighbor lists are computed once and reused across every candidate
+    (see build_algorithm_demo_recommendation), so nesting it would repeat
+    identical data across a hundred-odd rows. Only rating/deviation/weighted
+    genuinely vary per tutor, and those stay on the row.
+    """
+    details = {
+        neighbor_id: co_rated_detail(ratings, tutee.id, neighbor_id)
+        for neighbor_id in neighbor_ids
+    }
+
+    tutor_names = _shared_tutor_name_map(
+        {entry["tutor_id"] for detail in details.values() for entry in detail["shared"]}
+    )
+
+    return {
+        neighbor_id: {
+            # student_* is the tutee being scored, neighbor_* the peer, matching
+            # the row naming in compute_cf_breakdown.
+            "student_avg_over_set": detail["u_avg"],
+            "neighbor_avg_over_set": detail["v_avg"],
+            "shared": [
+                {
+                    "tutor_id": entry["tutor_id"],
+                    "name": tutor_names.get(entry["tutor_id"], {}).get("name", "Unknown"),
+                    "last_name": tutor_names.get(entry["tutor_id"], {}).get(
+                        "last_name", "Unknown"
+                    ),
+                    "student_rating": entry["u_rating"],
+                    "neighbor_rating": entry["v_rating"],
+                }
+                for entry in detail["shared"]
+            ],
+        }
+        for neighbor_id, detail in details.items()
+    }
+
+
 def apply_rating_overrides(ratings, overrides):
     """Apply what-if rating overrides to an in-memory rating matrix, in place.
 
@@ -117,11 +175,11 @@ def build_algorithm_demo_recommendation(tutee, institution_id=None, overrides=No
     subject_codes = get_student_subject_codes(tutee)
 
     if not subject_codes:
-        return {"reason": "no_preferences", "rows": []}
+        return {"reason": "no_preferences", "rows": [], "co_rated": {}}
 
     candidate_tutors = list(_candidate_tutors(subject_codes, institution_id))
     if not candidate_tutors:
-        return {"reason": "no_candidates", "rows": []}
+        return {"reason": "no_candidates", "rows": [], "co_rated": {}}
 
     ratings = build_rating_matrix()
     if overrides:
@@ -130,10 +188,11 @@ def build_algorithm_demo_recommendation(tutee, institution_id=None, overrides=No
     peer_ids = get_peer_student_ids(ratings, tutee) if tutee.id in ratings else []
     peer_neighbors = top_k(ratings, tutee.id, candidate_ids=peer_ids) if tutee.id in ratings else []
     global_neighbors = top_k(ratings, tutee.id) if tutee.id in ratings else []
-    neighbor_names = _neighbor_name_map(
-        neighbor_id
-        for neighbor_id, _ in [*peer_neighbors, *global_neighbors]
-    )
+    neighbor_ids = {
+        neighbor_id for neighbor_id, _ in [*peer_neighbors, *global_neighbors]
+    }
+    neighbor_names = _neighbor_name_map(neighbor_ids)
+    co_rated = _build_co_rated_map(ratings, tutee, neighbor_ids)
     target_categories = resolve_target_categories(None, subject_codes)
 
     rows = []
@@ -202,7 +261,7 @@ def build_algorithm_demo_recommendation(tutee, institution_id=None, overrides=No
     )
     _mark_tie_groups(rows)
 
-    return {"reason": None, "rows": rows}
+    return {"reason": None, "rows": rows, "co_rated": co_rated}
 
 
 def _mark_tie_groups(rows):
