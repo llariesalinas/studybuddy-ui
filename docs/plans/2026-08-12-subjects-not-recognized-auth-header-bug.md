@@ -1,7 +1,7 @@
 ---
 title: Subjects "Not recognized" false-flag from stripped auth header
 date: 2026-08-12
-status: Approved
+status: In Progress
 summary: subjects/ is listed as a public endpoint, so the request interceptor strips the JWT even for logged-in personalized calls, making every already-approved subject show "Not recognized".
 spec:
 ---
@@ -10,8 +10,11 @@ spec:
 
 ## Status & Progress Summary
 
-Root cause confirmed (backend-tested with/without JWT header). Plan approved, fix not yet
-implemented — waiting to make the one-line interceptor change in the next session.
+**2026-08-12 — Fix implemented; manual browser verification (Steps 3–4) still pending.**
+Root cause confirmed (backend-tested with/without JWT header). Applied the one-line interceptor
+change (Step 1) in `src/services/api/api.js`. `npm run lint`, `npm run test` (163/163 passing),
+and `npm run build` all pass. Risk noted in the plan (a test asserting no `Authorization` header
+on public endpoints) did not materialize — no test needed updating.
 
 ## Goal
 
@@ -86,3 +89,7 @@ just this one screen.
 - 2026-08-12: Plan created and approved. Root cause diagnosed and verified against a live
   backend run (JWT header present vs. stripped reproduced the bug exactly). Fix not yet
   implemented.
+- 2026-08-12: Implemented Step 1 (`if (token && !isPublicEndpoint(config.url))` →
+  `if (token)` in `src/services/api/api.js`), left the response interceptor untouched (Step 2).
+  `npm run lint`/`npm run test`/`npm run build` all pass. Steps 3–4 (manual browser
+  verification) not yet done.
