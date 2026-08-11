@@ -85,6 +85,17 @@ const dialogStyle = computed(() => {
   }
 })
 
+// `--sb-density-scale` is 1 at comfortable density and 0.8 at compact (see `main.css`).
+const readDensityScale = () => {
+  if (typeof window === 'undefined') {
+    return 1
+  }
+
+  const raw = getComputedStyle(document.documentElement).getPropertyValue('--sb-density-scale')
+  const parsed = Number.parseFloat(raw)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1
+}
+
 const clearScheduledMeasurement = () => {
   if (frameId && typeof window !== 'undefined') {
     window.cancelAnimationFrame(frameId)
@@ -110,9 +121,14 @@ const updateDialogPosition = () => {
   }
 
   const rect = anchor.getBoundingClientRect()
+  // `getBoundingClientRect()` reports post-zoom coordinates, but the `left`/`top` written back onto
+  // this fixed dialog are themselves scaled by the root `zoom` the density system applies (0.8 for
+  // Tutee/Tutor/SuperAdmin). Writing the measurement back unchanged applies the factor twice and
+  // parks the dialog up and to the left of its anchor, so divide it out first.
+  const scale = readDensityScale()
   dialogPosition.value = {
-    left: rect.left + rect.width / 2,
-    top: rect.top + rect.height / 2,
+    left: (rect.left + rect.width / 2) / scale,
+    top: (rect.top + rect.height / 2) / scale,
   }
 }
 

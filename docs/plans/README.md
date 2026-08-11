@@ -3,7 +3,32 @@
 Every finalized plan lives in this folder as its own dated file, created from [`_template.md`](_template.md).
 Status moves Draft â†’ Approved â†’ In Progress â†’ Done. When a plan is complete, its summary is linked below.
 
-**Status & Progress Summary** (2026-08-10): SuperAdmin-side UI at 80% density is In Progress —
+**Status & Progress Summary** (2026-08-10): Removing or modifying UI components is Done — three
+unrelated cleanups in one pass. `/register` no longer scrolls on load: only First/Middle/Last share
+a row, every other field keeps its original full-width position, and the height comes out of the
+masthead and the gaps via new opt-in `wide`/`dense` props on `AuthShell` (the card's paddings are
+scoped to that component, so `Register.vue` could not override them) plus a `max-height: 880px`
+tier. That threshold is set by the form's own height at the roomier tier, not a device number — an
+earlier 700px breakpoint left a dead band where a 720px viewport overflowed by 98px, worse than
+660px. The loaded form needs 639px against ~660px on a 768p laptop; a server alert stacked on a
+field error still scrolls there. `/login` and the other auth pages are untouched. The SuperAdmin
+Support Desk lost its `Escalated` tab and the claim/chat/resolve branches that fed it — the desk now
+exists only for system-opened Late Cancellation strike tickets — and the sidebar `Support` section
+(label included) is hidden for SuperAdmin, since `SupportModal` files an end-user ticket and there is
+no desk above SuperAdmin to receive one. Known consequence, deliberately left: Admin can still
+escalate, so escalated tickets are now fetched but unreachable; gating `canEscalate` is the one-line
+follow-up. A reported follow-up defect was folded in: on `/book`, Face-to-face opened
+`CampusLocationModal` off-centre over a backdrop covering 80% of the page — both caused by the
+density system's root `zoom`. It is the only modal in the app positioned from
+`getBoundingClientRect()`, and the measurement was being re-scaled by the zoom on write-back
+(measured drift -136, -170), so it now divides by `--sb-density-scale`; the backdrop got a global
+`--sb-vw-fix` in `main.css` beside the existing `--sb-vh-fix`, which also repairs `CashInModal` and
+`TutorWallet`. `.modal` was measured and deliberately left alone — its `100%` was never short.
+167/167 tests including 3 new positioning cases, `npm run build` and `npm run lint:eslint` clean.
+SuperAdmin/Admin/Tutee walkthroughs still need a logged-in session.
+[Plan](2026-08-10-removing-or-modifying-ui-components.md).
+
+**Previous** (2026-08-10): SuperAdmin-side UI at 80% density is In Progress —
 code landed, manual verification outstanding. Third pass of the density system after Tutee
 (2026-08-04) and Tutor (2026-08-05); no new mechanism, just `'superadmin'` added to `COMPACT_ROLES`
 in `src/stores/density.js` plus a fresh `vh` consumer audit. Only two selectors became reachable at
@@ -318,6 +343,7 @@ Entries marked Done&ast; predate the session-summary convention; their status is
 
 | Date | Change |
 |------|--------|
+| 2026-08-10 | Implemented Removing or modifying UI components on `fix/Removing-or-modifying-UI-components`: `/register` now pairs only the three name fields into a row (every other field keeps its original full-width position) inside a 560px card, behind new opt-in `wide`/`dense` props on `AuthShell` (its paddings are scoped, so `Register.vue` could not override them) plus a `max-height: 880px` masthead-squeezing tier — the threshold is the form's own height at the roomier tier, since an earlier 700px breakpoint left a dead band where a 720px viewport overflowed by 98px; loaded form needs 639px vs ~660px on a 768p laptop, `/login` unchanged; SuperAdmin's `Escalated` tab and its claim/chat/resolve branches removed, leaving the desk for Late Cancellation strike tickets; sidebar `Support` section hidden for SuperAdmin with a new `AppSidebar` test. Deliberately left: Admin can still escalate, so escalated tickets are now unreachable. Also fixed a reported follow-up: `CampusLocationModal` opened off-centre with an 80% backdrop under the density system's root `zoom` — the anchored position now divides by `--sb-density-scale` and a new global `--sb-vw-fix` sizes `.modal-backdrop` (also repairing `CashInModal`/`TutorWallet`); `.modal` measured and left alone. 167/167 tests including 3 new positioning cases, build and eslint clean |
 | 2026-08-09 | Traced why a tutee's "Pending Review" never surfaced for SuperAdmins and shipped the fix in one pass. Root cause was scope, not staleness: the dashboard's "Profile status" tile reads `profile_completed` (onboarding), and `AdminPendingActionsView` never queried applications at all. Added pending tutor/tutee applications and renewals to the queue as four item types (four rather than two, so `(type, id)` stays unique across two independent id sequences) that route to the Applications screen instead of approving inline. 2 pending-actions tests pass, `npm run build` clean |
 | 2026-08-08 | Implemented and verified Consolidate demo data seeding end-to-end, fixed a call-order bug plus an unrelated live Render `DB_HOST` incident found along the way; committed, pushed, opened [PR #116](https://github.com/llariesalinas/studybuddy-ui/pull/116); marked In Progress |
 | 2026-08-08 | Grilled Consolidate demo data seeding end-to-end (8 decisions) via `/grill-with-docs`; added the Approved plan and branched `chore/consolidate-demo-seed` off `origin/main` |

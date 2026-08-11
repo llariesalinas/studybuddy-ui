@@ -75,6 +75,7 @@
 :root[data-sb-density='compact'] {
   --sb-density-scale: 0.8;
   --sb-vh-fix: calc(100vh / var(--sb-density-scale));
+  --sb-vw-fix: calc(100vw / var(--sb-density-scale));
   zoom: var(--sb-density-scale);
 }
 
@@ -89,6 +90,16 @@
 
 [data-sb-density='compact'] .vh-100 {
   height: var(--sb-vh-fix) !important;
+}
+
+/* Bootstrap sizes `.modal-backdrop` with `100vw`/`100vh`. Root `zoom` does not rescale viewport
+   units, so the backdrop renders at 80% and leaves the page uncovered along the right and bottom
+   edges. `.modal` itself needs no compensation: its `100%` resolves against the initial containing
+   block, which is already in unzoomed pixels. Every `Teleport`ed overlay lands inside the zoomed
+   root, so this belongs here rather than in any one component. */
+[data-sb-density='compact'] .modal-backdrop {
+  width: var(--sb-vw-fix);
+  height: var(--sb-vh-fix);
 }
 
 [data-sb-density='compact'] .sb-sidebar {

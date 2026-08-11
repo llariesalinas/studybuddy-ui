@@ -1,5 +1,5 @@
 <template>
-  <AuthShell>
+  <AuthShell wide dense>
     <template #icon>
       <i class="bi bi-book"></i>
     </template>
@@ -9,36 +9,38 @@
     <div v-if="generalError" class="sb-auth-alert">{{ generalError }}</div>
 
     <form @submit.prevent="handleRegister">
-      <div class="sb-auth-field">
-        <label class="sb-auth-label">First Name</label>
-        <input
-          type="text"
-          v-model="store.newUserFname"
-          class="sb-auth-input sb-field"
-          placeholder="Juan"
-          required
-        />
-      </div>
+      <div class="sb-auth-row sb-auth-row--3">
+        <div class="sb-auth-field">
+          <label class="sb-auth-label">First Name</label>
+          <input
+            type="text"
+            v-model="store.newUserFname"
+            class="sb-auth-input sb-field"
+            placeholder="Juan"
+            required
+          />
+        </div>
 
-      <div class="sb-auth-field">
-        <label class="sb-auth-label">Middle Name</label>
-        <input
-          type="text"
-          v-model="store.newUserMname"
-          class="sb-auth-input sb-field"
-          placeholder="Optional"
-        />
-      </div>
+        <div class="sb-auth-field">
+          <label class="sb-auth-label">Middle Name</label>
+          <input
+            type="text"
+            v-model="store.newUserMname"
+            class="sb-auth-input sb-field"
+            placeholder="Optional"
+          />
+        </div>
 
-      <div class="sb-auth-field">
-        <label class="sb-auth-label">Last Name</label>
-        <input
-          type="text"
-          v-model="store.newUserLname"
-          class="sb-auth-input sb-field"
-          placeholder="Dela Cruz"
-          required
-        />
+        <div class="sb-auth-field">
+          <label class="sb-auth-label">Last Name</label>
+          <input
+            type="text"
+            v-model="store.newUserLname"
+            class="sb-auth-input sb-field"
+            placeholder="Dela Cruz"
+            required
+          />
+        </div>
       </div>
 
       <div class="sb-auth-field">
@@ -257,8 +259,40 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* Seven stacked full-width fields put the submit button below the fold on a 768p laptop, so the
+   three name fields share one row. Every other field keeps its original full-width position.
+   `align-items: start` keeps a field error from stretching its neighbours. */
+.sb-auth-row {
+  display: grid;
+  gap: 0 12px;
+  align-items: start;
+}
+
+.sb-auth-row--3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+@media (max-width: 768px) {
+  .sb-auth-row--3 {
+    grid-template-columns: 1fr;
+  }
+}
+
 .sb-auth-field {
-  margin-bottom: 16px;
+  margin-bottom: 14px;
+}
+
+/* Matches the AuthShell short-viewport threshold. Control heights stay put -- only the gaps
+   close, so inputs and the SbSelectModal triggers (pinned to a 44px min-height in that
+   component) keep matching. */
+@media (max-height: 880px) {
+  .sb-auth-field {
+    margin-bottom: 8px;
+  }
+
+  .sb-auth-label {
+    margin-bottom: 4px;
+  }
 }
 
 .sb-auth-label {
@@ -299,9 +333,9 @@ onMounted(() => {
   border: 1px solid #fecaca;
   color: #b91c1c;
   border-radius: 10px;
-  padding: 10px 14px;
+  padding: 8px 12px;
   font-size: 13px;
-  margin-bottom: 18px;
+  margin-bottom: 12px;
 }
 
 .sb-auth-field-error {

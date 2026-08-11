@@ -42,20 +42,22 @@
       </RouterLink>
     </nav>
 
-    <p class="sb-section-label">Support</p>
-    <nav class="sb-nav" aria-label="Support">
-      <button
-        type="button"
-        class="sb-item sb-item-btn"
-        data-test="help"
-        title="Help"
-        aria-label="Help"
-        @click="emit('open-support')"
-      >
-        <span class="sb-chip"><i class="bi bi-question-circle"></i></span>
-        <span class="sb-item-label">Help</span>
-      </button>
-    </nav>
+    <template v-if="showHelp">
+      <p class="sb-section-label">Support</p>
+      <nav class="sb-nav" aria-label="Support">
+        <button
+          type="button"
+          class="sb-item sb-item-btn"
+          data-test="help"
+          title="Help"
+          aria-label="Help"
+          @click="emit('open-support')"
+        >
+          <span class="sb-chip"><i class="bi bi-question-circle"></i></span>
+          <span class="sb-item-label">Help</span>
+        </button>
+      </nav>
+    </template>
 
     <div class="sb-spacer"></div>
 
@@ -112,6 +114,10 @@ const profileRoute = computed(() => {
   if (role.value === 'admin' || role.value === 'superadmin') return '/admin/dashboard'
   return '/tutee-profile'
 })
+
+// Help opens SupportModal, which files an end-user support ticket -- there is no desk above
+// SuperAdmin to receive one, so the whole Support section is hidden for that role.
+const showHelp = computed(() => role.value !== 'superadmin')
 
 const menuItems = computed(() => {
   if (role.value === 'admin') {

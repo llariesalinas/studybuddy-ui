@@ -501,14 +501,14 @@ const ticketToJudge = ref(null)
 const verdictError = ref('')
 const confirmingCounted = ref(false)
 const isSuperAdminDesk = computed(() => route.path.startsWith('/superadmin'))
-// System-opened Late Cancellation tickets land in the SuperAdmin queue as Open/unescalated, so
-// that desk needs an Open tab or they are fetched but unreachable.
+// The SuperAdmin desk no longer works escalations -- it exists for the system-opened Late
+// Cancellation tickets, which land as Open/unescalated and are judged from there.
 const statusTabs = computed(() => (
-  isSuperAdminDesk.value ? ['Open', 'Escalated', 'Resolved'] : ['Open', 'In_Progress', 'Resolved']
+  isSuperAdminDesk.value ? ['Open', 'Resolved'] : ['Open', 'In_Progress', 'Resolved']
 ))
 
 const filters = reactive({
-  status: route.path.startsWith('/superadmin') ? 'Escalated' : 'Open',
+  status: 'Open',
   search: ''
 })
 
@@ -529,8 +529,8 @@ onMounted(() => {
   fetchTickets()
 })
 
-watch(isSuperAdminDesk, (superAdminDesk) => {
-  filters.status = superAdminDesk ? 'Escalated' : 'Open'
+watch(isSuperAdminDesk, () => {
+  filters.status = 'Open'
   selectedTicket.value = null
   ticketToEscalate.value = null
   closeVerdictModal()
@@ -558,13 +558,13 @@ const openDetail = (ticket) => {
 
 const canClaim = (ticket) => {
   if (isSuperAdminDesk.value) {
-    return ticket.status === 'Escalated' && !ticket.assigned_agent_id
+    return ticket.status === 'Open' && !ticket.assigned_agent_id
   }
   return ticket.status === 'Open'
 }
 
 const canChat = (ticket) => {
-  return ticket.status === 'In_Progress' || (isSuperAdminDesk.value && ticket.status === 'Escalated' && ticket.assigned_agent_id)
+  return ticket.status === 'In_Progress'
 }
 
 const canEscalate = (ticket) => {
@@ -577,7 +577,6 @@ const canResolve = (ticket) => {
   if (ticket.status === 'Resolved') return false
   // A strike ticket needs a verdict, and admin_resolve_ticket only accepts one from a SuperAdmin.
   if (isStrikeTicket(ticket)) return isSuperAdminDesk.value
-  if (ticket.status === 'Escalated') return isSuperAdminDesk.value
   return !isSuperAdminDesk.value
 }
 
