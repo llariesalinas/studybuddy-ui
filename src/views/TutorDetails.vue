@@ -12,9 +12,6 @@
         <div class="left-column">
           <section class="info-card profile-card shadow-sm position-relative">
             <div class="profile-actions">
-              <button class="action-btn sb-btn" aria-label="Favorite" @click="toggleFavorite">
-                <i class="bi" :class="isFavorite ? 'bi-heart-fill text-danger' : 'bi-heart'"></i>
-              </button>
               <button class="action-btn sb-btn" aria-label="Message" @click="openChat">
                 <i class="bi bi-chat-dots"></i>
               </button>
@@ -303,7 +300,6 @@ const showFullSchedule = ref(false)
 const isSubmittingBooking = ref(false)
 const avatarLoadError = ref(false)
 const expandedSubjects = ref([])
-const isFavorite = ref(false)
 
 const openChat = async () => {
   try {
@@ -559,22 +555,6 @@ const toggleSubject = (index) => {
   }
 }
 
-const toggleFavorite = async () => {
-  isFavorite.value = !isFavorite.value
-
-  try {
-    if (isFavorite.value) {
-      await api.post('favorites/add/', { tutor_id: tutorID })
-    } else {
-      await api.delete(`favorites/remove/${tutorID}/`)
-    }
-  } catch (error) {
-    isFavorite.value = !isFavorite.value
-    console.error('Failed to toggle favorite status', error)
-    toastStore.push('Could not update favorite status. Please try again.', 'error')
-  }
-}
-
 function createLocalDate(dateString, timeString) {
   return new Date(`${dateString}T${timeString}:00`)
 }
@@ -667,7 +647,6 @@ const getTutorDetails = async () => {
       pinned_review_id: response.data.pinned_review_id ?? null,
       pinned_review: response.data.pinned_review ?? null
     }
-    isFavorite.value = response.data.is_favorite ?? false
   } catch (error) {
     console.error('Failed to load tutor details.', error)
   }
@@ -953,10 +932,6 @@ onMounted(async () => {
 .action-btn:hover {
   background: #f3f7f5;
   color: #0a7a51;
-}
-
-.action-btn:hover .text-danger {
-  color: #dc3545 !important;
 }
 
 .profile-header {
