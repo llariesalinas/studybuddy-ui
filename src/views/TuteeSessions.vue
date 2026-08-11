@@ -106,11 +106,12 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useSessionsStore } from '@/stores/completedSessions.js'
+import { isHiddenFromTutee } from '@/constants/tuteeSessionVisibility.js'
 
 const router = useRouter()
 const sessionsStore = useSessionsStore()
 
-const currentFilter = ref('pending')
+const currentFilter = ref('upcoming')
 const searchQuery = ref('')
 
 onMounted(() => {
@@ -119,8 +120,6 @@ onMounted(() => {
 
 const filters = [
     { label: 'All', value: 'all' },
-    { label: 'Pending', value: 'pending' },
-    { label: 'Rejected', value: 'rejected' },
     { label: 'Cancelled', value: 'cancelled' },
     { label: 'Upcoming', value: 'upcoming' },
     { label: 'Ongoing', value: 'ongoing' },
@@ -128,7 +127,9 @@ const filters = [
 ]
 
 const filteredSessions = computed(() => {
-    let filteredList = sessionsStore.sessions
+    // Pending and Rejected are filtered off the base list, not just missing a tab, so they stay out
+    // of "All" too. The store still holds them -- it is shared with the tutor side.
+    let filteredList = sessionsStore.sessions.filter((session) => !isHiddenFromTutee(session))
 
     if (currentFilter.value !== 'all') {
         filteredList = filteredList.filter((session) => {
@@ -152,10 +153,8 @@ const filteredSessions = computed(() => {
 
 const getStatusClass = (status) => {
     switch (String(status || '').toLowerCase()) {
-        case 'pending':
         case 'pending location':
             return 'bg-warning text-dark'
-        case 'rejected':
         case 'cancelled':
             return 'bg-danger text-white'
         case 'upcoming':
