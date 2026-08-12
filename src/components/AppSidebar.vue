@@ -44,20 +44,22 @@
       </RouterLink>
     </nav>
 
-    <p class="sb-section-label">Support</p>
-    <nav class="sb-nav" aria-label="Support">
-      <button
-        type="button"
-        class="sb-item sb-item-btn"
-        data-test="help"
-        title="Help"
-        aria-label="Help"
-        @click="emit('open-support')"
-      >
-        <span class="sb-chip"><i class="bi bi-question-circle"></i></span>
-        <span class="sb-item-label">Help</span>
-      </button>
-    </nav>
+    <template v-if="role !== 'superadmin'">
+      <p class="sb-section-label">Support</p>
+      <nav class="sb-nav" aria-label="Support">
+        <button
+          type="button"
+          class="sb-item sb-item-btn"
+          data-test="help"
+          title="Help"
+          aria-label="Help"
+          @click="emit('open-support')"
+        >
+          <span class="sb-chip"><i class="bi bi-question-circle"></i></span>
+          <span class="sb-item-label">Help</span>
+        </button>
+      </nav>
+    </template>
 
     <div class="sb-spacer"></div>
 
