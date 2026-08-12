@@ -712,12 +712,27 @@ onBeforeRouteUpdate(async (to, from, next) => {
 .tutor-filter-row .budget-toggle-btn,
 .tutor-filter-row .sb-field,
 .tutor-filter-row .filter-submit-btn {
+  /* An exact box, not a floor. `min-height` alone left Mode taller than the rest: each component
+     picks its own vertical padding (0.7rem on SbSelectModal against 0.55rem, 0.5rem and Bootstrap's
+     `py-2` elsewhere), and the taller ones simply computed past the minimum. Zeroing the vertical
+     padding hands height control to this rule alone; every trigger centres its own content, so the
+     22px icon and image slots still sit in the middle. */
+  height: 42px;
   min-height: 42px;
+  padding-top: 0;
+  padding-bottom: 0;
   /* 10px is the subject picker's own value -- the one radius in this row set deliberately by a
      component rather than inherited from a Bootstrap utility, and midway between the 6px pickers
      and SbSelectModal's 14px. The location input, budget toggle and submit button lost their
      `rounded-3` in the template: that utility carries `!important` and cannot be overridden here. */
   border-radius: 10px;
+}
+
+/* `.btn` is inline-block, so a fixed height would leave the label riding the top edge. */
+.tutor-filter-row .filter-submit-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .fallback-notice {
