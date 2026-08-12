@@ -73,10 +73,14 @@
             <span v-if="!activeCategory" class="meta" :class="categoryClass(subject.category)">
               <span class="category-dot"></span>{{ subject.category }}
             </span>
-            <span v-if="subject.description" class="desc">{{ subject.description }}</span>
+            <span v-if="subject.description" class="desc">
+              <template v-for="(segment, i) in highlightSegments(subject.description, searchQuery)" :key="i">
+                <strong v-if="segment.match">{{ segment.text }}</strong>
+                <template v-else>{{ segment.text }}</template>
+              </template>
+            </span>
           </span>
           <span v-if="modelValue.includes(subject.subject_code)" class="check">&#10003; Added</span>
-          <span v-else-if="subject.matchedViaHint" class="via-badge">via &ldquo;{{ searchQuery }}&rdquo;</span>
         </button>
       </div>
       <div v-else class="empty-state">
@@ -183,6 +187,25 @@ const matchedCategories = computed(() => {
     .map((category) => ({ category, count: counts.get(category) }))
 })
 
+// Splits `text` into plain/matched segments around the (case-insensitive) first occurrence of
+// `query`, so the template can bold the matched span without v-html. Falls through to a single
+// unmatched segment when the query is empty or the text doesn't contain it — the description just
+// renders as plain text, which is the intended behavior when a subject only matched via keywords.
+function highlightSegments(text, query) {
+  const normalizedQuery = String(query || '').trim().toLowerCase()
+  if (!normalizedQuery) return [{ text, match: false }]
+
+  const index = text.toLowerCase().indexOf(normalizedQuery)
+  if (index === -1) return [{ text, match: false }]
+
+  const end = index + normalizedQuery.length
+  return [
+    { text: text.slice(0, index), match: false },
+    { text: text.slice(index, end), match: true },
+    { text: text.slice(end), match: false },
+  ].filter((segment) => segment.text)
+}
+
 const countLine = computed(() => {
   if (!activeCategory.value) return ''
   const total = subjectsFor(activeCategory.value).length
@@ -243,7 +266,6 @@ const countLine = computed(() => {
 .result-row .meta { display: flex; align-items: center; gap: 6px; font-size: .73rem; color: var(--sb-text-muted); }
 .result-row .desc { font-size: .74rem; color: var(--sb-text-muted); line-height: 1.4; }
 .result-row .check { color: var(--sb-primary); font-weight: 750; font-size: .78rem; white-space: nowrap; }
-.result-row .via-badge { font-size: .68rem; padding: 2px 8px; border-radius: 999px; background: color-mix(in srgb, var(--sb-pop-yellow-deep) 15%, var(--sb-card-bg)); color: var(--sb-warning-text); white-space: nowrap; }
 
 .empty-state { padding: 22px 16px; text-align: center; border: 1px solid var(--sb-card-border); border-radius: 12px; }
 .empty-state p { color: var(--sb-text-muted); font-size: .85rem; margin: 0 0 10px; }
