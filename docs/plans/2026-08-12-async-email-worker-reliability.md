@@ -10,16 +10,23 @@ spec:
 
 ## Status/Progress Summary
 
-In Progress as of 2026-08-12. Steps 1-2 done. Step 1 (sync password reset): implemented and
-tested — `mailer.send_password_reset` mirrors `send_login_otp` (sync, rate-capped, raises
-`EmailRateLimitError`), `send_password_reset_email_task` and `enqueue_password_reset` are
-deleted, `views.password_reset_request` calls the sync function directly and stays on the
-generic response even when rate-limited (no enumeration regression). 4 new tests added; full
-suite (452 tests) has only 4 pre-existing, unrelated failures (test-data pollution from
-repeated `--keepdb` runs, not this diff). Step 2 (local dev doc note): `AGENTS.md`'s command
-table now documents the `qcluster` requirement. Step 4 (backlog purge) still to do; step 3
-(Render Cron Job) is a manual dashboard action for the user — the plan's Steps section has
-the exact command and schedule to set up when ready.
+In Progress as of 2026-08-12. Steps 1, 2, and 4 done; step 3 still needs the user. Step 1
+(sync password reset): implemented and tested — `mailer.send_password_reset` mirrors
+`send_login_otp` (sync, rate-capped, raises `EmailRateLimitError`),
+`send_password_reset_email_task` and `enqueue_password_reset` are deleted,
+`views.password_reset_request` calls the sync function directly and stays on the generic
+response even when rate-limited (no enumeration regression). 4 new tests added; full suite
+(452 tests) has only 4 pre-existing, unrelated failures (test-data pollution from repeated
+`--keepdb` runs, not this diff). Shipped in [PR #126](https://github.com/llariesalinas/studybuddy-ui/pull/126)
+(pushed, not yet merged). Step 2 (local dev doc note): `AGENTS.md`'s command table now
+documents the `qcluster` requirement. Step 4 (backlog purge): user ran the purge directly
+against the shared DB — 7 rows deleted (2 corrupt + 5 password-reset tasks, including the
+44-day-old one and, notably, two queued only 14 minutes before the purge, confirming the bug
+was actively recurring in the live app up to that moment since the fix wasn't deployed yet).
+14 legitimate tasks remain queued (booking-confirmed, application-approved, renewal-result),
+verified untouched, and will drain once step 3 is live. Step 3 (Render Cron Job) is the only
+remaining piece — a manual dashboard action only the user can do; the plan's Steps section
+has the exact command and schedule.
 
 ## Goal
 
@@ -169,3 +176,18 @@ plan once this fix ships, so a stuck worker becomes visible instead of silent ag
   `AGENTS.md`'s command table now documents that `qcluster` must run alongside `runserver`
   for async email, and what silently breaks without it. Steps 3 (Render Cron Job) and 4
   (backlog purge) remain — both need the user, not something this session can do.
+- **2026-08-12 (cont.)** — Code review (Standards + Spec axes, parallel sub-agents): 0 hard
+  violations, 0 spec gaps; 3 minor Standards judgement-calls noted (mild duplication between
+  `send_password_reset`/`send_login_otp`, a comment-placement nit, a harmless breadcrumb
+  comment) — none blocking. Committed as `e95ba09`. Pushed the branch and opened
+  [PR #126](https://github.com/llariesalinas/studybuddy-ui/pull/126) (not yet merged — Render's
+  deploy trigger for `main` wasn't confirmed, so merging is left to the user). Re-checked the
+  live queue immediately before touching it: now 21 tasks (up from 19), including two more
+  `send_password_reset_email_task` entries queued only 14 minutes earlier for the same real
+  account — direct evidence the bug was still actively recurring against the live app, since
+  the fix wasn't deployed yet at that point. User ran the purge directly (classifier blocked
+  it from this session): `OrmQ.objects.filter(id__in=[6, 15, 16, 23, 24, 25, 26]).delete()` —
+  7 deleted (2 corrupt + all 5 password-reset tasks, expanded from the plan's original 3 once
+  the recheck found 2 more). 14 legitimate tasks confirmed remaining
+  (booking-confirmed/application-approved/renewal-result), untouched. Step 4 done. Only step 3
+  (Render Cron Job) and merging PR #126 remain, both requiring the user.

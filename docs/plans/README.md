@@ -3,18 +3,22 @@
 Every finalized plan lives in this folder as its own dated file, created from [`_template.md`](_template.md).
 Status moves Draft â†’ Approved â†’ In Progress â†’ Done. When a plan is complete, its summary is linked below.
 
-**Status & Progress Summary** (2026-08-12): Async email worker reliability is Draft, awaiting
-approval. Diagnosed while investigating "password reset doesn't send an email" (same root cause
-as an earlier `mailer.py` fix for "verification approved doesn't send an email"): every async
-email — password reset, password-changed, verification approved/rejected, document renewal
-result/reminder, booking confirmed — routes through Django-Q, and nothing has ever run
-`python manage.py qcluster` to consume that queue, in dev or prod. Confirmed directly against the
-dev DB: 19 tasks stuck in `django_q.OrmQ`, including a password-reset email 44 days old (token
-almost certainly expired) and two more from live testing 16 minutes before the check. Production
-is a single Render web service with no worker process, so this is very likely a live prod bug,
-not just local. Plan: make password reset synchronous (mirrors the existing login-OTP pattern,
-removes its dependency on a worker entirely) and drain everything else via a Render Cron Job
-running `qcluster --run-once` every few minutes, chosen over an always-on worker service for cost.
+**Status & Progress Summary** (2026-08-12): Async email worker reliability is In Progress —
+diagnosis, code fix, doc note, and backlog purge are done; only the Render Cron Job setup and
+merging the PR remain, both requiring the user. Root cause: every async email — password reset,
+password-changed, verification approved/rejected, document renewal result/reminder, booking
+confirmed — routes through Django-Q, and nothing has ever run `python manage.py qcluster` to
+consume that queue, in dev or prod (single Render web service, no worker process). Fix: password
+reset is now synchronous (mirrors the existing login-OTP pattern, removes its dependency on a
+worker entirely); `AGENTS.md` documents the `qcluster` requirement for what's still async.
+Shipped in [PR #126](https://github.com/llariesalinas/studybuddy-ui/pull/126) (pushed, not
+merged). While purging the stuck queue, found live evidence the bug was still actively
+recurring — two more password-reset tasks queued 14 minutes before the check, for a real
+account — confirming this is a genuine production issue, not just a local artifact. User ran the
+purge directly against the shared DB: 7 stuck rows deleted (2 corrupt + all 5 password-reset
+tasks); 14 legitimate tasks remain queued, verified untouched, will drain once the cron job is
+live. Remaining: set up the Render Cron Job (`qcluster --run-once`, every 2-5 min — exact config
+in the plan) and merge PR #126.
 [Plan](2026-08-12-async-email-worker-reliability.md).
 
 **Previous** (2026-08-12): fixed a real send bug in `backend/studybuddy/mailer.py` while auditing
