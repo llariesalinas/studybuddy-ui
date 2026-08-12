@@ -184,13 +184,46 @@
                 </div>
                 <div class="mb-2">
                   <label class="form-label small fw-bold">Category</label>
-                  <select v-model="subjectEditForm.category" class="form-select form-select-sm sb-field">
+                  <template v-if="categoryMode === 'new'">
+                    <div v-if="categoryMismatchNote" class="category-mismatch-note small mb-2">
+                      <i class="bi bi-exclamation-triangle me-1"></i>{{ categoryMismatchNote }}
+                    </div>
+                    <input v-model.trim="subjectEditForm.category" class="form-control form-control-sm sb-field" placeholder="New category name">
+                    <button type="button" class="btn btn-link btn-sm px-0 mt-1" @click="useExistingCategory">
+                      Pick an existing category instead
+                    </button>
+                  </template>
+                  <select
+                    v-else
+                    v-model="subjectEditForm.category"
+                    class="form-select form-select-sm sb-field"
+                    @change="handleCategorySelectChange"
+                  >
                     <option v-for="category in taxonomyCategories" :key="category" :value="category">{{ category }}</option>
+                    <option value="__add_new__">+ Add new category...</option>
                   </select>
                 </div>
-                <div class="mb-2">
+                <div class="mb-2 keyword-field">
                   <label class="form-label small fw-bold">Keywords</label>
-                  <input v-model.trim="subjectEditForm.keywords" class="form-control form-control-sm sb-field" placeholder="Comma-separated synonyms, e.g. coding, programming, cs">
+                  <input
+                    v-model.trim="subjectEditForm.keywords"
+                    class="form-control form-control-sm sb-field"
+                    placeholder="Comma-separated synonyms, e.g. coding, programming, cs"
+                    autocomplete="off"
+                    @focus="keywordSuggestionsOpen = true"
+                    @blur="keywordSuggestionsOpen = false"
+                  >
+                  <div v-if="keywordSuggestionsOpen && keywordSuggestions.length" class="keyword-suggestions">
+                    <button
+                      v-for="keyword in keywordSuggestions"
+                      :key="keyword"
+                      type="button"
+                      class="keyword-suggestion"
+                      @mousedown.prevent="selectKeywordSuggestion(keyword)"
+                    >
+                      {{ keyword }}
+                    </button>
+                  </div>
                 </div>
                 <div class="mb-2">
                   <label class="form-label small fw-bold">Description</label>
@@ -286,6 +319,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useAdminStore } from '@/stores/admin'
+import { useCatalogStore } from '@/stores/catalog'
 import { Offcanvas } from 'bootstrap'
 import {
   getApplicationReviewKind,
@@ -294,9 +328,10 @@ import {
   getReviewStatus,
   getReviewSubmittedAt,
 } from '@/services/tutorApplicationState'
-import { TAXONOMY_CATEGORIES } from '@/constants/subjectTaxonomy'
+import { deriveCategoryOptions } from '@/constants/subjectTaxonomy'
 
 const adminStore = useAdminStore()
+const catalogStore = useCatalogStore()
 const filters = reactive({
   role: 'tutor',
   status: 'pending',
@@ -311,8 +346,46 @@ const processingSubject = ref('')
 const editingSubjectCode = ref('')
 const savingSubjectEdit = ref(false)
 const subjectEditForm = reactive({ subject_name: '', category: '', keywords: '', description: '' })
-const taxonomyCategories = TAXONOMY_CATEGORIES
+// 'select' shows the taxonomy dropdown; 'new' shows the free-text "add a category" input,
+// entered either by picking "+ Add new category..." or automatically when a proposed subject's
+// category doesn't match anything in the derived list.
+const categoryMode = ref('select')
+const categoryMismatchNote = ref('')
 let offcanvas = null
+
+const taxonomyCategories = computed(() => deriveCategoryOptions(catalogStore.courseCatalog))
+
+const catalogKeywords = computed(() => {
+  const keywords = new Set()
+  for (const subject of catalogStore.courseCatalog) {
+    for (const keyword of (subject.keywords || '').split(',')) {
+      const trimmed = keyword.trim()
+      if (trimmed) keywords.add(trimmed)
+    }
+  }
+  return [...keywords].sort()
+})
+
+// Custom dropdown instead of a native <datalist> — datalist popups render with unstyled OS/browser
+// chrome that clashes with the rest of the form.
+const keywordSuggestionsOpen = ref(false)
+
+const keywordSuggestions = computed(() => {
+  const enteredKeywords = subjectEditForm.keywords.split(',').map((kw) => kw.trim().toLowerCase())
+  const fragment = enteredKeywords[enteredKeywords.length - 1] || ''
+  const alreadyEntered = new Set(enteredKeywords.filter(Boolean))
+
+  return catalogKeywords.value
+    .filter((keyword) => !alreadyEntered.has(keyword.toLowerCase()))
+    .filter((keyword) => keyword.toLowerCase().includes(fragment))
+    .slice(0, 8)
+})
+
+const selectKeywordSuggestion = (keyword) => {
+  const lastComma = subjectEditForm.keywords.lastIndexOf(',')
+  const prefix = lastComma === -1 ? '' : `${subjectEditForm.keywords.slice(0, lastComma + 1)} `
+  subjectEditForm.keywords = `${prefix}${keyword}, `
+}
 
 const pageTitle = computed(() => (filters.role === 'tutee' ? 'Tutee Applications' : 'Tutor Applications'))
 
@@ -462,10 +535,36 @@ const startSubjectEdit = (subject) => {
     keywords: subject.keywords || '',
     description: subject.description || '',
   })
+
+  if (subject.category && !taxonomyCategories.value.includes(subject.category)) {
+    categoryMode.value = 'new'
+    categoryMismatchNote.value = `"${subject.category}" — not in the catalog yet`
+  } else {
+    categoryMode.value = 'select'
+    categoryMismatchNote.value = ''
+  }
+}
+
+const handleCategorySelectChange = () => {
+  if (subjectEditForm.category === '__add_new__') {
+    subjectEditForm.category = ''
+    categoryMode.value = 'new'
+    categoryMismatchNote.value = ''
+  }
+}
+
+const useExistingCategory = () => {
+  categoryMode.value = 'select'
+  categoryMismatchNote.value = ''
+  if (!taxonomyCategories.value.includes(subjectEditForm.category)) {
+    subjectEditForm.category = taxonomyCategories.value[0] || ''
+  }
 }
 
 const cancelSubjectEdit = () => {
   editingSubjectCode.value = ''
+  categoryMode.value = 'select'
+  categoryMismatchNote.value = ''
 }
 
 const saveSubjectEdit = async (subject) => {
@@ -478,6 +577,8 @@ const saveSubjectEdit = async (subject) => {
     )
     Object.assign(subject, updated, { description: subjectEditForm.description })
     editingSubjectCode.value = ''
+    categoryMode.value = 'select'
+    categoryMismatchNote.value = ''
   } catch (err) {
     console.error('Subject update failed:', err)
   } finally {
@@ -541,6 +642,9 @@ watch(() => [filters.role, filters.status, filters.reviewType], () => {
 
 onMounted(() => {
   loadApplications()
+  if (!catalogStore.courseCatalog.length) {
+    catalogStore.fetchCourseCatalog().catch((err) => console.error('Catalog fetch failed:', err))
+  }
 })
 </script>
 
@@ -611,6 +715,49 @@ onMounted(() => {
 
 .proposed-subject-edit-form {
   width: 100%;
+}
+
+.category-mismatch-note {
+  padding: 0.5rem 0.65rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--sb-warning-bg, #ffc107);
+  background: color-mix(in srgb, var(--sb-warning-bg, #ffc107) 12%, white);
+  color: var(--sb-warning-text, #997404);
+}
+
+.keyword-field {
+  position: relative;
+}
+
+.keyword-suggestions {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 5;
+  max-height: 180px;
+  overflow-y: auto;
+  background: var(--sb-card-bg, #fff);
+  border: 1px solid var(--sb-card-border);
+  border-radius: 0.5rem;
+  box-shadow: var(--sb-shadow-hover, 0 8px 24px rgba(15, 23, 42, 0.12));
+}
+
+.keyword-suggestion {
+  display: block;
+  width: 100%;
+  padding: 0.4rem 0.65rem;
+  border: 0;
+  background: none;
+  text-align: left;
+  font-size: 0.8rem;
+  color: var(--sb-text-main);
+}
+
+.keyword-suggestion:hover,
+.keyword-suggestion:focus {
+  background: var(--sb-green-tint, var(--sb-primary-light));
+  color: var(--sb-primary);
 }
 
 .fade-enter-active,
