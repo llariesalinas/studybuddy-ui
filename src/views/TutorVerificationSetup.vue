@@ -1,107 +1,78 @@
 <template>
-  <div class="onboarding-page">
-    <nav class="navbar sb-surface py-3">
-      <div class="container d-flex justify-content-between align-items-center">
-        <span class="navbar-brand fw-bold fs-4 sb-text">StudyBuddy</span>
-        <SbThemeToggle />
+  <TutorOnboardingShell :current-step="3">
+    <h3>Last step: verification</h3>
+    <p class="muted">Upload your documents now, or finish later.</p>
+
+    <div class="why-strip">
+      <i class="bi bi-info-circle" aria-hidden="true"></i>
+      <span
+        ><strong>Verified tutors appear in tutee search.</strong> Until an admin approves your
+        documents, tutees can't find or book you — but you can still use the rest of the
+        app.</span
+      >
+    </div>
+
+    <label class="field-label" for="school-id">School ID</label>
+    <label class="upload-row" for="school-id">
+      <i class="bi bi-file-earmark-arrow-up" aria-hidden="true"></i>
+      <span>{{ schoolId?.name || 'Click to upload' }}</span>
+    </label>
+    <input
+      id="school-id"
+      class="visually-hidden"
+      type="file"
+      accept="image/*"
+      @change="handleFileChange($event, 'schoolId')"
+    />
+
+    <label class="field-label" for="enrollment-proof">Enrollment proof</label>
+    <label class="upload-row" for="enrollment-proof">
+      <i class="bi bi-file-earmark-arrow-up" aria-hidden="true"></i>
+      <span>{{ enrollmentProof?.name || 'Click to upload' }}</span>
+    </label>
+    <input
+      id="enrollment-proof"
+      class="visually-hidden"
+      type="file"
+      accept="image/*,.pdf"
+      @change="handleFileChange($event, 'enrollmentProof')"
+    />
+
+    <div class="stack-actions">
+      <button
+        type="button"
+        class="btn-primary-pill sb-btn"
+        :disabled="isSubmitting"
+        @click="submitVerification"
+      >
+        {{ isSubmitting ? 'Submitting...' : 'Submit & Finish Onboarding' }}
+      </button>
+      <div class="step-nav-row">
+        <button
+          type="button"
+          class="btn-outline-pill sb-btn"
+          :disabled="isSubmitting"
+          @click="goBackToSubjects"
+        >
+          &larr; Back
+        </button>
+        <button
+          type="button"
+          class="btn-outline-pill sb-btn"
+          :disabled="isSubmitting"
+          @click="skipVerification"
+        >
+          Skip for Now
+        </button>
       </div>
-    </nav>
-
-    <main class="container py-5">
-      <div class="row justify-content-center">
-        <div class="col-lg-9">
-          <div class="onboarding-shell">
-            <aside class="onboarding-rail">
-              <div class="rail-step rail-step-done">
-                <span class="rail-num"></span><span>Preferences</span>
-              </div>
-              <div class="rail-step rail-step-done">
-                <span class="rail-num"></span><span>Subjects</span>
-              </div>
-              <div class="rail-step rail-step-active">
-                <span class="rail-num">3</span><span>Verify</span>
-              </div>
-            </aside>
-
-            <section class="onboarding-main sb-text">
-              <h3>Last step: verification</h3>
-              <p class="muted">Upload your documents now, or finish later.</p>
-
-              <div class="why-strip">
-                <i class="bi bi-info-circle" aria-hidden="true"></i>
-                <span
-                  ><strong>Verified tutors appear in tutee search.</strong> Until an admin approves
-                  your documents, tutees can't find or book you — but you can still use the rest of
-                  the app.</span
-                >
-              </div>
-
-              <label class="field-label" for="school-id">School ID</label>
-              <label class="upload-row" for="school-id">
-                <i class="bi bi-file-earmark-arrow-up" aria-hidden="true"></i>
-                <span>{{ schoolId?.name || 'Click to upload' }}</span>
-              </label>
-              <input
-                id="school-id"
-                class="visually-hidden"
-                type="file"
-                accept="image/*"
-                @change="handleFileChange($event, 'schoolId')"
-              />
-
-              <label class="field-label" for="enrollment-proof">Enrollment proof</label>
-              <label class="upload-row" for="enrollment-proof">
-                <i class="bi bi-file-earmark-arrow-up" aria-hidden="true"></i>
-                <span>{{ enrollmentProof?.name || 'Click to upload' }}</span>
-              </label>
-              <input
-                id="enrollment-proof"
-                class="visually-hidden"
-                type="file"
-                accept="image/*,.pdf"
-                @change="handleFileChange($event, 'enrollmentProof')"
-              />
-
-              <div class="stack-actions">
-                <button
-                  type="button"
-                  class="btn-primary-pill sb-btn"
-                  :disabled="isSubmitting"
-                  @click="submitVerification"
-                >
-                  {{ isSubmitting ? 'Submitting...' : 'Submit & Finish Onboarding' }}
-                </button>
-                <div class="step-nav-row">
-                  <button
-                    type="button"
-                    class="btn-outline-pill sb-btn"
-                    :disabled="isSubmitting"
-                    @click="goBackToSubjects"
-                  >
-                    &larr; Back
-                  </button>
-                  <button
-                    type="button"
-                    class="btn-outline-pill sb-btn"
-                    :disabled="isSubmitting"
-                    @click="skipVerification"
-                  >
-                    Skip for Now
-                  </button>
-                </div>
-              </div>
-            </section>
-          </div>
-        </div>
-      </div>
-    </main>
-  </div>
+    </div>
+  </TutorOnboardingShell>
 </template>
 
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import SbThemeToggle from '@/components/SbThemeToggle.vue'
+import TutorOnboardingShell from '@/components/TutorOnboardingShell.vue'
 import { useProfileStore } from '@/stores/profile'
 import { useToastStore } from '@/stores/toast'
 import { skipTutorVerification, submitTutorVerification } from '@/services/tutorOnboarding'
@@ -175,76 +146,6 @@ const goBackToSubjects = () => {
 </script>
 
 <style scoped>
-.onboarding-page {
-  min-height: 100vh;
-  background: var(--sb-bg);
-}
-.onboarding-shell {
-  display: flex;
-  background: var(--sb-card-bg);
-  border: 1px solid var(--sb-card-border);
-  border-radius: 18px;
-  box-shadow: 0 6px 20px var(--sb-shadow-soft);
-  overflow: hidden;
-}
-.onboarding-rail {
-  width: 160px;
-  flex-shrink: 0;
-  background: color-mix(in srgb, var(--sb-primary) 8%, var(--sb-card-bg));
-  border-right: 1px solid var(--sb-card-border);
-  padding: 28px 16px;
-}
-.rail-step {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 24px;
-  font-size: 13px;
-  color: var(--sb-text-muted);
-}
-.rail-num {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  border: 1.5px solid var(--sb-card-border);
-  background: var(--sb-card-bg);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  font-size: 11px;
-  flex-shrink: 0;
-}
-.rail-step-active {
-  color: var(--sb-text-main);
-  font-weight: 700;
-}
-.rail-step-active .rail-num,
-.rail-step-done .rail-num {
-  background: var(--sb-primary);
-  border-color: var(--sb-primary);
-  color: var(--sb-primary-contrast);
-}
-.rail-step-done .rail-num::after {
-  content: '\2713';
-  color: var(--sb-primary-contrast);
-  font-size: 12px;
-}
-.onboarding-main {
-  flex: 1;
-  min-width: 0;
-  padding: 32px 32px 30px;
-}
-.onboarding-main h3 {
-  font-weight: 800;
-  margin: 0 0 0.2rem;
-  font-size: 1.15rem;
-}
-.muted {
-  color: var(--sb-text-muted);
-  margin: 0 0 1.25rem;
-  font-size: 0.92rem;
-}
 .why-strip {
   display: flex;
   gap: 10px;
@@ -331,27 +232,5 @@ const goBackToSubjects = () => {
 .btn-outline-pill:hover {
   border-color: var(--sb-primary);
   color: var(--sb-primary);
-}
-@media (max-width: 640px) {
-  .onboarding-shell {
-    flex-direction: column;
-  }
-  .onboarding-rail {
-    width: 100%;
-    display: flex;
-    justify-content: space-between;
-    padding: 16px 18px;
-    border-right: 0;
-    border-bottom: 1px solid var(--sb-card-border);
-  }
-  .rail-step {
-    margin-bottom: 0;
-    flex-direction: column;
-    gap: 4px;
-    font-size: 11px;
-  }
-  .onboarding-main {
-    padding: 26px 20px;
-  }
 }
 </style>

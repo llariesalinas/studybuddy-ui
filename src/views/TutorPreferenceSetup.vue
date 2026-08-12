@@ -1,99 +1,82 @@
 <template>
-  <div class="min-vh-100 py-5 tutor-setup-page">
-    <div class="container-fluid px-4 mb-3 d-flex justify-content-between align-items-center">
-      <span class="fw-bold sb-text">StudyBuddy</span>
-      <SbThemeToggle />
-    </div>
+  <TutorOnboardingShell :current-step="1">
+    <h3>Tutor profile setup</h3>
+    <p class="muted">Set your teaching preferences to start matching.</p>
 
-    <div class="container">
-      <div class="row justify-content-center">
-        <div class="col-md-7 col-lg-6">
-          <div class="card border-0 sb-card-surface sb-text shadow-sm rounded-4">
-            <div class="card-body p-4 p-md-5">
-              <div class="text-center mb-4">
-                <h3 class="fw-bold sb-text">Tutor Profile Setup</h3>
-                <p class="sb-muted">Set your teaching preferences to start matching.</p>
-              </div>
+    <form @submit.prevent="handleCompleteSetup">
+      <div class="field-block">
+        <label class="field-label">Teaching Level</label>
+        <SbSelectModal
+          v-model="form.teaching_level"
+          :options="teachingLevelOptions"
+          title="Teaching Level"
+          placeholder="Select level"
+          trigger-class="form-select border-sb shadow-none"
+        />
+      </div>
 
-              <form @submit.prevent="handleCompleteSetup">
-                <div class="mb-4">
-                  <label class="form-label fw-bold small sb-muted">TEACHING LEVEL</label>
-                  <SbSelectModal
-                    v-model="form.teaching_level"
-                    :options="teachingLevelOptions"
-                    title="Teaching Level"
-                    placeholder="Select level"
-                    trigger-class="form-select border-sb shadow-none"
-                  />
-                </div>
-
-                <div class="mb-4">
-                  <label class="form-label fw-bold small sb-muted d-block">MODALITY</label>
-                  <div class="modality-pill-group">
-                    <button
-                      type="button"
-                      class="modality-pill sb-btn sb-pill"
-                      :class="{ 'modality-pill-active': form.can_online }"
-                      :aria-pressed="form.can_online"
-                      @click="form.can_online = !form.can_online"
-                    >
-                      <span class="modality-pill-icon"><i class="bi bi-camera-video-fill"></i></span>
-                      <span>Online</span>
-                    </button>
-                    <button
-                      type="button"
-                      class="modality-pill sb-btn sb-pill"
-                      :class="{ 'modality-pill-active': form.can_f2f }"
-                      :aria-pressed="form.can_f2f"
-                      @click="form.can_f2f = !form.can_f2f"
-                    >
-                      <span class="modality-pill-icon"><i class="bi bi-geo-alt-fill"></i></span>
-                      <span>Face-to-Face</span>
-                    </button>
-                  </div>
-                </div>
-
-                <div class="mb-4">
-                  <label class="form-label fw-bold small sb-muted" for="hourly-rate-input">HOURLY RATE (PHP)</label>
-                  <div
-                    class="rate-scrub-shell"
-                    :class="{ 'is-scrubbing': isScrubbingRate }"
-                    @mousedown="startRateScrub"
-                  >
-                    <span class="rate-prefix">PHP</span>
-                    <input
-                      id="hourly-rate-input"
-                      type="text"
-                      inputmode="numeric"
-                      class="rate-scrub-input"
-                      v-model="form.hourly_rate"
-                      placeholder="0.00"
-                      required
-                      @mousedown.stop
-                      @input="sanitizeRateInput"
-                    >
-                    <span class="rate-scrub-hint">drag &harr; or type</span>
-                  </div>
-                </div>
-
-                <div class="form-check mb-5">
-                  <input class="form-check-input" type="checkbox" v-model="commissionTermsAccepted" id="commission-terms">
-                  <label class="form-check-label small sb-muted" for="commission-terms">
-                    I understand StudyBuddy deducts a {{ commissionRatePercent }}% platform fee from
-                    each completed session's payout.
-                  </label>
-                </div>
-
-                <button type="submit" class="btn bg-sb-primary text-white w-100 py-3 rounded-3 fw-bold shadow-sm sb-btn" :disabled="!commissionTermsAccepted">
-                  Complete Profile
-                </button>
-              </form>
-            </div>
-          </div>
+      <div class="field-block">
+        <label class="field-label">Modality</label>
+        <div class="modality-pill-group">
+          <button
+            type="button"
+            class="modality-pill sb-btn sb-pill"
+            :class="{ 'modality-pill-active': form.can_online }"
+            :aria-pressed="form.can_online"
+            @click="form.can_online = !form.can_online"
+          >
+            <span class="modality-pill-icon"><i class="bi bi-camera-video-fill"></i></span>
+            <span>Online</span>
+          </button>
+          <button
+            type="button"
+            class="modality-pill sb-btn sb-pill"
+            :class="{ 'modality-pill-active': form.can_f2f }"
+            :aria-pressed="form.can_f2f"
+            @click="form.can_f2f = !form.can_f2f"
+          >
+            <span class="modality-pill-icon"><i class="bi bi-geo-alt-fill"></i></span>
+            <span>Face-to-Face</span>
+          </button>
         </div>
       </div>
-    </div>
-  </div>
+
+      <div class="field-block">
+        <label class="field-label" for="hourly-rate-input">Hourly Rate (PHP)</label>
+        <div
+          class="rate-scrub-shell"
+          :class="{ 'is-scrubbing': isScrubbingRate }"
+          @mousedown="startRateScrub"
+        >
+          <span class="rate-prefix">PHP</span>
+          <input
+            id="hourly-rate-input"
+            type="text"
+            inputmode="numeric"
+            class="rate-scrub-input"
+            v-model="form.hourly_rate"
+            placeholder="0.00"
+            required
+            @mousedown.stop
+            @input="sanitizeRateInput"
+          >
+          <span class="rate-scrub-hint">drag &harr; or type</span>
+        </div>
+      </div>
+
+      <div class="commission-row">
+        <input class="form-check-input" type="checkbox" v-model="commissionTermsAccepted" id="commission-terms">
+        <label class="form-check-label" for="commission-terms">
+          I understand StudyBuddy deducts a {{ commissionRatePercent }}% platform fee from
+          each completed session's payout.
+        </label>
+      </div>
+
+      <button type="submit" class="btn-primary-pill sb-btn" :disabled="!commissionTermsAccepted">
+        Continue to Subjects
+      </button>
+    </form>
+  </TutorOnboardingShell>
 </template>
 
 <script setup>
@@ -104,8 +87,8 @@ import { useToastStore } from '@/stores/toast'
 import api from '@/services/api/api'
 import { PLATFORM_COMMISSION_RATE_PERCENT } from '@/config'
 import { computeScrubbedRate, MIN_HOURLY_RATE } from '@/utils/rateScrub'
-import SbThemeToggle from '@/components/SbThemeToggle.vue'
 import SbSelectModal from '@/components/SbSelectModal.vue'
+import TutorOnboardingShell from '@/components/TutorOnboardingShell.vue'
 
 const router = useRouter()
 const profileStore = useProfileStore()
@@ -241,8 +224,52 @@ const handleCompleteSetup = async () => {
 </script>
 
 <style scoped>
-.tutor-setup-page {
-  background-color: var(--sb-bg);
+.field-block {
+  margin-bottom: 1.25rem;
+}
+
+.field-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sb-text-muted);
+  margin-bottom: 8px;
+}
+
+.commission-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0 0 1.5rem;
+  font-size: 0.82rem;
+  color: var(--sb-text-muted);
+}
+
+.commission-row .form-check-input {
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+
+.btn-primary-pill {
+  width: 100%;
+  border: 0;
+  border-radius: 999px;
+  padding: 11px 24px;
+  font-weight: 700;
+  font-size: 13.5px;
+  background: var(--sb-primary);
+  color: var(--sb-primary-contrast);
+}
+
+.btn-primary-pill:hover:not(:disabled) {
+  background: var(--sb-primary-hover);
+}
+
+.btn-primary-pill:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* Modality pills — same visual language as InitialBooking.vue's "Preferred Mode"

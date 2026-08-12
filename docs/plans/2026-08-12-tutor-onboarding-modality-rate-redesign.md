@@ -2,7 +2,7 @@
 title: Tutor onboarding modality and rate field redesign
 date: 2026-08-12
 status: In Progress
-summary: Restyle TutorPreferenceSetup's modality toggles as pills and its hourly-rate input as a typable/scrubbable field, matching the app's canonical feel tokens.
+summary: Restyle TutorPreferenceSetup's modality/rate fields and integrate the page into the shared onboarding rail shell used by Subjects and Verify.
 spec: ../mockups/2026-08-12-tutor-onboarding-modality-pills.html
 ---
 
@@ -21,8 +21,20 @@ used. Also added `PHP_PER_PIXEL`/`MIN_HOURLY_RATE` named constants in `rateScrub
 bare magic `1`), reused for the submit-time rate validation too. `prefers-reduced-motion` was
 flagged as unverified by the spec review but turned out already covered by `main.css`'s blanket
 `*, *::before, *::after` guard — no fix needed. 184/184 tests pass, lint clean (pre-existing
-`make_algo_pptx.*` errors only), build succeeds. Manual browser walkthrough (light/dark theme,
-`prefers-reduced-motion` on) still outstanding before moving to Done.
+`make_algo_pptx.*` errors only), build succeeds.
+
+Scope then expanded: the user pointed out `TutorPreferenceSetup.vue` never adopted the left-rail
+wizard shell (`.onboarding-shell`/`.onboarding-rail`) that `TutorSubjectSetup.vue` and
+`TutorVerificationSetup.vue` already share — it rendered as a disconnected standalone card with no
+step indicator. Settled via another `ui-preview` round, then extracted the previously-duplicated
+shell/rail markup+CSS into `src/components/TutorOnboardingShell.vue` and migrated all three
+onboarding views onto it (eliminating the duplication rather than adding a third copy). A second
+`/code-review` pass caught one real regression: `TutorPreferenceSetup.vue`'s `SbSelectModal` lost
+its `trigger-class` prop during the rewrite (a scoped-CSS class was mistakenly passed across a
+component boundary where Vue's `scoped` styles don't apply — fixed by restoring the original
+global-class prop). 184/184 tests, lint clean, build succeeds. Manual browser walkthrough (light/
+dark theme, `prefers-reduced-motion` on, all three onboarding steps) still outstanding before
+moving to Done.
 
 ## Goal
 
@@ -119,8 +131,11 @@ Mockups:
 
 - `npm run lint`
 - `npm run build`
-- Manual browser pass on `TutorPreferenceSetup.vue` (see Steps 5) in both light
-  and dark theme, and with `prefers-reduced-motion` enabled.
+- Manual browser pass across all three onboarding steps (`TutorPreferenceSetup.vue`,
+  `TutorSubjectSetup.vue`, `TutorVerificationSetup.vue`) in both light and dark
+  theme, and with `prefers-reduced-motion` enabled: confirm the rail shows the
+  correct done/active/pending state on each step, and that nothing regressed on
+  the two views that were refactored onto the shared shell.
 
 ## Changelog
 
@@ -139,4 +154,18 @@ Mockups:
   can't use; magic "1 PHP per pixel" and "0 floor" replaced with named constants
   shared between the scrub math and submit validation. 184/184 tests, lint clean
   (pre-existing unrelated errors only), build succeeds. Manual browser
+  walkthrough still outstanding.
+- **2026-08-12 (rail integration)** — Scope expanded after the user flagged that
+  `TutorPreferenceSetup.vue` didn't share the left-rail wizard shell already used
+  by `TutorSubjectSetup.vue`/`TutorVerificationSetup.vue`. Settled via another
+  `ui-preview` round (see `docs/mockups/2026-08-12-tutor-onboarding-rail-integration.html`).
+  Extracted `src/components/TutorOnboardingShell.vue` from the previously-duplicated
+  shell/rail markup+CSS and migrated all three onboarding views onto it
+  (eliminating the duplication rather than adding a third copy); relabeled the
+  Preferences submit button "Complete Profile" -> "Continue to Subjects" to
+  match the other steps' nav pattern. A second `/code-review` pass caught and
+  fixed a real regression: `SbSelectModal`'s `trigger-class` prop was dropped
+  during the rewrite (a scoped-CSS class had been mistakenly passed across a
+  component boundary Vue's `scoped` styles don't cross) — restored the original
+  global-class prop. 184/184 tests, lint clean, build succeeds. Manual browser
   walkthrough still outstanding.

@@ -1,0 +1,180 @@
+<style>
+  .sb-preview-wrap {
+    --sb-primary: #00895A;
+    --sb-primary-hover: #017a4f;
+    --sb-primary-contrast: #ffffff;
+    --sb-bg: #F8F9FA;
+    --sb-card-bg: #ffffff;
+    --sb-card-border: #EAEAEA;
+    --sb-text-main: #163127;
+    --sb-text-muted: #6B7280;
+    --sb-shadow-soft: rgba(15, 23, 42, 0.08);
+    --sb-spring: cubic-bezier(0.16, 1, 0.3, 1);
+    --sb-t-quick: 130ms;
+    --sb-t-normal: 180ms;
+    --sb-lift-control: -4px;
+    --sb-press: 0.97;
+    --sb-halo: 0 0 0 4px rgba(0, 137, 90, 0.12);
+    font-family: -apple-system, "Segoe UI", sans-serif;
+    color: var(--sb-text-main);
+    background: var(--sb-bg);
+    padding: 1.5rem;
+    border-radius: 12px;
+  }
+
+  .tag-row { display:flex; gap:6px; margin-bottom: 1rem; }
+  .tag {
+    font-size: 0.68rem; font-weight: 700; padding: 0.2rem 0.55rem; border-radius: 999px;
+    background: color-mix(in srgb, var(--sb-primary) 14%, transparent); color: var(--sb-primary);
+  }
+
+  /* --- Exact shell/rail lifted from TutorSubjectSetup.vue / TutorVerificationSetup.vue --- */
+  .onboarding-shell {
+    display: flex;
+    background: var(--sb-card-bg);
+    border: 1px solid var(--sb-card-border);
+    border-radius: 18px;
+    box-shadow: 0 6px 20px var(--sb-shadow-soft);
+    overflow: hidden;
+    max-width: 760px;
+    margin: 0 auto;
+  }
+  .onboarding-rail {
+    width: 160px;
+    flex-shrink: 0;
+    background: color-mix(in srgb, var(--sb-primary) 8%, var(--sb-card-bg));
+    border-right: 1px solid var(--sb-card-border);
+    padding: 28px 16px;
+  }
+  .rail-step { display: flex; align-items: center; gap: 10px; margin-bottom: 24px; font-size: 13px; color: var(--sb-text-muted); }
+  .rail-num {
+    width: 24px; height: 24px; border-radius: 50%; border: 1.5px solid var(--sb-card-border);
+    background: var(--sb-card-bg); display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 11px; flex-shrink: 0;
+  }
+  .rail-step-active { color: var(--sb-text-main); font-weight: 700; }
+  .rail-step-active .rail-num, .rail-step-done .rail-num {
+    background: var(--sb-primary); border-color: var(--sb-primary); color: var(--sb-primary-contrast);
+  }
+  .onboarding-main { flex: 1; min-width: 0; padding: 32px 32px 30px; }
+  .onboarding-main h3 { font-weight: 800; margin: 0 0 0.2rem; font-size: 1.15rem; }
+  .muted { color: var(--sb-text-muted); margin: 0 0 1.5rem; font-size: 0.92rem; }
+
+  .step-nav-row { display: flex; gap: 10px; margin-top: 24px; }
+  .btn-primary-pill, .btn-outline-pill {
+    border-radius: 999px; padding: 11px 24px; font-weight: 700; font-size: 13.5px; border: 0;
+    cursor: pointer; transition: transform var(--sb-t-normal) var(--sb-spring), background var(--sb-t-quick) var(--sb-spring);
+  }
+  .btn-primary-pill { background: var(--sb-primary); color: var(--sb-primary-contrast); flex: 1; }
+  .btn-primary-pill:hover { background: var(--sb-primary-hover); }
+  .btn-primary-pill:disabled { opacity: 0.5; cursor: not-allowed; }
+  @media (hover: hover) and (pointer: fine) {
+    .btn-primary-pill:hover:not(:disabled) { transform: translateY(var(--sb-lift-control)); }
+  }
+  .btn-primary-pill:active { transform: scale(var(--sb-press)); }
+
+  /* --- Real field styles carried over from TutorPreferenceSetup.vue (this session's commit) --- */
+  .field-block { margin-bottom: 1.5rem; }
+  .field-label { display: block; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--sb-text-muted); margin-bottom: 10px; }
+
+  .mini-input {
+    width: 100%; padding: 10px 12px; border: 1.5px solid var(--sb-card-border); border-radius: 10px;
+    font-size: 0.9rem; background: var(--sb-bg); color: var(--sb-text-main); font-family: inherit;
+  }
+
+  .modality-pill-group { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .modality-pill {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px;
+    border: 1px solid var(--sb-card-border); border-radius: 14px; background: var(--sb-card-bg);
+    color: var(--sb-text-main); padding: 9px 10px; font-size: 14px; font-weight: 700; cursor: pointer;
+    transition: transform var(--sb-t-normal) var(--sb-spring), border-color var(--sb-t-quick) var(--sb-spring);
+  }
+  .modality-pill:hover { border-color: var(--sb-primary); box-shadow: var(--sb-halo); }
+  .modality-pill.is-active { border-color: var(--sb-primary); background: color-mix(in srgb, var(--sb-primary) 12%, var(--sb-card-bg)); color: var(--sb-primary); }
+
+  .rate-scrub-shell {
+    position: relative; display: flex; align-items: center; gap: 6px; width: 100%;
+    border: 1.5px solid var(--sb-card-border); border-radius: 0.6rem; padding: 0.65rem 0.9rem;
+    background: var(--sb-bg); cursor: ew-resize;
+  }
+  .rate-scrub-shell:focus-within { border-color: var(--sb-primary); box-shadow: var(--sb-halo); }
+  .rate-prefix { color: var(--sb-text-muted); font-weight: 700; font-size: 0.95rem; }
+  .rate-scrub-input { border: none; background: transparent; outline: none; font-size: 1.05rem; font-weight: 700; color: var(--sb-text-main); }
+  .rate-scrub-hint { margin-left: auto; font-size: 0.65rem; color: var(--sb-text-muted); opacity: 0.7; }
+
+  .commission-row { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 1.75rem; font-size: 0.82rem; color: var(--sb-text-muted); }
+  .commission-row input { margin-top: 3px; }
+</style>
+
+<div class="sb-preview-wrap">
+  <h2>Preferences, integrated into the real onboarding rail</h2>
+  <p class="subtitle">
+    This is the exact <code>.onboarding-shell</code>/<code>.onboarding-rail</code> markup from
+    <code>TutorSubjectSetup.vue</code> — Preferences now shows as step 1 (active), with Subjects
+    and Verify visible ahead. The Teaching Level, Modality, and Hourly Rate fields are the same
+    ones already shipped, just relocated into this shell's narrower content column.
+  </p>
+
+  <div class="onboarding-shell">
+    <aside class="onboarding-rail">
+      <div class="rail-step rail-step-active"><span class="rail-num">1</span><span>Preferences</span></div>
+      <div class="rail-step"><span class="rail-num">2</span><span>Subjects</span></div>
+      <div class="rail-step"><span class="rail-num">3</span><span>Verify</span></div>
+    </aside>
+
+    <section class="onboarding-main">
+      <h3>Tutor profile setup</h3>
+      <p class="muted">Set your teaching preferences to start matching.</p>
+
+      <div class="field-block">
+        <span class="field-label">Teaching Level</span>
+        <select class="mini-input"><option>Select level</option></select>
+      </div>
+
+      <div class="field-block">
+        <span class="field-label">Modality</span>
+        <div class="modality-pill-group">
+          <button type="button" class="modality-pill is-active"><i class="bi bi-camera-video-fill"></i> Online</button>
+          <button type="button" class="modality-pill"><i class="bi bi-geo-alt-fill"></i> Face-to-Face</button>
+        </div>
+      </div>
+
+      <div class="field-block">
+        <span class="field-label">Hourly Rate (PHP)</span>
+        <div class="rate-scrub-shell">
+          <span class="rate-prefix">PHP</span>
+          <span class="rate-scrub-input">250.00</span>
+          <span class="rate-scrub-hint">drag &harr; or type</span>
+        </div>
+      </div>
+
+      <div class="commission-row">
+        <input type="checkbox" checked>
+        <span>I understand StudyBuddy deducts a 10% platform fee from each completed session's payout.</span>
+      </div>
+
+      <div class="tag-row"><span class="tag">LABEL CHANGED</span></div>
+      <div class="step-nav-row">
+        <button type="button" class="btn-primary-pill">Continue to Subjects</button>
+      </div>
+    </section>
+  </div>
+
+  <p class="subtitle" style="margin-top:1.5rem;">
+    One call-out: the primary button used to say <strong>"Complete Profile"</strong> — a name that
+    made sense as a standalone page, but reads oddly as step 1 of 3. Relabeled to
+    <strong>"Continue to Subjects"</strong> to match the Subjects page's own
+    "Continue to Verification" pattern. Flag if you want the old label kept.
+  </p>
+
+  <div class="options" style="margin-top:1rem;">
+    <div class="option" data-choice="approve" onclick="toggleSelect(this)">
+      <div class="letter">&#10003;</div>
+      <div class="content"><h3>This is the integration</h3><p>Lock in the shared rail shell + relabeled button.</p></div>
+    </div>
+    <div class="option" data-choice="tweak" onclick="toggleSelect(this)">
+      <div class="letter">&#9998;</div>
+      <div class="content"><h3>Something's off</h3><p>Tell me in the terminal what to change.</p></div>
+    </div>
+  </div>
+</div>
