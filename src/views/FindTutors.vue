@@ -39,7 +39,7 @@
           <input
             type="text"
             v-model="locationModel"
-            class="form-control border-sb shadow-none py-2 rounded-3 sb-field"
+            class="form-control border-sb shadow-none py-2 sb-field"
             placeholder="e.g. Library"
           />
         </div>
@@ -56,7 +56,7 @@
           <div class="budget-filter-wrap">
             <button
               type="button"
-              class="btn w-100 budget-toggle-btn shadow-none rounded-3 sb-btn"
+              class="btn w-100 budget-toggle-btn shadow-none sb-btn"
               :class="{ 'budget-toggle-btn-active': showBudgetFilter }"
               @click="showBudgetFilter = !showBudgetFilter"
             >
@@ -93,7 +93,7 @@
         <div class="col-lg-4 col-md-6">
           <button
             type="submit"
-            class="btn bg-sb-primary text-white w-100 py-2 rounded-3 fw-bold shadow-sm sb-btn filter-submit-btn"
+            class="btn bg-sb-primary text-white w-100 py-2 fw-bold shadow-sm sb-btn filter-submit-btn"
             :disabled="isSubmitting"
           >
             <i class="bi bi-search me-2"></i>Search Tutors
@@ -713,6 +713,11 @@ onBeforeRouteUpdate(async (to, from, next) => {
 .tutor-filter-row .sb-field,
 .tutor-filter-row .filter-submit-btn {
   min-height: 42px;
+  /* 10px is the subject picker's own value -- the one radius in this row set deliberately by a
+     component rather than inherited from a Bootstrap utility, and midway between the 6px pickers
+     and SbSelectModal's 14px. The location input, budget toggle and submit button lost their
+     `rounded-3` in the template: that utility carries `!important` and cannot be overridden here. */
+  border-radius: 10px;
 }
 
 .fallback-notice {
