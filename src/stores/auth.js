@@ -175,6 +175,8 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.setItem('user_role', normalizedRole)
     localStorage.setItem('user_id', authPayload.user_id)
     localStorage.setItem('profile_id', authPayload.profile_id)
+    localStorage.setItem('user_fname', authPayload.fname || '')
+    localStorage.setItem('user_lname', authPayload.lname || '')
     if (authPayload.application_status) {
       localStorage.setItem('application_status', authPayload.application_status)
     } else {
@@ -251,6 +253,8 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('user_role')
     localStorage.removeItem('user_id')
     localStorage.removeItem('profile_id')
+    localStorage.removeItem('user_fname')
+    localStorage.removeItem('user_lname')
     localStorage.removeItem('application_status')
     localStorage.removeItem('tutor_renewal_status')
     localStorage.removeItem('tutor_renewal_required')
@@ -277,6 +281,13 @@ export const useAuthStore = defineStore('auth', () => {
     })
 
     user.value = { ...user.value, ...updates }
+
+    if ('fname' in updates) {
+      localStorage.setItem('user_fname', updates.fname || '')
+    }
+    if ('lname' in updates) {
+      localStorage.setItem('user_lname', updates.lname || '')
+    }
   }
 
   const initializeAuth = () => {
@@ -293,6 +304,8 @@ export const useAuthStore = defineStore('auth', () => {
     if (storedRole) {
       const storedUserId = localStorage.getItem('user_id')
       const storedProfileId = localStorage.getItem('profile_id')
+      const storedFname = localStorage.getItem('user_fname')
+      const storedLname = localStorage.getItem('user_lname')
       const storedApplicationStatus = localStorage.getItem('application_status')
       const storedTutorRenewalStatus = localStorage.getItem('tutor_renewal_status')
       const storedTutorRenewalRequired =
@@ -301,6 +314,8 @@ export const useAuthStore = defineStore('auth', () => {
         role: normalizeRole(storedRole),
         id: storedUserId ? parseInt(storedUserId) : undefined,
         profile_id: storedProfileId ? parseInt(storedProfileId) : undefined,
+        fname: storedFname || '',
+        lname: storedLname || '',
         application_status: storedApplicationStatus || null,
         tutor_renewal_status: storedTutorRenewalStatus || null,
         tutor_renewal_required: storedTutorRenewalRequired
