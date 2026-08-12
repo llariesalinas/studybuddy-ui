@@ -54,8 +54,10 @@
           v-if="chatStore.hasLoadedRooms && !chatStore.rooms.length && !chatStore.isLoadingRooms"
           class="empty-rooms"
         >
-          <i class="bi bi-chat-dots"></i>
-          <p>No conversations yet</p>
+          <div class="empty-state">
+            <i class="bi bi-chat-dots"></i>
+            <p>No conversations yet</p>
+          </div>
         </div>
       </div>
     </aside>
