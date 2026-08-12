@@ -237,11 +237,12 @@ class SubjectSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['is_recognized']
 
-    def validate_category(self, value):
-        from .subject_taxonomy import CATEGORIES
-        if value not in CATEGORIES:
-            raise serializers.ValidationError('Select a taxonomy category.')
-        return value
+    # Category is intentionally not restricted to subject_taxonomy.CATEGORIES: SuperAdmins can add
+    # a category beyond the curated 6 from the tutor-application review panel (derived on the
+    # frontend from whatever distinct categories already exist in the catalog), and this
+    # serializer's own create/update (AdminCourseCatalogView) must accept those same values rather
+    # than rejecting them — matching Subjects.category itself (free CharField, no choices
+    # constraint). See docs/plans/2026-08-12-admin-review-panel-category-keywords-backdrop.md.
 
 
 class PinnedReviewSerializer(serializers.ModelSerializer):

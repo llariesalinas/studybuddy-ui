@@ -23,9 +23,11 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useCatalogStore } from '@/stores/catalog'
 import { useToastStore } from '@/stores/toast'
-import { TAXONOMY_CATEGORIES } from '@/constants/subjectTaxonomy'
+import { deriveCategoryOptions } from '@/constants/subjectTaxonomy'
 const catalogStore = useCatalogStore(); const toastStore = useToastStore()
-const categories = TAXONOMY_CATEGORIES
+// Derived from the catalog (not the static 6-entry constant) so a category added elsewhere, e.g.
+// via the tutor-application review panel, is immediately selectable here too.
+const categories = computed(() => deriveCategoryOptions(catalogStore.courseCatalog))
 const search = ref(''); const loading = ref(false); const saving = ref(false); const removingCode = ref(null); const showForm = ref(false); const editingCode = ref(null)
 const form = reactive({ subject_name: '', department: '', category: '', keywords: '', description: '' })
 const filteredSubjects = computed(() => { const query = search.value.toLowerCase(); return catalogStore.courseCatalog.filter((subject) => !query || [subject.subject_name, subject.department, subject.category, subject.keywords].filter(Boolean).some((value) => String(value).toLowerCase().includes(query))) })

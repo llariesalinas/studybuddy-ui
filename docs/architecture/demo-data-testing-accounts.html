@@ -576,6 +576,25 @@
       </p>
     </section>
 
+    <section aria-labelledby="drain-email-queue">
+      <h2 id="drain-email-queue">Draining the async email queue</h2>
+      <p class="note">
+        Verification approval/rejection, document renewal reminder/result, booking confirmed, and
+        password-changed-notice emails are queued via Django-Q and only actually send when
+        something consumes that queue &mdash; nothing does automatically yet (no <code>qcluster</code>
+        worker is deployed). Login OTP and password reset are unaffected; both send synchronously.
+        Drain the backlog by hand from a <a href="demo-deployment.md">Render Shell session</a>,
+        from <code>backend/</code>:
+        <br /><code>python manage.py qcluster --run-once</code>
+      </p>
+      <p class="note">
+        Processes every currently-queued task once, then exits &mdash; safe to re-run any time.
+        See <a href="../plans/2026-08-12-async-email-worker-reliability.md">async email worker
+        reliability</a> for the full diagnosis and the still-open follow-up (an automated Render
+        Cron Job on the same command, so this stops being a manual step).
+      </p>
+    </section>
+
     <section aria-labelledby="seed-superadmin">
       <h2 id="seed-superadmin">Seeding an additional SuperAdmin</h2>
       <p class="note">

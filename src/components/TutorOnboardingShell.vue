@@ -2,7 +2,12 @@
   <div class="onboarding-page">
     <nav class="navbar sb-surface py-3">
       <div class="container d-flex justify-content-between align-items-center">
-        <span class="navbar-brand fw-bold fs-4 sb-text">StudyBuddy</span>
+        <span class="navbar-brand fw-bold fs-4 sb-text d-inline-flex align-items-center gap-2">
+          <span class="brand-mark" aria-hidden="true">
+            <img src="@/assets/logos/studybuddy-logo.svg" alt="" class="brand-mark-logo" />
+          </span>
+          <span>StudyBuddy</span>
+        </span>
         <SbThemeToggle />
       </div>
     </nav>
@@ -59,6 +64,23 @@ defineProps({
 .onboarding-page {
   min-height: 100vh;
   background: var(--sb-bg);
+}
+
+/* Same brand mark as AuthShell.vue's .sb-brand-mark. */
+.brand-mark {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.brand-mark-logo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .onboarding-shell {

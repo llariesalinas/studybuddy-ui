@@ -3,7 +3,45 @@
 Every finalized plan lives in this folder as its own dated file, created from [`_template.md`](_template.md).
 Status moves Draft â†’ Approved â†’ In Progress â†’ Done. When a plan is complete, its summary is linked below.
 
-**Status & Progress Summary** (2026-08-12): SuperAdmin report drill-down pages and the SuperAdmin
+**Status & Progress Summary** (2026-08-13): Admin review panel Sub-Group + Keywords fix is Done —
+committed on `admin-review-panel-catalog-fixes` (`d850964`), not pushed. Added a Sub-Group field to
+the tutor-application review panel's Proposed Subjects form (it never had one, unlike the standalone
+Subject Catalog page), mirroring Category's select + "+ Add new sub-group" pattern and scoped to the
+selected category. Fixed `Subjects.department` being effectively required despite no form treating
+it that way (`blank=True, default=''` + migration). Widened the review offcanvas to 760px, added
+Category's own "+ Add new category" toggle to the same layout, and fixed the Keywords suggestion
+dropdown to bold matched text and offer an explicit "add as new keyword" action. 6 new backend
+tests; full suite (458 tests) has 1 pre-existing failure + 1 pre-existing error, both unrelated.
+[Plan](2026-08-13-admin-review-panel-subgroup-removal-keyword-fix.md).
+
+**Previous** (2026-08-12): Async email worker reliability is In Progress —
+diagnosis, code fix, doc note, and backlog purge are done; only the Render Cron Job setup and
+merging the PR remain, both requiring the user. Root cause: every async email — password reset,
+password-changed, verification approved/rejected, document renewal result/reminder, booking
+confirmed — routes through Django-Q, and nothing has ever run `python manage.py qcluster` to
+consume that queue, in dev or prod (single Render web service, no worker process). Fix: password
+reset is now synchronous (mirrors the existing login-OTP pattern, removes its dependency on a
+worker entirely); `AGENTS.md` documents the `qcluster` requirement for what's still async.
+Shipped in [PR #126](https://github.com/llariesalinas/studybuddy-ui/pull/126) (pushed, not
+merged). While purging the stuck queue, found live evidence the bug was still actively
+recurring — two more password-reset tasks queued 14 minutes before the check, for a real
+account — confirming this is a genuine production issue, not just a local artifact. User ran the
+purge directly against the shared DB: 7 stuck rows deleted (2 corrupt + all 5 password-reset
+tasks); 14 legitimate tasks remain queued, verified untouched, will drain once the cron job is
+live. Remaining: set up the Render Cron Job (`qcluster --run-once`, every 2-5 min — exact config
+in the plan) and merge PR #126.
+[Plan](2026-08-12-async-email-worker-reliability.md).
+
+**Previous** (2026-08-12): fixed a real send bug in `backend/studybuddy/mailer.py` while auditing
+verification-approval emails: `send_document_renewal_reminder_email_task` rendered its email body
+but never called `_deliver()`, and the missing `_deliver()` call had been misplaced inside
+`send_booking_confirmed_email_task` instead, referencing undefined variables there (would raise
+`NameError` if it ever ran). Fixed by moving the call back to the right function; 19/19 targeted
+email tests pass. The admin-approval email path itself was already correctly wired and tested —
+this fix was for a different email (the renewal-due reminder), not the approval-confirmation one.
+Committed on `worktree-fix+verification-approval-email` (not yet pushed).
+
+**Previous** (2026-08-12): SuperAdmin report drill-down pages and the SuperAdmin
 xlsx export it builds on are both Done — implemented, committed, pushed, and in
 [PR #123](https://github.com/llariesalinas/studybuddy-ui/pull/123). Cards keep their top-5 summary
 and gain a "View all" pill to a dedicated page per dataset; the export now emits every row instead

@@ -1041,10 +1041,16 @@ def build_dev_live_override(phase):
     start_at = current_time + timedelta(minutes=offsets[0])
     end_at = current_time + timedelta(minutes=offsets[1])
 
+    # start_at/end_at can land on different calendar dates (e.g. 'ending' is (-55, +5) minutes,
+    # which crosses backward over midnight whenever `current_time` is within 55 minutes past
+    # midnight). Both dates are stored explicitly -- collapsing to a single shared date silently
+    # produced an inverted (empty) Ongoing window whenever the two datetimes fell on different
+    # days, which get_display_status can't distinguish from "never started".
     return {
         "phase": phase,
         "date": start_at.date().isoformat(),
         "start_time": start_at.time().strftime("%H:%M"),
+        "end_date": end_at.date().isoformat(),
         "end_time": end_at.time().strftime("%H:%M"),
         "forced_at": current_time.isoformat(),
     }
@@ -1054,23 +1060,26 @@ def apply_dev_live_override(bookings, session_date, start_time, end_time):
     override = get_dev_live_override_for_bookings(bookings)
 
     if not override:
-        return session_date, start_time, end_time
+        return session_date, start_time, session_date, end_time
 
     return (
         datetime.strptime(override["date"], "%Y-%m-%d").date(),
         datetime.strptime(override["start_time"], "%H:%M").time(),
+        # .get() with a fallback to the start date keeps any override already sitting in cache
+        # (6-hour TTL) from a pre-fix write from raising a KeyError after this deploy.
+        datetime.strptime(override.get("end_date", override["date"]), "%Y-%m-%d").date(),
         datetime.strptime(override["end_time"], "%H:%M").time(),
     )
 
 
-def get_display_status(raw_status, session_date, start_time, end_time):
+def get_display_status(raw_status, start_date, start_time, end_date, end_time):
     normalized = str(raw_status or '').lower()
 
     if normalized == 'confirmed':
         timezone_now = timezone.localtime()
         timezone_info = timezone.get_current_timezone()
-        start_at = timezone.make_aware(datetime.combine(session_date, start_time), timezone_info)
-        end_at = timezone.make_aware(datetime.combine(session_date, end_time), timezone_info)
+        start_at = timezone.make_aware(datetime.combine(start_date, start_time), timezone_info)
+        end_at = timezone.make_aware(datetime.combine(end_date, end_time), timezone_info)
 
         if timezone_now < start_at:
             return 'Upcoming'
@@ -1097,14 +1106,14 @@ def get_current_display_status_for_booking(booking):
         datetime.combine(first_booking.session_date, last_booking.availability.time_slot)
         + timedelta(minutes=SESSION_SLOT_MINUTES)
     ).time()
-    session_date, start_time, end_time = apply_dev_live_override(
+    start_date, start_time, end_date, end_time = apply_dev_live_override(
         session_group_bookings,
         representative_booking.session_date,
         start_time,
         end_time,
     )
 
-    return get_display_status(representative_booking.status, session_date, start_time, end_time)
+    return get_display_status(representative_booking.status, start_date, start_time, end_date, end_time)
 
 
 def create_booking_status_notification(
@@ -1602,9 +1611,13 @@ def password_reset_request(request):
         user = User.objects.filter(Q(username__iexact=email) | Q(email__iexact=email)).first()
         if user and user.is_active and user.has_usable_password():
             try:
-                mailer.enqueue_password_reset(user)
+                mailer.send_password_reset(user)
+            except EmailRateLimitError:
+                # Stay generic even when capped: a distinct response here would let an
+                # attacker tell a rate-limited (real) account apart from an unknown one.
+                logger.warning("Password reset email suppressed by send cap for user_id=%s", user.id)
             except Exception:
-                logger.exception("Failed to queue password reset email for user_id=%s", user.id)
+                logger.exception("Failed to send password reset email for user_id=%s", user.id)
 
     return Response({"message": PASSWORD_RESET_GENERIC_MESSAGE})
 
@@ -2071,7 +2084,7 @@ def build_combined_block(group, profile=None):
         + timedelta(minutes=SESSION_SLOT_MINUTES)
     ).time()
     has_dev_live_override = get_dev_live_override_for_bookings(sorted_group) is not None
-    session_date, start_time, end_time = apply_dev_live_override(
+    start_date, start_time, end_date, end_time = apply_dev_live_override(
         sorted_group,
         first.session_date,
         start_time,
@@ -2084,8 +2097,9 @@ def build_combined_block(group, profile=None):
     group_status = first.status
     display_status = get_display_status(
         group_status,
-        session_date,
+        start_date,
         start_time,
+        end_date,
         end_time
     )
 
@@ -2103,7 +2117,7 @@ def build_combined_block(group, profile=None):
         "booking_request_id": str(representative_booking.booking_request_id) if representative_booking.booking_request_id else None,
         "status": display_status,
         "raw_status": group_status,
-        "date": session_date,
+        "date": start_date,
         "student": f"{first.student.fname} {first.student.lname}",
         "tuteeName": f"{first.student.fname} {first.student.lname}",
         "tutor": f"{first.tutor.profile.fname} {first.tutor.profile.lname}",
@@ -3084,6 +3098,7 @@ def cancel_booking(request, booking_id):
         raw_status,
         representative_booking.session_date,
         start_time,
+        representative_booking.session_date,
         end_time
     )
 
@@ -3262,7 +3277,7 @@ def build_booking_detail_payload(session_group_bookings, request=None):
         + timedelta(minutes=SESSION_SLOT_MINUTES)
     ).time()
     has_dev_live_override = get_dev_live_override_for_bookings(session_group_bookings) is not None
-    session_date, start_time, end_time = apply_dev_live_override(
+    start_date, start_time, end_date, end_time = apply_dev_live_override(
         session_group_bookings,
         representative_booking.session_date,
         start_time,
@@ -3270,8 +3285,9 @@ def build_booking_detail_payload(session_group_bookings, request=None):
     )
     display_status = get_display_status(
         representative_booking.status,
-        session_date,
+        start_date,
         start_time,
+        end_date,
         end_time
     )
 
@@ -3315,7 +3331,7 @@ def build_booking_detail_payload(session_group_bookings, request=None):
         },
         "session": {
             "subject": booking_subject_label(representative_booking),
-            "date": session_date.strftime("%Y-%m-%d"),
+            "date": start_date.strftime("%Y-%m-%d"),
             "start_time": start_time.strftime("%H:%M"),
             "end_time": end_time.strftime("%H:%M"),
             "duration_hours": get_duration_hours_for_bookings(session_group_bookings),

@@ -49,7 +49,7 @@
         </select>
       </div>
       <div>
-        <label class="field-label" for="proposal-description">Description (optional)</label>
+        <label class="field-label" for="proposal-description">Proposal Notes (optional):</label>
         <textarea
           id="proposal-description"
           v-model.trim="proposal.description"

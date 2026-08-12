@@ -73,10 +73,14 @@
             <span v-if="!activeCategory" class="meta" :class="categoryClass(subject.category)">
               <span class="category-dot"></span>{{ subject.category }}
             </span>
-            <span v-if="subject.description" class="desc">{{ subject.description }}</span>
+            <span v-if="subject.description" class="desc">
+              <template v-for="(segment, i) in highlightSegments(subject.description, searchQuery)" :key="i">
+                <strong v-if="segment.match">{{ segment.text }}</strong>
+                <template v-else>{{ segment.text }}</template>
+              </template>
+            </span>
           </span>
           <span v-if="modelValue.includes(subject.subject_code)" class="check">&#10003; Added</span>
-          <span v-else-if="subject.matchedViaHint" class="via-badge">via &ldquo;{{ searchQuery }}&rdquo;</span>
         </button>
       </div>
       <div v-else class="empty-state">
@@ -141,7 +145,12 @@
 
 <script setup>
 import { computed, ref } from 'vue'
-import { categoryClass, searchSubjects, subjectCategories } from '@/components/subjectPicker.shared'
+import {
+  categoryClass,
+  highlightSegments,
+  searchSubjects,
+  subjectCategories,
+} from '@/components/subjectPicker.shared'
 
 const props = defineProps({
   subjects: { type: Array, required: true },
@@ -243,7 +252,6 @@ const countLine = computed(() => {
 .result-row .meta { display: flex; align-items: center; gap: 6px; font-size: .73rem; color: var(--sb-text-muted); }
 .result-row .desc { font-size: .74rem; color: var(--sb-text-muted); line-height: 1.4; }
 .result-row .check { color: var(--sb-primary); font-weight: 750; font-size: .78rem; white-space: nowrap; }
-.result-row .via-badge { font-size: .68rem; padding: 2px 8px; border-radius: 999px; background: color-mix(in srgb, var(--sb-pop-yellow-deep) 15%, var(--sb-card-bg)); color: var(--sb-warning-text); white-space: nowrap; }
 
 .empty-state { padding: 22px 16px; text-align: center; border: 1px solid var(--sb-card-border); border-radius: 12px; }
 .empty-state p { color: var(--sb-text-muted); font-size: .85rem; margin: 0 0 10px; }

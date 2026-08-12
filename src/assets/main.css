@@ -78,6 +78,15 @@
 :root[data-sb-density='compact'] {
   --sb-density-scale: 0.8;
   --sb-vh-fix: calc(100vh / var(--sb-density-scale));
+}
+
+/* Scoped to #app rather than :root: Bootstrap's `.offcanvas-backdrop`/`.modal-backdrop` are
+   position: fixed and appended as a sibling of #app under <body>. Chromium's `zoom` miscalculates
+   the fixed containing block for descendants, so zooming :root/html clips those backdrops to a
+   fraction of the real viewport (docs/plans/2026-08-12-admin-review-panel-category-keywords-backdrop.md).
+   Zooming only #app keeps the compact visual scale while letting body-level backdrops line up with
+   the true viewport again. */
+[data-sb-density='compact'] #app {
   zoom: var(--sb-density-scale);
 }
 

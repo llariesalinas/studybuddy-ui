@@ -1727,11 +1727,12 @@ class AdminTutorProposedSubjectDetailView(APIView):
             return Response({"message": "Proposed subject rejected."})
 
         if action == 'update':
-            from .subject_taxonomy import CATEGORIES as TAXONOMY_CATEGORIES
-
             subject_name = str(request.data.get('subject_name') or '').strip()
             category = str(request.data.get('category') or '').strip()
             keywords = request.data.get('keywords')
+            # Sub-Group, like Category, is intentionally free text (see the comment below) and
+            # optional — an empty value just means the subject isn't grouped under one yet.
+            department = request.data.get('department')
             # Writes the global catalog copy (Subjects.description), not the
             # tutor's own note. Proposals are created without one, so without
             # this an approved proposal enters the catalog unsearchable.
@@ -1742,17 +1743,20 @@ class AdminTutorProposedSubjectDetailView(APIView):
                     {"error": "Subject name and category are required."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            if category not in TAXONOMY_CATEGORIES:
-                return Response(
-                    {"error": "Select a category from the taxonomy."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+            # Category is intentionally not restricted to subject_taxonomy.CATEGORIES: the admin
+            # review panel lets a SuperAdmin add a category beyond the curated 6 (derived from
+            # whatever distinct categories already exist in the catalog), matching how
+            # Subjects.category itself is stored (free CharField, no choices constraint). Sub-Group
+            # follows the same rule — no enforced relationship to Category, just a free label.
 
             subject.subject_name = subject_name
             subject.category = category
             if keywords is not None:
                 subject.keywords = str(keywords).strip()
             update_fields = ['subject_name', 'category', 'keywords']
+            if department is not None:
+                subject.department = str(department).strip()
+                update_fields.append('department')
             if catalog_description is not None:
                 subject.description = str(catalog_description).strip()
                 update_fields.append('description')

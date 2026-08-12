@@ -52,6 +52,12 @@ describe('AppSidebar', () => {
     expect(wrapper.emitted('open-support')).toBeTruthy()
   })
 
+  it('hides the Help button for superadmin', () => {
+    authStore.user.role = 'superadmin'
+    const wrapper = mountSidebar()
+    expect(wrapper.find('[data-test="help"]').exists()).toBe(false)
+  })
+
   it('calls toggle when the collapse button is clicked', async () => {
     const wrapper = mountSidebar()
     await wrapper.get('[data-test="collapse-toggle"]').trigger('click')
