@@ -1602,9 +1602,13 @@ def password_reset_request(request):
         user = User.objects.filter(Q(username__iexact=email) | Q(email__iexact=email)).first()
         if user and user.is_active and user.has_usable_password():
             try:
-                mailer.enqueue_password_reset(user)
+                mailer.send_password_reset(user)
+            except EmailRateLimitError:
+                # Stay generic even when capped: a distinct response here would let an
+                # attacker tell a rate-limited (real) account apart from an unknown one.
+                logger.warning("Password reset email suppressed by send cap for user_id=%s", user.id)
             except Exception:
-                logger.exception("Failed to queue password reset email for user_id=%s", user.id)
+                logger.exception("Failed to send password reset email for user_id=%s", user.id)
 
     return Response({"message": PASSWORD_RESET_GENERIC_MESSAGE})
 
