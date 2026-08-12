@@ -7790,6 +7790,30 @@ class DevLiveSessionTests(APITestCase):
         self.assertEqual(clear_response.status_code, 200)
         self.assertEqual(clear_response.data["session"]["status"], "Upcoming")
 
+    @override_settings(DEBUG=True)
+    def test_force_live_ongoing_survives_a_midnight_crossing(self):
+        """Regression test for a bug where build_dev_live_override() stored one shared date for
+        both start_time and end_time. Whenever a phase's window crossed local midnight (e.g.
+        'ending' is (-55, +5) minutes, which crosses backward whenever `now` is within 55 minutes
+        past midnight), get_display_status recombined the later end_time with the earlier date,
+        producing an end_at *before* start_at -- an impossible/empty Ongoing window, so the
+        endpoint silently returned 'Payment Required' instead of 'Ongoing'. Only manifested near
+        local midnight, which is why it looked like intermittent flakiness rather than a
+        deterministic bug across different test-run times. Freezes the clock just past midnight so
+        this can't silently regress into being wall-clock-time-dependent again."""
+        frozen_now = timezone.make_aware(
+            datetime.combine(date.today(), time(0, 30)), timezone.get_current_timezone(),
+        )
+        with patch("django.utils.timezone.now", return_value=frozen_now):
+            response = self.client.post(
+                f"/api/dev/bookings/{self.booking.id}/force-live/",
+                {"phase": "ending"},
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["session"]["status"], "Ongoing")
+
 
 class TutorCashInTests(APITestCase):
     def setUp(self):
