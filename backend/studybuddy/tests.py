@@ -10340,7 +10340,10 @@ class LateCancellationSupportTicketTests(APITestCase):
                 reference_id=f"LT-{ticket.id}",
             ).exists()
         )
-        self.assertEqual(response.data["monthly_counted_strikes"], 1)
+        # ADR-0011 replaced the calendar-month "monthly_counted_strikes" field with a rolling
+        # 14-day "active_strikes" count (see get_strike_snapshot); the ticket already counted
+        # provisionally the moment it opened, so resolving 'counted' leaves the count at 1.
+        self.assertEqual(response.data["active_strikes"], 1)
 
     def test_superadmin_excused_verdict_leaves_wallet_untouched(self):
         booking = self.create_confirmed_booking(hours_from_now=GRACE_CUTOFF_HOURS - 1)
