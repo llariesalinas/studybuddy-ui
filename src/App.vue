@@ -3,7 +3,7 @@
 
   <div v-if="isPublicRoute" class="public-layout">
     <router-view v-slot="{ Component }">
-      <Transition name="page" mode="out-in">
+      <Transition name="page">
         <component :is="Component" :key="route.name" />
       </Transition>
     </router-view>

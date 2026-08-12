@@ -16,9 +16,9 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.http import HttpResponse
-from django.urls import path, include
+from django.urls import path, re_path, include
 from django.conf import settings
-from django.conf.urls.static import static
+from django.views.static import serve
 
 
 def healthz(request):
@@ -36,7 +36,11 @@ urlpatterns = [
 
 # Serves uploaded media (avatars, application documents) unconditionally, not just under DEBUG.
 # Django's own docs discourage this for real production (no caching/CDN, single-process request
-# handling), but this app has no separate media host (S3, etc.) configured, and DEBUG=False on the
-# demo deployment for production-style security meant this block never ran there -- every image
-# 404'd. Revisit with a real media host before this settings file is reused for real production.
-urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+# handling), but this app has no separate media host (S3, etc.) configured. Note: django.conf.
+# urls.static.static() is NOT usable here -- it silently returns an empty pattern list whenever
+# settings.DEBUG is False, so appending its result is a no-op in production. Wiring django.views.
+# static.serve directly via re_path bypasses that DEBUG gate. Revisit with a real media host
+# before this settings file is reused for real production.
+urlpatterns += [
+    re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
+]
