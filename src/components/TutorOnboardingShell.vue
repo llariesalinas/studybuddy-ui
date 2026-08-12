@@ -3,7 +3,9 @@
     <nav class="navbar sb-surface py-3">
       <div class="container d-flex justify-content-between align-items-center">
         <span class="navbar-brand fw-bold fs-4 sb-text d-inline-flex align-items-center gap-2">
-          <span class="brand-mark" aria-hidden="true">S</span>
+          <span class="brand-mark" aria-hidden="true">
+            <img src="@/assets/logos/studybuddy-logo.svg" alt="" class="brand-mark-logo" />
+          </span>
           <span>StudyBuddy</span>
         </span>
         <SbThemeToggle />
@@ -69,13 +71,16 @@ defineProps({
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background: var(--sb-primary);
-  color: var(--sb-primary-contrast);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
   flex-shrink: 0;
+}
+
+.brand-mark-logo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .onboarding-shell {

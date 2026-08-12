@@ -10,7 +10,9 @@
 
     <nav class="studio-nav" aria-label="Main navigation">
       <button class="brand hoverable" type="button" @click="goTo('/')">
-        <span class="brand-mark" aria-hidden="true">S</span>
+        <span class="brand-mark" aria-hidden="true">
+          <img src="@/assets/logos/studybuddy-logo.svg" alt="" class="brand-mark-logo" />
+        </span>
         <span>StudyBuddy</span>
       </button>
       <div class="navlinks">
@@ -954,12 +956,15 @@ onUnmounted(() => {
   width: 34px;
   height: 34px;
   flex: 0 0 auto;
-  background: var(--sb-primary);
-  color: var(--sb-primary-contrast);
   border-radius: 10px;
   display: grid;
   place-items: center;
-  font-size: 18px;
+}
+
+.brand-mark-logo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .navlinks {
