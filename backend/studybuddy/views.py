@@ -68,7 +68,6 @@ from .subject_recognition import (
     subject_selection_queryset_for_profile,
     visible_subject_queryset_for_profile,
 )
-from .subject_taxonomy import CATEGORIES as TAXONOMY_CATEGORIES
 from django.core.cache import cache
 from . import _verification_dev
 from .models import Booking, Course, EmailOTPChallenge, Notification, PartnerInstitution, Payment, PaymentMethod, Preference, Rating, SessionCheckIn, Subjects, SupportTicket, Tutor, TutorApplication, TutorAvailability, TutorAvailabilityOverride, TutorDocumentRenewalReview, TutorSubjects, Wallet, PlatformActivity, Transaction, TuteeApplication, TuteeDocumentRenewalReview
@@ -4388,11 +4387,11 @@ def propose_tutor_subject(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    if category not in TAXONOMY_CATEGORIES:
-        return Response(
-            {"error": "Select a category from the taxonomy."},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
+    # Category is intentionally not restricted to subject_taxonomy.CATEGORIES: it's a free-text
+    # field (see SubjectSerializer's comment), and admins can approve categories beyond the
+    # curated 6 via the review panel -- a tutor re-proposing under one of those approved
+    # categories must not be rejected here. See docs/plans/2026-08-12-admin-review-panel-
+    # category-keywords-backdrop.md.
 
     application = TutorApplication.objects.filter(profile=profile).first()
     subject = Subjects.objects.create(

@@ -42,6 +42,15 @@ itself (per the earlier "this panel only" scope decision) — this fix only make
 categories (however they were added) consistently selectable and saveable everywhere they're
 shown, which is a data-consistency fix, not new scope. Updated/added backend tests; all pass.
 
+Second follow-up gap (2026-08-13): a *third* hardcoded taxonomy allowlist, in
+`propose_tutor_subject` (`backend/studybuddy/views.py`), rejected a tutor proposing a subject under
+a category already approved via the review panel ("Spoken Languages" isn't recognized, even though
+we approved it"). Removed the check and the now-unused `TAXONOMY_CATEGORIES` import; replaced the
+test that asserted the old rejection with one confirming an out-of-taxonomy category is accepted,
+plus a companion test for the still-required non-empty check. All three of the codebase's hardcoded
+category allowlists (admin PATCH, `SubjectSerializer`, tutor propose) are now removed, consistent
+with `Subjects.category` being a free-text field.
+
 ## Goal
 
 In the SuperAdmin "Review Application" offcanvas (`AdminTutorApplications.vue`), the Proposed
@@ -170,3 +179,11 @@ Mockup reviewed and approved: `docs/mockups/2026-08-12-admin-review-panel-catego
   nothing" bug. Test `test_create_rejects_a_category_outside_the_taxonomy` replaced with
   `test_create_accepts_a_category_outside_the_curated_taxonomy` (also fixed a latent bug in the
   old test: it never supplied `department`, a required field, so its 400 was partly coincidental).
+- 2026-08-13: Fixed a third hardcoded taxonomy allowlist the user hit: `propose_tutor_subject`
+  (`backend/studybuddy/views.py`) still rejected any category outside `subject_taxonomy.CATEGORIES`
+  with "Select a category from the taxonomy.", so a tutor proposing a subject under a category an
+  admin had already approved via the review panel (e.g. "Spoken Languages") got a 400 anyway.
+  Removed the check (same rationale as the other two removed allowlists) and dropped the now-unused
+  `TAXONOMY_CATEGORIES` import. Test `test_proposal_rejects_unknown_category` replaced with
+  `test_proposal_accepts_a_category_outside_the_curated_taxonomy`; added
+  `test_proposal_rejects_empty_category` to keep the still-required non-empty check covered.

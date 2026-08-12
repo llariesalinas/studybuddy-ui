@@ -9353,8 +9353,19 @@ class TutorSubjectProposalTests(APITestCase):
         self.assertEqual(subject.proposed_application, self.application)
         self.assertTrue(TutorSubjects.objects.filter(tutor=self.tutor, subject=subject).exists())
 
-    def test_proposal_rejects_unknown_category(self):
-        response = self.propose(category="Invented Category")
+    def test_proposal_accepts_a_category_outside_the_curated_taxonomy(self):
+        # Subjects.category is free-text (see SubjectSerializer's comment); a tutor proposing under
+        # a category an admin already approved beyond the curated 6 (e.g. "Spoken Languages") must
+        # not be rejected here. See docs/plans/2026-08-12-admin-review-panel-category-keywords-
+        # backdrop.md.
+        with patch("studybuddy.views.subject_is_recognized_for_profile"):
+            response = self.propose(category="Spoken Languages")
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["category"], "Spoken Languages")
+
+    def test_proposal_rejects_empty_category(self):
+        response = self.propose(category="")
 
         self.assertEqual(response.status_code, 400)
 
