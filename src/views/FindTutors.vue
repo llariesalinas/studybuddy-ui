@@ -302,10 +302,22 @@ const searchDateLabel = computed(() => {
   })
 })
 
-// Say what the search actually covered. Only an exact match may claim date availability -- the two
-// fallbacks dropped part of the query, and a header that hides that is simply wrong.
+// The backend only runs its exact stage when a time range was requested, so a no-time search --
+// which asks for "any time that day" -- comes back as `date_only` even though nothing was dropped.
+// For that search `date_only` IS the exact answer, and treating it as a fallback misreports a
+// perfectly good result as a failure.
+const isExactScope = computed(() => {
+  if (findTutorsStore.matchStage === MATCH_STAGE_EXACT) {
+    return true
+  }
+
+  return findTutorsStore.matchStage === MATCH_STAGE_DATE_ONLY && !hasTimeFilter.value
+})
+
+// Say what the search actually covered. Only an exact match may claim date availability -- a
+// genuine fallback dropped part of the query, and a header that hides that is simply wrong.
 const searchScopeLabel = computed(() => {
-  if (!searchDateLabel.value || findTutorsStore.matchStage !== MATCH_STAGE_EXACT) {
+  if (!searchDateLabel.value || !isExactScope.value) {
     return ''
   }
 
@@ -327,7 +339,9 @@ const fallbackNotice = computed(() => {
     return null
   }
 
-  if (findTutorsStore.matchStage === MATCH_STAGE_DATE_ONLY) {
+  // Gated on the time filter: without one there is no requested window to have missed, no range to
+  // name in the title, and no time filter for the action to clear.
+  if (findTutorsStore.matchStage === MATCH_STAGE_DATE_ONLY && hasTimeFilter.value) {
     const range = formatTimeRangeLabel(
       findTutorsStore.filters.startTime,
       findTutorsStore.filters.endTime,
