@@ -3,7 +3,30 @@
 Every finalized plan lives in this folder as its own dated file, created from [`_template.md`](_template.md).
 Status moves Draft â†’ Approved â†’ In Progress â†’ Done. When a plan is complete, its summary is linked below.
 
-**Status & Progress Summary** (2026-08-12): SuperAdmin report drill-down pages and the SuperAdmin
+**Status & Progress Summary** (2026-08-12): Async email worker reliability is Draft, awaiting
+approval. Diagnosed while investigating "password reset doesn't send an email" (same root cause
+as an earlier `mailer.py` fix for "verification approved doesn't send an email"): every async
+email — password reset, password-changed, verification approved/rejected, document renewal
+result/reminder, booking confirmed — routes through Django-Q, and nothing has ever run
+`python manage.py qcluster` to consume that queue, in dev or prod. Confirmed directly against the
+dev DB: 19 tasks stuck in `django_q.OrmQ`, including a password-reset email 44 days old (token
+almost certainly expired) and two more from live testing 16 minutes before the check. Production
+is a single Render web service with no worker process, so this is very likely a live prod bug,
+not just local. Plan: make password reset synchronous (mirrors the existing login-OTP pattern,
+removes its dependency on a worker entirely) and drain everything else via a Render Cron Job
+running `qcluster --run-once` every few minutes, chosen over an always-on worker service for cost.
+[Plan](2026-08-12-async-email-worker-reliability.md).
+
+**Previous** (2026-08-12): fixed a real send bug in `backend/studybuddy/mailer.py` while auditing
+verification-approval emails: `send_document_renewal_reminder_email_task` rendered its email body
+but never called `_deliver()`, and the missing `_deliver()` call had been misplaced inside
+`send_booking_confirmed_email_task` instead, referencing undefined variables there (would raise
+`NameError` if it ever ran). Fixed by moving the call back to the right function; 19/19 targeted
+email tests pass. The admin-approval email path itself was already correctly wired and tested —
+this fix was for a different email (the renewal-due reminder), not the approval-confirmation one.
+Committed on `worktree-fix+verification-approval-email` (not yet pushed).
+
+**Previous** (2026-08-12): SuperAdmin report drill-down pages and the SuperAdmin
 xlsx export it builds on are both Done — implemented, committed, pushed, and in
 [PR #123](https://github.com/llariesalinas/studybuddy-ui/pull/123). Cards keep their top-5 summary
 and gain a "View all" pill to a dedicated page per dataset; the export now emits every row instead
