@@ -32,9 +32,14 @@ onboarding views onto it (eliminating the duplication rather than adding a third
 `/code-review` pass caught one real regression: `TutorPreferenceSetup.vue`'s `SbSelectModal` lost
 its `trigger-class` prop during the rewrite (a scoped-CSS class was mistakenly passed across a
 component boundary where Vue's `scoped` styles don't apply — fixed by restoring the original
-global-class prop). 184/184 tests, lint clean, build succeeds. Manual browser walkthrough (light/
-dark theme, `prefers-reduced-motion` on, all three onboarding steps) still outstanding before
-moving to Done.
+global-class prop). 184/184 tests, lint clean, build succeeds.
+
+Finally, the user asked to remove the drag-scrub gesture entirely — the rate field is now a plain
+typable `<input>` with the `PHP` prefix, `.sb-field`-style focus halo, and nothing else. Deleted
+`src/utils/rateScrub.js` and its test (no longer referenced anywhere). 179/179 tests pass (184
+minus the 5 deleted `rateScrub` tests), lint clean, build succeeds. Manual browser walkthrough
+(light/dark theme, `prefers-reduced-motion` on, all three onboarding steps) still outstanding
+before moving to Done.
 
 ## Goal
 
@@ -88,8 +93,10 @@ This was chosen over two alternatives considered and rejected:
 
 1. Modality: multi-select pill toggles (booleans unchanged), Bootstrap Icons, no
    emoji.
-2. Hourly rate: single typable + scrubbable `<input>` with `PHP` prefix, ±1 per
-   drag-unit, `.sb-field` focus behavior. No stepper buttons, no slider.
+2. Hourly rate: plain typable `<input>` with `PHP` prefix, `.sb-field`-style focus
+   behavior. No stepper buttons, no slider, no drag — the drag-scrub gesture (see
+   below) was built, then removed at the user's request; typing is the only
+   interaction now.
 
 Mockups:
 - [`docs/mockups/2026-08-12-tutor-onboarding-modality-pills.html`](../mockups/2026-08-12-tutor-onboarding-modality-pills.html)
@@ -116,12 +123,8 @@ Mockups:
 
 ## Risks
 
-- Drag-to-scrub on a text input can conflict with native text selection if not
-  scoped carefully (mockup only starts a scrub when the mousedown target isn't
-  the input's text itself — the real implementation needs the same guard).
-- Touch devices don't have a mouse-drag gesture matching desktop scrub; typing
-  must remain fully sufficient on its own (already true by design, but worth
-  explicit touch-device testing).
+- ~~Drag-to-scrub on a text input can conflict with native text selection~~ — moot,
+  drag-to-scrub was removed (see Changelog).
 - `hourly_rate` is edited in two places now (this page and `TutorProfile.vue`'s
   own stepper) with two different interaction models — accepted tradeoff since
   onboarding privileges simplicity/first-impression and profile-edit privileges
@@ -169,3 +172,13 @@ Mockups:
   component boundary Vue's `scoped` styles don't cross) — restored the original
   global-class prop. 184/184 tests, lint clean, build succeeds. Manual browser
   walkthrough still outstanding.
+- **2026-08-12 (drag removed)** — User asked to remove the drag-scrub gesture
+  from the rate field entirely. Reverted `TutorPreferenceSetup.vue`'s rate field
+  to a plain typable `<input>` (renamed `.rate-scrub-shell`/`.rate-scrub-input`
+  -> `.rate-input-shell`/`.rate-input`, dropped the mousedown/mousemove/mouseup
+  wiring, the `is-scrubbing` state, the `ew-resize` cursor, and the "drag or
+  type" hint). Deleted `src/utils/rateScrub.js` and its test since nothing
+  references them anymore; `MIN_HOURLY_RATE` inlined locally in the component
+  since it no longer needs to be shared with the (now-deleted) drag math.
+  179/179 tests pass (184 minus the 5 removed `rateScrub` tests), lint clean,
+  build succeeds.
