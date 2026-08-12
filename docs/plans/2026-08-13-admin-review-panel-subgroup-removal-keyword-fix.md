@@ -1,13 +1,14 @@
 ---
 title: Admin review panel — add Sub-Group, fix Keywords autocomplete, widen panel
 date: 2026-08-13
-status: In Progress
+status: Done
 spec: ../mockups/2026-08-13-admin-review-panel-subgroup-keywords.html
 ---
 
 # Admin review panel — add Sub-Group, fix Keywords autocomplete, widen panel
 
-**Status & Progress Summary** (2026-08-13): In Progress — implementation done, checks in progress.
+**Status & Progress Summary** (2026-08-13): Done. Committed on `admin-review-panel-catalog-fixes`
+(`d850964`), not pushed.
 Reversed from an earlier version of this plan that removed Sub-Group (`Subjects.department`)
 entirely — traced end to end and found it unused by the recommender, tutee/tutor search, and every
 browse UI, which made it seem redundant with Category/Keywords. User decided to keep it and close
@@ -179,3 +180,5 @@ new" an explicit labelled action instead of a silent fallback.
   pre-existing and unrelated (`LateCancellationSupportTicketTests` referencing a field ADR-0011
   already removed; a `ChatFeatureTests` grace-cutoff assertion). Nothing in either touches
   `Subjects`, `department`, or any file this diff changed. All checks clean; ready to commit.
+- **2026-08-13**: Committed on `admin-review-panel-catalog-fixes` (`d850964`), not pushed. Status
+  set to Done.

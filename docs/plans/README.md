@@ -3,16 +3,15 @@
 Every finalized plan lives in this folder as its own dated file, created from [`_template.md`](_template.md).
 Status moves Draft â†’ Approved â†’ In Progress â†’ Done. When a plan is complete, its summary is linked below.
 
-**Status & Progress Summary** (2026-08-13): Admin review panel Sub-Group + Keywords fix is
-Approved, not started. Reversed from an earlier version of this plan that removed Sub-Group
-(`Subjects.department`) entirely after tracing it end to end and finding it unused by the CBF
-recommender, tutee/tutor search, or any browse UI — user decided to keep it and instead close the
-actual gap: the review panel's Proposed Subjects form never had a Sub-Group field, unlike the
-standalone Subject Catalog page. Adding it there with the same select + "+ Add new sub-group"
-pattern as Category, scoped to the chosen Category, plus a real backend change (the propose-subject
-save paths don't currently accept `department`). The review panel offcanvas also widens to 760px
-and gains a Category "+ Add new" toggle (confirmed via a `ui-preview` mockup), and the existing
-Keywords suggestion dropdown gets fixed/highlighted.
+**Status & Progress Summary** (2026-08-13): Admin review panel Sub-Group + Keywords fix is Done —
+committed on `admin-review-panel-catalog-fixes` (`d850964`), not pushed. Added a Sub-Group field to
+the tutor-application review panel's Proposed Subjects form (it never had one, unlike the standalone
+Subject Catalog page), mirroring Category's select + "+ Add new sub-group" pattern and scoped to the
+selected category. Fixed `Subjects.department` being effectively required despite no form treating
+it that way (`blank=True, default=''` + migration). Widened the review offcanvas to 760px, added
+Category's own "+ Add new category" toggle to the same layout, and fixed the Keywords suggestion
+dropdown to bold matched text and offer an explicit "add as new keyword" action. 6 new backend
+tests; full suite (458 tests) has 1 pre-existing failure + 1 pre-existing error, both unrelated.
 [Plan](2026-08-13-admin-review-panel-subgroup-removal-keyword-fix.md).
 
 **Previous** (2026-08-12): Async email worker reliability is In Progress —
