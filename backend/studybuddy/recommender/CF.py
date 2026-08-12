@@ -62,6 +62,47 @@ def sim(ratings, u, v):
     return numerator / (den1 * den2)
 
 
+def co_rated_detail(ratings, u, v):
+    """Return the co-rated intersection between two students with both of their
+    scores for each shared tutor, plus the two averages Pearson measures
+    deviation from.
+
+    sim() computes this same intersection and throws it away once it has a
+    number. The algorithm demo tool needs it kept: without the shared ratings a
+    similarity of +0.853 is an assertion the panel has to take on faith. This is
+    a separate function rather than an extra return value from sim() so the
+    scoring path stays untouched.
+
+    Note the averages here are NOT the same as the neighbor_avg reported by
+    compute_cf_breakdown. That one is the mean over all of a student's ratings
+    and feeds the deviation term; these are means over the co-rated set only,
+    which is what Pearson actually uses (see sim). The two diverge whenever a
+    student has rated a tutor the other has not, so the demo labels them
+    separately rather than showing one number and hoping nobody adds up the row.
+    """
+    common = set(ratings.get(u, {})) & set(ratings.get(v, {}))
+
+    if not common:
+        return {"shared": [], "u_avg": None, "v_avg": None}
+
+    # Sorted so the columns hold still across what-if refetches; an order that
+    # reshuffles under the panel would make the flashed cell meaningless.
+    shared_ids = sorted(common)
+
+    return {
+        "shared": [
+            {
+                "tutor_id": tutor_id,
+                "u_rating": ratings[u][tutor_id],
+                "v_rating": ratings[v][tutor_id],
+            }
+            for tutor_id in shared_ids
+        ],
+        "u_avg": sum(ratings[u][i] for i in common) / len(common),
+        "v_avg": sum(ratings[v][i] for i in common) / len(common),
+    }
+
+
 # -----------------------------
 # FIND TOP-K NEIGHBORS
 # -----------------------------

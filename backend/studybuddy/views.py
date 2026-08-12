@@ -92,16 +92,20 @@ from .models import (
     Booking,
     PartnerInstitution,
     Tutor,
-    TutorSubjects
+    TutorSubjects,
+    ACTIVE_BOOKING_STATUSES,
+    GRACE_CUTOFF_HOURS,
 )
 
 logger = logging.getLogger(__name__)
 TUTOR_SUBJECT_LIMIT = 8
 DEFAULT_TUTOR_SUBJECT_EXPERTISE_LEVEL = 3
 BOOKING_HORIZON_DAYS = 14
-GRACE_CUTOFF_HOURS = 12
 COUNTED_STRIKE_WALLET_DEDUCTION = decimal.Decimal('50.00')
-MONTHLY_STRIKE_CAP = 3
+# Rolling window: each Late Cancellation strike expires on its own, STRIKE_WINDOW_DAYS after it was
+# issued. Coincidentally equal to BOOKING_HORIZON_DAYS above -- they are unrelated, do not merge.
+STRIKE_WINDOW_DAYS = 14
+STRIKE_CAP = 3
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
@@ -315,6 +319,11 @@ def can_create_new_booking(profile):
     """Source-of-truth check for the forward-only booking gate: can this profile take on NEW work
     (a tutee creating a booking, a tutor accepting a pending booking request)? Existing bookings,
     wallet, and dashboard access are never affected by this check."""
+    # The strike cap applies to both roles unconditionally. It must not be short-circuited by the
+    # tutee verification grace period below -- that early return is about verification only.
+    if has_reached_strike_cap(profile):
+        return False
+
     if profile.role == 'Tutee' and not tutee_verification_enforced():
         return True
 
@@ -322,28 +331,57 @@ def can_create_new_booking(profile):
     if application is None:
         return False
 
-    if not (
+    return (
         application.application_status == 'approved'
         and application.document_renewal_status() == 'verified'
-    ):
-        return False
-
-    return not has_reached_monthly_strike_cap(profile)
+    )
 
 
-def get_monthly_counted_strike_count(profile, reference_time=None):
-    reference_time = timezone.localtime(reference_time or timezone.now())
+def get_active_strike_tickets(profile, reference_time=None):
+    """Late Cancellation tickets still counting against `profile`: opened inside the rolling
+    window and not excused. An unresolved ticket counts provisionally -- only an explicit
+    `excused` verdict relieves it.
+
+    No timezone.localtime() normalization here: a timedelta between two aware datetimes is
+    timezone-invariant. Manila only matters for *display* of expires_at, which the client formats.
+    """
+    if profile is None:
+        return SupportTicket.objects.none()
+
+    reference_time = reference_time or timezone.now()
     return SupportTicket.objects.filter(
         category='Late_Cancellation',
-        resolution_verdict='counted',
         penalized_user=profile,
-        created_at__year=reference_time.year,
-        created_at__month=reference_time.month,
-    ).count()
+        # Strict: a ticket at exactly STRIKE_WINDOW_DAYS has expired.
+        created_at__gt=reference_time - timedelta(days=STRIKE_WINDOW_DAYS),
+    ).exclude(resolution_verdict='excused')
 
 
-def has_reached_monthly_strike_cap(profile, reference_time=None):
-    return get_monthly_counted_strike_count(profile, reference_time) >= MONTHLY_STRIKE_CAP
+def has_reached_strike_cap(profile, reference_time=None):
+    return get_active_strike_tickets(profile, reference_time).count() >= STRIKE_CAP
+
+
+def get_strike_snapshot(profile, reference_time=None):
+    """Display-shaped strike state for /profile/status/ and the 403 payload."""
+    reference_time = reference_time or timezone.now()
+    rows = list(
+        get_active_strike_tickets(profile, reference_time)
+        .order_by('created_at')
+        .values_list('created_at', 'resolution_verdict')
+    )
+    count = len(rows)
+    blocked = count >= STRIKE_CAP
+    return {
+        'count': count,
+        'cap': STRIKE_CAP,
+        'provisional_count': sum(1 for _, verdict in rows if not verdict),
+        'window_days': STRIKE_WINDOW_DAYS,
+        'blocked': blocked,
+        # The strike whose expiry actually drops the count below the cap -- NOT simply the oldest,
+        # which would under-promise once a 4th strike lands.
+        'expires_at': rows[count - STRIKE_CAP][0] + timedelta(days=STRIKE_WINDOW_DAYS)
+        if blocked else None,
+    }
 
 
 # --- Verification dev tools (self-service) ---------------------------------------------------------
@@ -1454,6 +1492,8 @@ def profile_status(request):
         "tutor_subject_count": tutor_subject_count,
         "tutor_subjects_completed": tutor_subject_count > 0,
         "commission_terms_accepted": commission_terms_accepted,
+        # Role-agnostic: the tutee cancel modal consumes this today, the tutor UI can later.
+        "late_cancellation_strikes": get_strike_snapshot(profile),
         **document_context
     })
 
@@ -2077,6 +2117,7 @@ def build_combined_block(group, profile=None):
         "endTime": end_time.strftime("%H:%M"),
         "duration_hours": duration,
         "preferred_location": first.preferred_location,
+        "can_edit_location": representative_booking.tutor_can_edit_location(),
         "session_mode": first.session_mode,
         "dashboard_hidden_by_current_user": get_dashboard_hidden_for_profile(sorted_group, profile),
     }
@@ -2345,7 +2386,7 @@ def tutor_availability(request, tutor_id):
     relevant_bookings = Booking.objects.filter(
         tutor=tutor,
         session_date__range=(calendar_start, calendar_end),
-        status__in=["Confirmed", "Pending", "Completed"]
+        status__in=ACTIVE_BOOKING_STATUSES
     )
     full_day_dates, slot_override_keys = get_override_maps(
         tutor,
@@ -2477,14 +2518,28 @@ def confirm_payment_and_book(request):
 
     user_profile = get_object_or_404(UserProfile, user=request.user)
 
-    if user_profile.role == 'Tutee' and not can_create_new_booking(user_profile):
-        return Response(
-            {
-                "error": "Please verify your enrollment before booking a new session.",
-                "code": "verification_required",
-            },
-            status=403,
-        )
+    if user_profile.role == 'Tutee':
+        # Report the strike block first: it's the more actionable of the two causes, and a capped
+        # tutee would otherwise be told to verify an enrollment that is already fine.
+        strikes = get_strike_snapshot(user_profile)
+        if strikes['blocked']:
+            return Response(
+                {
+                    "error": "Late-cancellation strike limit reached.",
+                    "code": "strike_cap_reached",
+                    "strikes": strikes,
+                },
+                status=403,
+            )
+
+        if not can_create_new_booking(user_profile):
+            return Response(
+                {
+                    "error": "Please verify your enrollment before booking a new session.",
+                    "code": "verification_required",
+                },
+                status=403,
+            )
 
     tutor_id = request.data.get("tutor_id")
     slots = request.data.get("slots")
@@ -2624,7 +2679,7 @@ def confirm_payment_and_book(request):
             conflict_exists = Booking.objects.filter(
                 availability=availability,
                 session_date=session_date,
-                status__in=["Confirmed", "Pending", "Completed"]
+                status__in=ACTIVE_BOOKING_STATUSES
             ).exists()
 
             if conflict_exists:
@@ -3771,12 +3826,15 @@ def accept_commission_terms(request):
     return Response({"commission_terms_accepted_at": tutor.commission_terms_accepted_at})
 
 
-RECOMMENDATION_BLOCKING_STATUSES = [
-    'Pending',
-    'Confirmed',
-    'Awaiting Payment Verification',
-    'Completed',
-]
+# Which filter actually produced a result set. The client cannot infer this from the tutor list, and
+# without it the results header claims date availability that was never checked.
+MATCH_STAGE_EXACT = 'exact'
+MATCH_STAGE_DATE_ONLY = 'date_only'
+MATCH_STAGE_SUBJECT_ONLY = 'subject_only'
+
+# Mon-first, matching how tutors read their own weekly schedule. Alphabetical order would be
+# meaningless to a tutee reading "usually teaches" chips.
+WEEKDAY_ORDER = [WEEKDAY_MAP[index] for index in sorted(WEEKDAY_MAP)]
 
 
 def parse_recommendation_time(time_string):
@@ -3810,6 +3868,73 @@ def get_recommendation_time_slots(start_time_string, end_time_string):
     return slots
 
 
+def get_available_slot_times_by_tutor(tutor_ids, session_date):
+    """Map tutor_id -> set of time slots still bookable on session_date.
+
+    A slot drops out if it is booked, blocked by a full-day or single-slot override, or already in
+    the past. That is the same rule tutor_availability_calendar applies per day, so search and the
+    tutor's own calendar cannot disagree about whether a day has anything left. Tutors with nothing
+    left are simply absent from the returned map.
+
+    Bulk by design: the candidate loop above already runs per-tutor queries, so this must not add
+    another N+1 on top.
+    """
+    if not tutor_ids:
+        return {}
+
+    weekday = WEEKDAY_MAP[session_date.weekday()]
+    current_now = timezone.localtime(timezone.now())
+
+    slots = list(
+        TutorAvailability.objects.filter(
+            tutor_id__in=tutor_ids,
+            day=weekday,
+            is_active=True,
+        ).values_list('tutor_id', 'id', 'time_slot')
+    )
+
+    if not slots:
+        return {}
+
+    slot_ids = [slot_id for _, slot_id, _ in slots]
+
+    booked_slot_ids = set(
+        Booking.objects.filter(
+            availability_id__in=slot_ids,
+            session_date=session_date,
+            status__in=ACTIVE_BOOKING_STATUSES,
+        ).values_list('availability_id', flat=True)
+    )
+
+    overrides = TutorAvailabilityOverride.objects.filter(
+        tutor_id__in=tutor_ids,
+        override_date=session_date,
+    ).values_list('tutor_id', 'availability_id', 'is_full_day')
+
+    blocked_all_day = {tutor_id for tutor_id, _, is_full_day in overrides if is_full_day}
+    blocked_slot_ids = {
+        availability_id
+        for _, availability_id, is_full_day in overrides
+        if not is_full_day and availability_id is not None
+    }
+
+    available = {}
+
+    for tutor_id, slot_id, time_slot in slots:
+        if tutor_id in blocked_all_day:
+            continue
+
+        if slot_id in booked_slot_ids or slot_id in blocked_slot_ids:
+            continue
+
+        if session_date == current_now.date() and time_slot < current_now.time():
+            continue
+
+        available.setdefault(tutor_id, set()).add(time_slot)
+
+    return available
+
+
 def get_recommendation_candidate_tutors(
     subject,
     preferred_mode=None,
@@ -3830,7 +3955,7 @@ def get_recommendation_candidate_tutors(
         if (
             wallet.balance >= 0
             and load_snapshot['accepted_session_load'] < load_snapshot['session_load_limit']
-            and not has_reached_monthly_strike_cap(candidate.profile)
+            and not has_reached_strike_cap(candidate.profile)
         ):
             eligible_candidate_ids.append(candidate.profile_id)
     base_candidates = base_candidates.filter(profile_id__in=eligible_candidate_ids)
@@ -3849,81 +3974,40 @@ def get_recommendation_candidate_tutors(
     session_date = parse_request_date(requested_date)
     required_slots = get_recommendation_time_slots(start_time, end_time)
 
-    # Tutors with a known conflict for this date (an existing booking, a full-day
-    # override, or a slot override) must be excluded from every stage below — a
-    # booked/unavailable tutor should never surface, even in the broad fallbacks.
-    excluded_tutor_ids = set()
-    if session_date:
-        weekday = WEEKDAY_MAP[session_date.weekday()]
+    if not session_date:
+        return base_candidates.distinct(), MATCH_STAGE_SUBJECT_ONLY
 
-        if required_slots:
-            excluded_tutor_ids.update(
-                Booking.objects.filter(
-                    session_date=session_date,
-                    status__in=RECOMMENDATION_BLOCKING_STATUSES,
-                    availability__time_slot__in=required_slots,
-                ).values_list('tutor_id', flat=True)
-            )
-            excluded_tutor_ids.update(
-                TutorAvailabilityOverride.objects.filter(
-                    override_date=session_date,
-                    is_full_day=False,
-                    availability__day=weekday,
-                    availability__time_slot__in=required_slots,
-                ).values_list('tutor_id', flat=True)
+    # One availability read for the whole candidate set, already accounting for bookings, both
+    # override kinds, and past times. Tutors with nothing left on this date are absent from the map.
+    candidate_ids = list(base_candidates.values_list('profile_id', flat=True).distinct())
+    available_by_tutor = get_available_slot_times_by_tutor(candidate_ids, session_date)
+
+    # Stage 1: every requested slot is free.
+    if required_slots:
+        required = set(required_slots)
+        exact_ids = [
+            tutor_id
+            for tutor_id, available_times in available_by_tutor.items()
+            if required <= available_times
+        ]
+
+        if exact_ids:
+            return (
+                base_candidates.filter(profile_id__in=exact_ids).distinct(),
+                MATCH_STAGE_EXACT,
             )
 
-        excluded_tutor_ids.update(
-            TutorAvailabilityOverride.objects.filter(
-                override_date=session_date,
-                is_full_day=True,
-            ).values_list('tutor_id', flat=True)
+    # Stage 2: something is free that day, just not the requested window.
+    if available_by_tutor:
+        return (
+            base_candidates.filter(profile_id__in=list(available_by_tutor)).distinct(),
+            MATCH_STAGE_DATE_ONLY,
         )
 
-    # Stage 1: Exact Match (Date + All Time Slots)
-    if session_date and required_slots:
-        weekday = WEEKDAY_MAP[session_date.weekday()]
-
-        stage1_candidates = base_candidates.filter(
-            tutoravailability__day=weekday,
-            tutoravailability__time_slot__in=required_slots,
-            tutoravailability__is_active=True,
-        ).annotate(
-            matching_available_slots=Count(
-                "tutoravailability__time_slot",
-                filter=Q(
-                    tutoravailability__day=weekday,
-                    tutoravailability__time_slot__in=required_slots,
-                    tutoravailability__is_active=True,
-                ),
-                distinct=True,
-            )
-        ).filter(
-            matching_available_slots=len(required_slots)
-        ).exclude(
-            profile_id__in=excluded_tutor_ids
-        )
-
-        if stage1_candidates.exists():
-            return stage1_candidates
-
-    # Stage 2: Fallback (Date only, ignore time slots)
-    if session_date:
-        weekday = WEEKDAY_MAP[session_date.weekday()]
-        stage2_candidates = base_candidates.filter(
-            tutoravailability__day=weekday,
-            tutoravailability__is_active=True,
-        ).exclude(
-            profile_id__in=excluded_tutor_ids
-        ).distinct()
-
-        if stage2_candidates.exists():
-            return stage2_candidates
-
-    # Stage 3: Broad Fallback (Subject only, ignore date/time)
-    return base_candidates.exclude(
-        profile_id__in=excluded_tutor_ids
-    ).distinct()
+    # Stage 3: nothing on that date. The date is dropped entirely rather than used to exclude —
+    # filtering by a date we just abandoned would be incoherent, and a tutor booked solid on the 9th
+    # may be the best choice for the 10th. The caller surfaces this as a banner.
+    return base_candidates.distinct(), MATCH_STAGE_SUBJECT_ONLY
 
 
 @api_view(['POST'])
@@ -3952,8 +4036,29 @@ def recommend_tutors_view(request):
             status=400,
         )
 
+    # A date is required. Without this an unreadable date parsed to None and was treated as "no date
+    # given", which silently skipped both date stages and returned every tutor for the subject.
+    session_date = parse_request_date(requested_date)
+
+    if session_date is None:
+        return Response(
+            {"error": "A valid session date (YYYY-MM-DD) is required."},
+            status=400,
+        )
+
+    today = timezone.localtime(timezone.now()).date()
+
+    if session_date < today:
+        return Response({"error": "Cannot search a past date."}, status=400)
+
+    if session_date > today + timedelta(days=BOOKING_HORIZON_DAYS):
+        return Response(
+            {"error": f"Sessions can only be booked up to {BOOKING_HORIZON_DAYS} days ahead."},
+            status=400,
+        )
+
     ratings = build_rating_matrix()
-    candidate_qs = get_recommendation_candidate_tutors(
+    candidate_qs, match_stage = get_recommendation_candidate_tutors(
         subject,
         preferred_mode=preferred_mode,
         min_budget=min_budget,
@@ -3976,9 +4081,22 @@ def recommend_tutors_view(request):
         len(results),
     )
 
+    ranked = results[:10]
+
+    # The recurring weekly pattern, used for the "usually teaches" chips on fallback results. One
+    # query for the whole page rather than one per tutor.
+    ranked_tutor_ids = [r["tutor"].profile_id for r in ranked]
+    days_by_tutor = {}
+
+    for tutor_id, day in TutorAvailability.objects.filter(
+        tutor_id__in=ranked_tutor_ids,
+        is_active=True,
+    ).values_list('tutor_id', 'day').distinct():
+        days_by_tutor.setdefault(tutor_id, set()).add(day)
+
     data = []
 
-    for r in results[:10]:
+    for r in ranked:
 
         tutor = r["tutor"]
         score = r["score"]
@@ -3990,16 +4108,20 @@ def recommend_tutors_view(request):
             for ts in tutor_subjects
         ]
 
+        tutor_days = days_by_tutor.get(tutor.profile_id, set())
+
         data.append({
             "id": tutor.profile.id,
             "name": f"{tutor.profile.fname} {tutor.profile.lname}",
             "score": round(score, 3),
             "rating": tutor.rating_average,
             "hourly_rate": tutor.hourly_rate,
+            "total_sessions": tutor.total_sessions,
+            "available_days": [day for day in WEEKDAY_ORDER if day in tutor_days],
             "subjects": subjects
         })
 
-    return Response(data, status=200)
+    return Response({"match_stage": match_stage, "tutors": data}, status=200)
 
 #Setup Profile
 @api_view(['POST'])
@@ -4483,26 +4605,41 @@ def update_booking_location(request, booking_request_id):
     if not new_location:
         return Response({"error": "Location cannot be empty for Face-to-Face sessions."}, status=400)
 
-    pending_bookings = Booking.objects.filter(
+    # This used to require status="Pending", which Instant Booking (ADR-0008) stopped producing —
+    # so the edit had become unreachable and an audited value could never be corrected. The window
+    # is now the Grace Cutoff, evaluated per booking by Booking.tutor_can_edit_location().
+    editable_bookings = Booking.objects.filter(
         booking_request_id=booking_request_id,
         tutor=tutor,
-        status="Pending"
-    )
+    ).select_related('student', 'tutor__profile', 'availability')
 
-    booking = pending_bookings.select_related('student', 'tutor__profile', 'availability').first()
-    updated = pending_bookings.update(preferred_location=new_location)
+    booking = editable_bookings.first()
 
-    if not updated:
-        return Response({"error": "No matching pending bookings found."}, status=404)
+    if booking is None:
+        return Response({"error": "No matching bookings found."}, status=404)
 
-    if booking:
-        booking.preferred_location = new_location
-        create_booking_event(
-            booking,
-            request.user,
-            f"Face-to-face location updated to {new_location}.",
-            "location_updated"
+    if not booking.tutor_can_edit_location():
+        return Response(
+            {
+                "error": (
+                    "This location can no longer be changed. Face-to-face locations lock "
+                    f"{GRACE_CUTOFF_HOURS} hours before the session starts."
+                )
+            },
+            status=400,
         )
+
+    editable_bookings.update(preferred_location=new_location)
+
+    # Posts a live chat message into the shared room and refreshes both sides' booking context, so
+    # the tutee sees the change immediately rather than travelling to a stale address.
+    booking.preferred_location = new_location
+    create_booking_event(
+        booking,
+        request.user,
+        f"Face-to-face location updated to {new_location}.",
+        "location_updated"
+    )
 
     return Response({"message": "Location updated."})
 
@@ -5706,10 +5843,19 @@ def admin_list_tickets(request):
         return Response(status=403)
 
     from .models import SupportTicket
-    tickets = SupportTicket.objects.select_related('user', 'assigned_agent', 'escalated_by').all().order_by('-created_at')
+    tickets = SupportTicket.objects.select_related(
+        'user', 'assigned_agent', 'escalated_by', 'penalized_user'
+    ).all().order_by('-created_at')
 
     if profile.role == 'SuperAdmin':
-        tickets = tickets.filter(Q(status='Escalated') | Q(escalated_at__isnull=False))
+        # Late Cancellation tickets are opened by the system as Open/unescalated, so they would
+        # never surface under the escalation-only filter. Widened here rather than auto-escalating
+        # at creation, which would fabricate escalation metadata (escalated_by, escalated_at).
+        tickets = tickets.filter(
+            Q(status='Escalated')
+            | Q(escalated_at__isnull=False)
+            | Q(category='Late_Cancellation')
+        )
     else:
         tickets = tickets.filter(user__institution=profile.institution).exclude(status='Escalated')
 
@@ -5726,6 +5872,14 @@ def admin_list_tickets(request):
             "subject": ticket.subject,
             "description": ticket.description,
             "status": ticket.status,
+            "resolution_verdict": ticket.resolution_verdict,
+            "reported_by_system": ticket.reported_by_system,
+            # Who the strike lands on -- not the same person as `user`, who is the aggrieved party.
+            "penalized_user": {
+                "id": ticket.penalized_user.id,
+                "name": f"{ticket.penalized_user.fname} {ticket.penalized_user.lname}",
+                "role": ticket.penalized_user.role,
+            } if ticket.penalized_user else None,
             "booking_id": ticket.booking_id,
             "transaction_id": ticket.transaction_id,
             "chatroom_id": ticket.chatroom_id,
@@ -5791,7 +5945,7 @@ def admin_resolve_ticket(request, ticket_id):
         'message': 'Ticket resolved',
         'status': 'Resolved',
         'resolution_verdict': ticket.resolution_verdict,
-        'monthly_counted_strikes': get_monthly_counted_strike_count(ticket.penalized_user)
+        'active_strikes': get_strike_snapshot(ticket.penalized_user)['count']
         if ticket.penalized_user else 0,
     })
 

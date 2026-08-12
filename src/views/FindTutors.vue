@@ -112,6 +112,22 @@
       {{ searchScopeLabel }}
     </p>
 
+    <div
+      v-if="!isLoading && fallbackNotice"
+      class="fallback-notice mb-3"
+      :class="`fallback-notice--${fallbackNotice.variant}`"
+      role="status"
+    >
+      <i class="bi bi-info-circle-fill fallback-notice__icon" aria-hidden="true"></i>
+      <div>
+        <p class="fallback-notice__title">{{ fallbackNotice.title }}</p>
+        <p class="fallback-notice__body">{{ fallbackNotice.body }}</p>
+        <button type="button" class="fallback-notice__action" @click="onFallbackAction">
+          {{ fallbackNotice.actionLabel }}
+        </button>
+      </div>
+    </div>
+
     <div v-if="isLoading" class="text-center py-5">
       <div class="spinner-border text-sb-primary" role="status"></div>
       <p class="sb-muted mt-2">Running matching algorithm...</p>
@@ -166,6 +182,22 @@
                 Book Session
               </button>
             </div>
+
+            <!-- "Usually teaches", never "available": this is the recurring weekly pattern and
+                 does not account for one-off blocks or slots already booked. -->
+            <div v-if="showsAvailabilityDays" class="availability-days">
+              <template v-if="tutor.available_days.length">
+                <span class="sb-muted">Usually teaches</span>
+                <span
+                  v-for="day in tutor.available_days"
+                  :key="day"
+                  class="availability-days__chip"
+                >
+                  {{ day }}
+                </span>
+              </template>
+              <span v-else class="availability-days__empty">No published hours yet</span>
+            </div>
           </div>
         </div>
       </div>
@@ -189,6 +221,12 @@ import CampusLocationModal from '@/components/CampusLocationModal.vue'
 import SbSelectModal from '@/components/SbSelectModal.vue'
 import SubjectPickerModal from '@/components/SubjectPickerModal.vue'
 import { formatTimeRangeLabel, isPastDate, isPastTimeForDate } from '@/utils/time'
+
+import {
+  MATCH_STAGE_DATE_ONLY,
+  MATCH_STAGE_EXACT,
+  MATCH_STAGE_SUBJECT_ONLY,
+} from '@/stores/findTutors'
 
 import {
   INITIAL_BUDGET_MAX,
@@ -264,10 +302,10 @@ const searchDateLabel = computed(() => {
   })
 })
 
-// Say what the search actually covered -- without this, a whole-day result set looks identical
-// to a narrow one and reads as a time filter that silently failed.
+// Say what the search actually covered. Only an exact match may claim date availability -- the two
+// fallbacks dropped part of the query, and a header that hides that is simply wrong.
 const searchScopeLabel = computed(() => {
-  if (!searchDateLabel.value) {
+  if (!searchDateLabel.value || findTutorsStore.matchStage !== MATCH_STAGE_EXACT) {
     return ''
   }
 
@@ -281,6 +319,46 @@ const searchScopeLabel = computed(() => {
 
   return `Tutors available any time on ${searchDateLabel.value}`
 })
+
+// Deliberately gives no reason for an empty date. Sunday emptiness is a seed-data artifact rather
+// than a rule, and this stage also fires for blocked-off and fully-booked dates.
+const fallbackNotice = computed(() => {
+  if (!searchDateLabel.value || noBackendResults.value) {
+    return null
+  }
+
+  if (findTutorsStore.matchStage === MATCH_STAGE_DATE_ONLY) {
+    const range = formatTimeRangeLabel(
+      findTutorsStore.filters.startTime,
+      findTutorsStore.filters.endTime,
+    )
+    return {
+      variant: 'info',
+      title: `No tutors free ${range} on ${searchDateLabel.value}`,
+      body: 'Showing tutors available at other times that day.',
+      actionLabel: 'Clear the time filter',
+      action: 'clear-time',
+    }
+  }
+
+  if (findTutorsStore.matchStage === MATCH_STAGE_SUBJECT_ONLY) {
+    return {
+      variant: 'warning',
+      title: `No tutors available on ${searchDateLabel.value}`,
+      body: 'Showing your top matches and the days they usually teach.',
+      actionLabel: 'Choose a different date',
+      action: 'change-date',
+    }
+  }
+
+  return null
+})
+
+// Chips describe the recurring weekly pattern, so they only make sense once the date has been
+// dropped -- and only ever as "usually teaches", never as a promise of availability.
+const showsAvailabilityDays = computed(
+  () => findTutorsStore.matchStage === MATCH_STAGE_SUBJECT_ONLY,
+)
 
 const budgetSummary = computed(() => {
   const minLabel = Number(findTutorsStore.filters.minRate || 0).toLocaleString('en-PH')
@@ -399,6 +477,18 @@ const onCampusTypeSelected = (type) => {
   campusLocationType.value = type
 }
 
+// Each fallback banner offers the move that would actually fix the search: widen the time range, or
+// pick a date tutors cover.
+const onFallbackAction = async () => {
+  if (fallbackNotice.value?.action === 'clear-time') {
+    updateFindTutorsFilters({ startTime: null, endTime: null })
+    await searchTutor()
+    return
+  }
+
+  document.querySelector('.date-trigger')?.click()
+}
+
 const onCampusModalCancelled = () => {
   modeModel.value = null
   locationModel.value = ''
@@ -412,6 +502,8 @@ const canRunRecommendation = () => {
 }
 
 const runRecommendation = async () => {
+  // `location` is deliberately not sent -- it is the meeting spot the tutee proposes, carried into
+  // the booking, and the search endpoint has never read it.
   const response = await api.post('/recommend-tutors/', {
     subject: findTutorsStore.filters.subject,
     preferred_mode: findTutorsStore.filters.mode,
@@ -420,10 +512,9 @@ const runRecommendation = async () => {
     date: findTutorsStore.filters.date,
     start_time: findTutorsStore.filters.startTime,
     end_time: findTutorsStore.filters.endTime,
-    location: findTutorsStore.filters.location,
   })
 
-  const mappedTutors = response.data.map((tutor) => ({
+  const mappedTutors = (response.data.tutors ?? []).map((tutor) => ({
     profile_id: tutor.id,
     initials: tutor.name
       .split(' ')
@@ -436,10 +527,11 @@ const runRecommendation = async () => {
     subjects: tutor.subjects ?? [],
     hourly_rate: tutor.hourly_rate ?? 150,
     total_sessions: tutor.total_sessions ?? 0,
+    available_days: tutor.available_days ?? [],
     score: tutor.score,
   }))
 
-  findTutorsStore.setResults(mappedTutors)
+  findTutorsStore.setResults(mappedTutors, response.data.match_stage)
 }
 
 const ensureFindTutorsData = async () => {
@@ -592,6 +684,78 @@ onBeforeRouteUpdate(async (to, from, next) => {
 <style scoped>
 .subject-filter-column {
   position: relative;
+}
+
+.fallback-notice {
+  display: flex;
+  gap: 0.7rem;
+  padding: 0.85rem 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--sb-card-border, #eaeaea);
+  background: var(--sb-card-bg);
+}
+
+.fallback-notice--info {
+  border-color: rgba(56, 139, 253, 0.35);
+  background: rgba(56, 139, 253, 0.08);
+}
+
+.fallback-notice--warning {
+  border-color: rgba(210, 153, 34, 0.4);
+  background: rgba(210, 153, 34, 0.1);
+}
+
+.fallback-notice__icon {
+  font-size: 1rem;
+  line-height: 1.4;
+  color: var(--sb-text-main);
+}
+
+.fallback-notice__title {
+  margin: 0 0 0.15rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--sb-text-main);
+}
+
+.fallback-notice__body {
+  margin: 0;
+  font-size: 0.83rem;
+  color: var(--sb-text-muted, #6b7280);
+}
+
+.fallback-notice__action {
+  margin-top: 0.35rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 0.83rem;
+  font-weight: 600;
+  color: var(--sb-primary, #00895a);
+  text-decoration: underline;
+}
+
+.availability-days {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.7rem;
+  padding-top: 0.7rem;
+  border-top: 1px dashed var(--sb-card-border, #eaeaea);
+  font-size: 0.75rem;
+}
+
+.availability-days__chip {
+  padding: 0.1rem 0.4rem;
+  border-radius: 0.25rem;
+  font-weight: 700;
+  color: var(--sb-primary, #00895a);
+  background: rgba(0, 137, 90, 0.12);
+}
+
+.availability-days__empty {
+  color: var(--sb-danger, #b42318);
 }
 
 .budget-toggle-btn {

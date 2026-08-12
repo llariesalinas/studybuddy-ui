@@ -1,0 +1,86 @@
+@startuml admin-views-reports
+' Sequence: Admin (SuperAdmin role) views the Reports tab
+' Source of truth:
+'   Frontend : src/views/SuperAdminReports.vue, src/stores/superadmin.js, src/services/api/api.js
+'   Backend  : backend/studybuddy/admin_views.py (AdminAnalyticsView,
+'              SuperAdminInstitutionPerformanceView)
+'   Routes   : backend/studybuddy/urls.py, src/router/index.js
+
+skinparam sequenceMessageAlign left
+skinparam maxMessageSize 260
+skinparam responseMessageBelowArrow true
+
+actor Admin
+participant "Vue.js Frontend" as FE
+participant "Django Backend" as BE
+database "PostgreSQL DB" as DB
+
+note over Admin, DB
+  Pre-condition: Admin is authenticated with the SuperAdmin role and needs to
+  review platform or institution-level performance.
+end note
+
+autonumber
+
+Admin -> FE : Opens "Reports" tab
+activate FE
+
+FE -> BE : Request institution list and\nper-institution performance breakdown
+activate BE
+BE -> DB : Fetch institutions, tutors, tutees,\nbookings and payments
+activate DB
+DB --> BE : Return raw aggregate data
+deactivate DB
+BE --> FE : Send institution breakdown
+deactivate BE
+
+loop On first load, then on every filter change\n(period: 7D / 30D / 3M / All, institution: one or all)
+
+  Admin -> FE : Applies filters\n(skipped on first load — defaults to 30D, all institutions)
+
+  FE -> BE : Request analytics for the selected\nperiod and institution
+  activate BE
+
+  BE -> BE : Authorize request:\nvalid access token + SuperAdmin role
+
+  alt Authorized
+
+    BE -> DB : Fetch bookings, payments, tutors\nand subject records for the period
+    activate DB
+    DB --> BE : Return raw aggregate data
+    deactivate DB
+
+    BE -> BE : Format data into report structure
+    note right of BE
+      Stats presented:
+      - Gross revenue, platform commissions (10%)
+        and tutor payouts
+      - Session completion rate
+      - Top-performing tutors ranking
+        (sessions, rating, earnings)
+      - Subject demand distribution
+      - Completed-session time-series
+        (zero-padded for gaps)
+    end note
+
+    BE --> FE : Send analytics report
+    deactivate BE
+    FE -> Admin : Displays metric cards, charts\nand tabular report
+
+  else Not authorized / session expired
+
+    BE --> FE : Reject the request
+    FE -> Admin : Shows error state or returns\nthe Admin to the login screen
+
+  end
+
+end
+
+deactivate FE
+
+note over Admin, DB
+  Post-condition: Admin has an up-to-date report for the chosen period and
+  institution.
+end note
+
+@enduml

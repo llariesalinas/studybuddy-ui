@@ -1,7 +1,9 @@
 import csv
+import math
 import re
-from io import StringIO
-from datetime import date, time, timedelta
+from io import BytesIO, StringIO
+from openpyxl import load_workbook
+from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from unittest.mock import Mock, patch
 from uuid import uuid4
@@ -11,20 +13,32 @@ from django.core import mail
 from django.core.management import call_command
 from django.contrib.auth.models import User
 from django.db import connection
-from django.test import override_settings
+from django.test import TransactionTestCase, override_settings
 from django.utils import timezone
 from django.test.utils import CaptureQueriesContext
 from rest_framework.test import APITestCase, APIRequestFactory, force_authenticate
 from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .chat.services import get_current_booking_context, get_current_booking_contexts, get_partner_context
+from .chat.services import (
+    get_current_booking_context,
+    get_current_booking_contexts,
+    get_partner_context,
+    serialize_booking_context,
+)
 from .paymongo_money_movement import PayMongoCashOutError
-from .views import credit_tutor_wallet, dev_add_wallet_funds, dev_remove_wallet_funds
+from .views import (
+    COUNTED_STRIKE_WALLET_DEDUCTION,
+    credit_tutor_wallet,
+    dev_add_wallet_funds,
+    dev_remove_wallet_funds,
+    WEEKDAY_MAP,
+)
 from .models import (
     Booking,
     Course,
     EmailOTPChallenge,
+    GRACE_CUTOFF_HOURS,
     InstitutionRequest,
     PartnerInstitution,
     Payment,
@@ -132,6 +146,27 @@ class SuperAdminRedesignApiTests(APITestCase):
             },
         )
 
+    def test_pending_actions_includes_pending_verifications(self):
+        application = TuteeApplication.objects.create(
+            profile=self.target_profile,
+            application_status="pending",
+        )
+        TuteeApplication.objects.create(
+            profile=self.domain_profile,
+            application_status="approved",
+        )
+
+        response = self.client.get("/api/admin/pending-actions/")
+
+        self.assertEqual(response.status_code, 200)
+        verification_items = [
+            item for item in response.data["items"]
+            if item["type"] == "tutee_application"
+        ]
+        self.assertEqual(len(verification_items), 1)
+        self.assertEqual(verification_items[0]["id"], application.id)
+        self.assertIn(self.target_user.email, verification_items[0]["meta"])
+
     def test_institution_request_approval_creates_active_partner_institution(self):
         request_obj = InstitutionRequest.objects.create(
             institution_name="West Visayas State University",
@@ -200,7 +235,16 @@ class SuperAdminRedesignApiTests(APITestCase):
         self.assertEqual(tutor.session_load_limit, 14)
         self.assertEqual(response.data["tutor_session_load_limit"], 14)
 
-    def test_analytics_includes_completion_subject_popularity_and_csv(self):
+    @staticmethod
+    def _export_workbook(response):
+        """Load the exported workbook, so tests assert on sheets and cells rather than raw text."""
+        return load_workbook(BytesIO(response.content))
+
+    @staticmethod
+    def _sheet_rows(workbook, title):
+        return list(workbook[title].values)
+
+    def test_analytics_includes_completion_subject_popularity_and_workbook(self):
         course = Course.objects.create(course_code="MATH", course_name="Mathematics")
         subject = Subjects.objects.create(
             subject_code="ALG101",
@@ -241,8 +285,11 @@ class SuperAdminRedesignApiTests(APITestCase):
             session_date=date.today(),
             session_mode="Online",
             status="Completed",
+            subject=subject,
         )
-        payment_method = PaymentMethod.objects.create(code="online", method_name="Online Payment")
+        payment_method, _ = PaymentMethod.objects.get_or_create(
+            code="online", defaults={"method_name": "Online Payment"}
+        )
         Payment.objects.create(
             booking=booking,
             method=payment_method,
@@ -259,8 +306,218 @@ class SuperAdminRedesignApiTests(APITestCase):
 
         export_response = self.client.get("/api/admin/analytics/export/?period=7d")
         self.assertEqual(export_response.status_code, 200)
-        self.assertEqual(export_response["Content-Type"], "text/csv")
-        self.assertIn("date,institution,tutors,tutees,sessions,completion_rate,gross_revenue,commissions", export_response.content.decode())
+        self.assertEqual(
+            export_response["Content-Type"],
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        self.assertIn('filename="studybuddy-report-', export_response["Content-Disposition"])
+        self.assertTrue(export_response["Content-Disposition"].endswith('.xlsx"'))
+
+        workbook = self._export_workbook(export_response)
+        self.assertEqual(workbook.sheetnames, [
+            "Report Info", "Summary", "Sessions Over Time",
+            "Top Tutors", "Subject Popularity", "Booking Transactions",
+        ])
+
+        # Scope metadata lives on its own sheet, so each data sheet starts at A1 with its header.
+        info = dict(self._sheet_rows(workbook, "Report Info")[1:])
+        self.assertEqual(info["Period"], "7d")
+        self.assertEqual(info["Institution filter"], "All institutions")
+
+        # Summary is transposed to label/value rows.
+        summary = dict(self._sheet_rows(workbook, "Summary")[1:])
+        self.assertEqual(summary["Completed Sessions"], 1)
+        self.assertEqual(summary["Gross Revenue"], 500.0)
+        self.assertEqual(summary["Commissions"], 50.0)
+        self.assertEqual(summary["Tutor Payouts"], 450.0)
+
+        transactions = self._sheet_rows(workbook, "Booking Transactions")
+        self.assertEqual(transactions[0], (
+            "Session Date", "Institution", "Tutor", "Tutee", "Subject",
+            "Amount", "Commission", "Payout",
+        ))
+        self.assertEqual(transactions[1][1:5], (
+            self.institution.institution_name, "Tutor One", "Target User", "College Algebra",
+        ))
+        self.assertEqual(transactions[1][5:], (500.0, 50.0, 450.0))
+
+        self.assertEqual(
+            self._sheet_rows(workbook, "Subject Popularity")[1], ("College Algebra", 1)
+        )
+        self.assertEqual(self._sheet_rows(workbook, "Top Tutors")[1][:2], ("Tutor One", 1))
+
+    def _seed_completed_bookings(self, count):
+        """Create `count` tutors, each with one paid Completed booking on a subject of its own.
+
+        Enough rows for the dashboard caps to bite: the default response truncates tutors at 5 and
+        subjects at 10, so a `count` above both makes the truncation observable rather than
+        incidental.
+        """
+        payment_method, _ = PaymentMethod.objects.get_or_create(
+            code="online", defaults={"method_name": "Online Payment"}
+        )
+        for index in range(count):
+            subject = Subjects.objects.create(
+                subject_code=f"SUB{index:03d}",
+                subject_name=f"Subject {index:02d}",
+                department="Math",
+            )
+            tutor_user = User.objects.create_user(
+                username=f"bulk-tutor-{index}",
+                email=f"bulk-tutor-{index}@cpu.edu.ph",
+                password="password",
+            )
+            tutor_profile = UserProfile.objects.create(
+                user=tutor_user,
+                fname="Bulk",
+                mname="",
+                lname=f"Tutor {index:02d}",
+                role="Tutor",
+                institution=self.institution,
+                profile_completed=True,
+            )
+            tutor = Tutor.objects.create(profile=tutor_profile, hourly_rate=Decimal("500.00"))
+            availability = TutorAvailability.objects.create(
+                tutor=tutor,
+                day="Mon",
+                time_slot=time(9, 0),
+                is_active=True,
+            )
+            booking = Booking.objects.create(
+                student=self.target_profile,
+                tutor=tutor,
+                availability=availability,
+                session_date=date.today(),
+                session_mode="Online",
+                status="Completed",
+                subject=subject,
+            )
+            Payment.objects.create(
+                booking=booking,
+                method=payment_method,
+                amount=Decimal("500.00"),
+                payment_status="Paid",
+            )
+
+    def test_analytics_truncates_to_the_dashboard_caps_by_default(self):
+        self._seed_completed_bookings(11)
+
+        response = self.client.get("/api/admin/analytics/?period=7d")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data["top_tutors"]), 5)
+        self.assertEqual(len(response.data["subject_popularity"]), 10)
+
+    def test_analytics_view_full_returns_every_row(self):
+        self._seed_completed_bookings(11)
+
+        response = self.client.get("/api/admin/analytics/?period=7d&view=full")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data["top_tutors"]), 11)
+        self.assertEqual(len(response.data["subject_popularity"]), 11)
+
+    def test_analytics_reports_totals_the_truncated_lists_cannot_convey(self):
+        """The card labels its own drill-down link, and the count is not inferable from the rows."""
+        self._seed_completed_bookings(11)
+
+        summary = self.client.get("/api/admin/analytics/?period=7d")
+        full = self.client.get("/api/admin/analytics/?period=7d&view=full")
+
+        self.assertEqual(summary.data["tutor_total"], 11)
+        self.assertEqual(summary.data["subject_total"], 11)
+        self.assertEqual(full.data["tutor_total"], 11)
+        self.assertEqual(full.data["subject_total"], 11)
+
+    def test_analytics_falls_back_to_summary_for_an_unknown_view(self):
+        self._seed_completed_bookings(11)
+
+        response = self.client.get("/api/admin/analytics/?period=7d&view=nonsense")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data["top_tutors"]), 5)
+
+    def test_analytics_export_writes_every_row_not_the_dashboard_caps(self):
+        """The workbook and the screen it came from must not disagree about how many rows exist."""
+        self._seed_completed_bookings(11)
+
+        response = self.client.get("/api/admin/analytics/export/?period=7d")
+        workbook = self._export_workbook(response)
+
+        # Less one for the header row on each sheet.
+        self.assertEqual(len(self._sheet_rows(workbook, "Top Tutors")) - 1, 11)
+        self.assertEqual(len(self._sheet_rows(workbook, "Subject Popularity")) - 1, 11)
+
+    def test_analytics_export_writes_only_the_requested_sections(self):
+        self.client.force_authenticate(user=self.super_user)
+
+        response = self.client.get("/api/admin/analytics/export/?period=7d&sections=summary")
+
+        self.assertEqual(response.status_code, 200)
+        # A single section names the file after itself, so a folder of exports stays readable.
+        self.assertIn('filename="studybuddy-summary-', response["Content-Disposition"])
+        # Report Info is metadata rather than a tickable section, so it is always present.
+        self.assertEqual(
+            self._export_workbook(response).sheetnames, ["Report Info", "Summary"]
+        )
+
+    def test_analytics_export_ignores_unknown_sections_and_defaults_to_all(self):
+        self.client.force_authenticate(user=self.super_user)
+
+        all_sheets = [
+            "Report Info", "Summary", "Sessions Over Time",
+            "Top Tutors", "Subject Popularity", "Booking Transactions",
+        ]
+
+        # Omitted entirely: the pre-`sections` caller shape must keep working.
+        default_response = self.client.get("/api/admin/analytics/export/?period=7d")
+        # Only unrecognised slugs: falls back rather than emitting a file with no data sheets.
+        bogus_response = self.client.get(
+            "/api/admin/analytics/export/?period=7d&sections=nonsense"
+        )
+
+        self.assertEqual(self._export_workbook(default_response).sheetnames, all_sheets)
+        self.assertEqual(self._export_workbook(bogus_response).sheetnames, all_sheets)
+        self.assertIn('filename="studybuddy-report-', bogus_response["Content-Disposition"])
+
+    def test_analytics_export_writes_multiple_sections_in_file_order(self):
+        self.client.force_authenticate(user=self.super_user)
+
+        response = self.client.get(
+            "/api/admin/analytics/export/?period=7d&sections=transactions,summary"
+        )
+
+        self.assertEqual(
+            self._export_workbook(response).sheetnames,
+            ["Report Info", "Summary", "Booking Transactions"],
+        )
+        self.assertIn('filename="studybuddy-report-', response["Content-Disposition"])
+
+    def test_analytics_export_marks_empty_sections_rather_than_leaving_them_blank(self):
+        """An empty result must be distinguishable from a broken export."""
+        self.client.force_authenticate(user=self.super_user)
+
+        response = self.client.get(
+            "/api/admin/analytics/export/?period=7d&sections=transactions"
+        )
+        rows = self._sheet_rows(self._export_workbook(response), "Booking Transactions")
+
+        self.assertEqual(rows[0][0], "Session Date")
+        self.assertEqual(rows[1][0], "No data for this period.")
+
+    def test_analytics_export_keeps_formula_like_names_as_text(self):
+        """openpyxl writes '='-prefixed strings as live formulas unless the type is pinned."""
+        self.client.force_authenticate(user=self.super_user)
+        self.institution.institution_name = "=cmd()"
+        self.institution.save(update_fields=["institution_name"])
+
+        response = self.client.get(
+            f"/api/admin/analytics/export/?period=7d&institution_id={self.institution.pk}"
+        )
+        cell = self._export_workbook(response)["Report Info"]["B5"]
+
+        self.assertEqual(cell.value, "=cmd()")
+        self.assertEqual(cell.data_type, "s")
 
 
 class SuperAdminUserDetailApiTests(APITestCase):
@@ -503,7 +760,17 @@ class SuperAdminUserDetailApiTests(APITestCase):
         self.assertEqual(response.data["rating_distribution"]["5"], 3)
         self.assertEqual(response.data["recent_reviews"][0]["reviewer_name"], "Taylor Tutee")
         self.assertEqual(response.data["subjects"], [{"name": "Detail Testing", "expertise_level": 4}])
-        self.assertEqual(response.data["cancellations"], {"by_user": 2, "by_counterpart": 4})
+        self.assertEqual(
+            response.data["cancellations"],
+            {
+                "by_user": 2,
+                "by_counterpart": 4,
+                "active_strikes": 0,
+                "strike_cap": 3,
+                "strike_window_days": 14,
+                "strike_blocked": False,
+            },
+        )
         self.assertEqual(
             response.data["top_counterparts"],
             [
@@ -527,6 +794,56 @@ class SuperAdminUserDetailApiTests(APITestCase):
             [{"name": "Robin Tutor", "session_count": 12}],
         )
 
+    def test_stats_report_active_strikes_from_the_rolling_window(self):
+        """The admin desk reads current gate state, not cancellation history: an expired strike
+        stops showing even though the cancellation that caused it is still counted above."""
+        for verdict in (None, 'counted', 'excused'):
+            SupportTicket.objects.create(
+                user=self.tutor_profile,
+                category='Late_Cancellation',
+                subject='Late Cancellation review',
+                description='Cancelled after the Grace Cutoff.',
+                reported_by_system=True,
+                penalized_user=self.tutee_profile,
+                resolution_verdict=verdict,
+            )
+        expired = SupportTicket.objects.create(
+            user=self.tutor_profile,
+            category='Late_Cancellation',
+            subject='Late Cancellation review',
+            description='Cancelled after the Grace Cutoff.',
+            reported_by_system=True,
+            penalized_user=self.tutee_profile,
+        )
+        SupportTicket.objects.filter(pk=expired.pk).update(
+            created_at=timezone.now() - timedelta(days=15)
+        )
+
+        response = self.client.get(f"/api/admin/users/{self.tutee_profile.id}/stats/")
+
+        self.assertEqual(response.status_code, 200)
+        cancellations = response.data["cancellations"]
+        self.assertEqual(cancellations["active_strikes"], 2)
+        self.assertEqual(cancellations["strike_cap"], 3)
+        self.assertEqual(cancellations["strike_window_days"], 14)
+        self.assertFalse(cancellations["strike_blocked"])
+
+    def test_stats_flag_a_user_who_is_at_the_strike_cap(self):
+        for _ in range(3):
+            SupportTicket.objects.create(
+                user=self.tutor_profile,
+                category='Late_Cancellation',
+                subject='Late Cancellation review',
+                description='Cancelled after the Grace Cutoff.',
+                reported_by_system=True,
+                penalized_user=self.tutee_profile,
+            )
+
+        response = self.client.get(f"/api/admin/users/{self.tutee_profile.id}/stats/")
+
+        self.assertEqual(response.data["cancellations"]["active_strikes"], 3)
+        self.assertTrue(response.data["cancellations"]["strike_blocked"])
+
     def test_stats_export_flattens_computed_values(self):
         Rating.objects.create(
             booking=self.bookings[0],
@@ -546,6 +863,7 @@ class SuperAdminUserDetailApiTests(APITestCase):
         self.assertEqual(csv_rows[0], ["stat name", "value"])
         self.assertIn(["rating 5 stars", "1"], csv_rows)
         self.assertIn(["counterpart 1", "Taylor Tutee (12 sessions)"], csv_rows)
+        self.assertIn(["active late-cancellation strikes", "0"], csv_rows)
 
     def _create_tutee(self, first_name, last_name):
         username = f"{first_name.lower()}-{last_name.lower()}"
@@ -708,7 +1026,10 @@ class RecommendTutorsViewTests(APITestCase):
             year_level=11,
         )
         self.client.force_authenticate(user=self.student_user)
-        self.search_date = date(2026, 5, 11)
+        # The next Monday (add_slots seeds "Mon"), always inside the booking window and never today,
+        # so past-time filtering cannot make these assertions flaky.
+        today = timezone.localdate()
+        self.search_date = today + timedelta(days=((0 - today.weekday()) % 7) or 7)
 
     def create_tutor(
         self,
@@ -782,7 +1103,7 @@ class RecommendTutorsViewTests(APITestCase):
         return self.client.post("/api/recommend-tutors/", payload, format="json")
 
     def response_ids(self, response):
-        return {item["id"] for item in response.data}
+        return {item["id"] for item in response.data["tutors"]}
 
     def test_filters_by_subject_mode_and_budget(self):
         matching = self.create_tutor("matching")
@@ -820,13 +1141,15 @@ class RecommendTutorsViewTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(self.response_ids(response), {matching.profile_id})
 
-    def test_fallback_excludes_known_booking_conflicts(self):
-        fallback = self.create_tutor("fallbacksafe")
-        booked = self.create_tutor("fallbackbooked")
-        booked_slots = self.add_slots(booked, [time(14, 0), time(14, 30)])
+    def test_partially_booked_tutor_is_offered_for_other_times_that_day(self):
+        # The requested window is taken but the tutor still has 14:30 free, so they belong in the
+        # date-only fallback. A tutor with no slots that weekday at all does not.
+        no_slots_that_day = self.create_tutor("fallbacksafe")
+        partially_booked = self.create_tutor("fallbackbooked")
+        booked_slots = self.add_slots(partially_booked, [time(14, 0), time(14, 30)])
         Booking.objects.create(
             student=self.student_profile,
-            tutor=booked,
+            tutor=partially_booked,
             availability=booked_slots[0],
             session_date=self.search_date,
             session_mode="Online",
@@ -836,7 +1159,49 @@ class RecommendTutorsViewTests(APITestCase):
         response = self.recommend()
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(self.response_ids(response), {fallback.profile_id})
+        self.assertEqual(response.data["match_stage"], "date_only")
+        self.assertEqual(self.response_ids(response), {partially_booked.profile_id})
+        self.assertNotIn(no_slots_that_day.profile_id, self.response_ids(response))
+
+    def test_fully_booked_tutor_is_excluded_from_any_time_search(self):
+        free = self.create_tutor("stillfree")
+        fully_booked = self.create_tutor("solidlybooked")
+        self.add_slots(free, [time(14, 0)])
+        booked_slots = self.add_slots(fully_booked, [time(14, 0)])
+        Booking.objects.create(
+            student=self.student_profile,
+            tutor=fully_booked,
+            availability=booked_slots[0],
+            session_date=self.search_date,
+            session_mode="Online",
+            status="Confirmed",
+        )
+
+        # No time range at all -- the old code applied booking exclusions only when a range was
+        # given, so a tutor with nothing left still surfaced.
+        response = self.recommend(start_time=None, end_time=None)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.response_ids(response), {free.profile_id})
+
+    def test_mid_payment_booking_blocks_the_slot(self):
+        free = self.create_tutor("paymentfree")
+        mid_payment = self.create_tutor("paymentpending")
+        self.add_slots(free, [time(14, 0)])
+        booked_slots = self.add_slots(mid_payment, [time(14, 0)])
+        Booking.objects.create(
+            student=self.student_profile,
+            tutor=mid_payment,
+            availability=booked_slots[0],
+            session_date=self.search_date,
+            session_mode="Online",
+            status="Awaiting Payment Verification",
+        )
+
+        response = self.recommend(start_time=None, end_time=None)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.response_ids(response), {free.profile_id})
 
     def test_booked_slot_excludes_tutor(self):
         available = self.create_tutor("available")
@@ -881,13 +1246,72 @@ class RecommendTutorsViewTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(self.response_ids(response), {available.profile_id})
 
-    def test_missing_date_time_fields_remain_supported(self):
-        tutor = self.create_tutor("legacy")
+    # A date is required. It used to be optional, and an unreadable one parsed to None and was
+    # treated as "no date given" -- silently dropping every date filter and exclusion and returning
+    # the widest possible result set with no signal to the caller.
+
+    def test_missing_date_is_rejected(self):
+        self.create_tutor("nodate")
 
         response = self.recommend(date=None, start_time=None, end_time=None)
 
+        self.assertEqual(response.status_code, 400)
+
+    def test_unparseable_date_is_rejected(self):
+        self.create_tutor("baddate")
+
+        response = self.recommend(date="tomorrow", start_time=None, end_time=None)
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_past_date_is_rejected(self):
+        self.create_tutor("pastdate")
+        yesterday = (timezone.localdate() - timedelta(days=1)).isoformat()
+
+        response = self.recommend(date=yesterday, start_time=None, end_time=None)
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_date_beyond_booking_horizon_is_rejected(self):
+        self.create_tutor("farfuture")
+        too_far = (timezone.localdate() + timedelta(days=30)).isoformat()
+
+        response = self.recommend(date=too_far, start_time=None, end_time=None)
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_response_reports_match_stage_and_card_fields(self):
+        tutor = self.create_tutor("carddata")
+        self.add_slots(tutor, [time(14, 0)])
+
+        response = self.recommend()
+
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(self.response_ids(response), {tutor.profile_id})
+        self.assertEqual(response.data["match_stage"], "exact")
+        row = response.data["tutors"][0]
+        self.assertEqual(row["available_days"], ["Mon"])
+        self.assertEqual(row["total_sessions"], 0)
+
+    def test_subject_only_stage_keeps_tutors_booked_on_that_date(self):
+        # The date has been dropped entirely, so filtering by it would be incoherent -- a tutor
+        # booked solid on the searched date may be the right choice for another one.
+        booked = self.create_tutor("solidbooked")
+        booked_slots = self.add_slots(booked, [time(14, 0)])
+        Booking.objects.create(
+            student=self.student_profile,
+            tutor=booked,
+            availability=booked_slots[0],
+            session_date=self.search_date,
+            session_mode="Online",
+            status="Confirmed",
+        )
+
+        response = self.recommend(start_time=None, end_time=None)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["match_stage"], "subject_only")
+        self.assertEqual(self.response_ids(response), {booked.profile_id})
+        self.assertEqual(response.data["tutors"][0]["available_days"], ["Mon"])
 
     # The time range is optional on the booking search UI -- a date with no times means "any time
     # that day" and must land on the date-only candidate stage, not the broad subject-only
@@ -1533,24 +1957,78 @@ class ChatFeatureTests(APITestCase):
         self.assertEqual(response.data[0]["sender_name"], "System")
         self.assertIsNone(response.data[0]["sender_profile_id"])
 
-    def test_pending_location_update_posts_booking_event_to_canonical_room(self):
+    def make_editable_f2f_booking(self, days_ahead=3, status="Confirmed"):
+        """A live face-to-face booking comfortably outside the Grace Cutoff."""
+        self.booking.status = "Cancelled"
+        self.booking.save(update_fields=["status"])
+
+        return Booking.objects.create(
+            student=self.tutee_profile,
+            tutor=self.tutor,
+            availability=self.availability,
+            session_date=timezone.localdate() + timedelta(days=days_ahead),
+            session_mode="F2F",
+            preferred_location="Library",
+            booking_request_id=uuid4(),
+            status=status,
+        )
+
+    def test_location_update_posts_booking_event_to_canonical_room(self):
+        booking = self.make_editable_f2f_booking()
         self.client.force_authenticate(user=self.tutor_user)
 
         response = self.client.patch(
-            f"/api/bookings/{self.booking_request_id}/location/",
+            f"/api/bookings/{booking.booking_request_id}/location/",
             {"preferred_location": "Study Hall 2"},
             format="json",
         )
 
-        self.booking.refresh_from_db()
+        booking.refresh_from_db()
         room = ChatRoom.objects.get(tutee=self.tutee_profile, tutor=self.tutor_profile)
         message = room.messages.latest("created_at")
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(self.booking.preferred_location, "Study Hall 2")
+        self.assertEqual(booking.preferred_location, "Study Hall 2")
         self.assertEqual(message.message_type, "booking_event")
         self.assertEqual(message.metadata["event_type"], "location_updated")
         self.assertEqual(message.metadata["booking"]["preferred_location"], "Study Hall 2")
+
+    def test_location_update_allowed_while_awaiting_payment_verification(self):
+        booking = self.make_editable_f2f_booking(status="Awaiting Payment Verification")
+        self.client.force_authenticate(user=self.tutor_user)
+
+        response = self.client.patch(
+            f"/api/bookings/{booking.booking_request_id}/location/",
+            {"preferred_location": "Room 204"},
+            format="json",
+        )
+
+        booking.refresh_from_db()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(booking.preferred_location, "Room 204")
+
+    def test_location_update_rejected_inside_grace_cutoff(self):
+        # The session is today at 14:00 and the cutoff is 12 hours out, so it has already passed.
+        # This is also the is_born_late case: such bookings are frozen from creation.
+        booking = self.make_editable_f2f_booking(days_ahead=0)
+        self.client.force_authenticate(user=self.tutor_user)
+
+        response = self.client.patch(
+            f"/api/bookings/{booking.booking_request_id}/location/",
+            {"preferred_location": "Too Late Hall"},
+            format="json",
+        )
+
+        booking.refresh_from_db()
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(booking.preferred_location, "Library")
+
+    def test_booking_context_exposes_can_edit_location(self):
+        booking = self.make_editable_f2f_booking()
+
+        context = serialize_booking_context(booking)
+
+        self.assertTrue(context["can_edit_location"])
 
     def test_tutee_can_send_message_via_rest(self):
         room = ChatRoom.objects.create(tutee=self.tutee_profile, tutor=self.tutor_profile)
@@ -2599,6 +3077,7 @@ class TutorCashOutTests(APITestCase):
             ).exists()
         )
 
+    @override_settings(PAYMONGO_CASHOUT_MOCK=False)
     @patch("studybuddy.paymongo_money_movement.requests.post")
     def test_cashout_sends_centavos_and_normalizes_provider_amounts(self, mock_post):
         destination = self.destination_fields()
@@ -2636,6 +3115,7 @@ class TutorCashOutTests(APITestCase):
             mock_post.call_args.kwargs["json"]["data"]["attributes"]["callback_url"],
         )
 
+    @override_settings(PAYMONGO_CASHOUT_CALLBACK_SECRET="")
     @patch("studybuddy.views.create_wallet_transaction")
     def test_failed_callback_refunds_amount_and_fee_once(self, mock_create):
         destination = self.destination_fields()
@@ -3520,8 +4000,10 @@ class DevWalletFundsTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(self.wallet.balance, Decimal("200.00"))
 
-    @override_settings(DEBUG=False)
-    def test_dev_wallet_funds_404s_when_debug_disabled(self):
+    @override_settings(BOOKING_DEV_TOOLS_ENABLED=False)
+    def test_dev_wallet_funds_404s_when_dev_tools_disabled(self):
+        """Gated by BOOKING_DEV_TOOLS_ENABLED, not DEBUG -- see
+        test_force_live_returns_404_when_booking_dev_tools_disabled for the same pattern."""
         add_response = self.call_view(dev_add_wallet_funds, "300")
         remove_response = self.call_view(dev_remove_wallet_funds, "100")
 
@@ -3552,9 +4034,14 @@ class TuteeProfileTests(APITestCase):
         self.assertIn('profile_picture_url', response.data)
 
     def test_upload_avatar_success(self):
+        from io import BytesIO
+        from PIL import Image
         from django.core.files.uploadedfile import SimpleUploadedFile
         self.client.force_authenticate(user=self.tutee_user)
-        image = SimpleUploadedFile("avatar.jpg", b"file_content", content_type="image/jpeg")
+        buffer = BytesIO()
+        Image.new("RGB", (64, 64), (120, 80, 200)).save(buffer, format="JPEG")
+        buffer.seek(0)
+        image = SimpleUploadedFile("avatar.jpg", buffer.read(), content_type="image/jpeg")
         response = self.client.post('/api/tutee/profile/avatar/', {'avatar': image}, format='multipart')
         self.assertEqual(response.status_code, 200)
         self.assertIn('profile_picture_url', response.data)
@@ -3619,9 +4106,14 @@ class TutorProfileTests(APITestCase):
         self.assertIn('profile_picture_url', response.data)
 
     def test_upload_avatar_success(self):
+        from io import BytesIO
+        from PIL import Image
         from django.core.files.uploadedfile import SimpleUploadedFile
         self.client.force_authenticate(user=self.tutor_user)
-        image = SimpleUploadedFile("avatar.jpg", b"fake_image_content", content_type="image/jpeg")
+        buffer = BytesIO()
+        Image.new("RGB", (64, 64), (120, 80, 200)).save(buffer, format="JPEG")
+        buffer.seek(0)
+        image = SimpleUploadedFile("avatar.jpg", buffer.read(), content_type="image/jpeg")
         response = self.client.post('/api/tutor/profile/avatar/', {'avatar': image}, format='multipart')
         self.assertEqual(response.status_code, 200)
         self.assertIn('profile_picture_url', response.data)
@@ -4205,6 +4697,514 @@ class BookingVerificationGateTests(APITestCase):
         self.assertEqual(response.data.get("code"), "session_load_limit_reached")
         self.assertEqual(response.data.get("accepted_session_load"), 10)
         self.assertEqual(response.data.get("session_load_limit"), 10)
+
+    # --- Strike cap x verification gate interaction ------------------------------------------
+
+    def make_strikes(self, profile, count, verdict=None):
+        for index in range(count):
+            SupportTicket.objects.create(
+                user=self.tutor_profile if profile == self.tutee_profile else self.tutee_profile,
+                category='Late_Cancellation',
+                subject=f'Late Cancellation review {index}',
+                description='Cancelled after the Grace Cutoff.',
+                reported_by_system=True,
+                penalized_user=profile,
+                resolution_verdict=verdict,
+            )
+
+    @override_settings(**NOT_YET_ENFORCED)
+    def test_capped_tutee_blocked_even_while_verification_unenforced(self):
+        """The bug this change fixes: the strike cap used to sit behind the verification early
+        return, so a tutee in the grace period could late-cancel without limit."""
+        self.make_strikes(self.tutee_profile, 3)
+
+        response = self.post_confirm_booking()
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.data.get("code"), "strike_cap_reached")
+        self.assertEqual(response.data["strikes"]["count"], 3)
+        self.assertTrue(response.data["strikes"]["blocked"])
+        self.assertIsNotNone(response.data["strikes"]["expires_at"])
+
+    @override_settings(**ENFORCED)
+    def test_unverified_tutee_without_strikes_still_reports_verification(self):
+        """Ordering check: the strike branch must not swallow the verification cause."""
+        response = self.post_confirm_booking()
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.data.get("code"), "verification_required")
+
+    @override_settings(**ENFORCED)
+    def test_capped_tutee_reports_strike_cause_before_verification(self):
+        self.make_strikes(self.tutee_profile, 3)
+
+        response = self.post_confirm_booking()
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.data.get("code"), "strike_cap_reached")
+
+    @override_settings(**ENFORCED)
+    def test_verified_tutee_without_strikes_books_when_enforced(self):
+        self.make_verified_application(TuteeApplication, self.tutee_profile)
+
+        response = self.post_confirm_booking()
+
+        self.assertEqual(response.status_code, 200)
+
+    @override_settings(**NOT_YET_ENFORCED)
+    def test_verified_tutee_without_strikes_books_when_unenforced(self):
+        self.make_verified_application(TuteeApplication, self.tutee_profile)
+
+        response = self.post_confirm_booking()
+
+        self.assertEqual(response.status_code, 200)
+
+    @override_settings(**ENFORCED)
+    def test_two_strikes_do_not_block_booking(self):
+        self.make_verified_application(TuteeApplication, self.tutee_profile)
+        self.make_strikes(self.tutee_profile, 2)
+
+        response = self.post_confirm_booking()
+
+        self.assertEqual(response.status_code, 200)
+
+    @override_settings(**ENFORCED)
+    def test_capped_tutor_closes_the_availability_gate(self):
+        self.make_strikes(self.tutor_profile, 3)
+        self.client.force_authenticate(user=self.tutee_user)
+
+        response = self.client.get(f"/api/tutors/{self.tutor_profile.id}/availability/")
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.data.get("code"), "tutor_booking_gate_closed")
+
+    @override_settings(**ENFORCED)
+    def test_capped_tutor_excluded_from_recommendation_candidates(self):
+        from .views import get_recommendation_candidate_tutors
+
+        candidates, _ = get_recommendation_candidate_tutors(self.subject.subject_code)
+        self.assertIn(self.tutor, list(candidates))
+
+        self.make_strikes(self.tutor_profile, 3)
+
+        candidates, _ = get_recommendation_candidate_tutors(self.subject.subject_code)
+        self.assertNotIn(self.tutor, list(candidates))
+
+
+class LateCancellationStrikeWindowTests(APITestCase):
+    """The rolling 14-day strike window: strikes expire individually, unresolved tickets count
+    provisionally, and only an `excused` verdict relieves one. Replaces the old calendar-month cap.
+    """
+
+    def setUp(self):
+        self.institution = PartnerInstitution.objects.create(
+            institution_name="CPU",
+            school_email_domain="cpu.edu",
+            is_active=True,
+        )
+        self.tutee_user = User.objects.create_user(
+            username="strike-tutee@cpu.edu",
+            email="strike-tutee@cpu.edu",
+            password="password",
+        )
+        self.tutee_profile = UserProfile.objects.create(
+            user=self.tutee_user,
+            fname="Strike",
+            mname="",
+            lname="Tutee",
+            role="Tutee",
+            institution=self.institution,
+        )
+        self.tutor_user = User.objects.create_user(
+            username="strike-tutor@cpu.edu",
+            email="strike-tutor@cpu.edu",
+            password="password",
+        )
+        self.tutor_profile = UserProfile.objects.create(
+            user=self.tutor_user,
+            fname="Strike",
+            mname="",
+            lname="Tutor",
+            role="Tutor",
+            institution=self.institution,
+        )
+        self.tutor = Tutor.objects.create(
+            profile=self.tutor_profile,
+            hourly_rate=Decimal("300.00"),
+            can_online=True,
+            can_f2f=True,
+            teaching_level="SHS",
+        )
+        self.super_user = User.objects.create_user(
+            username="strike-super@studybuddy.test",
+            email="strike-super@studybuddy.test",
+            password="password",
+        )
+        self.super_profile = UserProfile.objects.create(
+            user=self.super_user,
+            fname="Sam",
+            mname="",
+            lname="Super",
+            role="SuperAdmin",
+            is_domain_exempt=True,
+        )
+
+    def make_ticket(self, profile=None, verdict=None):
+        return SupportTicket.objects.create(
+            user=self.tutor_profile,
+            category='Late_Cancellation',
+            subject='Late Cancellation review',
+            description='Cancelled after the Grace Cutoff.',
+            reported_by_system=True,
+            penalized_user=profile or self.tutee_profile,
+            resolution_verdict=verdict,
+        )
+
+    def backdate(self, ticket, **delta):
+        """created_at is auto_now_add, so an assignment would be discarded on save(). A queryset
+        update writes the column directly and bypasses it."""
+        SupportTicket.objects.filter(pk=ticket.pk).update(
+            created_at=timezone.now() - timedelta(**delta)
+        )
+        ticket.refresh_from_db()
+        return ticket
+
+    # --- Window boundary ----------------------------------------------------------------------
+
+    def test_ticket_just_inside_window_counts(self):
+        from .views import get_strike_snapshot
+
+        self.backdate(self.make_ticket(), days=13, hours=23)
+
+        self.assertEqual(get_strike_snapshot(self.tutee_profile)['count'], 1)
+
+    def test_ticket_at_exactly_fourteen_days_has_expired(self):
+        """`__gt` is strict on purpose -- the window is 14 days, not 14 days inclusive."""
+        from .views import get_strike_snapshot
+
+        self.backdate(self.make_ticket(), days=14)
+
+        self.assertEqual(get_strike_snapshot(self.tutee_profile)['count'], 0)
+
+    def test_ticket_past_the_window_does_not_count(self):
+        from .views import get_strike_snapshot
+
+        self.backdate(self.make_ticket(), days=14, minutes=1)
+
+        self.assertEqual(get_strike_snapshot(self.tutee_profile)['count'], 0)
+
+    def test_window_is_insensitive_to_calendar_month_boundaries(self):
+        """Regression guard for the whole change: three strikes spanning a month rollover used to
+        count as one under the calendar-month rule."""
+        from .views import get_strike_snapshot, has_reached_strike_cap
+
+        reference = timezone.make_aware(datetime(2026, 2, 2, 9, 0), timezone.get_current_timezone())
+        for day in (30, 31, 1):
+            month = 1 if day in (30, 31) else 2
+            ticket = self.make_ticket()
+            SupportTicket.objects.filter(pk=ticket.pk).update(
+                created_at=timezone.make_aware(
+                    datetime(2026, month, day, 9, 0), timezone.get_current_timezone()
+                )
+            )
+
+        snapshot = get_strike_snapshot(self.tutee_profile, reference_time=reference)
+
+        self.assertEqual(snapshot['count'], 3)
+        self.assertTrue(has_reached_strike_cap(self.tutee_profile, reference_time=reference))
+
+    # --- Provisional counting -----------------------------------------------------------------
+
+    def test_unresolved_ticket_counts_provisionally(self):
+        from .views import get_strike_snapshot
+
+        self.make_ticket()
+
+        snapshot = get_strike_snapshot(self.tutee_profile)
+        self.assertEqual(snapshot['count'], 1)
+        self.assertEqual(snapshot['provisional_count'], 1)
+
+    def test_excused_ticket_does_not_count(self):
+        from .views import get_strike_snapshot
+
+        self.make_ticket(verdict='excused')
+
+        self.assertEqual(get_strike_snapshot(self.tutee_profile)['count'], 0)
+
+    def test_counted_ticket_counts_and_is_not_provisional(self):
+        from .views import get_strike_snapshot
+
+        self.make_ticket(verdict='counted')
+
+        snapshot = get_strike_snapshot(self.tutee_profile)
+        self.assertEqual(snapshot['count'], 1)
+        self.assertEqual(snapshot['provisional_count'], 0)
+
+    def test_two_counted_plus_one_unresolved_blocks_until_excused(self):
+        from .views import has_reached_strike_cap
+
+        self.make_ticket(verdict='counted')
+        self.make_ticket(verdict='counted')
+        provisional = self.make_ticket()
+
+        self.assertTrue(has_reached_strike_cap(self.tutee_profile))
+
+        provisional.resolution_verdict = 'excused'
+        provisional.save(update_fields=['resolution_verdict'])
+
+        self.assertFalse(has_reached_strike_cap(self.tutee_profile))
+
+    # --- expires_at ---------------------------------------------------------------------------
+
+    def test_expires_at_is_null_when_not_blocked(self):
+        from .views import get_strike_snapshot
+
+        self.make_ticket()
+
+        self.assertIsNone(get_strike_snapshot(self.tutee_profile)['expires_at'])
+
+    def test_expires_at_is_the_strike_that_drops_the_count_below_the_cap(self):
+        from .views import STRIKE_WINDOW_DAYS, get_strike_snapshot
+
+        oldest = self.backdate(self.make_ticket(), days=10)
+        self.backdate(self.make_ticket(), days=5)
+        self.make_ticket()
+
+        snapshot = get_strike_snapshot(self.tutee_profile)
+
+        self.assertTrue(snapshot['blocked'])
+        self.assertEqual(
+            snapshot['expires_at'],
+            oldest.created_at + timedelta(days=STRIKE_WINDOW_DAYS),
+        )
+
+    def test_expires_at_shifts_forward_with_a_fourth_strike(self):
+        """With 4 active strikes the oldest expiring still leaves 3 -- the promise must be the
+        second-oldest, or we tell the user a date that does not unblock them."""
+        from .views import STRIKE_WINDOW_DAYS, get_strike_snapshot
+
+        self.backdate(self.make_ticket(), days=12)
+        second_oldest = self.backdate(self.make_ticket(), days=10)
+        self.backdate(self.make_ticket(), days=5)
+        self.make_ticket()
+
+        snapshot = get_strike_snapshot(self.tutee_profile)
+
+        self.assertEqual(snapshot['count'], 4)
+        self.assertEqual(
+            snapshot['expires_at'],
+            second_oldest.created_at + timedelta(days=STRIKE_WINDOW_DAYS),
+        )
+
+    # --- profile_status -----------------------------------------------------------------------
+
+    def test_profile_status_reports_the_strike_snapshot(self):
+        self.make_ticket(verdict='counted')
+        self.make_ticket()
+        self.client.force_authenticate(user=self.tutee_user)
+
+        response = self.client.get("/api/profile/status/")
+
+        self.assertEqual(response.status_code, 200)
+        strikes = response.data['late_cancellation_strikes']
+        self.assertEqual(strikes['count'], 2)
+        self.assertEqual(strikes['provisional_count'], 1)
+        self.assertEqual(strikes['cap'], 3)
+        self.assertEqual(strikes['window_days'], 14)
+        self.assertFalse(strikes['blocked'])
+
+    def test_profile_status_reports_zeros_for_a_clean_user(self):
+        self.client.force_authenticate(user=self.tutee_user)
+
+        response = self.client.get("/api/profile/status/")
+
+        strikes = response.data['late_cancellation_strikes']
+        self.assertEqual(strikes['count'], 0)
+        self.assertEqual(strikes['provisional_count'], 0)
+        self.assertFalse(strikes['blocked'])
+        self.assertIsNone(strikes['expires_at'])
+
+    # --- Admin verdict path -------------------------------------------------------------------
+
+    def resolve(self, ticket, verdict):
+        self.client.force_authenticate(user=self.super_user)
+        return self.client.post(
+            f"/api/admin/support/tickets/{ticket.id}/resolve/",
+            {"verdict": verdict},
+            format="json",
+        )
+
+    def test_strike_ticket_is_visible_in_the_superadmin_queue(self):
+        ticket = self.make_ticket()
+        self.client.force_authenticate(user=self.super_user)
+
+        response = self.client.get("/api/admin/support/tickets/")
+
+        self.assertEqual(response.status_code, 200)
+        row = next(item for item in response.data if item['id'] == ticket.id)
+        self.assertEqual(row['status'], 'Open')
+        self.assertIsNone(row['resolution_verdict'])
+        self.assertTrue(row['reported_by_system'])
+        self.assertEqual(row['penalized_user']['id'], self.tutee_profile.id)
+        self.assertEqual(row['penalized_user']['role'], 'Tutee')
+
+    def test_counting_a_provisional_strike_leaves_the_count_unchanged(self):
+        from .views import get_strike_snapshot
+
+        ticket = self.make_ticket()
+        self.assertEqual(get_strike_snapshot(self.tutee_profile)['count'], 1)
+
+        response = self.resolve(ticket, 'counted')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['active_strikes'], 1)
+        self.assertEqual(get_strike_snapshot(self.tutee_profile)['count'], 1)
+
+    def test_counting_a_tutee_strike_does_not_touch_a_wallet(self):
+        ticket = self.make_ticket(profile=self.tutee_profile)
+
+        self.resolve(ticket, 'counted')
+
+        self.assertFalse(Transaction.objects.filter(transaction_type='counted_strike').exists())
+
+    def test_counting_a_tutor_strike_deducts_fifty_once(self):
+        from .views import COUNTED_STRIKE_WALLET_DEDUCTION
+
+        # A post_save signal on Tutor already created the wallet.
+        wallet = Wallet.objects.get(tutor=self.tutor)
+        wallet.balance = Decimal('500.00')
+        wallet.save(update_fields=['balance'])
+        ticket = self.make_ticket(profile=self.tutor_profile)
+
+        self.resolve(ticket, 'counted')
+
+        wallet.refresh_from_db()
+        self.assertEqual(wallet.balance, Decimal('500.00') - COUNTED_STRIKE_WALLET_DEDUCTION)
+        self.assertEqual(Transaction.objects.filter(transaction_type='counted_strike').count(), 1)
+
+    def test_second_resolve_attempt_is_rejected(self):
+        ticket = self.make_ticket()
+
+        self.assertEqual(self.resolve(ticket, 'counted').status_code, 200)
+
+        response = self.resolve(ticket, 'excused')
+
+        self.assertEqual(response.status_code, 400)
+        ticket.refresh_from_db()
+        self.assertEqual(ticket.resolution_verdict, 'counted')
+
+    def test_excusing_a_strike_relieves_the_block(self):
+        from .views import has_reached_strike_cap
+
+        self.make_ticket(verdict='counted')
+        self.make_ticket(verdict='counted')
+        ticket = self.make_ticket()
+        self.assertTrue(has_reached_strike_cap(self.tutee_profile))
+
+        response = self.resolve(ticket, 'excused')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['active_strikes'], 2)
+        self.assertFalse(has_reached_strike_cap(self.tutee_profile))
+
+    # --- cancel_booking end to end ------------------------------------------------------------
+
+    def test_late_cancellation_counts_without_any_admin_action(self):
+        from .views import WEEKDAY_MAP, get_strike_snapshot
+
+        session_start = timezone.localtime(timezone.now()) + timedelta(hours=2)
+        availability = TutorAvailability.objects.create(
+            tutor=self.tutor,
+            day=WEEKDAY_MAP[session_start.date().weekday()],
+            time_slot=time(session_start.hour, 0),
+            is_active=True,
+        )
+        booking = Booking.objects.create(
+            student=self.tutee_profile,
+            tutor=self.tutor,
+            availability=availability,
+            session_date=session_start.date(),
+            session_mode="Online",
+            booking_request_id=uuid4(),
+            session_group_id=uuid4(),
+            status="Confirmed",
+        )
+        self.client.force_authenticate(user=self.tutee_user)
+
+        response = self.client.post(
+            f"/api/bookings/{booking.id}/cancel/",
+            {"reason": "Something urgent came up."},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        ticket = SupportTicket.objects.get(category='Late_Cancellation')
+        self.assertEqual(ticket.penalized_user, self.tutee_profile)
+        self.assertIsNone(ticket.resolution_verdict)
+        self.assertEqual(get_strike_snapshot(self.tutee_profile)['count'], 1)
+
+
+class LateCancellationStrikeMigrationTests(TransactionTestCase):
+    """The cutover backfill: provisional counting must not be retroactive."""
+
+    migrate_from = '0080_subjects_description_and_more'
+    migrate_to = '0081_strike_window_index'
+
+    def test_pre_cutover_unresolved_strikes_are_excused_and_resolved_ones_left_alone(self):
+        from django.db.migrations.executor import MigrationExecutor
+        from django.db import connection
+
+        executor = MigrationExecutor(connection)
+        executor.migrate([('studybuddy', self.migrate_from)])
+        executor.loader.build_graph()
+
+        old_apps = executor.loader.project_state([('studybuddy', self.migrate_from)]).apps
+        SupportTicket = old_apps.get_model('studybuddy', 'SupportTicket')
+        UserProfile = old_apps.get_model('studybuddy', 'UserProfile')
+        User = old_apps.get_model('auth', 'User')
+
+        user = User.objects.create(username='migration-tutee@cpu.edu')
+        profile = UserProfile.objects.create(
+            user_id=user.id,
+            fname='Mig',
+            mname='',
+            lname='Tutee',
+            role='Tutee',
+        )
+        unresolved = SupportTicket.objects.create(
+            user_id=profile.id,
+            category='Late_Cancellation',
+            subject='Late Cancellation review',
+            description='Pre-cutover.',
+            penalized_user_id=profile.id,
+        )
+        counted = SupportTicket.objects.create(
+            user_id=profile.id,
+            category='Late_Cancellation',
+            subject='Late Cancellation review',
+            description='Already judged.',
+            penalized_user_id=profile.id,
+            resolution_verdict='counted',
+        )
+        other_category = SupportTicket.objects.create(
+            user_id=profile.id,
+            category='Technical',
+            subject='Unrelated',
+            description='Not a strike.',
+        )
+
+        executor = MigrationExecutor(connection)
+        executor.loader.build_graph()
+        executor.migrate([('studybuddy', self.migrate_to)])
+
+        new_apps = executor.loader.project_state([('studybuddy', self.migrate_to)]).apps
+        SupportTicket = new_apps.get_model('studybuddy', 'SupportTicket')
+
+        self.assertEqual(
+            SupportTicket.objects.get(pk=unresolved.pk).resolution_verdict, 'excused'
+        )
+        self.assertEqual(SupportTicket.objects.get(pk=counted.pk).resolution_verdict, 'counted')
+        self.assertIsNone(SupportTicket.objects.get(pk=other_category.pk).resolution_verdict)
 
 
 class TuteeVerificationPhase3Tests(APITestCase):
@@ -4981,6 +5981,77 @@ class CfPeerNeighborTests(APITestCase):
         self.assertEqual(global_breakdown["pool"], "global")
         self.assertEqual(global_breakdown["neighbors"][0]["neighbor_id"], 3)
         self.assertEqual(empty_peer_breakdown["pool"], "global")
+
+
+class CoRatedDetailTests(APITestCase):
+    """co_rated_detail feeds the algorithm demo's expandable co-rated panel, which
+    exists so a similarity can be checked by hand rather than taken on faith. These
+    lock the curated S6/T-cast numbers documented in the algorithm demo guide."""
+
+    # Tutor ids 1/2/6/7/8 stand in for the curated T1/T2/T6/T7/T8, tutee keys for
+    # S6 and her neighbours — the same matrix as seed_data.CURATED_RATINGS.
+    RATINGS = {
+        6: {1: 5, 2: 3, 6: 5, 7: 2, 8: 4},   # S6 Katrina, overall avg 3.80
+        2: {1: 5, 2: 3, 6: 4, 8: 4},         # S2 Gloria
+        5: {3: 4, 4: 5},                     # shares nothing with S6
+    }
+
+    def test_returns_shared_tutors_with_both_students_scores(self):
+        from studybuddy.recommender.CF import co_rated_detail
+
+        detail = co_rated_detail(self.RATINGS, 6, 2)
+
+        self.assertEqual([e["tutor_id"] for e in detail["shared"]], [1, 2, 6, 8])
+        self.assertEqual([e["u_rating"] for e in detail["shared"]], [5, 3, 5, 4])
+        self.assertEqual([e["v_rating"] for e in detail["shared"]], [5, 3, 4, 4])
+
+    def test_averages_are_over_the_co_rated_set_not_all_ratings(self):
+        """The trap the panel has to survive: the average Pearson uses is not the
+        average the deviation term uses. S6's mean over the four tutors she shares
+        with S2 is 4.25, while her CF baseline over all five of her ratings is
+        3.80 — a panelist adding up the visible row must not land on 3.80."""
+        from studybuddy.recommender.CF import co_rated_detail
+
+        detail = co_rated_detail(self.RATINGS, 6, 2)
+        overall_avg = sum(self.RATINGS[6].values()) / len(self.RATINGS[6])
+
+        self.assertAlmostEqual(detail["u_avg"], 4.25)
+        self.assertAlmostEqual(detail["v_avg"], 4.0)
+        self.assertAlmostEqual(overall_avg, 3.8)
+        self.assertNotAlmostEqual(detail["u_avg"], overall_avg)
+
+    def test_shared_ratings_reproduce_the_reported_similarity(self):
+        """The panel's whole claim is that the expanded cells derive the number on
+        the collapsed row, so recomputing Pearson from those cells must agree with
+        sim()."""
+        from studybuddy.recommender.CF import co_rated_detail, sim
+
+        detail = co_rated_detail(self.RATINGS, 6, 2)
+        u_dev = [e["u_rating"] - detail["u_avg"] for e in detail["shared"]]
+        v_dev = [e["v_rating"] - detail["v_avg"] for e in detail["shared"]]
+
+        numerator = sum(a * b for a, b in zip(u_dev, v_dev))
+        denominator = (
+            math.sqrt(sum(a * a for a in u_dev)) * math.sqrt(sum(b * b for b in v_dev))
+        )
+
+        self.assertAlmostEqual(numerator / denominator, sim(self.RATINGS, 6, 2))
+        self.assertAlmostEqual(sim(self.RATINGS, 6, 2), 0.853, places=3)
+
+    def test_no_overlap_returns_empty_set_and_no_averages(self):
+        from studybuddy.recommender.CF import co_rated_detail
+
+        detail = co_rated_detail(self.RATINGS, 6, 5)
+
+        self.assertEqual(detail["shared"], [])
+        self.assertIsNone(detail["u_avg"])
+        self.assertIsNone(detail["v_avg"])
+
+    def test_unknown_student_is_tolerated(self):
+        """Cold-Start tutees are absent from the rating matrix entirely."""
+        from studybuddy.recommender.CF import co_rated_detail
+
+        self.assertEqual(co_rated_detail(self.RATINGS, 999, 2)["shared"], [])
 
 
 class CbfGraduatedSubjectMatchTests(APITestCase):
@@ -7178,22 +8249,22 @@ class CrossInstitutionMatchingTests(APITestCase):
         self.client.force_authenticate(user=self.tutee.user)
         resp = self.client.post(
             "/api/recommend-tutors/",
-            {"subject": "SCOPE101"},
+            {"subject": "SCOPE101", "date": timezone.localdate().isoformat()},
             format="json",
         )
         self.assertEqual(resp.status_code, 200)
-        ids = {r["id"] for r in resp.data}
+        ids = {r["id"] for r in resp.data["tutors"]}
         self.assertIn(self.tutor_a.profile.id, ids)
 
     def test_recommend_includes_other_institution_tutor(self):
         self.client.force_authenticate(user=self.tutee.user)
         resp = self.client.post(
             "/api/recommend-tutors/",
-            {"subject": "SCOPE101"},
+            {"subject": "SCOPE101", "date": timezone.localdate().isoformat()},
             format="json",
         )
         self.assertEqual(resp.status_code, 200)
-        ids = {r["id"] for r in resp.data}
+        ids = {r["id"] for r in resp.data["tutors"]}
         self.assertIn(self.tutor_b.profile.id, ids)
 
     def test_recommend_tutee_no_institution_still_matches(self):
@@ -7207,22 +8278,22 @@ class CrossInstitutionMatchingTests(APITestCase):
         self.client.force_authenticate(user=no_inst_user)
         resp = self.client.post(
             "/api/recommend-tutors/",
-            {"subject": "SCOPE101"},
+            {"subject": "SCOPE101", "date": timezone.localdate().isoformat()},
             format="json",
         )
         self.assertEqual(resp.status_code, 200)
-        ids = {r["id"] for r in resp.data}
+        ids = {r["id"] for r in resp.data["tutors"]}
         self.assertIn(self.tutor_a.profile.id, ids)
 
     def test_recommend_includes_null_institution_tutor(self):
         self.client.force_authenticate(user=self.tutee.user)
         resp = self.client.post(
             "/api/recommend-tutors/",
-            {"subject": "SCOPE101"},
+            {"subject": "SCOPE101", "date": timezone.localdate().isoformat()},
             format="json",
         )
         self.assertEqual(resp.status_code, 200)
-        ids = {r["id"] for r in resp.data}
+        ids = {r["id"] for r in resp.data["tutors"]}
         self.assertIn(self.tutor_null.profile.id, ids)
 
     def test_dashboard_widget_includes_cross_institution_tutors(self):
@@ -7319,6 +8390,7 @@ class VerificationDevToolsTests(APITestCase):
 
     # --- Enforcement override -----------------------------------------------------------------
 
+    @override_settings(TUTEE_VERIFICATION_ENFORCEMENT_START_DATE=None)
     def test_enforcement_override_flips_gate(self):
         from .views import tutee_verification_enforced
         from . import _verification_dev
@@ -7778,6 +8850,7 @@ class VerificationDevToolsAdminEndpointTests(APITestCase):
         )
         self.assertEqual(response.status_code, 403)
 
+    @override_settings(VERIFICATION_DEV_TOOLS_ENABLED=False)
     def test_403_for_superadmin_when_flag_off(self):
         self.client.force_authenticate(user=self.super_user)
         response = self.client.post(
@@ -8001,11 +9074,13 @@ class TutorOnboardingSearchVisibilityTests(APITestCase):
         self.client.force_authenticate(user=self.tutee.user)
 
         response = self.client.post(
-            "/api/recommend-tutors/", {"subject": self.subject.subject_code}, format="json",
+            "/api/recommend-tutors/",
+            {"subject": self.subject.subject_code, "date": timezone.localdate().isoformat()},
+            format="json",
         )
 
         self.assertEqual(response.status_code, 200)
-        tutor_ids = {row["id"] for row in response.data}
+        tutor_ids = {row["id"] for row in response.data["tutors"]}
         self.assertNotIn(no_application.profile_id, tutor_ids)
         self.assertNotIn(pending.profile_id, tutor_ids)
         self.assertNotIn(rejected.profile_id, tutor_ids)
@@ -8321,13 +9396,24 @@ class AdminProposedSubjectReviewTests(APITestCase):
         )
         self.client.force_authenticate(user=self.admin_user)
 
-    def make_proposal(self, code, keywords=""):
+    def make_proposal(self, code, keywords="", tutor_note=""):
         subject = Subjects.objects.create(
             subject_code=code, subject_name=f"Proposal {code}", department="Mathematics",
             status="pending", proposed_by_tutor=self.tutor,
             proposed_application=self.application, keywords=keywords,
         )
-        TutorSubjects.objects.create(tutor=self.tutor, subject=subject, expertise_level=3)
+        TutorSubjects.objects.create(
+            tutor=self.tutor, subject=subject, expertise_level=3, description=tutor_note,
+        )
+        return subject
+
+    def make_selected_subject(self, code, name, category="Natural Sciences"):
+        """An approved catalog subject the tutor picked, as opposed to proposed."""
+        subject = Subjects.objects.create(
+            subject_code=code, subject_name=name, department="Sciences",
+            category=category, status="approved",
+        )
+        TutorSubjects.objects.create(tutor=self.tutor, subject=subject, expertise_level=4)
         return subject
 
     def test_application_detail_includes_pending_proposed_subjects(self):
@@ -8358,8 +9444,11 @@ class AdminProposedSubjectReviewTests(APITestCase):
         self.application.refresh_from_db()
         self.assertEqual(self.application.application_status, "rejected")
 
-    def test_update_action_edits_pending_proposal_fields_and_description(self):
-        proposal = self.make_proposal("UPDATE-PROP")
+    def test_update_action_writes_catalog_description_not_the_tutor_note(self):
+        """The admin form edits Subjects.description (global catalog copy, which
+        the subject pickers search). The tutor's own note is evidence, not copy,
+        and must survive the edit untouched."""
+        proposal = self.make_proposal("UPDATE-PROP", tutor_note="I tutored this for two terms.")
 
         response = self.client.patch(
             f"/api/admin/tutor-applications/{self.application.id}/subjects/"
@@ -8369,7 +9458,7 @@ class AdminProposedSubjectReviewTests(APITestCase):
                 "subject_name": "Updated Proposal Name",
                 "category": "Mathematics & Data Sciences",
                 "keywords": "algebra, math",
-                "description": "Refined by admin.",
+                "catalog_description": "Refined by admin.",
             },
             format="json",
         )
@@ -8380,8 +9469,63 @@ class AdminProposedSubjectReviewTests(APITestCase):
         self.assertEqual(proposal.category, "Mathematics & Data Sciences")
         self.assertEqual(proposal.keywords, "algebra, math")
         self.assertEqual(proposal.status, "pending")
+        self.assertEqual(proposal.description, "Refined by admin.")
         link = TutorSubjects.objects.get(tutor=self.tutor, subject=proposal)
-        self.assertEqual(link.description, "Refined by admin.")
+        self.assertEqual(link.description, "I tutored this for two terms.")
+        self.assertEqual(response.data["tutor_note"], "I tutored this for two terms.")
+
+    def test_update_action_leaves_catalog_description_alone_when_omitted(self):
+        proposal = self.make_proposal("UPDATE-NO-DESC")
+        proposal.description = "Existing catalog copy."
+        proposal.save(update_fields=["description"])
+
+        response = self.client.patch(
+            f"/api/admin/tutor-applications/{self.application.id}/subjects/"
+            f"{proposal.subject_code}/",
+            {
+                "action": "update",
+                "subject_name": "Renamed Only",
+                "category": "Mathematics & Data Sciences",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        proposal.refresh_from_db()
+        self.assertEqual(proposal.description, "Existing catalog copy.")
+
+    def test_application_detail_separates_catalog_description_from_tutor_note(self):
+        proposal = self.make_proposal("SPLIT-PROP", tutor_note="My own note.")
+        proposal.description = "Catalog copy."
+        proposal.save(update_fields=["description"])
+
+        response = self.client.get(f"/api/admin/tutor-applications/{self.application.id}/")
+
+        self.assertEqual(response.status_code, 200)
+        row = response.data["proposed_subjects"][0]
+        self.assertEqual(row["catalog_description"], "Catalog copy.")
+        self.assertEqual(row["tutor_note"], "My own note.")
+
+    def test_application_detail_includes_selected_catalog_subjects(self):
+        self.make_proposal("SELECTED-PROP")
+        selected = self.make_selected_subject("BIO-101", "General Biology")
+
+        response = self.client.get(f"/api/admin/tutor-applications/{self.application.id}/")
+
+        self.assertEqual(response.status_code, 200)
+        codes = [row["subject_code"] for row in response.data["selected_subjects"]]
+        self.assertEqual(codes, [selected.subject_code])
+        self.assertEqual(response.data["selected_subjects"][0]["subject_name"], "General Biology")
+        # Pending proposals are the complement and must not leak into this list.
+        self.assertNotIn("SELECTED-PROP", codes)
+
+    def test_selected_subjects_is_empty_when_the_tutor_only_proposed(self):
+        self.make_proposal("ONLY-PROP")
+
+        response = self.client.get(f"/api/admin/tutor-applications/{self.application.id}/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["selected_subjects"], [])
 
     def test_update_action_rejects_unknown_category(self):
         proposal = self.make_proposal("UPDATE-BAD-CAT")
@@ -8954,3 +10098,195 @@ class DemoTieGroupTests(APITestCase):
 
     def test_empty_rows_are_handled(self):
         self.assertEqual(self._mark([]), [])
+
+
+class LateCancellationSupportTicketTests(APITestCase):
+    """Cancelling inside the Grace Cutoff opens a Late_Cancellation SupportTicket
+    (backend/studybuddy/views.py:cancel_booking) which a SuperAdmin resolves via
+    admin_resolve_ticket. See docs/architecture/booking-flow.md."""
+
+    def setUp(self):
+        self.institution = PartnerInstitution.objects.create(
+            institution_name="CPU",
+            school_email_domain="cpu.edu.ph",
+            is_active=True,
+        )
+        self.super_user = User.objects.create_user(
+            username="lc-superadmin",
+            email="lc-superadmin@studybuddy.test",
+            password="password",
+        )
+        self.super_profile = UserProfile.objects.create(
+            user=self.super_user,
+            fname="Super",
+            mname="",
+            lname="Admin",
+            role="SuperAdmin",
+            profile_completed=True,
+            is_domain_exempt=True,
+        )
+        self.tutee_user = User.objects.create_user(
+            username="lc-tutee@cpu.edu.ph",
+            email="lc-tutee@cpu.edu.ph",
+            password="password",
+        )
+        self.tutee_profile = UserProfile.objects.create(
+            user=self.tutee_user,
+            fname="Lc",
+            mname="",
+            lname="Tutee",
+            role="Tutee",
+            institution=self.institution,
+        )
+        self.tutor_user = User.objects.create_user(
+            username="lc-tutor@cpu.edu.ph",
+            email="lc-tutor@cpu.edu.ph",
+            password="password",
+        )
+        self.tutor_profile = UserProfile.objects.create(
+            user=self.tutor_user,
+            fname="Lc",
+            mname="",
+            lname="Tutor",
+            role="Tutor",
+            institution=self.institution,
+        )
+        self.tutor = Tutor.objects.create(
+            profile=self.tutor_profile,
+            hourly_rate=Decimal("280.00"),
+            can_online=True,
+            can_f2f=True,
+            teaching_level="SHS",
+        )
+        self.wallet, _ = Wallet.objects.get_or_create(tutor=self.tutor)
+        self.wallet.balance = Decimal("500.00")
+        self.wallet.save(update_fields=["balance"])
+
+    def create_confirmed_booking(self, *, hours_from_now):
+        """A Confirmed booking whose session starts `hours_from_now` from now."""
+        session_start = timezone.localtime(timezone.now()) + timedelta(hours=hours_from_now)
+        availability = TutorAvailability.objects.create(
+            tutor=self.tutor,
+            day=WEEKDAY_MAP[session_start.weekday()],
+            time_slot=session_start.time(),
+            is_active=True,
+        )
+        group_id = uuid4()
+        return Booking.objects.create(
+            student=self.tutee_profile,
+            tutor=self.tutor,
+            availability=availability,
+            session_date=session_start.date(),
+            session_mode="Online",
+            booking_request_id=group_id,
+            session_group_id=group_id,
+            status="Confirmed",
+        )
+
+    def cancel_as(self, user, booking, *, reason="Something came up"):
+        self.client.force_authenticate(user=user)
+        return self.client.post(
+            f"/api/bookings/{booking.id}/cancel/",
+            {"reason": reason},
+            format="json",
+        )
+
+    def test_cancellation_before_grace_cutoff_does_not_open_a_ticket(self):
+        booking = self.create_confirmed_booking(hours_from_now=GRACE_CUTOFF_HOURS + 1)
+
+        response = self.cancel_as(self.tutee_user, booking)
+
+        self.assertEqual(response.status_code, 200)
+        booking.refresh_from_db()
+        self.assertEqual(booking.status, "Cancelled")
+        self.assertFalse(SupportTicket.objects.filter(booking=booking).exists())
+
+    def test_tutee_late_cancellation_opens_ticket_penalizing_the_tutee(self):
+        booking = self.create_confirmed_booking(hours_from_now=GRACE_CUTOFF_HOURS - 1)
+
+        response = self.cancel_as(self.tutee_user, booking, reason="Family emergency")
+
+        self.assertEqual(response.status_code, 200)
+        ticket = SupportTicket.objects.get(booking=booking)
+        self.assertEqual(ticket.category, "Late_Cancellation")
+        self.assertEqual(ticket.status, "Open")
+        self.assertTrue(ticket.reported_by_system)
+        self.assertEqual(ticket.user_id, self.tutor_profile.id)
+        self.assertEqual(ticket.penalized_user_id, self.tutee_profile.id)
+        self.assertIn("Family emergency", ticket.description)
+        self.assertIsNone(ticket.resolution_verdict)
+
+    def test_tutor_late_cancellation_opens_ticket_penalizing_the_tutor(self):
+        booking = self.create_confirmed_booking(hours_from_now=GRACE_CUTOFF_HOURS - 1)
+
+        response = self.cancel_as(self.tutor_user, booking, reason="Sudden illness")
+
+        self.assertEqual(response.status_code, 200)
+        ticket = SupportTicket.objects.get(booking=booking)
+        self.assertEqual(ticket.user_id, self.tutee_profile.id)
+        self.assertEqual(ticket.penalized_user_id, self.tutor_profile.id)
+
+    def test_superadmin_counted_verdict_deducts_tutor_wallet(self):
+        booking = self.create_confirmed_booking(hours_from_now=GRACE_CUTOFF_HOURS - 1)
+        self.cancel_as(self.tutor_user, booking, reason="Sudden illness")
+        ticket = SupportTicket.objects.get(booking=booking)
+
+        self.client.force_authenticate(user=self.super_user)
+        response = self.client.post(
+            f"/api/admin/support/tickets/{ticket.id}/resolve/",
+            {"verdict": "counted"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        ticket.refresh_from_db()
+        self.assertEqual(ticket.status, "Resolved")
+        self.assertEqual(ticket.resolution_verdict, "counted")
+        self.wallet.refresh_from_db()
+        self.assertEqual(self.wallet.balance, Decimal("500.00") - COUNTED_STRIKE_WALLET_DEDUCTION)
+        self.assertTrue(
+            Transaction.objects.filter(
+                wallet=self.wallet,
+                transaction_type="counted_strike",
+                reference_id=f"LT-{ticket.id}",
+            ).exists()
+        )
+        self.assertEqual(response.data["monthly_counted_strikes"], 1)
+
+    def test_superadmin_excused_verdict_leaves_wallet_untouched(self):
+        booking = self.create_confirmed_booking(hours_from_now=GRACE_CUTOFF_HOURS - 1)
+        self.cancel_as(self.tutor_user, booking, reason="Sudden illness")
+        ticket = SupportTicket.objects.get(booking=booking)
+
+        self.client.force_authenticate(user=self.super_user)
+        response = self.client.post(
+            f"/api/admin/support/tickets/{ticket.id}/resolve/",
+            {"verdict": "excused"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        ticket.refresh_from_db()
+        self.assertEqual(ticket.resolution_verdict, "excused")
+        self.wallet.refresh_from_db()
+        self.assertEqual(self.wallet.balance, Decimal("500.00"))
+        self.assertFalse(Transaction.objects.filter(wallet=self.wallet).exists())
+
+    def test_ticket_cannot_be_resolved_twice(self):
+        booking = self.create_confirmed_booking(hours_from_now=GRACE_CUTOFF_HOURS - 1)
+        self.cancel_as(self.tutor_user, booking, reason="Sudden illness")
+        ticket = SupportTicket.objects.get(booking=booking)
+
+        self.client.force_authenticate(user=self.super_user)
+        self.client.post(
+            f"/api/admin/support/tickets/{ticket.id}/resolve/",
+            {"verdict": "excused"},
+            format="json",
+        )
+        second_response = self.client.post(
+            f"/api/admin/support/tickets/{ticket.id}/resolve/",
+            {"verdict": "counted"},
+            format="json",
+        )
+
+        self.assertEqual(second_response.status_code, 400)

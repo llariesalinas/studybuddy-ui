@@ -44,6 +44,11 @@ export const MAX_DOCUMENT_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024 // 5 MB; keep in s
 // Wallet / commission — keep in sync with COMMISSION_RATE in backend/studybuddy/views.py
 export const PLATFORM_COMMISSION_RATE_PERCENT = 10
 
+// Grace Cutoff — hours before a session starts after which cancelling is "late" and opens a
+// Late Cancellation review ticket. Must match GRACE_CUTOFF_HOURS in backend/studybuddy/models.py;
+// the backend is the authority, this only drives the warning copy.
+export const GRACE_CUTOFF_HOURS = 12
+
 // Polling
 export const SESSION_POLL_INTERVAL_MS      = 60_000
 export const NOTIFICATION_POLL_INTERVAL_MS = 60_000

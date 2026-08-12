@@ -18,6 +18,12 @@ availability is bounded by a 14-day Booking Horizon rather than freshness naggin
 detection. The old approve/reject endpoints and the tutor requested-sessions screen are removed
 outright, not deprecated; `Pending` survives only as a historical status value on old rows.
 
+**Superseded in part by [ADR-0011](0011-provisional-late-cancellation-strikes.md):** the cap of 3
+described above was a count of *counted* strikes per calendar month. It is now 3 *active* strikes
+in a rolling 14-day window, where an unresolved ticket counts provisionally and only an excused
+verdict relieves it. The rest of this decision — instant confirmation, the Grace Cutoff, the P50
+tutor deduction on a counted verdict — stands unchanged.
+
 Consequences worth noting: the three tutor-side gates formerly enforced at accept time
 (verification, non-negative wallet, Accepted Session Load Limit) now gate booking creation and
 are surfaced by hiding the tutor from search, with the server-side check as the authoritative

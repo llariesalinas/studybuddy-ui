@@ -66,7 +66,7 @@ api.interceptors.request.use(
     const authStore = useAuthStore()
     const token = authStore.token || localStorage.getItem('access_token')
 
-    if (token && !isPublicEndpoint(config.url)) {
+    if (token) {
       config.headers = config.headers ?? {}
       config.headers.Authorization = `Bearer ${token}`
     }

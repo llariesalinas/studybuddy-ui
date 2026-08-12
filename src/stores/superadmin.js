@@ -1,6 +1,13 @@
 import api from '@/services/api/api'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { buildCsv, downloadCsv, exportFilename } from '@/utils/csv'
+import {
+  REPORT_COMBINED_FILE_LABEL,
+  USERS_FILE_LABEL,
+  USER_COLUMN_GROUPS,
+} from '@/constants/superadminExports'
+import { ANALYTICS_VIEW_FULL } from '@/constants/superadminReports'
 
 export const useSuperAdminStore = defineStore('superadmin', () => {
   const stats = ref(null)
@@ -8,6 +15,7 @@ export const useSuperAdminStore = defineStore('superadmin', () => {
   const institutions = ref([])
   const institutionPerformance = ref([])
   const analytics = ref(null)
+  const analyticsDetail = ref(null)
   const pendingActions = ref({ count: 0, items: [] })
   const institutionRequests = ref([])
 
@@ -17,6 +25,7 @@ export const useSuperAdminStore = defineStore('superadmin', () => {
     institutions: false,
     institutionPerformance: false,
     analytics: false,
+    analyticsDetail: false,
     pendingActions: false,
     institutionRequests: false,
     export: false,
@@ -29,6 +38,7 @@ export const useSuperAdminStore = defineStore('superadmin', () => {
     institutions: null,
     institutionPerformance: null,
     analytics: null,
+    analyticsDetail: null,
     pendingActions: null,
     institutionRequests: null,
     export: null,
@@ -283,31 +293,68 @@ export const useSuperAdminStore = defineStore('superadmin', () => {
     }
   }
 
-  const exportAnalyticsCsv = async ({ institutionId = null, period = '30d' } = {}) => {
+  // `view=full` returns every ranked row instead of the dashboard's truncated cards. Kept in its
+  // own state so a drill-down page never overwrites the dashboard's summary payload, and the two
+  // can be open in separate tabs without fighting over one ref.
+  const fetchAnalyticsDetail = async (institutionId = null, period = '30d') => {
+    loading.value.analyticsDetail = true
+    error.value.analyticsDetail = null
+
+    try {
+      const params = { period, view: ANALYTICS_VIEW_FULL }
+      if (institutionId) params.institution_id = institutionId
+      const res = await api.get('/admin/analytics/', { params })
+      analyticsDetail.value = res.data
+    } catch {
+      error.value.analyticsDetail = 'Failed to load analytics.'
+    } finally {
+      loading.value.analyticsDetail = false
+    }
+  }
+
+  // `sections` narrows which sheets the server writes. Omitting it keeps the endpoint's
+  // all-sections default, so an existing caller that does not pass it is unaffected. The response
+  // is an xlsx workbook; downloadCsv passes the blob through with the server's content type.
+  const exportAnalyticsWorkbook = async ({
+    institutionId = null,
+    period = '30d',
+    sections = [],
+    filename = '',
+  } = {}) => {
     loading.value.export = true
     error.value.export = null
 
     try {
       const params = { period }
       if (institutionId) params.institution_id = institutionId
+      if (sections.length) params.sections = sections.join(',')
+
       const res = await api.get('/admin/analytics/export/', {
         params,
         responseType: 'blob',
       })
-      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'text/csv' }))
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `studybuddy-report-${new Date().toISOString().slice(0, 10)}.csv`
-      document.body.appendChild(link)
-      link.click()
-      link.remove()
-      window.URL.revokeObjectURL(url)
+      downloadCsv(filename || exportFilename(REPORT_COMBINED_FILE_LABEL, 'xlsx'), res.data)
     } catch {
       error.value.export = 'Failed to export analytics.'
       throw new Error(error.value.export)
     } finally {
       loading.value.export = false
     }
+  }
+
+  // Built client-side: /admin/users/ already returns the whole directory, so the rows the admin
+  // sees are the rows we write. `groupIds` selects column groups, in declaration order.
+  const exportUsersCsv = (rows, groupIds = [], filename = '') => {
+    const groups = USER_COLUMN_GROUPS.filter((group) => groupIds.includes(group.id))
+    if (!groups.length) return
+
+    const columns = groups.flatMap((group) => group.columns)
+    const csv = buildCsv([
+      columns.map((column) => column.header),
+      ...rows.map((row) => columns.map((column) => column.value(row))),
+    ])
+
+    downloadCsv(filename || exportFilename(USERS_FILE_LABEL), csv)
   }
 
   const fetchUserBookings = async (
@@ -327,14 +374,7 @@ export const useSuperAdminStore = defineStore('superadmin', () => {
 
     try {
       const res = await api.get(endpoint, { params, responseType: 'blob' })
-      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'text/csv' }))
-      const link = document.createElement('a')
-      link.href = url
-      link.download = filename
-      document.body.appendChild(link)
-      link.click()
-      link.remove()
-      window.URL.revokeObjectURL(url)
+      downloadCsv(filename, res.data)
     } catch {
       error.value.userExport = 'Failed to export user data.'
       throw new Error(error.value.userExport)
@@ -382,6 +422,7 @@ export const useSuperAdminStore = defineStore('superadmin', () => {
     institutions,
     institutionPerformance,
     analytics,
+    analyticsDetail,
     pendingActions,
     institutionRequests,
     loading,
@@ -403,7 +444,9 @@ export const useSuperAdminStore = defineStore('superadmin', () => {
     approveInstitutionRequest,
     rejectInstitutionRequest,
     fetchAnalytics,
-    exportAnalyticsCsv,
+    fetchAnalyticsDetail,
+    exportAnalyticsWorkbook,
+    exportUsersCsv,
     fetchUserBookings,
     exportUserBookingsCsv,
     fetchUserAvailability,

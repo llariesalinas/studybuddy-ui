@@ -1,7 +1,9 @@
 <template>
   <div class="sb-auth-page">
     <a class="sb-auth-brand" :href="backTo" @click.prevent="router.push(backTo)">
-      <span class="sb-brand-mark" aria-hidden="true">S</span>
+      <span class="sb-brand-mark" aria-hidden="true">
+        <img src="@/assets/logos/studybuddy-logo.svg" alt="" class="sb-brand-mark-logo" />
+      </span>
       <span>StudyBuddy</span>
       <span class="sb-auth-back">{{ backLabel }}</span>
     </a>
@@ -54,12 +56,7 @@ const router = useRouter()
   flex-direction: column;
   align-items: center;
   padding: 24px 16px 48px;
-  font-family:
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    sans-serif;
+  font-family: var(--sb-font-base);
   box-sizing: border-box;
 }
 
@@ -92,16 +89,19 @@ const router = useRouter()
 }
 
 .sb-brand-mark {
-  width: 24px;
-  height: 24px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
-  background: var(--sb-primary);
-  color: var(--sb-primary-contrast);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
   flex-shrink: 0;
+}
+
+.sb-brand-mark-logo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .sb-auth-back {

@@ -225,9 +225,13 @@
                     </button>
                   </div>
                 </div>
+                <div v-if="subject.tutor_note" class="mb-2">
+                  <label class="form-label small fw-bold">Tutor's note</label>
+                  <p class="tutor-note-readonly small mb-0">{{ subject.tutor_note }}</p>
+                </div>
                 <div class="mb-2">
-                  <label class="form-label small fw-bold">Description</label>
-                  <textarea v-model.trim="subjectEditForm.description" class="form-control form-control-sm sb-field" rows="2"></textarea>
+                  <label class="form-label small fw-bold">Catalog description</label>
+                  <textarea v-model.trim="subjectEditForm.catalog_description" class="form-control form-control-sm sb-field" rows="2" placeholder="Shown to every user and searched by the subject pickers"></textarea>
                 </div>
                 <div class="d-flex gap-2">
                   <button
@@ -275,6 +279,21 @@
           </div>
         </div>
 
+        <div v-if="isInitialTutorReview" class="mb-4">
+          <label class="text-muted small text-uppercase fw-bold mb-2">Selected from catalog</label>
+          <div v-if="selectedSubjects.length" class="selected-subject-list">
+            <span
+              v-for="subject in selectedSubjects"
+              :key="subject.subject_code"
+              class="selected-subject-chip"
+            >
+              {{ subject.subject_name }}
+              <small class="text-muted">{{ subject.category }}</small>
+            </span>
+          </div>
+          <p v-else class="small text-muted mb-0">No catalog subjects selected.</p>
+        </div>
+
         <div v-if="isPendingReview(selectedApp)" class="mt-5 pt-3 border-top">
           <div v-if="rejectionMode">
             <label class="form-label fw-bold small">Reason for Rejection</label>
@@ -318,6 +337,7 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useAdminStore } from '@/stores/admin'
 import { useCatalogStore } from '@/stores/catalog'
 import { useToastStore } from '@/stores/toast'
@@ -331,12 +351,18 @@ import {
 } from '@/services/tutorApplicationState'
 import { deriveCategoryOptions } from '@/constants/subjectTaxonomy'
 
+const APPLICANT_ROLES = ['tutor', 'tutee']
+const APPLICATION_STATUSES = ['pending', 'approved', 'rejected']
+
 const adminStore = useAdminStore()
 const catalogStore = useCatalogStore()
 const toastStore = useToastStore()
+const route = useRoute()
+// Deep links (e.g. the SuperAdmin dashboard's pending-review queue) may preselect the tab and
+// status; anything unrecognised falls back to the default pending-tutor view.
 const filters = reactive({
-  role: 'tutor',
-  status: 'pending',
+  role: APPLICANT_ROLES.includes(route.query.role) ? route.query.role : 'tutor',
+  status: APPLICATION_STATUSES.includes(route.query.status) ? route.query.status : 'pending',
   reviewType: ''
 })
 
@@ -347,7 +373,12 @@ const processing = ref(false)
 const processingSubject = ref('')
 const editingSubjectCode = ref('')
 const savingSubjectEdit = ref(false)
-const subjectEditForm = reactive({ subject_name: '', category: '', keywords: '', description: '' })
+const subjectEditForm = reactive({
+  subject_name: '',
+  category: '',
+  keywords: '',
+  catalog_description: '',
+})
 // 'select' shows the taxonomy dropdown; 'new' shows the free-text "add a category" input,
 // entered either by picking "+ Add new category..." or automatically when a proposed subject's
 // category doesn't match anything in the derived list.
@@ -421,9 +452,18 @@ const selectedReviewTypeLabel = computed(() =>
   selectedReviewType.value === 'renewal' ? 'Renewal Submission' : 'Application'
 )
 
+const isInitialTutorReview = computed(
+  () => filters.role === 'tutor' && selectedReviewType.value === 'initial'
+)
+
 const proposedSubjects = computed(() => {
-  if (filters.role !== 'tutor' || selectedReviewType.value !== 'initial') return []
+  if (!isInitialTutorReview.value) return []
   return selectedApp.value?.proposed_subjects || []
+})
+
+const selectedSubjects = computed(() => {
+  if (!isInitialTutorReview.value) return []
+  return selectedApp.value?.selected_subjects || []
 })
 
 const approveButtonLabel = computed(() =>
@@ -535,7 +575,9 @@ const startSubjectEdit = (subject) => {
     subject_name: subject.subject_name,
     category: subject.category,
     keywords: subject.keywords || '',
-    description: subject.description || '',
+    // Proposals arrive with no catalog copy; prefill from the tutor's note so
+    // the admin edits a draft rather than starting from an empty box.
+    catalog_description: subject.catalog_description || subject.tutor_note || '',
   })
 
   if (subject.category && !taxonomyCategories.value.includes(subject.category)) {
@@ -581,7 +623,7 @@ const saveSubjectEdit = async (subject) => {
       subject.subject_code,
       { ...subjectEditForm },
     )
-    Object.assign(subject, updated, { description: subjectEditForm.description })
+    Object.assign(subject, updated, { catalog_description: subjectEditForm.catalog_description })
     // Sync into the catalog store immediately so the category (and keyword) pickers reflect this
     // save without waiting on the next fetchCourseCatalog().
     catalogStore.upsertLocalCatalogSubject(subject)
@@ -723,6 +765,31 @@ onMounted(() => {
 .proposed-subject-row.editing {
   flex-direction: column;
   align-items: stretch;
+}
+
+.tutor-note-readonly {
+  padding: 0.5rem 0.65rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--sb-card-border);
+  background: var(--sb-surface-muted, var(--sb-card-bg));
+  color: var(--sb-text-muted);
+}
+
+.selected-subject-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.selected-subject-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid var(--sb-card-border);
+  background: var(--sb-card-bg);
+  font-size: 0.82rem;
 }
 
 .proposed-subject-edit-form {

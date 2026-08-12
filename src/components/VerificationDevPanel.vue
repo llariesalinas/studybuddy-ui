@@ -150,7 +150,7 @@ onMounted(refresh)
   display: flex;
   flex-wrap: wrap;
   gap: 0.25rem 1rem;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--sb-font-mono);
   font-size: 0.75rem;
 }
 

@@ -186,6 +186,22 @@
                 <span class="small text-muted d-block">ASSIGNED AGENT</span>
                 <strong class="text-sb-primary">{{ selectedTicket.assigned_agent }}</strong>
               </div>
+              <div class="col-6" v-if="selectedTicket.penalized_user">
+                <span class="small text-muted d-block">PENALIZED USER</span>
+                <strong class="sb-text">{{ selectedTicket.penalized_user.name }}</strong>
+                <span class="small text-muted d-block">{{ selectedTicket.penalized_user.role }}</span>
+              </div>
+              <div class="col-6" v-if="selectedTicket.resolution_verdict">
+                <span class="small text-muted d-block">VERDICT</span>
+                <span
+                  class="badge rounded-pill px-2 py-1 small"
+                  :class="selectedTicket.resolution_verdict === 'counted'
+                    ? 'bg-danger-subtle text-danger'
+                    : 'bg-success-subtle text-success'"
+                >
+                  {{ selectedTicket.resolution_verdict === 'counted' ? 'Counted as strike' : 'Excused' }}
+                </span>
+              </div>
             </div>
           </div>
 
@@ -263,7 +279,7 @@
               @click="handleResolve(selectedTicket)"
             >
               <span v-if="resolvingId === selectedTicket.id" class="spinner-border spinner-border-sm me-2"></span>
-              Mark Ticket as Resolved
+              {{ isStrikeTicket(selectedTicket) ? 'Review Late Cancellation' : 'Mark Ticket as Resolved' }}
             </button>
           </div>
         </div>
@@ -340,6 +356,125 @@
         @click="closeEscalationModal"
       ></div>
     </Teleport>
+
+    <!-- Late Cancellation verdict. Two-step on `counted` because the verdict cannot be reversed. -->
+    <Teleport to="body">
+      <div
+        v-if="ticketToJudge"
+        class="modal fade show d-block"
+        tabindex="-1"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="verdict-modal-title"
+      >
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content border-0 shadow">
+            <div class="modal-header border-0 pb-0">
+              <h5 id="verdict-modal-title" class="modal-title fw-bold sb-text">
+                {{ confirmingCounted ? 'Count this as a strike?' : 'Review Late Cancellation' }}
+              </h5>
+              <button
+                type="button"
+                class="btn-close shadow-none"
+                aria-label="Close"
+                @click="closeVerdictModal"
+              ></button>
+            </div>
+
+            <div class="modal-body">
+              <template v-if="!confirmingCounted">
+                <p class="small text-muted mb-3">
+                  Ticket #{{ ticketToJudge.id }} — a session was cancelled after the Grace Cutoff.
+                </p>
+                <div v-if="ticketToJudge.penalized_user" class="verdict-subject rounded-4 p-3 mb-3">
+                  <span class="small text-muted d-block">CANCELLED BY</span>
+                  <strong class="sb-text">{{ ticketToJudge.penalized_user.name }}</strong>
+                  <span class="small text-muted">· {{ ticketToJudge.penalized_user.role }}</span>
+                </div>
+                <p class="small sb-text mb-0">
+                  <strong>Excuse</strong> clears the strike from their record.
+                  <strong>Count as strike</strong> keeps it against them for 14 days.
+                </p>
+              </template>
+
+              <template v-else>
+                <p class="sb-text mb-3">
+                  This will count a strike against
+                  <strong>{{ ticketToJudge.penalized_user?.name || 'this user' }}</strong>
+                  for the next 14 days.
+                </p>
+                <div class="verdict-warning rounded-4 p-3 mb-0">
+                  <p class="small fw-bold mb-1">
+                    <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                    This is final and cannot be reversed.
+                  </p>
+                  <p
+                    v-if="ticketToJudge.penalized_user?.role === 'Tutor'"
+                    class="small mb-0"
+                  >
+                    It also deducts ₱50 from their wallet immediately.
+                  </p>
+                  <p v-else class="small mb-0">
+                    At 3 active strikes they cannot book new sessions until one expires.
+                  </p>
+                </div>
+              </template>
+
+              <p v-if="verdictError" class="text-danger small mt-3 mb-0">
+                {{ verdictError }}
+              </p>
+            </div>
+
+            <div class="modal-footer border-0 pt-0">
+              <template v-if="!confirmingCounted">
+                <button
+                  type="button"
+                  class="btn btn-outline-success rounded-pill px-4 sb-btn"
+                  :disabled="resolvingId === ticketToJudge.id"
+                  @click="submitVerdict('excused')"
+                >
+                  <span v-if="resolvingId === ticketToJudge.id" class="spinner-border spinner-border-sm me-2"></span>
+                  Excuse
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-danger-soft px-4 sb-btn"
+                  :disabled="resolvingId === ticketToJudge.id"
+                  @click="submitVerdict('counted')"
+                >
+                  Count as strike
+                </button>
+              </template>
+
+              <template v-else>
+                <button
+                  type="button"
+                  class="btn btn-light rounded-pill px-4 sb-btn"
+                  :disabled="resolvingId === ticketToJudge.id"
+                  @click="confirmingCounted = false"
+                >
+                  Go back
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-danger rounded-pill px-4 sb-btn"
+                  :disabled="resolvingId === ticketToJudge.id"
+                  @click="submitVerdict('counted')"
+                >
+                  <span v-if="resolvingId === ticketToJudge.id" class="spinner-border spinner-border-sm me-2"></span>
+                  Confirm strike
+                </button>
+              </template>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div
+        v-if="ticketToJudge"
+        class="modal-backdrop fade show"
+        @click="closeVerdictModal"
+      ></div>
+    </Teleport>
   </div>
 </template>
 
@@ -362,9 +497,14 @@ const selectedTicket = ref(null)
 const ticketToEscalate = ref(null)
 const escalationReason = ref('')
 const escalationError = ref('')
+const ticketToJudge = ref(null)
+const verdictError = ref('')
+const confirmingCounted = ref(false)
 const isSuperAdminDesk = computed(() => route.path.startsWith('/superadmin'))
+// System-opened Late Cancellation tickets land in the SuperAdmin queue as Open/unescalated, so
+// that desk needs an Open tab or they are fetched but unreachable.
 const statusTabs = computed(() => (
-  isSuperAdminDesk.value ? ['Escalated', 'Resolved'] : ['Open', 'In_Progress', 'Resolved']
+  isSuperAdminDesk.value ? ['Open', 'Escalated', 'Resolved'] : ['Open', 'In_Progress', 'Resolved']
 ))
 
 const filters = reactive({
@@ -393,6 +533,7 @@ watch(isSuperAdminDesk, (superAdminDesk) => {
   filters.status = superAdminDesk ? 'Escalated' : 'Open'
   selectedTicket.value = null
   ticketToEscalate.value = null
+  closeVerdictModal()
 })
 
 const getCount = (status) => tickets.value.filter((t) => t.status === status).length
@@ -430,8 +571,12 @@ const canEscalate = (ticket) => {
   return !isSuperAdminDesk.value && ticket.status === 'In_Progress'
 }
 
+const isStrikeTicket = (ticket) => ticket?.category === 'Late_Cancellation'
+
 const canResolve = (ticket) => {
   if (ticket.status === 'Resolved') return false
+  // A strike ticket needs a verdict, and admin_resolve_ticket only accepts one from a SuperAdmin.
+  if (isStrikeTicket(ticket)) return isSuperAdminDesk.value
   if (ticket.status === 'Escalated') return isSuperAdminDesk.value
   return !isSuperAdminDesk.value
 }
@@ -490,7 +635,55 @@ const handleEscalate = async () => {
   }
 }
 
+const openVerdictModal = (ticket) => {
+  ticketToJudge.value = ticket
+  confirmingCounted.value = false
+  verdictError.value = ''
+}
+
+const closeVerdictModal = () => {
+  ticketToJudge.value = null
+  confirmingCounted.value = false
+  verdictError.value = ''
+}
+
+const submitVerdict = async (verdict) => {
+  const ticket = ticketToJudge.value
+  if (!ticket) return
+
+  // Counting a strike is final and deducts from a tutor's wallet, so it goes through a second
+  // step. Excusing is the relieving verdict and needs no guard.
+  if (verdict === 'counted' && !confirmingCounted.value) {
+    confirmingCounted.value = true
+    return
+  }
+
+  resolvingId.value = ticket.id
+  verdictError.value = ''
+  try {
+    await api.post(`admin/support/tickets/${ticket.id}/resolve/`, { verdict })
+    toastStore.push(
+      verdict === 'counted'
+        ? 'Late cancellation counted as a strike.'
+        : 'Late cancellation excused. No strike recorded.',
+    )
+    selectedTicket.value = null
+    closeVerdictModal()
+    await fetchTickets()
+  } catch (error) {
+    console.error('Failed to resolve support ticket:', error)
+    verdictError.value = error.response?.data?.error || 'Unable to resolve ticket.'
+  } finally {
+    resolvingId.value = null
+  }
+}
+
 const handleResolve = async (ticket) => {
+  if (isStrikeTicket(ticket)) {
+    openVerdictModal(ticket)
+    return
+  }
+
   if (!confirm('Are you sure you want to mark this ticket as Resolved? The chat conversation will be closed.')) {
     return
   }
@@ -572,6 +765,17 @@ const formatDateFull = (dateStr) => {
 </script>
 
 <style scoped>
+.verdict-subject {
+  background: var(--sb-bg);
+  border: 1px solid var(--sb-card-border);
+}
+
+.verdict-warning {
+  border: 1px solid color-mix(in srgb, var(--sb-danger) 30%, transparent);
+  background: color-mix(in srgb, var(--sb-danger) 12%, transparent);
+  color: var(--sb-danger);
+}
+
 .filter-bar {
     background: var(--sb-bg);
     border: 1px solid var(--sb-card-border);

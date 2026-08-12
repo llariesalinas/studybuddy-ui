@@ -1,131 +1,98 @@
 <template>
-  <div class="onboarding-page">
-    <nav class="navbar sb-surface py-3">
-      <div class="container d-flex justify-content-between align-items-center">
-        <span class="navbar-brand fw-bold fs-4 sb-text">StudyBuddy</span>
-        <SbThemeToggle />
+  <TutorOnboardingShell :current-step="2">
+    <h3>
+      Add your subjects<span class="subject-counter"
+        >{{ selectedSubjects.length }}/{{ SUBJECT_LIMIT }}</span
+      >
+    </h3>
+    <p class="muted">Search the catalog, or propose one that's missing.</p>
+
+    <SubjectTaxonomyPicker
+      v-model="selectedCodes"
+      :subjects="allSubjects"
+      :max-selection="SUBJECT_LIMIT"
+      allow-propose
+      @propose="openProposalForm"
+    />
+
+    <button
+      v-if="!showProposalForm"
+      type="button"
+      class="btn-outline-pill sb-btn propose-trigger"
+      @click="openProposalForm"
+    >
+      + Propose a subject not in the catalog
+    </button>
+
+    <form v-if="showProposalForm" class="proposal-form" @submit.prevent="handleProposal">
+      <div>
+        <label class="field-label" for="proposal-name">Subject name</label>
+        <input
+          id="proposal-name"
+          v-model.trim="proposal.subject_name"
+          class="mini-input sb-field"
+          required
+        />
       </div>
-    </nav>
-
-    <main class="container py-5">
-      <div class="row justify-content-center">
-        <div class="col-lg-9">
-          <div class="onboarding-shell">
-            <aside class="onboarding-rail">
-              <div class="rail-step rail-step-done">
-                <span class="rail-num"></span><span>Preferences</span>
-              </div>
-              <div class="rail-step rail-step-active">
-                <span class="rail-num">2</span><span>Subjects</span>
-              </div>
-              <div class="rail-step"><span class="rail-num">3</span><span>Verify</span></div>
-            </aside>
-
-            <section class="onboarding-main sb-text">
-              <h3>
-                Add your subjects<span class="subject-counter"
-                  >{{ selectedSubjects.length }}/{{ SUBJECT_LIMIT }}</span
-                >
-              </h3>
-              <p class="muted">Search the catalog, or propose one that's missing.</p>
-
-              <SubjectTaxonomyPicker
-                v-model="selectedCodes"
-                :subjects="allSubjects"
-                :max-selection="SUBJECT_LIMIT"
-                allow-propose
-                @propose="openProposalForm"
-              />
-
-              <button
-                v-if="!showProposalForm"
-                type="button"
-                class="btn-outline-pill sb-btn propose-trigger"
-                @click="openProposalForm"
-              >
-                + Propose a subject not in the catalog
-              </button>
-
-              <form v-if="showProposalForm" class="proposal-form" @submit.prevent="handleProposal">
-                <div>
-                  <label class="field-label" for="proposal-name">Subject name</label>
-                  <input
-                    id="proposal-name"
-                    v-model.trim="proposal.subject_name"
-                    class="mini-input sb-field"
-                    required
-                  />
-                </div>
-                <div>
-                  <label class="field-label" for="proposal-category">Category</label>
-                  <select
-                    id="proposal-category"
-                    v-model="proposal.category"
-                    class="mini-input sb-field"
-                    required
-                  >
-                    <option value="" disabled>Select a category</option>
-                    <option v-for="category in categories" :key="category" :value="category">
-                      {{ category }}
-                    </option>
-                  </select>
-                </div>
-                <div>
-                  <label class="field-label" for="proposal-description"
-                    >Description (optional)</label
-                  >
-                  <textarea
-                    id="proposal-description"
-                    v-model.trim="proposal.description"
-                    class="mini-input sb-field"
-                    rows="3"
-                  ></textarea>
-                </div>
-                <div class="proposal-actions">
-                  <button type="submit" class="btn-primary-pill sb-btn" :disabled="isSubmitting">
-                    {{ isSubmitting ? 'Proposing...' : 'Add proposal' }}
-                  </button>
-                  <button
-                    type="button"
-                    class="btn-outline-pill sb-btn"
-                    @click="showProposalForm = false"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
-
-              <div class="step-nav-row">
-                <button
-                  type="button"
-                  class="btn-outline-pill sb-btn"
-                  :disabled="isSubmitting"
-                  @click="goBackToPreferences"
-                >
-                  &larr; Back
-                </button>
-                <button
-                  type="button"
-                  class="btn-primary-pill continue-button sb-btn"
-                  :disabled="!selectedSubjects.length || isSubmitting"
-                  @click="continueToVerification"
-                >
-                  Continue to Verification
-                </button>
-              </div>
-            </section>
-          </div>
-        </div>
+      <div>
+        <label class="field-label" for="proposal-category">Category</label>
+        <select
+          id="proposal-category"
+          v-model="proposal.category"
+          class="mini-input sb-field"
+          required
+        >
+          <option value="" disabled>Select a category</option>
+          <option v-for="category in categories" :key="category" :value="category">
+            {{ category }}
+          </option>
+        </select>
       </div>
-    </main>
-  </div>
+      <div>
+        <label class="field-label" for="proposal-description">Description (optional)</label>
+        <textarea
+          id="proposal-description"
+          v-model.trim="proposal.description"
+          class="mini-input sb-field"
+          rows="3"
+        ></textarea>
+      </div>
+      <div class="proposal-actions">
+        <button type="submit" class="btn-primary-pill sb-btn" :disabled="isSubmitting">
+          {{ isSubmitting ? 'Proposing...' : 'Add proposal' }}
+        </button>
+        <button type="button" class="btn-outline-pill sb-btn" @click="showProposalForm = false">
+          Cancel
+        </button>
+      </div>
+    </form>
+
+    <div class="step-nav-row">
+      <button
+        type="button"
+        class="btn-outline-pill sb-btn"
+        :disabled="isSubmitting"
+        @click="goBackToPreferences"
+      >
+        &larr; Back
+      </button>
+      <button
+        type="button"
+        class="btn-primary-pill continue-button sb-btn"
+        :disabled="!selectedSubjects.length || isSubmitting"
+        @click="continueToVerification"
+      >
+        Continue to Verification
+      </button>
+    </div>
+  </TutorOnboardingShell>
 </template>
 
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import SbThemeToggle from '@/components/SbThemeToggle.vue'
 import SubjectTaxonomyPicker from '@/components/SubjectTaxonomyPicker.vue'
+import TutorOnboardingShell from '@/components/TutorOnboardingShell.vue'
 import { useProfileStore } from '@/stores/profile'
 import { useToastStore } from '@/stores/toast'
 import {
@@ -240,76 +207,6 @@ onMounted(loadSubjects)
 </script>
 
 <style scoped>
-.onboarding-page {
-  min-height: 100vh;
-  background: var(--sb-bg);
-}
-.onboarding-shell {
-  display: flex;
-  background: var(--sb-card-bg);
-  border: 1px solid var(--sb-card-border);
-  border-radius: 18px;
-  box-shadow: 0 6px 20px var(--sb-shadow-soft);
-  overflow: hidden;
-}
-.onboarding-rail {
-  width: 160px;
-  flex-shrink: 0;
-  background: color-mix(in srgb, var(--sb-primary) 8%, var(--sb-card-bg));
-  border-right: 1px solid var(--sb-card-border);
-  padding: 28px 16px;
-}
-.rail-step {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 24px;
-  font-size: 13px;
-  color: var(--sb-text-muted);
-}
-.rail-num {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  border: 1.5px solid var(--sb-card-border);
-  background: var(--sb-card-bg);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  font-size: 11px;
-  flex-shrink: 0;
-}
-.rail-step-active {
-  color: var(--sb-text-main);
-  font-weight: 700;
-}
-.rail-step-active .rail-num,
-.rail-step-done .rail-num {
-  background: var(--sb-primary);
-  border-color: var(--sb-primary);
-  color: var(--sb-primary-contrast);
-}
-.rail-step-done .rail-num::after {
-  content: '\2713';
-  color: var(--sb-primary-contrast);
-  font-size: 12px;
-}
-.onboarding-main {
-  flex: 1;
-  min-width: 0;
-  padding: 32px 32px 30px;
-}
-.onboarding-main h3 {
-  font-weight: 800;
-  margin: 0 0 0.2rem;
-  font-size: 1.15rem;
-}
-.muted {
-  color: var(--sb-text-muted);
-  margin: 0 0 1.25rem;
-  font-size: 0.92rem;
-}
 .subject-counter {
   float: right;
   color: var(--sb-text-muted);
@@ -415,27 +312,5 @@ onMounted(loadSubjects)
 }
 .continue-button {
   flex: 1;
-}
-@media (max-width: 640px) {
-  .onboarding-shell {
-    flex-direction: column;
-  }
-  .onboarding-rail {
-    width: 100%;
-    display: flex;
-    justify-content: space-between;
-    padding: 16px 18px;
-    border-right: 0;
-    border-bottom: 1px solid var(--sb-card-border);
-  }
-  .rail-step {
-    margin-bottom: 0;
-    flex-direction: column;
-    gap: 4px;
-    font-size: 11px;
-  }
-  .onboarding-main {
-    padding: 26px 20px;
-  }
 }
 </style>

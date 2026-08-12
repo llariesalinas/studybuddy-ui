@@ -164,6 +164,18 @@ the Tutee being scored. Found by `top_k` (`backend/studybuddy/recommender/CF.py`
 lists are computed once per recommendation request and reused across every candidate Tutor: the
 Peer Pool and the global pool.
 
+**Co-rated Set**:
+The Tutors that two Tutees have both rated. Pearson similarity is computed over this intersection
+and nothing else (`sim` in `backend/studybuddy/recommender/CF.py`), so a pair sharing one Tutor
+scores 0 and is dropped, and a pair sharing exactly two always scores exactly +/-1 whatever the
+values are — three or more is the point below which a similarity is degenerate rather than merely
+weak. Note the average taken over the Co-rated Set is not the same number as the Tutee's overall
+rating average: the former is what Pearson measures deviation from, the latter is what the CF
+prediction's deviation term uses, and they diverge whenever either Tutee has rated a Tutor the
+other has not. The algorithm demo tool shows the set expanded per neighbour, labelling both.
+_Avoid_: "shared ratings" (ambiguous — the Tutors are shared, the scores are each Tutee's own),
+"overlap" (used elsewhere for schedule overlap)
+
 **Peer Pool**:
 The Top-K Neighbors drawn only from Tutees with exactly the same course as the Tutee being scored
 (no strand tier). CF prefers the Peer Pool per candidate Tutor ("peer ratings"); when no peer has
@@ -291,24 +303,37 @@ _Avoid_: "decline" (a pre-cutoff cancellation is still a cancellation, just untr
 (a different, more severe event — the session was never cancelled at all), "cancellation request"
 (nothing is requested — the cancellation takes effect immediately)
 
-**Counted Strike**:
-A Late Cancellation whose Support Ticket the admin resolved as counted rather than excused. For a
-Tutor it also costs a flat P50 wallet deduction (paid to the platform, not the wronged party; the
-deduction may push the wallet negative). Tutees pay no fee — they have no wallet to deduct from.
-Excused Late Cancellations and pre-cutoff cancellations are never Counted Strikes.
-_Avoid_: "penalty" alone (ambiguous between the fee and the cap), "fine" for Tutees (there is none)
+**Active Strike**:
+A Late Cancellation ticket that still counts against its Strike Cap: opened within the last 14
+days and not excused. An unresolved ticket is *provisional* — it counts from the moment it is
+opened, before any admin has looked at it. Only an explicit excused verdict relieves a strike;
+resolving as counted changes nothing about the count, because the ticket was already counting.
+_Avoid_: "pending strike" (it is not waiting to take effect — it already has)
 
-**Monthly Strike Cap**:
-The limit of 3 Counted Strikes per calendar month, applied per user to both roles. Reaching the
-cap suspends the role's core privilege for the remainder of that calendar month: a Tutee cannot
-create new bookings; a Tutor's availability is hidden from search. Existing confirmed sessions are
-untouched. The count resets at the start of the next calendar month.
-_Avoid_: "cancellation limit" (pre-cutoff and excused cancellations are unlimited and uncounted)
+**Counted Strike**:
+A Late Cancellation whose Support Ticket the admin resolved as counted rather than excused. The
+verdict's only remaining consequence is money: for a Tutor it costs a flat P50 wallet deduction
+(paid to the platform, not the wronged party; the deduction may push the wallet negative). Tutees
+pay no fee — they have no wallet to deduct from. The *block* is provisional; the *money* is not —
+a wallet debit cannot be undone, so it never fires on an unreviewed ticket. See ADR-0011.
+_Avoid_: "penalty" alone (ambiguous between the fee and the cap), "fine" for Tutees (there is
+none), treating it as the thing that causes a block (an Active Strike does that)
+
+**Strike Cap**:
+The limit of 3 Active Strikes, applied per user to both roles. Reaching the cap suspends the
+role's core privilege: a Tutee cannot create new bookings; a Tutor's availability is hidden from
+search. Existing confirmed sessions are untouched. Strikes expire individually, 14 days after
+each was issued — the block lifts the moment the count drops below 3, with no shared reset date.
+_Avoid_: "monthly cap" / "calendar reset" (the window is rolling per strike, not per month —
+the calendar-month rule was replaced), "cancellation limit" (pre-cutoff and excused cancellations
+are unlimited and uncounted)
 
 **Booking Horizon**:
 The farthest ahead a session can be instant-booked: 14 days from the moment of booking. Bounds
 the damage a stale recurring availability slot can cause (a forgotten weekly slot can accumulate
 at most two weeks of auto-confirmed sessions, not a semester's worth). A platform-wide constant.
+Not the strike window: the Strike Cap's rolling window is also 14 days, but the two are unrelated
+constants (`BOOKING_HORIZON_DAYS` vs `STRIKE_WINDOW_DAYS`) and either may change alone.
 _Avoid_: "advance booking limit" (one canonical term)
 
 **Meeting Link**:
@@ -362,3 +387,41 @@ A Subject owned by one Partner Institution and visible only to users and admins 
 institution. Custom Subjects can be curated into the owning institution's Institution Course
 Catalog, but cannot be curated by other institutions.
 _Avoid_: global subject, shared subject
+
+### Reporting population
+
+**Tutor Roster**:
+Every Tutor account that exists, regardless of activity. This is what the SuperAdmin Users tab
+lists — filterable by role, institution and status, but never by time.
+_Avoid_: "all tutors" on any Reports surface (see Period-Active Tutor)
+
+**Period-Active Tutor**:
+A Tutor with at least one Completed session inside the reporting window. A strict subset of the
+Tutor Roster, and the population every figure on the SuperAdmin Reports screen is drawn from. A
+Tutor who taught nothing in the window is absent from Reports entirely — they are not shown as a
+zero row. The two populations differ, and differ by period, so no Reports surface may be titled
+"All tutors".
+_Avoid_: all tutors, tutor list, roster (a roster includes the idle; this does not)
+
+**Lifetime Sessions**:
+A Tutor's total Completed sessions since joining. A stored field, surfaced on the Users tab and in
+the user export.
+_Avoid_: "sessions" unqualified when a Period Sessions figure is anywhere nearby
+
+**Period Sessions**:
+Completed sessions inside the selected reporting window, for the selected institution. Computed
+per request on the Reports screen and its exports. Different from Lifetime Sessions for the same
+Tutor; placing the two in one row without distinguishing labels has already produced one shipped
+defect.
+_Avoid_: total sessions (that phrasing means Lifetime Sessions)
+
+**Earnings**:
+A Tutor's share of Gross Revenue in the reporting window, from Paid payments only. Always
+period-scoped — there is no lifetime earnings figure anywhere in the product.
+_Avoid_: total earnings, wallet balance (a wallet balance is current funds, not period income)
+
+**Period**:
+The reporting window every Reports figure is scoped to (7d / 30d / 3m / all time). Changing it
+changes the *population*, not just the totals: the set of Period-Active Tutors and the set of
+Subjects with any bookings both shrink and grow with it.
+_Avoid_: date range (the window is chosen from fixed options, not arbitrary endpoints)

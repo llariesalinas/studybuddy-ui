@@ -28,12 +28,24 @@
           clear-label="All institutions"
           trigger-class="institution-trigger"
         />
-        <button type="button" class="export-button" :disabled="store.loading.export" @click="exportCsv">
+        <button type="button" class="export-button" :disabled="store.loading.export" @click="openExportModal">
           <i class="bi bi-download"></i>
           Export
         </button>
       </div>
     </header>
+
+    <SbExportModal
+      :open="isExportOpen"
+      title="Export report"
+      :items="exportSections"
+      :scope-line="exportScopeLine"
+      :combined-file-label="REPORT_COMBINED_FILE_LABEL"
+      file-extension="xlsx"
+      :busy="store.loading.export"
+      @confirm="exportWorkbook"
+      @close="isExportOpen = false"
+    />
 
     <section class="metric-grid">
       <article v-for="metric in metrics" :key="metric.label" class="metric-card sb-card-lift" :class="{ primary: metric.primary }">
@@ -86,6 +98,9 @@
             <p class="eyebrow">Tutors</p>
             <h2>Top performers</h2>
           </div>
+          <RouterLink v-if="tutorTotal > REPORT_CARD_ROW_LIMIT" :to="tutorsDetailTo" class="view-all">
+            View all
+          </RouterLink>
         </div>
         <div class="table-responsive">
           <table class="table align-middle mb-0">
@@ -123,6 +138,13 @@
             <p class="eyebrow">Demand</p>
             <h2>Subject popularity</h2>
           </div>
+          <RouterLink
+            v-if="subjectTotal > REPORT_CARD_ROW_LIMIT"
+            :to="subjectsDetailTo"
+            class="view-all"
+          >
+            View all
+          </RouterLink>
         </div>
         <div v-if="subjectPopularity.length" class="subject-list">
           <div v-for="(subject, index) in subjectPopularity" :key="subject.subject_name" class="subject-row">
@@ -187,24 +209,41 @@
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
+import { RouterLink, useRoute } from 'vue-router'
+import SbExportModal from '@/components/SbExportModal.vue'
 import SbSelectModal from '@/components/SbSelectModal.vue'
 import { useHaptics } from '@/composables/useHaptics'
 import { useSuperAdminStore } from '@/stores/superadmin'
 import { useToastStore } from '@/stores/toast'
+import { REPORT_COMBINED_FILE_LABEL, REPORT_SECTIONS } from '@/constants/superadminExports'
+import {
+  ALL_INSTITUTIONS_LABEL,
+  REPORT_CARD_ROW_LIMIT,
+  REPORT_DEFAULT_PERIOD,
+  REPORT_DETAIL_DATASETS,
+  REPORT_PERIOD_OPTIONS,
+  reportPeriodScopeLabel,
+} from '@/constants/superadminReports'
 
 const store = useSuperAdminStore()
 const toastStore = useToastStore()
 const { vibrate, patterns } = useHaptics()
 
-const selectedInstitutionId = ref('')
-const period = ref('30d')
+const route = useRoute()
 
-const periodOptions = [
-  { label: '7D', value: '7d' },
-  { label: '30D', value: '30d' },
-  { label: '3M', value: '3m' },
-  { label: 'All', value: 'all' },
-]
+// Seeded from the query string so returning from a drill-down page restores the filters the user
+// left with, rather than snapping back to the defaults.
+const selectedInstitutionId = ref(route.query.institution ? String(route.query.institution) : '')
+const period = ref(
+  REPORT_PERIOD_OPTIONS.some((option) => option.value === route.query.period)
+    ? String(route.query.period)
+    : REPORT_DEFAULT_PERIOD,
+)
+const isExportOpen = ref(false)
+
+const exportSections = REPORT_SECTIONS
+
+const periodOptions = REPORT_PERIOD_OPTIONS
 
 const subjectColors = ['#00895a', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899']
 
@@ -222,6 +261,36 @@ const selectedInstitutionName = computed(() => {
   const inst = store.institutionPerformance.find((item) => String(item.id) === String(selectedInstitutionId.value))
   return inst?.institution_name || null
 })
+
+const exportScopeLine = computed(() =>
+  [
+    reportPeriodScopeLabel(period.value),
+    selectedInstitutionName.value || ALL_INSTITUTIONS_LABEL,
+  ].join(' · '),
+)
+
+// Carried into the drill-down routes so a detail page opens on the slice that was clicked, and so
+// the crumb back from it restores these same filters.
+const detailQuery = computed(() => {
+  const query = { period: period.value }
+  if (selectedInstitutionId.value) query.institution = selectedInstitutionId.value
+  return query
+})
+
+// Totals come from the API rather than the rendered rows: the cards are truncated, so the row
+// count cannot say how many exist behind them, and the figure moves with the period.
+const tutorTotal = computed(() => store.analytics?.tutor_total ?? 0)
+const subjectTotal = computed(() => store.analytics?.subject_total ?? 0)
+
+const tutorsDetailTo = computed(() => ({
+  name: REPORT_DETAIL_DATASETS.tutors.routeName,
+  query: detailQuery.value,
+}))
+
+const subjectsDetailTo = computed(() => ({
+  name: REPORT_DETAIL_DATASETS.subjects.routeName,
+  query: detailQuery.value,
+}))
 
 const metrics = computed(() => [
   {
@@ -278,7 +347,12 @@ const topSessionCount = computed(() => {
   return Math.max(...tutors.map((tutor) => tutor.sessions || 0), 1)
 })
 
-const subjectPopularity = computed(() => (store.analytics?.subject_popularity || []).slice(0, 5))
+// The server also truncates, at its own larger cap. Slicing again here is what made the card show
+// five subjects while the export sheet carried ten; the shared constant keeps the card's summary
+// length stated once.
+const subjectPopularity = computed(() =>
+  (store.analytics?.subject_popularity || []).slice(0, REPORT_CARD_ROW_LIMIT),
+)
 const maxSubjectCount = computed(() => {
   if (!subjectPopularity.value.length) return 1
   return Math.max(...subjectPopularity.value.map((subject) => subject.booking_count || 0), 1)
@@ -309,15 +383,22 @@ function loadAnalytics() {
   store.fetchAnalytics(selectedInstitutionId.value || null, period.value)
 }
 
-async function exportCsv() {
+function openExportModal() {
   vibrate(patterns.light)
+  isExportOpen.value = true
+}
+
+async function exportWorkbook({ ids, filename }) {
+  isExportOpen.value = false
   try {
-    await store.exportAnalyticsCsv({
+    await store.exportAnalyticsWorkbook({
       institutionId: selectedInstitutionId.value || null,
       period: period.value,
+      sections: ids,
+      filename,
     })
   } catch {
-    toastStore.push('Failed to export CSV.', 'error')
+    toastStore.push('Failed to export the report.', 'error')
   }
 }
 
@@ -493,6 +574,28 @@ h2 {
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 18px;
+}
+
+.view-all {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  padding: 5px 14px;
+  border: 1px solid var(--sb-card-border);
+  border-radius: 999px;
+  background: #fff;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--sb-primary);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.view-all:hover {
+  background: var(--sb-primary);
+  border-color: var(--sb-primary);
+  color: #fff;
 }
 
 .chart-skeleton {

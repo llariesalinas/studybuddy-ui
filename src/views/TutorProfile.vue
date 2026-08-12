@@ -1129,7 +1129,7 @@ onMounted(() => {
   padding: 2rem;
   overflow: hidden;
   color: var(--sb-ink);
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--sb-font-base);
   background: transparent;
 }
 

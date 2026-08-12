@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Subject picker focus redesign - 2026-08-10</title>
+<style>
+  body { margin: 0; padding: 32px 20px 60px; background: #F8F9FA; color: #163127;
+         font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .page { max-width: 860px; margin: 0 auto; }
+  h1 { font-size: 1.5rem; margin: 0 0 6px; }
+  .lede { color: #6B7280; font-size: .9rem; line-height: 1.5; margin: 0 0 28px; max-width: 62ch; }
+  .lbl { display: inline-block; font-size: .68rem; text-transform: uppercase; letter-spacing: .06em;
+         font-weight: 700; color: #6B7280; margin: 26px 0 8px; }
+  .cap { font-size: .8rem; color: #6B7280; margin: 8px 0 0; line-height: 1.5; max-width: 66ch; }
+
+  .sb {
+    --p: #00895A; --p-light: #edf6f1; --violet: #8E7CF4; --blue: #006591;
+    --yellow: #DCA21B; --orange: #E0683A; --pink: #E26D86;
+    --card: #ffffff; --border: #EAEAEA; --text: #163127; --muted: #6B7280;
+    --bg: #F8F9FA; --border-light: #e0e7e3;
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px;
+  }
+  .sb * { box-sizing: border-box; }
+  .sb .search { position: relative; margin-bottom: 14px; }
+  .sb .search input { width: 100%; padding: 10px 32px 10px 34px; border: 1.5px solid var(--border);
+    border-radius: 10px; font-size: .88rem; background: var(--bg); color: var(--text); font-family: inherit; }
+  .sb .search.active input { border-color: var(--p); background: var(--card); }
+  .sb .search .ico { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); display: flex; }
+  .sb .search .clr { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: var(--muted);
+    border: 0; background: transparent; cursor: pointer; display: flex; padding: 0; }
+
+  .sb .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .sb .rich { position: relative; overflow: hidden; min-height: 112px; padding: 16px; text-align: left;
+    border: 1px solid; border-radius: 16px; cursor: pointer; display: block; width: 100%;
+    border-color: color-mix(in srgb, var(--cat) 30%, var(--border));
+    background: linear-gradient(135deg, color-mix(in srgb, var(--cat) 12%, var(--card)), var(--card) 65%); }
+  .sb .rich strong, .sb .rich small { display: block; position: relative; }
+  .sb .rich strong { font-size: .86rem; }
+  .sb .rich small { font-size: .72rem; color: var(--muted); margin-top: 4px; }
+  .sb .rich .mono { position: absolute; right: -8px; bottom: -35px; font: 700 6rem Georgia, serif;
+    color: color-mix(in srgb, var(--cat) 20%, transparent); line-height: 1; }
+  .sb .rich .sel { position: absolute; top: 11px; right: 11px; z-index: 2; font-size: .64rem; background: var(--p);
+    color: #fff; border-radius: 999px; padding: 1px 7px; font-weight: 700; }
+  .sb .rich .hit { color: var(--p); font-weight: 700; }
+  .sb .rich.compact { min-height: 0; padding: 12px 14px; border-radius: 13px; }
+  .sb .rich.compact strong { font-size: .81rem; }
+
+  .sb .back-pill { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--border);
+    background: var(--card); color: var(--text); border-radius: 999px; padding: 7px 14px 7px 11px;
+    font-size: .8rem; font-weight: 600; font-family: inherit; cursor: pointer; }
+  .sb .head-rule { height: 1px; background: var(--border); margin: 12px 0 14px; }
+  .sb .title { display: flex; align-items: center; gap: 9px; font-size: 1rem; font-weight: 750; margin: 0 0 4px; }
+  .sb .catdot { width: 9px; height: 9px; border-radius: 50%; background: var(--cat); flex: none; }
+  .sb .title .catdot { width: 10px; height: 10px; }
+  .sb .count { display: block; font-size: .75rem; color: var(--muted); margin-bottom: 13px; }
+  .sb .seclbl { font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; font-weight: 700;
+    color: var(--muted); margin: 0 0 8px; }
+
+  .sb .chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border);
+    background: var(--card); color: var(--text); border-radius: 999px; padding: 7px 13px;
+    margin: 0 7px 8px 0; font-size: .84rem; cursor: pointer; font-family: inherit; }
+  .sb .chip.on { border-color: var(--p); background: var(--p-light); font-weight: 650; }
+  .sb .chip.on::before { content: "\2713"; color: var(--p); font-weight: 800; font-size: .78rem; }
+
+  .sb .rows { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .sb .row { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
+    padding: 11px 14px; border-bottom: 1px solid var(--border); background: var(--card); cursor: pointer; }
+  .sb .row:last-child { border-bottom: 0; }
+  .sb .row.on { background: var(--p-light); }
+  .sb .row .nm { font-weight: 680; font-size: .87rem; }
+  .sb .row .ct { font-size: .73rem; color: var(--muted); margin-top: 2px; display: flex; align-items: center; gap: 6px; }
+  .sb .row .ds { font-size: .74rem; color: var(--muted); margin-top: 3px; line-height: 1.4; }
+  .sb .row .add { font-size: .78rem; color: var(--p); font-weight: 750; white-space: nowrap; }
+  .sb .row .via { font-size: .68rem; color: #997404; background: #fdf6e6; border-radius: 999px;
+    padding: 2px 8px; white-space: nowrap; }
+  .sb .hint { font-size: .77rem; color: var(--muted); margin: 12px 0 0; }
+  .sb .hint a { color: var(--p); font-weight: 650; text-decoration: none; }
+  .sb .tray { border-top: 1px dashed var(--border-light); margin-top: 16px; padding-top: 12px;
+    font-size: .8rem; color: var(--muted); }
+  .m1 { --cat: #00895A; } .m2 { --cat: #006591; } .m3 { --cat: #8E7CF4; }
+  .m4 { --cat: #DCA21B; } .m5 { --cat: #E0683A; } .m6 { --cat: #E26D86; }
+</style>
+</head>
+<body>
+<div class="page">
+<h1>Subject picker focus redesign</h1>
+<p class="lede">
+  Locked design for <code>SubjectTaxonomyPicker.vue</code>, 2026-08-10. Browsing focuses one category
+  behind a bordered back pill; searching preserves context instead of destroying the browse view.
+  Category colour marks identity only (card gradient, monogram, heading dot); green marks selection
+  and controls only. Chips for browsing, descriptive rows for searching.
+  See <code>docs/plans/2026-08-10-subject-picker-focus-redesign.md</code>.
+</p>
+
+<span class="lbl">State 1 &mdash; category grid</span>
+<div class="sb">
+  <div class="search">
+    <span class="ico"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="7" cy="7" r="4.7"/><path d="M10.5 10.5 L14.5 14.5" stroke-linecap="round"/></svg></span>
+    <input placeholder="Search subjects" readonly>
+  </div>
+  <div class="grid">
+    <button class="rich m1"><span class="mono">M</span><strong>Mathematics &amp; Data Sciences</strong><small>12 subjects</small></button>
+    <button class="rich m2"><span class="mono">N</span><strong>Natural Sciences</strong><small>14 subjects</small></button>
+    <button class="rich m3"><span class="mono">T</span><span class="sel">2</span><strong>Technology &amp; Computer Science</strong><small>17 subjects</small></button>
+    <button class="rich m4"><span class="mono">B</span><strong>Business, Finance &amp; Economics</strong><small>11 subjects</small></button>
+    <button class="rich m5"><span class="mono">H</span><strong>Humanities &amp; Social Sciences</strong><small>9 subjects</small></button>
+    <button class="rich m6"><span class="mono">H</span><strong>Hobbies &amp; Arts</strong><small>8 subjects</small></button>
+  </div>
+  <div class="tray">Selected 2 &nbsp; <button class="chip on">Python &times;</button><button class="chip on">JavaScript &times;</button></div>
+</div>
+<p class="cap">Gradient tint and monogram watermark carry category identity. Selected count sits in a green corner pill so it does not collide with the monogram.</p>
+
+<span class="lbl">State 2 &mdash; focused category, browsing with chips</span>
+<div class="sb m3">
+  <div class="search">
+    <span class="ico"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="7" cy="7" r="4.7"/><path d="M10.5 10.5 L14.5 14.5" stroke-linecap="round"/></svg></span>
+    <input placeholder="Search in Technology &amp; Computer Science" readonly>
+  </div>
+  <button class="back-pill"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 3.5 L5 8 L9.5 12.5"/></svg> All categories</button>
+  <div class="head-rule"></div>
+  <div class="title"><span class="catdot"></span>Technology &amp; Computer Science</div>
+  <span class="count">17 subjects &middot; 2 selected</span>
+  <button class="chip on">Python</button><button class="chip">Java</button><button class="chip on">JavaScript</button><button class="chip">C</button><button class="chip">C++</button><button class="chip">C#</button><button class="chip">Ruby</button><button class="chip">PHP</button><button class="chip">SQL</button><button class="chip">HTML &amp; CSS</button><button class="chip">Algorithms</button><button class="chip">Data Structures</button><button class="chip">Machine Learning</button><button class="chip">Cybersecurity</button>
+  <div class="tray">Selected 2 &nbsp; <button class="chip on">Python &times;</button><button class="chip on">JavaScript &times;</button></div>
+</div>
+<p class="cap">Back control is a bordered pill above a divider, so it can never read as the heading. No per-chip category dot &mdash; the heading already declares the category.</p>
+
+<span class="lbl">State 3 &mdash; top-level search: compact jump cards, then descriptive rows</span>
+<div class="sb">
+  <div class="search active">
+    <span class="ico"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="7" cy="7" r="4.7"/><path d="M10.5 10.5 L14.5 14.5" stroke-linecap="round"/></svg></span>
+    <input value="coding" readonly>
+    <button class="clr"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 3 L13 13 M13 3 L3 13"/></svg></button>
+  </div>
+  <span class="count">4 results for &ldquo;coding&rdquo; in 2 categories</span>
+  <p class="seclbl">Jump to a category</p>
+  <div class="grid" style="margin-bottom:16px">
+    <button class="rich compact m3"><strong>Technology &amp; Computer Science</strong><small class="hit">3 matches</small></button>
+    <button class="rich compact m1"><strong>Mathematics &amp; Data Sciences</strong><small class="hit">1 match</small></button>
+  </div>
+  <p class="seclbl">Matching subjects</p>
+  <div class="rows">
+    <div class="row on m3"><span><span class="nm">Python</span><span class="ct"><span class="catdot"></span>Technology &amp; Computer Science</span><span class="ds">A general-purpose language widely used for scripting, data, and web backends.</span></span><span class="add">&#10003; Added</span></div>
+    <div class="row m3"><span><span class="nm">Algorithms</span><span class="ct"><span class="catdot"></span>Technology &amp; Computer Science</span><span class="ds">Designing and analysing step-by-step procedures for solving problems.</span></span><span class="via">via &ldquo;coding&rdquo;</span></div>
+    <div class="row m3"><span><span class="nm">Web Development</span><span class="ct"><span class="catdot"></span>Technology &amp; Computer Science</span><span class="ds">Building and deploying sites and web applications, front to back.</span></span><span class="via">via &ldquo;coding&rdquo;</span></div>
+    <div class="row m1"><span><span class="nm">Statistics with R</span><span class="ct"><span class="catdot"></span>Mathematics &amp; Data Sciences</span><span class="ds">Statistical analysis and visualisation using the R language.</span></span><span class="via">via &ldquo;coding&rdquo;</span></div>
+  </div>
+  <div class="tray">Selected 2 &nbsp; <button class="chip on">Python &times;</button><button class="chip on">JavaScript &times;</button></div>
+</div>
+<p class="cap">The jump band reuses the card language at a lower weight (no monogram, reduced height) so the results lead. Cards are a shortcut, not a wall: select straight from a row, or click a card to enter that category already filtered.</p>
+
+<span class="lbl">State 4 &mdash; searching inside a category</span>
+<div class="sb m3">
+  <div class="search active">
+    <span class="ico"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="7" cy="7" r="4.7"/><path d="M10.5 10.5 L14.5 14.5" stroke-linecap="round"/></svg></span>
+    <input value="coding" readonly>
+    <button class="clr"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 3 L13 13 M13 3 L3 13"/></svg></button>
+  </div>
+  <button class="back-pill"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 3.5 L5 8 L9.5 12.5"/></svg> All categories</button>
+  <div class="head-rule"></div>
+  <div class="title"><span class="catdot"></span>Technology &amp; Computer Science</div>
+  <span class="count">3 of 17 match &ldquo;coding&rdquo;</span>
+  <div class="rows">
+    <div class="row on"><span><span class="nm">Python</span><span class="ds">A general-purpose language widely used for scripting, data, and web backends.</span></span><span class="add">&#10003; Added</span></div>
+    <div class="row"><span><span class="nm">Algorithms</span><span class="ds">Designing and analysing step-by-step procedures for solving problems.</span></span><span class="via">via &ldquo;coding&rdquo;</span></div>
+    <div class="row"><span><span class="nm">Web Development</span><span class="ds">Building and deploying sites and web applications, front to back.</span></span><span class="via">via &ldquo;coding&rdquo;</span></div>
+  </div>
+  <p class="hint">1 more match in other categories &mdash; <a href="#">search all categories</a></p>
+  <div class="tray">Selected 2 &nbsp; <button class="chip on">Python &times;</button><button class="chip on">JavaScript &times;</button></div>
+</div>
+<p class="cap">Back pill and heading hold position; only the chips swap for rows. The row category line is dropped because the heading states it. Matches elsewhere collapse to one hint line whose link widens the search.</p>
+</div>
+</body>
+</html>

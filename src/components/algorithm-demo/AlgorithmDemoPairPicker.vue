@@ -29,6 +29,8 @@ const tuteeOptions = computed(() =>
 const selectedTuteeId = ref(null)
 const selectedTutorId = ref(null)
 const rows = ref([])
+// Keyed by neighbour id — see AlgorithmDemoRankedList for why it is not per row.
+const coRated = ref({})
 const reason = ref(null)
 const loading = ref(false)
 const errorMessage = ref('')
@@ -58,6 +60,7 @@ async function onTuteeChange(tuteeId) {
   selectedTuteeId.value = tuteeId
   selectedTutorId.value = null
   rows.value = []
+  coRated.value = {}
   reason.value = null
   errorMessage.value = ''
   clearWhatIf()
@@ -72,6 +75,7 @@ async function refetchRows() {
   try {
     const { data } = await getAlgorithmDemoRecommendation(selectedTuteeId.value, props.institutionId)
     rows.value = data.rows
+    coRated.value = data.co_rated || {}
     reason.value = data.reason
   } catch (err) {
     errorMessage.value = err.response?.data?.error || 'Could not load candidate tutors.'
@@ -111,6 +115,7 @@ async function refreshWhatIf() {
       overrides.value
     )
     rows.value = data.rows
+    coRated.value = data.co_rated || {}
     reason.value = data.reason
     errorMessage.value = ''
   } catch (err) {
@@ -235,7 +240,11 @@ watch(
         <button type="button" class="whatif-reset" @click="resetWhatIf">Reset</button>
       </div>
 
-      <AlgorithmDemoBreakdown :row="selectedRow" @override="onOverride" />
+      <AlgorithmDemoBreakdown
+        :row="selectedRow"
+        :co-rated="coRated"
+        @override="onOverride"
+      />
     </template>
   </div>
 </template>

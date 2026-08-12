@@ -124,15 +124,15 @@
 <p class="subtitle">Regenerated 2026-08-12</p>
 
 <div class="badge-row">
-  <span class="count"><span class="dot" style="background:var(--in-progress)"></span>10 In Progress</span>
+  <span class="count"><span class="dot" style="background:var(--in-progress)"></span>16 In Progress</span>
   <span class="count"><span class="dot" style="background:var(--blocked)"></span>0 Blocked</span>
   <span class="count"><span class="dot" style="background:var(--approved)"></span>4 Approved</span>
   <span class="count"><span class="dot" style="background:var(--draft)"></span>17 Draft</span>
-  <span class="count"><span class="dot" style="background:var(--done)"></span>71 Done</span>
+  <span class="count"><span class="dot" style="background:var(--done)"></span>80 Done</span>
 </div>
 
 <div class="group">
-  <div class="group-title">In Progress (10)</div>
+  <div class="group-title">In Progress (16)</div>
   <div class="cards">
     <div class="card">
       <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-08-12-admin-review-panel-category-keywords-backdrop.md">Admin review panel — category taxonomy gap, keyword catalog check, backdrop fix</a>
@@ -140,9 +140,38 @@
       <div class="summary">Let admins add a new category inline when a proposed subject's category doesn't match the catalog, suggest existing keywords while editing, and fix the segmented backdrop caused by the compact-density zoom bug.</div>
     </div>
     <div class="card">
+      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-08-12-subjects-not-recognized-auth-header-bug.md">Subjects &quot;Not recognized&quot; false-flag from stripped auth header</a>
+      <div class="meta"><span class="status-badge status-in-progress">In Progress</span><span>2026-08-12</span></div>
+      <div class="summary">subjects/ is listed as a public endpoint, so the request interceptor strips the JWT even for logged-in personalized calls, making every already-approved subject show &quot;Not recognized&quot;.</div>
+    </div>
+    <div class="card">
+      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-08-12-tutor-onboarding-modality-rate-redesign.md">Tutor onboarding modality and rate field redesign</a>
+      <div class="meta"><span class="status-badge status-in-progress">In Progress</span><span>2026-08-12</span></div>
+      <div class="summary">Restyle TutorPreferenceSetup's modality/rate fields and integrate the page into the shared onboarding rail shell used by Subjects and Verify.</div>
+    </div>
+    <div class="card">
+      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-08-11-typography-system-rollout.md">Typography system rollout (Plus Jakarta Sans)</a>
+      <div class="meta"><span class="status-badge status-in-progress">In Progress</span><span>2026-08-11</span></div>
+      <div class="summary">Load Plus Jakarta Sans via @fontsource, add --sb-font-base/--sb-font-mono tokens, repoint every hardcoded font-family in the authenticated app to them. Landing page excluded by decision.</div>
+    </div>
+    <div class="card">
+      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-08-10-superadmin-ui-80-percent-density.md">SuperAdmin-side UI at 80% density</a>
+      <div class="meta"><span class="status-badge status-in-progress">In Progress</span><span>2026-08-10</span></div>
+    </div>
+    <div class="card">
+      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-08-09-find-tutors-search-and-booking-fixes.md">Find Tutors search correctness and booking location fixes</a>
+      <div class="meta"><span class="status-badge status-in-progress">In Progress</span><span>2026-08-09</span></div>
+      <div class="summary">Honest search results, one shared definition of a taken slot, and a restored tutor location edit.</div>
+    </div>
+    <div class="card">
       <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-08-08-consolidate-demo-seed.md">Consolidate demo data seeding</a>
       <div class="meta"><span class="status-badge status-in-progress">In Progress</span><span>2026-08-08</span></div>
       <div class="summary">Fold seed_tie_breaker_demo/seed_booking_load_limit_demo/seed_wallet_cases_demo into seed_data.py and seed 2 permanent SuperAdmin accounts, so reset_demo_data + seed_data alone produces a fully demoable database.</div>
+    </div>
+    <div class="card">
+      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-08-08-superadmin-reports-csv-export.md">SuperAdmin Reports CSV export</a>
+      <div class="meta"><span class="status-badge status-in-progress">In Progress</span><span>2026-08-08</span></div>
+      <div class="summary">Replaces the Reports page's institution-rollup CSV with a multi-section export covering daily sessions, top tutors, subject popularity, and per-booking transaction detail.</div>
     </div>
     <div class="card">
       <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-08-07-optional-time-fields-and-range-picker.md">Optional time fields and a single-modal time range picker</a>
@@ -281,8 +310,52 @@
 </div>
 
 <details class="group">
-  <summary>Done (71)</summary>
+  <summary>Done (80)</summary>
   <div class="cards">
+    <div class="card">
+      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-08-12-logo-watermark.md">Logo watermark in sidebar brand badge</a>
+      <div class="meta"><span class="status-badge status-done">Done</span><span>2026-08-12</span></div>
+      <div class="summary">Replace the sidebar's generic book-icon brand badge with the real StudyBuddy logo at full opacity.</div>
+    </div>
+    <div class="card">
+      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-08-11-superadmin-report-drilldown-pages.md">SuperAdmin report drill-down pages</a>
+      <div class="meta"><span class="status-badge status-done">Done</span><span>2026-08-11</span></div>
+      <div class="summary">Give the Top performers and Subject popularity cards a &quot;View all&quot; link to dedicated, filterable pages showing every row, and align the xlsx export with them.</div>
+    </div>
+    <div class="card">
+      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-08-11-superadmin-report-xlsx-export.md">SuperAdmin report export becomes a readable XLSX workbook</a>
+      <div class="meta"><span class="status-badge status-done">Done</span><span>2026-08-11</span></div>
+      <div class="summary">Replace the stacked multi-section analytics CSV with a one-sheet-per-section XLSX, and fix the subject-popularity and top-tutor aggregates it reports.</div>
+    </div>
+    <div class="card">
+      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-08-10-subject-description-search-and-admin-selected-subjects.md">Subject description search and admin selected subjects</a>
+      <div class="meta"><span class="status-badge status-done">Done</span><span>2026-08-10</span></div>
+      <div class="summary">Make subject descriptions searchable in both pickers with two-tier ordering, show a tutor's catalog picks alongside their proposals in the admin review drawer, and repoint the admin Description field at the catalog so approved proposals become searchable.</div>
+    </div>
+    <div class="card">
+      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-08-10-corated-set-visualization.md">Co-rated set visualization in the algorithm demo</a>
+      <div class="meta"><span class="status-badge status-done">Done</span><span>2026-08-10</span></div>
+      <div class="summary">Make the &quot;N co-rated&quot; chip in the CF waterfall openable, revealing which tutors two students both rated and what each gave them, so Pearson similarity is visibly derived rather than asserted.</div>
+    </div>
+    <div class="card">
+      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-08-10-superadmin-export-selection.md">SuperAdmin export selection modal</a>
+      <div class="meta"><span class="status-badge status-done">Done</span><span>2026-08-10</span></div>
+      <div class="summary">Adds a shared SbExportModal so Reports exports only the ticked sections, and rewires the Users page's Export CSV to actually export the filtered user list.</div>
+    </div>
+    <div class="card">
+      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-08-10-subject-picker-focus-redesign.md">Subject picker focus redesign</a>
+      <div class="meta"><span class="status-badge status-done">Done</span><span>2026-08-10</span></div>
+      <div class="summary">Rework SubjectTaxonomyPicker so browsing focuses one category behind a real back pill, and searching keeps descriptive rows instead of destroying the browse view.</div>
+    </div>
+    <div class="card">
+      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-08-09-live-session-details-redesign.md">Live session details view redesign</a>
+      <div class="meta"><span class="status-badge status-done">Done</span><span>2026-08-09</span></div>
+      <div class="summary">Replaced the stacked-card ongoing-session layout with a universal SessionActionRail across all booking statuses.</div>
+    </div>
+    <div class="card">
+      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-08-09-superadmin-pending-verifications.md">Surface pending verifications in the SuperAdmin review queue</a>
+      <div class="meta"><span class="status-badge status-done">Done</span><span>2026-08-09</span></div>
+    </div>
     <div class="card">
       <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-08-07-restore-demo-load-and-wallet-cases.md">Restore booking-load-limit and wallet demo cases</a>
       <div class="meta"><span class="status-badge status-done">Done</span><span>2026-08-07</span></div>
@@ -421,19 +494,7 @@
       <div class="meta"><span class="status-badge status-done">Done</span><span>2026-07-02</span></div>
     </div>
     <div class="card">
-      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-07-01-tutee-verification-phase4-email-devtools.md">Tutee enrollment verification — Phase 4 (email &amp; dev tools)</a>
-      <div class="meta"><span class="status-badge status-done">Done</span><span>2026-07-01</span></div>
-    </div>
-    <div class="card">
-      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-07-01-tutee-verification-phase3-ui.md">Tutee enrollment verification — Phase 3 (UI surfaces)</a>
-      <div class="meta"><span class="status-badge status-done">Done</span><span>2026-07-01</span></div>
-    </div>
-    <div class="card">
-      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-07-01-tutor-document-renewal-review.md">tutor-document-renewal-review</a>
-      <div class="meta"><span class="status-badge status-done">Done</span><span>2026-07-01</span></div>
-    </div>
-    <div class="card">
-      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-07-01-tutor-application-bugfixes.md">tutor-application-bugfixes</a>
+      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-07-01-tutee-verification-phase1-model.md">Tutee enrollment verification — Phase 1 (model &amp; backend foundation)</a>
       <div class="meta"><span class="status-badge status-done">Done</span><span>2026-07-01</span></div>
     </div>
     <div class="card">
@@ -449,7 +510,19 @@
       <div class="meta"><span class="status-badge status-done">Done</span><span>2026-07-01</span></div>
     </div>
     <div class="card">
-      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-07-01-tutee-verification-phase1-model.md">Tutee enrollment verification — Phase 1 (model &amp; backend foundation)</a>
+      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-07-01-tutor-application-bugfixes.md">tutor-application-bugfixes</a>
+      <div class="meta"><span class="status-badge status-done">Done</span><span>2026-07-01</span></div>
+    </div>
+    <div class="card">
+      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-07-01-tutor-document-renewal-review.md">tutor-document-renewal-review</a>
+      <div class="meta"><span class="status-badge status-done">Done</span><span>2026-07-01</span></div>
+    </div>
+    <div class="card">
+      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-07-01-tutee-verification-phase3-ui.md">Tutee enrollment verification — Phase 3 (UI surfaces)</a>
+      <div class="meta"><span class="status-badge status-done">Done</span><span>2026-07-01</span></div>
+    </div>
+    <div class="card">
+      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-07-01-tutee-verification-phase4-email-devtools.md">Tutee enrollment verification — Phase 4 (email &amp; dev tools)</a>
       <div class="meta"><span class="status-badge status-done">Done</span><span>2026-07-01</span></div>
     </div>
     <div class="card">

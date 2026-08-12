@@ -247,8 +247,13 @@
                 {{ confirmBookingButtonLabel }}
               </button>
 
+              <p v-if="isTuteeStrikeBlocked" class="strike-booking-note">
+                You have {{ profileStore.strikeCap }} late-cancellation strikes. Booking reopens
+                {{ strikeExpiryLabel }}.
+              </p>
+
               <router-link
-                v-if="isTuteeVerificationBlocked"
+                v-else-if="isTuteeBookingBlocked"
                 to="/application-status"
                 class="verify-booking-link"
               >
@@ -273,7 +278,8 @@ import { usePaymentStore } from '@/stores/tuteePaymentDetails'
 import { useChatStore } from '@/stores/chat'
 import { useProfileStore } from '@/stores/profile'
 import { useToastStore } from '@/stores/toast'
-import { needsTuteeVerificationBlock } from '@/services/tutorApplicationState'
+import { needsTuteeBookingBlock, needsTuteeStrikeBlock } from '@/services/tutorApplicationState'
+import { formatCutoffLabel } from '@/composables/useCancellationWindow'
 import api from '@/services/api/api'
 
 const router = useRouter()
@@ -494,18 +500,39 @@ const tuteeVerificationSnapshot = computed(() => ({
   application_status: profileStore.applicationStatus || null,
   document_renewal_status: profileStore.renewalStatus || null,
   tutee_verification_enforced: profileStore.tuteeVerificationEnforced,
+  strike_blocked: profileStore.strikeBlocked,
+  strike_expires_at: profileStore.strikeExpiresAt,
 }))
 
-const isTuteeVerificationBlocked = computed(() =>
-  profileStore.loaded && needsTuteeVerificationBlock(tuteeVerificationSnapshot.value)
+const isTuteeStrikeBlocked = computed(() =>
+  profileStore.loaded && needsTuteeStrikeBlock(tuteeVerificationSnapshot.value)
+)
+
+const strikeExpiryLabel = computed(() => {
+  const expiresAt = profileStore.strikeExpiresAt
+
+  if (!expiresAt) {
+    return 'once a strike expires'
+  }
+
+  return `on ${formatCutoffLabel(new Date(expiresAt))}`
+})
+
+const isTuteeBookingBlocked = computed(() =>
+  profileStore.loaded && needsTuteeBookingBlock(tuteeVerificationSnapshot.value)
 )
 
 const isConfirmBookingDisabled = computed(() =>
-  isTuteeVerificationBlocked.value || selectedSlots.value.length === 0 || isSubmittingBooking.value
+  isTuteeBookingBlocked.value || selectedSlots.value.length === 0 || isSubmittingBooking.value
 )
 
 const confirmBookingButtonLabel = computed(() => {
-  if (isTuteeVerificationBlocked.value) {
+  // Strike first: it's the cause the tutee can't fix by verifying.
+  if (isTuteeStrikeBlocked.value) {
+    return 'Booking paused'
+  }
+
+  if (isTuteeBookingBlocked.value) {
     return 'Verify to book'
   }
 
@@ -797,7 +824,7 @@ function toggleSlot(day, week, slot) {
 }
 
 const confirmBooking = async () => {
-  if (isTuteeVerificationBlocked.value || selectedSlots.value.length === 0) {
+  if (isTuteeBookingBlocked.value || selectedSlots.value.length === 0) {
     return
   }
 
@@ -1489,6 +1516,15 @@ onMounted(async () => {
 
 .verify-booking-link:hover {
   text-decoration: underline;
+}
+
+.strike-booking-note {
+  margin: 0.85rem 0 0;
+  color: var(--sb-danger);
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.45;
+  text-align: center;
 }
 
 @media (max-width: 1199px) {

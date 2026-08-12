@@ -1,5 +1,5 @@
 import uuid
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from django.db import models
 from django.db.models import Q
@@ -17,6 +17,30 @@ TUTOR_ACCEPTED_SESSION_LOAD_STATUSES = (
     'Confirmed',
     'Awaiting Payment Verification',
 )
+
+# The single definition of "this slot is spoken for". A booking in one of these statuses blocks
+# its (availability, session_date) pair; Cancelled and Rejected deliberately release it. The DB
+# constraint on Booking, the tutor availability calendar, the booking guard, and tutor search all
+# read this — they used to keep their own copies and two of them omitted
+# 'Awaiting Payment Verification', which let a mid-payment slot look free and then fail the
+# constraint. See docs/plans/2026-08-09-find-tutors-search-and-booking-fixes.md.
+ACTIVE_BOOKING_STATUSES = (
+    'Pending',
+    'Confirmed',
+    'Awaiting Payment Verification',
+    'Completed',
+)
+
+# A booking that is live and still ahead of its session. Instant Booking (ADR-0008) creates
+# bookings as 'Confirmed', so these two replaced 'Pending' as the states an upcoming session can be
+# in. Same members as TUTOR_ACCEPTED_SESSION_LOAD_STATUSES, for an unrelated reason.
+LIVE_BOOKING_STATUSES = (
+    'Confirmed',
+    'Awaiting Payment Verification',
+)
+
+# Penalty-free cancellation boundary, and the same boundary the face-to-face location edit uses.
+GRACE_CUTOFF_HOURS = 12
 
 class Strand(models.Model):
 
@@ -847,6 +871,39 @@ class Booking(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
 
+    @property
+    def session_start(self):
+        if not self.availability_id or not self.session_date:
+            return None
+
+        return timezone.make_aware(
+            datetime.combine(self.session_date, self.availability.time_slot),
+            timezone.get_current_timezone(),
+        )
+
+    def tutor_can_edit_location(self, now=None):
+        """Whether the tutor may still correct this session's face-to-face meeting spot.
+
+        The location is free text the tutee typed at booking and is kept for auditing, so it has to
+        be correctable — but only up to the Grace Cutoff. Past that the tutee may already be
+        travelling to the agreed spot, which is the same reason cancellation locks there.
+
+        Bookings created inside the window (is_born_late) are therefore frozen from the moment they
+        exist, consistent with their having no penalty-free cancellation window either.
+        """
+        if self.session_mode != 'F2F':
+            return False
+
+        if self.status not in LIVE_BOOKING_STATUSES:
+            return False
+
+        session_start = self.session_start
+
+        if session_start is None:
+            return False
+
+        return (now or timezone.now()) < session_start - timedelta(hours=GRACE_CUTOFF_HOURS)
+
     class Meta:
         indexes = [
             models.Index(fields=['session_date', 'availability', 'status']),
@@ -858,12 +915,8 @@ class Booking(models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=['availability', 'session_date'],
-                condition=Q(status__in=[
-                    'Pending',
-                    'Confirmed',
-                    'Awaiting Payment Verification',
-                    'Completed',
-                ]),
+                # list() keeps the deconstructed condition byte-identical to the migrated one.
+                condition=Q(status__in=list(ACTIVE_BOOKING_STATUSES)),
                 name='unique_active_booking_per_slot_date',
             ),
         ]
@@ -1107,6 +1160,17 @@ class SupportTicket(models.Model):
     escalated_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [
+            # Serves the rolling strike-window query (get_active_strike_tickets), which runs once
+            # per candidate tutor inside the recommender loop and on every /profile/status/ hit.
+            # Equality columns first, range column last.
+            models.Index(
+                fields=['penalized_user', 'category', 'created_at'],
+                name='ticket_strike_window_idx',
+            ),
+        ]
 
     def __str__(self):
         return f"Ticket #{self.id} - {self.subject} ({self.status})"

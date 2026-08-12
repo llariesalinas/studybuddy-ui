@@ -8,6 +8,11 @@ spec: ../adr/0008-instant-booking-replaces-request-to-book.md
 
 # Instant Booking
 
+> **Partly superseded (2026-08-10).** The Monthly Strike Cap described below (3 *counted* strikes
+> per calendar month) is now a rolling 14-day window of 3 *active* strikes, counted provisionally
+> from the moment the ticket opens. See
+> [ADR-0011](../adr/0011-provisional-late-cancellation-strikes.md).
+
 ## Status & Progress Summary
 
 **In Progress.** Design settled in the 2026-07-15 grilling session; ADR 0008 and glossary terms

@@ -70,6 +70,9 @@
   --sb-shadow-rest-brand: 0 8px 18px rgba(0, 137, 90, 0.20);
   --sb-shadow-hover-brand: 0 14px 30px rgba(0, 137, 90, 0.28);
   --sb-density-scale: 1;
+  /* Typography system — see ADR-0012 */
+  --sb-font-base: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --sb-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 :root[data-sb-density='compact'] {
@@ -158,6 +161,17 @@
   max-height: min(calc(86vh / var(--sb-density-scale)), 780px);
 }
 
+/* SuperAdmin-reachable vh consumers. `.admin-applications` is also an Admin route
+   (`/admin/tutor-applications`, role `['Admin','SuperAdmin']`); the rule is attribute-gated,
+   so Admin at 100% is unaffected. */
+[data-sb-density='compact'] .admin-applications {
+  min-height: var(--sb-vh-fix);
+}
+
+[data-sb-density='compact'] .superadmin-user-modal {
+  max-height: min(760px, calc(var(--sb-vh-fix) - 48px));
+}
+
 @media (max-width: 640px) {
   [data-sb-density='compact'] .sb-select-dialog,
   [data-sb-density='compact'] .subject-dialog {
@@ -221,7 +235,7 @@ body {
 
 body {
   background: var(--sb-bg);
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: var(--sb-font-base);
 }
 
 body > #app {

@@ -58,71 +58,6 @@
                 />
               </div>
 
-              <section v-if="isOngoing" class="session-progress-card glass-segment">
-                <div class="session-progress-head">
-                  <div>
-                    <h4>Mid-session pulse</h4>
-                    <p>
-                      A quick check helps us understand whether you are making progress while the session is still live.
-                    </p>
-                  </div>
-                  <span class="session-progress-chip">
-                    {{ heroClock.formattedElapsed }} elapsed
-                  </span>
-                </div>
-
-                <template v-if="midpointCheckIn">
-                  <div class="session-progress-status" :class="`is-${midpointCheckIn.response || 'saved'}`">
-                    <strong>{{ midpointStatusTitle }}</strong>
-                    <span>{{ midpointStatusCopy }}</span>
-                  </div>
-                </template>
-
-                <template v-else>
-                  <button
-                    class="session-progress-button session-progress-button-good sb-btn"
-                    :disabled="isQuickSubmitting"
-                    @click="openMidpointModal"
-                  >
-                    <strong>Answer progress check</strong>
-                    <span>Opens the mid-session popup so you can confirm things are on track or ask for help.</span>
-                  </button>
-                </template>
-              </section>
-
-              <section v-if="isOngoing" class="session-action-card glass-segment">
-                <h4>Quick actions</h4>
-                <div class="session-quick-grid">
-                  <button
-                    class="session-quick-button sb-btn"
-                    :disabled="isQuickSubmitting"
-                    @click="handleVenueQuickAction"
-                  >
-                    <i class="bi bi-geo-alt"></i>
-                    I've arrived
-                  </button>
-                  <button class="session-quick-button sb-btn" @click="handleLightAction(goToChat)">
-                    <i class="bi bi-chat-dots"></i>
-                    Message
-                  </button>
-                  <button
-                    class="session-quick-button sb-btn"
-                    :disabled="isQuickSubmitting"
-                    @click="openMidpointModal"
-                  >
-                    <i class="bi bi-activity"></i>
-                    Progress check
-                  </button>
-                  <button
-                    class="session-quick-button sb-btn"
-                    @click="handleLightAction(() => openSupport('Booking', sessionDetail?.session?.id))"
-                  >
-                    <i class="bi bi-flag"></i>
-                    Report
-                  </button>
-                </div>
-              </section>
-
               <div class="session-detail-pair">
                 <SessionInfoGrid class="glass-segment" :items="sessionInfoItems" />
 
@@ -139,84 +74,28 @@
             </div>
 
             <div class="session-alive-column session-alive-rail">
-              <section class="session-action-card session-next-action glass-segment">
-                <div class="session-action-head">
-                  <h4>{{ actionTitle }}</h4>
-                  <span v-if="isOngoing" class="session-live-pill">
-                    <span></span>
-                    Live
-                  </span>
-                </div>
-
-                <template v-if="isOngoing">
-                  <p>Your session is live. Use the progress pulse and quick actions to stay in sync.</p>
-                  <button
-                    class="session-cta sb-btn btn-primary-action sb-elevated sb-elevated--brand"
-                    @click="handleLightAction(goToChat)"
-                  >
-                    <i class="bi bi-chat-dots"></i>
-                    Open chat
-                  </button>
-                </template>
-
-                <template v-else-if="canSubmitPayment">
-                  <p>
-                    Your session has ended. Submit your post-session payment details so your tutor can verify them.
-                  </p>
-                  <button
-                    class="session-cta sb-btn btn-primary-action sb-elevated sb-elevated--brand"
-                    @click="handleLightAction(goToPayment)"
-                  >
-                    Submit Payment
-                  </button>
-                </template>
-
-                <template v-else-if="isAwaitingPaymentVerification">
-                  <p>Waiting for your tutor to review the submitted payment.</p>
-                  <button class="session-cta sb-btn btn-soft" disabled>
-                    Waiting for tutor verification...
-                  </button>
-                </template>
-
-                <template v-else-if="isCompleted && !sessionDetail.rating_submitted">
-                  <p>Your session is complete. A rating is optional, but it helps improve StudyBuddy matches.</p>
-                  <button
-                    class="session-cta sb-btn btn-primary-action sb-elevated sb-elevated--brand"
-                    @click="openRatingModal"
-                  >
-                    <i class="bi bi-star"></i>
-                    Leave a Rating
-                  </button>
-                </template>
-
-                <template v-else-if="showCancelAction">
-                  <p>{{ cancelActionMessage }}</p>
-                  <button
-                    class="session-cta sb-btn btn-danger-soft"
-                    :disabled="isCancelling || !canCancelSession"
-                    @click="handleLightAction(() => { isCancelModalOpen = true })"
-                  >
-                    {{ isCancelling ? 'Cancelling...' : isPending ? 'Withdraw request' : 'Cancel Session' }}
-                  </button>
-                </template>
-
-                <template v-else>
-                  <p>No pending action for this session right now.</p>
-                </template>
-              </section>
-
-              <section class="session-action-card glass-segment">
-                <h4>Support</h4>
-                <p>Something off with this session?</p>
-                <button
-                  class="session-cta sb-btn btn-danger-soft"
-                  @click="handleLightAction(() => openSupport('Booking', sessionDetail?.session?.id))"
-                >
-                  <i class="bi bi-exclamation-circle"></i>
-                  Report issue
-                </button>
-              </section>
-
+              <SessionActionRail
+                :is-ongoing="isOngoing"
+                :can-submit-payment="canSubmitPayment"
+                :is-awaiting-payment-verification="isAwaitingPaymentVerification"
+                :is-completed="isCompleted"
+                :rating-submitted="!!sessionDetail.rating_submitted"
+                :show-cancel-action="showCancelAction"
+                :is-cancelling="isCancelling"
+                :is-pending="isPending"
+                :is-quick-submitting="isQuickSubmitting"
+                :cancel-action-message="cancelActionMessage"
+                :midpoint-check-in="midpointCheckIn"
+                :midpoint-status-title="midpointStatusTitle"
+                :midpoint-status-copy="midpointStatusCopy"
+                @open-chat="handleLightAction(goToChat)"
+                @open-progress="openMidpointModal"
+                @venue-arrived="handleVenueQuickAction"
+                @submit-payment="handleLightAction(goToPayment)"
+                @open-rating="openRatingModal"
+                @open-cancel="handleLightAction(handleOpenCancel)"
+                @report="handleLightAction(() => openSupport('Booking', sessionDetail?.session?.id))"
+              />
             </div>
           </div>
         </div>
@@ -239,71 +118,21 @@
       @rated="handleRated"
     />
 
-    <div
-      v-if="isCancelModalOpen"
-      class="modal fade show d-block"
-      tabindex="-1"
-      role="dialog"
-      aria-modal="true"
-    >
-      <div class="modal-dialog modal-dialog-centered" role="document">
-        <div class="modal-content border-0 shadow">
-          <div class="modal-header">
-            <h5 class="modal-title fw-bold">Cancel Session</h5>
-            <button
-              type="button"
-              class="btn-close"
-              aria-label="Close"
-              :disabled="isCancelling"
-              @click="closeCancelModal"
-            ></button>
-          </div>
-
-          <div class="modal-body">
-            <p class="mb-2">Are you sure you want to cancel this session?</p>
-            <label class="form-label fw-semibold small">Reason (required)</label>
-            <textarea
-              v-model="cancelReason"
-              class="form-control border-sb shadow-none sb-field"
-              rows="3"
-              placeholder="Let your tutor know why you're cancelling..."
-              :disabled="isCancelling"
-            ></textarea>
-            <p class="small text-muted mt-2 mb-0">
-              Please also
-              <a href="#" @click.prevent="goToChat">message your tutor in Chat</a>
-              to coordinate.
-            </p>
-          </div>
-
-          <div class="modal-footer">
-            <button
-              type="button"
-              class="btn btn-outline-secondary sb-btn"
-              :disabled="isCancelling"
-              @click="closeCancelModal"
-            >
-              Keep Session
-            </button>
-            <button
-              type="button"
-              class="btn btn-danger sb-btn"
-              :disabled="isCancelling || !reasonValid"
-              @click="handleCancelSession"
-            >
-              <span
-                v-if="isCancelling"
-                class="spinner-border spinner-border-sm me-2"
-                role="status"
-                aria-hidden="true"
-              ></span>
-              {{ isCancelling ? 'Cancelling...' : 'Yes, Cancel Session' }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div v-if="isCancelModalOpen" class="modal-backdrop fade show"></div>
+    <CancelSessionModal
+      :open="isCancelModalOpen"
+      :submitting="isCancelling"
+      :is-pending="isPending"
+      :is-late="isLateCancellation"
+      :cutoff-label="cutoffLabel"
+      :strike-count="profileStore.strikeCount"
+      :strike-cap="profileStore.strikeCap"
+      :strike-provisional-count="profileStore.strikeProvisionalCount"
+      :strikes-loading="strikesLoading"
+      :strikes-unavailable="strikesUnavailable"
+      @close="closeCancelModal"
+      @confirm="handleCancelSession"
+      @go-to-chat="goToChat"
+    />
     <SupportModal
       :open="isSupportModalOpen"
       :context-type="supportContextType"
@@ -324,11 +153,13 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useSessionsStore } from '@/stores/completedSessions'
 import { useNotificationsStore } from '@/stores/notifications'
+import { useProfileStore } from '@/stores/profile'
 import { useToastStore } from '@/stores/toast'
 import { useHaptics } from '@/composables/useHaptics'
 import { useOrbitStrip } from '@/composables/useOrbitStrip'
 import { resolveMidpointCheckInOutcome } from '@/composables/useMidpointCheckIn'
 import { useSessionClock } from '@/composables/useSessionClock'
+import { useCancellationWindow } from '@/composables/useCancellationWindow'
 import RatingStackModal from '@/components/RatingStackModal.vue'
 import SupportModal from '@/components/SupportModal.vue'
 import DevSessionQaPanel from '@/components/DevSessionQaPanel.vue'
@@ -337,12 +168,15 @@ import SessionAurora from '@/components/session/SessionAurora.vue'
 import SessionHero from '@/components/session/SessionHero.vue'
 import SessionInfoGrid from '@/components/session/SessionInfoGrid.vue'
 import SessionTimeline from '@/components/session/SessionTimeline.vue'
+import SessionActionRail from '@/components/session/SessionActionRail.vue'
 import SessionCheckInModal from '@/components/SessionCheckInModal.vue'
+import CancelSessionModal from '@/components/session/CancelSessionModal.vue'
 
 const route = useRoute()
 const router = useRouter()
 const sessionsStore = useSessionsStore()
 const notificationsStore = useNotificationsStore()
+const profileStore = useProfileStore()
 const toastStore = useToastStore()
 const { vibrate, patterns } = useHaptics()
 
@@ -353,7 +187,8 @@ const isRatingModalOpen = ref(false)
 const isCancelModalOpen = ref(false)
 const isCancelling = ref(false)
 const isQuickSubmitting = ref(false)
-const cancelReason = ref('')
+const strikesLoading = ref(false)
+const strikesUnavailable = ref(false)
 const paymentSyncing = ref(false)
 const paymentReturnMessage = ref('')
 const paymentReturnState = ref('info')
@@ -387,28 +222,19 @@ const isCompleted = computed(() => normalizedStatus.value === 'completed')
 const statusOngoing = computed(() => normalizedStatus.value === 'ongoing')
 const isUpcoming = computed(() => normalizedStatus.value === 'upcoming')
 const isPending = computed(() => normalizedStatus.value === 'pending')
-const reasonValid = computed(() => cancelReason.value.trim().length >= 5)
-const tomorrowKey = computed(() => {
-  const d = new Date()
-  d.setDate(d.getDate() + 1)
-  const year = d.getFullYear()
-  const month = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-})
 const showCancelAction = computed(() => isUpcoming.value || isPending.value)
-const canCancelSession = computed(() => (
-  (isUpcoming.value || isPending.value)
-  && String(sessionDetail.value?.session?.date || '') > tomorrowKey.value
-))
+// Cancelling is never blocked by the UI -- the backend accepts it either way and only differs in
+// whether it opens a Late Cancellation ticket. See useCancellationWindow.
 const cancelActionMessage = computed(() => {
-  if (canCancelSession.value) {
-    return isPending.value
-      ? 'You can withdraw this pending request before it is confirmed.'
-      : 'This upcoming session can still be cancelled.'
+  if (isPending.value) {
+    return 'You can withdraw this pending request.'
   }
 
-  return 'Sessions can only be cancelled at least two days before the session date.'
+  if (!isLateCancellation.value) {
+    return `Free to cancel until ${cutoffLabel.value}.`
+  }
+
+  return 'Past the Grace Cutoff — cancelling now counts as a strike.'
 })
 const paymentReturnAlertClass = computed(() => {
   if (paymentReturnState.value === 'success') return 'alert-success'
@@ -484,6 +310,12 @@ const clock = useSessionClock({
   endTime: computed(() => sessionDetail.value?.session?.end_time),
   isOngoing: statusOngoing,
 })
+// Anchored on the session's first slot, matching is_late_cancellation in the backend, which
+// measures from the first booking of the group.
+const { isLate: isLateCancellation, cutoffLabel } = useCancellationWindow({
+  date: computed(() => sessionDetail.value?.session?.date),
+  startTime: computed(() => sessionDetail.value?.session?.start_time),
+})
 const { presentation: detailOrbitPresentation, hasOrbit: showDetailOrbit } = useOrbitStrip({
   session: sessionDetail,
 })
@@ -522,14 +354,6 @@ const midpointStatusCopy = computed(() => {
   }
 
   return 'You already confirmed the session is going well.'
-})
-
-const actionTitle = computed(() => {
-  if (isOngoing.value) return 'Happening now'
-  if (canSubmitPayment.value) return 'Next action'
-  if (isAwaitingPaymentVerification.value) return 'Payment review'
-  if (isCompleted.value) return sessionDetail.value?.rating_submitted ? 'All done' : 'All done'
-  return 'Next action'
 })
 
 const prefersReducedMotion = () => (
@@ -672,8 +496,24 @@ const closeCancelModal = () => {
     return
   }
 
-  cancelReason.value = ''
   isCancelModalOpen.value = false
+}
+
+// The store is hydrated at app load, so the count would be stale by the time someone cancels.
+// Refresh on open -- but never block opening the modal on it: a failed refresh must not stop
+// someone from cancelling, it only costs us the strike line in the warning.
+const handleOpenCancel = async () => {
+  isCancelModalOpen.value = true
+  strikesLoading.value = true
+  strikesUnavailable.value = false
+
+  try {
+    await profileStore.checkProfileStatus()
+  } catch {
+    strikesUnavailable.value = true
+  } finally {
+    strikesLoading.value = false
+  }
 }
 
 const goToPayment = () => {
@@ -684,18 +524,13 @@ const goToChat = () => {
   router.push({ name: 'chat' })
 }
 
-const handleCancelSession = async () => {
-  if (!canCancelSession.value || !reasonValid.value) {
-    return
-  }
-
+const handleCancelSession = async (reason) => {
   isCancelling.value = true
 
   try {
-    const updatedDetail = await sessionsStore.cancelSession(route.params.id, cancelReason.value.trim())
+    const updatedDetail = await sessionsStore.cancelSession(route.params.id, reason)
     sessionDetail.value = updatedDetail
     isCancelModalOpen.value = false
-    cancelReason.value = ''
     await notificationsStore.fetchNotifications()
     toastStore.push('Session cancelled successfully.')
   } catch (error) {
@@ -770,213 +605,6 @@ onMounted(async () => {
   gap: 16px;
 }
 
-.session-action-card {
-  display: grid;
-  align-content: start;
-  gap: 0;
-}
-
-.session-progress-card {
-  display: grid;
-  gap: 14px;
-}
-
-.session-progress-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.session-progress-head h4 {
-  margin: 0 0 6px;
-  color: var(--sb-text-main);
-  font-size: 1rem;
-  font-weight: 850;
-}
-
-.session-progress-head p {
-  margin: 0;
-  color: var(--sb-text-muted);
-  font-size: 0.8rem;
-  line-height: 1.5;
-}
-
-.session-progress-chip {
-  display: inline-flex;
-  align-items: center;
-  min-height: 32px;
-  padding: 0 12px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--sb-card-bg) 72%, transparent);
-  border: 1px solid color-mix(in srgb, var(--sb-card-border) 84%, transparent);
-  color: var(--sb-text-main);
-  font-size: 0.74rem;
-  font-weight: 800;
-  white-space: nowrap;
-}
-
-.session-progress-button,
-.session-progress-status {
-  position: relative;
-  display: grid;
-  gap: 5px;
-  padding: 16px 18px;
-  border-radius: 20px;
-  border: 1px solid color-mix(in srgb, var(--sb-card-border) 82%, transparent);
-  background: color-mix(in srgb, var(--sb-card-bg) 82%, transparent);
-}
-
-.session-progress-button {
-  text-align: left;
-  cursor: pointer;
-}
-
-.session-progress-button:hover {
-  box-shadow: 0 16px 30px rgba(15, 23, 42, 0.08);
-}
-
-.session-progress-button::after,
-.session-progress-status::after {
-  content: '';
-  position: absolute;
-  inset: auto 0 0;
-  height: 3px;
-  border-radius: 999px;
-}
-
-.session-progress-button-good::after,
-.session-progress-status.is-good::after {
-  background: linear-gradient(90deg, var(--sb-primary), var(--sb-primary-mid));
-}
-
-.session-progress-status.is-issues::after {
-  background: linear-gradient(90deg, var(--sb-pop-yellow), var(--sb-pop-orange));
-}
-
-.session-progress-button strong,
-.session-progress-status strong {
-  color: var(--sb-text-dark);
-  font-size: 0.94rem;
-  font-weight: 850;
-}
-
-.session-progress-button span,
-.session-progress-status span {
-  color: var(--sb-text-muted);
-  font-size: 0.8rem;
-  line-height: 1.45;
-}
-
-.session-action-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 11px;
-}
-
-.session-action-card h4 {
-  margin: 0 0 11px;
-  color: var(--sb-text-main);
-  font-size: 0.96rem;
-  font-weight: 850;
-  letter-spacing: 0;
-}
-
-.session-action-head h4 {
-  margin: 0;
-}
-
-.session-action-card p {
-  margin: 0 0 11px;
-  color: var(--sb-text-muted);
-  font-size: 0.8rem;
-  line-height: 1.5;
-}
-
-.session-live-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--sb-pop-pink) 16%, var(--sb-card-bg));
-  color: var(--sb-pop-pink-deep);
-  padding: 4px 10px;
-  font-size: 0.64rem;
-  font-weight: 800;
-  text-transform: uppercase;
-}
-
-.session-live-pill span {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: currentColor;
-  animation: session-live-beat 1.1s ease-in-out infinite;
-}
-
-/* Layout-only helper: the shared sb-btn tiers own the visuals. */
-.session-cta {
-  width: 100%;
-  font-size: 0.86rem;
-}
-
-.session-cta:focus-visible {
-  outline: 0;
-  box-shadow:
-    0 0 0 4px color-mix(in srgb, var(--sb-primary) 18%, transparent),
-    0 10px 24px var(--sb-shadow-soft);
-}
-
-.session-quick-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.session-quick-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  gap: 7px;
-  width: 100%;
-  min-height: 78px;
-  border: 1px solid var(--sb-card-border);
-  border-radius: 12px;
-  padding: 11px;
-  background: color-mix(in srgb, var(--sb-card-bg) 72%, transparent);
-  color: var(--sb-text-secondary);
-  font: inherit;
-  font-size: 0.72rem;
-  font-weight: 700;
-  line-height: 1.1;
-}
-
-.session-quick-button:focus-visible {
-  outline: 0;
-  box-shadow:
-    0 0 0 4px color-mix(in srgb, var(--sb-primary) 18%, transparent),
-    0 10px 24px var(--sb-shadow-soft);
-}
-
-.session-quick-button:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--sb-primary) 34%, var(--sb-card-border));
-  background: color-mix(in srgb, var(--sb-card-bg) 96%, transparent);
-  box-shadow: 0 16px 34px color-mix(in srgb, var(--sb-shadow-soft) 78%, rgba(15, 23, 42, 0.1));
-}
-
-.session-quick-button i {
-  color: var(--sb-primary);
-  font-size: 21px;
-  transition: transform var(--sb-t-normal) var(--sb-spring);
-}
-
-.session-quick-button:hover:not(:disabled) i {
-  transform: scale(1.12);
-}
-
 .session-confetti {
   position: absolute;
   inset: 0;
@@ -995,17 +623,6 @@ onMounted(async () => {
   background: var(--session-confetti-color);
   animation: session-confetti-burst 1.2s ease-out forwards;
   animation-delay: calc(var(--session-confetti-index) * 14ms);
-}
-
-.modal {
-  background: rgba(17, 24, 39, 0.35);
-}
-
-@keyframes session-live-beat {
-  50% {
-    transform: scale(1.7);
-    opacity: 0.4;
-  }
 }
 
 @keyframes session-confetti-burst {
@@ -1027,27 +644,14 @@ onMounted(async () => {
 }
 
 @media (max-width: 575px) {
-  .session-quick-grid {
-    grid-template-columns: 1fr;
-  }
-
   .session-alive-stage {
     padding: 12px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .session-live-pill span,
   .session-confetti i {
     animation: none;
-  }
-
-  .session-quick-button i {
-    transition: none;
-  }
-
-  .session-quick-button:hover:not(:disabled) i {
-    transform: none;
   }
 }
 </style>
