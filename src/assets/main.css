@@ -78,6 +78,7 @@
 :root[data-sb-density='compact'] {
   --sb-density-scale: 0.8;
   --sb-vh-fix: calc(100vh / var(--sb-density-scale));
+  --sb-vw-fix: calc(100vw / var(--sb-density-scale));
 }
 
 /* Scoped to #app rather than :root: Bootstrap's `.offcanvas-backdrop`/`.modal-backdrop` are
@@ -101,6 +102,17 @@
 
 [data-sb-density='compact'] .vh-100 {
   height: var(--sb-vh-fix) !important;
+}
+
+/* Bootstrap sizes `.modal-backdrop` with `100vw`/`100vh`. A backdrop a component renders itself
+   (TutorWallet's cash-out, CashInModal, CampusLocationModal, AdminSupport...) lives *inside* the
+   zoomed `#app`, so those viewport units are scaled down with everything else and the backdrop
+   covers 80% of the page, leaving the right and bottom edges undimmed. Dividing the zoom back out
+   restores full coverage. Deliberately scoped to `#app`: Bootstrap's own backdrops are appended as
+   siblings of `#app`, are never zoomed, and would overflow the viewport if given the same size. */
+[data-sb-density='compact'] #app .modal-backdrop {
+  width: var(--sb-vw-fix);
+  height: var(--sb-vh-fix);
 }
 
 [data-sb-density='compact'] .sb-sidebar {
