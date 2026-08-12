@@ -91,11 +91,10 @@
   zoom: var(--sb-density-scale);
 }
 
-[data-sb-density='compact'] html,
-[data-sb-density='compact'] body {
-  min-height: var(--sb-vh-fix);
-}
-
+/* `body` deliberately keeps the plain `min-height: 100vh` below. It sits outside the zoomed `#app`,
+   so a `--sb-vh-fix` height here is never scaled back down and simply makes the document 25% taller
+   than the viewport -- 180px of empty scroll under every page at 720p. `#app` needs the compensated
+   height because it *is* zoomed: 100vh / 0.8 * 0.8 renders as exactly one viewport. */
 [data-sb-density='compact'] body > #app {
   min-height: var(--sb-vh-fix);
 }
