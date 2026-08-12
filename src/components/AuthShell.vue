@@ -89,8 +89,8 @@ const router = useRouter()
 }
 
 .sb-brand-mark {
-  width: 24px;
-  height: 24px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   display: inline-flex;
   align-items: center;

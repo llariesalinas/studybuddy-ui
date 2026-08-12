@@ -953,8 +953,8 @@ onUnmounted(() => {
 }
 
 .brand-mark {
-  width: 34px;
-  height: 34px;
+  width: 42px;
+  height: 42px;
   flex: 0 0 auto;
   border-radius: 10px;
   display: grid;

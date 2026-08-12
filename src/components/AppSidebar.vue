@@ -191,8 +191,8 @@ const menuItems = computed(() => {
 .sb-brand-badge {
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
+  width: 50px;
+  height: 50px;
   flex: 0 0 auto;
   border-radius: 10px;
 }
