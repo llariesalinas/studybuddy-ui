@@ -13,8 +13,9 @@ run lint` clean aside from pre-existing unrelated errors). One deviation from th
 the Keywords field uses a custom-styled suggestion dropdown instead of a native `<datalist>` — the
 datalist popup rendered with unstyled OS/browser chrome (plain dark box) that clashed with the
 form, so it was swapped for a small absolutely-positioned dropdown matching `sb-card`/`sb-field`
-styling. Manual verification (compact-density backdrop across all four admin offcanvas panels,
-category mismatch/add-new flow, keyword suggestions) still outstanding.
+styling. A success toast now confirms when a new category is
+added on save. Manual verification (compact-density backdrop across all four admin offcanvas
+panels, category mismatch/add-new flow, keyword suggestions, new-category toast) still outstanding.
 
 ## Goal
 
@@ -119,3 +120,7 @@ Mockup reviewed and approved: `docs/mockups/2026-08-12-admin-review-panel-catego
   field switched from the planned native `<datalist>` to a custom dropdown after manual testing
   showed the datalist's unstyled browser popup. `npm run build` and `npm run lint` pass. Manual
   verification (compact-density backdrop, mismatch flow, keyword suggestions) still to be run.
+  Committed as `f22dd53`.
+- 2026-08-12: Added a success toast ("'X' added as a new category.") on `saveSubjectEdit` when the
+  saved subject introduces a category not already in the derived taxonomy list, via the existing
+  `useToastStore`/`SbToast` (already mounted globally in `App.vue`).

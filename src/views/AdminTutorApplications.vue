@@ -320,6 +320,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useAdminStore } from '@/stores/admin'
 import { useCatalogStore } from '@/stores/catalog'
+import { useToastStore } from '@/stores/toast'
 import { Offcanvas } from 'bootstrap'
 import {
   getApplicationReviewKind,
@@ -332,6 +333,7 @@ import { deriveCategoryOptions } from '@/constants/subjectTaxonomy'
 
 const adminStore = useAdminStore()
 const catalogStore = useCatalogStore()
+const toastStore = useToastStore()
 const filters = reactive({
   role: 'tutor',
   status: 'pending',
@@ -568,6 +570,10 @@ const cancelSubjectEdit = () => {
 }
 
 const saveSubjectEdit = async (subject) => {
+  const isNewCategory = categoryMode.value === 'new'
+    && subjectEditForm.category
+    && !taxonomyCategories.value.includes(subjectEditForm.category)
+
   savingSubjectEdit.value = true
   try {
     const updated = await adminStore.updateTutorProposedSubject(
@@ -579,6 +585,9 @@ const saveSubjectEdit = async (subject) => {
     editingSubjectCode.value = ''
     categoryMode.value = 'select'
     categoryMismatchNote.value = ''
+    if (isNewCategory) {
+      toastStore.push(`"${subjectEditForm.category}" added as a new category.`, 'success')
+    }
   } catch (err) {
     console.error('Subject update failed:', err)
   } finally {
