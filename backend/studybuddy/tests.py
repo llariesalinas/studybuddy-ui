@@ -9743,15 +9743,21 @@ class AdminCourseCatalogTaxonomyTests(APITestCase):
         self.assertEqual(response.data["subject_code"], "organic-chemistry")
         self.assertTrue(Subjects.objects.filter(subject_code="organic-chemistry").exists())
 
-    def test_create_rejects_a_category_outside_the_taxonomy(self):
+    def test_create_accepts_a_category_outside_the_curated_taxonomy(self):
+        """A category added via the tutor-application review panel (e.g. "Spoken Languages")
+        must also be usable here — the catalog page's own create/edit must not reject it."""
         response = self.client.post(
             "/api/admin/course-catalog/",
-            {"subject_name": "Mystery Subject", "category": "Not A Real Category"},
+            {
+                "subject_name": "Mystery Subject",
+                "category": "Not A Real Category",
+                "department": "Miscellaneous",
+            },
             format="json",
         )
 
-        self.assertEqual(response.status_code, 400)
-        self.assertFalse(Subjects.objects.filter(subject_name="Mystery Subject").exists())
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(Subjects.objects.filter(subject_name="Mystery Subject").exists())
 
     def test_list_filters_by_category(self):
         Subjects.objects.create(

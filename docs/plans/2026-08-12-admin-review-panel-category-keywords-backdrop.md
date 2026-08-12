@@ -31,6 +31,17 @@ CSS fix (`zoom` scoped to `#app`) is confirmed intact and present in the built b
 a stale dev-server/browser state after the branch churn, not a source regression; a dev-server
 restart and hard refresh should resolve it, to be confirmed by the user.
 
+Follow-up gap found by the user: a category added via the review panel didn't show up in the
+**Course Catalog** page's (`AdminCourseCatalog.vue`) own category dropdown, because that page
+still read the static `TAXONOMY_CATEGORIES` constant directly. Its create/edit form would also
+have hit the same class of backend rejection as the "Save Changes does nothing" bug, via a second,
+separate hardcoded check: `SubjectSerializer.validate_category`. Fixed both — the dropdown now uses
+`deriveCategoryOptions(catalogStore.courseCatalog)` (same helper as the review panel), and the
+serializer validator was removed. Course Catalog still has no "add a brand new category" input
+itself (per the earlier "this panel only" scope decision) — this fix only makes *already-existing*
+categories (however they were added) consistently selectable and saveable everywhere they're
+shown, which is a data-consistency fix, not new scope. Updated/added backend tests; all pass.
+
 ## Goal
 
 In the SuperAdmin "Review Application" offcanvas (`AdminTutorApplications.vue`), the Proposed
@@ -151,3 +162,11 @@ Mockup reviewed and approved: `docs/mockups/2026-08-12-admin-review-panel-catego
   Confirmed the backdrop CSS fix is intact and present in the built bundle — the "broken again"
   report is most likely stale dev-server state from the branch churn, pending user confirmation
   after a restart/hard refresh.
+- 2026-08-12: Fixed a second, related gap the user found: `AdminCourseCatalog.vue`'s category
+  dropdown still read the static `TAXONOMY_CATEGORIES` constant, so a category added via the
+  review panel didn't appear there. Switched it to the same `deriveCategoryOptions` helper, and
+  removed the matching backend rejection (`SubjectSerializer.validate_category`), which would have
+  400'd that page's own create/edit form for the same reason as the earlier "Save Changes does
+  nothing" bug. Test `test_create_rejects_a_category_outside_the_taxonomy` replaced with
+  `test_create_accepts_a_category_outside_the_curated_taxonomy` (also fixed a latent bug in the
+  old test: it never supplied `department`, a required field, so its 400 was partly coincidental).
