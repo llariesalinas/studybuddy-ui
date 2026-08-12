@@ -740,6 +740,7 @@ WEEKDAY_MAP = {
 }
 
 SESSION_SLOT_MINUTES = 60
+TUTOR_COMMISSION_RATE = decimal.Decimal('0.10')
 
 
 def get_duration_hours_from_slot_count(slot_count):
@@ -1912,7 +1913,8 @@ def student_dashboard(request):
         'student',
         'tutor__profile__course',
         'availability',
-        'rating'
+        'rating',
+        'payment'
     ).order_by('-session_date', 'availability__time_slot')
 
     grouped_completed = defaultdict(list)
@@ -2071,6 +2073,25 @@ class SubjectListView(ListAPIView):
 
 
 
+def get_tutor_earnings_for_booking(booking, status):
+    """Net amount the tutor was credited for a completed, paid booking.
+
+    Mirrors the payout math in credit_tutor_wallet: the tutor keeps the
+    session's payment amount less the platform commission, regardless of
+    payment method (cash sessions debit the same commission from the wallet
+    instead of crediting a share, but the tutor's net take is identical).
+    Returns None when the session isn't completed or wasn't paid.
+    """
+    if status != "Completed":
+        return None
+
+    payment = getattr(booking, "payment", None)
+    if not payment or payment.payment_status != "Paid":
+        return None
+
+    return float(payment.amount - (payment.amount * TUTOR_COMMISSION_RATE))
+
+
 def build_combined_block(group, profile=None):
 
     sorted_group = sort_bookings_for_session_group(group)
@@ -2125,6 +2146,7 @@ def build_combined_block(group, profile=None):
         "tutor_confirmed": representative_booking.tutor_confirmed,
         "rating": representative_booking.rating.rating_score if hasattr(representative_booking, "rating") else None,
         "rating_submitted": hasattr(representative_booking, "rating"),
+        "earnings": get_tutor_earnings_for_booking(representative_booking, group_status),
 
         "subject": booking_subject_label(first),
         "startTime": start_time.strftime("%H:%M"),
@@ -3187,11 +3209,11 @@ def list_bookings(request):
     if profile.role == "Tutor":
         bookings = Booking.objects.filter(
             tutor__profile=profile
-        ).select_related('student', 'availability', 'tutor__profile__course', 'rating')
+        ).select_related('student', 'availability', 'tutor__profile__course', 'rating', 'payment')
     else:
         bookings = Booking.objects.filter(
             student=profile
-        ).select_related('student', 'availability', 'tutor__profile__course', 'rating')
+        ).select_related('student', 'availability', 'tutor__profile__course', 'rating', 'payment')
 
     bookings = bookings.order_by("session_date", "availability__time_slot")
 
@@ -5467,9 +5489,8 @@ def credit_tutor_wallet(booking):
     if Transaction.objects.filter(reference_id=ref_id).exists():
         return
 
-    COMMISSION_RATE = decimal.Decimal('0.10')
     total_amount = payment.amount
-    commission = total_amount * COMMISSION_RATE
+    commission = total_amount * TUTOR_COMMISSION_RATE
 
     with transaction.atomic():
         wallet, _ = Wallet.objects.get_or_create(tutor=rep_booking.tutor)
