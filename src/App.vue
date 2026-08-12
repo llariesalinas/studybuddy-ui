@@ -205,7 +205,7 @@
 
           <div v-if="route.path === '/superadmin/support'">
             <h2 class="fw-bold sb-text">SuperAdmin Support</h2>
-            <p class="sb-muted">Claim and resolve escalated support tickets from institution admins.</p>
+            <p class="sb-muted">Claim and resolve tickets escalated by institution admins, plus late cancellation reviews.</p>
           </div>
 
           <div class="d-flex gap-3 align-items-center ms-auto">

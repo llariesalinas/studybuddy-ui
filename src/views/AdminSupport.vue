@@ -75,8 +75,16 @@
                     {{ getCategoryLabel(ticket.category) }}
                   </span>
                 </td>
-                <td class="fw-semibold sb-text text-truncate" style="max-width: 250px;">
-                  {{ ticket.subject }}
+                <td style="max-width: 250px;">
+                  <span class="fw-semibold sb-text d-block text-truncate">{{ ticket.subject }}</span>
+                  <!-- The SuperAdmin Open tab holds both Open and Escalated, so it needs the status. -->
+                  <span
+                    v-if="isSuperAdminDesk"
+                    class="d-inline-block mt-1"
+                    :class="getStatusBadgeClass(ticket.status)"
+                  >
+                    {{ ticket.status.replace('_', ' ') }}
+                  </span>
                 </td>
                 <td class="small text-muted">{{ formatDate(ticket.created_at) }}</td>
                 <td class="small font-semibold">
@@ -501,14 +509,27 @@ const ticketToJudge = ref(null)
 const verdictError = ref('')
 const confirmingCounted = ref(false)
 const isSuperAdminDesk = computed(() => route.path.startsWith('/superadmin'))
-// System-opened Late Cancellation tickets land in the SuperAdmin queue as Open/unescalated, so
-// that desk needs an Open tab or they are fetched but unreachable.
-const statusTabs = computed(() => (
-  isSuperAdminDesk.value ? ['Open', 'Escalated', 'Resolved'] : ['Open', 'In_Progress', 'Resolved']
+// A tab can cover more than one status. The SuperAdmin desk has no Escalated tab, so its Open tab
+// carries both Open and Escalated; without that widening, escalated tickets are fetched from
+// admin_list_tickets but unreachable. System-opened Late Cancellation tickets land in that queue as
+// Open/unescalated, which is the other reason the desk needs an Open tab at all.
+const TAB_STATUSES = {
+  Open: ['Open'],
+  In_Progress: ['In_Progress'],
+  Resolved: ['Resolved'],
+}
+const SUPERADMIN_TAB_STATUSES = { ...TAB_STATUSES, Open: ['Open', 'Escalated'] }
+
+const tabStatuses = computed(() => (
+  isSuperAdminDesk.value ? SUPERADMIN_TAB_STATUSES : TAB_STATUSES
 ))
+const statusTabs = computed(() => (
+  isSuperAdminDesk.value ? ['Open', 'Resolved'] : ['Open', 'In_Progress', 'Resolved']
+))
+const statusesForTab = (tab) => tabStatuses.value[tab] ?? [tab]
 
 const filters = reactive({
-  status: route.path.startsWith('/superadmin') ? 'Escalated' : 'Open',
+  status: 'Open',
   search: ''
 })
 
@@ -529,18 +550,22 @@ onMounted(() => {
   fetchTickets()
 })
 
-watch(isSuperAdminDesk, (superAdminDesk) => {
-  filters.status = superAdminDesk ? 'Escalated' : 'Open'
+watch(isSuperAdminDesk, () => {
+  filters.status = 'Open'
   selectedTicket.value = null
   ticketToEscalate.value = null
   closeVerdictModal()
 })
 
-const getCount = (status) => tickets.value.filter((t) => t.status === status).length
+const getCount = (tab) => {
+  const statuses = statusesForTab(tab)
+  return tickets.value.filter((t) => statuses.includes(t.status)).length
+}
 
 const filteredTickets = computed(() => {
+  const statuses = statusesForTab(filters.status)
   return tickets.value.filter((ticket) => {
-    const matchesStatus = ticket.status === filters.status
+    const matchesStatus = statuses.includes(ticket.status)
     const search = filters.search.toLowerCase()
     const matchesSearch =
       !search ||

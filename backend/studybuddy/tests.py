@@ -26,12 +26,14 @@ from .chat.services import (
     get_partner_context,
     serialize_booking_context,
 )
+from .mailer import EmailRateLimitError
 from .paymongo_money_movement import PayMongoCashOutError
 from .views import (
     COUNTED_STRIKE_WALLET_DEDUCTION,
     credit_tutor_wallet,
     dev_add_wallet_funds,
     dev_remove_wallet_funds,
+    PASSWORD_RESET_GENERIC_MESSAGE,
     WEEKDAY_MAP,
 )
 from .models import (
@@ -5819,6 +5821,25 @@ class EmailAuthTests(APITestCase):
         )
         self.assertEqual(len(mail.outbox), 2)
 
+    def test_password_reset_send_raises_rate_limit_error_when_capped(self):
+        from . import mailer
+
+        with patch("studybuddy.mailer.is_send_allowed", return_value=False):
+            with self.assertRaises(EmailRateLimitError):
+                mailer.send_password_reset(self.user)
+
+    def test_password_reset_request_stays_generic_when_capped(self):
+        with patch("studybuddy.views.mailer.send_password_reset", side_effect=EmailRateLimitError(self.user.email)):
+            response = self.client.post(
+                "/api/password-reset/request/",
+                {"email": self.user.email},
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["message"], PASSWORD_RESET_GENERIC_MESSAGE)
+        self.assertEqual(len(mail.outbox), 0)
+
     def test_password_reset_confirm_validates_password_confirmation(self):
         self.client.post(
             "/api/password-reset/request/",
@@ -8696,6 +8717,23 @@ class EmailDeliveryDisabledTests(APITestCase):
 
         with patch("studybuddy.mailer._deliver") as mock_deliver:
             mailer.send_login_otp(self.user, "123456")
+        mock_deliver.assert_called_once()
+        self.assertEqual(mock_deliver.call_args.kwargs["recipient"], self.user.email)
+
+    @override_settings(EMAIL_DELIVERY_DISABLED=True)
+    def test_password_reset_suppressed_when_disabled(self):
+        from . import mailer
+
+        with patch("studybuddy.mailer._deliver") as mock_deliver:
+            mailer.send_password_reset(self.user)
+        mock_deliver.assert_not_called()
+
+    @override_settings(EMAIL_DELIVERY_DISABLED=False)
+    def test_password_reset_delivered_when_enabled(self):
+        from . import mailer
+
+        with patch("studybuddy.mailer._deliver") as mock_deliver:
+            mailer.send_password_reset(self.user)
         mock_deliver.assert_called_once()
         self.assertEqual(mock_deliver.call_args.kwargs["recipient"], self.user.email)
 
