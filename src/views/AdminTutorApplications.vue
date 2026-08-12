@@ -114,7 +114,7 @@
     </div>
 
     <!-- Application Detail Offcanvas -->
-    <div class="offcanvas offcanvas-end border-0 shadow" tabindex="-1" id="appDetailOffcanvas" style="width: 500px;">
+    <div class="offcanvas offcanvas-end border-0 shadow" tabindex="-1" id="appDetailOffcanvas" style="width: 760px;">
       <div class="offcanvas-header bg-light border-bottom">
         <h5 class="offcanvas-title fw-bold">Review {{ selectedReviewTypeLabel }}</h5>
         <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
@@ -182,26 +182,52 @@
                   <label class="form-label small fw-bold">Subject name</label>
                   <input v-model.trim="subjectEditForm.subject_name" class="form-control form-control-sm sb-field">
                 </div>
-                <div class="mb-2">
-                  <label class="form-label small fw-bold">Category</label>
-                  <template v-if="categoryMode === 'new'">
-                    <div v-if="categoryMismatchNote" class="category-mismatch-note small mb-2">
-                      <i class="bi bi-exclamation-triangle me-1"></i>{{ categoryMismatchNote }}
-                    </div>
-                    <input v-model.trim="subjectEditForm.category" class="form-control form-control-sm sb-field" placeholder="New category name">
-                    <button type="button" class="btn btn-link btn-sm px-0 mt-1" @click="useExistingCategory">
-                      Pick an existing category instead
-                    </button>
-                  </template>
-                  <select
-                    v-else
-                    v-model="subjectEditForm.category"
-                    class="form-select form-select-sm sb-field"
-                    @change="handleCategorySelectChange"
-                  >
-                    <option v-for="category in taxonomyCategories" :key="category" :value="category">{{ category }}</option>
-                    <option value="__add_new__">+ Add new category...</option>
-                  </select>
+                <div class="two-up-fields">
+                  <div class="mb-2">
+                    <label class="form-label small fw-bold">Category</label>
+                    <template v-if="categoryMode === 'new'">
+                      <div v-if="categoryMismatchNote" class="category-mismatch-note small mb-2">
+                        <i class="bi bi-exclamation-triangle me-1"></i>{{ categoryMismatchNote }}
+                      </div>
+                      <input v-model.trim="subjectEditForm.category" class="form-control form-control-sm sb-field" placeholder="New category name">
+                      <button type="button" class="btn btn-link btn-sm px-0 mt-1" @click="useExistingCategory">
+                        Pick an existing category instead
+                      </button>
+                    </template>
+                    <template v-else>
+                      <select
+                        v-model="subjectEditForm.category"
+                        class="form-select form-select-sm sb-field"
+                        @change="handleCategorySelectChange"
+                      >
+                        <option v-for="category in taxonomyCategories" :key="category" :value="category">{{ category }}</option>
+                        <option value="__add_new__">+ Add new category...</option>
+                      </select>
+                    </template>
+                  </div>
+                  <div class="mb-2">
+                    <label class="form-label small fw-bold">Sub-Group</label>
+                    <template v-if="subgroupMode === 'new'">
+                      <div v-if="subgroupMismatchNote" class="category-mismatch-note small mb-2">
+                        <i class="bi bi-exclamation-triangle me-1"></i>{{ subgroupMismatchNote }}
+                      </div>
+                      <input v-model.trim="subjectEditForm.department" class="form-control form-control-sm sb-field" placeholder="New sub-group name">
+                      <button type="button" class="btn btn-link btn-sm px-0 mt-1" @click="useExistingSubgroup">
+                        Pick an existing sub-group instead
+                      </button>
+                    </template>
+                    <template v-else>
+                      <select
+                        v-model="subjectEditForm.department"
+                        class="form-select form-select-sm sb-field"
+                        @change="handleSubgroupSelectChange"
+                      >
+                        <option value="">None</option>
+                        <option v-for="subgroup in subgroupOptions" :key="subgroup" :value="subgroup">{{ subgroup }}</option>
+                        <option value="__add_new__">+ Add new sub-group...</option>
+                      </select>
+                    </template>
+                  </div>
                 </div>
                 <div class="mb-2 keyword-field">
                   <label class="form-label small fw-bold">Keywords</label>
@@ -213,7 +239,8 @@
                     @focus="keywordSuggestionsOpen = true"
                     @blur="keywordSuggestionsOpen = false"
                   >
-                  <div v-if="keywordSuggestionsOpen && keywordSuggestions.length" class="keyword-suggestions">
+                  <div v-if="keywordSuggestionsOpen && keywordFragment" class="keyword-suggestions">
+                    <div v-if="keywordSuggestions.length" class="keyword-suggestions-hint">Matching existing catalog keywords</div>
                     <button
                       v-for="keyword in keywordSuggestions"
                       :key="keyword"
@@ -221,7 +248,18 @@
                       class="keyword-suggestion"
                       @mousedown.prevent="selectKeywordSuggestion(keyword)"
                     >
-                      {{ keyword }}
+                      <template v-for="(segment, i) in highlightSegments(keyword, keywordFragment)" :key="i">
+                        <strong v-if="segment.match">{{ segment.text }}</strong>
+                        <template v-else>{{ segment.text }}</template>
+                      </template>
+                    </button>
+                    <button
+                      v-if="!keywordFragmentExists"
+                      type="button"
+                      class="keyword-suggestion keyword-add-new"
+                      @mousedown.prevent="selectKeywordSuggestion(keywordFragment)"
+                    >
+                      + Use "{{ keywordFragment }}" as a new keyword
                     </button>
                   </div>
                 </div>
@@ -349,7 +387,8 @@ import {
   getReviewStatus,
   getReviewSubmittedAt,
 } from '@/services/tutorApplicationState'
-import { deriveCategoryOptions } from '@/constants/subjectTaxonomy'
+import { deriveCategoryOptions, deriveSubgroupOptions } from '@/constants/subjectTaxonomy'
+import { highlightSegments } from '@/components/subjectPicker.shared'
 
 const APPLICANT_ROLES = ['tutor', 'tutee']
 const APPLICATION_STATUSES = ['pending', 'approved', 'rejected']
@@ -376,6 +415,7 @@ const savingSubjectEdit = ref(false)
 const subjectEditForm = reactive({
   subject_name: '',
   category: '',
+  department: '',
   keywords: '',
   catalog_description: '',
 })
@@ -384,9 +424,18 @@ const subjectEditForm = reactive({
 // category doesn't match anything in the derived list.
 const categoryMode = ref('select')
 const categoryMismatchNote = ref('')
+// Same two-mode pattern as Category, scoped to whichever category is currently selected.
+const subgroupMode = ref('select')
+const subgroupMismatchNote = ref('')
 let offcanvas = null
 
 const taxonomyCategories = computed(() => deriveCategoryOptions(catalogStore.courseCatalog))
+
+// Sub-group values already used by subjects under the currently-selected category — a suggestion
+// list only, not an enforced relationship (see deriveSubgroupOptions).
+const subgroupOptions = computed(() =>
+  deriveSubgroupOptions(catalogStore.courseCatalog, subjectEditForm.category)
+)
 
 const catalogKeywords = computed(() => {
   const keywords = new Set()
@@ -403,9 +452,16 @@ const catalogKeywords = computed(() => {
 // chrome that clashes with the rest of the form.
 const keywordSuggestionsOpen = ref(false)
 
+// The comma-separated fragment currently being typed (what suggestions match against).
+const keywordFragment = computed(() => {
+  const enteredKeywords = subjectEditForm.keywords.split(',').map((kw) => kw.trim())
+  return enteredKeywords[enteredKeywords.length - 1] || ''
+})
+
 const keywordSuggestions = computed(() => {
+  const fragment = keywordFragment.value.toLowerCase()
+  if (!fragment) return []
   const enteredKeywords = subjectEditForm.keywords.split(',').map((kw) => kw.trim().toLowerCase())
-  const fragment = enteredKeywords[enteredKeywords.length - 1] || ''
   const alreadyEntered = new Set(enteredKeywords.filter(Boolean))
 
   return catalogKeywords.value
@@ -413,6 +469,12 @@ const keywordSuggestions = computed(() => {
     .filter((keyword) => keyword.toLowerCase().includes(fragment))
     .slice(0, 8)
 })
+
+// Whether the typed fragment already exists as a catalog keyword verbatim — if so, "add as new" is
+// redundant with just picking the matching suggestion.
+const keywordFragmentExists = computed(() =>
+  catalogKeywords.value.some((keyword) => keyword.toLowerCase() === keywordFragment.value.toLowerCase())
+)
 
 const selectKeywordSuggestion = (keyword) => {
   const lastComma = subjectEditForm.keywords.lastIndexOf(',')
@@ -574,6 +636,7 @@ const startSubjectEdit = (subject) => {
   Object.assign(subjectEditForm, {
     subject_name: subject.subject_name,
     category: subject.category,
+    department: subject.department || '',
     keywords: subject.keywords || '',
     // Proposals arrive with no catalog copy; prefill from the tutor's note so
     // the admin edits a draft rather than starting from an empty box.
@@ -586,6 +649,14 @@ const startSubjectEdit = (subject) => {
   } else {
     categoryMode.value = 'select'
     categoryMismatchNote.value = ''
+  }
+
+  if (subject.department && !subgroupOptions.value.includes(subject.department)) {
+    subgroupMode.value = 'new'
+    subgroupMismatchNote.value = `"${subject.department}" — not in the catalog yet`
+  } else {
+    subgroupMode.value = 'select'
+    subgroupMismatchNote.value = ''
   }
 }
 
@@ -605,16 +676,37 @@ const useExistingCategory = () => {
   }
 }
 
+const handleSubgroupSelectChange = () => {
+  if (subjectEditForm.department === '__add_new__') {
+    subjectEditForm.department = ''
+    subgroupMode.value = 'new'
+    subgroupMismatchNote.value = ''
+  }
+}
+
+const useExistingSubgroup = () => {
+  subgroupMode.value = 'select'
+  subgroupMismatchNote.value = ''
+  if (!subgroupOptions.value.includes(subjectEditForm.department)) {
+    subjectEditForm.department = ''
+  }
+}
+
 const cancelSubjectEdit = () => {
   editingSubjectCode.value = ''
   categoryMode.value = 'select'
   categoryMismatchNote.value = ''
+  subgroupMode.value = 'select'
+  subgroupMismatchNote.value = ''
 }
 
 const saveSubjectEdit = async (subject) => {
   const isNewCategory = categoryMode.value === 'new'
     && subjectEditForm.category
     && !taxonomyCategories.value.includes(subjectEditForm.category)
+  const isNewSubgroup = subgroupMode.value === 'new'
+    && subjectEditForm.department
+    && !subgroupOptions.value.includes(subjectEditForm.department)
 
   savingSubjectEdit.value = true
   try {
@@ -624,14 +716,19 @@ const saveSubjectEdit = async (subject) => {
       { ...subjectEditForm },
     )
     Object.assign(subject, updated, { catalog_description: subjectEditForm.catalog_description })
-    // Sync into the catalog store immediately so the category (and keyword) pickers reflect this
-    // save without waiting on the next fetchCourseCatalog().
+    // Sync into the catalog store immediately so the category/sub-group (and keyword) pickers
+    // reflect this save without waiting on the next fetchCourseCatalog().
     catalogStore.upsertLocalCatalogSubject(subject)
     editingSubjectCode.value = ''
     categoryMode.value = 'select'
     categoryMismatchNote.value = ''
+    subgroupMode.value = 'select'
+    subgroupMismatchNote.value = ''
     if (isNewCategory) {
       toastStore.push(`"${subjectEditForm.category}" added as a new category.`, 'success')
+    }
+    if (isNewSubgroup) {
+      toastStore.push(`"${subjectEditForm.department}" added as a new sub-group.`, 'success')
     }
   } catch (err) {
     console.error('Subject update failed:', err)
@@ -805,8 +902,29 @@ onMounted(() => {
   color: var(--sb-warning-text, #997404);
 }
 
+.two-up-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
 .keyword-field {
   position: relative;
+}
+
+.keyword-suggestions-hint {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 700;
+  color: var(--sb-text-muted);
+  padding: 0.4rem 0.65rem 0.15rem;
+}
+
+.keyword-add-new {
+  border-top: 1px dashed var(--sb-card-border);
+  color: var(--sb-primary);
+  font-weight: 700;
 }
 
 .keyword-suggestions {

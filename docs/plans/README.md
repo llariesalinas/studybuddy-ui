@@ -3,7 +3,19 @@
 Every finalized plan lives in this folder as its own dated file, created from [`_template.md`](_template.md).
 Status moves Draft â†’ Approved â†’ In Progress â†’ Done. When a plan is complete, its summary is linked below.
 
-**Status & Progress Summary** (2026-08-12): Async email worker reliability is In Progress —
+**Status & Progress Summary** (2026-08-13): Admin review panel Sub-Group + Keywords fix is
+Approved, not started. Reversed from an earlier version of this plan that removed Sub-Group
+(`Subjects.department`) entirely after tracing it end to end and finding it unused by the CBF
+recommender, tutee/tutor search, or any browse UI — user decided to keep it and instead close the
+actual gap: the review panel's Proposed Subjects form never had a Sub-Group field, unlike the
+standalone Subject Catalog page. Adding it there with the same select + "+ Add new sub-group"
+pattern as Category, scoped to the chosen Category, plus a real backend change (the propose-subject
+save paths don't currently accept `department`). The review panel offcanvas also widens to 760px
+and gains a Category "+ Add new" toggle (confirmed via a `ui-preview` mockup), and the existing
+Keywords suggestion dropdown gets fixed/highlighted.
+[Plan](2026-08-13-admin-review-panel-subgroup-removal-keyword-fix.md).
+
+**Previous** (2026-08-12): Async email worker reliability is In Progress —
 diagnosis, code fix, doc note, and backlog purge are done; only the Render Cron Job setup and
 merging the PR remain, both requiring the user. Root cause: every async email — password reset,
 password-changed, verification approved/rejected, document renewal result/reminder, booking

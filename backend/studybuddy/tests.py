@@ -1001,6 +1001,23 @@ class GlobalSubjectCatalogTests(APITestCase):
     def test_catalog_description_defaults_to_blank(self):
         self.assertEqual(self.subject.description, "")
 
+    def test_catalog_create_accepts_a_blank_department(self):
+        """Sub-Group is optional, matching every form's lack of a `required` attribute — the model
+        previously had no `blank=True`, which made the serializer reject an empty value. See
+        docs/plans/2026-08-13-admin-review-panel-subgroup-removal-keyword-fix.md."""
+        create_response = self.client.post(
+            "/api/admin/course-catalog/",
+            {
+                "subject_code": "AI204",
+                "subject_name": "Robotics",
+                "department": "",
+                "category": "Technology & Computer Science",
+            },
+            format="json",
+        )
+        self.assertEqual(create_response.status_code, 201)
+        self.assertEqual(create_response.data["department"], "")
+
 
 class RecommendTutorsViewTests(APITestCase):
     def setUp(self):
@@ -9625,6 +9642,70 @@ class AdminProposedSubjectReviewTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, 400)
+
+    def test_update_action_persists_department(self):
+        """The review panel's Sub-Group field (Subjects.department) mirrors Category: free text,
+        not restricted to any curated list. See
+        docs/plans/2026-08-13-admin-review-panel-subgroup-removal-keyword-fix.md."""
+        proposal = self.make_proposal("UPDATE-SUBGROUP")
+
+        response = self.client.patch(
+            f"/api/admin/tutor-applications/{self.application.id}/subjects/"
+            f"{proposal.subject_code}/",
+            {
+                "action": "update",
+                "subject_name": "Still Fine",
+                "category": "Mathematics & Data Sciences",
+                "department": "Algebra",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        proposal.refresh_from_db()
+        self.assertEqual(proposal.department, "Algebra")
+        self.assertEqual(response.data["department"], "Algebra")
+
+    def test_update_action_leaves_department_alone_when_omitted(self):
+        proposal = self.make_proposal("UPDATE-NO-SUBGROUP")
+        proposal.department = "Existing Sub-Group"
+        proposal.save(update_fields=["department"])
+
+        response = self.client.patch(
+            f"/api/admin/tutor-applications/{self.application.id}/subjects/"
+            f"{proposal.subject_code}/",
+            {
+                "action": "update",
+                "subject_name": "Renamed Only",
+                "category": "Mathematics & Data Sciences",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        proposal.refresh_from_db()
+        self.assertEqual(proposal.department, "Existing Sub-Group")
+
+    def test_update_action_accepts_a_blank_department(self):
+        """Sub-Group is optional — see the required/allow_blank fix in
+        docs/plans/2026-08-13-admin-review-panel-subgroup-removal-keyword-fix.md."""
+        proposal = self.make_proposal("UPDATE-BLANK-SG")
+
+        response = self.client.patch(
+            f"/api/admin/tutor-applications/{self.application.id}/subjects/"
+            f"{proposal.subject_code}/",
+            {
+                "action": "update",
+                "subject_name": "Still Fine",
+                "category": "Mathematics & Data Sciences",
+                "department": "",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        proposal.refresh_from_db()
+        self.assertEqual(proposal.department, "")
 
     def test_reject_subject_deletes_subject_and_tutor_link(self):
         proposal = self.make_proposal("REJECT-PROP")

@@ -145,7 +145,12 @@
 
 <script setup>
 import { computed, ref } from 'vue'
-import { categoryClass, searchSubjects, subjectCategories } from '@/components/subjectPicker.shared'
+import {
+  categoryClass,
+  highlightSegments,
+  searchSubjects,
+  subjectCategories,
+} from '@/components/subjectPicker.shared'
 
 const props = defineProps({
   subjects: { type: Array, required: true },
@@ -186,25 +191,6 @@ const matchedCategories = computed(() => {
     .filter((category) => counts.has(category))
     .map((category) => ({ category, count: counts.get(category) }))
 })
-
-// Splits `text` into plain/matched segments around the (case-insensitive) first occurrence of
-// `query`, so the template can bold the matched span without v-html. Falls through to a single
-// unmatched segment when the query is empty or the text doesn't contain it — the description just
-// renders as plain text, which is the intended behavior when a subject only matched via keywords.
-function highlightSegments(text, query) {
-  const normalizedQuery = String(query || '').trim().toLowerCase()
-  if (!normalizedQuery) return [{ text, match: false }]
-
-  const index = text.toLowerCase().indexOf(normalizedQuery)
-  if (index === -1) return [{ text, match: false }]
-
-  const end = index + normalizedQuery.length
-  return [
-    { text: text.slice(0, index), match: false },
-    { text: text.slice(index, end), match: true },
-    { text: text.slice(end), match: false },
-  ].filter((segment) => segment.text)
-}
 
 const countLine = computed(() => {
   if (!activeCategory.value) return ''

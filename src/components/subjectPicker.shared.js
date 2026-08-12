@@ -41,6 +41,26 @@ export function subjectCategories(subjects) {
 }
 
 /**
+ * Splits `text` into plain/matched segments around the (case-insensitive) first occurrence of
+ * `query`, so a template can bold the matched span without v-html. Falls through to a single
+ * unmatched segment when the query is empty or the text doesn't contain it.
+ */
+export function highlightSegments(text, query) {
+  const normalizedQuery = String(query || '').trim().toLowerCase()
+  if (!normalizedQuery) return [{ text, match: false }]
+
+  const index = text.toLowerCase().indexOf(normalizedQuery)
+  if (index === -1) return [{ text, match: false }]
+
+  const end = index + normalizedQuery.length
+  return [
+    { text: text.slice(0, index), match: false },
+    { text: text.slice(index, end), match: true },
+    { text: text.slice(end), match: false },
+  ].filter((segment) => segment.text)
+}
+
+/**
  * Category -> scoped accent class. Both picker components define the matching
  * .cat-* rules (each sets the --cat custom property to an --sb-* accent).
  */

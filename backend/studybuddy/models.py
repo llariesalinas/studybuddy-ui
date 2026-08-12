@@ -691,7 +691,7 @@ class Subjects(models.Model):
 
     subject_code = models.CharField(max_length=20, primary_key=True)
     subject_name = models.CharField(max_length=100)
-    department = models.CharField(max_length=100)
+    department = models.CharField(max_length=100, blank=True, default='')
     category = models.CharField(max_length=100, null=True, blank=True)
     keywords = models.TextField(blank=True, default='')
     description = models.TextField(blank=True, default='')

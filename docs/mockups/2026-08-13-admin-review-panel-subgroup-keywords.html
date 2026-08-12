@@ -1,0 +1,172 @@
+<style>
+  .rp-wrap { --sb-primary:#00895A; --sb-primary-hover:#00704A; --sb-primary-light:#edf6f1;
+    --sb-card-bg:#fff; --sb-card-border:#EAEAEA; --sb-text-main:#163127; --sb-text-muted:#6B7280;
+    --sb-warning-bg:#ffc107; --sb-warning-text:#997404; --sb-shadow-hover:0 8px 24px rgba(15,23,42,.12);
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; color: var(--sb-text-main); }
+  .rp-question { margin-bottom: 18px; }
+  .rp-question p { color: var(--sb-text-muted); font-size: .88rem; margin: 4px 0 0; }
+  .rp-panel { width: 620px; max-width: 100%; margin: 0 auto; border: 2px solid var(--sb-card-border); border-radius: 18px;
+    background: #fcfcfc; box-shadow: 0 4px 20px rgba(15,23,42,.05); overflow: hidden; }
+  .rp-panel-head { background: #f4f4f4; border-bottom: 1px solid var(--sb-card-border); padding: 14px 20px;
+    display: flex; justify-content: space-between; align-items: center; }
+  .rp-panel-head h5 { margin: 0; font-size: .95rem; font-weight: 700; }
+  .rp-close { color: var(--sb-text-muted); font-size: 1.1rem; line-height: 1; }
+  .rp-body { padding: 22px; }
+  .rp-section-label { font-size: .68rem; text-transform: uppercase; letter-spacing: .05em; font-weight: 700;
+    color: var(--sb-text-muted); margin-bottom: 8px; display: block; }
+  .rp-applicant { padding: 12px 14px; background: #f7f7f7; border-radius: 12px; margin-bottom: 18px; }
+  .rp-applicant h6 { margin: 0 0 3px; font-weight: 700; font-size: .92rem; }
+  .rp-applicant .meta { font-size: .78rem; color: var(--sb-text-muted); }
+  .rp-badge { display: inline-block; margin-top: 8px; background: var(--sb-primary-light); color: var(--sb-primary);
+    border: 1px solid #b8dece; border-radius: 999px; font-size: .68rem; font-weight: 700; padding: 3px 10px; }
+  .rp-docs { display: flex; gap: 10px; margin-bottom: 18px; }
+  .rp-doc { flex: 1; background: #eee; border-radius: 10px; height: 96px; display: flex; align-items: center;
+    justify-content: center; font-size: .72rem; color: var(--sb-text-muted); font-weight: 600; border: 1px solid var(--sb-card-border); }
+  .rp-form { border: 1px solid var(--sb-card-border); border-radius: 14px; padding: 18px; background: #fff; }
+  .field { margin-bottom: 14px; }
+  .field:last-child { margin-bottom: 0; }
+  .field label { display: block; font-size: .74rem; font-weight: 700; margin-bottom: 6px; color: var(--sb-text-main); }
+  .field .hint { font-weight: 400; color: var(--sb-text-muted); text-transform: none; letter-spacing: 0; margin-left: 5px; }
+  .sb-field { width: 100%; border: 1px solid var(--sb-card-border); border-radius: 9px; padding: 8px 11px;
+    font-size: .84rem; font-family: inherit; color: var(--sb-text-main); background: #fff; box-sizing: border-box; }
+  .sb-field:focus { outline: none; border-color: var(--sb-primary); box-shadow: 0 0 0 3px rgba(0,137,90,.1); }
+  select.sb-field { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236B7280'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 30px; }
+  .toggle-link { border: 0; background: none; color: var(--sb-primary); font-size: .76rem; font-weight: 700;
+    padding: 6px 0 0; cursor: pointer; }
+  .two-up { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .autocomplete-wrap { position: relative; }
+  .suggestions { border: 1px solid var(--sb-card-border); border-radius: 9px; margin-top: 4px; background: #fff;
+    box-shadow: var(--sb-shadow-hover); overflow: hidden; }
+  .suggestions .sug-hint { font-size: .68rem; color: var(--sb-text-muted); padding: 6px 11px 4px; }
+  .suggestion-row { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 7px 11px;
+    font-size: .8rem; cursor: pointer; color: var(--sb-text-main); border-top: 1px solid #f2f2f2; }
+  .suggestion-row:first-of-type { border-top: 0; }
+  .suggestion-row:hover, .suggestion-row.active { background: var(--sb-primary-light); color: var(--sb-primary); }
+  .suggestion-row b { background: #ffe9a8; border-radius: 2px; }
+  .suggestion-row .cat { float: right; color: var(--sb-text-muted); font-size: .7rem; }
+  .add-new-row { display: block; width: 100%; text-align: left; border: 0; border-top: 1px dashed var(--sb-card-border);
+    background: #fafafa; padding: 7px 11px; font-size: .78rem; cursor: pointer; color: var(--sb-primary); font-weight: 700; }
+  .mismatch-note { padding: 7px 10px; border-radius: 8px; border: 1px solid var(--sb-warning-bg);
+    background: color-mix(in srgb, var(--sb-warning-bg) 12%, white); color: var(--sb-warning-text);
+    font-size: .74rem; margin-bottom: 8px; }
+  .pill-btn { border-radius: 999px; border: 0; padding: 9px 20px; font-size: .84rem; font-weight: 700; cursor: pointer; }
+  .pill-primary { background: var(--sb-primary); color: #fff; }
+  .pill-primary:hover { background: var(--sb-primary-hover); }
+  .pill-light { background: #f1f1f1; color: var(--sb-text-main); }
+  .actions-row { display: flex; gap: 8px; margin-top: 18px; }
+  .demo-toggle-row { display: flex; gap: 8px; margin: 0 auto 16px; width: 620px; max-width: 100%; }
+  .demo-toggle { flex: 1; border: 1px solid var(--sb-card-border); background: #fff; border-radius: 999px;
+    padding: 7px 0; font-size: .76rem; font-weight: 700; cursor: pointer; color: var(--sb-text-muted); }
+  .demo-toggle.active { border-color: var(--sb-primary); color: var(--sb-primary); background: var(--sb-primary-light); }
+</style>
+
+<div class="rp-wrap">
+  <div class="rp-question">
+    <h2>760px panel, with "add new" on both Category and Sub-Group</h2>
+    <p>Both fields now use the same select + "+ Add new..." escape hatch. Use the toggles below the
+      panel to preview what "Add new category" and "Add new sub-group" look like when clicked
+      (mirrors the existing category-mismatch pattern already in the form).</p>
+  </div>
+
+  <div class="demo-toggle-row">
+    <button type="button" class="demo-toggle active" id="btn-existing" onclick="showMode('existing')">Existing values (default)</button>
+    <button type="button" class="demo-toggle" id="btn-newcat" onclick="showMode('newcat')">+ Add new category clicked</button>
+    <button type="button" class="demo-toggle" id="btn-newsub" onclick="showMode('newsub')">+ Add new sub-group clicked</button>
+  </div>
+
+  <div class="rp-panel">
+    <div class="rp-panel-head"><h5>Review Application</h5><span class="rp-close">&times;</span></div>
+    <div class="rp-body">
+      <div class="rp-applicant">
+        <h6>Maria Santos</h6>
+        <div class="meta">maria.santos@cpu.edu.ph &middot; Central Philippine University</div>
+        <span class="rp-badge">First-time Application</span>
+      </div>
+      <span class="rp-section-label">Documents</span>
+      <div class="rp-docs">
+        <div class="rp-doc">School ID</div>
+        <div class="rp-doc">Enrollment Proof</div>
+      </div>
+      <span class="rp-section-label">Proposed Subject</span>
+      <div class="rp-form">
+        <div class="two-up">
+          <div class="field">
+            <label>Subject name</label>
+            <input class="sb-field" value="French">
+          </div>
+
+          <div class="field" id="category-field">
+            <div id="category-existing">
+              <label>Category</label>
+              <select class="sb-field">
+                <option>Humanities &amp; Social Sciences</option>
+                <option>Technology &amp; Computer Science</option>
+                <option>Mathematics &amp; Data Sciences</option>
+              </select>
+              <button type="button" class="toggle-link">+ Add new category</button>
+            </div>
+            <div id="category-new" style="display:none">
+              <label>Category</label>
+              <div class="mismatch-note">This subject's proposed category doesn't match anything in the catalog yet.</div>
+              <input class="sb-field" placeholder="New category name" value="World Languages">
+              <button type="button" class="toggle-link">Pick an existing category instead</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="two-up">
+          <div class="field" id="subgroup-field">
+            <div id="subgroup-existing">
+              <label>Sub-Group <span class="hint">scoped to Humanities &amp; Social Sciences</span></label>
+              <select class="sb-field">
+                <option>World Languages</option>
+                <option>History</option>
+                <option>Literature</option>
+              </select>
+              <button type="button" class="toggle-link">+ Add new sub-group</button>
+            </div>
+            <div id="subgroup-new" style="display:none">
+              <label>Sub-Group</label>
+              <input class="sb-field" placeholder="New sub-group name" value="French Language">
+              <button type="button" class="toggle-link">Pick an existing sub-group instead</button>
+            </div>
+          </div>
+
+          <div class="field autocomplete-wrap">
+            <label>Keywords</label>
+            <input class="sb-field" value="lang">
+            <div class="suggestions">
+              <div class="sug-hint">Matching existing catalog keywords</div>
+              <button type="button" class="suggestion-row"><b>lang</b>uage <span class="cat">Spanish</span></button>
+              <button type="button" class="suggestion-row">foreign <b>lang</b> <span class="cat">German</span></button>
+              <button type="button" class="add-new-row">+ Use "lang" as a new keyword</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Catalog description</label>
+          <textarea class="sb-field" rows="2">Please add french subject</textarea>
+        </div>
+        <div class="actions-row">
+          <button class="pill-btn pill-primary">Save changes</button>
+          <button class="pill-btn pill-light">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function showMode(mode) {
+    document.getElementById('category-existing').style.display = mode === 'newcat' ? 'none' : 'block';
+    document.getElementById('category-new').style.display = mode === 'newcat' ? 'block' : 'none';
+    document.getElementById('subgroup-existing').style.display = mode === 'newsub' ? 'none' : 'block';
+    document.getElementById('subgroup-new').style.display = mode === 'newsub' ? 'block' : 'none';
+    ['btn-existing', 'btn-newcat', 'btn-newsub'].forEach(function (id) {
+      document.getElementById(id).classList.remove('active');
+    });
+    var map = { existing: 'btn-existing', newcat: 'btn-newcat', newsub: 'btn-newsub' };
+    document.getElementById(map[mode]).classList.add('active');
+  }
+</script>
