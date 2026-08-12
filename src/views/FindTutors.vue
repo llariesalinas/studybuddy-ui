@@ -1,7 +1,7 @@
 <template>
   <div class="p-4">
     <form @submit.prevent="searchTutor" class="mb-5">
-      <div class="row g-3 align-items-end">
+      <div class="row g-3 align-items-end tutor-filter-row">
         <!-- Subject -->
         <div class="col-lg-4 col-md-6">
           <label class="form-label fw-semibold small sb-muted">Subject</label>
@@ -9,7 +9,7 @@
         </div>
 
         <!-- Mode -->
-        <div class="col-lg-2 col-md-3">
+        <div class="col-lg-4 col-md-6">
           <label class="form-label fw-semibold small sb-muted">Mode</label>
           <SbSelectModal
             v-model="modeModel"
@@ -23,7 +23,7 @@
         </div>
 
         <!-- Location -->
-        <div v-if="modeModel === 'Face-to-face' && campusLocationType" class="col-lg-3 col-md-3">
+        <div v-if="modeModel === 'Face-to-face' && campusLocationType" class="col-lg-4 col-md-6">
           <div class="d-flex justify-content-between align-items-center gap-2 mb-1 flex-wrap">
             <label class="form-label fw-semibold small sb-muted mb-0">
               Location ({{ campusLocationType === 'inside' ? 'Inside Campus' : 'Outside Campus' }})
@@ -45,13 +45,13 @@
         </div>
 
         <!-- Date -->
-        <div class="col-lg-3 col-md-6">
+        <div class="col-lg-4 col-md-6">
           <label class="form-label fw-semibold small sb-muted">Date</label>
           <BookingDatePicker v-model="dateModel" />
         </div>
 
         <!-- Budget -->
-        <div class="col-lg-3 col-md-6 subject-filter-column">
+        <div class="col-lg-4 col-md-6 subject-filter-column">
           <label class="form-label fw-semibold small sb-muted">Budget Range</label>
           <div class="budget-filter-wrap">
             <button
@@ -77,7 +77,7 @@
         </div>
 
         <!-- Time range (optional) -->
-        <div class="col-lg-3 col-md-6">
+        <div class="col-lg-4 col-md-6">
           <label class="form-label fw-semibold small sb-muted">
             Time <span class="fw-normal">(optional)</span>
           </label>
@@ -90,10 +90,10 @@
         </div>
 
         <!-- Search Action -->
-        <div class="col-lg-3 col-md-6">
+        <div class="col-lg-4 col-md-6">
           <button
             type="submit"
-            class="btn bg-sb-primary text-white w-100 py-2 rounded-3 fw-bold shadow-sm sb-btn"
+            class="btn bg-sb-primary text-white w-100 py-2 rounded-3 fw-bold shadow-sm sb-btn filter-submit-btn"
             :disabled="isSubmitting"
           >
             <i class="bi bi-search me-2"></i>Search Tutors
@@ -698,6 +698,21 @@ onBeforeRouteUpdate(async (to, from, next) => {
 <style scoped>
 .subject-filter-column {
   position: relative;
+}
+
+/* Every control in this row comes from a different component, each shipping its own trigger height
+   (42px, except SbSelectModal at 44px) while the location input and submit button take theirs from
+   Bootstrap's `py-2`. Pin them together so the row reads as one set of fields. Overridden here
+   rather than in the components: SbSelectModal's 44px trigger is shared with the booking and
+   onboarding flows, which are not being resized. */
+.tutor-filter-row :deep(.subject-trigger),
+.tutor-filter-row :deep(.sb-select-trigger),
+.tutor-filter-row :deep(.date-trigger),
+.tutor-filter-row :deep(.time-trigger),
+.tutor-filter-row .budget-toggle-btn,
+.tutor-filter-row .sb-field,
+.tutor-filter-row .filter-submit-btn {
+  min-height: 42px;
 }
 
 .fallback-notice {
