@@ -18,6 +18,12 @@ uploaded media under `backend/media/`.
 - `npm run lint`: run oxlint and ESLint with auto-fixes.
 - `npm run format`: run Prettier over `src/`.
 - `cd backend && python manage.py runserver`: start the Django API server.
+- `cd backend && python manage.py qcluster`: start the async email worker. Required alongside
+  `runserver` for verification-approval/rejection, document renewal reminder/result, booking
+  confirmed, and password-changed-notice emails to actually send — without it they queue
+  silently in `django_q.OrmQ` and never go out, with no error anywhere. (Login OTP and password
+  reset are sent synchronously and don't need this.) See
+  `docs/plans/2026-08-12-async-email-worker-reliability.md`.
 - `cd backend && python manage.py test`: run Django tests.
 
 ## Coding Style & Naming Conventions

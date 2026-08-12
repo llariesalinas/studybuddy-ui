@@ -1,7 +1,7 @@
 ---
 title: Async email worker reliability
 date: 2026-08-12
-status: Draft
+status: In Progress
 summary: Django-Q emails (password reset, verification approval, booking confirmed, renewal reminders/results) queue but never send because no process has ever consumed the queue, in dev or prod; make password reset synchronous and drain the rest via a Render cron job.
 spec:
 ---
@@ -10,10 +10,16 @@ spec:
 
 ## Status/Progress Summary
 
-Draft as of 2026-08-12. Root cause diagnosed and confirmed against the live dev DB (19 stuck
-`django_q.OrmQ` tasks); approach decided with the user (sync password reset + Render cron
-drain for the rest). Nothing implemented yet — awaiting plan approval before touching code or
-the Render dashboard.
+In Progress as of 2026-08-12. Steps 1-2 done. Step 1 (sync password reset): implemented and
+tested — `mailer.send_password_reset` mirrors `send_login_otp` (sync, rate-capped, raises
+`EmailRateLimitError`), `send_password_reset_email_task` and `enqueue_password_reset` are
+deleted, `views.password_reset_request` calls the sync function directly and stays on the
+generic response even when rate-limited (no enumeration regression). 4 new tests added; full
+suite (452 tests) has only 4 pre-existing, unrelated failures (test-data pollution from
+repeated `--keepdb` runs, not this diff). Step 2 (local dev doc note): `AGENTS.md`'s command
+table now documents the `qcluster` requirement. Step 4 (backlog purge) still to do; step 3
+(Render Cron Job) is a manual dashboard action for the user — the plan's Steps section has
+the exact command and schedule to set up when ready.
 
 ## Goal
 
@@ -141,3 +147,25 @@ plan once this fix ships, so a stuck worker becomes visible instead of silent ag
   this DB, in dev or prod. User chose Render Cron Job (`qcluster --run-once`) over an
   always-on worker service for cost reasons, and chose to make password reset synchronous
   (mirroring login OTP) rather than leave it dependent on the worker.
+- **2026-08-12 (cont.)** — Implemented step 1. `mailer.send_password_reset` added (sync,
+  rate-capped via the existing `is_send_allowed`/`EmailRateLimitError` machinery, same
+  `EMAIL_SYNC_TIMEOUT`/`EMAIL_SYNC_MAX_ATTEMPTS` as OTP); `send_password_reset_email_task` and
+  `enqueue_password_reset` deleted outright rather than left as dead code.
+  `views.password_reset_request` now calls the sync function and catches
+  `EmailRateLimitError` to keep the response generic even when capped, preserving the
+  existing no-enumeration guarantee (a distinct response on rate-limit would have let an
+  attacker distinguish a real, capped account from an unknown one). Added
+  `test_password_reset_suppressed_when_disabled` / `_delivered_when_enabled` (mirroring the
+  existing OTP pair) and `test_password_reset_send_raises_rate_limit_error_when_capped` /
+  `test_password_reset_request_stays_generic_when_capped`. All 33 tests across
+  `EmailAuthTests`, `EmailDeliveryDisabledTests`, `VerificationEmailWiringTests`,
+  `RenewalReminderTests`, `EmailUtilsRoleLabelTests` pass. Full suite: 452 tests, 4 failures
+  (1 fail + 3 errors), none touching `mailer.py`/`views.py`/email code — `SupportTicket`
+  strike-window/wallet-deduction/tutee-search-pagination tests, with symptoms (duplicate
+  `migration-tutee@cpu.edu` username, extra `SupportTicket`/tutee rows) consistent with
+  `--keepdb` data pollution from the many repeated runs against the same DB today rather than
+  a regression — matches the same "pre-existing, unrelated" 4-failure pattern already
+  recorded in `docs/plans/README.md` from an earlier session. Step 1 done. Step 2 done:
+  `AGENTS.md`'s command table now documents that `qcluster` must run alongside `runserver`
+  for async email, and what silently breaks without it. Steps 3 (Render Cron Job) and 4
+  (backlog purge) remain — both need the user, not something this session can do.

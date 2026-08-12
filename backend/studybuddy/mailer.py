@@ -3,12 +3,12 @@
 All outbound mail routes through here so that retries, logging, the per-recipient
 send cap, and template rendering live in one place. Two paths exist:
 
-* Synchronous + hardened (login OTP): the user is waiting for the code, so it is
-  sent in-request with a short timeout and a couple of retries, and raises on
+* Synchronous + hardened (login OTP, password reset): the user is waiting on these, so
+  they're sent in-request with a short timeout and a couple of retries, and raise on
   final failure so the caller can return an honest error.
-* Asynchronous (password reset / changed notice): dispatched to Django-Q2 via
-  ``async_task`` and delivered off the request thread by the ``qcluster`` worker,
-  which also handles task-level retries.
+* Asynchronous (password-changed notice, renewal reminders, booking confirmed): dispatched
+  to Django-Q2 via ``async_task`` and delivered off the request thread by the ``qcluster``
+  worker, which also handles task-level retries.
 
 Note: this module is deliberately named ``mailer`` (not ``email``) so it cannot
 shadow Python's stdlib ``email`` package that Django's mail internals import.
@@ -141,15 +141,21 @@ def send_login_otp(user, code):
     )
 
 
-# --- Asynchronous task targets (run inside the qcluster worker) -----------
-# These take serializable args (user_id) and re-fetch the user. max_attempts=1
-# here because Django-Q2 owns task-level retries (see Q_CLUSTER).
+def send_password_reset(user):
+    """Send the password-reset email synchronously. Raises EmailRateLimitError if capped,
+    or the underlying exception if delivery fails after retries.
 
-def send_password_reset_email_task(user_id):
+    Sync (not routed through Django-Q like the rest of this module) for the same reason as
+    send_login_otp: the user is waiting on it, it's already rate-capped, and a stuck async
+    worker must not be the reason a locked-out user can't recover their account. See
+    docs/plans/2026-08-12-async-email-worker-reliability.md."""
     if settings.EMAIL_DELIVERY_DISABLED:
-        logger.info("Email delivery disabled: suppressing password reset email for user_id=%s", user_id)
+        logger.info("Email delivery disabled: suppressing password reset email for user_id=%s", user.id)
         return
-    user = User.objects.get(pk=user_id)
+    recipient = _recipient_for(user)
+    if not is_send_allowed(recipient):
+        raise EmailRateLimitError(recipient)
+
     text_body, html_body = _render(
         "password_reset", {"reset_url": _password_reset_url(user)}
     )
@@ -157,12 +163,16 @@ def send_password_reset_email_task(user_id):
         subject="Reset your StudyBuddy password",
         text_body=text_body,
         html_body=html_body,
-        recipient=_recipient_for(user),
+        recipient=recipient,
         purpose=EmailSendLog.PURPOSE_PASSWORD_RESET,
-        timeout=settings.EMAIL_TIMEOUT,
-        max_attempts=1,
+        timeout=settings.EMAIL_SYNC_TIMEOUT,
+        max_attempts=settings.EMAIL_SYNC_MAX_ATTEMPTS,
     )
 
+
+# --- Asynchronous task targets (run inside the qcluster worker) -----------
+# These take serializable args (user_id) and re-fetch the user. max_attempts=1
+# here because Django-Q2 owns task-level retries (see Q_CLUSTER).
 
 def send_password_changed_email_task(user_id):
     if settings.EMAIL_DELIVERY_DISABLED:
@@ -236,16 +246,7 @@ def send_booking_confirmed_email_task(booking_id):
 
 
 # --- Enqueue helpers (called from views) ----------------------------------
-
-def enqueue_password_reset(user):
-    """Queue a password-reset email. Suppressed (not queued) if the recipient is
-    over the send cap; password-reset is an abuse vector, so the cap applies."""
-    recipient = _recipient_for(user)
-    if not is_send_allowed(recipient):
-        logger.warning("Password reset email suppressed by send cap for recipient=%s", recipient)
-        return
-    async_task("studybuddy.mailer.send_password_reset_email_task", user.id)
-
+# Password reset is sent synchronously (send_password_reset, above) rather than enqueued here.
 
 def enqueue_password_changed(user):
     """Queue a password-changed security notice. Not capped: users should always
