@@ -15,9 +15,21 @@ datalist popup rendered with unstyled OS/browser chrome (plain dark box) that cl
 form, so it was swapped for a small absolutely-positioned dropdown matching `sb-card`/`sb-field`
 styling. A success toast now confirms when a new category is
 added on save, and the save also syncs into `catalogStore` locally so the category/keyword lists
-update in the same session without a refetch. Manual verification (compact-density backdrop across
-all four admin offcanvas panels, category mismatch/add-new flow, keyword suggestions, new-category
-toast + immediate list update) still outstanding.
+update in the same session without a refetch. Merged `tutor-onboarding-plus-logo` onto this branch
+(merge commit `16fb225`) so both feature sets ship together; resolved the resulting field-name
+conflict in favor of `catalog_description` (the real backend field) and fixed an
+`AdminTutorApplications.vue` script mismerge that had dropped the `savingSubjectEdit` ref (caught
+by lint immediately after). **Found and fixed the actual cause of "Save Changes does nothing":**
+`AdminTutorProposedSubjectDetailView.patch` (`backend/studybuddy/admin_views.py`) had its own
+hardcoded validation rejecting any category outside `subject_taxonomy.CATEGORIES` — a leftover
+400 guard that predates this feature and directly contradicts the "derive categories dynamically,
+no fixed allowlist" design decision. Removed it, updated the one test that asserted the old
+behavior, added a companion test for the still-required non-empty check, and added a failure
+toast so a rejected save is no longer silent. All 10 tests in `AdminProposedSubjectReviewTests`
+pass; `npm run build`/`lint` clean. The reported "backdrop broken again" was investigated and the
+CSS fix (`zoom` scoped to `#app`) is confirmed intact and present in the built bundle — most likely
+a stale dev-server/browser state after the branch churn, not a source regression; a dev-server
+restart and hard refresh should resolve it, to be confirmed by the user.
 
 ## Goal
 
@@ -131,3 +143,11 @@ Mockup reviewed and approved: `docs/mockups/2026-08-12-admin-review-panel-catego
   same session instead of waiting on the next `fetchCourseCatalog()`. `updateTutorProposedSubject`
   persists through a different endpoint than `catalogStore`'s own CRUD actions, so `courseCatalog`
   wasn't reflecting the save until this local sync was added.
+- 2026-08-12: Merged `tutor-onboarding-plus-logo` onto this branch (merge commit `16fb225`);
+  resolved conflicts, including a mismerge that briefly dropped `savingSubjectEdit`. Diagnosed
+  "Save Changes does nothing" to a pre-existing hardcoded category allowlist in
+  `AdminTutorProposedSubjectDetailView.patch` that 400'd any non-taxonomy category; removed it,
+  updated/added backend tests, and added a failure toast so future save errors aren't silent.
+  Confirmed the backdrop CSS fix is intact and present in the built bundle — the "broken again"
+  report is most likely stale dev-server state from the branch churn, pending user confirmation
+  after a restart/hard refresh.

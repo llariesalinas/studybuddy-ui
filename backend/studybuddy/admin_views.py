@@ -1727,8 +1727,6 @@ class AdminTutorProposedSubjectDetailView(APIView):
             return Response({"message": "Proposed subject rejected."})
 
         if action == 'update':
-            from .subject_taxonomy import CATEGORIES as TAXONOMY_CATEGORIES
-
             subject_name = str(request.data.get('subject_name') or '').strip()
             category = str(request.data.get('category') or '').strip()
             keywords = request.data.get('keywords')
@@ -1742,11 +1740,10 @@ class AdminTutorProposedSubjectDetailView(APIView):
                     {"error": "Subject name and category are required."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            if category not in TAXONOMY_CATEGORIES:
-                return Response(
-                    {"error": "Select a category from the taxonomy."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+            # Category is intentionally not restricted to subject_taxonomy.CATEGORIES: the admin
+            # review panel lets a SuperAdmin add a category beyond the curated 6 (derived from
+            # whatever distinct categories already exist in the catalog), matching how
+            # Subjects.category itself is stored (free CharField, no choices constraint).
 
             subject.subject_name = subject_name
             subject.category = category

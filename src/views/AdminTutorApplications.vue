@@ -635,6 +635,7 @@ const saveSubjectEdit = async (subject) => {
     }
   } catch (err) {
     console.error('Subject update failed:', err)
+    toastStore.push(err?.response?.data?.error || 'Failed to save subject changes.', 'error')
   } finally {
     savingSubjectEdit.value = false
   }

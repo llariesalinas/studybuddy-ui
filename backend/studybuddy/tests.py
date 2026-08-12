@@ -9527,8 +9527,11 @@ class AdminProposedSubjectReviewTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["selected_subjects"], [])
 
-    def test_update_action_rejects_unknown_category(self):
-        proposal = self.make_proposal("UPDATE-BAD-CAT")
+    def test_update_action_accepts_a_category_outside_the_curated_taxonomy(self):
+        """The review panel lets a SuperAdmin add a category beyond the curated 6 (derived from
+        the catalog on the frontend); the endpoint must not reject it. See
+        docs/plans/2026-08-12-admin-review-panel-category-keywords-backdrop.md."""
+        proposal = self.make_proposal("UPDATE-NEW-CAT")
 
         response = self.client.patch(
             f"/api/admin/tutor-applications/{self.application.id}/subjects/"
@@ -9537,6 +9540,24 @@ class AdminProposedSubjectReviewTests(APITestCase):
                 "action": "update",
                 "subject_name": "Still Fine",
                 "category": "Invented Category",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        proposal.refresh_from_db()
+        self.assertEqual(proposal.category, "Invented Category")
+
+    def test_update_action_still_requires_a_category(self):
+        proposal = self.make_proposal("UPDATE-NO-CAT")
+
+        response = self.client.patch(
+            f"/api/admin/tutor-applications/{self.application.id}/subjects/"
+            f"{proposal.subject_code}/",
+            {
+                "action": "update",
+                "subject_name": "Still Fine",
+                "category": "",
             },
             format="json",
         )
