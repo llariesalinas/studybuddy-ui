@@ -281,6 +281,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useSessionsStore } from '@/stores/completedSessions'
+import { isHiddenFromTutee } from '@/constants/tuteeSessionVisibility.js'
 
 const router = useRouter()
 const route = useRoute()
@@ -429,6 +430,7 @@ const visibleSessions = computed(() => {
         session.dateKey >= startKey
         && session.dateKey <= endKey
         && !session.dashboard_hidden_by_current_user
+        && !isHiddenFromTutee(session)
       )
     })
     .sort((left, right) => {
@@ -566,20 +568,18 @@ const getEmptyStateIcon = (dayIndex) => {
 
 const getWeeklySessionCardClasses = (status) => {
   const s = String(status || '').toLowerCase()
-  if (s === 'pending')               return 'weekly-session-card-pending'
   if (s === 'upcoming')              return 'weekly-session-card-upcoming'
   if (s === 'ongoing')               return 'weekly-session-card-ongoing'
   if (s === 'awaiting verification') return 'weekly-session-card-verification'
   if (s === 'payment required')      return 'weekly-session-card-payment-required'
   if (s === 'completed')             return 'weekly-session-card-completed'
-  if (s === 'rejected')              return 'weekly-session-card-rejected'
   if (s === 'cancelled')             return 'weekly-session-card-cancelled'
   return 'weekly-session-card-upcoming'
 }
 
 const canDismissDashboardPill = (session) => {
   const status = String(session?.status || '').toLowerCase()
-  return ['rejected', 'cancelled'].includes(status) && !session?.dashboard_hidden_by_current_user
+  return status === 'cancelled' && !session?.dashboard_hidden_by_current_user
 }
 
 const openDismissPillDialog = (session) => {
@@ -654,7 +654,6 @@ const goToNextWeek = () => {
 }
 
 const stats = computed(() => [
-  { label: 'Pending', count: sessionsStore.requestedSessions?.length || 0, icon: 'bi-clock', bgClass: 'bg-warning bg-opacity-10' },
   { label: 'Upcoming', count: sessionsStore.upcomingSessions?.length || 0, icon: 'bi-calendar-event', bgClass: 'bg-info bg-opacity-10' },
   { label: 'Ongoing', count: sessionsStore.ongoingSessions?.length || 0, icon: 'bi-play-circle', bgClass: 'bg-primary bg-opacity-10' },
   { label: 'Completed', count: sessionsStore.completedSessions?.length || 0, icon: 'bi-check-square', bgClass: 'bg-success bg-opacity-10' }
@@ -734,7 +733,7 @@ const viewMoreTutors = () => router.push({ name: 'tutors' })
 
 .metrics-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1rem;
 }
 
@@ -1201,19 +1200,9 @@ const viewMoreTutors = () => router.push({ name: 'tutors' })
   border-left: 4px solid #f97316;
 }
 
-.weekly-session-card-pending {
-  background: #fffbeb;
-  border-left: 4px solid #fbbf24;
-}
-
 .weekly-session-card-payment-required {
   background: #fff1f2;
   border-left: 4px solid #ef4444;
-}
-
-.weekly-session-card-rejected {
-  background: #fef2f2;
-  border-left: 4px solid #dc2626;
 }
 
 .weekly-session-card-cancelled {
@@ -1261,19 +1250,9 @@ const viewMoreTutors = () => router.push({ name: 'tutors' })
   color: #c2410c;
 }
 
-.weekly-session-card-pending .weekly-session-status {
-  background: rgba(251, 191, 36, 0.18);
-  color: #92400e;
-}
-
 .weekly-session-card-payment-required .weekly-session-status {
   background: rgba(239, 68, 68, 0.12);
   color: #b91c1c;
-}
-
-.weekly-session-card-rejected .weekly-session-status {
-  background: rgba(220, 38, 38, 0.12);
-  color: #991b1b;
 }
 
 .weekly-session-card-cancelled .weekly-session-status {

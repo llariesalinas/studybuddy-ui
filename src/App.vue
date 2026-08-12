@@ -62,6 +62,14 @@
       </div>
     </div>
 
+    <!-- `data-sb-owned` keeps clearBootstrapModalState() from ripping out a backdrop Vue renders. -->
+    <div
+      v-if="showLogoutModal"
+      class="modal-backdrop fade show"
+      data-sb-owned
+      @click="closeLogoutModal"
+    ></div>
+
     <main
       class="app-main app-main-surface flex-grow-1 overflow-auto p-5 position-relative"
       :class="{ 'app-main-chat': route.name === 'chat' }"
@@ -107,7 +115,7 @@
 
           <div v-if="route.path === '/tuteeSessions'">
             <h2 class="fw-bold sb-text">Here are your sessions, {{ userFname}}!</h2>
-            <p class="sb-muted">Browse and review pending, upcoming, and completed sessions and confirm ongoing sessions here.</p>
+            <p class="sb-muted">Browse and review your upcoming and completed sessions and confirm ongoing sessions here.</p>
           </div>
 
           <div v-if="route.path.startsWith('/tuteeSessionDetails/')">
@@ -586,7 +594,9 @@ const clearBootstrapModalState = () => {
   document.body.classList.remove('modal-open')
   document.body.style.removeProperty('overflow')
   document.body.style.removeProperty('padding-right')
-  document.querySelectorAll('.modal-backdrop').forEach(backdrop => backdrop.remove())
+  // Only Bootstrap's own leftovers. Vue-rendered backdrops are marked `data-sb-owned` and must be
+  // left to their `v-if` -- closeLogoutModal() calls this before Vue has flushed the removal.
+  document.querySelectorAll('.modal-backdrop:not([data-sb-owned])').forEach(backdrop => backdrop.remove())
 }
 
 const openLogoutModal = () => {
@@ -814,10 +824,6 @@ onBeforeUnmount(() => {
   background: #f3f4f6;
   color: #52606d;
   border: 1px solid #dce3e8;
-}
-
-.logout-modal {
-  background: transparent;
 }
 
 .logout-modal .modal-content {
