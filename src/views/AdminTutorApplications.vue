@@ -582,6 +582,9 @@ const saveSubjectEdit = async (subject) => {
       { ...subjectEditForm },
     )
     Object.assign(subject, updated, { description: subjectEditForm.description })
+    // Sync into the catalog store immediately so the category (and keyword) pickers reflect this
+    // save without waiting on the next fetchCourseCatalog().
+    catalogStore.upsertLocalCatalogSubject(subject)
     editingSubjectCode.value = ''
     categoryMode.value = 'select'
     categoryMismatchNote.value = ''

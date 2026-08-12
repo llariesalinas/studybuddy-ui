@@ -14,8 +14,10 @@ the Keywords field uses a custom-styled suggestion dropdown instead of a native 
 datalist popup rendered with unstyled OS/browser chrome (plain dark box) that clashed with the
 form, so it was swapped for a small absolutely-positioned dropdown matching `sb-card`/`sb-field`
 styling. A success toast now confirms when a new category is
-added on save. Manual verification (compact-density backdrop across all four admin offcanvas
-panels, category mismatch/add-new flow, keyword suggestions, new-category toast) still outstanding.
+added on save, and the save also syncs into `catalogStore` locally so the category/keyword lists
+update in the same session without a refetch. Manual verification (compact-density backdrop across
+all four admin offcanvas panels, category mismatch/add-new flow, keyword suggestions, new-category
+toast + immediate list update) still outstanding.
 
 ## Goal
 
@@ -124,3 +126,8 @@ Mockup reviewed and approved: `docs/mockups/2026-08-12-admin-review-panel-catego
 - 2026-08-12: Added a success toast ("'X' added as a new category.") on `saveSubjectEdit` when the
   saved subject introduces a category not already in the derived taxonomy list, via the existing
   `useToastStore`/`SbToast` (already mounted globally in `App.vue`).
+- 2026-08-12: Added `catalogStore.upsertLocalCatalogSubject()` and call it from `saveSubjectEdit`
+  right after a successful save, so the derived category/keyword lists update immediately in the
+  same session instead of waiting on the next `fetchCourseCatalog()`. `updateTutorProposedSubject`
+  persists through a different endpoint than `catalogStore`'s own CRUD actions, so `courseCatalog`
+  wasn't reflecting the save until this local sync was added.

@@ -74,6 +74,21 @@ export const useCatalogStore = defineStore('catalog', () => {
     )
   }
 
+  // Syncs a subject that was already persisted elsewhere (e.g. the tutor-application review
+  // panel's own save endpoint) into local catalog state, so category/keyword pickers derived from
+  // `courseCatalog` update immediately instead of waiting on the next fetchCourseCatalog().
+  function upsertLocalCatalogSubject(subject) {
+    if (!subject?.subject_code) return
+    const index = courseCatalog.value.findIndex((item) => item.subject_code === subject.subject_code)
+    if (index === -1) {
+      courseCatalog.value = [...courseCatalog.value, subject]
+    } else {
+      courseCatalog.value = courseCatalog.value.map((item, i) =>
+        i === index ? { ...item, ...subject } : item,
+      )
+    }
+  }
+
   async function fetchPaymentMethods(options = {}) {
     const { data } = await cachedGet('payment-methods/', {
       ttlMs: PAYMENT_METHODS_CACHE_TTL_MS,
@@ -109,6 +124,7 @@ export const useCatalogStore = defineStore('catalog', () => {
     addCatalogSubject,
     updateCatalogSubject,
     removeCatalogSubject,
+    upsertLocalCatalogSubject,
     fetchPaymentMethods,
     fetchReceivingInstitutions,
   }
