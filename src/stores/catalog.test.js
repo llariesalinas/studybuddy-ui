@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 
 const cachedGet = vi.fn()
+const clearApiCache = vi.fn()
 const api = {
   delete: vi.fn(),
   get: vi.fn(),
@@ -11,6 +12,7 @@ const api = {
 
 vi.mock('@/services/api/cache', () => ({
   cachedGet,
+  clearApiCache,
 }))
 
 vi.mock('@/services/api/api', () => ({
@@ -23,6 +25,7 @@ describe('catalog store', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     cachedGet.mockReset()
+    clearApiCache.mockReset()
     Object.values(api).forEach((mock) => mock.mockReset())
   })
 
@@ -66,5 +69,16 @@ describe('catalog store', () => {
     })
     expect(api.delete).toHaveBeenCalledWith('/admin/course-catalog/python/')
     expect(catalog.courseCatalog).toEqual([])
+    // Each mutation must burst the cached tutee-facing subjects/ fetch, or pickers built on
+    // `subjects` keep serving a stale pre-change list until the cache's TTL expires.
+    expect(clearApiCache).toHaveBeenCalledTimes(3)
+    expect(clearApiCache).toHaveBeenCalledWith('catalog')
+  })
+
+  it('bursts the subjects cache when a subject is synced in locally', () => {
+    const catalog = useCatalogStore()
+    catalog.upsertLocalCatalogSubject({ subject_code: 'python', subject_name: 'Python' })
+
+    expect(clearApiCache).toHaveBeenCalledWith('catalog')
   })
 })

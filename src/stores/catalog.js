@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import api from '@/services/api/api'
-import { cachedGet } from '@/services/api/cache'
+import { cachedGet, clearApiCache } from '@/services/api/cache'
 import {
   CATALOG_CACHE_TTL_MS,
   PARTNER_INSTITUTIONS_CACHE_TTL_MS,
@@ -53,9 +53,18 @@ export const useCatalogStore = defineStore('catalog', () => {
     return courseCatalog.value
   }
 
+  // Subjects are also served (as `subjects`) from a session-cached `subjects/` fetch used by
+  // tutee-facing pickers. That cache has no other invalidation trigger, so every mutation below
+  // that can change what a tutee should see (add, edit, remove, or an external approve/reject)
+  // must burst it or those pickers keep serving a stale list until the cache's TTL expires.
+  function invalidateSubjectsCache() {
+    clearApiCache('catalog')
+  }
+
   async function addCatalogSubject(payload) {
     const { data } = await api.post('/admin/course-catalog/', payload)
     courseCatalog.value = [...courseCatalog.value, data]
+    invalidateSubjectsCache()
     return data
   }
 
@@ -64,6 +73,7 @@ export const useCatalogStore = defineStore('catalog', () => {
     courseCatalog.value = courseCatalog.value.map((subject) =>
       subject.subject_code === subjectCode ? data : subject,
     )
+    invalidateSubjectsCache()
     return data
   }
 
@@ -72,6 +82,7 @@ export const useCatalogStore = defineStore('catalog', () => {
     courseCatalog.value = courseCatalog.value.filter(
       (subject) => subject.subject_code !== subjectCode,
     )
+    invalidateSubjectsCache()
   }
 
   // Syncs a subject that was already persisted elsewhere (e.g. the tutor-application review
@@ -87,6 +98,7 @@ export const useCatalogStore = defineStore('catalog', () => {
         i === index ? { ...item, ...subject } : item,
       )
     }
+    invalidateSubjectsCache()
   }
 
   async function fetchPaymentMethods(options = {}) {
@@ -125,6 +137,7 @@ export const useCatalogStore = defineStore('catalog', () => {
     updateCatalogSubject,
     removeCatalogSubject,
     upsertLocalCatalogSubject,
+    invalidateSubjectsCache,
     fetchPaymentMethods,
     fetchReceivingInstitutions,
   }

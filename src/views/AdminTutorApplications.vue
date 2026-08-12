@@ -624,6 +624,11 @@ const handleSubjectReview = async (subject, status) => {
     selectedApp.value.proposed_subjects = proposedSubjects.value.filter(
       (item) => item.subject_code !== subject.subject_code,
     )
+    // Approving flips the subject's backend status to 'approved', which changes what tutee-facing
+    // pickers should return from the cached subjects/ fetch — burst it so they see it immediately.
+    if (status === 'approved') {
+      catalogStore.invalidateSubjectsCache()
+    }
   } catch (err) {
     console.error('Subject review failed:', err)
   } finally {
