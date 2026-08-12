@@ -1,0 +1,280 @@
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<style>
+  .sb-preview-wrap {
+    --sb-primary: #00895A;
+    --sb-primary-hover: #017a4f;
+    --sb-bg: #F8F9FA;
+    --sb-card-bg: #ffffff;
+    --sb-text-main: #163127;
+    --sb-text-muted: #6B7280;
+    --sb-border: #E2E6E4;
+    --sb-spring: cubic-bezier(0.16, 1, 0.3, 1);
+    --sb-t-quick: 130ms;
+    --sb-t-normal: 180ms;
+    --sb-lift-control: -4px;
+    --sb-press: 0.97;
+    --sb-halo: 0 0 0 4px rgba(0, 137, 90, 0.12);
+    --sb-shadow-rest-brand: 0 8px 18px rgba(0, 137, 90, 0.20);
+    --sb-shadow-hover-brand: 0 14px 30px rgba(0, 137, 90, 0.28);
+  }
+  .sb-card-mock {
+    background: var(--sb-card-bg);
+    border: 1px solid var(--sb-border);
+    border-radius: 1rem;
+    padding: 1.75rem;
+    color: var(--sb-text-main);
+    font-family: -apple-system, "Segoe UI", sans-serif;
+    max-width: 460px;
+    margin: 0 auto;
+  }
+  .sb-field-label {
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--sb-text-muted);
+    margin-bottom: 0.6rem;
+  }
+
+  /* Canonical pill control — tokens copied verbatim from
+     docs/specs/2026-06-21-feel-haptics-unification-design.md / src/assets/main.css.
+     No emoji anywhere: icons are Bootstrap Icons, same glyphs InitialBooking.vue
+     already uses for Online / Face-to-face (bi-camera-video-fill / bi-geo-alt-fill). */
+  .pill-group {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .pill-btn {
+    position: relative;
+    isolation: isolate;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border: 1.5px solid var(--sb-border);
+    border-radius: 16px;
+    padding: 0.9rem 0.6rem;
+    background: var(--sb-card-bg);
+    color: var(--sb-text-main);
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    overflow: hidden;
+    transform: translateY(0) scale(1);
+    transition: transform var(--sb-t-normal) var(--sb-spring),
+                border-color var(--sb-t-normal) var(--sb-spring),
+                background var(--sb-t-normal) var(--sb-spring),
+                color var(--sb-t-normal) var(--sb-spring);
+  }
+  .pill-btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    box-shadow: var(--sb-shadow-hover-brand);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--sb-t-normal) var(--sb-spring);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .pill-btn:hover { transform: translateY(var(--sb-lift-control)); border-color: var(--sb-primary); }
+    .pill-btn:hover::after { opacity: 1; }
+  }
+  .pill-btn:active { transform: scale(var(--sb-press)); transition-duration: 70ms; }
+  .pill-btn:focus-visible { outline: none; box-shadow: var(--sb-halo); }
+  .pill-btn.is-active { border-color: var(--sb-primary); background: color-mix(in srgb, var(--sb-primary) 12%, var(--sb-card-bg)); color: var(--sb-primary); }
+
+  .pill-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--sb-text-main) 6%, transparent);
+    font-size: 1rem;
+    color: var(--sb-text-muted);
+    transition: background var(--sb-t-normal) var(--sb-spring), color var(--sb-t-normal) var(--sb-spring);
+  }
+  .pill-btn.is-active .pill-icon {
+    background: color-mix(in srgb, var(--sb-primary) 18%, transparent);
+    color: var(--sb-primary);
+  }
+
+  /* Selection pop — the same sb-pop keyframe used app-wide for "just selected" state */
+  @keyframes sb-pop {
+    0% { transform: scale(0.6); opacity: 0; }
+    60% { transform: scale(1.08); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  .pill-icon.is-popping { animation: sb-pop var(--sb-t-normal) var(--sb-spring) both; }
+
+  /* Inline check glyph, replaces the corner badge — appears/disappears with the
+     existing sb-scale-in keyframe, opacity+transform only per the guardrail */
+  @keyframes sb-scale-in {
+    from { opacity: 0; transform: scale(0.7); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  .pill-badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--sb-primary);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.6rem;
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  .pill-btn.is-active .pill-badge {
+    animation: sb-scale-in var(--sb-t-quick) var(--sb-spring) both;
+  }
+
+  @keyframes sb-stagger-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .sb-stagger-item { animation: sb-stagger-in var(--sb-t-normal) var(--sb-spring) both; }
+  .sb-stagger-item:nth-child(1) { animation-delay: 0ms; }
+  .sb-stagger-item:nth-child(2) { animation-delay: 60ms; }
+
+  .pill-hint {
+    font-size: 0.8rem;
+    color: var(--sb-text-muted);
+    margin-top: 0.85rem;
+    min-height: 1.2em;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .pill-hint i { color: var(--sb-primary); opacity: 0; transition: opacity var(--sb-t-quick) var(--sb-spring); }
+  .pill-hint.is-ok i { opacity: 1; }
+  .pill-hint.is-warn { color: #b45309; }
+
+  /* Downstream preview — shows the modality choice reflected live in a second
+     field (the rate step), so the interaction visibly "does something" beyond
+     itself. Reveal uses opacity + max-height-free translateY, per the guardrail
+     (no height animation). */
+  .downstream {
+    margin-top: 1.5rem;
+    padding-top: 1.25rem;
+    border-top: 1px dashed var(--sb-border);
+  }
+  .downstream-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0.55rem 0.75rem;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--sb-text-main) 4%, transparent);
+    font-size: 0.82rem;
+    color: var(--sb-text-muted);
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity var(--sb-t-normal) var(--sb-spring), transform var(--sb-t-normal) var(--sb-spring);
+  }
+  .downstream-row.is-visible { opacity: 1; transform: translateY(0); }
+  .downstream-row + .downstream-row { margin-top: 6px; }
+  .downstream-row i { color: var(--sb-primary); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pill-btn, .pill-btn::after, .pill-icon, .pill-badge, .sb-stagger-item, .downstream-row {
+      animation: none !important;
+      transition: none !important;
+    }
+  }
+</style>
+
+<div class="sb-preview-wrap">
+  <h2>Modality — expanded, no emoji, real Bootstrap Icons</h2>
+  <p class="subtitle">
+    Corrected: icons are now <code>bi-camera-video-fill</code> / <code>bi-geo-alt-fill</code> —
+    the exact glyphs <code>InitialBooking.vue</code> already uses for Online / Face-to-face, not emoji.
+    Expanded the interaction: a check-badge confirms selection, and toggling now visibly drives a
+    downstream summary row (the kind of thing the Complete Profile step would reflect back). Still
+    only canonical tokens from the feel-haptics spec — no new easing, no blur, no decorative motion.
+  </p>
+
+  <div class="mockup">
+    <div class="mockup-header">Live preview — hover, click, tab to focus</div>
+    <div class="mockup-body">
+      <div class="sb-card-mock">
+        <span class="sb-field-label">MODALITY</span>
+        <div class="pill-group" id="pill-group">
+          <button type="button" class="pill-btn is-active sb-stagger-item" data-mode="online" data-label="Online" onclick="toggleMode(this)">
+            <span class="pill-badge"><i class="bi bi-check-lg"></i></span>
+            <span class="pill-icon"><i class="bi bi-camera-video-fill"></i></span>
+            <span>Online</span>
+          </button>
+          <button type="button" class="pill-btn sb-stagger-item" data-mode="f2f" data-label="Face-to-Face" onclick="toggleMode(this)">
+            <span class="pill-badge"><i class="bi bi-check-lg"></i></span>
+            <span class="pill-icon"><i class="bi bi-geo-alt-fill"></i></span>
+            <span>Face-to-Face</span>
+          </button>
+        </div>
+        <p class="pill-hint is-ok" id="pill-hint"><i class="bi bi-check-circle-fill"></i><span>Both modes selectable — this tutor teaches online.</span></p>
+
+        <div class="downstream">
+          <div class="downstream-row is-visible" id="row-online"><i class="bi bi-camera-video-fill"></i> Bookable for Online sessions</div>
+          <div class="downstream-row" id="row-f2f"><i class="bi bi-geo-alt-fill"></i> Bookable for Face-to-Face sessions</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function toggleMode(btn) {
+      btn.classList.toggle('is-active');
+      const icon = btn.querySelector('.pill-icon');
+      icon.classList.remove('is-popping');
+      void icon.offsetWidth;
+      icon.classList.add('is-popping');
+
+      const group = document.getElementById('pill-group');
+      const active = [...group.querySelectorAll('.pill-btn.is-active')];
+      const activeModes = active.map(b => b.dataset.mode);
+
+      const hint = document.getElementById('pill-hint');
+      const hintText = hint.querySelector('span');
+      if (activeModes.length === 0) {
+        hint.classList.remove('is-ok'); hint.classList.add('is-warn');
+        hintText.textContent = 'Select at least one mode to continue.';
+      } else {
+        hint.classList.remove('is-warn'); hint.classList.add('is-ok');
+        hintText.textContent = activeModes.length === 2
+          ? 'Both selected — this tutor teaches online and face-to-face.'
+          : (activeModes[0] === 'online' ? 'Online only.' : 'Face-to-Face only.');
+      }
+
+      document.getElementById('row-online').classList.toggle('is-visible', activeModes.includes('online'));
+      document.getElementById('row-f2f').classList.toggle('is-visible', activeModes.includes('f2f'));
+
+      if (window.recordChoice) window.recordChoice('modality-live', activeModes.join('+'));
+    }
+  </script>
+
+  <div class="options" data-choice-group="approve" style="margin-top:1.75rem;">
+    <div class="option" data-choice="approve" onclick="toggleSelect(this)">
+      <div class="letter">A</div>
+      <div class="content">
+        <h3>This is the one</h3>
+        <p>Lock this pattern in for the modality field.</p>
+      </div>
+    </div>
+    <div class="option" data-choice="more" onclick="toggleSelect(this)">
+      <div class="letter">B</div>
+      <div class="content">
+        <h3>Keep iterating</h3>
+        <p>Tell me in the terminal what to change next.</p>
+      </div>
+    </div>
+  </div>
+</div>
