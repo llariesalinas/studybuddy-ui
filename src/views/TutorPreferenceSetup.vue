@@ -1,170 +1,178 @@
 <template>
-  <TutorOnboardingShell :current-step="1">
-    <h3>Tutor profile setup</h3>
-    <p class="muted">Set your teaching preferences to start matching.</p>
+  <!-- Single wrapping element: App.vue's route Transition (mode="out-in") requires exactly one
+  root element to animate. A bare two-root template here (shell + modal as siblings) makes Vue
+  warn "renders non-element root node that cannot be animated" and can leave the transition stuck
+  mid-swap, blanking the page until a hard refresh. The modal stays `position: fixed`, so wrapping
+  it costs nothing visually -- this div introduces no transform/filter/perspective that would
+  change its containing block. -->
+  <div>
+    <TutorOnboardingShell :current-step="1">
+      <h3>Tutor profile setup</h3>
+      <p class="muted">Set your teaching preferences to start matching.</p>
 
-    <form @submit.prevent="handleCompleteSetup">
-      <div class="field-block">
-        <label class="field-label">Course and Year Level</label>
-        <div class="course-year-display">
-          <span class="course-chip" :class="{ 'chip-unset': !form.course }">
-            {{ currentCourseLabel }}
-          </span>
-          <span class="year-chip" :class="{ 'chip-unset': !form.year_level }">
-            {{ currentYearLabel }}
-          </span>
-          <button type="button" class="change-btn sb-btn" @click="openCourseYearModal">
-            Change
-            <i class="bi bi-arrow-right-short"></i>
-          </button>
+      <form @submit.prevent="handleCompleteSetup">
+        <div class="field-block">
+          <label class="field-label">Course and Year Level</label>
+          <div class="course-year-display">
+            <span class="course-chip" :class="{ 'chip-unset': !form.course }">
+              {{ currentCourseLabel }}
+            </span>
+            <span class="year-chip" :class="{ 'chip-unset': !form.year_level }">
+              {{ currentYearLabel }}
+            </span>
+            <button type="button" class="change-btn sb-btn" @click="openCourseYearModal">
+              Change
+              <i class="bi bi-arrow-right-short"></i>
+            </button>
+          </div>
         </div>
-      </div>
 
-      <div class="field-block">
-        <label class="field-label">Expertise Level</label>
-        <p class="field-hint">Choose the learner level you are ready to teach.</p>
-        <div class="teaching-level-grid" role="radiogroup" aria-label="Teaching level">
-          <button
-            v-for="option in teachingLevelOptions"
-            :key="option.value"
-            type="button"
-            class="teaching-card sb-btn"
-            :class="{ 'teaching-card-active': form.teaching_level === option.value }"
-            role="radio"
-            :aria-checked="form.teaching_level === option.value"
-            @click="form.teaching_level = option.value"
-          >
-            <i :class="['bi', option.icon, 'teaching-card-icon']"></i>
-            <span class="teaching-card-label">{{ option.label }}</span>
-          </button>
+        <div class="field-block">
+          <label class="field-label">Expertise Level</label>
+          <p class="field-hint">Choose the learner level you are ready to teach.</p>
+          <div class="teaching-level-grid" role="radiogroup" aria-label="Teaching level">
+            <button
+              v-for="option in teachingLevelOptions"
+              :key="option.value"
+              type="button"
+              class="teaching-card sb-btn"
+              :class="{ 'teaching-card-active': form.teaching_level === option.value }"
+              role="radio"
+              :aria-checked="form.teaching_level === option.value"
+              @click="form.teaching_level = option.value"
+            >
+              <i :class="['bi', option.icon, 'teaching-card-icon']"></i>
+              <span class="teaching-card-label">{{ option.label }}</span>
+            </button>
+          </div>
         </div>
-      </div>
 
-      <div class="field-block">
-        <label class="field-label">Modality</label>
-        <div class="modality-pill-group">
-          <button
-            type="button"
-            class="modality-pill sb-btn sb-pill"
-            :class="{ 'modality-pill-active': form.can_online }"
-            :aria-pressed="form.can_online"
-            @click="form.can_online = !form.can_online"
-          >
-            <span class="modality-pill-icon"><i class="bi bi-camera-video-fill"></i></span>
-            <span>Online</span>
-          </button>
-          <button
-            type="button"
-            class="modality-pill sb-btn sb-pill"
-            :class="{ 'modality-pill-active': form.can_f2f }"
-            :aria-pressed="form.can_f2f"
-            @click="form.can_f2f = !form.can_f2f"
-          >
-            <span class="modality-pill-icon"><i class="bi bi-geo-alt-fill"></i></span>
-            <span>Face-to-Face</span>
-          </button>
+        <div class="field-block">
+          <label class="field-label">Modality</label>
+          <div class="modality-pill-group">
+            <button
+              type="button"
+              class="modality-pill sb-btn sb-pill"
+              :class="{ 'modality-pill-active': form.can_online }"
+              :aria-pressed="form.can_online"
+              @click="form.can_online = !form.can_online"
+            >
+              <span class="modality-pill-icon"><i class="bi bi-camera-video-fill"></i></span>
+              <span>Online</span>
+            </button>
+            <button
+              type="button"
+              class="modality-pill sb-btn sb-pill"
+              :class="{ 'modality-pill-active': form.can_f2f }"
+              :aria-pressed="form.can_f2f"
+              @click="form.can_f2f = !form.can_f2f"
+            >
+              <span class="modality-pill-icon"><i class="bi bi-geo-alt-fill"></i></span>
+              <span>Face-to-Face</span>
+            </button>
+          </div>
         </div>
-      </div>
 
-      <div class="field-block">
-        <label class="field-label" for="hourly-rate-input">Hourly Rate (PHP)</label>
-        <div class="rate-input-shell">
-          <span class="rate-prefix">PHP</span>
-          <input
-            id="hourly-rate-input"
-            type="text"
-            inputmode="numeric"
-            class="rate-input"
-            v-model="form.hourly_rate"
-            placeholder="0.00"
-            required
-            @input="sanitizeRateInput"
-          >
+        <div class="field-block">
+          <label class="field-label" for="hourly-rate-input">Hourly Rate (PHP)</label>
+          <div class="rate-input-shell">
+            <span class="rate-prefix">PHP</span>
+            <input
+              id="hourly-rate-input"
+              type="text"
+              inputmode="numeric"
+              class="rate-input"
+              v-model="form.hourly_rate"
+              placeholder="0.00"
+              required
+              @input="sanitizeRateInput"
+            >
+          </div>
         </div>
-      </div>
 
-      <div class="commission-row">
-        <input class="form-check-input" type="checkbox" v-model="commissionTermsAccepted" id="commission-terms">
-        <label class="form-check-label" for="commission-terms">
-          I understand StudyBuddy deducts a {{ commissionRatePercent }}% platform fee from
-          each completed session's payout.
-        </label>
-      </div>
+        <div class="commission-row">
+          <input class="form-check-input" type="checkbox" v-model="commissionTermsAccepted" id="commission-terms">
+          <label class="form-check-label" for="commission-terms">
+            I understand StudyBuddy deducts a {{ commissionRatePercent }}% platform fee from
+            each completed session's payout.
+          </label>
+        </div>
 
-      <button type="submit" class="btn-primary-pill sb-btn" :disabled="!commissionTermsAccepted">
-        Continue to Subjects
-      </button>
-    </form>
-  </TutorOnboardingShell>
+        <button type="submit" class="btn-primary-pill sb-btn" :disabled="!commissionTermsAccepted">
+          Continue to Subjects
+        </button>
+      </form>
+    </TutorOnboardingShell>
 
-  <div
-    v-if="isCourseYearModalOpen"
-    class="modal-backdrop-soft"
-    role="presentation"
-    @click.self="closeCourseYearModal"
-  >
-    <section
-      class="glass-modal course-year-modal"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="course-year-title"
+    <div
+      v-if="isCourseYearModalOpen"
+      class="modal-backdrop-soft"
+      role="presentation"
+      @click.self="closeCourseYearModal"
     >
-      <div class="modal-header-row">
-        <div>
-          <p class="modal-kicker">Academic Context</p>
-          <h2 id="course-year-title" class="modal-title">Course and Year Level</h2>
-        </div>
-        <button type="button" class="modal-close sb-btn" aria-label="Close" @click="closeCourseYearModal">
-          <i class="bi bi-x-lg"></i>
-        </button>
-      </div>
-
-      <div class="modal-section">
-        <p class="modal-section-label">Course</p>
-        <div class="course-grid">
-          <button
-            v-for="course in courses"
-            :key="course.course_code"
-            type="button"
-            class="course-card sb-btn"
-            :class="{ 'course-card-active': draftCourse === course.course_code }"
-            @click="draftCourse = course.course_code"
-          >
-            <span class="course-card-code">{{ course.course_code }}</span>
-            <span class="course-card-name">{{ course.course_name }}</span>
-          </button>
-
-          <p v-if="!courses.length" class="empty-note modal-empty">
-            Courses are not available right now.
-          </p>
-        </div>
-      </div>
-
-      <div class="modal-section">
-        <p class="modal-section-label">Year Level</p>
-        <div class="year-grid">
-          <button
-            v-for="year in filteredDraftYearLevels"
-            :key="year.value"
-            type="button"
-            class="year-btn sb-btn"
-            :class="{ 'year-btn-active': Number(draftYearLevel) === year.value }"
-            @click="draftYearLevel = year.value"
-          >
-            {{ year.label }}
+      <section
+        class="glass-modal course-year-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="course-year-title"
+      >
+        <div class="modal-header-row">
+          <div>
+            <p class="modal-kicker">Academic Context</p>
+            <h2 id="course-year-title" class="modal-title">Course and Year Level</h2>
+          </div>
+          <button type="button" class="modal-close sb-btn" aria-label="Close" @click="closeCourseYearModal">
+            <i class="bi bi-x-lg"></i>
           </button>
         </div>
-      </div>
 
-      <div class="modal-footer-row">
-        <button type="button" class="btn-ghost-sm sb-btn" @click="closeCourseYearModal">
-          Cancel
-        </button>
-        <button type="button" class="btn-confirm sb-btn" @click="confirmCourseYearSelection">
-          Confirm
-        </button>
-      </div>
-    </section>
+        <div class="modal-section">
+          <p class="modal-section-label">Course</p>
+          <div class="course-grid">
+            <button
+              v-for="course in courses"
+              :key="course.course_code"
+              type="button"
+              class="course-card sb-btn"
+              :class="{ 'course-card-active': draftCourse === course.course_code }"
+              @click="draftCourse = course.course_code"
+            >
+              <span class="course-card-code">{{ course.course_code }}</span>
+              <span class="course-card-name">{{ course.course_name }}</span>
+            </button>
+
+            <p v-if="!courses.length" class="empty-note modal-empty">
+              Courses are not available right now.
+            </p>
+          </div>
+        </div>
+
+        <div class="modal-section">
+          <p class="modal-section-label">Year Level</p>
+          <div class="year-grid">
+            <button
+              v-for="year in filteredDraftYearLevels"
+              :key="year.value"
+              type="button"
+              class="year-btn sb-btn"
+              :class="{ 'year-btn-active': Number(draftYearLevel) === year.value }"
+              @click="draftYearLevel = year.value"
+            >
+              {{ year.label }}
+            </button>
+          </div>
+        </div>
+
+        <div class="modal-footer-row">
+          <button type="button" class="btn-ghost-sm sb-btn" @click="closeCourseYearModal">
+            Cancel
+          </button>
+          <button type="button" class="btn-confirm sb-btn" @click="confirmCourseYearSelection">
+            Confirm
+          </button>
+        </div>
+      </section>
+    </div>
   </div>
 </template>
 
