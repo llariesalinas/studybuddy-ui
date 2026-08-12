@@ -1,7 +1,9 @@
 <template>
   <aside class="sb-sidebar" :class="{ 'sb-sidebar--collapsed': sidebar.collapsed }">
     <div class="sb-brand">
-      <span class="sb-brand-badge"><i class="bi bi-book"></i></span>
+      <span class="sb-brand-badge">
+        <img src="@/assets/logos/studybuddy-logo.svg" alt="" class="sb-brand-logo" />
+      </span>
       <span class="sb-brand-word">StudyBuddy</span>
       <button
         type="button"
@@ -189,13 +191,16 @@ const menuItems = computed(() => {
 .sb-brand-badge {
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
+  width: 40px;
+  height: 40px;
   flex: 0 0 auto;
   border-radius: 10px;
-  background: linear-gradient(135deg, var(--sb-primary), var(--sb-primary-mid));
-  color: #fff;
-  font-size: 1.05rem;
+}
+
+.sb-brand-logo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .sb-brand-word {

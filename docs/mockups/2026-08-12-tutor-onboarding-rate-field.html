@@ -1,0 +1,158 @@
+<style>
+  .sb-preview-wrap {
+    --sb-primary: #00895A;
+    --sb-card-bg: #ffffff;
+    --sb-text-main: #163127;
+    --sb-text-muted: #6B7280;
+    --sb-border: #E2E6E4;
+    --sb-spring: cubic-bezier(0.16, 1, 0.3, 1);
+    --sb-t-quick: 130ms;
+    --sb-halo: 0 0 0 4px rgba(0, 137, 90, 0.12);
+  }
+  .sb-card-mock {
+    background: var(--sb-card-bg);
+    border: 1px solid var(--sb-border);
+    border-radius: 1rem;
+    padding: 1.6rem;
+    color: var(--sb-text-main);
+    font-family: -apple-system, "Segoe UI", sans-serif;
+    max-width: 380px;
+    margin: 0 auto;
+  }
+  .sb-field-label {
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--sb-text-muted);
+    margin-bottom: 0.6rem;
+  }
+
+  @keyframes sb-pop { 0% { transform: scale(0.6); opacity: 0; } 60% { transform: scale(1.08); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+  .bump.is-popping { animation: sb-pop var(--sb-t-quick) var(--sb-spring) both; }
+
+  .scrub-field-shell {
+    position: relative;
+    display: flex;
+    align-items: center;
+    border: 1.5px solid var(--sb-border);
+    border-radius: 0.6rem;
+    overflow: hidden;
+    background: var(--sb-card-bg);
+    cursor: ew-resize;
+    transition: border-color var(--sb-t-quick) var(--sb-spring), box-shadow var(--sb-t-quick) var(--sb-spring);
+  }
+  .scrub-field-shell.is-scrubbing,
+  .scrub-field-shell:focus-within {
+    border-color: var(--sb-primary);
+    box-shadow: var(--sb-halo);
+  }
+  .scrub-fill {
+    position: absolute;
+    inset: 0;
+    width: 20.8%;
+    background: color-mix(in srgb, var(--sb-primary) 10%, transparent);
+    pointer-events: none;
+  }
+  .scrub-content {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    padding: 0.65rem 0.9rem;
+  }
+  .scrub-prefix { color: var(--sb-text-muted); font-weight: 700; font-size: 0.95rem; pointer-events: none; }
+  .scrub-input {
+    border: none;
+    background: transparent;
+    outline: none;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--sb-text-main);
+    width: 90px;
+    cursor: text;
+    padding: 0;
+  }
+  .scrub-hint-inline { margin-left: auto; font-size: 0.65rem; color: var(--sb-text-muted); opacity: 0.7; pointer-events: none; }
+
+  .hint { font-size: 0.78rem; color: var(--sb-text-muted); margin-top: 0.7rem; }
+</style>
+
+<div class="sb-preview-wrap">
+  <h2>Final: scrubbable + typable, ±1 increment</h2>
+  <p class="subtitle">
+    A real <code>&lt;input&gt;</code> underneath — click it and type a number normally, or click-drag
+    anywhere in the field (without landing in the text caret) to scrub the value up/down by 1 per
+    unit of drag. No separate buttons, no second widget.
+  </p>
+
+  <div class="mockup">
+    <div class="mockup-header">Live preview — type, or click-drag horizontally</div>
+    <div class="mockup-body">
+      <div class="sb-card-mock">
+        <span class="sb-field-label">HOURLY RATE (PHP)</span>
+        <div class="scrub-field-shell" id="scrub" onmousedown="startScrub(event)">
+          <div class="scrub-fill" id="fill"></div>
+          <div class="scrub-content">
+            <span class="scrub-prefix">PHP</span>
+            <input type="text" inputmode="numeric" class="scrub-input bump" id="val" value="250.00"
+                   onclick="event.stopPropagation()" oninput="onType(this.value)">
+            <span class="scrub-hint-inline">drag ↔ or type</span>
+          </div>
+        </div>
+        <p class="hint">Dragging moves the value by 1 per drag-unit; typing replaces it directly. Both write to the same <code>hourly_rate</code> field.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="options" style="margin-top:1.5rem;">
+    <div class="option" data-choice="approve" onclick="toggleSelect(this)">
+      <div class="letter">✓</div>
+      <div class="content"><h3>This is it</h3><p>Lock in scrub + type, ±1.</p></div>
+    </div>
+    <div class="option" data-choice="tweak" onclick="toggleSelect(this)">
+      <div class="letter">✎</div>
+      <div class="content"><h3>One more tweak</h3><p>Tell me in the terminal.</p></div>
+    </div>
+  </div>
+
+  <script>
+    let value = 250;
+    function render() {
+      const input = document.getElementById('val');
+      input.value = value.toFixed(2);
+      input.classList.remove('is-popping'); void input.offsetWidth; input.classList.add('is-popping');
+      document.getElementById('fill').style.width = Math.min(100, (value / 1200) * 100) + '%';
+    }
+    function onType(v) {
+      const n = Number(v.replace(/[^\d.]/g, ''));
+      if (!Number.isNaN(n)) value = n;
+      document.getElementById('fill').style.width = Math.min(100, (value / 1200) * 100) + '%';
+      if (window.recordChoice) window.recordChoice('rate-final-type', String(value));
+    }
+
+    let scrubbing = false, startX = 0, startVal = 250;
+    function startScrub(e) {
+      if (e.target.id === 'val') return; // clicking the input focuses it for typing instead
+      scrubbing = true; startX = e.clientX; startVal = value;
+      document.getElementById('scrub').classList.add('is-scrubbing');
+      document.addEventListener('mousemove', onScrub);
+      document.addEventListener('mouseup', endScrub);
+    }
+    function onScrub(e) {
+      if (!scrubbing) return;
+      const delta = e.clientX - startX;
+      value = Math.max(0, Math.round(startVal + delta)); // 1:1, +1 per pixel-unit of drag
+      render();
+    }
+    function endScrub() {
+      if (!scrubbing) return;
+      scrubbing = false;
+      document.getElementById('scrub').classList.remove('is-scrubbing');
+      document.removeEventListener('mousemove', onScrub);
+      document.removeEventListener('mouseup', endScrub);
+      if (window.recordChoice) window.recordChoice('rate-final-scrub', String(value));
+    }
+  </script>
+</div>
