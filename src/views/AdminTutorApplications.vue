@@ -631,6 +631,10 @@ const handleSubjectReview = async (subject, status) => {
     }
   } catch (err) {
     console.error('Subject review failed:', err)
+    toastStore.push(
+      err?.response?.data?.error || `Failed to ${status === 'approved' ? 'approve' : 'reject'} subject.`,
+      'error',
+    )
   } finally {
     processingSubject.value = ''
   }
