@@ -191,6 +191,15 @@ def send_document_renewal_reminder_email_task(user_id, role_label, days_remainin
         "document_renewal_reminder",
         {"days_remaining": days_remaining, "due_at": due_at_iso, "status_url": status_url},
     )
+    _deliver(
+        subject=f"Your StudyBuddy {role_label.capitalize()} verification renewal is due soon",
+        text_body=text_body,
+        html_body=html_body,
+        recipient=_recipient_for(user),
+        purpose=EmailSendLog.PURPOSE_DOCUMENT_RENEWAL_REMINDER,
+        timeout=settings.EMAIL_TIMEOUT,
+        max_attempts=1,
+    )
 
 
 def send_booking_confirmed_email_task(booking_id):
@@ -221,15 +230,6 @@ def send_booking_confirmed_email_task(booking_id):
         html_body=text_body.replace('\n', '<br>'),
         recipient=_recipient_for(booking.tutor.profile.user),
         purpose=EmailSendLog.PURPOSE_BOOKING_CONFIRMED,
-        timeout=settings.EMAIL_TIMEOUT,
-        max_attempts=1,
-    )
-    _deliver(
-        subject=f"Your StudyBuddy {role_label.capitalize()} verification renewal is due soon",
-        text_body=text_body,
-        html_body=html_body,
-        recipient=_recipient_for(user),
-        purpose=EmailSendLog.PURPOSE_DOCUMENT_RENEWAL_REMINDER,
         timeout=settings.EMAIL_TIMEOUT,
         max_attempts=1,
     )
