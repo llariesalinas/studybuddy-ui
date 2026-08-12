@@ -1001,6 +1001,23 @@ class GlobalSubjectCatalogTests(APITestCase):
     def test_catalog_description_defaults_to_blank(self):
         self.assertEqual(self.subject.description, "")
 
+    def test_catalog_create_accepts_a_blank_department(self):
+        """Sub-Group is optional, matching every form's lack of a `required` attribute — the model
+        previously had no `blank=True`, which made the serializer reject an empty value. See
+        docs/plans/2026-08-13-admin-review-panel-subgroup-removal-keyword-fix.md."""
+        create_response = self.client.post(
+            "/api/admin/course-catalog/",
+            {
+                "subject_code": "AI204",
+                "subject_name": "Robotics",
+                "department": "",
+                "category": "Technology & Computer Science",
+            },
+            format="json",
+        )
+        self.assertEqual(create_response.status_code, 201)
+        self.assertEqual(create_response.data["department"], "")
+
 
 class RecommendTutorsViewTests(APITestCase):
     def setUp(self):
@@ -7790,6 +7807,30 @@ class DevLiveSessionTests(APITestCase):
         self.assertEqual(clear_response.status_code, 200)
         self.assertEqual(clear_response.data["session"]["status"], "Upcoming")
 
+    @override_settings(DEBUG=True)
+    def test_force_live_ongoing_survives_a_midnight_crossing(self):
+        """Regression test for a bug where build_dev_live_override() stored one shared date for
+        both start_time and end_time. Whenever a phase's window crossed local midnight (e.g.
+        'ending' is (-55, +5) minutes, which crosses backward whenever `now` is within 55 minutes
+        past midnight), get_display_status recombined the later end_time with the earlier date,
+        producing an end_at *before* start_at -- an impossible/empty Ongoing window, so the
+        endpoint silently returned 'Payment Required' instead of 'Ongoing'. Only manifested near
+        local midnight, which is why it looked like intermittent flakiness rather than a
+        deterministic bug across different test-run times. Freezes the clock just past midnight so
+        this can't silently regress into being wall-clock-time-dependent again."""
+        frozen_now = timezone.make_aware(
+            datetime.combine(date.today(), time(0, 30)), timezone.get_current_timezone(),
+        )
+        with patch("django.utils.timezone.now", return_value=frozen_now):
+            response = self.client.post(
+                f"/api/dev/bookings/{self.booking.id}/force-live/",
+                {"phase": "ending"},
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["session"]["status"], "Ongoing")
+
 
 class TutorCashInTests(APITestCase):
     def setUp(self):
@@ -9565,8 +9606,11 @@ class AdminProposedSubjectReviewTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["selected_subjects"], [])
 
-    def test_update_action_rejects_unknown_category(self):
-        proposal = self.make_proposal("UPDATE-BAD-CAT")
+    def test_update_action_accepts_a_category_outside_the_curated_taxonomy(self):
+        """The review panel lets a SuperAdmin add a category beyond the curated 6 (derived from
+        the catalog on the frontend); the endpoint must not reject it. See
+        docs/plans/2026-08-12-admin-review-panel-category-keywords-backdrop.md."""
+        proposal = self.make_proposal("UPDATE-NEW-CAT")
 
         response = self.client.patch(
             f"/api/admin/tutor-applications/{self.application.id}/subjects/"
@@ -9579,7 +9623,89 @@ class AdminProposedSubjectReviewTests(APITestCase):
             format="json",
         )
 
+        self.assertEqual(response.status_code, 200)
+        proposal.refresh_from_db()
+        self.assertEqual(proposal.category, "Invented Category")
+
+    def test_update_action_still_requires_a_category(self):
+        proposal = self.make_proposal("UPDATE-NO-CAT")
+
+        response = self.client.patch(
+            f"/api/admin/tutor-applications/{self.application.id}/subjects/"
+            f"{proposal.subject_code}/",
+            {
+                "action": "update",
+                "subject_name": "Still Fine",
+                "category": "",
+            },
+            format="json",
+        )
+
         self.assertEqual(response.status_code, 400)
+
+    def test_update_action_persists_department(self):
+        """The review panel's Sub-Group field (Subjects.department) mirrors Category: free text,
+        not restricted to any curated list. See
+        docs/plans/2026-08-13-admin-review-panel-subgroup-removal-keyword-fix.md."""
+        proposal = self.make_proposal("UPDATE-SUBGROUP")
+
+        response = self.client.patch(
+            f"/api/admin/tutor-applications/{self.application.id}/subjects/"
+            f"{proposal.subject_code}/",
+            {
+                "action": "update",
+                "subject_name": "Still Fine",
+                "category": "Mathematics & Data Sciences",
+                "department": "Algebra",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        proposal.refresh_from_db()
+        self.assertEqual(proposal.department, "Algebra")
+        self.assertEqual(response.data["department"], "Algebra")
+
+    def test_update_action_leaves_department_alone_when_omitted(self):
+        proposal = self.make_proposal("UPDATE-NO-SUBGROUP")
+        proposal.department = "Existing Sub-Group"
+        proposal.save(update_fields=["department"])
+
+        response = self.client.patch(
+            f"/api/admin/tutor-applications/{self.application.id}/subjects/"
+            f"{proposal.subject_code}/",
+            {
+                "action": "update",
+                "subject_name": "Renamed Only",
+                "category": "Mathematics & Data Sciences",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        proposal.refresh_from_db()
+        self.assertEqual(proposal.department, "Existing Sub-Group")
+
+    def test_update_action_accepts_a_blank_department(self):
+        """Sub-Group is optional — see the required/allow_blank fix in
+        docs/plans/2026-08-13-admin-review-panel-subgroup-removal-keyword-fix.md."""
+        proposal = self.make_proposal("UPDATE-BLANK-SG")
+
+        response = self.client.patch(
+            f"/api/admin/tutor-applications/{self.application.id}/subjects/"
+            f"{proposal.subject_code}/",
+            {
+                "action": "update",
+                "subject_name": "Still Fine",
+                "category": "Mathematics & Data Sciences",
+                "department": "",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        proposal.refresh_from_db()
+        self.assertEqual(proposal.department, "")
 
     def test_reject_subject_deletes_subject_and_tutor_link(self):
         proposal = self.make_proposal("REJECT-PROP")
@@ -9760,15 +9886,21 @@ class AdminCourseCatalogTaxonomyTests(APITestCase):
         self.assertEqual(response.data["subject_code"], "organic-chemistry")
         self.assertTrue(Subjects.objects.filter(subject_code="organic-chemistry").exists())
 
-    def test_create_rejects_a_category_outside_the_taxonomy(self):
+    def test_create_accepts_a_category_outside_the_curated_taxonomy(self):
+        """A category added via the tutor-application review panel (e.g. "Spoken Languages")
+        must also be usable here — the catalog page's own create/edit must not reject it."""
         response = self.client.post(
             "/api/admin/course-catalog/",
-            {"subject_name": "Mystery Subject", "category": "Not A Real Category"},
+            {
+                "subject_name": "Mystery Subject",
+                "category": "Not A Real Category",
+                "department": "Miscellaneous",
+            },
             format="json",
         )
 
-        self.assertEqual(response.status_code, 400)
-        self.assertFalse(Subjects.objects.filter(subject_name="Mystery Subject").exists())
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(Subjects.objects.filter(subject_name="Mystery Subject").exists())
 
     def test_list_filters_by_category(self):
         Subjects.objects.create(
@@ -10289,7 +10421,10 @@ class LateCancellationSupportTicketTests(APITestCase):
                 reference_id=f"LT-{ticket.id}",
             ).exists()
         )
-        self.assertEqual(response.data["monthly_counted_strikes"], 1)
+        # ADR-0011 replaced the calendar-month "monthly_counted_strikes" field with a rolling
+        # 14-day "active_strikes" count (see get_strike_snapshot); the ticket already counted
+        # provisionally the moment it opened, so resolving 'counted' leaves the count at 1.
+        self.assertEqual(response.data["active_strikes"], 1)
 
     def test_superadmin_excused_verdict_leaves_wallet_untouched(self):
         booking = self.create_confirmed_booking(hours_from_now=GRACE_CUTOFF_HOURS - 1)

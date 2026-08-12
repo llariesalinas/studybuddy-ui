@@ -1,0 +1,89 @@
+<h2>Proposed Subjects edit form — category mismatch + keyword suggestions</h2>
+<p class="subtitle">Left: the mismatch is detected on open, auto-prefilled into "add new category". Right: typing in Keywords surfaces existing catalog keywords.</p>
+
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header">Category mismatch → auto "add new"</div>
+    <div class="mockup-body">
+      <div style="font-family:system-ui;font-size:13px;max-width:340px;margin:0 auto;">
+        <label style="display:block;font-weight:700;font-size:12px;margin-bottom:4px;">Subject name</label>
+        <input class="mock-input" value="Kimi K2 AI" readonly style="margin-bottom:14px;">
+
+        <label style="display:block;font-weight:700;font-size:12px;margin-bottom:4px;">Category</label>
+        <div style="background:#fff7e6;border:1px solid #f0c36d;border-radius:8px;padding:8px 10px;font-size:12px;color:#8a6100;margin-bottom:8px;">
+          ⚠ Tutor proposed "Kimi K2 AI Tools" — not in the catalog yet
+        </div>
+        <div style="display:flex;gap:6px;margin-bottom:14px;">
+          <input class="mock-input" value="Kimi K2 AI Tools" style="flex:1;border-color:#2e7d5b;">
+          <button class="mock-button" style="background:#2e7d5b;white-space:nowrap;">Add category</button>
+        </div>
+        <div style="font-size:11px;color:#777;margin-top:-8px;margin-bottom:14px;">
+          ↩ <a href="#" style="color:#2e7d5b;">Pick an existing category instead</a>
+        </div>
+
+        <label style="display:block;font-weight:700;font-size:12px;margin-bottom:4px;">Keywords</label>
+        <input class="mock-input" placeholder="Comma-separated synonyms" style="margin-bottom:14px;">
+
+        <div style="display:flex;gap:8px;">
+          <button class="mock-button" style="background:#2e7d5b;">Save changes</button>
+          <button class="mock-button" style="background:#eee;color:#333;">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mockup">
+    <div class="mockup-header">Keywords — existing-keyword suggestions</div>
+    <div class="mockup-body">
+      <div style="font-family:system-ui;font-size:13px;max-width:340px;margin:0 auto;">
+        <label style="display:block;font-weight:700;font-size:12px;margin-bottom:4px;">Category</label>
+        <select class="mock-input" style="margin-bottom:14px;">
+          <option>Technology &amp; Computer Science</option>
+        </select>
+
+        <label style="display:block;font-weight:700;font-size:12px;margin-bottom:4px;">Keywords</label>
+        <input class="mock-input" value="coding, ai, ml, cod" style="margin-bottom:2px;">
+        <div style="border:1px solid #ddd;border-radius:8px;box-shadow:0 4px 10px rgba(0,0,0,.08);overflow:hidden;margin-bottom:14px;">
+          <div style="padding:7px 10px;border-bottom:1px solid #f0f0f0;background:#f4faf7;">
+            <strong>coding</strong> <span style="color:#888;font-size:11px;">— already used on 4 subjects</span>
+          </div>
+          <div style="padding:7px 10px;">
+            <strong>programming</strong> <span style="color:#888;font-size:11px;">— already used on 3 subjects</span>
+          </div>
+        </div>
+        <p style="font-size:11px;color:#777;margin-top:-10px;">
+          Suggestions come from every keyword already in the catalog (native browser autocomplete). Typing something new just adds it.
+        </p>
+
+        <div style="display:flex;gap:8px;margin-top:14px;">
+          <button class="mock-button" style="background:#2e7d5b;">Save changes</button>
+          <button class="mock-button" style="background:#eee;color:#333;">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:24px;">
+  <h3>Backdrop fix — before / after</h3>
+  <p class="subtitle">Compact density on. Left: today's bug (dim overlay stops short, sidebar bottom stays lit). Right: after moving <code>zoom</code> from &lt;html&gt; to #app.</p>
+</div>
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header">Before — segmented</div>
+    <div class="mockup-body" style="position:relative;height:220px;background:linear-gradient(160deg,#e8f5ef,#fdf3e4);border-radius:8px;overflow:hidden;">
+      <div style="position:absolute;inset:0;background:rgba(0,0,0,.45);height:70%;width:78%;"></div>
+      <div style="position:absolute;right:10px;bottom:10px;font-size:11px;color:#a05a00;background:#fff8ec;border:1px solid #f0c36d;padding:4px 8px;border-radius:6px;">
+        undimmed gap
+      </div>
+    </div>
+  </div>
+  <div class="mockup">
+    <div class="mockup-header">After — full coverage</div>
+    <div class="mockup-body" style="position:relative;height:220px;background:linear-gradient(160deg,#e8f5ef,#fdf3e4);border-radius:8px;overflow:hidden;">
+      <div style="position:absolute;inset:0;background:rgba(0,0,0,.45);"></div>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:20px;">Take a look and let me know in the terminal — does the mismatch/prefill flow and the keyword suggestion style look right, or should anything change?</p>

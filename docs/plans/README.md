@@ -3,7 +3,18 @@
 Every finalized plan lives in this folder as its own dated file, created from [`_template.md`](_template.md).
 Status moves Draft â†’ Approved â†’ In Progress â†’ Done. When a plan is complete, its summary is linked below.
 
-**Status & Progress Summary** (2026-08-12): Async email worker reliability is In Progress —
+**Status & Progress Summary** (2026-08-13): Admin review panel Sub-Group + Keywords fix is Done —
+committed on `admin-review-panel-catalog-fixes` (`d850964`), not pushed. Added a Sub-Group field to
+the tutor-application review panel's Proposed Subjects form (it never had one, unlike the standalone
+Subject Catalog page), mirroring Category's select + "+ Add new sub-group" pattern and scoped to the
+selected category. Fixed `Subjects.department` being effectively required despite no form treating
+it that way (`blank=True, default=''` + migration). Widened the review offcanvas to 760px, added
+Category's own "+ Add new category" toggle to the same layout, and fixed the Keywords suggestion
+dropdown to bold matched text and offer an explicit "add as new keyword" action. 6 new backend
+tests; full suite (458 tests) has 1 pre-existing failure + 1 pre-existing error, both unrelated.
+[Plan](2026-08-13-admin-review-panel-subgroup-removal-keyword-fix.md).
+
+**Previous** (2026-08-12): Async email worker reliability is In Progress —
 diagnosis, code fix, doc note, and backlog purge are done; only the Render Cron Job setup and
 merging the PR remain, both requiring the user. Root cause: every async email — password reset,
 password-changed, verification approved/rejected, document renewal result/reminder, booking

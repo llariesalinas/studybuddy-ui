@@ -114,7 +114,7 @@
     </div>
 
     <!-- Application Detail Offcanvas -->
-    <div class="offcanvas offcanvas-end border-0 shadow" tabindex="-1" id="appDetailOffcanvas" style="width: 500px;">
+    <div class="offcanvas offcanvas-end border-0 shadow" tabindex="-1" id="appDetailOffcanvas" style="width: 760px;">
       <div class="offcanvas-header bg-light border-bottom">
         <h5 class="offcanvas-title fw-bold">Review {{ selectedReviewTypeLabel }}</h5>
         <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
@@ -182,15 +182,86 @@
                   <label class="form-label small fw-bold">Subject name</label>
                   <input v-model.trim="subjectEditForm.subject_name" class="form-control form-control-sm sb-field">
                 </div>
-                <div class="mb-2">
-                  <label class="form-label small fw-bold">Category</label>
-                  <select v-model="subjectEditForm.category" class="form-select form-select-sm sb-field">
-                    <option v-for="category in taxonomyCategories" :key="category" :value="category">{{ category }}</option>
-                  </select>
+                <div class="two-up-fields">
+                  <div class="mb-2">
+                    <label class="form-label small fw-bold">Category</label>
+                    <template v-if="categoryMode === 'new'">
+                      <div v-if="categoryMismatchNote" class="category-mismatch-note small mb-2">
+                        <i class="bi bi-exclamation-triangle me-1"></i>{{ categoryMismatchNote }}
+                      </div>
+                      <input v-model.trim="subjectEditForm.category" class="form-control form-control-sm sb-field" placeholder="New category name">
+                      <button type="button" class="btn btn-link btn-sm px-0 mt-1" @click="useExistingCategory">
+                        Pick an existing category instead
+                      </button>
+                    </template>
+                    <template v-else>
+                      <select
+                        v-model="subjectEditForm.category"
+                        class="form-select form-select-sm sb-field"
+                        @change="handleCategorySelectChange"
+                      >
+                        <option v-for="category in taxonomyCategories" :key="category" :value="category">{{ category }}</option>
+                        <option value="__add_new__">+ Add new category...</option>
+                      </select>
+                    </template>
+                  </div>
+                  <div class="mb-2">
+                    <label class="form-label small fw-bold">Sub-Group</label>
+                    <template v-if="subgroupMode === 'new'">
+                      <div v-if="subgroupMismatchNote" class="category-mismatch-note small mb-2">
+                        <i class="bi bi-exclamation-triangle me-1"></i>{{ subgroupMismatchNote }}
+                      </div>
+                      <input v-model.trim="subjectEditForm.department" class="form-control form-control-sm sb-field" placeholder="New sub-group name">
+                      <button type="button" class="btn btn-link btn-sm px-0 mt-1" @click="useExistingSubgroup">
+                        Pick an existing sub-group instead
+                      </button>
+                    </template>
+                    <template v-else>
+                      <select
+                        v-model="subjectEditForm.department"
+                        class="form-select form-select-sm sb-field"
+                        @change="handleSubgroupSelectChange"
+                      >
+                        <option value="">None</option>
+                        <option v-for="subgroup in subgroupOptions" :key="subgroup" :value="subgroup">{{ subgroup }}</option>
+                        <option value="__add_new__">+ Add new sub-group...</option>
+                      </select>
+                    </template>
+                  </div>
                 </div>
-                <div class="mb-2">
+                <div class="mb-2 keyword-field">
                   <label class="form-label small fw-bold">Keywords</label>
-                  <input v-model.trim="subjectEditForm.keywords" class="form-control form-control-sm sb-field" placeholder="Comma-separated synonyms, e.g. coding, programming, cs">
+                  <input
+                    v-model.trim="subjectEditForm.keywords"
+                    class="form-control form-control-sm sb-field"
+                    placeholder="Comma-separated synonyms, e.g. coding, programming, cs"
+                    autocomplete="off"
+                    @focus="keywordSuggestionsOpen = true"
+                    @blur="keywordSuggestionsOpen = false"
+                  >
+                  <div v-if="keywordSuggestionsOpen && keywordFragment" class="keyword-suggestions">
+                    <div v-if="keywordSuggestions.length" class="keyword-suggestions-hint">Matching existing catalog keywords</div>
+                    <button
+                      v-for="keyword in keywordSuggestions"
+                      :key="keyword"
+                      type="button"
+                      class="keyword-suggestion"
+                      @mousedown.prevent="selectKeywordSuggestion(keyword)"
+                    >
+                      <template v-for="(segment, i) in highlightSegments(keyword, keywordFragment)" :key="i">
+                        <strong v-if="segment.match">{{ segment.text }}</strong>
+                        <template v-else>{{ segment.text }}</template>
+                      </template>
+                    </button>
+                    <button
+                      v-if="!keywordFragmentExists"
+                      type="button"
+                      class="keyword-suggestion keyword-add-new"
+                      @mousedown.prevent="selectKeywordSuggestion(keywordFragment)"
+                    >
+                      + Use "{{ keywordFragment }}" as a new keyword
+                    </button>
+                  </div>
                 </div>
                 <div v-if="subject.tutor_note" class="mb-2">
                   <label class="form-label small fw-bold">Tutor's note</label>
@@ -306,6 +377,8 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAdminStore } from '@/stores/admin'
+import { useCatalogStore } from '@/stores/catalog'
+import { useToastStore } from '@/stores/toast'
 import { Offcanvas } from 'bootstrap'
 import {
   getApplicationReviewKind,
@@ -314,12 +387,15 @@ import {
   getReviewStatus,
   getReviewSubmittedAt,
 } from '@/services/tutorApplicationState'
-import { TAXONOMY_CATEGORIES } from '@/constants/subjectTaxonomy'
+import { deriveCategoryOptions, deriveSubgroupOptions } from '@/constants/subjectTaxonomy'
+import { highlightSegments } from '@/components/subjectPicker.shared'
 
 const APPLICANT_ROLES = ['tutor', 'tutee']
 const APPLICATION_STATUSES = ['pending', 'approved', 'rejected']
 
 const adminStore = useAdminStore()
+const catalogStore = useCatalogStore()
+const toastStore = useToastStore()
 const route = useRoute()
 // Deep links (e.g. the SuperAdmin dashboard's pending-review queue) may preselect the tab and
 // status; anything unrecognised falls back to the default pending-tutor view.
@@ -339,11 +415,72 @@ const savingSubjectEdit = ref(false)
 const subjectEditForm = reactive({
   subject_name: '',
   category: '',
+  department: '',
   keywords: '',
   catalog_description: '',
 })
-const taxonomyCategories = TAXONOMY_CATEGORIES
+// 'select' shows the taxonomy dropdown; 'new' shows the free-text "add a category" input,
+// entered either by picking "+ Add new category..." or automatically when a proposed subject's
+// category doesn't match anything in the derived list.
+const categoryMode = ref('select')
+const categoryMismatchNote = ref('')
+// Same two-mode pattern as Category, scoped to whichever category is currently selected.
+const subgroupMode = ref('select')
+const subgroupMismatchNote = ref('')
 let offcanvas = null
+
+const taxonomyCategories = computed(() => deriveCategoryOptions(catalogStore.courseCatalog))
+
+// Sub-group values already used by subjects under the currently-selected category — a suggestion
+// list only, not an enforced relationship (see deriveSubgroupOptions).
+const subgroupOptions = computed(() =>
+  deriveSubgroupOptions(catalogStore.courseCatalog, subjectEditForm.category)
+)
+
+const catalogKeywords = computed(() => {
+  const keywords = new Set()
+  for (const subject of catalogStore.courseCatalog) {
+    for (const keyword of (subject.keywords || '').split(',')) {
+      const trimmed = keyword.trim()
+      if (trimmed) keywords.add(trimmed)
+    }
+  }
+  return [...keywords].sort()
+})
+
+// Custom dropdown instead of a native <datalist> — datalist popups render with unstyled OS/browser
+// chrome that clashes with the rest of the form.
+const keywordSuggestionsOpen = ref(false)
+
+// The comma-separated fragment currently being typed (what suggestions match against).
+const keywordFragment = computed(() => {
+  const enteredKeywords = subjectEditForm.keywords.split(',').map((kw) => kw.trim())
+  return enteredKeywords[enteredKeywords.length - 1] || ''
+})
+
+const keywordSuggestions = computed(() => {
+  const fragment = keywordFragment.value.toLowerCase()
+  if (!fragment) return []
+  const enteredKeywords = subjectEditForm.keywords.split(',').map((kw) => kw.trim().toLowerCase())
+  const alreadyEntered = new Set(enteredKeywords.filter(Boolean))
+
+  return catalogKeywords.value
+    .filter((keyword) => !alreadyEntered.has(keyword.toLowerCase()))
+    .filter((keyword) => keyword.toLowerCase().includes(fragment))
+    .slice(0, 8)
+})
+
+// Whether the typed fragment already exists as a catalog keyword verbatim — if so, "add as new" is
+// redundant with just picking the matching suggestion.
+const keywordFragmentExists = computed(() =>
+  catalogKeywords.value.some((keyword) => keyword.toLowerCase() === keywordFragment.value.toLowerCase())
+)
+
+const selectKeywordSuggestion = (keyword) => {
+  const lastComma = subjectEditForm.keywords.lastIndexOf(',')
+  const prefix = lastComma === -1 ? '' : `${subjectEditForm.keywords.slice(0, lastComma + 1)} `
+  subjectEditForm.keywords = `${prefix}${keyword}, `
+}
 
 const pageTitle = computed(() => (filters.role === 'tutee' ? 'Tutee Applications' : 'Tutor Applications'))
 
@@ -487,8 +624,17 @@ const handleSubjectReview = async (subject, status) => {
     selectedApp.value.proposed_subjects = proposedSubjects.value.filter(
       (item) => item.subject_code !== subject.subject_code,
     )
+    // Approving flips the subject's backend status to 'approved', which changes what tutee-facing
+    // pickers should return from the cached subjects/ fetch — burst it so they see it immediately.
+    if (status === 'approved') {
+      catalogStore.invalidateSubjectsCache()
+    }
   } catch (err) {
     console.error('Subject review failed:', err)
+    toastStore.push(
+      err?.response?.data?.error || `Failed to ${status === 'approved' ? 'approve' : 'reject'} subject.`,
+      'error',
+    )
   } finally {
     processingSubject.value = ''
   }
@@ -499,18 +645,78 @@ const startSubjectEdit = (subject) => {
   Object.assign(subjectEditForm, {
     subject_name: subject.subject_name,
     category: subject.category,
+    department: subject.department || '',
     keywords: subject.keywords || '',
     // Proposals arrive with no catalog copy; prefill from the tutor's note so
     // the admin edits a draft rather than starting from an empty box.
     catalog_description: subject.catalog_description || subject.tutor_note || '',
   })
+
+  if (subject.category && !taxonomyCategories.value.includes(subject.category)) {
+    categoryMode.value = 'new'
+    categoryMismatchNote.value = `"${subject.category}" — not in the catalog yet`
+  } else {
+    categoryMode.value = 'select'
+    categoryMismatchNote.value = ''
+  }
+
+  if (subject.department && !subgroupOptions.value.includes(subject.department)) {
+    subgroupMode.value = 'new'
+    subgroupMismatchNote.value = `"${subject.department}" — not in the catalog yet`
+  } else {
+    subgroupMode.value = 'select'
+    subgroupMismatchNote.value = ''
+  }
+}
+
+const handleCategorySelectChange = () => {
+  if (subjectEditForm.category === '__add_new__') {
+    subjectEditForm.category = ''
+    categoryMode.value = 'new'
+    categoryMismatchNote.value = ''
+  }
+}
+
+const useExistingCategory = () => {
+  categoryMode.value = 'select'
+  categoryMismatchNote.value = ''
+  if (!taxonomyCategories.value.includes(subjectEditForm.category)) {
+    subjectEditForm.category = taxonomyCategories.value[0] || ''
+  }
+}
+
+const handleSubgroupSelectChange = () => {
+  if (subjectEditForm.department === '__add_new__') {
+    subjectEditForm.department = ''
+    subgroupMode.value = 'new'
+    subgroupMismatchNote.value = ''
+  }
+}
+
+const useExistingSubgroup = () => {
+  subgroupMode.value = 'select'
+  subgroupMismatchNote.value = ''
+  if (!subgroupOptions.value.includes(subjectEditForm.department)) {
+    subjectEditForm.department = ''
+  }
 }
 
 const cancelSubjectEdit = () => {
   editingSubjectCode.value = ''
+  categoryMode.value = 'select'
+  categoryMismatchNote.value = ''
+  subgroupMode.value = 'select'
+  subgroupMismatchNote.value = ''
 }
 
 const saveSubjectEdit = async (subject) => {
+  const isNewCategory = categoryMode.value === 'new'
+    && subjectEditForm.category
+    && !taxonomyCategories.value.includes(subjectEditForm.category)
+  const isNewSubgroup = subgroupMode.value === 'new'
+    && subjectEditForm.department
+    && !subgroupOptions.value.includes(subjectEditForm.department)
+
   savingSubjectEdit.value = true
   try {
     const updated = await adminStore.updateTutorProposedSubject(
@@ -519,9 +725,23 @@ const saveSubjectEdit = async (subject) => {
       { ...subjectEditForm },
     )
     Object.assign(subject, updated, { catalog_description: subjectEditForm.catalog_description })
+    // Sync into the catalog store immediately so the category/sub-group (and keyword) pickers
+    // reflect this save without waiting on the next fetchCourseCatalog().
+    catalogStore.upsertLocalCatalogSubject(subject)
     editingSubjectCode.value = ''
+    categoryMode.value = 'select'
+    categoryMismatchNote.value = ''
+    subgroupMode.value = 'select'
+    subgroupMismatchNote.value = ''
+    if (isNewCategory) {
+      toastStore.push(`"${subjectEditForm.category}" added as a new category.`, 'success')
+    }
+    if (isNewSubgroup) {
+      toastStore.push(`"${subjectEditForm.department}" added as a new sub-group.`, 'success')
+    }
   } catch (err) {
     console.error('Subject update failed:', err)
+    toastStore.push(err?.response?.data?.error || 'Failed to save subject changes.', 'error')
   } finally {
     savingSubjectEdit.value = false
   }
@@ -583,6 +803,9 @@ watch(() => [filters.role, filters.status, filters.reviewType], () => {
 
 onMounted(() => {
   loadApplications()
+  if (!catalogStore.courseCatalog.length) {
+    catalogStore.fetchCourseCatalog().catch((err) => console.error('Catalog fetch failed:', err))
+  }
 })
 </script>
 
@@ -678,6 +901,70 @@ onMounted(() => {
 
 .proposed-subject-edit-form {
   width: 100%;
+}
+
+.category-mismatch-note {
+  padding: 0.5rem 0.65rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--sb-warning-bg, #ffc107);
+  background: color-mix(in srgb, var(--sb-warning-bg, #ffc107) 12%, white);
+  color: var(--sb-warning-text, #997404);
+}
+
+.two-up-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.keyword-field {
+  position: relative;
+}
+
+.keyword-suggestions-hint {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 700;
+  color: var(--sb-text-muted);
+  padding: 0.4rem 0.65rem 0.15rem;
+}
+
+.keyword-add-new {
+  border-top: 1px dashed var(--sb-card-border);
+  color: var(--sb-primary);
+  font-weight: 700;
+}
+
+.keyword-suggestions {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 5;
+  max-height: 180px;
+  overflow-y: auto;
+  background: var(--sb-card-bg, #fff);
+  border: 1px solid var(--sb-card-border);
+  border-radius: 0.5rem;
+  box-shadow: var(--sb-shadow-hover, 0 8px 24px rgba(15, 23, 42, 0.12));
+}
+
+.keyword-suggestion {
+  display: block;
+  width: 100%;
+  padding: 0.4rem 0.65rem;
+  border: 0;
+  background: none;
+  text-align: left;
+  font-size: 0.8rem;
+  color: var(--sb-text-main);
+}
+
+.keyword-suggestion:hover,
+.keyword-suggestion:focus {
+  background: var(--sb-green-tint, var(--sb-primary-light));
+  color: var(--sb-primary);
 }
 
 .fade-enter-active,
