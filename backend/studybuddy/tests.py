@@ -2049,6 +2049,32 @@ class ChatFeatureTests(APITestCase):
 
         self.assertTrue(context["can_edit_location"])
 
+    def test_booking_context_subject_is_the_booked_subject_not_the_tutors_course(self):
+        # Regression: serialize_booking_context() used to read the tutor's own
+        # course/year-level (tutor.profile.course) as the card's "subject" instead of the
+        # booking's actual Subjects FK — see docs/plans/2026-08-13-chat-session-card-subject-fix.md.
+        self.tutor_profile.course = Course.objects.create(
+            course_code="STEM",
+            course_name="Senior High - STEM Track",
+        )
+        self.tutor_profile.save(update_fields=["course"])
+
+        booking = self.make_editable_f2f_booking()
+        booking.subject = self.subject  # "Ethics" from setUp
+        booking.save(update_fields=["subject"])
+
+        context = serialize_booking_context(booking)
+
+        self.assertEqual(context["subject"], "Ethics")
+        self.assertNotEqual(context["subject"], "Senior High - STEM Track")
+
+    def test_booking_context_subject_falls_back_to_general_when_unset(self):
+        booking = self.make_editable_f2f_booking()  # subject left null
+
+        context = serialize_booking_context(booking)
+
+        self.assertEqual(context["subject"], "General")
+
     def test_tutee_can_send_message_via_rest(self):
         room = ChatRoom.objects.create(tutee=self.tutee_profile, tutor=self.tutor_profile)
         self.client.force_authenticate(user=self.tutee_user)

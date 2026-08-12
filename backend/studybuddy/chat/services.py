@@ -72,6 +72,7 @@ def get_booking_group(booking):
         'availability',
         'student',
         'tutor__profile__course',
+        'subject',
     ))
 
 
@@ -138,8 +139,8 @@ def serialize_booking_context(booking, grouped_bookings=None):
     time_blocks = split_time_blocks(bookings)
     primary_block = time_blocks[0]
     subject = (
-        representative.tutor.profile.course.course_name
-        if representative.tutor.profile.course
+        representative.subject.subject_name
+        if representative.subject
         else 'General'
     )
 
@@ -189,7 +190,7 @@ def get_current_booking_context(room):
             status__in=['Pending', 'Confirmed', 'Awaiting Payment Verification'],
         )
         .filter(Q(status='Pending') | Q(status='Confirmed') | Q(session_date__gte=current_date))
-        .select_related('availability', 'student', 'tutor__profile__course')
+        .select_related('availability', 'student', 'tutor__profile__course', 'subject')
         .order_by('session_date', 'availability__time_slot', 'id')
         .first()
     )
@@ -233,7 +234,7 @@ def get_current_booking_context(room):
             status='Completed',
         )
         .exclude(rating__isnull=False)
-        .select_related('availability', 'student', 'tutor__profile__course')
+        .select_related('availability', 'student', 'tutor__profile__course', 'subject')
         .order_by('-session_date', '-availability__time_slot', '-id')
         .first()
     )
@@ -256,7 +257,7 @@ def get_current_booking_context(room):
             status__in=['Rejected', 'Cancelled'],
             session_date__gte=week_ago,
         )
-        .select_related('availability', 'student', 'tutor__profile__course')
+        .select_related('availability', 'student', 'tutor__profile__course', 'subject')
         .order_by('-session_date', '-availability__time_slot', '-id')
         .first()
     )
@@ -297,7 +298,7 @@ def get_current_booking_contexts(rooms):
         return (
             Booking.objects
             .filter(student_id__in=tutee_ids, tutor__profile_id__in=tutor_profile_ids)
-            .select_related('availability', 'student', 'tutor__profile__course')
+            .select_related('availability', 'student', 'tutor__profile__course', 'subject')
         )
 
     selected = {}
@@ -427,7 +428,7 @@ def get_booking_groups_for_contexts(bookings):
     for booking in (
         Booking.objects
         .filter(filters)
-        .select_related('availability', 'student', 'tutor__profile__course')
+        .select_related('availability', 'student', 'tutor__profile__course', 'subject')
     ):
         groups.setdefault(get_booking_context_group_key(booking), []).append(booking)
 
