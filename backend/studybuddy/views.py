@@ -83,8 +83,23 @@ from .serializers import (
     TuteeApplicationSerializer,
 )
 from .email_utils import send_application_received_email
-from .chat.services import create_booking_event, get_canonical_room_for_booking
+from .chat.services import (
+    broadcast_booking_context_updated,
+    create_booking_event,
+    create_chat_message,
+    get_canonical_room_for_booking,
+)
 from .image_utils import compress_image, compress_if_image
+from .booking_status import (
+    DEV_LIVE_PHASES,
+    apply_dev_confirmed_gate,
+    apply_dev_live_override,
+    build_dev_live_override,
+    clear_dev_live_override_for_bookings,
+    get_dev_live_override_for_bookings,
+    get_display_status,
+    set_dev_live_override_for_bookings,
+)
 
 from .models import (
     UserProfile,
@@ -980,119 +995,6 @@ def get_session_notification_context(bookings):
         "tutor_name": tutor_name,
         "tutee_name": tutee_name,
     }
-
-
-DEV_LIVE_PHASES = {
-    'upcoming': (12, 72),
-    'start': (-5, 55),
-    'midpoint': (-30, 30),
-    'ending': (-55, 5),
-    'handoff': (-70, -10),
-}
-DEV_LIVE_CACHE_TIMEOUT_SECONDS = 60 * 60 * 6
-
-
-def get_dev_live_cache_keys_for_booking(booking):
-    if booking.status == "Pending" and booking.booking_request_id:
-        return [f"studybuddy:dev-live:request:{booking.booking_request_id}"]
-
-    if booking.session_group_id:
-        return [f"studybuddy:dev-live:group:{booking.session_group_id}"]
-
-    if booking.booking_request_id:
-        return [f"studybuddy:dev-live:request:{booking.booking_request_id}"]
-
-    return [f"studybuddy:dev-live:booking:{booking.id}"]
-
-
-def get_dev_live_override_for_bookings(bookings):
-    if not settings.BOOKING_DEV_TOOLS_ENABLED:
-        return None
-
-    for booking in sort_bookings_for_session_group(bookings):
-        for key in get_dev_live_cache_keys_for_booking(booking):
-            override = cache.get(key)
-            if override:
-                return override
-
-    return None
-
-
-def set_dev_live_override_for_bookings(bookings, override):
-    keys = {
-        key
-        for booking in sort_bookings_for_session_group(bookings)
-        for key in get_dev_live_cache_keys_for_booking(booking)
-    }
-
-    for key in keys:
-        cache.set(key, override, DEV_LIVE_CACHE_TIMEOUT_SECONDS)
-
-
-def clear_dev_live_override_for_bookings(bookings):
-    for booking in sort_bookings_for_session_group(bookings):
-        for key in get_dev_live_cache_keys_for_booking(booking):
-            cache.delete(key)
-
-
-def build_dev_live_override(phase):
-    offsets = DEV_LIVE_PHASES[phase]
-    current_time = timezone.localtime(timezone.now()).replace(second=0, microsecond=0)
-    start_at = current_time + timedelta(minutes=offsets[0])
-    end_at = current_time + timedelta(minutes=offsets[1])
-
-    # start_at/end_at can land on different calendar dates (e.g. 'ending' is (-55, +5) minutes,
-    # which crosses backward over midnight whenever `current_time` is within 55 minutes past
-    # midnight). Both dates are stored explicitly -- collapsing to a single shared date silently
-    # produced an inverted (empty) Ongoing window whenever the two datetimes fell on different
-    # days, which get_display_status can't distinguish from "never started".
-    return {
-        "phase": phase,
-        "date": start_at.date().isoformat(),
-        "start_time": start_at.time().strftime("%H:%M"),
-        "end_date": end_at.date().isoformat(),
-        "end_time": end_at.time().strftime("%H:%M"),
-        "forced_at": current_time.isoformat(),
-    }
-
-
-def apply_dev_live_override(bookings, session_date, start_time, end_time):
-    override = get_dev_live_override_for_bookings(bookings)
-
-    if not override:
-        return session_date, start_time, session_date, end_time
-
-    return (
-        datetime.strptime(override["date"], "%Y-%m-%d").date(),
-        datetime.strptime(override["start_time"], "%H:%M").time(),
-        # .get() with a fallback to the start date keeps any override already sitting in cache
-        # (6-hour TTL) from a pre-fix write from raising a KeyError after this deploy.
-        datetime.strptime(override.get("end_date", override["date"]), "%Y-%m-%d").date(),
-        datetime.strptime(override["end_time"], "%H:%M").time(),
-    )
-
-
-def get_display_status(raw_status, start_date, start_time, end_date, end_time):
-    normalized = str(raw_status or '').lower()
-
-    if normalized == 'confirmed':
-        timezone_now = timezone.localtime()
-        timezone_info = timezone.get_current_timezone()
-        start_at = timezone.make_aware(datetime.combine(start_date, start_time), timezone_info)
-        end_at = timezone.make_aware(datetime.combine(end_date, end_time), timezone_info)
-
-        if timezone_now < start_at:
-            return 'Upcoming'
-
-        if start_at <= timezone_now < end_at:
-            return 'Ongoing'
-
-        return 'Payment Required'
-
-    if normalized == 'awaiting payment verification':
-        return 'Awaiting Verification'
-
-    return raw_status
 
 
 def get_current_display_status_for_booking(booking):
@@ -2123,13 +2025,12 @@ def build_combined_block(group, profile=None):
         end_time
     )
 
-    if (
-        settings.BOOKING_DEV_TOOLS_ENABLED
-        and not has_dev_live_override
-        and representative_booking.status == "Confirmed"
-        and representative_booking.tutor_confirmed
-    ):
-        display_status = "Payment Required"
+    display_status = apply_dev_confirmed_gate(
+        display_status,
+        has_dev_live_override,
+        representative_booking.status,
+        representative_booking.tutor_confirmed,
+    )
 
     return {
         "id": representative_booking.id,
@@ -3312,13 +3213,12 @@ def build_booking_detail_payload(session_group_bookings, request=None):
         end_time
     )
 
-    if (
-        settings.BOOKING_DEV_TOOLS_ENABLED
-        and not has_dev_live_override
-        and representative_booking.status == "Confirmed"
-        and representative_booking.tutor_confirmed
-    ):
-        display_status = "Payment Required"
+    display_status = apply_dev_confirmed_gate(
+        display_status,
+        has_dev_live_override,
+        representative_booking.status,
+        representative_booking.tutor_confirmed,
+    )
 
     return {
         "id": representative_booking.id,
@@ -3616,6 +3516,18 @@ def complete_booking(request, booking_id):
     return tutor_confirm_booking(request, booking_id)
 
 
+def announce_dev_live_change(booking, message):
+    """Posts a dev-tools-only system pill into the booking's chat room and pushes a booking-context
+    refresh, so chat (which has no other way to learn a cache-only override changed) can't be left
+    showing a status that contradicts what dev_force_booking_live / dev_clear_booking_live just did.
+    The pill states only what happened, never a time window: under an active override the banner
+    shows the simulated window, and a pill asserting its own window would drift from that.
+    """
+    room = get_canonical_room_for_booking(booking)
+    create_chat_message(room, None, message, message_type='system')
+    broadcast_booking_context_updated(room)
+
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def dev_force_booking_live(request, booking_id):
@@ -3650,6 +3562,8 @@ def dev_force_booking_live(request, booking_id):
         session_group_bookings,
         build_dev_live_override(phase),
     )
+    announce_dev_live_change(booking, f"Dev: session forced to {phase}.")
+
     refreshed_group = get_session_group_bookings(booking)
 
     return Response(build_booking_detail_payload(refreshed_group))
@@ -3672,6 +3586,8 @@ def dev_clear_booking_live(request, booking_id):
 
     session_group_bookings = get_session_group_bookings(booking)
     clear_dev_live_override_for_bookings(session_group_bookings)
+    announce_dev_live_change(booking, "Dev: forced live state cleared.")
+
     refreshed_group = get_session_group_bookings(booking)
 
     return Response(build_booking_detail_payload(refreshed_group))

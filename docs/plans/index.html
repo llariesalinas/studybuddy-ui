@@ -128,7 +128,7 @@
   <span class="count"><span class="dot" style="background:var(--blocked)"></span>0 Blocked</span>
   <span class="count"><span class="dot" style="background:var(--approved)"></span>5 Approved</span>
   <span class="count"><span class="dot" style="background:var(--draft)"></span>17 Draft</span>
-  <span class="count"><span class="dot" style="background:var(--done)"></span>84 Done</span>
+  <span class="count"><span class="dot" style="background:var(--done)"></span>85 Done</span>
 </div>
 
 <div class="group">
@@ -324,7 +324,7 @@
 </div>
 
 <details class="group">
-  <summary>Done (84)</summary>
+  <summary>Done (85)</summary>
   <div class="cards">
     <div class="card">
       <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-08-13-chat-session-card-subject-fix.md">Chat session card shows tutor's course instead of the booked subject</a>
@@ -336,14 +336,19 @@
       <div class="meta"><span class="status-badge status-done">Done</span><span>2026-08-13</span></div>
     </div>
     <div class="card">
+      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-08-13-corrupt-auth-session-guard-fix.md">Corrupt auth session guard fix</a>
+      <div class="meta"><span class="status-badge status-done">Done</span><span>2026-08-13</span></div>
+      <div class="summary">Router guard self-heals when a token survives in localStorage without its role, instead of silently no-oping Log in/Get started.</div>
+    </div>
+    <div class="card">
       <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-08-13-dev-force-live-midnight-crossing-bug.md">Dev force-live tool returns &quot;Payment Required&quot; instead of &quot;Ongoing&quot; near midnight</a>
       <div class="meta"><span class="status-badge status-done">Done</span><span>2026-08-13</span></div>
       <div class="summary">Fixed DevLiveSessionTests flakiness (previously misdiagnosed as intermittent) — the dev &quot;force live&quot; booking tool silently failed near local midnight because the override stored one shared date for both the start and end of the simulated session window.</div>
     </div>
     <div class="card">
-      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-08-13-corrupt-auth-session-guard-fix.md">Corrupt auth session guard fix</a>
+      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-08-13-dev-force-live-chat-context.md">Chat banner ignores the dev force-live override</a>
       <div class="meta"><span class="status-badge status-done">Done</span><span>2026-08-13</span></div>
-      <div class="summary">Router guard self-heals when a token survives in localStorage without its role, instead of silently no-oping Log in/Get started.</div>
+      <div class="summary">Chat recomputes session status from real booking rows instead of the dev-live override, so forcing a session live leaves the chat banner reading &quot;Upcoming&quot;; fixed by extracting the status helpers into a shared module both views and chat import, and pushing a symmetric system pill plus a context broadcast from the dev endpoints.</div>
     </div>
     <div class="card">
       <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-08-12-logo-watermark.md">Logo watermark in sidebar brand badge</a>
@@ -511,11 +516,11 @@
       <div class="meta"><span class="status-badge status-done">Done</span><span>2026-07-04</span></div>
     </div>
     <div class="card">
-      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-07-03-remove-superadmin-applicant-review.md">Remove Applicant Review from Super Admin</a>
+      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-07-03-session-countdown-prototype-plan.md">Session countdown (Orbit Strip)</a>
       <div class="meta"><span class="status-badge status-done">Done</span><span>2026-07-03</span></div>
     </div>
     <div class="card">
-      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-07-03-session-countdown-prototype-plan.md">Session countdown (Orbit Strip)</a>
+      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-07-03-remove-superadmin-applicant-review.md">Remove Applicant Review from Super Admin</a>
       <div class="meta"><span class="status-badge status-done">Done</span><span>2026-07-03</span></div>
     </div>
     <div class="card">
