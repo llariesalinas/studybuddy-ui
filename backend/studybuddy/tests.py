@@ -7857,6 +7857,46 @@ class DevLiveSessionTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["session"]["status"], "Ongoing")
 
+    @override_settings(DEBUG=True)
+    def test_location_update_snapshot_keeps_real_window_during_override(self):
+        """The chat banner now follows the dev-live override (status, date, times, time_blocks),
+        but the immutable metadata a booking_event message stamps into the database must not --
+        that JSON is persisted and outlives the override's 6-hour cache TTL, so baking a simulated
+        window into it would leave a permanent artifact of a transient dev state. This pins the
+        boundary: apply_confirmed_status_and_dev_override touches get_current_booking_context's
+        return value, never serialize_booking_context, which create_booking_event snapshots as-is.
+        """
+        self.booking.booking_request_id = uuid4()
+        self.booking.save(update_fields=["booking_request_id"])
+        real_date = self.booking.session_date.isoformat()
+        real_start_time = self.availability.time_slot.strftime("%H:%M")
+
+        force_response = self.client.post(
+            f"/api/dev/bookings/{self.booking.id}/force-live/",
+            {"phase": "midpoint"},
+            format="json",
+        )
+        self.assertEqual(force_response.status_code, 200)
+        self.assertEqual(force_response.data["session"]["status"], "Ongoing")
+        # The override's simulated window really is in effect, and really does differ from the
+        # real one -- otherwise this test could pass with the invariant broken.
+        self.assertNotEqual(force_response.data["session"]["date"], real_date)
+
+        self.client.force_authenticate(user=self.tutor_user)
+        location_response = self.client.patch(
+            f"/api/bookings/{self.booking.booking_request_id}/location/",
+            {"preferred_location": "Room 204"},
+            format="json",
+        )
+        self.assertEqual(location_response.status_code, 200)
+
+        event_message = Message.objects.filter(message_type="booking_event").latest("id")
+        self.assertEqual(event_message.metadata["event_type"], "location_updated")
+        snapshot = event_message.metadata["booking"]
+
+        self.assertEqual(snapshot["date"], real_date)
+        self.assertEqual(snapshot["startTime"], real_start_time)
+
 
 class TutorCashInTests(APITestCase):
     def setUp(self):

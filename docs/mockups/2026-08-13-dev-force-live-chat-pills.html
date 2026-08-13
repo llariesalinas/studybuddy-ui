@@ -1,0 +1,152 @@
+<h2>Q7: does clearing get a pill too?</h2>
+<p class="subtitle">A QA pass that cycles midpoint &rarr; ending &rarr; clear. Same transcript, same moment in time &mdash; the difference is only what happens at the end.</p>
+
+<style>
+  .chat-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin: 28px 0; }
+  @media (max-width: 900px) { .chat-compare { grid-template-columns: 1fr; } }
+
+  .chat-pane {
+    border: 2px solid #e3e8ee; border-radius: 14px; overflow: hidden;
+    background: #f5f8fa; cursor: pointer; transition: border-color .15s, box-shadow .15s;
+  }
+  .chat-pane.selected { border-color: #00895A; box-shadow: 0 0 0 3px rgba(0,137,90,.15); }
+  .chat-pane-head {
+    padding: 10px 14px; font: 600 13px/1.3 system-ui, sans-serif;
+    background: #fff; border-bottom: 1px solid #e3e8ee; display: flex; gap: 8px; align-items: center;
+  }
+  .chat-pane-head .tag {
+    font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+    background: #00895A; color: #fff; border-radius: 999px; padding: 2px 9px;
+  }
+  .chat-body { padding: 14px; display: flex; flex-direction: column; gap: 12px; min-height: 430px; }
+
+  /* banner */
+  .sb-banner {
+    background: #fff; border-radius: 12px; border-left: 5px solid #00895A;
+    padding: 11px 13px; display: flex; align-items: center; gap: 10px;
+    box-shadow: 0 1px 3px rgba(16,24,40,.08);
+  }
+  .sb-banner .icon {
+    width: 30px; height: 30px; border-radius: 9px; background: #e8f1fe;
+    display: grid; place-items: center; font-size: 15px; flex: none;
+  }
+  .sb-banner .meta { flex: 1; min-width: 0; }
+  .sb-banner .title { font: 700 13px system-ui, sans-serif; color: #101828; }
+  .sb-banner .when { font: 500 11px system-ui, sans-serif; color: #667085; margin-top: 1px; }
+  .pillbadge { font: 700 10px system-ui, sans-serif; color: #fff; border-radius: 999px; padding: 3px 10px; flex: none; }
+  .pillbadge.upcoming { background: #2f6fed; }
+  .pillbadge.ongoing  { background: #00895A; }
+  .sb-banner .view { font: 700 11px system-ui, sans-serif; color: #344054; border: 1px solid #d0d5dd; border-radius: 999px; padding: 5px 11px; background: #fff; flex: none; }
+
+  /* messages */
+  .msg { max-width: 74%; padding: 8px 12px; border-radius: 14px; font: 400 12.5px/1.45 system-ui, sans-serif; }
+  .msg.out { align-self: flex-end; background: #b8ecc6; color: #10321c; border-bottom-right-radius: 4px; }
+  .msg.in  { align-self: flex-start; background: #fff; color: #101828; border-bottom-left-radius: 4px; border: 1px solid #eaecf0; }
+
+  /* system pill */
+  .syspill {
+    align-self: center; background: #eef2f6; border: 1px solid #dfe5ec; border-radius: 999px;
+    padding: 5px 14px; font: 500 11.5px system-ui, sans-serif; color: #667085;
+    display: flex; align-items: center; gap: 7px; text-align: center;
+  }
+  .syspill .dot { width: 6px; height: 6px; border-radius: 50%; background: #98a2b3; flex: none; }
+  .syspill.fresh .dot { background: #00895A; }
+
+  .ghost-slot {
+    align-self: center; border: 1px dashed #d0d5dd; border-radius: 999px;
+    padding: 5px 14px; font: 500 11.5px system-ui, sans-serif; color: #b6bec9; font-style: italic;
+  }
+
+  .verdict { margin-top: 12px; padding: 11px 13px; border-radius: 10px; font: 400 12px/1.5 system-ui, sans-serif; }
+  .verdict.good { background: #eafaf0; border: 1px solid #b7e6c9; color: #10502f; }
+  .verdict.bad  { background: #fef4f2; border: 1px solid #f6cfc7; color: #7a2718; }
+  .verdict b { font-weight: 700; }
+  .arrowline { text-align: center; font: 600 11px system-ui, sans-serif; color: #98a2b3; letter-spacing: .05em; }
+</style>
+
+<div class="chat-compare">
+
+  <!-- OPTION A -->
+  <div class="chat-pane" data-choice="a" onclick="toggleSelect(this)">
+    <div class="chat-pane-head"><span class="tag">A</span> Symmetric &mdash; clearing posts a pill too</div>
+    <div class="chat-body">
+
+      <div class="sb-banner">
+        <div class="icon">&#128197;</div>
+        <div class="meta">
+          <div class="title">Session Confirmed</div>
+          <div class="when">2026-08-14 &middot; 13:00-14:00</div>
+        </div>
+        <span class="pillbadge upcoming">Upcoming</span>
+        <span class="view">View Details</span>
+      </div>
+
+      <div class="msg out">the location to ? somwerher around here ? '</div>
+      <div class="msg in">Yep, by the library steps.</div>
+
+      <div class="syspill"><span class="dot"></span> Dev: session forced to midpoint.</div>
+      <div class="syspill"><span class="dot"></span> Dev: session forced to ending.</div>
+      <div class="syspill fresh"><span class="dot"></span> Dev: forced live state cleared.</div>
+
+      <div class="verdict good">
+        Banner reads <b>Upcoming</b>. The last pill says <b>cleared</b>.
+        Transcript and banner agree &mdash; you can read the sequence top-to-bottom and know where you are.
+      </div>
+    </div>
+  </div>
+
+  <!-- OPTION B -->
+  <div class="chat-pane" data-choice="b" onclick="toggleSelect(this)">
+    <div class="chat-pane-head"><span class="tag">B</span> Asymmetric &mdash; clearing is silent</div>
+    <div class="chat-body">
+
+      <div class="sb-banner">
+        <div class="icon">&#128197;</div>
+        <div class="meta">
+          <div class="title">Session Confirmed</div>
+          <div class="when">2026-08-14 &middot; 13:00-14:00</div>
+        </div>
+        <span class="pillbadge upcoming">Upcoming</span>
+        <span class="view">View Details</span>
+      </div>
+
+      <div class="msg out">the location to ? somwerher around here ? '</div>
+      <div class="msg in">Yep, by the library steps.</div>
+
+      <div class="syspill"><span class="dot"></span> Dev: session forced to midpoint.</div>
+      <div class="syspill"><span class="dot"></span> Dev: session forced to ending.</div>
+      <div class="ghost-slot">(nothing posted &mdash; banner silently reverted)</div>
+
+      <div class="verdict bad">
+        Banner reads <b>Upcoming</b>, but the newest evidence in the transcript says
+        <b>forced to ending</b>. Two sources, two answers &mdash; and the transcript is the one that looks authoritative.
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="arrowline">&mdash;&mdash;&mdash; and this is what it looks like mid-QA, while an override is actually active &mdash;&mdash;&mdash;</div>
+
+<div style="max-width:520px;margin:18px auto 0">
+  <div class="chat-pane" style="cursor:default">
+    <div class="chat-pane-head">During an active override (identical under A and B)</div>
+    <div class="chat-body" style="min-height:0">
+      <div class="sb-banner">
+        <div class="icon">&#128197;</div>
+        <div class="meta">
+          <div class="title">Session Confirmed</div>
+          <div class="when">2026-08-13 &middot; 05:02-06:02</div>
+        </div>
+        <span class="pillbadge ongoing">Ongoing</span>
+        <span class="view">View Details</span>
+      </div>
+      <div class="msg out">the location to ? somwerher around here ? '</div>
+      <div class="syspill fresh"><span class="dot"></span> Dev: session forced to midpoint.</div>
+      <div class="verdict good" style="margin-top:8px">
+        Per Q1/Q2 the banner shows the <b>simulated</b> window (05:02-06:02 today), not the real
+        13:00-14:00 tomorrow. The pill states the phase and asserts no times of its own &mdash; that's
+        the Q6 decision doing its job.
+      </div>
+    </div>
+  </div>
+</div>

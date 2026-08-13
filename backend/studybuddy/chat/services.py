@@ -6,10 +6,25 @@ from django.db.models import Q
 from django.utils import timezone
 
 from studybuddy.models import Booking, Tutor, TutorSubjects, UserProfile
+from studybuddy.booking_status import (
+    apply_dev_confirmed_gate,
+    apply_dev_live_override,
+    get_dev_live_override_for_bookings,
+    get_display_status,
+)
 
 from .models import ChatRoom, Message
 
 SESSION_SLOT_MINUTES = 60
+
+# get_display_status returns these exact capitalized strings for a Confirmed booking; chat's
+# status_intent (used for CSS class + template branching, see ChatBanner.vue) has always used
+# lowercase words instead, so this is the map between the two vocabularies.
+CONFIRMED_STATUS_INTENTS = {
+    'Upcoming': 'confirmed',
+    'Ongoing': 'ongoing',
+    'Payment Required': 'payment_required',
+}
 
 
 def full_name(profile):
@@ -179,6 +194,53 @@ def serialize_booking_context(booking, grouped_bookings=None):
     }
 
 
+def apply_confirmed_status_and_dev_override(context, booking, bookings):
+    """For a Confirmed booking, sets status/status_intent the same way the booking screens do --
+    honoring an active dev-live override (backend/studybuddy/booking_status.py) instead of the
+    inline recomputation this used to duplicate, which was blind to the override entirely.
+
+    When an override is active, also rewrites the displayed date/time window (and collapses
+    time_blocks to one block matching it), so the banner can never show a status that contradicts
+    its own schedule. Leaves the real per-slot window alone otherwise -- including the case where
+    apply_dev_confirmed_gate forces "Payment Required" with no override active, since that gate
+    only fires when there is no override to rewrite times from. Mutates and returns `context`.
+    """
+    first_booking = bookings[0]
+    last_booking = bookings[-1]
+    start_time = first_booking.availability.time_slot
+    end_time = (
+        datetime.combine(first_booking.session_date, last_booking.availability.time_slot)
+        + timedelta(minutes=SESSION_SLOT_MINUTES)
+    ).time()
+
+    has_dev_live_override = get_dev_live_override_for_bookings(bookings) is not None
+    start_date, start_time, end_date, end_time = apply_dev_live_override(
+        bookings, first_booking.session_date, start_time, end_time,
+    )
+
+    display_status = get_display_status(booking.status, start_date, start_time, end_date, end_time)
+    display_status = apply_dev_confirmed_gate(
+        display_status, has_dev_live_override, booking.status, first_booking.tutor_confirmed,
+    )
+
+    context['status_intent'] = CONFIRMED_STATUS_INTENTS[display_status]
+    context['status'] = display_status
+
+    if has_dev_live_override:
+        context['date'] = start_date.isoformat()
+        context['startTime'] = start_time.strftime('%H:%M')
+        context['endTime'] = end_time.strftime('%H:%M')
+        context['time_blocks'] = [{
+            'date': start_date.isoformat(),
+            'startTime': start_time.strftime('%H:%M'),
+            'endTime': end_time.strftime('%H:%M'),
+            'duration_hours': context['duration_hours'],
+        }]
+        context['hasMultipleTimeBlocks'] = False
+
+    return context
+
+
 def get_current_booking_context(room):
     current_date = timezone.localdate()
 
@@ -196,7 +258,8 @@ def get_current_booking_context(room):
     )
 
     if booking:
-        context = serialize_booking_context(booking)
+        bookings = get_booking_group(booking)
+        context = serialize_booking_context(booking, grouped_bookings=bookings)
 
         if context is None:
             return None
@@ -206,21 +269,7 @@ def get_current_booking_context(room):
                 'pending_location' if booking.session_mode == 'F2F' else 'pending'
             )
         elif booking.status == 'Confirmed':
-            session_naive = datetime.combine(booking.session_date, booking.availability.time_slot)
-            session_start = timezone.make_aware(session_naive)
-            duration_minutes = context.get('duration_hours', 0.5) * 60
-            session_end = session_start + timedelta(minutes=duration_minutes)
-            now = timezone.now()
-
-            if now < session_start:
-                context['status_intent'] = 'confirmed'
-                context['status'] = 'Upcoming'
-            elif session_start <= now <= session_end:
-                context['status_intent'] = 'ongoing'
-                context['status'] = 'Ongoing'
-            else:
-                context['status_intent'] = 'payment_required'
-                context['status'] = 'Payment Required'
+            apply_confirmed_status_and_dev_override(context, booking, bookings)
         else:
             context['status_intent'] = 'awaiting_payment'
 
@@ -345,10 +394,8 @@ def get_current_booking_contexts(rooms):
     grouped_bookings = get_booking_groups_for_contexts(selected.values())
     context_by_pair = {}
     for pair, booking in selected.items():
-        context = serialize_booking_context(
-            booking,
-            grouped_bookings.get(get_booking_context_group_key(booking), [booking]),
-        )
+        bookings = grouped_bookings.get(get_booking_context_group_key(booking), [booking])
+        context = serialize_booking_context(booking, bookings)
         if context is None:
             context_by_pair[pair] = None
             continue
@@ -358,21 +405,7 @@ def get_current_booking_contexts(rooms):
                 'pending_location' if booking.session_mode == 'F2F' else 'pending'
             )
         elif booking.status == 'Confirmed':
-            session_naive = datetime.combine(booking.session_date, booking.availability.time_slot)
-            session_start = timezone.make_aware(session_naive)
-            duration_minutes = context.get('duration_hours', 0.5) * 60
-            session_end = session_start + timedelta(minutes=duration_minutes)
-            now = timezone.now()
-
-            if now < session_start:
-                context['status_intent'] = 'confirmed'
-                context['status'] = 'Upcoming'
-            elif session_start <= now <= session_end:
-                context['status_intent'] = 'ongoing'
-                context['status'] = 'Ongoing'
-            else:
-                context['status_intent'] = 'payment_required'
-                context['status'] = 'Payment Required'
+            apply_confirmed_status_and_dev_override(context, booking, bookings)
         elif booking.status == 'Awaiting Payment Verification':
             context['status_intent'] = 'awaiting_payment'
         elif booking.status == 'Completed':
