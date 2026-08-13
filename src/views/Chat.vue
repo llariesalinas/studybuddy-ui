@@ -3,6 +3,10 @@
     <aside class="chat-sidebar">
       <div class="sidebar-header">
         <div>
+          <button class="back-link sb-btn" type="button" @click="goBack">
+            <i class="bi bi-arrow-left"></i>
+            Back
+          </button>
           <h3>Messages</h3>
           <p>{{ chatStore.totalUnread }} unread</p>
         </div>
@@ -296,7 +300,7 @@
 
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useChatStore } from '@/stores/chat'
 import { useAuthStore } from '@/stores/auth'
 import { useSessionsStore } from '@/stores/completedSessions'
@@ -309,6 +313,7 @@ const chatStore = useChatStore()
 const authStore = useAuthStore()
 const sessionsStore = useSessionsStore()
 const route = useRoute()
+const router = useRouter()
 const newMessage = ref('')
 const roomList = ref(null)
 const messageList = ref(null)
@@ -323,6 +328,10 @@ const isTutor = computed(() => {
   const role = authStore.user?.role || localStorage.getItem('user_role')
   return String(role || '').toLowerCase() === 'tutor'
 })
+
+const goBack = () => {
+  router.back()
+}
 
 async function openRatingModal() {
   if (!sessionsStore.sessions.length) {
@@ -686,6 +695,19 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  color: var(--sb-primary);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 0;
+  margin-bottom: 8px;
 }
 
 .sidebar-header h3 {
