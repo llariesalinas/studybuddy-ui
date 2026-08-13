@@ -944,7 +944,8 @@ const viewMoreTutors = () => router.push({ name: 'tutors' })
   grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 0.5rem;
   min-width: 0;
-  align-items: start;
+  height: 100%;
+  align-items: stretch;
 }
 
 .day-column {
@@ -1012,9 +1013,6 @@ const viewMoreTutors = () => router.push({ name: 'tutors' })
   flex-direction: column;
   justify-content: flex-start;
   width: 100%;
-  height: 150px;
-  min-height: 150px;
-  max-height: 150px;
   border: 1px solid transparent;
   border-radius: 14px;
   padding: 0.56rem;
