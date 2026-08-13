@@ -309,6 +309,16 @@ router.beforeEach(async (to) => {
       ? [to.meta.role.toLowerCase()]
       : []
 
+  // Self-heal a corrupt/partial session: a token can survive in localStorage without its
+  // matching user_role (storage eviction, an extension clearing one key, manual edits).
+  // Left unchecked, isAuthenticated reads true with no role to redirect on, and the
+  // GUEST_ONLY branch below falls back to '/' — a silent no-op when already on '/' that
+  // makes "Log in"/"Get started" look dead. Log out to restore a consistent state and let
+  // the checks below run normally against it.
+  if (authStore.isAuthenticated && !normalizedUserRole) {
+    authStore.logout()
+  }
+
   // 1️⃣ Protect routes requiring authentication
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     return '/login'
