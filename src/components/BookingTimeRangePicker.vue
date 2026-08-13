@@ -39,7 +39,6 @@
                 type="button"
                 class="time-option sb-btn"
                 :class="{ 'time-option-active': slot.value === pendingStart }"
-                :disabled="slot.disabled"
                 role="option"
                 :aria-selected="slot.value === pendingStart"
                 :data-testid="`time-start-${slot.value}`"
@@ -53,13 +52,13 @@
 
         <div class="time-column">
           <p class="time-column-label">End</p>
-          <ul class="time-option-list" role="listbox" aria-label="End time">
+          <p v-if="!endSlots.length" class="time-column-empty">Pick a start time first</p>
+          <ul v-else class="time-option-list" role="listbox" aria-label="End time" ref="endListRef">
             <li v-for="slot in endSlots" :key="slot.value">
               <button
                 type="button"
                 class="time-option sb-btn"
                 :class="{ 'time-option-active': slot.value === end && slot.value === pendingEnd }"
-                :disabled="slot.disabled"
                 role="option"
                 :aria-selected="slot.value === pendingEnd"
                 :data-testid="`time-end-${slot.value}`"
@@ -84,7 +83,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import {
   formatDurationLabel,
   formatTimeLabel,
@@ -129,6 +128,7 @@ const LAST_HOUR = `${padNumber(HOURS_IN_DAY - 1)}:00`
 
 const isOpen = ref(false)
 const pendingStart = ref(null)
+const endListRef = ref(null)
 
 const hasRange = computed(() => Boolean(props.start && props.end))
 const pendingEnd = computed(() => (pendingStart.value === props.start ? props.end : null))
@@ -149,29 +149,34 @@ const hourValues = computed(() =>
   Array.from({ length: HOURS_IN_DAY }, (_, hour) => `${padNumber(hour)}:00`),
 )
 
+// Past hours (and the un-startable last hour) are left out entirely rather than shown
+// disabled, so the list -- and its scroll position -- only ever holds pickable times.
 const startSlots = computed(() =>
-  hourValues.value.map((value) => ({
-    value,
-    label: formatTimeLabel(value),
-    // Blocked as a start only -- it stays valid as an end.
-    disabled: isPastTimeForDate(props.selectedDate, value) || value === LAST_HOUR,
-  })),
-)
-
-const endSlots = computed(() =>
-  hourValues.value.map((value) => {
-    const isAfterStart =
-      Boolean(pendingStart.value) &&
-      timeToMinutes(value) > timeToMinutes(pendingStart.value)
-
-    return {
+  hourValues.value
+    .filter((value) => value !== LAST_HOUR && !isPastTimeForDate(props.selectedDate, value))
+    .map((value) => ({
       value,
       label: formatTimeLabel(value),
-      duration: isAfterStart ? formatDurationLabel(pendingStart.value, value) : '',
-      disabled: !isAfterStart || isPastTimeForDate(props.selectedDate, value),
-    }
-  }),
+    })),
 )
+
+const endSlots = computed(() => {
+  if (!pendingStart.value) {
+    return []
+  }
+
+  return hourValues.value
+    .filter(
+      (value) =>
+        timeToMinutes(value) > timeToMinutes(pendingStart.value) &&
+        !isPastTimeForDate(props.selectedDate, value),
+    )
+    .map((value) => ({
+      value,
+      label: formatTimeLabel(value),
+      duration: formatDurationLabel(pendingStart.value, value),
+    }))
+})
 
 const commit = (startTime, endTime) => {
   emit('update:start', startTime)
@@ -181,22 +186,10 @@ const commit = (startTime, endTime) => {
 }
 
 const selectStart = (value) => {
-  if (isPastTimeForDate(props.selectedDate, value) || value === LAST_HOUR) {
-    return
-  }
-
   pendingStart.value = value
 }
 
 const selectEnd = (value) => {
-  if (!pendingStart.value || timeToMinutes(value) <= timeToMinutes(pendingStart.value)) {
-    return
-  }
-
-  if (isPastTimeForDate(props.selectedDate, value)) {
-    return
-  }
-
   commit(pendingStart.value, value)
 }
 
@@ -233,6 +226,16 @@ watch(isOpen, (open) => {
     document.addEventListener('mousedown', onDocumentMousedown)
   } else {
     document.removeEventListener('mousedown', onDocumentMousedown)
+  }
+})
+
+// endSlots is rebuilt from scratch on every start pick, so the list's old scroll offset can
+// leave the new (much shorter) list scrolled past its own content. Snap back to the top so
+// the first pickable end hour is visible without the user having to scroll for it.
+watch(pendingStart, async () => {
+  await nextTick()
+  if (endListRef.value) {
+    endListRef.value.scrollTop = 0
   }
 })
 
@@ -357,6 +360,13 @@ onBeforeUnmount(() => {
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+.time-column-empty {
+  margin: 0;
+  color: var(--sb-text-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
 }
 
 .time-option {
