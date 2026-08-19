@@ -125,10 +125,32 @@ class UserProfile(models.Model):
         ('SuperAdmin', 'SuperAdmin'),
     ]
 
+    # `role` is the ACTIVE MODE, not the account's identity: one account can hold both the Tutor
+    # and the Tutee experience and switch between them (docs/plans/2026-08-19-dual-role-mode-
+    # switch.md). It still holds exactly one value at a time, so every `role == '...'` check that
+    # asks "what is the requester doing right now" keeps working. Checks that ask "is this OTHER
+    # person a tutor" are identity checks and must use can_tutor/can_tutee instead.
     role = models.CharField(max_length=20, choices=ROLE_CHOICES)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    # Modes this account is PROVISIONED for -- derived, never stored, so they cannot drift from
+    # the rows they describe. "Provisioned" rather than "permitted": every non-admin student is
+    # permitted both modes, so a permission-flavoured flag would gate nothing. Being false is what
+    # makes the "you don't have a {role} account" modal fire and sends the user to onboarding.
+    @property
+    def can_tutor(self):
+        tutor = getattr(self, 'tutor', None)
+
+        if tutor is None or tutor.hourly_rate is None:
+            return False
+
+        return tutor.tutorsubjects_set.exists()
+
+    @property
+    def can_tutee(self):
+        return hasattr(self, 'preference')
 
     def __str__(self):
         return f"{self.fname} {self.lname}"

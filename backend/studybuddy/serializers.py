@@ -105,8 +105,13 @@ class AdminUserSerializer(serializers.ModelSerializer):
     def get_full_name(self, obj):
         return f"{obj.fname} {obj.lname}"
 
+    # These are IDENTITY checks -- "does this account tutor at all" -- not mode checks. Gating them
+    # on obj.role would blank a dual-role user's own wallet and tutor stats whenever they happened
+    # to be browsing in Tutee mode. Holding a Tutor row is the durable answer, and it is
+    # deliberately looser than UserProfile.can_tutor: a tutor still mid-onboarding has a wallet
+    # worth showing before they have set an hourly rate.
     def get_wallet_balance(self, obj):
-        if obj.role == 'Tutor':
+        if hasattr(obj, 'tutor'):
             try:
                 return float(obj.tutor.wallet.balance)
             except Exception:
@@ -120,7 +125,7 @@ class AdminUserSerializer(serializers.ModelSerializer):
         return obj.profile_picture.url if obj.profile_picture else None
 
     def get_tutor_sessions_completed(self, obj):
-        if obj.role != 'Tutor':
+        if not hasattr(obj, 'tutor'):
             return None
         try:
             return obj.tutor.total_sessions
@@ -128,7 +133,7 @@ class AdminUserSerializer(serializers.ModelSerializer):
             return 0
 
     def get_tutor_avg_rating(self, obj):
-        if obj.role != 'Tutor':
+        if not hasattr(obj, 'tutor'):
             return None
         try:
             return obj.tutor.rating_average
@@ -136,7 +141,7 @@ class AdminUserSerializer(serializers.ModelSerializer):
             return 0
 
     def get_tutor_session_load_limit(self, obj):
-        if obj.role != 'Tutor':
+        if not hasattr(obj, 'tutor'):
             return None
         try:
             return obj.tutor.session_load_limit
@@ -144,7 +149,7 @@ class AdminUserSerializer(serializers.ModelSerializer):
             return 10
 
     def get_tutor_accepted_session_load(self, obj):
-        if obj.role != 'Tutor':
+        if not hasattr(obj, 'tutor'):
             return None
         try:
             return obj.tutor.accepted_session_load()
@@ -152,7 +157,7 @@ class AdminUserSerializer(serializers.ModelSerializer):
             return 0
 
     def get_tutor_session_load_remaining(self, obj):
-        if obj.role != 'Tutor':
+        if not hasattr(obj, 'tutor'):
             return None
         try:
             return obj.tutor.accepted_session_load_remaining()

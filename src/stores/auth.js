@@ -8,9 +8,16 @@ import {
   startIdleSessionTracking,
   stopIdleSessionTracking
 } from '@/services/auth/idleSession'
+import { useToastStore } from '@/stores/toast'
 import { API_BASE_URL, ACCESS_REFRESH_INTERVAL_MS } from '../config.js'
 
 let refreshIntervalId = null
+
+// Roles are stored lowercase on the client but the API speaks the model's 'Tutor'/'Tutee'.
+const capitalizeMode = (mode) => {
+  const normalized = String(mode || '').toLowerCase()
+  return normalized ? normalized.charAt(0).toUpperCase() + normalized.slice(1) : ''
+}
 
 const clearStudyBuddySessionCache = () => {
   if (typeof window === 'undefined' || !window.sessionStorage) {
@@ -37,6 +44,24 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     return String(role).toLowerCase()
+  }
+
+  // Writes an active mode into the places the app reads it from. Kept separate from
+  // completeLogin so a mode switch does not have to fake a whole login payload.
+  const applyRole = (role) => {
+    const normalizedRole = normalizeRole(role)
+
+    if (!normalizedRole) {
+      return null
+    }
+
+    if (user.value) {
+      user.value = { ...user.value, role: normalizedRole }
+    }
+
+    localStorage.setItem('user_role', normalizedRole)
+
+    return normalizedRole
   }
 
   const handleIdleLogout = () => {
@@ -103,6 +128,16 @@ export const useAuthStore = defineStore('auth', () => {
     if (rotatedRefreshToken) {
       refreshToken.value = rotatedRefreshToken
       localStorage.setItem('refresh_token', rotatedRefreshToken)
+    }
+
+    // Active mode is persisted on the profile, so it is account-global: switching on another
+    // device changes it here too. The refresh endpoint reports the server's view, so a stale
+    // client corrects itself within one cycle instead of silently rendering the wrong sidebar.
+    const serverRole = normalizeRole(response.data.role)
+    if (serverRole && serverRole !== normalizeRole(user.value?.role)) {
+      applyRole(serverRole)
+      profileStore.resetProfileState()
+      useToastStore().push(`Switched to ${capitalizeMode(serverRole)} mode on another device.`)
     }
 
     return newAccessToken
@@ -323,6 +358,19 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  // Switch the account's active mode. No token is reissued -- role is not a JWT claim and the
+  // backend reads it from the profile on every request -- so the existing tokens stay valid.
+  const switchMode = async (mode) => {
+    const response = await api.post('/switch-mode/', { mode: capitalizeMode(mode) })
+
+    applyRole(response.data.role)
+    // Capabilities and every role-scoped onboarding flag are re-derived server-side, so drop the
+    // cached profile rather than patching it field by field.
+    profileStore.resetProfileState()
+
+    return normalizeRole(response.data.role)
+  }
+
   return {
     token,
     refreshToken,
@@ -335,6 +383,8 @@ export const useAuthStore = defineStore('auth', () => {
     completeLogin,
     login,
     logout,
+    applyRole,
+    switchMode,
     patchUserProfile,
     initializeAuth
   }

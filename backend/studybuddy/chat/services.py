@@ -540,8 +540,10 @@ def get_partner_context(room, user=None, current_booking=_CURRENT_BOOKING_UNSET)
         }
 
     subtitle_parts = []
-    if partner.role:
-        subtitle_parts.append(partner.role)
+    # Identity check, not a mode check: `partner.role` is the partner's ACTIVE MODE, so a tutor
+    # who happens to be browsing as a tutee would be labelled "Tutee" in a room where they are the
+    # tutor. Which side of the room they sit on is the durable answer.
+    subtitle_parts.append('Tutor' if partner.id == room.tutor_id else 'Tutee')
     if partner.course:
         subtitle_parts.append(partner.course.course_name)
     elif partner.year_level:
@@ -739,6 +741,8 @@ def create_booking_event(booking, actor, content, event_type):
 
 
 def get_room_for_tutor_profile(tutee_profile, tutor_profile_id):
-    tutor_profile = UserProfile.objects.get(id=tutor_profile_id, role='Tutor')
-    tutor = Tutor.objects.get(profile=tutor_profile)
+    # Identity check, not a mode check: filtering on role='Tutor' raised DoesNotExist for any
+    # tutor who was browsing in Tutee mode, blocking the tutee from opening the chat at all.
+    # Holding a Tutor row is what makes someone a tutor; their current mode is irrelevant here.
+    tutor = Tutor.objects.select_related('profile').get(profile_id=tutor_profile_id)
     return get_canonical_room(tutee_profile, tutor.profile)

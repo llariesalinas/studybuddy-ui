@@ -1,6 +1,5 @@
 from django.urls import path, include
 from django.conf.urls.static import static
-from rest_framework_simplejwt.views import TokenRefreshView
 from .views import(
                    cancel_booking,
                    complete_booking,
@@ -92,8 +91,11 @@ urlpatterns = [
     path('password-reset/request/', views.password_reset_request),
     path('password-reset/confirm/', views.password_reset_confirm),
     path('logout/', views.logout_view),
-    path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    # Mode-aware refresh: also returns the profile's current active mode so a client whose mode
+    # was changed on another device notices within one refresh cycle.
+    path('token/refresh/', views.ModeAwareTokenRefreshView.as_view(), name='token_refresh'),
     path('profile/status/', views.profile_status),
+    path('switch-mode/', views.switch_mode),
     path('tutor-application/status/', views.tutor_application_status),
     path('tutor-application/submit/', views.tutor_application_submit),
     path('tutor-application/resubmit/', views.tutor_application_resubmit),

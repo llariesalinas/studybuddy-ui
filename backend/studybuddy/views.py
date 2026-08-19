@@ -32,7 +32,8 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.throttling import AnonRateThrottle
 from django.utils import timezone
-from rest_framework_simplejwt.tokens import RefreshToken, TokenError
+from rest_framework_simplejwt.tokens import AccessToken, RefreshToken, TokenError
+from rest_framework_simplejwt.views import TokenRefreshView
 from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
 
 
@@ -1386,6 +1387,10 @@ def profile_status(request):
     # Default True (never gated) for non-Tutors and Tutors with no Tutor row yet — the commission
     # gate only applies once a Tutor record exists to accept terms on. See ADR-0010.
     commission_terms_accepted = True
+    # Whether the hourly rate is set. Separate from profile_completed (which covers the SHARED
+    # identity step) because a tutee switching into Tutor mode has completed that shared step but
+    # has never seen the rate step -- without this the onboarding router would skip them past it.
+    tutor_rate_set = False
     if profile.role == 'Tutor':
         tutor = getattr(profile, 'tutor', None)
         if tutor is not None:
@@ -1393,20 +1398,146 @@ def profile_status(request):
             wallet_negative = bool(wallet and wallet.balance < 0)
             tutor_subject_count = TutorSubjects.objects.filter(tutor=tutor).count()
             commission_terms_accepted = tutor.commission_terms_accepted_at is not None
+            tutor_rate_set = tutor.hourly_rate is not None
 
     return Response({
         "profile_completed": profile.profile_completed,
         "role": profile.role,
+        # Modes this account is provisioned for. The router uses these to decide between
+        # auto-switching into the other mode and bouncing to the "no {role} account" modal.
+        "can_tutor": profile.can_tutor,
+        "can_tutee": profile.can_tutee,
         "wallet_negative": wallet_negative,
         "tutee_verification_enforced": tutee_verification_enforced(),
         **get_tutor_onboarding_context(profile),
         "tutor_subject_count": tutor_subject_count,
         "tutor_subjects_completed": tutor_subject_count > 0,
+        "tutor_rate_set": tutor_rate_set,
         "commission_terms_accepted": commission_terms_accepted,
         # Role-agnostic: the tutee cancel modal consumes this today, the tutor UI can later.
         "late_cancellation_strikes": get_strike_snapshot(profile),
         **document_context
     })
+
+class ModeAwareTokenRefreshView(TokenRefreshView):
+    """Stock refresh, plus the profile's current active mode.
+
+    Mode is persisted on UserProfile, so it is account-global: switching on a phone changes the
+    mode a laptop is in. The laptop finds out here, on its next scheduled refresh (worst case
+    ACCESS_REFRESH_INTERVAL_MS, 4 minutes), instead of silently rendering the wrong sidebar.
+    """
+
+    def post(self, request, *args, **kwargs):
+        response = super().post(request, *args, **kwargs)
+
+        if response.status_code != status.HTTP_200_OK:
+            return response
+
+        # Read the user from the freshly issued ACCESS token, not the incoming refresh token:
+        # ROTATE_REFRESH_TOKENS + BLACKLIST_AFTER_ROTATION means the one we were handed is already
+        # blacklisted by the time super() returns.
+        try:
+            user_id = AccessToken(response.data.get('access')).get('user_id')
+        except TokenError:
+            return response
+
+        profile = UserProfile.objects.filter(user_id=user_id).first()
+
+        if profile is not None:
+            response.data['role'] = profile.role
+            response.data['can_tutor'] = profile.can_tutor
+            response.data['can_tutee'] = profile.can_tutee
+
+        return response
+
+
+SWITCHABLE_MODES = ('Tutor', 'Tutee')
+
+
+def carry_over_verification(profile, target_mode):
+    """Give `target_mode` an already-approved application when the other mode has one.
+
+    TutorApplication and TuteeApplication collect the SAME two documents (school_id,
+    enrollment_proof) and answer the same question -- "is this a real enrolled CPU student" --
+    which is role-independent. Asking a dual-role user to upload them twice would ask it twice and
+    double the SuperAdmin review queue, so the approved application is copied across instead.
+    See docs/plans/2026-08-19-dual-role-mode-switch.md.
+
+    No-op when the target already has an application or the source isn't approved.
+    """
+    if target_mode == 'Tutor':
+        target_model, source = TutorApplication, getattr(profile, 'tutee_application', None)
+    else:
+        target_model, source = TuteeApplication, getattr(profile, 'tutor_application', None)
+
+    if source is None or source.application_status != 'approved':
+        return None
+
+    if target_model.objects.filter(profile=profile).exists():
+        return None
+
+    # `.name` is the storage path, so both applications reference the same uploaded files rather
+    # than duplicating them in media. Both then share a reviewed_at, so their 90-day renewal
+    # cadences fall due together -- correct, since they are literally the same two documents.
+    return target_model.objects.create(
+        profile=profile,
+        school_id=source.school_id.name,
+        enrollment_proof=source.enrollment_proof.name,
+        application_status='approved',
+        reviewed_at=source.reviewed_at,
+        reviewed_by=source.reviewed_by,
+    )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def switch_mode(request):
+    """Switch the account's ACTIVE MODE between Tutor and Tutee.
+
+    No token is reissued: `role` is not a JWT claim (see build_login_response_payload) and every
+    backend check reads request.user.userprofile.role fresh from the DB, so the existing
+    access/refresh pair stays valid.
+
+    Switching into a mode the account isn't provisioned for is deliberately allowed -- that is how
+    a user reaches that mode's onboarding. Whether to offer the switch at all is the client's
+    decision, driven by can_tutor/can_tutee.
+    """
+    profile = get_login_profile_for_user(request.user)
+
+    if profile is None:
+        return Response(
+            {"error": "User profile not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    target_mode = str(request.data.get('mode') or '').strip().capitalize()
+
+    if target_mode not in SWITCHABLE_MODES:
+        return Response(
+            {"error": f"Mode must be one of: {', '.join(SWITCHABLE_MODES)}."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # SuperAdmins are excluded outright rather than merely hidden in the UI:
+    # get_login_profile_for_user force-resets staff back to SuperAdmin on every login, so a
+    # switched admin would be silently flipped back mid-session.
+    if profile.role == 'SuperAdmin' or request.user.is_staff or request.user.is_superuser:
+        return Response(
+            {"error": "Admin accounts cannot switch modes."},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    if profile.role != target_mode:
+        profile.role = target_mode
+        profile.save(update_fields=['role', 'updated_at'])
+        carry_over_verification(profile, target_mode)
+
+    return Response({
+        "role": profile.role,
+        "can_tutor": profile.can_tutor,
+        "can_tutee": profile.can_tutee,
+    })
+
 
 @api_view(['POST'])
 @authentication_classes([])
@@ -1914,6 +2045,9 @@ class SearchTutorsView(APIView):
             )
         tutors = Tutor.objects.filter(
             tutorsubjects__subject__subject_code=subject_code
+        ).exclude(
+            # A dual-role account must never find itself in tutor search.
+            profile_id=student_profile.id
         ).select_related('profile').distinct()
 
         serializer = TutorSearchSerializer(tutors, many=True)
@@ -2482,6 +2616,19 @@ def confirm_payment_and_book(request):
     method_id = request.data.get("payment_method")
     subject_code = request.data.get("subject")
     preferred_location = request.data.get('preferred_location', '').strip()
+
+    # A dual-role account must not book itself. Search already hides the requester from their own
+    # results, but per ADR-0008 the confirm-time server check is the authority and hiding is only
+    # the surface -- someone holding a stale tutor id could otherwise POST straight past it. This
+    # also keeps chat from ever creating a room whose two participants are the same person.
+    if str(tutor_id) == str(user_profile.id):
+        return Response(
+            {
+                "error": "You cannot book a session with yourself.",
+                "code": "self_booking",
+            },
+            status=400,
+        )
 
     if isinstance(slots, str):
         try:
@@ -3896,11 +4043,17 @@ def get_recommendation_candidate_tutors(
     requested_date=None,
     start_time=None,
     end_time=None,
+    exclude_profile_id=None,
 ):
     base_candidates = Tutor.objects.filter(
         tutorsubjects__subject__subject_code=subject,
         profile__tutor_application__application_status='approved',
     )
+
+    # A dual-role account must never match itself. Excluded as a queryset filter rather than a
+    # per-candidate check because recommend_tutors_hybrid scores every row this returns.
+    if exclude_profile_id is not None:
+        base_candidates = base_candidates.exclude(profile_id=exclude_profile_id)
     eligible_candidate_ids = []
     for candidate in base_candidates.distinct():
         wallet, _ = Wallet.objects.get_or_create(tutor=candidate)
@@ -4019,6 +4172,7 @@ def recommend_tutors_view(request):
         requested_date=requested_date,
         start_time=start_time,
         end_time=end_time,
+        exclude_profile_id=student_profile.id,
     )
 
     results = recommend_tutors_hybrid(

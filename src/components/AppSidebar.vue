@@ -64,6 +64,7 @@
     <div class="sb-spacer"></div>
 
     <div class="sb-footer">
+      <SbModeSwitcher />
       <button
         type="button"
         class="sb-item sb-item-btn sb-item--danger"
@@ -85,6 +86,7 @@ import { computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useSidebarStore } from '@/stores/sidebar'
 import SbThemeToggle from '@/components/SbThemeToggle.vue'
+import SbModeSwitcher from '@/components/SbModeSwitcher.vue'
 
 const emit = defineEmits(['logout', 'open-support'])
 

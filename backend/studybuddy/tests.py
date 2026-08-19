@@ -10540,3 +10540,229 @@ class LateCancellationSupportTicketTests(APITestCase):
         )
 
         self.assertEqual(second_response.status_code, 400)
+
+
+class DualRoleModeSwitchTests(APITestCase):
+    """One account acting as both Tutor and Tutee.
+
+    `UserProfile.role` is the ACTIVE MODE rather than the account's identity, so these cover the
+    two things that distinction introduces: capability derived separately from mode, and the
+    places that used to read `role` as identity.
+    See docs/plans/2026-08-19-dual-role-mode-switch.md.
+    """
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="dual@example.edu",
+            email="dual@example.edu",
+            password="password",
+        )
+        self.profile = UserProfile.objects.create(
+            user=self.user,
+            fname="Dual",
+            mname="",
+            lname="Role",
+            role="Tutee",
+            profile_completed=True,
+        )
+        self.client.force_authenticate(user=self.user)
+
+    def provision_tutor(self, hourly_rate=Decimal("200.00"), with_subject=True):
+        tutor = Tutor.objects.create(profile=self.profile, hourly_rate=hourly_rate)
+        if with_subject:
+            subject = Subjects.objects.create(
+                subject_code="calc-1",
+                subject_name="Calculus 1",
+                category="Mathematics & Data Sciences",
+            )
+            TutorSubjects.objects.create(tutor=tutor, subject=subject, expertise_level=3)
+        return tutor
+
+    def reloaded_profile(self):
+        return UserProfile.objects.get(pk=self.profile.pk)
+
+    # --- capability derivation ----------------------------------------------------------------
+
+    def test_can_tutor_is_false_without_a_tutor_row(self):
+        self.assertFalse(self.reloaded_profile().can_tutor)
+
+    def test_can_tutor_is_false_when_the_rate_is_unset(self):
+        self.provision_tutor(hourly_rate=None)
+
+        self.assertFalse(self.reloaded_profile().can_tutor)
+
+    def test_can_tutor_is_false_without_any_subjects(self):
+        self.provision_tutor(with_subject=False)
+
+        self.assertFalse(self.reloaded_profile().can_tutor)
+
+    def test_can_tutor_is_true_with_a_rate_and_at_least_one_subject(self):
+        self.provision_tutor()
+
+        self.assertTrue(self.reloaded_profile().can_tutor)
+
+    def test_can_tutee_follows_the_preference_row(self):
+        self.assertFalse(self.reloaded_profile().can_tutee)
+
+        Preference.objects.create(user=self.profile)
+
+        self.assertTrue(self.reloaded_profile().can_tutee)
+
+    def test_profile_status_exposes_both_capabilities(self):
+        self.provision_tutor()
+
+        response = self.client.get("/api/profile/status/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["can_tutor"])
+        self.assertFalse(response.data["can_tutee"])
+
+    # --- the switch endpoint ------------------------------------------------------------------
+
+    def test_switch_mode_changes_the_active_mode(self):
+        response = self.client.post("/api/switch-mode/", {"mode": "Tutor"}, format="json")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["role"], "Tutor")
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.role, "Tutor")
+
+    def test_switch_mode_into_an_unprovisioned_mode_is_allowed(self):
+        """That is how a user reaches the other mode's onboarding; the guard, not the endpoint,
+        decides whether to offer the switch."""
+        response = self.client.post("/api/switch-mode/", {"mode": "Tutor"}, format="json")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.data["can_tutor"])
+
+    def test_switch_mode_rejects_an_unknown_mode(self):
+        response = self.client.post("/api/switch-mode/", {"mode": "SuperAdmin"}, format="json")
+
+        self.assertEqual(response.status_code, 400)
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.role, "Tutee")
+
+    def test_switch_mode_rejects_admin_accounts(self):
+        self.user.is_staff = True
+        self.user.save(update_fields=["is_staff"])
+
+        response = self.client.post("/api/switch-mode/", {"mode": "Tutor"}, format="json")
+
+        self.assertEqual(response.status_code, 403)
+
+    # --- verification carry-over --------------------------------------------------------------
+
+    def test_switching_carries_an_approved_application_across_roles(self):
+        reviewed_at = timezone.now()
+        TuteeApplication.objects.create(
+            profile=self.profile,
+            school_id="tutee_applications/school_ids/id.png",
+            enrollment_proof="tutee_applications/enrollment_proofs/proof.pdf",
+            application_status="approved",
+            reviewed_at=reviewed_at,
+        )
+
+        self.client.post("/api/switch-mode/", {"mode": "Tutor"}, format="json")
+
+        carried = TutorApplication.objects.get(profile=self.profile)
+        self.assertEqual(carried.application_status, "approved")
+        self.assertEqual(carried.reviewed_at, reviewed_at)
+        # Same storage paths: the documents are referenced, not duplicated in media.
+        self.assertEqual(carried.school_id.name, "tutee_applications/school_ids/id.png")
+
+    def test_a_pending_application_is_not_carried_across(self):
+        TuteeApplication.objects.create(
+            profile=self.profile,
+            school_id="tutee_applications/school_ids/id.png",
+            enrollment_proof="tutee_applications/enrollment_proofs/proof.pdf",
+            application_status="pending",
+        )
+
+        self.client.post("/api/switch-mode/", {"mode": "Tutor"}, format="json")
+
+        self.assertFalse(TutorApplication.objects.filter(profile=self.profile).exists())
+
+    # --- self-matching ------------------------------------------------------------------------
+
+    def test_a_dual_role_account_cannot_book_itself(self):
+        import json
+
+        self.provision_tutor()
+        # Verified, so the booking gates ahead of the self-booking check all pass -- a real
+        # dual-role account is necessarily verified.
+        TuteeApplication.objects.create(
+            profile=self.profile,
+            school_id="tutee_applications/school_ids/id.png",
+            enrollment_proof="tutee_applications/enrollment_proofs/proof.pdf",
+            application_status="approved",
+            reviewed_at=timezone.now(),
+        )
+
+        response = self.client.post(
+            "/api/bookings/confirm/",
+            {
+                "tutor_id": self.profile.id,
+                "slots": json.dumps([
+                    {
+                        "session_date": "2030-01-01",
+                        "start_time": "10:00",
+                        "session_mode": "Online",
+                    }
+                ]),
+            },
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["code"], "self_booking")
+
+    def test_tutor_search_excludes_the_requesting_profile(self):
+        self.provision_tutor()
+
+        response = self.client.get("/api/search-tutors/", {"subject": "calc-1"})
+
+        self.assertEqual(response.status_code, 200)
+        returned_ids = {
+            row.get("profile_id") or row.get("profile") or row.get("id")
+            for row in response.data
+        }
+        self.assertNotIn(self.profile.id, returned_ids)
+
+    # --- identity checks that used to read `role` ---------------------------------------------
+
+    def test_chat_room_lookup_works_for_a_tutor_sitting_in_tutee_mode(self):
+        from .chat.services import get_room_for_tutor_profile
+
+        self.provision_tutor()
+        # The tutor is browsing as a tutee -- the old lookup filtered on role='Tutor' and raised
+        # DoesNotExist, which blocked the tutee from opening the chat at all.
+        self.profile.role = "Tutee"
+        self.profile.save(update_fields=["role"])
+
+        other_user = User.objects.create_user(
+            username="seeker@example.edu",
+            email="seeker@example.edu",
+            password="password",
+        )
+        seeker = UserProfile.objects.create(
+            user=other_user, fname="See", mname="", lname="Ker", role="Tutee"
+        )
+
+        room = get_room_for_tutor_profile(seeker, self.profile.id)
+
+        self.assertEqual(room.tutor_id, self.profile.id)
+        self.assertEqual(room.tutee_id, seeker.id)
+
+    def test_wallet_balance_is_reported_while_in_tutee_mode(self):
+        from .serializers import AdminUserSerializer
+
+        tutor = self.provision_tutor()
+        wallet = Wallet.objects.get(tutor=tutor)
+        wallet.balance = Decimal("125.00")
+        wallet.save(update_fields=["balance"])
+        self.profile.role = "Tutee"
+        self.profile.save(update_fields=["role"])
+
+        serialized = AdminUserSerializer(self.reloaded_profile()).data
+
+        self.assertEqual(serialized["wallet_balance"], 125.0)

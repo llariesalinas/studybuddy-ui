@@ -12,7 +12,15 @@
           @click="toastStore.dismiss(toast.id)"
         >
           <span class="sb-toast-dot"></span>
-          {{ toast.message }}
+          <span class="sb-toast-message">{{ toast.message }}</span>
+          <button
+            v-if="toast.action"
+            type="button"
+            class="sb-toast-action"
+            @click.stop="runAction(toast)"
+          >
+            {{ toast.action.label }}
+          </button>
         </div>
       </TransitionGroup>
     </div>
@@ -22,6 +30,11 @@
 <script setup>
 import { useToastStore } from '@/stores/toast'
 const toastStore = useToastStore()
+
+const runAction = (toast) => {
+  toastStore.dismiss(toast.id)
+  toast.action?.handler?.()
+}
 </script>
 
 <style scoped>
@@ -51,6 +64,22 @@ const toastStore = useToastStore()
   pointer-events: auto;
   max-width: 320px;
 }
+
+.sb-toast-message { flex: 1; }
+
+.sb-toast-action {
+  background: rgba(255, 255, 255, 0.16);
+  border: none;
+  color: inherit;
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.sb-toast-action:hover { background: rgba(255, 255, 255, 0.26); }
 
 .sb-toast--error   { background: #7f1d1d; }
 .sb-toast--warning { background: #78350f; }
