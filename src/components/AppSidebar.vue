@@ -142,6 +142,7 @@ const menuItems = computed(() => {
       { to: '/superadmin/reports', label: 'Reports', icon: 'bi-bar-chart-line' },
       { to: '/superadmin/support', label: 'Support Desk', icon: 'bi-headset' },
       { to: '/superadmin/algorithm-demo', label: 'Algorithm Demo', icon: 'bi-diagram-3' },
+      { to: '/superadmin/algorithm-settings', label: 'Algorithm Settings', icon: 'bi-sliders' },
     ]
   }
 

@@ -1,0 +1,560 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Algorithm Settings — chosen design (2026-08-19)</title>
+    <style>
+      :root {
+        --p: #00895a;
+        --b: #006591;
+        --wn: #946200;
+        --ink: #0f172a;
+        --mu: #475569;
+        --ov: #bdcabf;
+        --w: #ffffff;
+        --lo: #f0f5ee;
+        --cv: #f8fafc;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+        color: var(--ink);
+        background: var(--cv);
+        margin: 0;
+        padding: 32px 20px 60px;
+        line-height: 1.5;
+      }
+      .wrap {
+        max-width: 1080px;
+        margin: 0 auto;
+      }
+      .doc {
+        background: #fff;
+        border: 1px solid var(--ov);
+        border-radius: 12px;
+        padding: 18px 22px;
+        margin-bottom: 26px;
+        font-size: 13px;
+        color: var(--mu);
+      }
+      .doc h1 {
+        font-size: 21px;
+        color: var(--ink);
+        margin: 0 0 6px;
+      }
+      .doc ul {
+        margin: 10px 0 0;
+        padding-left: 20px;
+      }
+      .doc li {
+        margin-bottom: 4px;
+      }
+      .eyebrow {
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--p);
+        margin: 0 0 4px;
+      }
+      h2.pg {
+        font-size: 24px;
+        margin: 0 0 4px;
+        font-weight: 700;
+      }
+      p.sub {
+        color: var(--mu);
+        font-size: 13px;
+        margin: 0 0 22px;
+      }
+      .card {
+        background: var(--w);
+        border: 1px solid var(--ov);
+        border-radius: 14px;
+        padding: 20px 22px;
+        margin-bottom: 20px;
+      }
+      .card > h3 {
+        margin: 0 0 3px;
+        font-size: 16px;
+        font-weight: 700;
+      }
+      .card > p.h {
+        margin: 0 0 16px;
+        font-size: 12px;
+        color: var(--mu);
+      }
+      .lbl {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--mu);
+        margin-bottom: 9px;
+      }
+      .bar {
+        display: flex;
+        height: 32px;
+        border-radius: 8px;
+        overflow: hidden;
+        border: 1px solid var(--ov);
+        margin-bottom: 14px;
+      }
+      .bar div {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        font-weight: 700;
+        color: #fff;
+        white-space: nowrap;
+        overflow: hidden;
+        transition: width 0.12s ease;
+      }
+      input[type='range'] {
+        width: 100%;
+        accent-color: var(--p);
+        margin: 0;
+      }
+      .ends {
+        display: flex;
+        justify-content: space-between;
+        font-size: 11px;
+        color: var(--mu);
+        margin: 4px 0 14px;
+      }
+      .ro {
+        display: flex;
+        gap: 26px;
+      }
+      .rk {
+        display: block;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--mu);
+        font-weight: 700;
+      }
+      .rv {
+        display: block;
+        font-size: 24px;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+      }
+      .row {
+        display: grid;
+        grid-template-columns: 150px 1fr 78px;
+        align-items: center;
+        gap: 12px;
+        padding: 7px 0;
+        border-bottom: 1px solid var(--lo);
+      }
+      .row:last-child {
+        border-bottom: none;
+      }
+      .nm {
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .nm small {
+        display: block;
+        font-weight: 400;
+        color: var(--mu);
+        font-size: 11px;
+      }
+      .pct {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+        font-weight: 700;
+        font-size: 15px;
+        color: var(--p);
+      }
+      .pct small {
+        display: block;
+        font-weight: 600;
+        color: var(--mu);
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      .sum {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 12px;
+        padding-top: 11px;
+        border-top: 1px solid var(--ov);
+        font-size: 12px;
+        color: var(--mu);
+      }
+      .sum b {
+        color: var(--ink);
+        font-variant-numeric: tabular-nums;
+      }
+      .btn {
+        border-radius: 9999px;
+        border: 1px solid var(--ov);
+        background: var(--w);
+        color: var(--mu);
+        font-size: 13px;
+        font-weight: 600;
+        padding: 8px 18px;
+        cursor: pointer;
+      }
+      .btn.p {
+        background: var(--p);
+        border-color: var(--p);
+        color: #fff;
+      }
+      .btn.p:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+      .foot {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        border-top: 1px solid var(--ov);
+        margin-top: 16px;
+        padding-top: 13px;
+        flex-wrap: wrap;
+      }
+      .audit {
+        font-size: 12px;
+        color: var(--mu);
+      }
+      .btns {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .dirty {
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--wn);
+      }
+      .split {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 22px;
+      }
+      @media (max-width: 860px) {
+        .split {
+          grid-template-columns: 1fr;
+        }
+        .row {
+          grid-template-columns: 120px 1fr 66px;
+        }
+      }
+      .sel {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        max-width: 380px;
+        padding: 9px 13px;
+        border: 1px solid var(--ov);
+        border-radius: 9px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        margin-bottom: 12px;
+        background: var(--w);
+      }
+      .drop {
+        max-width: 380px;
+        border: 1px solid var(--ov);
+        border-radius: 9px;
+        margin: -6px 0 12px;
+        overflow: hidden;
+      }
+      .drop input {
+        width: 100%;
+        border: none;
+        border-bottom: 1px solid var(--ov);
+        padding: 9px 13px;
+        font-size: 13px;
+        outline: none;
+      }
+      .opt {
+        padding: 9px 13px;
+        font-size: 13px;
+        cursor: pointer;
+        border-bottom: 1px solid var(--lo);
+      }
+      .opt:hover {
+        background: var(--lo);
+      }
+      .opt small {
+        display: block;
+        color: var(--mu);
+        font-size: 11px;
+      }
+      ul.rank {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+      ul.rank li {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 12px;
+        border: 1px solid var(--ov);
+        border-radius: 9px;
+        margin-bottom: 6px;
+        font-size: 13px;
+        background: var(--w);
+      }
+      ul.rank li.mv {
+        border-color: var(--p);
+        background: #f2fbf7;
+      }
+      .pos {
+        width: 21px;
+        height: 21px;
+        border-radius: 50%;
+        background: var(--lo);
+        color: var(--mu);
+        font-size: 11px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex: none;
+      }
+      .tn {
+        flex: 1;
+        font-weight: 600;
+      }
+      .sc {
+        font-variant-numeric: tabular-nums;
+        color: var(--mu);
+        font-size: 12px;
+      }
+      .d {
+        width: 26px;
+        text-align: right;
+        font-size: 11px;
+        font-weight: 700;
+      }
+      .up {
+        color: var(--p);
+      }
+      .dn {
+        color: #9a3e3e;
+      }
+      .fl {
+        color: #cbd5e1;
+      }
+      .gated {
+        font-size: 12px;
+        color: var(--mu);
+        background: var(--lo);
+        border: 1px dashed var(--ov);
+        border-radius: 9px;
+        padding: 12px 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="doc">
+        <h1>Algorithm Settings &mdash; chosen design</h1>
+        <p>
+          Decision artifact for
+          <code>docs/plans/2026-08-19-dynamic-algorithm-weights.md</code>. Addresses the thesis panel
+          comment that an admin should be able to edit each part of the recommendation algorithm.
+          Interactive: drag any slider and the preview re-sorts.
+        </p>
+        <ul>
+          <li><b>Scope</b> &mdash; the two weight groups only: hybrid blend (2) and CBF components (6).</li>
+          <li><b>Storage</b> &mdash; one row per weight keyed by <code>group</code> + <code>key</code>, with <code>updated_by</code> / <code>updated_at</code>.</li>
+          <li><b>Constraint</b> &mdash; raw values stored, normalised at score time, so no invalid set exists.</li>
+          <li><b>Control</b> &mdash; sliders at 5% steps; displayed percentage is the derived share.</li>
+          <li><b>Preview</b> &mdash; searchable tutee picker, gated behind <code>ALGORITHM_DEMO_TOOLS_ENABLED</code>; controls stay available when it is off.</li>
+          <li><b>Save</b> &mdash; single action, no confirmation; the preview is the confirmation.</li>
+        </ul>
+      </div>
+
+      <p class="eyebrow">Recommender</p>
+      <h2 class="pg">Algorithm Settings</h2>
+      <p class="sub">
+        Tune how tutor recommendations are ranked. Changes apply to every recommendation platform-wide
+        once saved.
+      </p>
+
+      <div class="card">
+        <h3>Hybrid blend</h3>
+        <p class="h">
+          How much of the final score comes from content-based matching versus collaborative
+          filtering. The two always total 100%.
+        </p>
+        <div class="bar">
+          <div id="h-a" style="width: 70%; background: var(--p)">CBF 70%</div>
+          <div id="h-b" style="width: 30%; background: var(--b)">CF 30%</div>
+        </div>
+        <input id="h-r" type="range" min="0" max="100" step="5" value="70" />
+        <div class="ends"><span>All collaborative</span><span>All content-based</span></div>
+        <div class="ro">
+          <div><span class="rk">Content-based</span><span class="rv" id="h-va" style="color: var(--p)">0.70</span></div>
+          <div><span class="rk">Collaborative &middot; derived</span><span class="rv" id="h-vb" style="color: var(--b)">0.30</span></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Content-based match components</h3>
+        <p class="h">
+          What the content-based score is made of. Values are stored as entered and normalised when
+          scoring, so the share shown is what actually applies.
+        </p>
+        <div class="bar" id="c-bar"></div>
+        <div id="c-rows"></div>
+        <div class="sum">
+          <span>Raw total <b id="c-sum">1.00</b> &mdash; normalised to 100% at score time</span>
+          <button class="btn" onclick="cReset()">Reset to defaults</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Preview</h3>
+        <p class="h">Recomputed live from both groups above. Nothing is saved until you press Save.</p>
+        <div class="split">
+          <div>
+            <div class="lbl">Preview against tutee</div>
+            <div class="sel" onclick="tog()">
+              <span id="who">Maria Santos &middot; Calculus I</span><span style="color: var(--mu)">&#9662;</span>
+            </div>
+            <div class="drop" id="dd" style="display: none">
+              <input placeholder="Search tutees…" />
+              <div class="opt" onclick="pick('Maria Santos · Calculus I')">Maria Santos<small>Calculus I &middot; 14 completed sessions</small></div>
+              <div class="opt" onclick="pick('Diego Fernandez · General Chemistry')">Diego Fernandez<small>General Chemistry &middot; 9 completed sessions</small></div>
+              <div class="opt" onclick="pick('Grace Obispo · Intro to Programming')">Grace Obispo<small>Intro to Programming &middot; 21 completed sessions</small></div>
+            </div>
+            <div class="gated">
+              When <code>ALGORITHM_DEMO_TOOLS_ENABLED</code> is off this half is replaced by this note.
+              The weight controls above stay fully usable.
+            </div>
+          </div>
+          <div>
+            <div class="lbl">Ranked tutors</div>
+            <ul class="rank" id="pv"></ul>
+          </div>
+        </div>
+        <div class="foot">
+          <span class="audit">
+            Blend last changed by <strong>R. Dagohoy</strong> on 12 Aug 2026 &middot; components by
+            <strong>R. Dagohoy</strong> on 4 Aug 2026
+          </span>
+          <div class="btns">
+            <span class="dirty" id="dirty" style="visibility: hidden">Unsaved changes</span>
+            <button class="btn p" id="save" disabled onclick="doSave()">Save</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      var DEF = [
+        { l: 'Specific', d: 'exact subject match', v: 0.4 },
+        { l: 'General', d: 'same-field match', v: 0.2 },
+        { l: 'Expertise', d: 'declared expertise level', v: 0.15 },
+        { l: 'Course', d: 'same course or strand', v: 0.1 },
+        { l: 'Year', d: 'year-level proximity', v: 0.1 },
+        { l: 'Level', d: 'teaching-level fit', v: 0.05 }
+      ]
+      var COL = ['#00895a', '#0a9e6b', '#22b37f', '#4cc79a', '#7ddab6', '#b0ead2']
+      var C = DEF.map(function (x) { return x.v })
+      var SAVED = C.slice()
+      var hSaved = 70
+
+      var T = [
+        { n: 'Jonas Reyes', s: [1, 1, 0.88, 0.5, 0.5, 1], cf: 0.42 },
+        { n: 'Aileen Cruz', s: [0, 1, 0.62, 1, 1, 1], cf: 0.96 },
+        { n: 'Miguel Tan', s: [1, 1, 0.54, 0, 0.33, 1], cf: 0.61 },
+        { n: 'Precious Lim', s: [0, 1, 0.4, 0.5, 0.5, 1], cf: 0.88 },
+        { n: 'Karl Villanueva', s: [1, 1, 0.96, 0.5, 0.25, 0], cf: 0.35 }
+      ]
+
+      function norm(a) {
+        var t = a.reduce(function (x, y) { return x + y }, 0)
+        return t > 0 ? a.map(function (x) { return x / t }) : a.map(function () { return 0 })
+      }
+
+      document.getElementById('c-rows').innerHTML = DEF.map(function (x, i) {
+        return (
+          '<div class="row"><div class="nm">' + x.l + '<small>' + x.d + '</small></div>' +
+          '<input type="range" min="0" max="100" step="5" value="' + x.v * 100 + '" oninput="cIn(' + i + ',this.value)">' +
+          '<div class="pct" id="c-p' + i + '"></div></div>'
+        )
+      }).join('')
+
+      function cRender() {
+        var n = norm(C)
+        n.forEach(function (p, i) {
+          document.getElementById('c-p' + i).innerHTML = (p * 100).toFixed(0) + '%<small>share</small>'
+        })
+        document.getElementById('c-sum').textContent = C.reduce(function (a, b) { return a + b }, 0).toFixed(2)
+        document.getElementById('c-bar').innerHTML = n.map(function (p, i) {
+          return '<div style="width:' + p * 100 + '%;background:' + COL[i] + ';color:' + (i > 3 ? '#14563a' : '#fff') + '">' + (p > 0.09 ? DEF[i].l + ' ' + (p * 100).toFixed(0) + '%' : '') + '</div>'
+        }).join('')
+        touch()
+      }
+      function cIn(i, v) { C[i] = +v / 100; cRender() }
+      function cReset() {
+        C = DEF.map(function (x) { return x.v })
+        document.querySelectorAll('#c-rows input').forEach(function (el, i) { el.value = C[i] * 100 })
+        cRender()
+      }
+
+      var hR = document.getElementById('h-r')
+      function hRender() {
+        var v = +hR.value
+        document.getElementById('h-a').style.width = v + '%'
+        document.getElementById('h-b').style.width = 100 - v + '%'
+        document.getElementById('h-a').textContent = v >= 12 ? 'CBF ' + v + '%' : ''
+        document.getElementById('h-b').textContent = 100 - v >= 12 ? 'CF ' + (100 - v) + '%' : ''
+        document.getElementById('h-va').textContent = (v / 100).toFixed(2)
+        document.getElementById('h-vb').textContent = ((100 - v) / 100).toFixed(2)
+        touch()
+      }
+      hR.addEventListener('input', hRender)
+
+      function tog() {
+        var e = document.getElementById('dd')
+        e.style.display = e.style.display === 'none' ? 'block' : 'none'
+      }
+      function pick(t) {
+        document.getElementById('who').textContent = t
+        tog()
+      }
+
+      var base = null
+      function pvRender() {
+        var w = norm(C)
+        var hw = +hR.value / 100
+        var rows = T.map(function (t) {
+          var cbf = t.s.reduce(function (a, s, i) { return a + w[i] * s }, 0)
+          return { n: t.n, v: hw * cbf + (1 - hw) * t.cf }
+        }).sort(function (a, b) { return b.v - a.v })
+        if (!base) base = rows.map(function (r) { return r.n })
+        document.getElementById('pv').innerHTML = rows.map(function (r, i) {
+          var d = base.indexOf(r.n) - i
+          var c = d > 0 ? 'up' : d < 0 ? 'dn' : 'fl'
+          var tx = d > 0 ? '▲' + d : d < 0 ? '▼' + -d : '–'
+          return '<li class="' + (d ? 'mv' : '') + '"><span class="pos">' + (i + 1) + '</span><span class="tn">' + r.n + '</span><span class="sc">' + r.v.toFixed(3) + '</span><span class="d ' + c + '">' + tx + '</span></li>'
+        }).join('')
+      }
+      function touch() {
+        var d = +hR.value !== hSaved || C.some(function (v, i) { return v !== SAVED[i] })
+        document.getElementById('dirty').style.visibility = d ? 'visible' : 'hidden'
+        document.getElementById('save').disabled = !d
+        pvRender()
+      }
+      function doSave() { hSaved = +hR.value; SAVED = C.slice(); touch() }
+
+      cRender(); hRender()
+    </script>
+  </body>
+</html>

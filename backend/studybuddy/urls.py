@@ -36,7 +36,9 @@ from .admin_views import (
     AdminTutorDocumentRenewalDetailView, SuperAdminInstitutionPerformanceView,
     AdminTuteeApplicationListView, AdminTuteeApplicationDetailView,
     AdminTuteeDocumentRenewalDetailView, AdminOperationalQueueView,
-    AdminUserVerificationDevToolsView
+    AdminUserVerificationDevToolsView,
+    AdminAlgorithmWeightsView,
+    AdminAlgorithmWeightsPreviewView
 )
 from . import views
 
@@ -172,6 +174,11 @@ urlpatterns = [
     path('dev/verification/set-state/', views.dev_verification_set_state),
     path('dev/verification/enforcement/', views.dev_verification_set_enforcement),
     # Recommendation algorithm demo tool (gated in-view by ALGORITHM_DEMO_TOOLS_ENABLED + IsSuperAdminUser)
+    # Algorithm weights: the settings endpoints are ungated (SuperAdmin only),
+    # the preview is gated in-view like the demo tools below it.
+    path('admin/algorithm-weights/', AdminAlgorithmWeightsView.as_view()),
+    path('admin/algorithm-weights/preview/', AdminAlgorithmWeightsPreviewView.as_view()),
+
     path('dev/algorithm-demo/tutees/', views.algorithm_demo_search_tutees),
     path('dev/algorithm-demo/recommend/', views.algorithm_demo_recommend),
     path('dev/algorithm-demo/recommend-whatif/', views.algorithm_demo_recommend_whatif),

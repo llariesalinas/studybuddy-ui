@@ -1196,3 +1196,48 @@ class SupportTicket(models.Model):
 
     def __str__(self):
         return f"Ticket #{self.id} - {self.subject} ({self.status})"
+
+
+class AlgorithmWeight(models.Model):
+    """One tunable weight in the recommender, editable by a SuperAdmin.
+
+    Replaces the module-level constants in recommender/hybrid.py and
+    recommender/cbf.py, which could previously only be changed by editing code
+    and redeploying.
+
+    Weights belong to a group whose members are normalised together at score
+    time (see recommender/weights.py). Values are therefore stored exactly as
+    entered and are relative, not absolute: 40/20/15/10/10/5 and 8/4/3/2/2/1
+    describe the same algorithm. Normalising rather than validating that a group
+    sums to 1.0 is deliberate - it means an invalid set does not exist, instead
+    of existing and being rejected by a rule every write path has to remember.
+
+    updated_by/updated_at answer "who changed this weight, and when", which is
+    the point of making the weights editable at all.
+    """
+
+    GROUP_HYBRID = 'hybrid'
+    GROUP_CBF = 'cbf'
+    GROUP_CHOICES = [
+        (GROUP_HYBRID, 'Hybrid blend'),
+        (GROUP_CBF, 'Content-based match components'),
+    ]
+
+    group = models.CharField(max_length=20, choices=GROUP_CHOICES)
+    key = models.CharField(max_length=32)
+    value = models.FloatField(validators=[MinValueValidator(0)])
+    updated_by = models.ForeignKey(
+        UserProfile,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='algorithm_weight_updates',
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('group', 'key')
+        ordering = ['group', 'key']
+
+    def __str__(self):
+        return f"{self.group}.{self.key} = {self.value}"

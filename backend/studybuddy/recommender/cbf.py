@@ -1,15 +1,20 @@
 import logging
 
 from ..models import Preference, Subjects, Tutor
+from .weights import DEFAULT_WEIGHTS, GROUP_CBF, default_weights, load_weights
 
 logger = logging.getLogger(__name__)
 
-W_SPECIFIC = 0.40
-W_GENERAL = 0.20
-W_EXPERTISE = 0.15
-W_COURSE = 0.10
-W_YEAR = 0.10
-W_LEVEL = 0.05
+# The shipped defaults, kept as named constants for readability and for callers
+# that score without a database. weights.py is the single source of truth; these
+# are aliases so the two cannot drift apart. Admin overrides arrive per-call via
+# the `weights` argument - see docs/plans/2026-08-19-dynamic-algorithm-weights.md.
+W_SPECIFIC = DEFAULT_WEIGHTS[GROUP_CBF]['specific']
+W_GENERAL = DEFAULT_WEIGHTS[GROUP_CBF]['general']
+W_EXPERTISE = DEFAULT_WEIGHTS[GROUP_CBF]['expertise']
+W_COURSE = DEFAULT_WEIGHTS[GROUP_CBF]['course']
+W_YEAR = DEFAULT_WEIGHTS[GROUP_CBF]['year']
+W_LEVEL = DEFAULT_WEIGHTS[GROUP_CBF]['level']
 TEACHING_LEVEL_MAX_YEAR = {'Elementary': 6, 'High School': 12, 'College': 16}
 
 # Sentinel distinguishing "caller did not supply target_categories" (resolve it
@@ -51,6 +56,7 @@ def compute_cbf_breakdown(
     student_subjects=None,
     tutor_subjects=None,
     target_categories=_UNSET,
+    weights=None,
 ):
     """Same computation as compute_cbf_score, but returns each weighted sub-score
     alongside the total. Used by compute_cbf_score and by the algorithm demo tool
@@ -79,6 +85,9 @@ def compute_cbf_breakdown(
 
     if target_categories is _UNSET:
         target_categories = resolve_target_categories(requested_subject, subject_codes)
+
+    if weights is None:
+        weights = default_weights()[GROUP_CBF]
 
     tutor_profile = tutor.profile
     tutor_course = tutor_profile.course
@@ -140,12 +149,12 @@ def compute_cbf_breakdown(
         s_level = 0
 
     sub_scores = {
-        "specific": (W_SPECIFIC, s_specific),
-        "general": (W_GENERAL, s_general),
-        "expertise": (W_EXPERTISE, s_expertise),
-        "course": (W_COURSE, s_course),
-        "year": (W_YEAR, s_year),
-        "level": (W_LEVEL, s_level),
+        "specific": (weights["specific"], s_specific),
+        "general": (weights["general"], s_general),
+        "expertise": (weights["expertise"], s_expertise),
+        "course": (weights["course"], s_course),
+        "year": (weights["year"], s_year),
+        "level": (weights["level"], s_level),
     }
 
     breakdown = {
@@ -173,6 +182,7 @@ def compute_cbf_score(
     student_subjects=None,
     tutor_subjects=None,
     target_categories=_UNSET,
+    weights=None,
 ):
     return compute_cbf_breakdown(
         student_profile,
@@ -181,10 +191,11 @@ def compute_cbf_score(
         student_subjects=student_subjects,
         tutor_subjects=tutor_subjects,
         target_categories=target_categories,
+        weights=weights,
     )["score"]
 
 
-def recommend_tutors(student_profile, subject=None, preferred_mode=None):
+def recommend_tutors(student_profile, subject=None, preferred_mode=None, weights=None):
     logger.debug("Starting CBF recommender")
 
     tutors = Tutor.objects.select_related(
@@ -201,6 +212,11 @@ def recommend_tutors(student_profile, subject=None, preferred_mode=None):
 
     student_subjects = get_student_subject_codes(student_profile)
     target_categories = resolve_target_categories(subject, student_subjects)
+
+    # Loaded once, outside the loop below, like target_categories above it.
+    if weights is None:
+        weights = load_weights()[GROUP_CBF]
+
     results = []
 
     for tutor in tutors:
@@ -211,6 +227,7 @@ def recommend_tutors(student_profile, subject=None, preferred_mode=None):
             student_subjects=student_subjects,
             tutor_subjects=tutor.tutorsubjects_set.all(),
             target_categories=target_categories,
+            weights=weights,
         )
 
         results.append({

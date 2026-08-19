@@ -36,7 +36,9 @@ from .views import (
     PASSWORD_RESET_GENERIC_MESSAGE,
     WEEKDAY_MAP,
 )
+from .recommender import weights as weights_module
 from .models import (
+    AlgorithmWeight,
     Booking,
     Course,
     EmailOTPChallenge,
@@ -6122,8 +6124,12 @@ class CbfGraduatedSubjectMatchTests(APITestCase):
     """CBF graduated subject matching: a tutee requesting a specific subject
     sees exact-match tutors ranked above same-field tutors, ranked above
     unrelated tutors, instead of the old all-or-nothing subject match. See
-    docs/plans/ for the approved weights (W_SPECIFIC=0.40, W_GENERAL=0.20,
-    W_EXPERTISE=0.15, W_COURSE=0.10, W_YEAR=0.10, W_LEVEL=0.05)."""
+    docs/plans/ for the approved default weights (W_SPECIFIC=0.40, W_GENERAL=0.20,
+    W_EXPERTISE=0.15, W_COURSE=0.10, W_YEAR=0.10, W_LEVEL=0.05). These are the
+    seeded defaults, not constants - a SuperAdmin can change them from Algorithm
+    Settings. This class asserts the graduated ordering those defaults produce, so
+    it deliberately scores against the defaults rather than whatever is stored;
+    see docs/plans/2026-08-19-dynamic-algorithm-weights.md."""
 
     def setUp(self):
         from studybuddy.recommender.cbf import compute_cbf_breakdown
@@ -10253,6 +10259,9 @@ class TieBreakerOrderingTests(APITestCase):
 
         def fake_cbf(_student, tutor, *_args, **_kwargs):
             # CF is coerced to 0 for this student, so hybrid = CBF_WEIGHT * cbf.
+            # CBF_WEIGHT is the seeded default rather than a constant now, but it
+            # is still what an unmodified database scores with, which is what this
+            # test sets up.
             return score_by_id[tutor.profile_id] / hybrid.CBF_WEIGHT
 
         with patch.object(hybrid, "get_student_subject_codes", return_value=[]), \
@@ -10766,3 +10775,433 @@ class DualRoleModeSwitchTests(APITestCase):
         serialized = AdminUserSerializer(self.reloaded_profile()).data
 
         self.assertEqual(serialized["wallet_balance"], 125.0)
+
+
+class AlgorithmWeightNormalizationTests(APITestCase):
+    """The normalise-don't-validate contract from
+    docs/plans/2026-08-19-dynamic-algorithm-weights.md."""
+
+    def test_defaults_already_sum_to_one(self):
+        for group, defaults in weights_module.DEFAULT_WEIGHTS.items():
+            self.assertAlmostEqual(sum(defaults.values()), 1.0, places=9, msg=group)
+
+    def test_normalize_group_scales_to_one(self):
+        result = weights_module.normalize_group(
+            {'cbf': 7.0, 'cf': 1.0}, weights_module.GROUP_HYBRID
+        )
+
+        self.assertAlmostEqual(sum(result.values()), 1.0, places=9)
+        self.assertAlmostEqual(result['cbf'], 0.875, places=9)
+
+    def test_proportional_sets_are_the_same_algorithm(self):
+        """40/20/15/10/10/5 and 8/4/3/2/2/1 must normalise identically - this is
+        the whole reason raw values can be stored without validation."""
+        as_percent = weights_module.normalize_group(
+            {
+                'specific': 40, 'general': 20, 'expertise': 15,
+                'course': 10, 'year': 10, 'level': 5,
+            },
+            weights_module.GROUP_CBF,
+        )
+        as_ratio = weights_module.normalize_group(
+            {
+                'specific': 8, 'general': 4, 'expertise': 3,
+                'course': 2, 'year': 2, 'level': 1,
+            },
+            weights_module.GROUP_CBF,
+        )
+
+        for key in as_percent:
+            self.assertAlmostEqual(as_percent[key], as_ratio[key], places=9, msg=key)
+
+    def test_zero_sum_group_falls_back_to_defaults(self):
+        """A group summing to zero cannot be scaled. Returning all-zero weights
+        would flatten every score in that group and rank every tutor identically,
+        so the defaults stand in instead."""
+        result = weights_module.normalize_group(
+            {key: 0 for key in weights_module.DEFAULT_WEIGHTS[weights_module.GROUP_CBF]},
+            weights_module.GROUP_CBF,
+        )
+
+        self.assertAlmostEqual(sum(result.values()), 1.0, places=9)
+        self.assertAlmostEqual(result['specific'], 0.40, places=9)
+
+    def test_load_weights_falls_back_when_rows_are_missing(self):
+        AlgorithmWeight.objects.all().delete()
+
+        loaded = weights_module.load_weights()
+
+        self.assertAlmostEqual(loaded[weights_module.GROUP_HYBRID]['cbf'], 0.70, places=9)
+        self.assertAlmostEqual(loaded[weights_module.GROUP_CBF]['specific'], 0.40, places=9)
+
+    def test_load_weights_normalises_stored_values(self):
+        AlgorithmWeight.objects.update_or_create(
+            group=weights_module.GROUP_HYBRID, key='cbf', defaults={'value': 3.0}
+        )
+        AlgorithmWeight.objects.update_or_create(
+            group=weights_module.GROUP_HYBRID, key='cf', defaults={'value': 1.0}
+        )
+
+        loaded = weights_module.load_weights()
+
+        self.assertAlmostEqual(loaded[weights_module.GROUP_HYBRID]['cbf'], 0.75, places=9)
+        self.assertAlmostEqual(loaded[weights_module.GROUP_HYBRID]['cf'], 0.25, places=9)
+
+    def test_unknown_stored_keys_are_ignored(self):
+        """Code defines which components exist; the database only supplies values."""
+        AlgorithmWeight.objects.create(
+            group=weights_module.GROUP_CBF, key='not_a_real_component', value=99.0
+        )
+
+        loaded = weights_module.load_weights()
+
+        self.assertNotIn('not_a_real_component', loaded[weights_module.GROUP_CBF])
+        self.assertAlmostEqual(loaded[weights_module.GROUP_CBF]['specific'], 0.40, places=9)
+
+    def test_seed_migration_matches_the_previous_constants(self):
+        """The seeded rows must be the values that were hardcoded before, or the
+        first request after deploying scores differently from the last one."""
+        seeded = {
+            (weight.group, weight.key): weight.value
+            for weight in AlgorithmWeight.objects.all()
+        }
+
+        self.assertEqual(seeded[(weights_module.GROUP_HYBRID, 'cbf')], 0.70)
+        self.assertEqual(seeded[(weights_module.GROUP_HYBRID, 'cf')], 0.30)
+        self.assertEqual(seeded[(weights_module.GROUP_CBF, 'specific')], 0.40)
+        self.assertEqual(seeded[(weights_module.GROUP_CBF, 'general')], 0.20)
+        self.assertEqual(seeded[(weights_module.GROUP_CBF, 'expertise')], 0.15)
+        self.assertEqual(seeded[(weights_module.GROUP_CBF, 'course')], 0.10)
+        self.assertEqual(seeded[(weights_module.GROUP_CBF, 'year')], 0.10)
+        self.assertEqual(seeded[(weights_module.GROUP_CBF, 'level')], 0.05)
+
+
+class AlgorithmWeightScoringTests(APITestCase):
+    """Admin-set weights must actually reach the scorer, and the seeded defaults
+    must reproduce the behaviour that was hardcoded before them."""
+
+    def setUp(self):
+        from studybuddy.recommender.cbf import compute_cbf_breakdown
+
+        self.compute_cbf_breakdown = compute_cbf_breakdown
+
+        self.course = Course.objects.create(course_code="BSIT", course_name="Info Tech")
+        self.subject = Subjects.objects.create(
+            subject_code="MATH101", subject_name="Calculus 1", department="Math",
+            category="STEM",
+        )
+
+        student_user = User.objects.create_user(
+            username="weight-student", email="weight-student@example.com", password="password",
+        )
+        self.student = UserProfile.objects.create(
+            user=student_user, fname="Weight", mname="", lname="Student", role="Tutee",
+            year_level=12, course=self.course,
+        )
+
+        tutor_user = User.objects.create_user(
+            username="weight-tutor", email="weight-tutor@example.com", password="password",
+        )
+        tutor_profile = UserProfile.objects.create(
+            user=tutor_user, fname="Weight", mname="", lname="Tutor", role="Tutor",
+            year_level=12, course=self.course,
+        )
+        self.tutor = Tutor.objects.create(
+            profile=tutor_profile, hourly_rate=200, can_online=True, can_f2f=False,
+            teaching_level="College",
+        )
+        TutorSubjects.objects.create(tutor=self.tutor, subject=self.subject, expertise_level=5)
+
+    def _breakdown(self, weights=None):
+        return self.compute_cbf_breakdown(
+            self.student, self.tutor, self.subject.subject_code, weights=weights,
+        )
+
+    def test_defaults_reproduce_the_previous_hardcoded_weights(self):
+        """Characterization test. This tutor matches everything, so each
+        component contributes its own weight and the breakdown should show the
+        exact constants that used to live in cbf.py."""
+        breakdown = self._breakdown()
+
+        self.assertAlmostEqual(breakdown["specific"]["weight"], 0.40, places=9)
+        self.assertAlmostEqual(breakdown["general"]["weight"], 0.20, places=9)
+        self.assertAlmostEqual(breakdown["expertise"]["weight"], 0.15, places=9)
+        self.assertAlmostEqual(breakdown["course"]["weight"], 0.10, places=9)
+        self.assertAlmostEqual(breakdown["year"]["weight"], 0.10, places=9)
+        self.assertAlmostEqual(breakdown["level"]["weight"], 0.05, places=9)
+        self.assertAlmostEqual(breakdown["score"], 1.0, places=9)
+
+    def test_stored_weights_change_the_cbf_breakdown(self):
+        AlgorithmWeight.objects.filter(
+            group=weights_module.GROUP_CBF, key='specific'
+        ).update(value=0.80)
+
+        loaded = weights_module.load_weights()[weights_module.GROUP_CBF]
+        breakdown = self._breakdown(weights=loaded)
+
+        # 0.80 out of a new total of 1.40.
+        self.assertAlmostEqual(breakdown["specific"]["weight"], 0.80 / 1.40, places=9)
+        self.assertAlmostEqual(sum(
+            breakdown[key]["weight"] for key in
+            ('specific', 'general', 'expertise', 'course', 'year', 'level')
+        ), 1.0, places=9)
+
+    def test_hybrid_blend_weights_reach_the_hybrid_score(self):
+        from studybuddy.recommender.hybrid import hybrid_prediction_breakdown
+
+        cbf_only = {
+            weights_module.GROUP_HYBRID: {'cbf': 1.0, 'cf': 0.0},
+            weights_module.GROUP_CBF: weights_module.default_weights()[weights_module.GROUP_CBF],
+        }
+        cf_only = {
+            weights_module.GROUP_HYBRID: {'cbf': 0.0, 'cf': 1.0},
+            weights_module.GROUP_CBF: weights_module.default_weights()[weights_module.GROUP_CBF],
+        }
+
+        all_cbf = hybrid_prediction_breakdown(
+            {}, self.student, self.tutor, self.subject.subject_code, weights=cbf_only,
+        )
+        all_cf = hybrid_prediction_breakdown(
+            {}, self.student, self.tutor, self.subject.subject_code, weights=cf_only,
+        )
+
+        self.assertAlmostEqual(all_cbf["hybrid_score"], all_cbf["cbf"]["score"], places=9)
+        # No ratings, so CF falls back to 0 and an all-CF blend scores nothing.
+        self.assertAlmostEqual(all_cf["hybrid_score"], 0.0, places=9)
+
+    def test_weights_are_loaded_once_not_per_tutor(self):
+        """recommend_tutors_hybrid scores every candidate. Loading weights inside
+        that loop would work and be quietly slow, so pin the query count."""
+        from studybuddy.recommender.hybrid import recommend_tutors_hybrid
+
+        Preference.objects.create(user=self.student).subjects.set([self.subject])
+
+        for index in range(3):
+            user = User.objects.create_user(
+                username=f"loop-tutor-{index}",
+                email=f"loop-tutor-{index}@example.com",
+                password="password",
+            )
+            profile = UserProfile.objects.create(
+                user=user, fname=f"Loop{index}", mname="", lname="Tutor", role="Tutor",
+                year_level=12, course=self.course,
+            )
+            extra = Tutor.objects.create(
+                profile=profile, hourly_rate=200, can_online=True, can_f2f=False,
+                teaching_level="College",
+            )
+            TutorSubjects.objects.create(tutor=extra, subject=self.subject, expertise_level=3)
+
+        with CaptureQueriesContext(connection) as ctx:
+            recommend_tutors_hybrid({}, self.student, self.subject.subject_code)
+
+        weight_queries = [
+            query for query in ctx.captured_queries
+            if 'algorithmweight' in query['sql'].lower()
+        ]
+        self.assertEqual(len(weight_queries), 1, weight_queries)
+
+
+class AlgorithmWeightsApiTests(APITestCase):
+    """The settings endpoints stay reachable without ALGORITHM_DEMO_TOOLS_ENABLED;
+    only the preview is gated by it."""
+
+    WEIGHTS_URL = '/api/admin/algorithm-weights/'
+    PREVIEW_URL = '/api/admin/algorithm-weights/preview/'
+
+    def setUp(self):
+        superadmin_user = User.objects.create_user(
+            username="weights-superadmin", email="weights-superadmin@example.com",
+            password="password",
+        )
+        self.superadmin = UserProfile.objects.create(
+            user=superadmin_user, fname="Super", mname="", lname="Admin", role="SuperAdmin",
+        )
+
+        tutee_user = User.objects.create_user(
+            username="weights-tutee", email="weights-tutee@example.com", password="password",
+        )
+        self.tutee = UserProfile.objects.create(
+            user=tutee_user, fname="Reg", mname="", lname="Tutee", role="Tutee",
+        )
+
+    def _auth_superadmin(self):
+        self.client.force_authenticate(user=self.superadmin.user)
+
+    def test_get_returns_both_groups_with_shares(self):
+        self._auth_superadmin()
+
+        response = self.client.get(self.WEIGHTS_URL)
+
+        self.assertEqual(response.status_code, 200)
+        groups = {group['group']: group for group in response.data['groups']}
+        self.assertEqual(set(groups), {'hybrid', 'cbf'})
+        self.assertEqual(len(groups['cbf']['weights']), 6)
+
+        shares = sum(weight['share'] for weight in groups['cbf']['weights'])
+        self.assertAlmostEqual(shares, 1.0, places=9)
+
+    def test_get_is_available_with_demo_tools_disabled(self):
+        self._auth_superadmin()
+
+        with override_settings(ALGORITHM_DEMO_TOOLS_ENABLED=False):
+            response = self.client.get(self.WEIGHTS_URL)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.data['preview_enabled'])
+
+    def test_non_superadmin_is_refused(self):
+        self.client.force_authenticate(user=self.tutee.user)
+
+        self.assertEqual(self.client.get(self.WEIGHTS_URL).status_code, 403)
+
+    def test_anonymous_is_refused(self):
+        self.assertIn(self.client.get(self.WEIGHTS_URL).status_code, (401, 403))
+
+    def test_patch_stores_raw_values_and_stamps_the_actor(self):
+        self._auth_superadmin()
+
+        response = self.client.patch(
+            self.WEIGHTS_URL, {'groups': {'hybrid': {'cbf': 3.0, 'cf': 1.0}}}, format='json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        stored = AlgorithmWeight.objects.get(group='hybrid', key='cbf')
+        self.assertEqual(stored.value, 3.0)
+        self.assertEqual(stored.updated_by, self.superadmin)
+        self.assertIsNotNone(stored.updated_at)
+
+        hybrid = next(g for g in response.data['groups'] if g['group'] == 'hybrid')
+        self.assertAlmostEqual(
+            next(w['share'] for w in hybrid['weights'] if w['key'] == 'cbf'), 0.75, places=9,
+        )
+        self.assertEqual(hybrid['updated_by'], 'Super Admin')
+
+    def test_patch_rejects_unknown_group_and_key(self):
+        self._auth_superadmin()
+
+        self.assertEqual(self.client.patch(
+            self.WEIGHTS_URL, {'groups': {'nope': {'cbf': 1}}}, format='json',
+        ).status_code, 400)
+
+        self.assertEqual(self.client.patch(
+            self.WEIGHTS_URL, {'groups': {'hybrid': {'nope': 1}}}, format='json',
+        ).status_code, 400)
+
+    def test_patch_rejects_negative_and_non_numeric(self):
+        self._auth_superadmin()
+
+        self.assertEqual(self.client.patch(
+            self.WEIGHTS_URL, {'groups': {'hybrid': {'cbf': -1}}}, format='json',
+        ).status_code, 400)
+
+        self.assertEqual(self.client.patch(
+            self.WEIGHTS_URL, {'groups': {'hybrid': {'cbf': 'lots'}}}, format='json',
+        ).status_code, 400)
+
+    def test_patch_rejects_an_all_zero_group(self):
+        """Normalising a zero-sum group is impossible, so it is refused at the
+        edge rather than silently falling back to defaults after saving."""
+        self._auth_superadmin()
+
+        response = self.client.patch(
+            self.WEIGHTS_URL, {'groups': {'hybrid': {'cbf': 0, 'cf': 0}}}, format='json',
+        )
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_patch_bumps_the_dashboard_recommendation_cache(self):
+        from studybuddy.recommender import dashboard
+
+        self._auth_superadmin()
+        before = dashboard._dashboard_recs_cache_version()
+
+        self.client.patch(
+            self.WEIGHTS_URL, {'groups': {'hybrid': {'cbf': 0.6}}}, format='json',
+        )
+
+        self.assertNotEqual(dashboard._dashboard_recs_cache_version(), before)
+
+    @override_settings(ALGORITHM_DEMO_TOOLS_ENABLED=False)
+    def test_preview_is_gated_off_by_default(self):
+        self._auth_superadmin()
+
+        response = self.client.post(
+            self.PREVIEW_URL, {'tutee_id': self.tutee.id}, format='json',
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+    @override_settings(ALGORITHM_DEMO_TOOLS_ENABLED=True)
+    def test_preview_runs_without_saving_anything(self):
+        self._auth_superadmin()
+
+        response = self.client.post(
+            self.PREVIEW_URL,
+            {'tutee_id': self.tutee.id, 'groups': {'hybrid': {'cbf': 0.1, 'cf': 0.9}}},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        # The tutee has no preferences, so the recommender bails early - the
+        # point here is that the override did not persist.
+        self.assertEqual(
+            AlgorithmWeight.objects.get(group='hybrid', key='cbf').value, 0.70,
+        )
+
+
+@override_settings(ALGORITHM_DEMO_TOOLS_ENABLED=True)
+class AlgorithmWeightsPreviewValidationTests(APITestCase):
+    """The preview validates its overrides exactly as the save does. A preview
+    that accepted a value the save rejects would let an admin study a ranking
+    they could never apply."""
+
+    PREVIEW_URL = '/api/admin/algorithm-weights/preview/'
+
+    def setUp(self):
+        superadmin_user = User.objects.create_user(
+            username="preview-superadmin", email="preview-superadmin@example.com",
+            password="password",
+        )
+        self.superadmin = UserProfile.objects.create(
+            user=superadmin_user, fname="Super", mname="", lname="Admin", role="SuperAdmin",
+        )
+
+        tutee_user = User.objects.create_user(
+            username="preview-tutee", email="preview-tutee@example.com", password="password",
+        )
+        self.tutee = UserProfile.objects.create(
+            user=tutee_user, fname="Prev", mname="", lname="Tutee", role="Tutee",
+        )
+
+        self.client.force_authenticate(user=self.superadmin.user)
+
+    def _preview(self, groups):
+        return self.client.post(
+            self.PREVIEW_URL, {'tutee_id': self.tutee.id, 'groups': groups}, format='json',
+        )
+
+    def test_non_numeric_override_is_a_400_not_a_500(self):
+        response = self._preview({'hybrid': {'cbf': 'lots'}})
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_negative_override_is_rejected(self):
+        """Normalising cannot rescue a negative weight - the group can still sum
+        above zero while that member contributes a negative share."""
+        response = self._preview({'hybrid': {'cbf': -2, 'cf': 3}})
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_unknown_group_and_key_are_rejected(self):
+        self.assertEqual(self._preview({'nope': {'cbf': 1}}).status_code, 400)
+        self.assertEqual(self._preview({'hybrid': {'nope': 1}}).status_code, 400)
+
+    def test_boolean_is_not_accepted_as_a_number(self):
+        self.assertEqual(self._preview({'hybrid': {'cbf': True}}).status_code, 400)
+
+    def test_valid_override_is_accepted(self):
+        response = self._preview({'hybrid': {'cbf': 0.2, 'cf': 0.8}})
+
+        self.assertEqual(response.status_code, 200)
