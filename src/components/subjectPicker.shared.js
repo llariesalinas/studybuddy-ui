@@ -2,6 +2,14 @@
 // (SubjectTaxonomyPicker, SubjectPickerModal). Pure functions, no reactivity.
 
 /**
+ * A subject the user proposed that an admin hasn't reviewed yet. Mirrors
+ * Subjects.STATUS_CHOICES on the backend.
+ */
+export const PENDING_STATUS = 'pending'
+
+export const isPendingSubject = (subject) => subject?.status === PENDING_STATUS
+
+/**
  * Filter subjects by a free-text query against name, category, keywords, and
  * description. Returns matches annotated with `matchedViaHint` when only the
  * keywords or description matched (used to render the "via ..." badge).

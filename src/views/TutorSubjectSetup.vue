@@ -92,6 +92,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import SubjectTaxonomyPicker from '@/components/SubjectTaxonomyPicker.vue'
+import { isPendingSubject } from '@/components/subjectPicker.shared'
 import TutorOnboardingShell from '@/components/TutorOnboardingShell.vue'
 import { useProfileStore } from '@/stores/profile'
 import { useToastStore } from '@/stores/toast'
@@ -128,11 +129,23 @@ const selectedCodes = computed({
   },
 })
 
+// The catalog endpoint returns approved subjects only, so a tutor's own pending proposals are
+// absent from it. The picker renders the selection tray by filtering its `subjects` prop, so any
+// selected subject missing from the catalog would show no chip (while still counting towards the
+// N/8 counter). Keep the catalog a superset of the selection.
+const mergeIntoCatalog = (subjects) => {
+  const known = new Set(allSubjects.value.map((subject) => subject.subject_code))
+  subjects.forEach((subject) => {
+    if (!known.has(subject.subject_code)) allSubjects.value.push(subject)
+  })
+}
+
 const loadSubjects = async () => {
   try {
     const [catalog, selected] = await Promise.all([fetchSubjectCatalog(), fetchTutorSubjects()])
     allSubjects.value = catalog
     selectedSubjects.value = selected
+    mergeIntoCatalog(selected)
   } catch (error) {
     toastStore.push(error.response?.data?.error || 'Could not load subjects.', 'error')
   }
@@ -173,7 +186,7 @@ const handleProposal = async () => {
   try {
     const subject = await proposeTutorSubject({ ...proposal })
     selectedSubjects.value.push(subject)
-    allSubjects.value.push(subject)
+    mergeIntoCatalog([subject])
     showProposalForm.value = false
   } catch (error) {
     toastStore.push(error.response?.data?.error || 'Could not propose that subject.', 'error')
@@ -185,6 +198,14 @@ const handleProposal = async () => {
 const handleRemove = async (subjectCode) => {
   try {
     await removeTutorSubject(subjectCode)
+    // Removing a pending proposal deletes the subject server-side, so it has to leave the merged
+    // catalog too -- an approved subject stays, since the catalog owns it either way.
+    const removed = selectedSubjects.value.find((selected) => selected.subject_code === subjectCode)
+    if (isPendingSubject(removed)) {
+      allSubjects.value = allSubjects.value.filter(
+        (subject) => subject.subject_code !== subjectCode,
+      )
+    }
     selectedSubjects.value = selectedSubjects.value.filter(
       (selected) => selected.subject_code !== subjectCode,
     )

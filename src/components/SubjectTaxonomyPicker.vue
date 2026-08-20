@@ -69,7 +69,10 @@
           @click="toggle(subject.subject_code)"
         >
           <span class="left">
-            <span class="name">{{ subject.subject_name }}</span>
+            <span class="name">
+              {{ subject.subject_name }}
+              <span v-if="isPending(subject)" class="pending-flag">Awaiting admin review</span>
+            </span>
             <span v-if="!activeCategory" class="meta" :class="categoryClass(subject.category)">
               <span class="category-dot"></span>{{ subject.category }}
             </span>
@@ -103,7 +106,7 @@
         :key="subject.subject_code"
         type="button"
         class="subject-chip"
-        :class="{ selected: modelValue.includes(subject.subject_code) }"
+        :class="chipClass(subject)"
         :title="subject.description || undefined"
         @click="toggle(subject.subject_code)"
       >
@@ -131,7 +134,7 @@
     <div v-if="selectedSubjects.length" class="selection-tray">
       <span>Selected {{ modelValue.length }}<span v-if="maxSelection">/{{ maxSelection }}</span></span>
       <button
-        v-for="subject in selectedSubjects"
+        v-for="subject in approvedSelection"
         :key="subject.subject_code"
         type="button"
         class="subject-chip selected"
@@ -139,6 +142,21 @@
       >
         {{ subject.subject_name }} &times;
       </button>
+
+      <!-- Subjects the user proposed themselves stay selected but aren't in the catalog until an
+           admin approves them; the sub-row labels that for any number of them at once. -->
+      <div v-if="pendingSelection.length" class="pending-group">
+        <p class="section-label">Awaiting admin review</p>
+        <button
+          v-for="subject in pendingSelection"
+          :key="subject.subject_code"
+          type="button"
+          class="subject-chip selected pending"
+          @click="toggle(subject.subject_code)"
+        >
+          {{ subject.subject_name }} &times;
+        </button>
+      </div>
     </div>
   </section>
 </template>
@@ -148,6 +166,7 @@ import { computed, ref } from 'vue'
 import {
   categoryClass,
   highlightSegments,
+  isPendingSubject,
   searchSubjects,
   subjectCategories,
 } from '@/components/subjectPicker.shared'
@@ -163,6 +182,15 @@ const activeCategory = ref('')
 const searchQuery = ref('')
 const categories = computed(() => subjectCategories(props.subjects))
 const selectedSubjects = computed(() => props.subjects.filter((subject) => props.modelValue.includes(subject.subject_code)))
+const isPending = isPendingSubject
+// The amber treatment rides on top of `selected`, never on its own: an unselected chip must not
+// borrow the selected chip's checkmark.
+const chipClass = (subject) => {
+  const selected = props.modelValue.includes(subject.subject_code)
+  return { selected, pending: selected && isPending(subject) }
+}
+const approvedSelection = computed(() => selectedSubjects.value.filter((subject) => !isPending(subject)))
+const pendingSelection = computed(() => selectedSubjects.value.filter(isPending))
 const subjectsFor = (category) => props.subjects.filter((subject) => subject.category === category)
 const selectedFor = (category) => subjectsFor(category).filter((subject) => props.modelValue.includes(subject.subject_code)).length
 function toggle(code) { if (props.modelValue.includes(code)) emit('update:modelValue', props.modelValue.filter((value) => value !== code)); else if (!props.maxSelection || props.modelValue.length < props.maxSelection) emit('update:modelValue', [...props.modelValue, code]) }
@@ -249,6 +277,8 @@ const countLine = computed(() => {
 .result-row.selected { background: color-mix(in srgb, var(--sb-primary) 10%, var(--sb-card-bg)); }
 .result-row .left { display: flex; flex-direction: column; gap: 2px; }
 .result-row .name { font-weight: 680; font-size: .87rem; }
+/* Mirrors the tray's pending sub-row: a search hit for an unreviewed proposal says so inline. */
+.result-row .pending-flag { margin-left: 7px; font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--sb-pop-yellow-deep); white-space: nowrap; }
 .result-row .meta { display: flex; align-items: center; gap: 6px; font-size: .73rem; color: var(--sb-text-muted); }
 .result-row .desc { font-size: .74rem; color: var(--sb-text-muted); line-height: 1.4; }
 .result-row .check { color: var(--sb-primary); font-weight: 750; font-size: .78rem; white-space: nowrap; }
@@ -262,6 +292,14 @@ const countLine = computed(() => {
 
 .selection-tray { border-top: 1px dashed var(--sb-border-light); margin-top: 16px; padding-top: 12px; }
 .selection-tray > span { font-size: .8rem; color: var(--sb-text-muted); margin-right: 8px; }
+
+/* Pending sub-row. --sb-pop-yellow-deep is the one amber accent defined in both themes, so the
+   chips stay legible in dark mode; the label reuses .section-label rather than adding a colour. */
+.pending-group { margin-top: 6px; }
+.pending-group .section-label { margin-bottom: 7px; }
+.subject-chip.selected.pending { border-color: var(--sb-pop-yellow-deep); background: color-mix(in srgb, var(--sb-pop-yellow-deep) 10%, var(--sb-card-bg)); }
+.subject-chip.selected.pending::before { color: var(--sb-pop-yellow-deep); }
+.subject-chip.selected.pending:hover { border-color: var(--sb-pop-yellow-deep); }
 
 .cat-math { --cat: var(--sb-primary); }.cat-science { --cat: var(--sb-secondary-blue); }.cat-tech { --cat: var(--sb-aurora-violet); }.cat-business { --cat: var(--sb-pop-yellow-deep); }.cat-humanities { --cat: var(--sb-pop-orange-deep); }.cat-arts { --cat: var(--sb-pop-pink-deep); }
 @media (max-width: 640px) { .category-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
