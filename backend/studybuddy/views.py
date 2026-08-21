@@ -110,6 +110,7 @@ from .models import (
     TutorSubjects,
     ACTIVE_BOOKING_STATUSES,
     GRACE_CUTOFF_HOURS,
+    resolve_category,
 )
 
 logger = logging.getLogger(__name__)
@@ -2061,7 +2062,7 @@ class SubjectListView(ListAPIView):
         search_query = self.request.query_params.get('search', '').strip()
         user = self.request.user
         if not user.is_authenticated or not hasattr(user, 'userprofile'):
-            queryset = Subjects.objects.filter(status='approved')
+            queryset = Subjects.objects.filter(status='approved').select_related('category')
             if search_query:
                 queryset = queryset.filter(
                     Q(subject_name__icontains=search_query)
@@ -4397,7 +4398,9 @@ def get_tutor_subjects(request):
     profile = request.user.userprofile
     tutor = Tutor.objects.get(profile=profile)
 
-    subjects = TutorSubjects.objects.filter(tutor=tutor).select_related('subject')
+    subjects = TutorSubjects.objects.filter(tutor=tutor).select_related(
+        'subject', 'subject__category',
+    )
     recognized_codes = recognized_subject_codes_for_profile(profile)
 
     data = [
@@ -4405,7 +4408,7 @@ def get_tutor_subjects(request):
             "subject_code": ts.subject.subject_code,
             "subject_name": ts.subject.subject_name,
             "department": ts.subject.department,
-            "category": ts.subject.category,
+            "category": ts.subject.category.name,
             "description": ts.description or '',
             "status": ts.subject.status,
             "is_recognized": ts.subject.subject_code in recognized_codes,
@@ -4457,17 +4460,22 @@ def propose_tutor_subject(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    # Category is intentionally not restricted to subject_taxonomy.CATEGORIES: it's a free-text
-    # field (see SubjectSerializer's comment), and admins can approve categories beyond the
-    # curated 6 via the review panel -- a tutor re-proposing under one of those approved
-    # categories must not be rejected here. See docs/plans/2026-08-12-admin-review-panel-
-    # category-keywords-backdrop.md.
+    # Categories are admin-owned: minting one happens in the subject catalog or the tutor-
+    # application review panel, never here. The tutor-side picker only offers categories that
+    # already exist, so an unrecognized name means a stale or hand-rolled client, not a
+    # legitimate new category. See docs/plans/2026-08-21-subject-category-storage.md.
+    subject_category = resolve_category(category)
+    if subject_category is None:
+        return Response(
+            {"error": "That category is not recognized."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
     application = TutorApplication.objects.filter(profile=profile).first()
     subject = Subjects.objects.create(
         subject_code=generate_proposed_subject_code(subject_name),
         subject_name=subject_name,
-        category=category,
+        category=subject_category,
         keywords=keywords,
         status='pending',
         proposed_by_tutor=tutor,
@@ -4484,7 +4492,7 @@ def propose_tutor_subject(request):
         {
             "subject_code": subject.subject_code,
             "subject_name": subject.subject_name,
-            "category": subject.category,
+            "category": subject.category.name,
             "keywords": subject.keywords,
             "description": description,
             "status": subject.status,

@@ -24,13 +24,16 @@ from .models import (
     PartnerInstitution, Wallet, Transaction, PlatformActivity,
     TutorApplication, TutorDocumentRenewalReview,
     TuteeApplication, TuteeDocumentRenewalReview, Payment,
-    TutorSubjects, TutorAvailability, Rating, Subjects, SupportTicket,
-    TUTOR_ACCEPTED_SESSION_LOAD_STATUSES
+    TutorSubjects, TutorAvailability, Rating, Subjects, SubjectCategory, SupportTicket,
+    TUTOR_ACCEPTED_SESSION_LOAD_STATUSES,
+    resolve_category,
+    resolve_or_create_category,
 )
 from .serializers import (
     InstitutionRequestSerializer,
     AdminWithdrawalSerializer, AdminUserSerializer,
     PartnerInstitutionSerializer, PlatformActivitySerializer,
+    SubjectCategorySerializer,
     SubjectSerializer, TutorApplicationSerializer, TutorDocumentRenewalReviewSerializer,
     TuteeApplicationSerializer, TuteeDocumentRenewalReviewSerializer
 )
@@ -1049,9 +1052,9 @@ class AdminCourseCatalogView(APIView):
 
     def get(self, request):
         category = request.query_params.get('category')
-        subjects = Subjects.objects.all().order_by('subject_code')
+        subjects = Subjects.objects.select_related('category').order_by('subject_code')
         if category:
-            subjects = subjects.filter(category=category)
+            subjects = subjects.filter(category__name__iexact=category)
 
         serializer = SubjectSerializer(subjects, many=True)
         return Response(serializer.data)
@@ -1063,6 +1066,11 @@ class AdminCourseCatalogView(APIView):
         if not data.get('subject_code'):
             data['subject_code'] = slugify_subject_code(data.get('subject_name'))
         data.setdefault('department', '')
+        # The catalog screen is one of the two places a SuperAdmin may name a category that does
+        # not exist yet, so mint it before the serializer resolves the name.
+        category = resolve_or_create_category(data.get('category'))
+        if category is not None:
+            data['category'] = category.name
         serializer = SubjectSerializer(data=data)
         serializer.is_valid(raise_exception=True)
         subject = serializer.save()
@@ -1075,7 +1083,12 @@ class AdminCourseCatalogView(APIView):
 
     def patch(self, request, pk=None):
         subject = get_object_or_404(Subjects, pk=pk)
-        serializer = SubjectSerializer(subject, data=request.data, partial=True)
+        data = request.data.copy()
+        if data.get('category'):
+            category = resolve_or_create_category(data.get('category'))
+            if category is not None:
+                data['category'] = category.name
+        serializer = SubjectSerializer(subject, data=data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
@@ -1087,6 +1100,73 @@ class AdminCourseCatalogView(APIView):
         PlatformActivity.objects.create(
             activity_type='admin_action',
             message=f"Global subject removed: {subject_code}",
+            institution=request.user.userprofile.institution,
+        )
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class AdminSubjectCategoryView(APIView):
+    """CRUD for the subject category list.
+
+    Categories exist independently of subjects, so one can be created empty and survives its last
+    subject being removed -- see docs/plans/2026-08-21-subject-category-storage.md.
+    """
+
+    permission_classes = [permissions.IsAuthenticated, IsSuperAdminUser]
+
+    def get(self, request):
+        categories = SubjectCategory.objects.all()
+        return Response(SubjectCategorySerializer(categories, many=True).data)
+
+    def post(self, request):
+        serializer = SubjectCategorySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        name = str(serializer.validated_data.get('name') or '').strip()
+        if resolve_category(name) is not None:
+            return Response(
+                {"error": "A category with that name already exists."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        category = resolve_or_create_category(name)
+        PlatformActivity.objects.create(
+            activity_type='admin_action',
+            message=f"Subject category added: {category.name}",
+            institution=request.user.userprofile.institution,
+        )
+        return Response(
+            SubjectCategorySerializer(category).data, status=status.HTTP_201_CREATED,
+        )
+
+    def patch(self, request, pk=None):
+        category = get_object_or_404(SubjectCategory, pk=pk)
+        name = str(request.data.get('name') or '').strip()
+        clash = resolve_category(name)
+        if name and clash is not None and clash.pk != category.pk:
+            return Response(
+                {"error": "A category with that name already exists."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        serializer = SubjectCategorySerializer(category, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+    def delete(self, request, pk=None):
+        category = get_object_or_404(SubjectCategory, pk=pk)
+        if category.is_system:
+            return Response(
+                {"error": f"{category.name} cannot be deleted."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        # Subjects are not deleted with the category: Subjects.category falls back to
+        # Uncategorized, since TutorSubjects and Preference.subjects point at Subjects and a
+        # cascade would strip tutor expertise and tutee preferences.
+        moved = category.subjects.count()
+        name = category.name
+        category.delete()
+        PlatformActivity.objects.create(
+            activity_type='admin_action',
+            message=f"Subject category removed: {name} ({moved} subjects moved)",
             institution=request.user.userprofile.institution,
         )
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -1747,14 +1827,13 @@ class AdminTutorProposedSubjectDetailView(APIView):
                     {"error": "Subject name and category are required."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            # Category is intentionally not restricted to subject_taxonomy.CATEGORIES: the admin
-            # review panel lets a SuperAdmin add a category beyond the curated 6 (derived from
-            # whatever distinct categories already exist in the catalog), matching how
-            # Subjects.category itself is stored (free CharField, no choices constraint). Sub-Group
-            # follows the same rule — no enforced relationship to Category, just a free label.
+            # A SuperAdmin reviewing a proposal is allowed to mint a category that does not
+            # exist yet -- this panel and the subject catalog are the two places categories are
+            # created. Sub-Group stays free text: no enforced relationship to Category.
+            # See docs/plans/2026-08-21-subject-category-storage.md.
 
             subject.subject_name = subject_name
-            subject.category = category
+            subject.category = resolve_or_create_category(category)
             if keywords is not None:
                 subject.keywords = str(keywords).strip()
             update_fields = ['subject_name', 'category', 'keywords']

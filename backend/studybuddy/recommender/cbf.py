@@ -1,6 +1,7 @@
 import logging
 
 from ..models import Preference, Subjects, Tutor
+from ..subject_taxonomy import UNCATEGORIZED_CATEGORY
 from .weights import DEFAULT_WEIGHTS, GROUP_CBF, default_weights, load_weights
 
 logger = logging.getLogger(__name__)
@@ -32,7 +33,7 @@ def get_student_subject_codes(student_profile):
 
 
 def resolve_target_categories(requested_subject, subject_codes):
-    """The set of non-null Subjects.category values for the "target" subject(s)
+    """The set of SubjectCategory ids for the "target" subject(s)
     a tutor is being matched against: the single requested subject when one was
     asked for, or the tutee's whole preference list as a fallback (see
     compute_cbf_breakdown). Callers looping over many tutors for the same
@@ -43,10 +44,16 @@ def resolve_target_categories(requested_subject, subject_codes):
     if not codes:
         return set()
 
-    categories = Subjects.objects.filter(subject_code__in=codes).values_list(
-        "category", flat=True
-    )
-    return {category for category in categories if category}
+    # Ids, not names: compared against ts.subject.category_id below, which avoids dereferencing
+    # the category on every tutor subject (an N+1 query on a per-tutor loop).
+    # Uncategorized is excluded deliberately. It is the fallback bucket, so two subjects sharing
+    # it are not in the same field in any meaningful sense -- and before categories had a table,
+    # the NULL/'' categories that now map onto Uncategorized were skipped here for the same
+    # reason. Counting it would inflate the same-field score between unrelated subjects.
+    categories = Subjects.objects.filter(subject_code__in=codes).exclude(
+        category__name=UNCATEGORIZED_CATEGORY
+    ).values_list("category_id", flat=True)
+    return {category_id for category_id in categories if category_id}
 
 
 def compute_cbf_breakdown(
@@ -105,7 +112,7 @@ def compute_cbf_breakdown(
     same_field_matches = [
         ts
         for ts in subjects
-        if ts.subject.category and ts.subject.category in target_categories
+        if ts.subject.category_id and ts.subject.category_id in target_categories
     ]
 
     s_specific = 1 if exact_matches else 0

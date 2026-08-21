@@ -23,7 +23,9 @@ def current_subject_codes_for_profile(profile):
 
 
 def visible_subject_queryset_for_profile(profile):
-    return Subjects.objects.filter(status='approved')
+    # select_related('category'): SubjectSerializer renders the category by name, which is a
+    # per-row query on a foreign key without it.
+    return Subjects.objects.filter(status='approved').select_related('category')
 
 
 def subject_selection_queryset_for_profile(profile, course_code=None, include_current=False):
@@ -35,7 +37,9 @@ def subject_selection_queryset_for_profile(profile, course_code=None, include_cu
         # approved-only visible queryset would otherwise hide from their selection list.
         allowed_codes.update(current_subject_codes_for_profile(profile))
 
-    queryset = Subjects.objects.filter(subject_code__in=allowed_codes)
+    queryset = Subjects.objects.filter(subject_code__in=allowed_codes).select_related(
+        'category'
+    )
     return queryset, recognized_codes
 
 

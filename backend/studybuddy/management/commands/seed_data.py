@@ -32,12 +32,18 @@ from faker import Faker
 
 from studybuddy.models import (
     Booking, Course, PartnerInstitution, Payment, PaymentMethod, Preference,
-    Rating, Strand, Subjects, Tutor, TutorApplication, TutorAvailability,
+    Rating, Strand, SubjectCategory, Subjects, Tutor, TutorApplication, TutorAvailability,
     TutorSubjects, UserProfile, Wallet,
 )
 from studybuddy.recommender.demo import build_algorithm_demo_recommendation
 from studybuddy.subject_descriptions import SUBJECT_DESCRIPTIONS
-from studybuddy.subject_taxonomy import CATEGORIES, SUBJECTS, slugify_subject_code
+from studybuddy.subject_taxonomy import (
+    CATEGORIES,
+    SUBJECTS,
+    UNCATEGORIZED_CATEGORY,
+    seed_display_order,
+    slugify_subject_code,
+)
 
 from ._year_level_scale import YEAR_RANGE_BY_COURSE, random_year_level
 
@@ -275,21 +281,33 @@ class Command(BaseCommand):
         return institution, courses_by_code
 
     def _seed_subjects(self):
+        # Categories are seeded first and independently: they own a table now, so the ones with no
+        # subjects in the fixture (Sports, Uncategorized) still exist and stay pickable.
+        categories_by_name = {
+            name: SubjectCategory.objects.get_or_create(
+                name=name,
+                defaults={
+                    'display_order': seed_display_order(name),
+                    'is_system': name == UNCATEGORIZED_CATEGORY,
+                },
+            )[0]
+            for name in CATEGORIES
+        }
         Subjects.objects.bulk_create([
             Subjects(
                 subject_code=slugify_subject_code(name),
                 subject_name=name,
                 department=subgroup,
-                category=category,
+                category=categories_by_name[category],
                 description=SUBJECT_DESCRIPTIONS.get(name, ''),
                 status='approved',
             )
             for name, category, subgroup in SUBJECTS
         ])
-        all_subjects = list(Subjects.objects.all())
+        all_subjects = list(Subjects.objects.select_related('category'))
         subjects_by_category = {category: [] for category in CATEGORIES}
         for subject in all_subjects:
-            subjects_by_category.setdefault(subject.category, []).append(subject)
+            subjects_by_category.setdefault(subject.category.name, []).append(subject)
         subjects_by_name = {subject.subject_name: subject for subject in all_subjects}
         self.stdout.write(f'  seeded {len(all_subjects)} subjects across {len(CATEGORIES)} '
                            f'categories')

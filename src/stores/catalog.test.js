@@ -44,6 +44,30 @@ describe('catalog store', () => {
     expect(catalog.receivingInstitutions).toEqual(institutions)
   })
 
+  it('keeps subject categories as their own stored list', async () => {
+    // Categories used to be derived from the categories present on catalog subjects, so one with
+    // no subjects could not be represented. They are stored server-side now and fetched as a list.
+    const categories = [
+      { id: 1, name: 'Sports', display_order: 70, is_system: false, subject_count: 0 },
+      { id: 2, name: 'Uncategorized', display_order: 999, is_system: true, subject_count: 0 },
+    ]
+    api.get.mockResolvedValueOnce({ data: categories })
+    api.post.mockResolvedValueOnce({ data: { id: 3, name: 'Music', display_order: 80 } })
+
+    const catalog = useCatalogStore()
+    await catalog.fetchSubjectCategories()
+    expect(api.get).toHaveBeenCalledWith('/admin/subject-categories/')
+    expect(catalog.subjectCategories).toEqual(categories)
+
+    await catalog.addSubjectCategory('Music')
+    expect(api.post).toHaveBeenCalledWith('/admin/subject-categories/', { name: 'Music' })
+    expect(catalog.subjectCategories.map((category) => category.name)).toEqual([
+      'Sports',
+      'Uncategorized',
+      'Music',
+    ])
+  })
+
   it('manages the subject catalog globally on the taxonomy shape', async () => {
     const subject = {
       subject_code: 'python',
@@ -52,6 +76,9 @@ describe('catalog store', () => {
       category: 'Technology & Computer Science',
     }
     api.get.mockResolvedValueOnce({ data: [subject] })
+    // A subject save can mint a category server-side, so the store re-reads the category list when
+    // the saved subject lands in one it has not seen.
+    api.get.mockResolvedValueOnce({ data: [{ id: 3, name: subject.category }] })
     api.post.mockResolvedValueOnce({ data: subject })
     api.patch.mockResolvedValueOnce({ data: { ...subject, subject_name: 'Python 3' } })
     api.delete.mockResolvedValueOnce({})
@@ -63,6 +90,9 @@ describe('catalog store', () => {
     await catalog.removeCatalogSubject('python')
 
     expect(api.get).toHaveBeenCalledWith('/admin/course-catalog/')
+    // Once for the add (category unknown), not again for the update (now known).
+    expect(api.get).toHaveBeenCalledWith('/admin/subject-categories/')
+    expect(api.get).toHaveBeenCalledTimes(2)
     expect(api.post).toHaveBeenCalledWith('/admin/course-catalog/', subject)
     expect(api.patch).toHaveBeenCalledWith('/admin/course-catalog/python/', {
       subject_name: 'Python 3',

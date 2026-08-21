@@ -2,6 +2,21 @@
 import re
 
 
+# The category a subject falls back to when its own category is deleted, and the value the
+# migration backfills over legacy NULL/'' categories. It is seeded with is_system=True so it can
+# never be deleted -- the fallback target has to outlive everything that points at it.
+UNCATEGORIZED_CATEGORY = 'Uncategorized'
+
+# Categories are seeded 10, 20, 30... rather than 1, 2, 3 so a new one can be wedged between two
+# existing ones without renumbering the rest.
+CATEGORY_ORDER_STEP = 10
+
+# Sorts the fallback last, behind any category an admin adds later.
+UNCATEGORIZED_DISPLAY_ORDER = 999
+
+# Seed fixture for the SubjectCategory table, not the runtime source of truth -- once seeded, the
+# table owns the list and admins can add to it. Order here is the authored picker order, so append
+# rather than prepend: seed_data uses CATEGORIES[:1] as its default course affinity.
 CATEGORIES = [
     'Mathematics & Data Sciences',
     'Natural Sciences',
@@ -9,7 +24,16 @@ CATEGORIES = [
     'Business, Finance & Economics',
     'Humanities & Social Sciences',
     'Hobbies & Arts',
+    'Sports',
+    UNCATEGORIZED_CATEGORY,
 ]
+
+
+def seed_display_order(name):
+    """Return the seeded display_order for a taxonomy category."""
+    if name == UNCATEGORIZED_CATEGORY:
+        return UNCATEGORIZED_DISPLAY_ORDER
+    return (CATEGORIES.index(name) + 1) * CATEGORY_ORDER_STEP
 
 # Subjects.subject_code is a CharField(max_length=20); names whose plain slug would exceed
 # that get an explicit short form here so the code stays readable rather than a raw truncation.

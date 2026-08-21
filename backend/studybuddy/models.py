@@ -3,12 +3,19 @@ from datetime import datetime, timedelta
 
 from django.db import models
 from django.db.models import Q
+from django.db.models.functions import Lower
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.contrib.auth.models import User
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.utils import timezone
+
+from .subject_taxonomy import (
+    CATEGORY_ORDER_STEP,
+    UNCATEGORIZED_CATEGORY,
+    UNCATEGORIZED_DISPLAY_ORDER,
+)
 
 
 # Create your models here.
@@ -704,6 +711,92 @@ def create_tutor_wallet(sender, instance, created, **kwargs):
     if created:
         Wallet.objects.get_or_create(tutor=instance)
 
+#Subject Category Table
+class SubjectCategory(models.Model):
+    """A subject category, stored in its own right rather than derived from subject rows.
+
+    The pickable category list used to be "the distinct Subjects.category strings that exist",
+    which made an empty category unrepresentable -- a category vanished when its last subject was
+    removed, and one could not be created ahead of its first subject. Seeded from
+    subject_taxonomy.CATEGORIES; the table owns the list from then on.
+    """
+
+    name = models.CharField(max_length=100, unique=True)
+    display_order = models.PositiveIntegerField(default=0)
+    # True only for the Uncategorized fallback, which the delete endpoint refuses to remove.
+    is_system = models.BooleanField(default=False)
+
+    class Meta:
+        verbose_name_plural = 'subject categories'
+        ordering = ['display_order', 'name']
+        constraints = [
+            # Names are stored as typed but compared case-insensitively, so 'sports' cannot become
+            # a second category alongside 'Sports'.
+            models.UniqueConstraint(Lower('name'), name='unique_subject_category_name_ci'),
+        ]
+
+    def __str__(self):
+        return self.name
+
+
+def get_uncategorized():
+    """Return the Uncategorized category, for Subjects.category's on_delete fallback.
+
+    Deleting a category moves its subjects here rather than deleting them: TutorSubjects and
+    Preference.subjects point at Subjects, so a cascade would silently strip tutor expertise and
+    tutee preferences.
+    """
+    category, _ = SubjectCategory.objects.get_or_create(
+        name=UNCATEGORIZED_CATEGORY,
+        defaults={
+            'display_order': UNCATEGORIZED_DISPLAY_ORDER,
+            'is_system': True,
+        },
+    )
+    return category
+
+
+def get_uncategorized_id():
+    """The Uncategorized category's pk, for Subjects.category's default.
+
+    Separate from get_uncategorized because a ForeignKey default is a pk, not an instance.
+    """
+    return get_uncategorized().pk
+
+
+def resolve_category(name):
+    """Return the SubjectCategory matching `name` case-insensitively, or None.
+
+    Used by paths that may only reference an existing category (tutor subject proposals), as
+    opposed to admin paths that are allowed to mint one.
+    """
+    name = str(name or '').strip()
+    if not name:
+        return None
+    return SubjectCategory.objects.filter(name__iexact=name).first()
+
+
+def resolve_or_create_category(name):
+    """Return the SubjectCategory matching `name`, creating it if an admin named a new one.
+
+    New categories sort after every existing one, since there is no way to infer where in the
+    authored order an admin meant to slot it.
+    """
+    name = str(name or '').strip()
+    if not name:
+        return None
+    category = resolve_category(name)
+    if category is not None:
+        return category
+    last = (
+        SubjectCategory.objects.exclude(name=UNCATEGORIZED_CATEGORY)
+        .order_by('-display_order')
+        .first()
+    )
+    next_order = (last.display_order if last else 0) + CATEGORY_ORDER_STEP
+    return SubjectCategory.objects.create(name=name, display_order=next_order)
+
+
 #Subjects Table
 class Subjects(models.Model):
     STATUS_CHOICES = [
@@ -714,7 +807,15 @@ class Subjects(models.Model):
     subject_code = models.CharField(max_length=20, primary_key=True)
     subject_name = models.CharField(max_length=100)
     department = models.CharField(max_length=100, blank=True, default='')
-    category = models.CharField(max_length=100, null=True, blank=True)
+    # Required, but defaults to the Uncategorized sink rather than being nullable: "no category
+    # stated" and "category deleted out from under it" are the same situation, and giving them one
+    # representation is the point of the sink. Before this, the same state could be NULL or ''.
+    category = models.ForeignKey(
+        SubjectCategory,
+        on_delete=models.SET(get_uncategorized),
+        related_name='subjects',
+        default=get_uncategorized_id,
+    )
     keywords = models.TextField(blank=True, default='')
     description = models.TextField(blank=True, default='')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='approved')

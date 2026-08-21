@@ -201,7 +201,7 @@
                         @change="handleCategorySelectChange"
                       >
                         <option v-for="category in taxonomyCategories" :key="category" :value="category">{{ category }}</option>
-                        <option value="__add_new__">+ Add new category...</option>
+                        <option :value="ADD_NEW_OPTION">+ Add new category...</option>
                       </select>
                     </template>
                   </div>
@@ -224,7 +224,7 @@
                       >
                         <option value="">None</option>
                         <option v-for="subgroup in subgroupOptions" :key="subgroup" :value="subgroup">{{ subgroup }}</option>
-                        <option value="__add_new__">+ Add new sub-group...</option>
+                        <option :value="ADD_NEW_OPTION">+ Add new sub-group...</option>
                       </select>
                     </template>
                   </div>
@@ -387,7 +387,7 @@ import {
   getReviewStatus,
   getReviewSubmittedAt,
 } from '@/services/tutorApplicationState'
-import { deriveCategoryOptions, deriveSubgroupOptions } from '@/constants/subjectTaxonomy'
+import { ADD_NEW_OPTION, deriveSubgroupOptions } from '@/constants/subjectTaxonomy'
 import { highlightSegments } from '@/components/subjectPicker.shared'
 
 const APPLICANT_ROLES = ['tutor', 'tutee']
@@ -421,7 +421,7 @@ const subjectEditForm = reactive({
 })
 // 'select' shows the taxonomy dropdown; 'new' shows the free-text "add a category" input,
 // entered either by picking "+ Add new category..." or automatically when a proposed subject's
-// category doesn't match anything in the derived list.
+// category doesn't match anything in the stored list.
 const categoryMode = ref('select')
 const categoryMismatchNote = ref('')
 // Same two-mode pattern as Category, scoped to whichever category is currently selected.
@@ -429,7 +429,10 @@ const subgroupMode = ref('select')
 const subgroupMismatchNote = ref('')
 let offcanvas = null
 
-const taxonomyCategories = computed(() => deriveCategoryOptions(catalogStore.courseCatalog))
+// Server-side list (SubjectCategory), so a category with no subjects still appears here.
+const taxonomyCategories = computed(() =>
+  catalogStore.subjectCategories.map((category) => category.name)
+)
 
 // Sub-group values already used by subjects under the currently-selected category — a suggestion
 // list only, not an enforced relationship (see deriveSubgroupOptions).
@@ -670,7 +673,7 @@ const startSubjectEdit = (subject) => {
 }
 
 const handleCategorySelectChange = () => {
-  if (subjectEditForm.category === '__add_new__') {
+  if (subjectEditForm.category === ADD_NEW_OPTION) {
     subjectEditForm.category = ''
     categoryMode.value = 'new'
     categoryMismatchNote.value = ''
@@ -686,7 +689,7 @@ const useExistingCategory = () => {
 }
 
 const handleSubgroupSelectChange = () => {
-  if (subjectEditForm.department === '__add_new__') {
+  if (subjectEditForm.department === ADD_NEW_OPTION) {
     subjectEditForm.department = ''
     subgroupMode.value = 'new'
     subgroupMismatchNote.value = ''
@@ -805,6 +808,11 @@ onMounted(() => {
   loadApplications()
   if (!catalogStore.courseCatalog.length) {
     catalogStore.fetchCourseCatalog().catch((err) => console.error('Catalog fetch failed:', err))
+  }
+  if (!catalogStore.subjectCategories.length) {
+    catalogStore
+      .fetchSubjectCategories()
+      .catch((err) => console.error('Subject category fetch failed:', err))
   }
 })
 </script>

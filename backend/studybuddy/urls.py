@@ -25,6 +25,7 @@ from .views import(
 from .admin_views import (
     AdminAnalyticsExportView,
     AdminCourseCatalogView,
+    AdminSubjectCategoryView,
     AdminStatsView, AdminWithdrawalListView, AdminWithdrawalDetailView,
     AdminUserListView, AdminInstitutionView, AdminAnalyticsView,
     AdminUserBookingsView, AdminUserBookingsExportView,
@@ -69,6 +70,8 @@ urlpatterns = [
     path('admin/users/<int:pk>/stats/', AdminUserStatsView.as_view()),
     path('admin/users/<int:pk>/stats/export/', AdminUserStatsExportView.as_view()),
     path('admin/users/<int:pk>/verification-dev-tools/', AdminUserVerificationDevToolsView.as_view()),
+    path('admin/subject-categories/', AdminSubjectCategoryView.as_view()),
+    path('admin/subject-categories/<int:pk>/', AdminSubjectCategoryView.as_view()),
     path('admin/course-catalog/', AdminCourseCatalogView.as_view()),
     path('admin/course-catalog/<str:pk>/', AdminCourseCatalogView.as_view()),
     path('admin/institutions/', AdminInstitutionView.as_view()),

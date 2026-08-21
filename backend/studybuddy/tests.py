@@ -48,6 +48,7 @@ from .models import (
     Payment,
     PaymentMethod,
     Rating,
+    SubjectCategory,
     Subjects,
     SupportTicket,
     SessionCheckIn,
@@ -68,6 +69,18 @@ from .models import (
     Preference,
 )
 from .chat.models import ChatRoom, Message
+from .models import get_uncategorized
+from .subject_taxonomy import UNCATEGORIZED_CATEGORY
+
+
+def make_category(name):
+    """The SubjectCategory row for `name`, created if it does not exist yet.
+
+    Subjects.category is a foreign key (see docs/plans/2026-08-21-subject-category-storage.md), so
+    tests that care about a specific category name need the row rather than the string. Tests that
+    do not care can omit category entirely -- it defaults to Uncategorized.
+    """
+    return SubjectCategory.objects.get_or_create(name=name)[0]
 
 
 class SuperAdminRedesignApiTests(APITestCase):
@@ -893,7 +906,7 @@ class GlobalSubjectCatalogTests(APITestCase):
             subject_code="CS101",
             subject_name="Introduction to Computing",
             department="Computer Science",
-            category="Technology & Computer Science",
+            category=make_category("Technology & Computer Science"),
         )
         self.super_user = User.objects.create_user(
             username="super",
@@ -4102,7 +4115,7 @@ class TuteeProfileTests(APITestCase):
             subject_code="MATH101",
             subject_name="College Algebra",
             department="Math",
-            category="College",
+            category=make_category("College"),
         )
         self.tutee_profile.course = course
         self.tutee_profile.save()
@@ -4518,7 +4531,7 @@ class BookingVerificationGateTests(APITestCase):
             subject_code="GATE-SUBJ",
             subject_name="Catalog Approved Subject",
             department="Gate",
-            category=self.course.course_code,
+            category=make_category(self.course.course_code),
         )
         self.tutee_user = User.objects.create_user(
             username="gate-tutee@cpu.edu",
@@ -6140,19 +6153,19 @@ class CbfGraduatedSubjectMatchTests(APITestCase):
 
         self.requested_subject = Subjects.objects.create(
             subject_code="MATH101", subject_name="Calculus 1", department="Math",
-            category="STEM",
+            category=make_category("STEM"),
         )
         self.same_field_subject = Subjects.objects.create(
             subject_code="MATH201", subject_name="Calculus 2", department="Math",
-            category="STEM",
+            category=make_category("STEM"),
         )
         self.other_same_field_subject = Subjects.objects.create(
             subject_code="PHYS101", subject_name="Physics 1", department="Science",
-            category="STEM",
+            category=make_category("STEM"),
         )
         self.unrelated_subject = Subjects.objects.create(
             subject_code="ART101", subject_name="Painting", department="Arts",
-            category="Arts",
+            category=make_category("Arts"),
         )
         self.null_category_subject = Subjects.objects.create(
             subject_code="GEN101", subject_name="General Studies", department="Gen",
@@ -9173,7 +9186,7 @@ class TutorOnboardingSearchVisibilityTests(APITestCase):
         )
         self.subject = Subjects.objects.create(
             subject_code="ONBOARD101", subject_name="Onboarding Search", department="Education",
-            category=self.course.course_code,
+            category=make_category(self.course.course_code),
         )
         tutee_user = User.objects.create_user(
             username="onboarding-tutee@cpu.edu.ph", email="onboarding-tutee@cpu.edu.ph",
@@ -9382,7 +9395,7 @@ class TutorSubjectProposalTests(APITestCase):
         )
         self.catalog_subject = Subjects.objects.create(
             subject_code="MATH101", subject_name="College Algebra", department="Mathematics",
-            category="Mathematics & Data Sciences",
+            category=make_category("Mathematics & Data Sciences"),
         )
         self.course = Course.objects.create(course_code="PROPOSAL", course_name="Proposal Course")
         self.tutor_user = User.objects.create_user(
@@ -9426,15 +9439,28 @@ class TutorSubjectProposalTests(APITestCase):
         self.assertTrue(TutorSubjects.objects.filter(tutor=self.tutor, subject=subject).exists())
 
     def test_proposal_accepts_a_category_outside_the_curated_taxonomy(self):
-        # Subjects.category is free-text (see SubjectSerializer's comment); a tutor proposing under
-        # a category an admin already approved beyond the curated 6 (e.g. "Spoken Languages") must
-        # not be rejected here. See docs/plans/2026-08-12-admin-review-panel-category-keywords-
-        # backdrop.md.
+        # A tutor proposing under a category an admin already added beyond the curated 6 (e.g.
+        # "Spoken Languages") must not be rejected. What changed with the SubjectCategory table is
+        # only that the category has to exist first -- see
+        # docs/plans/2026-08-21-subject-category-storage.md.
+        make_category("Spoken Languages")
+
         with patch("studybuddy.views.subject_is_recognized_for_profile"):
             response = self.propose(category="Spoken Languages")
 
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.data["category"], "Spoken Languages")
+
+    def test_proposal_rejects_a_category_that_does_not_exist(self):
+        """Minting a category is an admin action (the subject catalog or the review panel), and
+        the tutor-side picker only offers categories that already exist."""
+        with patch("studybuddy.views.subject_is_recognized_for_profile"):
+            response = self.propose(category="Category Nobody Created")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(
+            SubjectCategory.objects.filter(name="Category Nobody Created").exists(),
+        )
 
     def test_proposal_rejects_empty_category(self):
         response = self.propose(category="")
@@ -9515,7 +9541,7 @@ class TutorSubjectProposalTests(APITestCase):
         # different field, e.g. Hobbies & Arts, proving selection is catalog-wide now.
         unrelated_subject = Subjects.objects.create(
             subject_code="guitar-101", subject_name="Guitar Basics", department="Instruments",
-            category="Hobbies & Arts",
+            category=make_category("Hobbies & Arts"),
         )
 
         response = self.client.get("/api/subjects/", {"search": "Guitar"})
@@ -9573,7 +9599,7 @@ class AdminProposedSubjectReviewTests(APITestCase):
         """An approved catalog subject the tutor picked, as opposed to proposed."""
         subject = Subjects.objects.create(
             subject_code=code, subject_name=name, department="Sciences",
-            category=category, status="approved",
+            category=make_category(category), status="approved",
         )
         TutorSubjects.objects.create(tutor=self.tutor, subject=subject, expertise_level=4)
         return subject
@@ -9628,7 +9654,7 @@ class AdminProposedSubjectReviewTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         proposal.refresh_from_db()
         self.assertEqual(proposal.subject_name, "Updated Proposal Name")
-        self.assertEqual(proposal.category, "Mathematics & Data Sciences")
+        self.assertEqual(proposal.category.name, "Mathematics & Data Sciences")
         self.assertEqual(proposal.keywords, "algebra, math")
         self.assertEqual(proposal.status, "pending")
         self.assertEqual(proposal.description, "Refined by admin.")
@@ -9708,7 +9734,7 @@ class AdminProposedSubjectReviewTests(APITestCase):
 
         self.assertEqual(response.status_code, 200)
         proposal.refresh_from_db()
-        self.assertEqual(proposal.category, "Invented Category")
+        self.assertEqual(proposal.category.name, "Invented Category")
 
     def test_update_action_still_requires_a_category(self):
         proposal = self.make_proposal("UPDATE-NO-CAT")
@@ -9936,6 +9962,124 @@ class SubjectTaxonomyModuleTests(APITestCase):
             self.assertIn(category, CATEGORIES, f"{name} has an unrecognized category")
 
 
+class SubjectCategoryStorageTests(APITestCase):
+    """Categories exist in their own right rather than being derived from the subjects that
+    happen to reference them. See docs/plans/2026-08-21-subject-category-storage.md."""
+
+    def setUp(self):
+        self.institution = PartnerInstitution.objects.create(
+            institution_name="CPU", school_email_domain="cpu.edu.ph", is_active=True,
+        )
+        self.admin_user = User.objects.create_user(
+            username="cat.admin@cpu.edu.ph", email="cat.admin@cpu.edu.ph", password="password",
+        )
+        self.admin_profile = UserProfile.objects.create(
+            user=self.admin_user, fname="Cat", mname="", lname="Admin", role="SuperAdmin",
+            institution=self.institution,
+        )
+        self.client.force_authenticate(user=self.admin_user)
+
+    def test_a_category_survives_having_no_subjects(self):
+        """The whole point of the table: the derived list could not represent this at all."""
+        # Sports is one of the seeded categories and ships with no subjects at all.
+        category = make_category("Sports")
+        subject = Subjects.objects.create(
+            subject_code="chess", subject_name="Chess", category=category,
+        )
+        subject.delete()
+
+        self.assertTrue(SubjectCategory.objects.filter(name="Sports").exists())
+        response = self.client.get('/api/admin/subject-categories/')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Sports", [row['name'] for row in response.data])
+
+    def test_seeded_taxonomy_categories_include_sports_and_uncategorized(self):
+        from .subject_taxonomy import CATEGORIES
+
+        self.assertIn("Sports", CATEGORIES)
+        self.assertIn(UNCATEGORIZED_CATEGORY, CATEGORIES)
+        # Appended, never prepended: seed_data uses CATEGORIES[:1] as its default course affinity.
+        self.assertEqual(CATEGORIES[0], 'Mathematics & Data Sciences')
+
+    def test_subject_defaults_to_uncategorized_when_no_category_is_given(self):
+        subject = Subjects.objects.create(subject_code="loose", subject_name="Loose Subject")
+        self.assertEqual(subject.category.name, UNCATEGORIZED_CATEGORY)
+
+    def test_deleting_a_category_moves_its_subjects_to_uncategorized(self):
+        """Not a cascade: TutorSubjects and Preference.subjects point at Subjects, so deleting
+        the subjects would strip tutor expertise and tutee preferences."""
+        category = make_category("Doomed Category")
+        subject = Subjects.objects.create(
+            subject_code="doomed", subject_name="Doomed Subject", category=category,
+        )
+
+        response = self.client.delete(f'/api/admin/subject-categories/{category.pk}/')
+        self.assertEqual(response.status_code, 204)
+
+        subject.refresh_from_db()
+        self.assertEqual(subject.category.name, UNCATEGORIZED_CATEGORY)
+        self.assertFalse(SubjectCategory.objects.filter(pk=category.pk).exists())
+
+    def test_uncategorized_cannot_be_deleted(self):
+        uncategorized = get_uncategorized()
+        response = self.client.delete(f'/api/admin/subject-categories/{uncategorized.pk}/')
+        self.assertEqual(response.status_code, 400)
+        self.assertTrue(SubjectCategory.objects.filter(pk=uncategorized.pk).exists())
+
+    def test_category_names_are_case_insensitively_unique(self):
+        make_category("Sports")
+        response = self.client.post('/api/admin/subject-categories/', {'name': 'sports'})
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(SubjectCategory.objects.filter(name__iexact="sports").count(), 1)
+
+    def test_creating_a_category_needs_no_subject(self):
+        response = self.client.post('/api/admin/subject-categories/', {'name': 'Culinary Arts'})
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data['name'], 'Culinary Arts')
+        self.assertEqual(response.data['subject_count'], 0)
+
+    def test_categories_come_back_in_display_order_with_uncategorized_last(self):
+        SubjectCategory.objects.all().delete()
+        make_category("Zebra Studies").__class__.objects.filter(name="Zebra Studies").update(
+            display_order=10,
+        )
+        SubjectCategory.objects.create(name="Alpha Studies", display_order=20)
+        get_uncategorized()
+
+        response = self.client.get('/api/admin/subject-categories/')
+        names = [row['name'] for row in response.data]
+        # display_order wins over alphabetical, and the fallback sorts last.
+        self.assertEqual(names, ["Zebra Studies", "Alpha Studies", UNCATEGORIZED_CATEGORY])
+
+    def test_seed_data_assigns_category_rows_and_keeps_empty_ones(self):
+        """seed_data seeds categories before subjects, and the two categories with no subjects in
+        the fixture still exist afterwards."""
+        from studybuddy.management.commands.seed_data import Command
+
+        command = Command()
+        command.stdout = StringIO()
+        subjects_by_category, subjects_by_name = command._seed_subjects()
+
+        self.assertEqual(subjects_by_category["Sports"], [])
+        self.assertEqual(subjects_by_category[UNCATEGORIZED_CATEGORY], [])
+        self.assertTrue(subjects_by_category["Natural Sciences"])
+        self.assertEqual(
+            subjects_by_name["Python"].category.name, "Technology & Computer Science",
+        )
+        # Keyed by name, not by the category object, since COURSE_CATEGORY_AFFINITY uses names.
+        self.assertTrue(all(isinstance(key, str) for key in subjects_by_category))
+
+    def test_serializer_still_emits_the_category_name(self):
+        """The API contract is unchanged from when category was a CharField."""
+        subject = Subjects.objects.create(
+            subject_code="algebra", subject_name="Algebra",
+            category=make_category("Mathematics & Data Sciences"),
+        )
+        response = self.client.get('/api/admin/course-catalog/')
+        row = next(r for r in response.data if r['subject_code'] == subject.subject_code)
+        self.assertEqual(row['category'], "Mathematics & Data Sciences")
+
+
 class AdminCourseCatalogTaxonomyTests(APITestCase):
     """Admin subject-catalog CRUD on the taxonomy shape: auto-generated slugs, category
     validation, and category-based filtering (replacing the retired course filter)."""
@@ -9987,10 +10131,12 @@ class AdminCourseCatalogTaxonomyTests(APITestCase):
 
     def test_list_filters_by_category(self):
         Subjects.objects.create(
-            subject_code="calculus", subject_name="Calculus", category="Mathematics & Data Sciences",
+            subject_code="calculus", subject_name="Calculus",
+            category=make_category("Mathematics & Data Sciences"),
         )
         Subjects.objects.create(
-            subject_code="guitar", subject_name="Guitar", category="Hobbies & Arts",
+            subject_code="guitar", subject_name="Guitar",
+            category=make_category("Hobbies & Arts"),
         )
 
         response = self.client.get(
@@ -10018,18 +10164,20 @@ class CuratedPersonaCbfOrderingTests(APITestCase):
         self.bsba = Course.objects.create(course_code="BSBA", course_name="Business Administration")
 
         self.python = Subjects.objects.create(
-            subject_code="python", subject_name="Python", category="Technology & Computer Science",
+            subject_code="python", subject_name="Python",
+            category=make_category("Technology & Computer Science"),
         )
         self.data_structures = Subjects.objects.create(
             subject_code="data-structures", subject_name="Data Structures",
-            category="Technology & Computer Science",
+            category=make_category("Technology & Computer Science"),
         )
         self.cpp = Subjects.objects.create(
-            subject_code="cpp", subject_name="C++", category="Technology & Computer Science",
+            subject_code="cpp", subject_name="C++",
+            category=make_category("Technology & Computer Science"),
         )
         self.financial_accounting = Subjects.objects.create(
             subject_code="financial-accounting", subject_name="Financial Accounting",
-            category="Business, Finance & Economics",
+            category=make_category("Business, Finance & Economics"),
         )
 
         s1_user = User.objects.create_user(
@@ -10098,7 +10246,7 @@ class PendingProposedSubjectRemainsSelectableTests(APITestCase):
         self.tutor = Tutor.objects.create(profile=self.tutor_profile)
         self.pending_subject = Subjects.objects.create(
             subject_code="pending-subj", subject_name="Pending Subject",
-            category="Hobbies & Arts", status="pending",
+            category=make_category("Hobbies & Arts"), status="pending",
         )
         TutorSubjects.objects.create(
             tutor=self.tutor, subject=self.pending_subject, expertise_level=3,
@@ -10582,7 +10730,7 @@ class DualRoleModeSwitchTests(APITestCase):
             subject = Subjects.objects.create(
                 subject_code="calc-1",
                 subject_name="Calculus 1",
-                category="Mathematics & Data Sciences",
+                category=make_category("Mathematics & Data Sciences"),
             )
             TutorSubjects.objects.create(tutor=tutor, subject=subject, expertise_level=3)
         return tutor
@@ -10888,7 +11036,7 @@ class AlgorithmWeightScoringTests(APITestCase):
         self.course = Course.objects.create(course_code="BSIT", course_name="Info Tech")
         self.subject = Subjects.objects.create(
             subject_code="MATH101", subject_name="Calculus 1", department="Math",
-            category="STEM",
+            category=make_category("STEM"),
         )
 
         student_user = User.objects.create_user(

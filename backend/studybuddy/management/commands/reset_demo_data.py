@@ -14,7 +14,12 @@ Local/dev use only — this command deletes data.
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand
 
-from studybuddy.models import InstitutionRequest, PlatformActivity, Subjects
+from studybuddy.models import (
+    InstitutionRequest,
+    PlatformActivity,
+    SubjectCategory,
+    Subjects,
+)
 
 
 class Command(BaseCommand):
@@ -32,4 +37,7 @@ class Command(BaseCommand):
         PlatformActivity.objects.all().delete()
         InstitutionRequest.objects.all().delete()
         Subjects.objects.all().delete()
+        # After the subjects, so the on_delete fallback does not recreate Uncategorized on
+        # the way out. seed_data re-seeds the taxonomy categories from scratch.
+        SubjectCategory.objects.all().delete()
         self.stdout.write(f'  cleared: {deleted} rows cascaded from non-staff users')

@@ -7,6 +7,7 @@ from .models import (
     PlatformActivity,
     Preference,
     Rating,
+    SubjectCategory,
     Subjects,
     Tutor,
     TutorApplication,
@@ -220,8 +221,27 @@ class TutorSearchSerializer(serializers.ModelSerializer):
             'total_sessions'
         ]
 
+class SubjectCategorySerializer(serializers.ModelSerializer):
+    subject_count = serializers.SerializerMethodField()
+
+    def get_subject_count(self, obj):
+        return obj.subjects.count()
+
+    class Meta:
+        model = SubjectCategory
+        fields = ['id', 'name', 'display_order', 'is_system', 'subject_count']
+        # is_system is set only by the seed/migration: the Uncategorized fallback is the one
+        # category the delete endpoint refuses to remove, and that must not be editable over the
+        # API in either direction.
+        read_only_fields = ['is_system', 'subject_count']
+
+
 class SubjectSerializer(serializers.ModelSerializer):
     is_recognized = serializers.SerializerMethodField()
+    category = serializers.SlugRelatedField(
+        slug_field='name',
+        queryset=SubjectCategory.objects.all(),
+    )
 
     def get_is_recognized(self, obj):
         recognized_codes = self.context.get('recognized_codes')
@@ -242,12 +262,12 @@ class SubjectSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['is_recognized']
 
-    # Category is intentionally not restricted to subject_taxonomy.CATEGORIES: SuperAdmins can add
-    # a category beyond the curated 6 from the tutor-application review panel (derived on the
-    # frontend from whatever distinct categories already exist in the catalog), and this
-    # serializer's own create/update (AdminCourseCatalogView) must accept those same values rather
-    # than rejecting them — matching Subjects.category itself (free CharField, no choices
-    # constraint). See docs/plans/2026-08-12-admin-review-panel-category-keywords-backdrop.md.
+    # Emitted and accepted as the plain category name, not an id, so the API shape is unchanged
+    # from when Subjects.category was a CharField and no frontend read of subject.category breaks.
+    # The set of valid names is now the SubjectCategory table rather than anything goes: minting a
+    # category is an admin action (AdminCourseCatalogView, the review panel), so a name that does
+    # not exist yet is rejected here instead of silently becoming a new category.
+    # See docs/plans/2026-08-21-subject-category-storage.md.
 
 
 class PinnedReviewSerializer(serializers.ModelSerializer):
@@ -496,7 +516,9 @@ class TutorApplicationSerializer(serializers.ModelSerializer):
         return 'initial'
 
     def get_proposed_subjects(self, obj):
-        subjects = list(obj.proposed_subjects.filter(status='pending'))
+        subjects = list(
+            obj.proposed_subjects.filter(status='pending').select_related('category')
+        )
         # Two distinct fields are both called "description": the global catalog
         # copy on Subjects, and the tutor's own note on TutorSubjects. They are
         # returned under separate keys so neither can be mistaken for the other.
@@ -511,7 +533,7 @@ class TutorApplicationSerializer(serializers.ModelSerializer):
             {
                 'subject_code': subject.subject_code,
                 'subject_name': subject.subject_name,
-                'category': subject.category,
+                'category': subject.category.name,
                 'keywords': subject.keywords,
                 'catalog_description': subject.description or '',
                 'tutor_note': tutor_notes.get(subject.subject_code, ''),
@@ -526,12 +548,12 @@ class TutorApplicationSerializer(serializers.ModelSerializer):
         tutor_subjects = TutorSubjects.objects.filter(
             tutor__profile=obj.profile,
             subject__status='approved',
-        ).select_related('subject')
+        ).select_related('subject', 'subject__category')
         return [
             {
                 'subject_code': tutor_subject.subject.subject_code,
                 'subject_name': tutor_subject.subject.subject_name,
-                'category': tutor_subject.subject.category,
+                'category': tutor_subject.subject.category.name,
             }
             for tutor_subject in tutor_subjects
         ]
