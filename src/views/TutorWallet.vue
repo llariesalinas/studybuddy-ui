@@ -207,7 +207,8 @@
       </div>
     </section>
 
-    <div v-if="showCashoutModal" class="modal-backdrop fade show"></div>
+    <Teleport to="body">
+    <div v-if="showCashoutModal" class="modal-backdrop fade show sb-overlay" data-sb-owned></div>
     <div v-if="showCashoutModal" class="modal fade show d-block" tabindex="-1">
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content wallet-modal">
@@ -386,6 +387,7 @@
         </div>
       </div>
     </div>
+    </Teleport>
 
     <CashInModal v-if="showCashinModal" @close="showCashinModal = false" />
   </div>
@@ -1535,12 +1537,8 @@ watch(showCashoutModal, async (isOpen) => {
   }
 }
 
-.modal-backdrop {
-  z-index: 1050;
-}
-
 .modal {
-  z-index: 1055;
+  z-index: var(--sb-z-surface);
 }
 
 @media (max-width: 1180px) {

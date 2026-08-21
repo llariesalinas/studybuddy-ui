@@ -29,7 +29,7 @@ const toastStore = useToastStore()
   position: fixed;
   top: 20px;
   right: 24px;
-  z-index: 9999;
+  z-index: var(--sb-z-toast);
   display: flex;
   flex-direction: column;
   gap: 8px;

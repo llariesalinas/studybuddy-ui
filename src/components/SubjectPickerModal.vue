@@ -19,7 +19,7 @@
   </button>
 
   <Teleport to="body">
-    <div v-if="isOpen" class="subject-backdrop" role="presentation" @click.self="closeModal">
+    <div v-if="isOpen" class="subject-backdrop sb-overlay sb-overlay--nested" role="presentation" @click.self="closeModal">
       <section
         :id="dialogId"
         class="subject-dialog"
@@ -296,9 +296,6 @@ onBeforeUnmount(() => {
 }
 
 .subject-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 1060;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -307,6 +304,8 @@ onBeforeUnmount(() => {
 }
 
 .subject-dialog {
+  position: relative;
+  z-index: var(--sb-z-surface-nested);
   display: grid;
   gap: 0.85rem;
   width: min(560px, 100%);

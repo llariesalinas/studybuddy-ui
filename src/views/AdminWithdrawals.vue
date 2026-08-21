@@ -310,9 +310,11 @@
     </Transition>
 
     <!-- MODAL -->
+    <Teleport to="body">
     <div
       v-if="activeWithdrawal"
-      class="modal-backdrop fade show"
+      class="modal-backdrop fade show sb-overlay"
+      data-sb-owned
     ></div>
 
     <div
@@ -484,6 +486,7 @@
         </div>
       </div>
     </div>
+    </Teleport>
 
   </div>
 </template>
@@ -573,4 +576,8 @@ const updateStatus = async (status) => {
 
 .icon-box { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; }
 .admin-withdrawals .table thead th { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: none; }
+
+.modal {
+  z-index: var(--sb-z-surface);
+}
 </style>

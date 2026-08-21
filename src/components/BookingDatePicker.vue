@@ -11,7 +11,7 @@
     </button>
 
     <Teleport to="body">
-      <div v-if="isOpen" class="date-modal-backdrop" @click.self="closeModal">
+      <div v-if="isOpen" class="date-modal-backdrop sb-overlay sb-overlay--nested" @click.self="closeModal">
         <section
           class="date-modal"
           role="dialog"
@@ -264,9 +264,6 @@ const selectToday = () => {
 }
 
 .date-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 1060;
   display: grid;
   place-items: center;
   padding: 1rem;
@@ -274,6 +271,8 @@ const selectToday = () => {
 }
 
 .date-modal {
+  position: relative;
+  z-index: var(--sb-z-surface-nested);
   width: min(420px, 100%);
   max-height: calc(100vh - 2rem);
   overflow-y: auto;

@@ -294,8 +294,10 @@ const router = createRouter({
   GLOBAL NAVIGATION GUARD
 */
 router.beforeEach(async (to) => {
-  // Clean up any lingering backdrops or modal styles
-  document.querySelectorAll('.offcanvas-backdrop, .modal-backdrop').forEach(el => el.remove())
+  // Clean up any lingering backdrops or modal styles. `:not([data-sb-owned])` mirrors
+  // App.vue's clearBootstrapModalState() guard so this doesn't rip out a backdrop Vue
+  // still owns (e.g. a sidepanel scrim mid-navigation).
+  document.querySelectorAll('.offcanvas-backdrop:not([data-sb-owned]), .modal-backdrop:not([data-sb-owned])').forEach(el => el.remove())
   document.body.classList.remove('modal-open', 'offcanvas-open')
   document.body.style.removeProperty('overflow')
   document.body.style.removeProperty('padding-right')

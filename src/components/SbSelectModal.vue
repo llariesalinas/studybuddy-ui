@@ -26,7 +26,7 @@
   <Teleport to="body">
     <div
       v-if="isOpen"
-      class="sb-select-backdrop"
+      class="sb-select-backdrop sb-overlay sb-overlay--nested"
       role="presentation"
       @click.self="closeModal"
     >
@@ -436,9 +436,6 @@ function unlockBodyScroll() {
 }
 
 .sb-select-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 1060;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -447,6 +444,8 @@ function unlockBodyScroll() {
 }
 
 .sb-select-dialog {
+  position: relative;
+  z-index: var(--sb-z-surface-nested);
   display: grid;
   gap: 1rem;
   width: min(560px, 100%);

@@ -248,9 +248,10 @@
       </main>
     </form>
 
+    <Teleport to="body">
     <div
       v-if="isAcademicModalOpen"
-      class="modal-backdrop-soft"
+      class="modal-backdrop-soft sb-overlay"
       role="presentation"
       @click.self="closeAcademicModal"
     >
@@ -338,7 +339,7 @@
 
     <div
       v-if="isSubjectModalOpen"
-      class="modal-backdrop-soft"
+      class="modal-backdrop-soft sb-overlay"
       role="presentation"
       @click.self="closeSubjectModal"
     >
@@ -448,6 +449,7 @@
         </div>
       </section>
     </div>
+    </Teleport>
   </div>
 </template>
 
@@ -1443,9 +1445,6 @@ onMounted(() => {
 }
 
 .modal-backdrop-soft {
-  position: fixed;
-  inset: 0;
-  z-index: 1060;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1454,6 +1453,8 @@ onMounted(() => {
 }
 
 .glass-modal {
+  position: relative;
+  z-index: var(--sb-z-surface);
   display: grid;
   gap: 1.25rem;
   width: min(760px, 100%);

@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div v-if="open && activeSession" class="rating-stack-shell" @click.self="emit('close')">
+    <div v-if="open && activeSession" class="rating-stack-shell sb-overlay" @click.self="emit('close')">
       <div
         class="rating-stack-modal"
         role="dialog"
@@ -222,9 +222,6 @@ onUnmounted(() => {
 
 <style scoped>
 .rating-stack-shell {
-  position: fixed;
-  inset: 0;
-  z-index: 1100;
   background: rgba(10, 25, 22, 0.5);
   display: grid;
   place-items: center;
@@ -232,6 +229,8 @@ onUnmounted(() => {
 }
 
 .rating-stack-modal {
+  position: relative;
+  z-index: var(--sb-z-surface);
   width: min(100%, 540px);
   max-height: 98vh; 
   overflow-y: auto;

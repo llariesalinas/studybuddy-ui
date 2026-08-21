@@ -73,6 +73,13 @@
   /* Typography system — see ADR-0012 */
   --sb-font-base: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --sb-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  /* Overlay stack. Everything fixed-position picks a layer from here — no literals. */
+  --sb-z-dock: 1030;            /* OngoingBookingBar, page-level docks */
+  --sb-z-overlay: 1080;         /* backdrop / scrim */
+  --sb-z-surface: 1085;         /* the dialog or panel sitting on it */
+  --sb-z-overlay-nested: 1090;  /* a picker opened from inside a dialog */
+  --sb-z-surface-nested: 1095;
+  --sb-z-toast: 1200;           /* SbToast — always on top */
 }
 
 :root[data-sb-density='compact'] {
@@ -103,17 +110,6 @@
   height: var(--sb-vh-fix) !important;
 }
 
-/* Bootstrap sizes `.modal-backdrop` with `100vw`/`100vh`. A backdrop a component renders itself
-   (TutorWallet's cash-out, CashInModal, CampusLocationModal, AdminSupport...) lives *inside* the
-   zoomed `#app`, so those viewport units are scaled down with everything else and the backdrop
-   covers 80% of the page, leaving the right and bottom edges undimmed. Dividing the zoom back out
-   restores full coverage. Deliberately scoped to `#app`: Bootstrap's own backdrops are appended as
-   siblings of `#app`, are never zoomed, and would overflow the viewport if given the same size. */
-[data-sb-density='compact'] #app .modal-backdrop {
-  width: var(--sb-vw-fix);
-  height: var(--sb-vh-fix);
-}
-
 [data-sb-density='compact'] .sb-sidebar {
   height: var(--sb-vh-fix);
 }
@@ -125,20 +121,6 @@
 
 [data-sb-density='compact'] .tutee-profile-shell {
   min-height: var(--sb-vh-fix);
-}
-
-[data-sb-density='compact'] .glass-modal,
-[data-sb-density='compact'] .sb-select-dialog,
-[data-sb-density='compact'] .subject-dialog {
-  max-height: calc(var(--sb-vh-fix) - 2.5rem);
-}
-
-[data-sb-density='compact'] .date-modal {
-  max-height: calc(var(--sb-vh-fix) - 2rem);
-}
-
-[data-sb-density='compact'] .rating-stack-modal {
-  max-height: calc(98vh / var(--sb-density-scale));
 }
 
 /* Tutee-reachable, missed by the original audit: `/tutor/:id` is a Tutee route. */
@@ -162,32 +144,11 @@
   min-height: calc(var(--sb-vh-fix) - 7rem);
 }
 
-[data-sb-density='compact'] .modal-box {
-  max-height: calc(88vh / var(--sb-density-scale));
-}
-
-/* Qualified through the shell so it beats the Tutee-authored `.glass-modal` rule
-   above, which ties with TutorProfile's scoped rule on specificity alone. */
-[data-sb-density='compact'] .tutor-profile-shell .glass-modal {
-  max-height: min(calc(86vh / var(--sb-density-scale)), 780px);
-}
-
 /* SuperAdmin-reachable vh consumers. `.admin-applications` is also an Admin route
    (`/admin/tutor-applications`, role `['Admin','SuperAdmin']`); the rule is attribute-gated,
    so Admin at 100% is unaffected. */
 [data-sb-density='compact'] .admin-applications {
   min-height: var(--sb-vh-fix);
-}
-
-[data-sb-density='compact'] .superadmin-user-modal {
-  max-height: min(760px, calc(var(--sb-vh-fix) - 48px));
-}
-
-@media (max-width: 640px) {
-  [data-sb-density='compact'] .sb-select-dialog,
-  [data-sb-density='compact'] .subject-dialog {
-    max-height: calc(var(--sb-vh-fix) - 1.5rem);
-  }
 }
 
 [data-sb-theme="dark"] {
@@ -253,6 +214,20 @@ body > #app {
   position: relative;
   z-index: 1;
   min-height: 100vh;
+}
+
+/* Every modal / sidepanel scrim. Teleported to <body>, so it is never inside the
+   compact-density `zoom` on #app and `inset: 0` covers the true viewport. Components
+   keep their own background, padding and content layout; they must not re-declare
+   position, inset or z-index. */
+.sb-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--sb-z-overlay);
+}
+
+.sb-overlay--nested {
+  z-index: var(--sb-z-overlay-nested);
 }
 
 /* Custom Utilities to extend Bootstrap */

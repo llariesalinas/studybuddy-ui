@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div class="superadmin-modal-backdrop" role="presentation" @click.self="close">
+    <div class="superadmin-modal-backdrop sb-overlay" role="presentation" @click.self="close">
       <section class="superadmin-user-modal" role="dialog" aria-modal="true" aria-labelledby="superadmin-user-title">
         <header class="modal-topbar">
           <div class="user-identity">
@@ -806,9 +806,6 @@ function formatMoney(value) {
 
 <style scoped>
 .superadmin-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 1080;
   background: rgba(10, 25, 22, 0.42);
   display: flex;
   align-items: center;
@@ -817,6 +814,8 @@ function formatMoney(value) {
 }
 
 .superadmin-user-modal {
+  position: relative;
+  z-index: var(--sb-z-surface);
   width: min(760px, 100%);
   max-height: min(760px, calc(100vh - 48px));
   overflow: auto;

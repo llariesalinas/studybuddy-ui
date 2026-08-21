@@ -151,7 +151,8 @@
       </div>
     </section>
 
-    <div v-if="showAddModal" class="modal-overlay" @click.self="closeAddModal">
+    <Teleport to="body">
+    <div v-if="showAddModal" class="modal-overlay sb-overlay" @click.self="closeAddModal">
       <div class="modal-box">
         <div class="time-picker-header">
           <div>
@@ -303,6 +304,7 @@
         </div>
       </div>
     </div>
+    </Teleport>
   </div>
 </template>
 
@@ -1219,19 +1221,15 @@ function addOneHour(timeString) {
 }
 
 .modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
   background: rgba(0, 0, 0, 0.5);
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 2000;
 }
 
 .modal-box {
+  position: relative;
+  z-index: var(--sb-z-surface);
   background: white;
   padding: 24px;
   border-radius: 18px;
