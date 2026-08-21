@@ -102,6 +102,7 @@
     </div>
 
     <!-- Detail Side Panel -->
+    <Teleport to="body">
     <div class="offcanvas offcanvas-end border-0 shadow" :class="{ show: selectedUser }" tabindex="-1" style="width: 450px;">
       <div class="offcanvas-header bg-light">
         <h5 class="offcanvas-title fw-bold">User Details</h5>
@@ -201,7 +202,8 @@
         </div>
       </div>
     </div>
-    <div v-if="selectedUser" @click="selectedUser = null" class="offcanvas-backdrop fade show"></div>
+    <div v-if="selectedUser" @click="selectedUser = null" class="offcanvas-backdrop fade show sb-overlay" data-sb-owned></div>
+    </Teleport>
   </div>
 </template>
 
@@ -347,4 +349,8 @@ const saveTutorSessionLoadLimit = async () => {
 .admin-users .table thead th { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: none; }
 .admin-users .table tbody td { border-bottom: 1px solid #f8f9fa; }
 .dropdown-item:active { background-color: var(--sb-primary); }
+
+.offcanvas {
+  z-index: var(--sb-z-surface);
+}
 </style>

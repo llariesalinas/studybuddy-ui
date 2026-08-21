@@ -109,6 +109,7 @@
     </div>
 
     <!-- Offcanvas -->
+    <Teleport to="body">
     <div
       class="offcanvas offcanvas-end border-0 shadow"
       :class="{ show: selectedInstitution }"
@@ -171,12 +172,13 @@
         </div>
       </div>
     </div>
-    <div v-if="selectedInstitution" @click="selectedInstitution = null" class="offcanvas-backdrop fade show"></div>
+    <div v-if="selectedInstitution" @click="selectedInstitution = null" class="offcanvas-backdrop fade show sb-overlay" data-sb-owned></div>
 
     <!-- Add Modal -->
     <div
       v-if="showAddModal"
-      class="modal-backdrop fade show"
+      class="modal-backdrop fade show sb-overlay"
+      data-sb-owned
     ></div>
 
     <div
@@ -262,6 +264,7 @@
         </div>
       </div>
     </div>
+    </Teleport>
   </div>
 </template>
 
@@ -333,4 +336,9 @@ const submitAdd = async () => {
 .letter-spacing-05 { letter-spacing: 0.05em; }
 code { color: var(--sb-primary); background: #f8f9fa; padding: 2px 6px; border-radius: 4px; }
 .admin-institutions .table thead th { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: none; }
+
+.offcanvas,
+.modal {
+  z-index: var(--sb-z-surface);
+}
 </style>

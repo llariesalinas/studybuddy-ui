@@ -2,7 +2,7 @@
   <Teleport to="body">
     <div
       v-if="open"
-      class="sb-export-backdrop"
+      class="sb-export-backdrop sb-overlay sb-overlay--nested"
       role="presentation"
       @click.self="close"
     >
@@ -230,9 +230,6 @@ function unlockBodyScroll() {
 
 <style scoped>
 .sb-export-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 1060;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -241,6 +238,8 @@ function unlockBodyScroll() {
 }
 
 .sb-export-dialog {
+  position: relative;
+  z-index: var(--sb-z-surface-nested);
   display: grid;
   width: min(620px, 100%);
   max-height: calc(100vh - 2.5rem);

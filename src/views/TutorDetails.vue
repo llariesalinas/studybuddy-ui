@@ -640,7 +640,7 @@ const getTutorDetails = async () => {
       rating: response.data.rating_average ?? 4.7,
       bio: response.data.bio,
       profile_picture_url: response.data.profile_picture_url || '',
-      hourly_rate: response.data.hourly_rate ?? 350,
+      hourly_rate: response.data.hourly_rate ?? 0,
       total_sessions: response.data.total_sessions ?? 124,
       response_time_label: response.data.response_time_label || '',
       is_verified: Boolean(response.data.is_verified),

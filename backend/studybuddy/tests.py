@@ -34,6 +34,7 @@ from .views import (
     dev_add_wallet_funds,
     dev_remove_wallet_funds,
     PASSWORD_RESET_GENERIC_MESSAGE,
+    TUTOR_SUBJECT_LIMIT,
     WEEKDAY_MAP,
 )
 from .recommender import weights as weights_module
@@ -43,6 +44,8 @@ from .models import (
     Course,
     EmailOTPChallenge,
     GRACE_CUTOFF_HOURS,
+    MIN_HOURLY_RATE,
+    MAX_HOURLY_RATE,
     InstitutionRequest,
     PartnerInstitution,
     Payment,
@@ -363,7 +366,7 @@ class SuperAdminRedesignApiTests(APITestCase):
         )
         self.assertEqual(self._sheet_rows(workbook, "Top Tutors")[1][:2], ("Tutor One", 1))
 
-    def _seed_completed_bookings(self, count):
+    def _seed_completed_bookings(self, count, session_date=None, code_prefix="SUB"):
         """Create `count` tutors, each with one paid Completed booking on a subject of its own.
 
         Enough rows for the dashboard caps to bite: the default response truncates tutors at 5 and
@@ -373,22 +376,23 @@ class SuperAdminRedesignApiTests(APITestCase):
         payment_method, _ = PaymentMethod.objects.get_or_create(
             code="online", defaults={"method_name": "Online Payment"}
         )
+        booking_date = session_date or date.today()
         for index in range(count):
             subject = Subjects.objects.create(
-                subject_code=f"SUB{index:03d}",
-                subject_name=f"Subject {index:02d}",
+                subject_code=f"{code_prefix}{index:03d}",
+                subject_name=f"Subject {code_prefix}{index:02d}",
                 department="Math",
             )
             tutor_user = User.objects.create_user(
-                username=f"bulk-tutor-{index}",
-                email=f"bulk-tutor-{index}@cpu.edu.ph",
+                username=f"bulk-tutor-{code_prefix}-{index}",
+                email=f"bulk-tutor-{code_prefix}-{index}@cpu.edu.ph",
                 password="password",
             )
             tutor_profile = UserProfile.objects.create(
                 user=tutor_user,
                 fname="Bulk",
                 mname="",
-                lname=f"Tutor {index:02d}",
+                lname=f"Tutor {code_prefix}{index:02d}",
                 role="Tutor",
                 institution=self.institution,
                 profile_completed=True,
@@ -404,7 +408,7 @@ class SuperAdminRedesignApiTests(APITestCase):
                 student=self.target_profile,
                 tutor=tutor,
                 availability=availability,
-                session_date=date.today(),
+                session_date=booking_date,
                 session_mode="Online",
                 status="Completed",
                 subject=subject,
@@ -415,6 +419,72 @@ class SuperAdminRedesignApiTests(APITestCase):
                 amount=Decimal("500.00"),
                 payment_status="Paid",
             )
+
+    def test_analytics_custom_period_scopes_to_the_requested_range(self):
+        inside = date.today() - timedelta(days=40)
+        outside = date.today() - timedelta(days=10)
+        self._seed_completed_bookings(2, session_date=inside, code_prefix="IN")
+        self._seed_completed_bookings(3, session_date=outside, code_prefix="OUT")
+
+        response = self.client.get(
+            "/api/admin/analytics/"
+            f"?period=custom&date_from={(inside - timedelta(days=2)).isoformat()}"
+            f"&date_to={(inside + timedelta(days=2)).isoformat()}"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["tutor_total"], 2)
+
+    def test_analytics_custom_period_excludes_activity_after_the_end_date(self):
+        """The window used to have no upper bound, so every range silently ran to today."""
+        old = date.today() - timedelta(days=40)
+        recent = date.today() - timedelta(days=1)
+        self._seed_completed_bookings(2, session_date=old, code_prefix="OLD")
+        self._seed_completed_bookings(4, session_date=recent, code_prefix="NEW")
+
+        response = self.client.get(
+            "/api/admin/analytics/"
+            f"?period=custom&date_from={(old - timedelta(days=1)).isoformat()}"
+            f"&date_to={(old + timedelta(days=1)).isoformat()}"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["tutor_total"], 2)
+
+    def test_analytics_custom_period_requires_both_endpoints(self):
+        response = self.client.get("/api/admin/analytics/?period=custom&date_from=2026-01-01")
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_analytics_custom_period_rejects_an_inverted_range(self):
+        response = self.client.get(
+            "/api/admin/analytics/?period=custom&date_from=2026-06-30&date_to=2026-04-01"
+        )
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_analytics_custom_period_rejects_a_malformed_date(self):
+        response = self.client.get(
+            "/api/admin/analytics/?period=custom&date_from=30-06-2026&date_to=2026-07-01"
+        )
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_analytics_export_reports_the_custom_range_it_used(self):
+        target = date.today() - timedelta(days=20)
+        self._seed_completed_bookings(1, session_date=target, code_prefix="EXP")
+        start = (target - timedelta(days=1)).isoformat()
+        end = (target + timedelta(days=1)).isoformat()
+
+        response = self.client.get(
+            f"/api/admin/analytics/export/?period=custom&date_from={start}&date_to={end}"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        workbook = load_workbook(BytesIO(response.content))
+        info = dict(self._sheet_rows(workbook, "Report Info")[1:])
+        self.assertEqual(info["Date range"], f"{start} to {end}")
+        self.assertEqual(info["Period"], f"{start} to {end}")
 
     def test_analytics_truncates_to_the_dashboard_caps_by_default(self):
         self._seed_completed_bookings(11)
@@ -2966,13 +3036,45 @@ class CommissionTermsDisclosureTests(APITestCase):
 
         response = self.client.post(
             "/api/tutor/setup/",
-            {"teaching_level": "College", "hourly_rate": "350.00"},
+            {"teaching_level": "College", "hourly_rate": "180.00"},
             format="json",
         )
 
         self.assertEqual(response.status_code, 200)
         self.tutor.refresh_from_db()
         self.assertEqual(self.tutor.commission_terms_accepted_at, original_timestamp)
+
+    def test_tutor_setup_clamps_an_over_cap_hourly_rate(self):
+        # Clamped rather than rejected so a tutor carrying a pre-cap rate is not locked out of
+        # saving their profile -- see MIN_HOURLY_RATE / MAX_HOURLY_RATE in models.py.
+        self.tutor.commission_terms_accepted_at = timezone.now()
+        self.tutor.save(update_fields=["commission_terms_accepted_at"])
+        self.client.force_authenticate(user=self.tutor_user)
+
+        response = self.client.post(
+            "/api/tutor/setup/",
+            {"teaching_level": "College", "hourly_rate": "999.00"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.tutor.refresh_from_db()
+        self.assertEqual(self.tutor.hourly_rate, MAX_HOURLY_RATE)
+
+    def test_tutor_setup_raises_an_under_floor_hourly_rate(self):
+        self.tutor.commission_terms_accepted_at = timezone.now()
+        self.tutor.save(update_fields=["commission_terms_accepted_at"])
+        self.client.force_authenticate(user=self.tutor_user)
+
+        response = self.client.post(
+            "/api/tutor/setup/",
+            {"teaching_level": "College", "hourly_rate": "5.00"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.tutor.refresh_from_db()
+        self.assertEqual(self.tutor.hourly_rate, MIN_HOURLY_RATE)
 
     def test_accept_commission_terms_endpoint_is_idempotent(self):
         self.client.force_authenticate(user=self.tutor_user)
@@ -9437,6 +9539,63 @@ class TutorSubjectProposalTests(APITestCase):
         self.assertEqual(subject.proposed_by_tutor, self.tutor)
         self.assertEqual(subject.proposed_application, self.application)
         self.assertTrue(TutorSubjects.objects.filter(tutor=self.tutor, subject=subject).exists())
+
+    def _fill_subject_slots(self, count):
+        """Gives the tutor `count` catalog subjects, bypassing the API so the limit under test is
+        the only thing the request exercises."""
+        for index in range(count):
+            subject = Subjects.objects.create(
+                subject_code=f"FILL{index}", subject_name=f"Filler {index}", department="Filler",
+            )
+            TutorSubjects.objects.create(tutor=self.tutor, subject=subject, expertise_level=3)
+
+    def test_add_subject_is_refused_at_the_subject_limit(self):
+        # The cap used to be enforced on the propose path only, leaving the primary add path
+        # client-side-only.
+        self._fill_subject_slots(TUTOR_SUBJECT_LIMIT)
+
+        with patch("studybuddy.views.subject_is_recognized_for_profile", return_value=True):
+            response = self.client.post(
+                "/api/tutor/subjects/add/",
+                {"subject_code": self.catalog_subject.subject_code},
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn(str(TUTOR_SUBJECT_LIMIT), response.data["error"])
+        self.assertEqual(TutorSubjects.objects.filter(tutor=self.tutor).count(), TUTOR_SUBJECT_LIMIT)
+
+    def test_add_subject_is_allowed_one_below_the_limit(self):
+        self._fill_subject_slots(TUTOR_SUBJECT_LIMIT - 1)
+
+        with patch("studybuddy.views.subject_is_recognized_for_profile", return_value=True):
+            response = self.client.post(
+                "/api/tutor/subjects/add/",
+                {"subject_code": self.catalog_subject.subject_code},
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(TutorSubjects.objects.filter(tutor=self.tutor).count(), TUTOR_SUBJECT_LIMIT)
+
+    def test_add_subject_at_the_limit_can_still_update_an_existing_subject(self):
+        # A tutor sitting exactly at the cap must still be able to re-save a description on a
+        # subject they already hold -- that add is not a new selection.
+        self._fill_subject_slots(TUTOR_SUBJECT_LIMIT - 1)
+        TutorSubjects.objects.create(
+            tutor=self.tutor, subject=self.catalog_subject, expertise_level=3,
+        )
+
+        with patch("studybuddy.views.subject_is_recognized_for_profile", return_value=True):
+            response = self.client.post(
+                "/api/tutor/subjects/add/",
+                {"subject_code": self.catalog_subject.subject_code, "description": "Updated note."},
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        link = TutorSubjects.objects.get(tutor=self.tutor, subject=self.catalog_subject)
+        self.assertEqual(link.description, "Updated note.")
 
     def test_proposal_accepts_a_category_outside_the_curated_taxonomy(self):
         # A tutor proposing under a category an admin already added beyond the curated 6 (e.g.

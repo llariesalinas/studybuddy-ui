@@ -2,7 +2,7 @@
   <Teleport to="body">
     <div
       v-if="open"
-      class="session-cancel-shell"
+      class="session-cancel-shell sb-overlay"
       @click.self="emit('close')"
     >
       <section
@@ -188,9 +188,6 @@ onUnmounted(() => {
 
 <style scoped>
 .session-cancel-shell {
-  position: fixed;
-  inset: 0;
-  z-index: 1200;
   display: grid;
   place-items: center;
   padding: 24px;
@@ -198,6 +195,8 @@ onUnmounted(() => {
 }
 
 .session-cancel-card {
+  position: relative;
+  z-index: var(--sb-z-surface);
   width: min(100%, 440px);
   padding: 26px;
   background:

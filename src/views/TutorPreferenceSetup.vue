@@ -1,190 +1,145 @@
 <template>
-  <!-- Single wrapping element: App.vue's route Transition (mode="out-in") requires exactly one
-  root element to animate. A bare two-root template here (shell + modal as siblings) makes Vue
-  warn "renders non-element root node that cannot be animated" and can leave the transition stuck
-  mid-swap, blanking the page until a hard refresh. The modal stays `position: fixed`, so wrapping
-  it costs nothing visually -- this div introduces no transform/filter/perspective that would
-  change its containing block. -->
-  <div>
-    <TutorOnboardingShell :current-step="1">
-      <h3>Tutor profile setup</h3>
-      <p class="muted">Set your teaching preferences to start matching.</p>
+  <TutorOnboardingShell :current-step="1">
+    <h3>Tutor profile setup</h3>
+    <p class="muted">Set your teaching preferences to start matching.</p>
 
-      <form @submit.prevent="handleCompleteSetup">
-        <div class="field-block">
-          <label class="field-label">Course and Year Level</label>
-          <div class="course-year-display">
-            <span class="course-chip" :class="{ 'chip-unset': !form.course }">
-              {{ currentCourseLabel }}
-            </span>
-            <span class="year-chip" :class="{ 'chip-unset': !form.year_level }">
-              {{ currentYearLabel }}
-            </span>
-            <button type="button" class="change-btn sb-btn" @click="openCourseYearModal">
-              Change
-              <i class="bi bi-arrow-right-short"></i>
-            </button>
-          </div>
+    <form @submit.prevent="handleCompleteSetup">
+      <div class="field-block">
+        <label class="field-label">Course</label>
+        <p class="field-hint">Your own degree program or academic track.</p>
+        <SbSelectModal
+          v-model="form.course"
+          :options="courseOptions"
+          title="Course"
+          placeholder="+ Add Course"
+          search-placeholder="Search courses"
+          searchable
+        />
+      </div>
+
+      <div class="field-block">
+        <label class="field-label">Year Level</label>
+        <div class="year-grid" role="radiogroup" aria-label="Year level">
+          <button
+            v-for="year in filteredYearLevels"
+            :key="year.value"
+            type="button"
+            class="year-btn sb-btn"
+            :class="{ 'year-btn-active': Number(form.year_level) === year.value }"
+            role="radio"
+            :aria-checked="Number(form.year_level) === year.value"
+            @click="form.year_level = year.value"
+          >
+            {{ year.label }}
+          </button>
         </div>
+      </div>
 
-        <div class="field-block">
-          <label class="field-label">Expertise Level</label>
-          <p class="field-hint">Choose the learner level you are ready to teach.</p>
-          <div class="teaching-level-grid" role="radiogroup" aria-label="Teaching level">
-            <button
-              v-for="option in teachingLevelOptions"
-              :key="option.value"
-              type="button"
-              class="teaching-card sb-btn"
-              :class="{ 'teaching-card-active': form.teaching_level === option.value }"
-              role="radio"
-              :aria-checked="form.teaching_level === option.value"
-              @click="form.teaching_level = option.value"
-            >
-              <i :class="['bi', option.icon, 'teaching-card-icon']"></i>
-              <span class="teaching-card-label">{{ option.label }}</span>
-            </button>
-          </div>
+      <div class="field-block">
+        <label class="field-label">Expertise Level</label>
+        <p class="field-hint">Choose the learner level you are ready to teach.</p>
+        <div class="teaching-level-grid" role="radiogroup" aria-label="Teaching level">
+          <button
+            v-for="option in teachingLevelOptions"
+            :key="option.value"
+            type="button"
+            class="teaching-card sb-btn"
+            :class="{ 'teaching-card-active': form.teaching_level === option.value }"
+            role="radio"
+            :aria-checked="form.teaching_level === option.value"
+            @click="form.teaching_level = option.value"
+          >
+            <i :class="['bi', option.icon, 'teaching-card-icon']"></i>
+            <span class="teaching-card-label">{{ option.label }}</span>
+          </button>
         </div>
+      </div>
 
-        <div class="field-block">
-          <label class="field-label">Modality</label>
-          <div class="modality-pill-group">
-            <button
-              type="button"
-              class="modality-pill sb-btn sb-pill"
-              :class="{ 'modality-pill-active': form.can_online }"
-              :aria-pressed="form.can_online"
-              @click="form.can_online = !form.can_online"
-            >
-              <span class="modality-pill-icon"><i class="bi bi-camera-video-fill"></i></span>
-              <span>Online</span>
-            </button>
-            <button
-              type="button"
-              class="modality-pill sb-btn sb-pill"
-              :class="{ 'modality-pill-active': form.can_f2f }"
-              :aria-pressed="form.can_f2f"
-              @click="form.can_f2f = !form.can_f2f"
-            >
-              <span class="modality-pill-icon"><i class="bi bi-geo-alt-fill"></i></span>
-              <span>Face-to-Face</span>
-            </button>
-          </div>
+      <div class="field-block">
+        <label class="field-label">Modality</label>
+        <div class="modality-pill-group">
+          <button
+            type="button"
+            class="modality-pill sb-btn sb-pill"
+            :class="{ 'modality-pill-active': form.can_online }"
+            :aria-pressed="form.can_online"
+            @click="form.can_online = !form.can_online"
+          >
+            <span class="modality-pill-icon"><i class="bi bi-camera-video-fill"></i></span>
+            <span>Online</span>
+          </button>
+          <button
+            type="button"
+            class="modality-pill sb-btn sb-pill"
+            :class="{ 'modality-pill-active': form.can_f2f }"
+            :aria-pressed="form.can_f2f"
+            @click="form.can_f2f = !form.can_f2f"
+          >
+            <span class="modality-pill-icon"><i class="bi bi-geo-alt-fill"></i></span>
+            <span>Face-to-Face</span>
+          </button>
         </div>
+      </div>
 
-        <div class="field-block">
-          <label class="field-label" for="hourly-rate-input">Hourly Rate (PHP)</label>
-          <div class="rate-input-shell">
-            <span class="rate-prefix">PHP</span>
-            <input
-              id="hourly-rate-input"
-              type="text"
-              inputmode="numeric"
-              class="rate-input"
-              v-model="form.hourly_rate"
-              placeholder="0.00"
-              required
-              @input="sanitizeRateInput"
-            >
-          </div>
+      <div class="field-block">
+        <label class="field-label" for="hourly-rate-input">Hourly Rate (PHP)</label>
+        <div class="rate-input-shell">
+          <span class="rate-prefix">PHP</span>
+          <input
+            id="hourly-rate-input"
+            type="text"
+            inputmode="numeric"
+            class="rate-input"
+            v-model="form.hourly_rate"
+            placeholder="0.00"
+            required
+            @input="sanitizeRateInput"
+          >
         </div>
+        <p class="field-hint">
+          Between PHP {{ minHourlyRate }} and PHP {{ maxHourlyRate }} per hour.
+        </p>
+      </div>
 
-        <div class="commission-row">
-          <input class="form-check-input" type="checkbox" v-model="commissionTermsAccepted" id="commission-terms">
-          <label class="form-check-label" for="commission-terms">
-            I understand StudyBuddy deducts a {{ commissionRatePercent }}% platform fee from
-            each completed session's payout.
-          </label>
-        </div>
+      <div class="commission-row">
+        <input class="form-check-input" type="checkbox" v-model="commissionTermsAccepted" id="commission-terms">
+        <label class="form-check-label" for="commission-terms">
+          I understand StudyBuddy deducts a {{ commissionRatePercent }}% platform fee from
+          each completed session's payout.
+        </label>
+      </div>
 
-        <button type="submit" class="btn-primary-pill sb-btn" :disabled="!commissionTermsAccepted">
-          Continue to Subjects
-        </button>
-      </form>
-    </TutorOnboardingShell>
-
-    <div
-      v-if="isCourseYearModalOpen"
-      class="modal-backdrop-soft"
-      role="presentation"
-      @click.self="closeCourseYearModal"
-    >
-      <section
-        class="glass-modal course-year-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="course-year-title"
+      <button
+        type="submit"
+        class="btn-primary-pill sb-btn"
+        :disabled="!isSetupComplete"
+        :title="incompleteReason || undefined"
       >
-        <div class="modal-header-row">
-          <div>
-            <p class="modal-kicker">Academic Context</p>
-            <h2 id="course-year-title" class="modal-title">Course and Year Level</h2>
-          </div>
-          <button type="button" class="modal-close sb-btn" aria-label="Close" @click="closeCourseYearModal">
-            <i class="bi bi-x-lg"></i>
-          </button>
-        </div>
+        Continue to Subjects
+      </button>
 
-        <div class="modal-section">
-          <p class="modal-section-label">Course</p>
-          <div class="course-grid">
-            <button
-              v-for="course in courses"
-              :key="course.course_code"
-              type="button"
-              class="course-card sb-btn"
-              :class="{ 'course-card-active': draftCourse === course.course_code }"
-              @click="draftCourse = course.course_code"
-            >
-              <span class="course-card-code">{{ course.course_code }}</span>
-              <span class="course-card-name">{{ course.course_name }}</span>
-            </button>
-
-            <p v-if="!courses.length" class="empty-note modal-empty">
-              Courses are not available right now.
-            </p>
-          </div>
-        </div>
-
-        <div class="modal-section">
-          <p class="modal-section-label">Year Level</p>
-          <div class="year-grid">
-            <button
-              v-for="year in filteredDraftYearLevels"
-              :key="year.value"
-              type="button"
-              class="year-btn sb-btn"
-              :class="{ 'year-btn-active': Number(draftYearLevel) === year.value }"
-              @click="draftYearLevel = year.value"
-            >
-              {{ year.label }}
-            </button>
-          </div>
-        </div>
-
-        <div class="modal-footer-row">
-          <button type="button" class="btn-ghost-sm sb-btn" @click="closeCourseYearModal">
-            Cancel
-          </button>
-          <button type="button" class="btn-confirm sb-btn" @click="confirmCourseYearSelection">
-            Confirm
-          </button>
-        </div>
-      </section>
-    </div>
-  </div>
+      <p v-if="incompleteReason" class="setup-blocker" role="status">
+        <i class="bi bi-info-circle-fill"></i>
+        {{ incompleteReason }}
+      </p>
+    </form>
+  </TutorOnboardingShell>
 </template>
 
 <script setup>
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useProfileStore } from '@/stores/profile'
 import { useToastStore } from '@/stores/toast'
 import { useCatalogStore } from '@/stores/catalog'
 import api from '@/services/api/api'
-import { PLATFORM_COMMISSION_RATE_PERCENT } from '@/config'
+import {
+  MAX_HOURLY_RATE,
+  MIN_HOURLY_RATE,
+  PLATFORM_COMMISSION_RATE_PERCENT,
+} from '@/config'
 import TutorOnboardingShell from '@/components/TutorOnboardingShell.vue'
+import SbSelectModal from '@/components/SbSelectModal.vue'
 
 const router = useRouter()
 const profileStore = useProfileStore()
@@ -193,8 +148,8 @@ const catalogStore = useCatalogStore()
 
 const commissionRatePercent = PLATFORM_COMMISSION_RATE_PERCENT
 
-// A tutor's hourly rate can't be negative.
-const MIN_HOURLY_RATE = 0
+const minHourlyRate = MIN_HOURLY_RATE
+const maxHourlyRate = MAX_HOURLY_RATE
 
 const form = ref({
   course: '',
@@ -215,13 +170,9 @@ const teachingLevelOptions = [
   { label: 'College', value: 'College', icon: 'bi-mortarboard-fill' },
 ]
 
-// Course/year picker — same picker as TutorProfile.vue's "Change" flow (Identity Details),
-// reused here so it's collected at onboarding instead of only after the tutor already has a
-// profile to edit.
+// Course/year picker — same controls as TutorProfile.vue's Identity Details section, so a tutor
+// sees one consistent way to set their course whether they are onboarding or editing later.
 const courses = ref([])
-const isCourseYearModalOpen = ref(false)
-const draftCourse = ref('')
-const draftYearLevel = ref(null)
 
 const yearLevels = [
   { label: 'Grade 1', value: 1 },
@@ -274,26 +225,15 @@ function getCourseEducationLevel(course) {
   return null
 }
 
-const currentCourseLabel = computed(() => {
-  if (!form.value.course) {
-    return 'Select course'
-  }
+const courseOptions = computed(() =>
+  courses.value.map(course => ({
+    label: `${course.course_code} - ${course.course_name}`,
+    value: course.course_code,
+  }))
+)
 
-  const course = courses.value.find(item => item.course_code === form.value.course)
-  if (!course) {
-    return form.value.course
-  }
-
-  return `${course.course_code} - ${course.course_name}`
-})
-
-const currentYearLabel = computed(() => {
-  const year = yearLevels.find(item => item.value === Number(form.value.year_level))
-  return year?.label || 'Select year'
-})
-
-const filteredDraftYearLevels = computed(() => {
-  const selectedCourse = courses.value.find(course => course.course_code === draftCourse.value)
+const filteredYearLevels = computed(() => {
+  const selectedCourse = courses.value.find(course => course.course_code === form.value.course)
   const level = getCourseEducationLevel(selectedCourse)
 
   if (level === 'elementary') {
@@ -315,21 +255,17 @@ const filteredDraftYearLevels = computed(() => {
   return yearLevels
 })
 
-function openCourseYearModal() {
-  draftCourse.value = form.value.course || ''
-  draftYearLevel.value = form.value.year_level || null
-  isCourseYearModalOpen.value = true
-}
+// Switching course narrows the year-level options (a college course cannot be Grade 3), so a
+// year carried over from the previous course would otherwise stay selected while invisible.
+watch(() => form.value.course, () => {
+  const stillValid = filteredYearLevels.value.some(
+    year => year.value === Number(form.value.year_level)
+  )
 
-function closeCourseYearModal() {
-  isCourseYearModalOpen.value = false
-}
-
-function confirmCourseYearSelection() {
-  form.value.course = draftCourse.value
-  form.value.year_level = draftYearLevel.value
-  closeCourseYearModal()
-}
+  if (!stillValid) {
+    form.value.year_level = null
+  }
+})
 
 async function loadCourses() {
   try {
@@ -348,6 +284,70 @@ const sanitizeRateInput = (event) => {
     .replace(/(\..*)\./g, '$1')
   form.value.hourly_rate = sanitized
 }
+
+
+/* SETUP COMPLETENESS CHECK */
+
+// The rate field is free text (see sanitizeRateInput), so "", "." and "12." all reach here.
+// Returns null for anything that is not a usable number rather than leaning on Number(''), which
+// is 0 and would read as a filled-in rate.
+const parsedHourlyRate = computed(() => {
+  const raw = String(form.value.hourly_rate ?? '').trim()
+
+  if (!raw) {
+    return null
+  }
+
+  const parsed = Number(raw)
+  return Number.isFinite(parsed) ? parsed : null
+})
+
+const isHourlyRateValid = computed(() =>
+  parsedHourlyRate.value !== null &&
+  parsedHourlyRate.value >= minHourlyRate &&
+  parsedHourlyRate.value <= maxHourlyRate
+)
+
+// Both modality flags are independent booleans, so a tutor can switch both off and end up
+// bookable in no format at all.
+const hasModality = computed(() => Boolean(form.value.can_online || form.value.can_f2f))
+
+// Ordered top-to-bottom to match the form, so the message always names the first thing the tutor
+// still has to do. Doubles as the reason the Continue button is disabled -- a dead submit control
+// with no explanation reads as a broken page.
+const incompleteReason = computed(() => {
+  if (!form.value.course) {
+    return 'Select your course to continue.'
+  }
+
+  if (!form.value.year_level) {
+    return 'Select your year level to continue.'
+  }
+
+  if (!form.value.teaching_level) {
+    return 'Select the expertise level you can teach.'
+  }
+
+  if (!hasModality.value) {
+    return 'Pick at least one modality — Online, Face-to-Face, or both.'
+  }
+
+  if (parsedHourlyRate.value === null) {
+    return 'Enter your hourly rate to continue.'
+  }
+
+  if (!isHourlyRateValid.value) {
+    return `Your hourly rate must be between PHP ${minHourlyRate} and PHP ${maxHourlyRate}.`
+  }
+
+  if (!commissionTermsAccepted.value) {
+    return 'Acknowledge the platform commission to continue.'
+  }
+
+  return ''
+})
+
+const isSetupComplete = computed(() => !incompleteReason.value)
 
 
 /* LOAD EXISTING TUTOR DATA */
@@ -390,10 +390,25 @@ const handleCompleteSetup = async () => {
     return
   }
 
+  if (!hasModality.value) {
+    toastStore.push("Please choose at least one modality.", 'warning')
+    return
+  }
+
   const parsedRate = Number(form.value.hourly_rate)
 
-  if (!form.value.hourly_rate || Number.isNaN(parsedRate) || parsedRate <= MIN_HOURLY_RATE) {
+  if (!form.value.hourly_rate || Number.isNaN(parsedRate)) {
     toastStore.push("Please enter a valid hourly rate.", 'warning')
+    return
+  }
+
+  // Checked here rather than in sanitizeRateInput: clamping mid-keystroke would fight a tutor
+  // typing "200" by rewriting the "2". The server clamps to the same bounds on save.
+  if (parsedRate < minHourlyRate || parsedRate > maxHourlyRate) {
+    toastStore.push(
+      `Your hourly rate must be between PHP ${minHourlyRate} and PHP ${maxHourlyRate}.`,
+      'warning',
+    )
     return
   }
 
@@ -452,59 +467,6 @@ const handleCompleteSetup = async () => {
   color: var(--sb-text-muted);
 }
 
-/* Course/year chip row — same visual language as TutorProfile.vue's Identity Details card,
-   reused here since this is where the course/year selector now lives during onboarding. */
-.course-year-display {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-  margin-bottom: 1.25rem;
-}
-
-.course-chip,
-.year-chip {
-  display: inline-flex;
-  align-items: center;
-  min-height: 34px;
-  max-width: 100%;
-  padding: 0.42rem 0.7rem;
-  border: 1px solid rgba(0, 137, 90, 0.22);
-  border-radius: 10px;
-  background: rgba(0, 137, 90, 0.08);
-  color: var(--sb-primary);
-  font-size: 0.84rem;
-  font-weight: 750;
-}
-
-.course-chip {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.chip-unset {
-  color: #94a3b8;
-  background: #f8fafc;
-  border-color: #dbe3df;
-}
-
-.change-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.2rem;
-  border: 1.5px dashed #b9c7c1;
-  background: transparent;
-  color: #4b655b;
-  font-weight: 800;
-  padding: 0.42rem 0.7rem;
-}
-
-.change-btn:hover {
-  border-color: var(--sb-primary);
-  color: var(--sb-primary);
-  background: rgba(0, 137, 90, 0.05);
-}
 
 /* Expertise-level card grid — same pattern as TutorProfile.vue's Expertise Level section. */
 .teaching-level-grid {
@@ -542,116 +504,10 @@ const handleCompleteSetup = async () => {
   font-weight: 850;
 }
 
-/* Course/year modal — same shell and grids as TutorProfile.vue's course-year-modal. */
-.modal-backdrop-soft {
-  position: fixed;
-  inset: 0;
-  z-index: 1050;
-  display: grid;
-  place-items: center;
-  padding: 1.5rem;
-  background: rgba(15, 23, 42, 0.46);
-}
-
-.glass-modal {
-  width: min(100%, 680px);
-  max-height: min(86vh, 780px);
-  display: grid;
-  gap: 1.1rem;
-  overflow: auto;
-  border: 1px solid rgba(255, 255, 255, 0.92);
-  border-radius: 22px;
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 28px 90px rgba(15, 23, 42, 0.26);
-  padding: 1.5rem;
-}
-
-.modal-header-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
-.modal-kicker {
-  margin: 0 0 0.25rem;
-  color: var(--sb-primary);
-  font-size: 0.74rem;
-  font-weight: 800;
-  text-transform: uppercase;
-}
-
-.modal-title {
-  margin: 0;
-  color: #10231d;
-  font-size: 1.25rem;
-  font-weight: 850;
-}
-
-.modal-close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 38px;
-  height: 38px;
-  flex: 0 0 auto;
-  border: 1px solid #dbe7e1;
-  background: #fff;
-  color: #526960;
-}
-
-.modal-section {
-  display: grid;
-  gap: 0.75rem;
-}
-
-.modal-section-label {
-  margin: 0;
-  color: #64748b;
-  font-size: 0.74rem;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0;
-}
-
-.course-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
-  gap: 0.55rem;
-}
-
 .empty-note {
   margin: 0;
   color: #7b8b84;
   font-size: 0.88rem;
-}
-
-.course-card {
-  display: grid;
-  gap: 0.18rem;
-  min-height: 76px;
-  border: 1.5px solid #dbe7e1;
-  background: rgba(248, 250, 252, 0.82);
-  padding: 0.65rem 0.75rem;
-  text-align: left;
-}
-
-.course-card:hover,
-.course-card-active {
-  border-color: var(--sb-primary);
-  background: rgba(0, 137, 90, 0.08);
-}
-
-.course-card-code {
-  color: #10231d;
-  font-size: 0.84rem;
-  font-weight: 850;
-}
-
-.course-card-name {
-  color: #64748b;
-  font-size: 0.75rem;
-  line-height: 1.25;
 }
 
 .year-grid {
@@ -677,52 +533,9 @@ const handleCompleteSetup = async () => {
   color: #fff;
 }
 
-.modal-footer-row {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.75rem;
-}
-
-.btn-ghost-sm,
-.btn-confirm {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.45rem;
-  border: 0;
-  border-radius: 999px;
-  font-weight: 800;
-  padding: 0.6rem 1.1rem;
-}
-
-.btn-ghost-sm {
-  background: transparent;
-  color: var(--sb-text-muted);
-}
-
-.btn-ghost-sm:hover {
-  color: var(--sb-text-main);
-}
-
-.btn-confirm {
-  color: #fff;
-  background: var(--sb-primary);
-  box-shadow: 0 12px 24px rgba(0, 137, 90, 0.22);
-}
-
-.btn-confirm:hover {
-  background: var(--sb-primary-hover);
-  color: #fff;
-}
-
 @media (max-width: 540px) {
   .teaching-level-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .course-grid {
-    grid-template-columns: 1fr;
   }
 
   .year-grid {
@@ -762,6 +575,15 @@ const handleCompleteSetup = async () => {
 .btn-primary-pill:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.setup-blocker {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.6rem 0 0;
+  font-size: 0.82rem;
+  color: var(--sb-text-muted);
 }
 
 /* Modality pills — same visual language as InitialBooking.vue's "Preferred Mode"

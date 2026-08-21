@@ -294,7 +294,8 @@
       </div>
       <div
         v-if="selectedTicket"
-        class="offcanvas-backdrop fade show"
+        class="offcanvas-backdrop fade show sb-overlay"
+        data-sb-owned
         @click="selectedTicket = null"
       ></div>
     </Teleport>
@@ -360,7 +361,8 @@
       </div>
       <div
         v-if="ticketToEscalate"
-        class="modal-backdrop fade show"
+        class="modal-backdrop fade show sb-overlay"
+        data-sb-owned
         @click="closeEscalationModal"
       ></div>
     </Teleport>
@@ -479,7 +481,8 @@
       </div>
       <div
         v-if="ticketToJudge"
-        class="modal-backdrop fade show"
+        class="modal-backdrop fade show sb-overlay"
+        data-sb-owned
         @click="closeVerdictModal"
       ></div>
     </Teleport>
@@ -790,6 +793,11 @@ const formatDateFull = (dateStr) => {
 </script>
 
 <style scoped>
+.offcanvas,
+.modal {
+  z-index: var(--sb-z-surface);
+}
+
 .verdict-subject {
   background: var(--sb-bg);
   border: 1px solid var(--sb-card-border);

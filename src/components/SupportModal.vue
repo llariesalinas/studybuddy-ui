@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div v-if="open" class="support-modal-shell" @click.self="emit('close')">
+    <div v-if="open" class="support-modal-shell sb-overlay" @click.self="emit('close')">
       <div
         class="support-modal-card"
         role="dialog"
@@ -198,9 +198,6 @@ onUnmounted(() => {
 
 <style scoped>
 .support-modal-shell {
-  position: fixed;
-  inset: 0;
-  z-index: 1200;
   background: rgba(15, 23, 42, 0.45);
   display: grid;
   place-items: center;
@@ -208,6 +205,8 @@ onUnmounted(() => {
 }
 
 .support-modal-card {
+  position: relative;
+  z-index: var(--sb-z-surface);
   width: min(100%, 500px);
   background: #ffffff;
   border: 1px solid rgba(241, 245, 249, 0.8);

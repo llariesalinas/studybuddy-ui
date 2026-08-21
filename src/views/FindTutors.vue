@@ -539,7 +539,7 @@ const runRecommendation = async () => {
     rating: tutor.rating ?? 5.0,
     bio: 'Peer tutor available.',
     subjects: tutor.subjects ?? [],
-    hourly_rate: tutor.hourly_rate ?? 150,
+    hourly_rate: tutor.hourly_rate ?? 0,
     total_sessions: tutor.total_sessions ?? 0,
     available_days: tutor.available_days ?? [],
     score: tutor.score,

@@ -212,6 +212,7 @@ import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAdminStore } from '@/stores/admin'
 import { useHaptics } from '@/composables/useHaptics'
+import { formatCount } from '@/utils/currency'
 
 const store = useAdminStore()
 const router = useRouter()
@@ -242,14 +243,14 @@ const kpiCards = computed(() => {
   return [
     {
       label: 'Active Members',
-      value: formatCompact(totalMembers),
+      value: formatCount(totalMembers),
       delta: `${s.total_tutors || 0} tutors / ${s.total_tutees || 0} tutees · +${newThisMonth} this month`,
       icon: 'bi-people-fill',
       tone: 'tone-primary',
     },
     {
       label: 'Sessions This Week',
-      value: formatCompact(thisWeek),
+      value: formatCount(thisWeek),
       delta: sessionDelta,
       icon: 'bi-calendar-check',
       tone: 'tone-info',
@@ -263,7 +264,7 @@ const kpiCards = computed(() => {
     },
     {
       label: 'Needs Attention',
-      value: formatCompact(store.operationalQueue.count || 0),
+      value: formatCount(store.operationalQueue.count || 0),
       delta: store.operationalQueue.count ? 'Items in your queue' : 'All clear',
       icon: 'bi-inbox-fill',
       tone: 'tone-danger',
@@ -341,10 +342,6 @@ function initials(name) {
   const parts = String(name || '').trim().split(/\s+/).filter(Boolean)
   if (!parts.length) return 'SB'
   return parts.slice(0, 2).map((part) => part.charAt(0).toUpperCase()).join('')
-}
-
-function formatCompact(value) {
-  return Number(value || 0).toLocaleString(undefined, { notation: 'compact', maximumFractionDigits: 1 })
 }
 
 function formatShortDate(value) {

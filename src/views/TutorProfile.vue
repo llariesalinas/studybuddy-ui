@@ -94,17 +94,31 @@
               </div>
 
               <div class="field">
-                <span class="field-label">Course and Year Level</span>
-                <div class="course-year-display">
-                  <span class="course-chip" :class="{ 'chip-unset': !profile.course }">
-                    {{ currentCourseLabel }}
-                  </span>
-                  <span class="year-chip" :class="{ 'chip-unset': !profile.year_level }">
-                    {{ currentYearLabel }}
-                  </span>
-                  <button type="button" class="change-btn sb-btn" @click="openCourseYearModal">
-                    Change
-                    <i class="bi bi-arrow-right-short"></i>
+                <span class="field-label">Course</span>
+                <SbSelectModal
+                  v-model="profile.course"
+                  :options="courseOptions"
+                  title="Course"
+                  placeholder="+ Add Course"
+                  search-placeholder="Search courses"
+                  searchable
+                />
+              </div>
+
+              <div class="field">
+                <span class="field-label">Year Level</span>
+                <div class="year-grid" role="radiogroup" aria-label="Year level">
+                  <button
+                    v-for="year in filteredYearLevels"
+                    :key="year.value"
+                    type="button"
+                    class="year-btn sb-btn"
+                    :class="{ 'year-btn-active': Number(profile.year_level) === year.value }"
+                    role="radio"
+                    :aria-checked="Number(profile.year_level) === year.value"
+                    @click="profile.year_level = year.value"
+                  >
+                    {{ year.label }}
                   </button>
                 </div>
               </div>
@@ -163,12 +177,16 @@
                   <button
                     type="button"
                     class="stepper-btn sb-btn"
+                    :disabled="normalizedRate >= maxHourlyRate"
                     aria-label="Increase hourly rate"
                     @click="incrementRate"
                   >
                     <i class="bi bi-plus-lg"></i>
                   </button>
                 </div>
+                <p class="field-hint">
+                  Maximum PHP {{ maxHourlyRate.toFixed(2) }} per hour.
+                </p>
               </div>
 
               <div class="field">
@@ -198,9 +216,14 @@
               <span class="segment-icon"><i class="bi bi-stars"></i></span>
               <div>
                 <h2 class="segment-title">Specializations</h2>
-                <p class="segment-copy">Select subjects and describe your tutoring approach.</p>
+                <p class="segment-copy">
+                  Your top {{ TUTOR_SUBJECT_LIMIT }} subjects — the ones you teach best.
+                </p>
               </div>
-              <span class="subject-counter">{{ profile.subjects.length }}/8</span>
+              <span
+                class="subject-counter"
+                :class="{ 'subject-counter-full': isAtSubjectLimit }"
+              >{{ profile.subjects.length }}/{{ TUTOR_SUBJECT_LIMIT }}</span>
             </div>
 
             <div class="field-group">
@@ -221,11 +244,22 @@
                   </button>
                 </span>
 
-                <button type="button" class="subject-add-btn sb-btn" @click="openSubjectModal">
+                <button
+                  type="button"
+                  class="subject-add-btn sb-btn"
+                  :disabled="isAtSubjectLimit"
+                  :title="isAtSubjectLimit ? subjectLimitMessage : undefined"
+                  @click="openSubjectModal"
+                >
                   <i class="bi bi-plus-lg"></i>
                   Add Subject
                 </button>
               </div>
+
+              <p v-if="isAtSubjectLimit" class="limit-notice">
+                <i class="bi bi-info-circle-fill"></i>
+                {{ subjectLimitMessage }}
+              </p>
 
               <p v-if="!profile.subjects.length" class="empty-note">
                 No subjects selected yet.
@@ -368,79 +402,10 @@
       </main>
     </form>
 
-    <div
-      v-if="isCourseYearModalOpen"
-      class="modal-backdrop-soft"
-      role="presentation"
-      @click.self="closeCourseYearModal"
-    >
-      <section
-        class="glass-modal course-year-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="course-year-title"
-      >
-        <div class="modal-header-row">
-          <div>
-            <p class="modal-kicker">Academic Context</p>
-            <h2 id="course-year-title" class="modal-title">Course and Year Level</h2>
-          </div>
-          <button type="button" class="modal-close sb-btn" aria-label="Close" @click="closeCourseYearModal">
-            <i class="bi bi-x-lg"></i>
-          </button>
-        </div>
-
-        <div class="modal-section">
-          <p class="modal-section-label">Course</p>
-          <div class="course-grid">
-            <button
-              v-for="course in courses"
-              :key="course.course_code"
-              type="button"
-              class="course-card sb-btn"
-              :class="{ 'course-card-active': draftCourse === course.course_code }"
-              @click="draftCourse = course.course_code"
-            >
-              <span class="course-card-code">{{ course.course_code }}</span>
-              <span class="course-card-name">{{ course.course_name }}</span>
-            </button>
-
-            <p v-if="!courses.length" class="empty-note modal-empty">
-              Courses are not available right now.
-            </p>
-          </div>
-        </div>
-
-        <div class="modal-section">
-          <p class="modal-section-label">Year Level</p>
-          <div class="year-grid">
-            <button
-              v-for="year in filteredDraftYearLevels"
-              :key="year.value"
-              type="button"
-              class="year-btn sb-btn"
-              :class="{ 'year-btn-active': Number(draftYearLevel) === year.value }"
-              @click="draftYearLevel = year.value"
-            >
-              {{ year.label }}
-            </button>
-          </div>
-        </div>
-
-        <div class="modal-footer-row">
-          <button type="button" class="btn-ghost-sm sb-btn" @click="closeCourseYearModal">
-            Cancel
-          </button>
-          <button type="button" class="btn-confirm sb-btn" @click="confirmCourseYearSelection">
-            Confirm
-          </button>
-        </div>
-      </section>
-    </div>
-
+    <Teleport to="body">
     <div
       v-if="isSubjectModalOpen"
-      class="modal-backdrop-soft"
+      class="modal-backdrop-soft sb-overlay"
       role="presentation"
       @click.self="closeSubjectModal"
     >
@@ -460,32 +425,6 @@
           </button>
         </div>
 
-        <label class="field">
-          <span class="field-label">Search Subjects</span>
-          <input
-            v-model.trim="subjectSearch"
-            type="text"
-            class="input-glass sb-field"
-            placeholder="Search by subject name or code"
-          >
-        </label>
-
-        <div class="modal-section">
-          <p class="modal-section-label">Categories</p>
-          <div class="category-pills">
-            <button
-              v-for="category in availableCategories"
-              :key="category"
-              type="button"
-              class="category-pill sb-btn"
-              :class="{ active: activeCategory === category }"
-              @click="activeCategory = category"
-            >
-              {{ category }}
-            </button>
-          </div>
-        </div>
-
         <div class="subject-modal-list">
           <div v-if="isLoadingSubjects" class="modal-status">
             <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
@@ -494,33 +433,14 @@
           <div v-else-if="subjectsLoadError" class="modal-status modal-error">
             {{ subjectsLoadError }}
           </div>
-          <template v-else>
-            <button
-              v-for="subject in filteredSubjects"
-              :key="subject.subject_code"
-              type="button"
-              class="subject-option sb-btn"
-              :class="{ selected: isDraftSelected(subject.subject_code) }"
-              @click="toggleDraftSubject(subject.subject_code)"
-            >
-              <span class="subject-option-copy">
-                <span class="subject-option-name">{{ subject.subject_name }}</span>
-                <span class="subject-option-meta">
-                  {{ normalizeCategory(subject.category) }}
-                </span>
-              </span>
-              <span class="subject-option-check" aria-hidden="true">
-                <i
-                  class="bi"
-                  :class="isDraftSelected(subject.subject_code) ? 'bi-check-circle-fill' : 'bi-circle'"
-                ></i>
-              </span>
-            </button>
-
-            <div v-if="!filteredSubjects.length" class="modal-status">
-              No subjects match your filters.
-            </div>
-          </template>
+          <!-- Same picker the onboarding step uses, so the browse/search/limit behaviour a tutor
+               learned during onboarding is the behaviour they get when editing later. -->
+          <SubjectTaxonomyPicker
+            v-else
+            v-model="draftSubjectCodes"
+            :subjects="allSubjects"
+            :max-selection="TUTOR_SUBJECT_LIMIT"
+          />
         </div>
 
         <div class="subject-modal-footer">
@@ -536,6 +456,7 @@
         </div>
       </section>
     </div>
+    </Teleport>
   </div>
 </template>
 
@@ -547,6 +468,14 @@ import { useAuthStore } from '@/stores/auth'
 import { useCatalogStore } from '@/stores/catalog'
 import { useToastStore } from '@/stores/toast'
 import { useProfileStore } from '@/stores/profile'
+import {
+  HOURLY_RATE_STEP,
+  MAX_HOURLY_RATE,
+  MIN_HOURLY_RATE,
+  TUTOR_SUBJECT_LIMIT,
+} from '@/config'
+import SbSelectModal from '@/components/SbSelectModal.vue'
+import SubjectTaxonomyPicker from '@/components/SubjectTaxonomyPicker.vue'
 import VerificationStatusCard from '@/components/VerificationStatusCard.vue'
 import VerificationDevPanel from '@/components/VerificationDevPanel.vue'
 
@@ -558,8 +487,9 @@ const catalogStore = useCatalogStore()
 const toastStore = useToastStore()
 const profileStore = useProfileStore()
 
-const minHourlyRate = 50
-const hourlyRateStep = 10
+const minHourlyRate = MIN_HOURLY_RATE
+const maxHourlyRate = MAX_HOURLY_RATE
+const hourlyRateStep = HOURLY_RATE_STEP
 
 const profile = ref({
   fullName: '',
@@ -588,12 +518,7 @@ const isLoadingProfile = ref(false)
 const isSavingProfile = ref(false)
 const isUploadingAvatar = ref(false)
 const isSubjectModalOpen = ref(false)
-const isCourseYearModalOpen = ref(false)
-const subjectSearch = ref('')
-const activeCategory = ref('All')
 const draftSubjectCodes = ref([])
-const draftCourse = ref('')
-const draftYearLevel = ref(null)
 const openSubjectCode = ref(null)
 const isLoadingSubjects = ref(false)
 const subjectsLoadError = ref('')
@@ -638,9 +563,12 @@ watch(
 
 const bioCharCount = computed(() => profile.value.bio?.length || 0)
 
+// Clamped at both ends so a tutor carrying a pre-cap rate (seeded demo data had 350) sees the
+// value the server will actually store, rather than a figure that silently changes on save.
 const normalizedRate = computed(() => {
   const rate = Number(profile.value.hourly_rate)
-  return Number.isFinite(rate) ? Math.max(rate, minHourlyRate) : minHourlyRate
+  if (!Number.isFinite(rate)) return minHourlyRate
+  return Math.min(Math.max(rate, minHourlyRate), maxHourlyRate)
 })
 
 const avatarUrl = computed(() => profile.value.profile_picture_url || '')
@@ -664,26 +592,15 @@ const initials = computed(() => {
     .join('')
 })
 
-const currentCourseLabel = computed(() => {
-  if (!profile.value.course) {
-    return 'Select course'
-  }
+const courseOptions = computed(() =>
+  courses.value.map(course => ({
+    label: `${course.course_code} - ${course.course_name}`,
+    value: course.course_code,
+  }))
+)
 
-  const course = courses.value.find(item => item.course_code === profile.value.course)
-  if (!course) {
-    return profile.value.course
-  }
-
-  return `${course.course_code} - ${course.course_name}`
-})
-
-const currentYearLabel = computed(() => {
-  const year = yearLevels.find(item => item.value === Number(profile.value.year_level))
-  return year?.label || 'Select year'
-})
-
-const filteredDraftYearLevels = computed(() => {
-  const selectedCourse = courses.value.find(course => course.course_code === draftCourse.value)
+const filteredYearLevels = computed(() => {
+  const selectedCourse = courses.value.find(course => course.course_code === profile.value.course)
   const level = getCourseEducationLevel(selectedCourse)
 
   if (level === 'elementary') {
@@ -705,38 +622,15 @@ const filteredDraftYearLevels = computed(() => {
   return yearLevels
 })
 
-const availableCategories = computed(() => {
-  const categories = allSubjects.value
-    .map(subject => normalizeCategory(subject.category))
-    .filter(Boolean)
-
-  return ['All', ...new Set(categories)]
-})
-
-const filteredSubjects = computed(() => {
-  const query = subjectSearch.value.trim().toLowerCase()
-
-  return allSubjects.value.filter(subject => {
-    const category = normalizeCategory(subject.category)
-    const matchesCategory = activeCategory.value === 'All' || category === activeCategory.value
-    const matchesSearch =
-      !query ||
-      subject.subject_name.toLowerCase().includes(query) ||
-      category.toLowerCase().includes(query)
-
-    return matchesCategory && matchesSearch
-  })
-})
-
 const selectedDraftCountLabel = computed(() => {
   const count = draftSubjectCodes.value.length
-  return `${count} subject${count === 1 ? '' : 's'} selected`
+  return `${count} of ${TUTOR_SUBJECT_LIMIT} subject${count === 1 ? '' : 's'} selected`
 })
 
-function normalizeCategory(category) {
-  const normalized = category?.trim()
-  return normalized || 'Uncategorized'
-}
+const isAtSubjectLimit = computed(() => profile.value.subjects.length >= TUTOR_SUBJECT_LIMIT)
+
+const subjectLimitMessage =
+  `You've reached the ${TUTOR_SUBJECT_LIMIT}-subject limit. Remove one to add another.`
 
 function getCourseEducationLevel(course) {
   if (!course) {
@@ -811,44 +705,22 @@ function syncProfileSubjectsFromCodes(subjectCodes) {
     .sort((left, right) => left.subject_name.localeCompare(right.subject_name))
 }
 
-function openCourseYearModal() {
-  draftCourse.value = profile.value.course || ''
-  draftYearLevel.value = profile.value.year_level || null
-  isCourseYearModalOpen.value = true
-  alignDraftYearLevelWithCourse()
-}
-
-function closeCourseYearModal() {
-  isCourseYearModalOpen.value = false
-}
-
-function confirmCourseYearSelection() {
-  profile.value.course = draftCourse.value
-  profile.value.year_level = draftYearLevel.value
-  closeCourseYearModal()
-}
-
-function alignDraftYearLevelWithCourse() {
-  const yearOptions = filteredDraftYearLevels.value
-
-  if (!yearOptions.length) {
+// Switching course narrows the year-level options (a college course cannot be Grade 3), so a year
+// carried over from the previous course would otherwise stay selected while no longer on screen.
+// Guarded against the initial hydration, where the stored course and year arrive as separate
+// assignments and must not clear each other.
+watch(() => profile.value.course, () => {
+  if (isLoadingProfile.value) {
     return
   }
 
-  const currentDraftYear = Number(draftYearLevel.value)
-  const hasCurrentYear = yearOptions.some(year => year.value === currentDraftYear)
+  const stillValid = filteredYearLevels.value.some(
+    year => year.value === Number(profile.value.year_level)
+  )
 
-  if (!hasCurrentYear) {
-    draftYearLevel.value = yearOptions[0].value
+  if (!stillValid) {
+    profile.value.year_level = null
   }
-}
-
-watch(filteredDraftYearLevels, () => {
-  if (!isCourseYearModalOpen.value) {
-    return
-  }
-
-  alignDraftYearLevelWithCourse()
 })
 
 async function openSubjectModal() {
@@ -857,34 +729,12 @@ async function openSubjectModal() {
   }
 
   draftSubjectCodes.value = profile.value.subjects.map(subject => subject.subject_code)
-  subjectSearch.value = ''
-  activeCategory.value = 'All'
   isSubjectModalOpen.value = true
 }
 
 function closeSubjectModal() {
   isSubjectModalOpen.value = false
-  subjectSearch.value = ''
-  activeCategory.value = 'All'
   draftSubjectCodes.value = []
-}
-
-function isDraftSelected(subjectCode) {
-  return draftSubjectCodes.value.includes(subjectCode)
-}
-
-function toggleDraftSubject(subjectCode) {
-  if (isDraftSelected(subjectCode)) {
-    draftSubjectCodes.value = draftSubjectCodes.value.filter(code => code !== subjectCode)
-    return
-  }
-
-  if (draftSubjectCodes.value.length >= 8) {
-    toastStore.push('You can select up to 8 subjects.', 'warning')
-    return
-  }
-
-  draftSubjectCodes.value = [...draftSubjectCodes.value, subjectCode]
 }
 
 function confirmSubjectSelection() {
@@ -907,7 +757,7 @@ function toggleSubjectAccordion(subjectCode) {
 }
 
 function incrementRate() {
-  profile.value.hourly_rate = normalizedRate.value + hourlyRateStep
+  profile.value.hourly_rate = Math.min(maxHourlyRate, normalizedRate.value + hourlyRateStep)
 }
 
 function decrementRate() {
@@ -1165,10 +1015,8 @@ onMounted(() => {
 .header-left,
 .header-actions,
 .segment-header,
-.course-year-display,
 .profile-actions,
 .modal-header-row,
-.modal-footer-row,
 .modal-footer-actions,
 .subject-modal-footer {
   display: flex;
@@ -1387,6 +1235,32 @@ onMounted(() => {
   border: 1px solid var(--sb-green-border);
 }
 
+/* At the cap the counter is the explanation for the disabled Add Subject button, so it needs to
+   read as a stop rather than as a neutral tally. */
+.subject-counter-full {
+  color: var(--sb-pop-orange-deep);
+  background: color-mix(in srgb, var(--sb-pop-orange-deep) 10%, transparent);
+  border-color: color-mix(in srgb, var(--sb-pop-orange-deep) 35%, transparent);
+}
+
+.limit-notice {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.6rem 0 0;
+  padding: 0.6rem 0.85rem;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--sb-pop-orange-deep) 30%, transparent);
+  background: color-mix(in srgb, var(--sb-pop-orange-deep) 8%, transparent);
+  color: var(--sb-text-main);
+  font-size: 0.85rem;
+}
+
+.subject-add-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .field-group {
   display: grid;
   gap: 1.1rem;
@@ -1404,7 +1278,6 @@ onMounted(() => {
 }
 
 .field-label,
-.modal-section-label,
 .subject-accordion-label {
   color: #64748b;
   font-size: 0.74rem;
@@ -1433,55 +1306,6 @@ onMounted(() => {
 
 .input-disabled {
   opacity: 0.68;
-}
-
-.course-year-display {
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.course-chip,
-.year-chip {
-  display: inline-flex;
-  align-items: center;
-  min-height: 34px;
-  max-width: 100%;
-  padding: 0.42rem 0.7rem;
-  border: 1px solid rgba(0, 137, 90, 0.22);
-  border-radius: 10px;
-  background: rgba(0, 137, 90, 0.08);
-  color: var(--sb-primary);
-  font-size: 0.84rem;
-  font-weight: 750;
-}
-
-.course-chip {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.chip-unset {
-  color: #94a3b8;
-  background: #f8fafc;
-  border-color: #dbe3df;
-}
-
-.change-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.2rem;
-  border: 1.5px dashed #b9c7c1;
-  background: transparent;
-  color: #4b655b;
-  font-weight: 800;
-  padding: 0.42rem 0.7rem;
-}
-
-.change-btn:hover {
-  border-color: var(--sb-primary);
-  color: var(--sb-primary);
-  background: rgba(0, 137, 90, 0.05);
 }
 
 .teaching-level-grid {
@@ -1634,6 +1458,12 @@ onMounted(() => {
   margin: 0;
   color: #7b8b84;
   font-size: 0.88rem;
+}
+
+.field-hint {
+  margin: 0.4rem 0 0;
+  color: #7b8b84;
+  font-size: 0.82rem;
 }
 
 .bio-textarea {
@@ -1900,9 +1730,6 @@ onMounted(() => {
 }
 
 .modal-backdrop-soft {
-  position: fixed;
-  inset: 0;
-  z-index: 1050;
   display: grid;
   place-items: center;
   padding: 1.5rem;
@@ -1910,6 +1737,8 @@ onMounted(() => {
 }
 
 .glass-modal {
+  position: relative;
+  z-index: var(--sb-z-surface);
   width: min(100%, 680px);
   max-height: min(86vh, 780px);
   display: grid;
@@ -1950,49 +1779,6 @@ onMounted(() => {
   color: #526960;
 }
 
-.modal-section {
-  display: grid;
-  gap: 0.75rem;
-}
-
-.modal-section-label {
-  margin: 0;
-}
-
-.course-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
-  gap: 0.55rem;
-}
-
-.course-card {
-  display: grid;
-  gap: 0.18rem;
-  min-height: 76px;
-  border: 1.5px solid #dbe7e1;
-  background: rgba(248, 250, 252, 0.82);
-  padding: 0.65rem 0.75rem;
-  text-align: left;
-}
-
-.course-card:hover,
-.course-card-active {
-  border-color: var(--sb-primary);
-  background: rgba(0, 137, 90, 0.08);
-}
-
-.course-card-code {
-  color: #10231d;
-  font-size: 0.84rem;
-  font-weight: 850;
-}
-
-.course-card-name {
-  color: #64748b;
-  font-size: 0.75rem;
-  line-height: 1.25;
-}
-
 .year-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -2016,51 +1802,8 @@ onMounted(() => {
   color: #fff;
 }
 
-.modal-footer-row {
-  justify-content: flex-end;
-  gap: 0.75rem;
-}
-
-.btn-ghost-sm,
-.btn-confirm {
-  padding: 0.62rem 1.05rem;
-}
-
-.btn-ghost-sm {
-  border: 1.5px solid #dbe7e1;
-  background: #fff;
-  color: #526960;
-}
-
-.btn-ghost-sm:hover {
-  background: #f8fafc;
-}
-
 .subject-modal {
   width: min(100%, 720px);
-}
-
-.category-pills {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.45rem;
-}
-
-.category-pill {
-  border: 1px solid #d8e3de;
-  border-radius: 999px;
-  background: #fff;
-  color: #315447;
-  padding: 0.42rem 0.85rem;
-  font-size: 0.84rem;
-  font-weight: 800;
-}
-
-.category-pill:hover,
-.category-pill.active {
-  border-color: var(--sb-primary);
-  background: rgba(0, 137, 90, 0.08);
-  color: var(--sb-primary);
 }
 
 .subject-modal-list {
@@ -2069,47 +1812,6 @@ onMounted(() => {
   max-height: 370px;
   overflow: auto;
   padding-right: 0.15rem;
-}
-
-.subject-option {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  width: 100%;
-  border: 1px solid #dbe7e1;
-  background: #fff;
-  padding: 0.8rem 0.9rem;
-  text-align: left;
-}
-
-.subject-option:hover,
-.subject-option.selected {
-  border-color: #86d0af;
-  background: #eef8f4;
-}
-
-.subject-option-copy {
-  display: grid;
-  gap: 0.15rem;
-  min-width: 0;
-}
-
-.subject-option-name {
-  color: #163127;
-  font-size: 0.92rem;
-  font-weight: 850;
-}
-
-.subject-option-meta {
-  color: #6e8178;
-  font-size: 0.8rem;
-}
-
-.subject-option-check {
-  flex: 0 0 auto;
-  color: var(--sb-primary);
-  font-size: 1.15rem;
 }
 
 .modal-status {
@@ -2124,11 +1826,6 @@ onMounted(() => {
 
 .modal-error {
   color: #dc3545;
-}
-
-.modal-empty {
-  grid-column: 1 / -1;
-  padding: 0.5rem 0;
 }
 
 .subject-modal-footer {
@@ -2218,10 +1915,6 @@ onMounted(() => {
   .teaching-level-grid,
   .response-pills,
   .year-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .course-grid {
     grid-template-columns: 1fr;
   }
 

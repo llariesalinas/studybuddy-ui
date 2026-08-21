@@ -130,7 +130,7 @@ const openSession = () => {
   left: 50%;
   bottom: 20px;
   transform: translateX(-50%);
-  z-index: 1150;
+  z-index: var(--sb-z-dock);
   width: min(640px, calc(100% - 48px));
 }
 
@@ -306,7 +306,7 @@ const openSession = () => {
   position: fixed;
   right: 24px;
   bottom: 20px;
-  z-index: 1150;
+  z-index: var(--sb-z-dock);
   display: inline-flex;
   align-items: center;
   gap: 10px;

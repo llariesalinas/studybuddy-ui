@@ -34,6 +34,7 @@ from studybuddy.models import (
     Booking, Course, PartnerInstitution, Payment, PaymentMethod, Preference,
     Rating, Strand, SubjectCategory, Subjects, Tutor, TutorApplication, TutorAvailability,
     TutorSubjects, UserProfile, Wallet,
+    MIN_HOURLY_RATE, MAX_HOURLY_RATE,
 )
 from studybuddy.recommender.demo import build_algorithm_demo_recommendation
 from studybuddy.subject_descriptions import SUBJECT_DESCRIPTIONS
@@ -121,26 +122,26 @@ TIE_GROUP_SEARCH_LIMIT = 50
 # Curated tutors: (key, fname, lname, course_code, year, teaching_level, can_online, can_f2f,
 # hourly_rate, [(subject_name, expertise_level), ...])
 CURATED_TUTORS = [
-    ('T1', 'Marisol', 'Aquino', 'BSCS', 16, 'College', True, True, 350,
+    ('T1', 'Marisol', 'Aquino', 'BSCS', 16, 'College', True, True, 200,
      [('Python', 5), ('Data Structures', 4), ('Algorithms', 4)]),
-    ('T2', 'Benigno', 'Bautista', 'BSCS', 15, 'College', True, False, 280,
+    ('T2', 'Benigno', 'Bautista', 'BSCS', 15, 'College', True, False, 165,
      [('C++', 3), ('Web Development', 3)]),
-    ('T3', 'Corazon', 'Cruz', 'BSBA', 15, 'College', True, True, 300,
+    ('T3', 'Corazon', 'Cruz', 'BSBA', 15, 'College', True, True, 175,
      [('Financial Accounting', 5), ('Microeconomics', 4)]),
-    ('T4', 'Domingo', 'Diaz', 'BSCS', 16, 'College', True, False, 250,
+    ('T4', 'Domingo', 'Diaz', 'BSCS', 16, 'College', True, False, 150,
      [('Python', 3)]),
-    ('T5', 'Esperanza', 'Elizalde', 'SHS-STEM', 12, 'High School', True, False, 200,
+    ('T5', 'Esperanza', 'Elizalde', 'SHS-STEM', 12, 'High School', True, False, 130,
      [('Python', 5)]),
     # Tier-1 programming core (see TIER1_TUTEE_KEYS): three more BSCS tutors so the
     # curated BSCS tutees have enough shared tutors to co-rate. Pearson runs over the
     # co-rated intersection only (CF.py), so a pair sharing 1 tutor scores 0 and is
     # dropped, and a pair sharing 2 always scores exactly +/-1 — neither is worth showing
     # a panel. Five shared tutors puts every pair at 3 or more.
-    ('T6', 'Fidel', 'Fajardo', 'BSCS', 16, 'College', True, True, 320,
+    ('T6', 'Fidel', 'Fajardo', 'BSCS', 16, 'College', True, True, 185,
      [('Data Structures', 5), ('Algorithms', 4)]),
-    ('T7', 'Gemma', 'Gatchalian', 'BSCS', 15, 'College', True, False, 290,
+    ('T7', 'Gemma', 'Gatchalian', 'BSCS', 15, 'College', True, False, 170,
      [('Web Development', 5)]),
-    ('T8', 'Hector', 'Hidalgo', 'BSCS', 16, 'College', True, True, 310,
+    ('T8', 'Hector', 'Hidalgo', 'BSCS', 16, 'College', True, True, 180,
      [('SQL', 4)]),
 ]
 
@@ -502,7 +503,7 @@ class Command(BaseCommand):
             level = random.choices(TEACHING_LEVEL_CHOICES, weights=TEACHING_LEVEL_WEIGHTS)[0]
             can_online = True
             can_f2f = random.random() < 0.3
-            hourly_rate = random.randint(120, 450)
+            hourly_rate = random.randint(int(MIN_HOURLY_RATE), int(MAX_HOURLY_RATE))
             response_time = random.choice(RESPONSE_TIME_CHOICES)
             tutor = self._make_tutor(
                 profile, level, can_online, can_f2f, hourly_rate, response_time, now,

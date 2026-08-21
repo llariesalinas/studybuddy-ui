@@ -65,7 +65,9 @@
           :key="subject.subject_code"
           type="button"
           class="result-row"
-          :class="{ selected: modelValue.includes(subject.subject_code) }"
+          :class="{ selected: modelValue.includes(subject.subject_code), blocked: isBlocked(subject.subject_code) }"
+          :disabled="isBlocked(subject.subject_code)"
+          :title="isBlocked(subject.subject_code) ? limitMessage : undefined"
           @click="toggle(subject.subject_code)"
         >
           <span class="left">
@@ -107,7 +109,8 @@
         type="button"
         class="subject-chip"
         :class="chipClass(subject)"
-        :title="subject.description || undefined"
+        :disabled="isBlocked(subject.subject_code)"
+        :title="isBlocked(subject.subject_code) ? limitMessage : (subject.description || undefined)"
         @click="toggle(subject.subject_code)"
       >
         {{ subject.subject_name }}
@@ -131,8 +134,15 @@
       </button>
     </div>
 
+    <p v-if="isAtLimit" class="limit-line">
+      <i class="bi bi-info-circle-fill"></i>
+      {{ limitMessage }}
+    </p>
+
     <div v-if="selectedSubjects.length" class="selection-tray">
-      <span>Selected {{ modelValue.length }}<span v-if="maxSelection">/{{ maxSelection }}</span></span>
+      <span :class="{ 'tray-count-full': isAtLimit }">
+        Selected {{ modelValue.length }}<span v-if="maxSelection">/{{ maxSelection }}</span>
+      </span>
       <button
         v-for="subject in approvedSelection"
         :key="subject.subject_code"
@@ -183,16 +193,29 @@ const searchQuery = ref('')
 const categories = computed(() => subjectCategories(props.subjects))
 const selectedSubjects = computed(() => props.subjects.filter((subject) => props.modelValue.includes(subject.subject_code)))
 const isPending = isPendingSubject
-// The amber treatment rides on top of `selected`, never on its own: an unselected chip must not
-// borrow the selected chip's checkmark.
-const chipClass = (subject) => {
-  const selected = props.modelValue.includes(subject.subject_code)
-  return { selected, pending: selected && isPending(subject) }
-}
 const approvedSelection = computed(() => selectedSubjects.value.filter((subject) => !isPending(subject)))
 const pendingSelection = computed(() => selectedSubjects.value.filter(isPending))
 const subjectsFor = (category) => props.subjects.filter((subject) => subject.category === category)
 const selectedFor = (category) => subjectsFor(category).filter((subject) => props.modelValue.includes(subject.subject_code)).length
+
+// At the cap, adding is refused. Surfaced as a disabled state on every unselected option rather
+// than left as a silent no-op, so the picker explains itself instead of appearing broken.
+const isAtLimit = computed(
+  () => Boolean(props.maxSelection) && props.modelValue.length >= props.maxSelection,
+)
+const isBlocked = (code) => isAtLimit.value && !props.modelValue.includes(code)
+
+// The amber `pending` treatment rides on top of `selected`, never on its own: an unselected chip
+// must not borrow the selected chip's checkmark. `blocked` is independent of both -- an
+// already-selected chip is never blocked, since removing it is always allowed.
+const chipClass = (subject) => {
+  const selected = props.modelValue.includes(subject.subject_code)
+  return { selected, pending: selected && isPending(subject), blocked: isBlocked(subject.subject_code) }
+}
+const limitMessage = computed(
+  () => `You've reached the ${props.maxSelection}-subject limit. Remove one to add another.`,
+)
+
 function toggle(code) { if (props.modelValue.includes(code)) emit('update:modelValue', props.modelValue.filter((value) => value !== code)); else if (!props.maxSelection || props.modelValue.length < props.maxSelection) emit('update:modelValue', [...props.modelValue, code]) }
 
 const searchPlaceholder = computed(() =>
@@ -292,6 +315,18 @@ const countLine = computed(() => {
 
 .selection-tray { border-top: 1px dashed var(--sb-border-light); margin-top: 16px; padding-top: 12px; }
 .selection-tray > span { font-size: .8rem; color: var(--sb-text-muted); margin-right: 8px; }
+.tray-count-full { color: var(--sb-primary); font-weight: 700; }
+
+/* A blocked option is still readable -- it is a subject the tutor could pick after freeing a
+   slot, not an invalid one. */
+.subject-chip.blocked, .result-row.blocked { opacity: .45; cursor: not-allowed; }
+.limit-line {
+  display: flex; align-items: center; gap: .5rem;
+  margin: 12px 0 0; padding: .55rem .8rem; border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--sb-primary) 30%, transparent);
+  background: color-mix(in srgb, var(--sb-primary) 8%, transparent);
+  font-size: .82rem; color: var(--sb-text-main);
+}
 
 /* Pending sub-row. --sb-pop-yellow-deep is the one amber accent defined in both themes, so the
    chips stay legible in dark mode; the label reuses .section-label rather than adding a colour. */

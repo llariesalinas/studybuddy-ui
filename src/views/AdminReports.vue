@@ -24,7 +24,7 @@
               <p class="placeholder col-10 rounded mb-0 bg-white opacity-25"></p>
             </div>
             <div v-else>
-              <h2 class="fw-bold mb-0">₱{{ store.analytics?.revenue_summary?.gross?.toLocaleString() }}</h2>
+              <h2 class="fw-bold mb-0">{{ formatPhp(store.analytics?.revenue_summary?.gross) }}</h2>
               <div class="mt-3 pt-3 border-top border-white-50">
                 <p class="small mb-0 opacity-75">Total volume of all paid sessions</p>
               </div>
@@ -42,7 +42,7 @@
               <p class="placeholder col-9 rounded mb-0"></p>
             </div>
             <div v-else>
-              <h2 class="fw-bold mb-0 text-dark">₱{{ store.analytics?.revenue_summary?.commissions?.toLocaleString() }}</h2>
+              <h2 class="fw-bold mb-0 text-dark">{{ formatPhp(store.analytics?.revenue_summary?.commissions) }}</h2>
               <div class="mt-3 pt-3 border-top border-light">
                 <p class="small text-muted mb-0">Net earnings from the 10% platform fee</p>
               </div>
@@ -60,7 +60,7 @@
               <p class="placeholder col-9 rounded mb-0"></p>
             </div>
             <div v-else>
-              <h2 class="fw-bold mb-0 text-dark">₱{{ store.analytics?.revenue_summary?.payouts?.toLocaleString() }}</h2>
+              <h2 class="fw-bold mb-0 text-dark">{{ formatPhp(store.analytics?.revenue_summary?.payouts) }}</h2>
               <div class="mt-3 pt-3 border-top border-light">
                 <p class="small text-muted mb-0">Total amount distributed to tutors</p>
               </div>
@@ -178,6 +178,7 @@
 <script setup>
 import { onMounted, computed } from 'vue';
 import { useAdminStore } from '@/stores/admin';
+import { formatPhp } from '@/utils/currency';
 
 const store = useAdminStore()
 
