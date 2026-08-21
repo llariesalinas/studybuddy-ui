@@ -57,6 +57,16 @@ ANALYTICS_PERIODS = {
     'all': None,
 }
 
+# Explicit start/end reporting window. The preset periods above are all trailing windows ending
+# today, so none of them can express a period that ends in the past -- reporting on a school year
+# while excluding the summer downtime needs both endpoints. Kept alongside the presets rather than
+# replacing them, so the common one-click windows stay one click. See the "Period" entry in
+# CONTEXT.md.
+ANALYTICS_PERIOD_CUSTOM = 'custom'
+
+# Guard against a chart with one bar per day over a decade.
+ANALYTICS_MAX_WINDOW_DAYS = 366 * 3
+
 # Sections of the analytics export, in the order their sheets appear in the workbook. The keys are
 # the slugs accepted by the `sections` query param and must stay in step with REPORT_SECTIONS in
 # src/constants/superadminExports.js; the values name the file when only that section is exported.
@@ -600,6 +610,68 @@ USER_BOOKINGS_CSV_HEADERS = [
     'mode',
     'status',
 ]
+
+
+def _resolve_analytics_window(request, qs_bookings):
+    """Resolves the reporting window shared by the analytics and analytics-export views.
+
+    Returns ``(start_date, end_date, chart_days, label, error_response)``. Both endpoints computed
+    this independently before, and both filtered on ``session_date__gte`` only -- so every window
+    silently ran to today no matter what was asked for. The end bound is applied here, which is
+    what makes an explicit start/end range meaningful.
+    """
+    today = timezone.localtime(timezone.now()).date()
+    period = request.query_params.get('period', '30d')
+
+    if period == ANALYTICS_PERIOD_CUSTOM:
+        from_value = request.query_params.get('date_from')
+        to_value = request.query_params.get('date_to')
+        start_date = parse_date(from_value) if from_value else None
+        end_date = parse_date(to_value) if to_value else None
+
+        if (from_value and start_date is None) or (to_value and end_date is None):
+            return None, None, None, None, Response(
+                {'error': 'Dates must use YYYY-MM-DD format.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if start_date is None or end_date is None:
+            return None, None, None, None, Response(
+                {'error': 'A custom period needs both date_from and date_to.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if start_date > end_date:
+            return None, None, None, None, Response(
+                {'error': 'date_from cannot be after date_to.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        chart_days = (end_date - start_date).days + 1
+        if chart_days > ANALYTICS_MAX_WINDOW_DAYS:
+            return None, None, None, None, Response(
+                {'error': f'The reporting window cannot exceed {ANALYTICS_MAX_WINDOW_DAYS} days.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        label = f'{start_date.isoformat()} to {end_date.isoformat()}'
+        return start_date, end_date, chart_days, label, None
+
+    if period not in ANALYTICS_PERIODS:
+        period = '30d'
+
+    days = ANALYTICS_PERIODS[period]
+    end_date = today
+
+    if days is None:
+        earliest = qs_bookings.order_by('session_date').values_list(
+            'session_date', flat=True
+        ).first()
+        start_date = earliest or today
+        chart_days = max((today - start_date).days + 1, 1)
+    else:
+        start_date = today - timedelta(days=days - 1)
+        chart_days = days
+
+    return start_date, end_date, chart_days, period, None
 
 
 def _filtered_user_bookings(request, profile):
@@ -1236,12 +1308,6 @@ class AdminAnalyticsView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsSuperAdminUser]
 
     def get(self, request):
-        today = timezone.localtime(timezone.now()).date()
-        period = request.query_params.get('period', '30d')
-        if period not in ANALYTICS_PERIODS:
-            period = '30d'
-
-        days = ANALYTICS_PERIODS[period]
         labels = []
         session_counts = []
 
@@ -1257,15 +1323,15 @@ class AdminAnalyticsView(APIView):
             except PartnerInstitution.DoesNotExist:
                 pass
 
-        if days is None:
-            earliest = qs_bookings.order_by('session_date').values_list('session_date', flat=True).first()
-            start_date = earliest or today
-            chart_days = max((today - start_date).days + 1, 1)
-        else:
-            start_date = today - timedelta(days=days - 1)
-            chart_days = days
+        start_date, end_date, chart_days, _label, error_response = _resolve_analytics_window(
+            request, qs_bookings
+        )
+        if error_response:
+            return error_response
 
-        period_bookings = qs_bookings.filter(session_date__gte=start_date) if days is not None else qs_bookings
+        period_bookings = qs_bookings.filter(
+            session_date__gte=start_date, session_date__lte=end_date
+        )
         completed_bookings = period_bookings.filter(status='Completed')
 
         daily_counts = (
@@ -1276,7 +1342,7 @@ class AdminAnalyticsView(APIView):
         counts_dict = {item['session_date']: item['count'] for item in daily_counts}
 
         for i in range(chart_days - 1, -1, -1):
-            day = today - timedelta(days=i)
+            day = end_date - timedelta(days=i)
             labels.append(day.strftime('%b %d'))
             session_counts.append(counts_dict.get(day, 0))
 
@@ -1342,12 +1408,6 @@ class AdminAnalyticsExportView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsSuperAdminUser]
 
     def get(self, request):
-        today = timezone.localtime(timezone.now()).date()
-        period = request.query_params.get('period', '30d')
-        if period not in ANALYTICS_PERIODS:
-            period = '30d'
-
-        days = ANALYTICS_PERIODS[period]
         qs_bookings = Booking.objects.all()
 
         institution_id = request.query_params.get('institution_id')
@@ -1360,15 +1420,15 @@ class AdminAnalyticsExportView(APIView):
             except PartnerInstitution.DoesNotExist:
                 pass
 
-        if days is None:
-            earliest = qs_bookings.order_by('session_date').values_list('session_date', flat=True).first()
-            start_date = earliest or today
-            chart_days = max((today - start_date).days + 1, 1)
-        else:
-            start_date = today - timedelta(days=days - 1)
-            chart_days = days
+        start_date, end_date, chart_days, period_label, error_response = (
+            _resolve_analytics_window(request, qs_bookings)
+        )
+        if error_response:
+            return error_response
 
-        period_bookings = qs_bookings.filter(session_date__gte=start_date) if days is not None else qs_bookings
+        period_bookings = qs_bookings.filter(
+            session_date__gte=start_date, session_date__lte=end_date
+        )
         completed_bookings = period_bookings.filter(status='Completed')
         qs_payments = Payment.objects.filter(
             booking__in=completed_bookings,
@@ -1386,8 +1446,8 @@ class AdminAnalyticsExportView(APIView):
         # sheet can start with its header row at A1.
         add_xlsx_sheet(workbook, 'Report Info', ['Field', 'Value'], [
             ['Report', 'Studybuddy Platform Analytics'],
-            ['Period', period],
-            ['Date range', f'{start_date.isoformat()} to {today.isoformat()}'],
+            ['Period', period_label],
+            ['Date range', f'{start_date.isoformat()} to {end_date.isoformat()}'],
             ['Institution filter', institution_label],
             ['Generated at', timezone.localtime(timezone.now()).isoformat()],
         ])
@@ -1425,7 +1485,7 @@ class AdminAnalyticsExportView(APIView):
                 'Sessions Over Time',
                 ['Date', 'Completed Sessions'],
                 [
-                    [today - timedelta(days=i), counts_dict.get(today - timedelta(days=i), 0)]
+                    [end_date - timedelta(days=i), counts_dict.get(end_date - timedelta(days=i), 0)]
                     for i in range(chart_days - 1, -1, -1)
                 ],
                 formats={0: XLSX_DATE_FORMAT},
@@ -1500,8 +1560,11 @@ class AdminAnalyticsExportView(APIView):
         buffer = BytesIO()
         workbook.save(buffer)
         response = HttpResponse(buffer.getvalue(), content_type=XLSX_CONTENT_TYPE)
+        # Stamped with the generation date, not the window end -- two exports of the same
+        # historical range taken on different days are different files.
+        generated_on = timezone.localtime(timezone.now()).date()
         response['Content-Disposition'] = (
-            f'attachment; filename="{self._build_filename(selected_sections, today)}"'
+            f'attachment; filename="{self._build_filename(selected_sections, generated_on)}"'
         )
         return response
 
@@ -1517,14 +1580,14 @@ class AdminAnalyticsExportView(APIView):
         return selected or list(ANALYTICS_EXPORT_SECTIONS)
 
     @staticmethod
-    def _build_filename(selected_sections, today):
+    def _build_filename(selected_sections, generated_on):
         """Name the file after the section when only one was asked for, mirroring the frontend."""
         label = (
             ANALYTICS_EXPORT_SECTIONS[selected_sections[0]]
             if len(selected_sections) == 1
             else ANALYTICS_EXPORT_COMBINED_LABEL
         )
-        return f'studybuddy-{label}-{today.isoformat()}.xlsx'
+        return f'studybuddy-{label}-{generated_on.isoformat()}.xlsx'
 
 
 class SuperAdminInstitutionPerformanceView(APIView):
@@ -1548,16 +1611,39 @@ class SuperAdminInstitutionPerformanceView(APIView):
         )
         tutees_dict = {item['institution_id']: item['tutee_count'] for item in tutees_data}
 
-        sessions_data = Booking.objects.filter(status='Completed').values('tutor__profile__institution_id').annotate(
+        # Session and revenue figures are scoped to the reporting window when the caller asks for
+        # one. The Reports page always does, because this table sits directly under the period
+        # toggle and used to contradict it by being unconditionally all-time. The SuperAdmin
+        # dashboard has no period control and passes nothing, so it keeps the all-time view it
+        # has always shown. Head-count columns (tutors, tutees, average rating) are roster facts
+        # and stay all-time either way.
+        window_bookings = Booking.objects.all()
+        wants_window = any(
+            request.query_params.get(key) for key in ('period', 'date_from', 'date_to')
+        )
+
+        if wants_window:
+            start_date, end_date, _chart_days, _label, error_response = (
+                _resolve_analytics_window(request, window_bookings)
+            )
+            if error_response:
+                return error_response
+
+            window_bookings = window_bookings.filter(
+                session_date__gte=start_date, session_date__lte=end_date
+            )
+
+        sessions_data = window_bookings.filter(status='Completed').values('tutor__profile__institution_id').annotate(
             session_count=Count('id')
         )
         sessions_dict = {item['tutor__profile__institution_id']: item['session_count'] for item in sessions_data}
-        total_sessions_data = Booking.objects.values('tutor__profile__institution_id').annotate(
+        total_sessions_data = window_bookings.values('tutor__profile__institution_id').annotate(
             session_count=Count('id')
         )
         total_sessions_dict = {item['tutor__profile__institution_id']: item['session_count'] for item in total_sessions_data}
 
         payments_data = Payment.objects.filter(
+            booking__in=window_bookings,
             booking__status='Completed',
             payment_status='Paid'
         ).values('booking__tutor__profile__institution_id').annotate(

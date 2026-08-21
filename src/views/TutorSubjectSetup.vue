@@ -1,11 +1,20 @@
 <template>
   <TutorOnboardingShell :current-step="2">
     <h3>
-      Add your subjects<span class="subject-counter"
+      Add your top {{ SUBJECT_LIMIT }} subjects<span
+        class="subject-counter"
+        :class="{ 'subject-counter-full': isAtSubjectLimit }"
         >{{ selectedSubjects.length }}/{{ SUBJECT_LIMIT }}</span
       >
     </h3>
-    <p class="muted">Search the catalog, or propose one that's missing.</p>
+    <p class="muted">
+      Pick the {{ SUBJECT_LIMIT }} subjects you teach best — this is the maximum.
+      Search the catalog, or propose one that's missing.
+    </p>
+    <p v-if="isAtSubjectLimit" class="limit-notice">
+      <i class="bi bi-info-circle-fill"></i>
+      You've reached the {{ SUBJECT_LIMIT }}-subject limit. Remove one to add another.
+    </p>
 
     <SubjectTaxonomyPicker
       v-model="selectedCodes"
@@ -95,6 +104,7 @@ import SubjectTaxonomyPicker from '@/components/SubjectTaxonomyPicker.vue'
 import TutorOnboardingShell from '@/components/TutorOnboardingShell.vue'
 import { useProfileStore } from '@/stores/profile'
 import { useToastStore } from '@/stores/toast'
+import { TUTOR_SUBJECT_LIMIT } from '@/config'
 import {
   addTutorSubject,
   fetchSubjectCatalog,
@@ -103,7 +113,7 @@ import {
   removeTutorSubject,
 } from '@/services/tutorOnboarding'
 
-const SUBJECT_LIMIT = 8
+const SUBJECT_LIMIT = TUTOR_SUBJECT_LIMIT
 const SUBJECT_LIMIT_MESSAGE = `You can add up to ${SUBJECT_LIMIT} subjects only.`
 
 const router = useRouter()
@@ -116,6 +126,8 @@ const isSubmitting = ref(false)
 const proposal = reactive({ subject_name: '', category: '', description: '', keywords: '' })
 
 const categories = computed(() => [...new Set(allSubjects.value.map((s) => s.category))].sort())
+
+const isAtSubjectLimit = computed(() => selectedSubjects.value.length >= SUBJECT_LIMIT)
 
 const selectedCodes = computed({
   get: () => selectedSubjects.value.map((subject) => subject.subject_code),
@@ -209,9 +221,36 @@ onMounted(loadSubjects)
 <style scoped>
 .subject-counter {
   float: right;
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid var(--sb-card-border);
+  background: color-mix(in srgb, var(--sb-card-bg) 86%, transparent);
   color: var(--sb-text-muted);
   font-size: 0.78rem;
   font-weight: 700;
+}
+
+/* At the cap the counter stops reading as a neutral tally and becomes the reason the picker
+   has stopped accepting selections. */
+.subject-counter-full {
+  border-color: color-mix(in srgb, var(--sb-primary) 45%, transparent);
+  background: color-mix(in srgb, var(--sb-primary) 12%, transparent);
+  color: var(--sb-primary);
+}
+
+.limit-notice {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 1rem;
+  padding: 0.6rem 0.85rem;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--sb-primary) 30%, transparent);
+  background: color-mix(in srgb, var(--sb-primary) 8%, transparent);
+  color: var(--sb-text-main);
+  font-size: 0.85rem;
 }
 .subject-pill-row {
   display: flex;

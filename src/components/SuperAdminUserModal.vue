@@ -227,23 +227,16 @@
               Export CSV
             </button>
           </div>
-          <div class="booking-filters" aria-label="Booking date filters">
-            <button
-              v-for="preset in bookingPresets"
-              :key="preset.value"
-              type="button"
-              class="filter-button"
-              :class="{ active: bookingFilter === preset.value }"
-              @click="setBookingPreset(preset.value)"
-            >
-              {{ preset.label }}
-            </button>
-          </div>
-          <div v-if="bookingFilter === 'custom'" class="custom-date-row">
-            <label>From<input v-model="customDateFrom" type="date"></label>
-            <label>To<input v-model="customDateTo" type="date"></label>
-            <button type="button" class="secondary-action compact" @click="applyCustomDates">Apply</button>
-          </div>
+          <SbDateRangeFilter
+            v-model:date-from="customDateFrom"
+            v-model:date-to="customDateTo"
+            :model-value="bookingFilter"
+            :presets="bookingPresets"
+            aria-label="Booking date filters"
+            class="booking-range-filter"
+            @update:model-value="setBookingPreset"
+            @apply="applyCustomDates"
+          />
           <p v-if="bookingsLoading" class="empty-state">Loading bookings...</p>
           <div v-else class="booking-table-wrap">
             <table class="booking-table">
@@ -376,7 +369,9 @@
 
 <script setup>
 import { computed, nextTick, ref, watch } from 'vue'
+import SbDateRangeFilter from '@/components/SbDateRangeFilter.vue'
 import SbSelectModal from '@/components/SbSelectModal.vue'
+import { getDateKey } from '@/utils/time'
 import { useHaptics } from '@/composables/useHaptics'
 import { useSuperAdminStore } from '@/stores/superadmin'
 import { useToastStore } from '@/stores/toast'
@@ -602,13 +597,6 @@ function scheduleSlot(day, timeSlot) {
   return scheduleSlotMap.value.get(`${day}-${timeSlot}`)
 }
 
-function toIsoDate(value) {
-  const year = value.getFullYear()
-  const month = String(value.getMonth() + 1).padStart(2, '0')
-  const day = String(value.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
 async function setBookingPreset(preset) {
   bookingFilter.value = preset
   highlightedBookingId.value = null
@@ -620,8 +608,8 @@ async function setBookingPreset(preset) {
     const today = new Date()
     const start = new Date(today)
     start.setDate(start.getDate() - Number(preset) + 1)
-    bookingDateFrom.value = toIsoDate(start)
-    bookingDateTo.value = toIsoDate(today)
+    bookingDateFrom.value = getDateKey(start)
+    bookingDateTo.value = getDateKey(today)
   }
   bookingPage.value = 1
   await loadBookings(true, 1)
@@ -1190,53 +1178,6 @@ h2 {
   margin: 10px 0 0;
   color: var(--sb-text-muted);
   font-size: 12px;
-}
-
-.booking-filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
-  margin-bottom: 14px;
-}
-
-.filter-button {
-  border: 1px solid var(--sb-card-border);
-  border-radius: 999px;
-  padding: 7px 12px;
-  background: var(--sb-card-bg);
-  color: var(--sb-text-muted);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.filter-button.active {
-  border-color: var(--sb-primary);
-  background: color-mix(in srgb, var(--sb-primary) 9%, var(--sb-card-bg));
-  color: var(--sb-primary);
-}
-
-.custom-date-row {
-  display: flex;
-  align-items: end;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-bottom: 14px;
-}
-
-.custom-date-row label {
-  display: grid;
-  gap: 4px;
-  color: var(--sb-text-muted);
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.custom-date-row input {
-  border: 1px solid var(--sb-card-border);
-  border-radius: 9px;
-  padding: 8px;
-  background: var(--sb-card-bg);
-  color: var(--sb-text-main);
 }
 
 .booking-table-wrap {

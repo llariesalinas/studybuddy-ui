@@ -26,11 +26,18 @@ export const SORT_DESCENDING = 'desc'
 // one thing on one screen and something else on the next. `label` is the terse toggle text;
 // `scopeLabel` is the spelled-out form for subtitles and the export scope line, where "3M" would
 // read as jargon.
+// The custom window is a real start/end range rather than a trailing one. It exists because no
+// trailing window can express "the school year, excluding the summer break" -- the presets all
+// end today by construction. Kept alongside them, not in place of them, so the common one-click
+// windows are still one click.
+export const REPORT_PERIOD_CUSTOM = 'custom'
+
 export const REPORT_PERIOD_OPTIONS = [
   { label: '7D', value: '7d', scopeLabel: 'Last 7 days' },
   { label: '30D', value: '30d', scopeLabel: 'Last 30 days' },
   { label: '3M', value: '3m', scopeLabel: 'Last 3 months' },
   { label: 'All', value: 'all', scopeLabel: 'All time' },
+  { label: 'Custom', value: REPORT_PERIOD_CUSTOM, scopeLabel: 'Custom range' },
 ]
 
 export const REPORT_DEFAULT_PERIOD = '30d'
@@ -59,8 +66,30 @@ export const sortReportRows = (rows, key, direction = SORT_DESCENDING) => {
   })
 }
 
-export const reportPeriodScopeLabel = (value) =>
-  REPORT_PERIOD_OPTIONS.find((option) => option.value === value)?.scopeLabel || value
+// Renders a date key ('YYYY-MM-DD') without going through the Date constructor's timezone
+// handling -- `new Date('2026-04-01')` parses as UTC midnight and prints as the previous day for
+// anyone west of UTC.
+const formatRangeDate = (key) => {
+  const [year, month, day] = String(key || '').split('-').map(Number)
+  if (!year || !month || !day) return key
+
+  return new Date(year, month - 1, day).toLocaleDateString('en-PH', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+}
+
+// A custom window is spelled out as its actual endpoints, since "Custom range" alone would not
+// say what the figures beneath it cover.
+export const reportPeriodScopeLabel = (value, dateFrom = '', dateTo = '') => {
+  if (value === REPORT_PERIOD_CUSTOM) {
+    if (dateFrom && dateTo) return `${formatRangeDate(dateFrom)} – ${formatRangeDate(dateTo)}`
+    return 'Custom range'
+  }
+
+  return REPORT_PERIOD_OPTIONS.find((option) => option.value === value)?.scopeLabel || value
+}
 
 // Both pages are titled for what the query actually returns. The analytics queryset is
 // booking-driven, so a tutor or subject with no completed session in the window is absent

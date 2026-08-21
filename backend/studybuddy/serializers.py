@@ -19,6 +19,8 @@ from .models import (
     UserProfile,
     Wallet,
     WithdrawalRequest,
+    MIN_HOURLY_RATE,
+    MAX_HOURLY_RATE,
 )
 
 # Create Serializers here.
@@ -387,6 +389,14 @@ class TutorProfileUpdateSerializer(serializers.ModelSerializer):
             'pinned_review_id'
         ]
 
+    def validate_hourly_rate(self, value):
+        # Clamped, not rejected -- see MIN_HOURLY_RATE / MAX_HOURLY_RATE in models.py for why.
+        # This is the profile-edit write path; tutor_setup() in views.py is the onboarding one.
+        if value is None:
+            return value
+
+        return min(max(value, MIN_HOURLY_RATE), MAX_HOURLY_RATE)
+
     def validate_pinned_review(self, value):
         tutor = self.instance
 
@@ -463,6 +473,7 @@ class TutorApplicationSerializer(serializers.ModelSerializer):
     latest_document_renewal_reviewed_at = serializers.SerializerMethodField()
     latest_document_renewal_school_id_url = serializers.SerializerMethodField()
     latest_document_renewal_enrollment_proof_url = serializers.SerializerMethodField()
+    has_document_renewal_history = serializers.SerializerMethodField()
     proposed_subjects = serializers.SerializerMethodField()
     selected_subjects = serializers.SerializerMethodField()
 
@@ -480,6 +491,7 @@ class TutorApplicationSerializer(serializers.ModelSerializer):
             'latest_document_renewal_reviewed_at',
             'latest_document_renewal_school_id_url',
             'latest_document_renewal_enrollment_proof_url',
+            'has_document_renewal_history',
             'proposed_subjects',
             'selected_subjects',
         ]
@@ -489,6 +501,12 @@ class TutorApplicationSerializer(serializers.ModelSerializer):
         if obj.application_status == 'approved' and renewal and renewal.status in ['pending', 'rejected']:
             return 'document_renewal'
         return 'initial'
+
+    def get_has_document_renewal_history(self, obj):
+        # Distinguishes "approved and never renewed" from "approved after a renewal".
+        # document_renewal_status() collapses both to 'verified'. See get_document_review_context()
+        # in views.py and getTutorApplicationFlow in src/services/tutorApplicationState.js.
+        return obj.latest_document_renewal_review() is not None
 
     def get_proposed_subjects(self, obj):
         subjects = list(obj.proposed_subjects.filter(status='pending'))
@@ -607,6 +625,7 @@ class TutorDocumentRenewalReviewSerializer(serializers.ModelSerializer):
     application_status = serializers.CharField(source='status')
     school_id_url = serializers.SerializerMethodField()
     enrollment_proof_url = serializers.SerializerMethodField()
+    has_document_renewal_history = serializers.SerializerMethodField()
 
     class Meta:
         model = TutorDocumentRenewalReview
@@ -614,11 +633,17 @@ class TutorDocumentRenewalReviewSerializer(serializers.ModelSerializer):
             'id', 'review_type', 'applicant_name', 'email', 'institution_name',
             'reason_to_tutor', 'application_status',
             'school_id_url', 'enrollment_proof_url',
-            'rejection_reason', 'submitted_at', 'reviewed_at'
+            'rejection_reason', 'submitted_at', 'reviewed_at',
+            'has_document_renewal_history',
         ]
 
     def get_review_type(self, obj):
         return 'document_renewal'
+
+    def get_has_document_renewal_history(self, obj):
+        # Always true by construction -- this serializer *is* a renewal review. Present so both row
+        # types in the merged admin list carry the same keys.
+        return True
 
     def get_applicant_name(self, obj):
         return f"{obj.profile.fname} {obj.profile.lname}"
@@ -658,6 +683,7 @@ class TuteeApplicationSerializer(serializers.ModelSerializer):
     latest_document_renewal_reviewed_at = serializers.SerializerMethodField()
     latest_document_renewal_school_id_url = serializers.SerializerMethodField()
     latest_document_renewal_enrollment_proof_url = serializers.SerializerMethodField()
+    has_document_renewal_history = serializers.SerializerMethodField()
 
     class Meta:
         model = TuteeApplication
@@ -673,6 +699,7 @@ class TuteeApplicationSerializer(serializers.ModelSerializer):
             'latest_document_renewal_reviewed_at',
             'latest_document_renewal_school_id_url',
             'latest_document_renewal_enrollment_proof_url',
+            'has_document_renewal_history',
         ]
 
     def get_review_type(self, obj):
@@ -680,6 +707,10 @@ class TuteeApplicationSerializer(serializers.ModelSerializer):
         if obj.application_status == 'approved' and renewal and renewal.status in ['pending', 'rejected']:
             return 'document_renewal'
         return 'initial'
+
+    def get_has_document_renewal_history(self, obj):
+        # See the tutor serializer's copy of this method for why the flag exists.
+        return obj.latest_document_renewal_review() is not None
 
     def get_applicant_name(self, obj):
         return f"{obj.profile.fname} {obj.profile.lname}"
@@ -757,6 +788,7 @@ class TuteeDocumentRenewalReviewSerializer(serializers.ModelSerializer):
     application_status = serializers.CharField(source='status')
     school_id_url = serializers.SerializerMethodField()
     enrollment_proof_url = serializers.SerializerMethodField()
+    has_document_renewal_history = serializers.SerializerMethodField()
 
     class Meta:
         model = TuteeDocumentRenewalReview
@@ -764,11 +796,16 @@ class TuteeDocumentRenewalReviewSerializer(serializers.ModelSerializer):
             'id', 'review_type', 'applicant_name', 'email', 'institution_name',
             'reason_to_tutor', 'application_status',
             'school_id_url', 'enrollment_proof_url',
-            'rejection_reason', 'submitted_at', 'reviewed_at'
+            'rejection_reason', 'submitted_at', 'reviewed_at',
+            'has_document_renewal_history',
         ]
 
     def get_review_type(self, obj):
         return 'document_renewal'
+
+    def get_has_document_renewal_history(self, obj):
+        # See TutorDocumentRenewalReviewSerializer's copy.
+        return True
 
     def get_applicant_name(self, obj):
         return f"{obj.profile.fname} {obj.profile.lname}"

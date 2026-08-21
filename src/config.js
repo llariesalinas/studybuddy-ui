@@ -44,6 +44,18 @@ export const MAX_DOCUMENT_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024 // 5 MB; keep in s
 // Wallet / commission — keep in sync with COMMISSION_RATE in backend/studybuddy/views.py
 export const PLATFORM_COMMISSION_RATE_PERCENT = 10
 
+// Tutor hourly rate bounds, in PHP. The backend is the authority and clamps on save — these drive
+// the input limits and helper copy so a tutor is never allowed to type a rate that will be
+// silently rewritten. Keep in sync with MIN_HOURLY_RATE / MAX_HOURLY_RATE in
+// backend/studybuddy/views.py.
+export const MIN_HOURLY_RATE = 50
+export const MAX_HOURLY_RATE = 200
+export const HOURLY_RATE_STEP = 10
+
+// Most subjects a tutor may claim as their expertise. Keep in sync with TUTOR_SUBJECT_LIMIT in
+// backend/studybuddy/views.py, which enforces it on both the add and propose paths.
+export const TUTOR_SUBJECT_LIMIT = 8
+
 // Grace Cutoff — hours before a session starts after which cancelling is "late" and opens a
 // Late Cancellation review ticket. Must match GRACE_CUTOFF_HOURS in backend/studybuddy/models.py;
 // the backend is the authority, this only drives the warning copy.

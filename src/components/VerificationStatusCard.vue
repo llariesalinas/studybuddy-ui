@@ -34,7 +34,10 @@ const state = computed(() => {
       case 'due': return 'renewal_due'
       case 'pending': return 'renewal_pending'
       case 'rejected': return 'renewal_rejected'
-      default: return 'verified'
+      // The server reports 'verified' whether or not a renewal ever happened, so the badge is
+      // split on renewal history -- a first-time approved applicant has renewed nothing and must
+      // not be told they were "Renewed".
+      default: return profileStore.hasRenewalHistory ? 'verified_renewed' : 'verified_initial'
     }
   }
 
@@ -49,7 +52,13 @@ const state = computed(() => {
 // per-property lookup table risks silently missing a state in one of the four when a new state
 // is added).
 const STATE_CONFIG = {
-  verified: {
+  verified_initial: {
+    tone: 'tone-success',
+    icon: 'bi bi-patch-check-fill',
+    badge: 'Approved ✓',
+    showAction: false,
+  },
+  verified_renewed: {
     tone: 'tone-success',
     icon: 'bi bi-patch-check-fill',
     badge: 'Renewed ✓',
@@ -106,7 +115,7 @@ const iconClass = computed(() => currentConfig.value.icon)
 const badgeLabel = computed(() => currentConfig.value.badge)
 
 const subtitle = computed(() => {
-  if (state.value === 'verified') {
+  if (state.value === 'verified_initial' || state.value === 'verified_renewed') {
     return daysUntilDue.value != null
       ? `Next renewal in ${daysUntilDue.value} day${daysUntilDue.value === 1 ? '' : 's'}.`
       : 'Your enrollment documents are current.'

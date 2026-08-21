@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime, timedelta
+from decimal import Decimal
 
 from django.db import models
 from django.db.models import Q
@@ -41,6 +42,14 @@ LIVE_BOOKING_STATUSES = (
 
 # Penalty-free cancellation boundary, and the same boundary the face-to-face location edit uses.
 GRACE_CUTOFF_HOURS = 12
+
+# Tutor hourly rate bounds, in PHP. Defined here rather than in views.py so serializers.py can
+# import them without a circular import. Enforced by clamping on write (see clamp_hourly_rate in
+# views.py) rather than rejecting, so a tutor carrying a pre-cap rate is brought into range on
+# their next save instead of being locked out of editing their profile. Keep in sync with
+# MIN_HOURLY_RATE / MAX_HOURLY_RATE in src/config.js.
+MIN_HOURLY_RATE = Decimal('50')
+MAX_HOURLY_RATE = Decimal('200')
 
 class Strand(models.Model):
 

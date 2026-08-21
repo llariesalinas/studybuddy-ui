@@ -7,17 +7,18 @@
         <span v-if="selectedInstitutionName">Viewing {{ selectedInstitutionName }}</span>
       </div>
       <div class="reports-controls">
-        <div class="period-toggle" aria-label="Report period">
-          <button
-            v-for="option in periodOptions"
-            :key="option.value"
-            type="button"
-            :class="{ active: period === option.value }"
-            @click="setPeriod(option.value)"
-          >
-            {{ option.label }}
-          </button>
-        </div>
+        <SbDateRangeFilter
+          :model-value="period"
+          :presets="periodOptions"
+          :custom-value="REPORT_PERIOD_CUSTOM"
+          :date-from="dateFrom"
+          :date-to="dateTo"
+          aria-label="Report period"
+          @update:model-value="setPeriod"
+          @update:date-from="dateFrom = $event"
+          @update:date-to="dateTo = $event"
+          @apply="applyCustomRange"
+        />
         <SbSelectModal
           v-model="selectedInstitutionId"
           :options="institutionOptions"
@@ -50,7 +51,7 @@
     <section class="metric-grid">
       <article v-for="metric in metrics" :key="metric.label" class="metric-card sb-card-lift" :class="{ primary: metric.primary }">
         <p>{{ metric.label }}</p>
-        <h2>{{ metric.value }}</h2>
+        <h2 :title="metric.value">{{ metric.value }}</h2>
         <span>{{ metric.caption }}</span>
       </article>
     </section>
@@ -121,8 +122,8 @@
                     <strong>{{ tutor.sessions }}</strong>
                   </div>
                 </td>
-                <td><i class="bi bi-star-fill rating-icon"></i>{{ formatNumber(tutor.rating, 1) }}</td>
-                <td class="text-end fw-bold">PHP {{ formatMoney(tutor.earnings) }}</td>
+                <td><i class="bi bi-star-fill rating-icon"></i>{{ formatDecimal(tutor.rating, 1) }}</td>
+                <td class="text-end fw-bold">{{ formatPhp(tutor.earnings) }}</td>
               </tr>
               <tr v-if="!store.analytics?.top_tutors?.length">
                 <td colspan="4" class="text-center py-5 text-muted">No tutor analytics available.</td>
@@ -194,8 +195,8 @@
               <td class="text-center">{{ inst.tutors }}</td>
               <td class="text-center">{{ inst.tutees }}</td>
               <td class="text-center">{{ inst.sessions }}</td>
-              <td class="text-center">{{ formatNumber(inst.completion_rate, 1) }}%</td>
-              <td class="text-end fw-bold">PHP {{ formatMoney(inst.revenue) }}</td>
+              <td class="text-center">{{ formatDecimal(inst.completion_rate, 1) }}%</td>
+              <td class="text-end fw-bold">{{ formatPhp(inst.revenue) }}</td>
             </tr>
             <tr v-if="!store.institutionPerformance.length">
               <td colspan="6" class="text-center py-5 text-muted">No institution data available.</td>
@@ -210,17 +211,20 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
+import SbDateRangeFilter from '@/components/SbDateRangeFilter.vue'
 import SbExportModal from '@/components/SbExportModal.vue'
 import SbSelectModal from '@/components/SbSelectModal.vue'
 import { useHaptics } from '@/composables/useHaptics'
 import { useSuperAdminStore } from '@/stores/superadmin'
 import { useToastStore } from '@/stores/toast'
 import { REPORT_COMBINED_FILE_LABEL, REPORT_SECTIONS } from '@/constants/superadminExports'
+import { formatDecimal, formatPhp } from '@/utils/currency'
 import {
   ALL_INSTITUTIONS_LABEL,
   REPORT_CARD_ROW_LIMIT,
   REPORT_DEFAULT_PERIOD,
   REPORT_DETAIL_DATASETS,
+  REPORT_PERIOD_CUSTOM,
   REPORT_PERIOD_OPTIONS,
   reportPeriodScopeLabel,
 } from '@/constants/superadminReports'
@@ -239,6 +243,16 @@ const period = ref(
     ? String(route.query.period)
     : REPORT_DEFAULT_PERIOD,
 )
+const dateFrom = ref(route.query.from ? String(route.query.from) : '')
+const dateTo = ref(route.query.to ? String(route.query.to) : '')
+
+// The range is only sent once it is complete; a half-filled custom range would otherwise 400 on
+// every keystroke. `appliedRange` is what requests actually use.
+const appliedRange = ref({
+  from: period.value === REPORT_PERIOD_CUSTOM ? dateFrom.value : '',
+  to: period.value === REPORT_PERIOD_CUSTOM ? dateTo.value : '',
+})
+
 const isExportOpen = ref(false)
 
 const exportSections = REPORT_SECTIONS
@@ -264,7 +278,7 @@ const selectedInstitutionName = computed(() => {
 
 const exportScopeLine = computed(() =>
   [
-    reportPeriodScopeLabel(period.value),
+    reportPeriodScopeLabel(period.value, appliedRange.value.from, appliedRange.value.to),
     selectedInstitutionName.value || ALL_INSTITUTIONS_LABEL,
   ].join(' · '),
 )
@@ -274,6 +288,8 @@ const exportScopeLine = computed(() =>
 const detailQuery = computed(() => {
   const query = { period: period.value }
   if (selectedInstitutionId.value) query.institution = selectedInstitutionId.value
+  if (appliedRange.value.from) query.from = appliedRange.value.from
+  if (appliedRange.value.to) query.to = appliedRange.value.to
   return query
 })
 
@@ -295,23 +311,23 @@ const subjectsDetailTo = computed(() => ({
 const metrics = computed(() => [
   {
     label: 'Gross Revenue',
-    value: `PHP ${formatCompact(store.analytics?.revenue_summary?.gross || 0)}`,
+    value: formatPhp(store.analytics?.revenue_summary?.gross || 0),
     caption: 'Paid completed sessions',
     primary: true,
   },
   {
     label: 'Platform Commissions',
-    value: `PHP ${formatCompact(store.analytics?.revenue_summary?.commissions || 0)}`,
+    value: formatPhp(store.analytics?.revenue_summary?.commissions || 0),
     caption: '10% platform fee',
   },
   {
     label: 'Tutor Payouts',
-    value: `PHP ${formatCompact(store.analytics?.revenue_summary?.payouts || 0)}`,
+    value: formatPhp(store.analytics?.revenue_summary?.payouts || 0),
     caption: 'Tutor-side earnings',
   },
   {
     label: 'Completion Rate',
-    value: `${formatNumber(store.analytics?.completion_rate || 0, 1)}%`,
+    value: `${formatDecimal(store.analytics?.completion_rate || 0, 1)}%`,
     caption: 'Completed / total sessions',
   },
 ])
@@ -365,12 +381,26 @@ watch(selectedInstitutionId, () => {
 
 onMounted(() => {
   store.fetchInstitutions()
-  store.fetchInstitutionPerformance()
   loadAnalytics()
 })
 
 function setPeriod(value) {
   period.value = value
+  vibrate(patterns.light)
+
+  // Selecting Custom only reveals the inputs -- nothing is refetched until Apply, since the range
+  // is not yet known. Leaving Custom drops the range so the preset is unambiguous.
+  if (value === REPORT_PERIOD_CUSTOM) {
+    if (!appliedRange.value.from || !appliedRange.value.to) return
+  } else {
+    appliedRange.value = { from: '', to: '' }
+  }
+
+  loadAnalytics()
+}
+
+function applyCustomRange() {
+  appliedRange.value = { from: dateFrom.value, to: dateTo.value }
   vibrate(patterns.light)
   loadAnalytics()
 }
@@ -380,7 +410,10 @@ function selectInstitution(inst) {
 }
 
 function loadAnalytics() {
-  store.fetchAnalytics(selectedInstitutionId.value || null, period.value)
+  const { from, to } = appliedRange.value
+  store.fetchAnalytics(selectedInstitutionId.value || null, period.value, from, to)
+  // The institutions table is scoped to the same window, so it has to move with it.
+  store.fetchInstitutionPerformance(true, { period: period.value, dateFrom: from, dateTo: to })
 }
 
 function openExportModal() {
@@ -394,6 +427,8 @@ async function exportWorkbook({ ids, filename }) {
     await store.exportAnalyticsWorkbook({
       institutionId: selectedInstitutionId.value || null,
       period: period.value,
+      dateFrom: appliedRange.value.from,
+      dateTo: appliedRange.value.to,
       sections: ids,
       filename,
     })
@@ -402,23 +437,6 @@ async function exportWorkbook({ ids, filename }) {
   }
 }
 
-function formatMoney(value) {
-  return Number(value || 0).toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })
-}
-
-function formatCompact(value) {
-  return Number(value || 0).toLocaleString(undefined, {
-    notation: 'compact',
-    maximumFractionDigits: 1,
-  })
-}
-
-function formatNumber(value, digits = 0) {
-  return Number(value || 0).toFixed(digits)
-}
 </script>
 
 <style scoped>
@@ -463,6 +481,14 @@ h2 {
   margin: 0;
 }
 
+/* Exact peso figures ("₱1,234,567.89") are far wider than the abbreviated form these cards used
+   to show, so the value scales with the column and is allowed to wrap rather than overflow the
+   card on narrow viewports. */
+.metric-card h2 {
+  font-size: clamp(15px, 1.55vw + 8px, 20px);
+  overflow-wrap: anywhere;
+}
+
 .reports-header span,
 .metric-card span {
   color: var(--sb-text-muted);
@@ -474,31 +500,6 @@ h2 {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 10px;
-}
-
-.period-toggle {
-  display: inline-flex;
-  gap: 4px;
-  padding: 4px;
-  border: 1px solid var(--sb-card-border);
-  border-radius: 999px;
-  background: #fff;
-}
-
-.period-toggle button {
-  min-width: 48px;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--sb-text-muted);
-  font-size: 13px;
-  font-weight: 800;
-  padding: 7px 10px;
-}
-
-.period-toggle button.active {
-  background: var(--sb-primary);
-  color: #fff;
 }
 
 :deep(.institution-trigger) {

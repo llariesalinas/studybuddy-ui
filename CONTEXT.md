@@ -421,7 +421,14 @@ period-scoped — there is no lifetime earnings figure anywhere in the product.
 _Avoid_: total earnings, wallet balance (a wallet balance is current funds, not period income)
 
 **Period**:
-The reporting window every Reports figure is scoped to (7d / 30d / 3m / all time). Changing it
-changes the *population*, not just the totals: the set of Period-Active Tutors and the set of
-Subjects with any bookings both shrink and grow with it.
-_Avoid_: date range (the window is chosen from fixed options, not arbitrary endpoints)
+The reporting window every Reports figure is scoped to: one of the presets (7d / 30d / 3m / all
+time) or a **Custom range** with explicit start and end dates. Changing it changes the
+*population*, not just the totals: the set of Period-Active Tutors and the set of Subjects with
+any bookings both shrink and grow with it.
+
+The presets are all trailing windows ending today. Custom exists because no trailing window can
+express a period that ends in the past — reporting on a school year while excluding the summer
+downtime needs both endpoints. Presets remain the default and the one-click path; Custom is the
+escape hatch, not a replacement.
+_Avoid_: calling a preset a "date range" (only Custom has arbitrary endpoints); assuming a window
+runs to today (Custom does not)

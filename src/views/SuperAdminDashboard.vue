@@ -146,9 +146,9 @@
                 <td class="text-center">{{ inst.tutees }}</td>
                 <td class="text-center"><span class="metric-pill">{{ inst.sessions }}</span></td>
                 <td class="text-center">
-                  <span class="rating-text"><i class="bi bi-star-fill"></i>{{ formatNumber(inst.avg_rating, 1) }}</span>
+                  <span class="rating-text"><i class="bi bi-star-fill"></i>{{ formatDecimal(inst.avg_rating, 1) }}</span>
                 </td>
-                <td class="text-end fw-bold">PHP {{ formatMoney(inst.revenue) }}</td>
+                <td class="text-end fw-bold">{{ formatPhp(inst.revenue) }}</td>
               </tr>
             </template>
             <tr v-else>
@@ -167,6 +167,7 @@ import { useRouter } from 'vue-router'
 import { useHaptics } from '@/composables/useHaptics'
 import { useSuperAdminStore } from '@/stores/superadmin'
 import { useToastStore } from '@/stores/toast'
+import { formatCount, formatDecimal, formatPhp } from '@/utils/currency'
 
 const APPLICATIONS_ROUTE = '/admin/tutor-applications'
 // Verification items open the Applications screen instead of resolving inline: approving one
@@ -187,28 +188,28 @@ const actingKey = ref('')
 const kpiCards = computed(() => [
   {
     label: 'Total Users',
-    value: formatCompact((store.stats?.total_tutors || 0) + (store.stats?.total_tutees || 0)),
+    value: formatCount((store.stats?.total_tutors || 0) + (store.stats?.total_tutees || 0)),
     delta: `${store.stats?.total_tutors || 0} tutors / ${store.stats?.total_tutees || 0} tutees`,
     icon: 'bi-people-fill',
     tone: 'tone-primary',
   },
   {
     label: 'Sessions Today',
-    value: formatCompact(store.stats?.active_sessions_today || 0),
+    value: formatCount(store.stats?.active_sessions_today || 0),
     delta: 'Confirmed and currently active',
     icon: 'bi-calendar-check',
     tone: 'tone-info',
   },
   {
     label: 'Revenue MTD',
-    value: `PHP ${formatCompact(store.stats?.commissions_this_month || 0)}`,
+    value: formatPhp(store.stats?.commissions_this_month || 0),
     delta: 'Platform commissions',
     icon: 'bi-wallet2',
     tone: 'tone-warning',
   },
   {
     label: 'Pending Actions',
-    value: formatCompact(store.pendingActions.count || 0),
+    value: formatCount(store.pendingActions.count || 0),
     delta: 'SuperAdmin-only queue',
     icon: 'bi-inbox-fill',
     tone: 'tone-danger',
@@ -310,21 +311,6 @@ function getPendingMeta(type) {
     default:
       return { icon: 'bi-dot', tone: 'pending-green', action: 'Review' }
   }
-}
-
-function formatMoney(value) {
-  return Number(value || 0).toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })
-}
-
-function formatCompact(value) {
-  return Number(value || 0).toLocaleString(undefined, { notation: 'compact', maximumFractionDigits: 1 })
-}
-
-function formatNumber(value, digits = 0) {
-  return Number(value || 0).toFixed(digits)
 }
 
 function formatShortDate(value) {

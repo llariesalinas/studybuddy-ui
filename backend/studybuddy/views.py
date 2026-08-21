@@ -109,6 +109,8 @@ from .models import (
     TutorSubjects,
     ACTIVE_BOOKING_STATUSES,
     GRACE_CUTOFF_HOURS,
+    MIN_HOURLY_RATE,
+    MAX_HOURLY_RATE,
 )
 
 logger = logging.getLogger(__name__)
@@ -193,6 +195,25 @@ def build_login_response_payload(user, profile):
     }
 
 
+def clamp_hourly_rate(value, fallback=None):
+    """Coerces a submitted hourly rate into [MIN_HOURLY_RATE, MAX_HOURLY_RATE].
+
+    Clamping rather than rejecting is deliberate: tutors carrying a pre-cap rate (the seeded demo
+    data had 350) would otherwise be unable to save any profile edit at all until they noticed the
+    rate field. The UI never lets a tutor type an out-of-range value, so a clamp here only ever
+    fires for legacy data or a direct API call. An unparseable value leaves the stored rate alone.
+    """
+    if value is None or value == '':
+        return fallback
+
+    try:
+        rate = decimal.Decimal(str(value))
+    except (decimal.InvalidOperation, TypeError, ValueError):
+        return fallback
+
+    return min(max(rate, MIN_HOURLY_RATE), MAX_HOURLY_RATE)
+
+
 EMPTY_DOCUMENT_REVIEW_CONTEXT = {
     "application_status": None,
     "document_renewal_status": None,
@@ -205,6 +226,7 @@ EMPTY_DOCUMENT_REVIEW_CONTEXT = {
     "tutor_renewal_due_at": None,
     "tutor_renewal_rejection_reason": '',
     "can_submit_document_renewal": False,
+    "has_document_renewal_history": False,
 }
 
 
@@ -261,6 +283,11 @@ def get_document_review_context(application, role_label):
         "tutor_renewal_due_at": document_renewal_due_at,
         "tutor_renewal_rejection_reason": document_renewal_rejection_reason,
         "can_submit_document_renewal": can_submit_document_renewal,
+        # document_renewal_status() reports 'verified' for *any* approved application, including
+        # one that has never renewed. Without this flag the client cannot tell those apart, and a
+        # first-time approved applicant gets labelled "Renewal Approved" -- see
+        # src/services/tutorApplicationState.js.
+        "has_document_renewal_history": latest_renewal is not None,
     }
 
 
@@ -3747,7 +3774,7 @@ def tutor_setup(request):
     tutor.can_online = request.data.get("can_online", True)
     tutor.can_f2f = request.data.get("can_f2f", False)
 
-    tutor.hourly_rate = request.data.get("hourly_rate")
+    tutor.hourly_rate = clamp_hourly_rate(request.data.get("hourly_rate"), tutor.hourly_rate)
     tutor.response_time = request.data.get("response_time", tutor.response_time)
 
     if not tutor.commission_terms_accepted_at:
@@ -4359,10 +4386,20 @@ def add_tutor_subject(request):
             status=400,
         )
 
+    # Mirrors the guard in propose_tutor_subject. Checked before get_or_create and only against a
+    # subject the tutor does not already hold, so re-saving a description on an existing subject
+    # is never blocked by a tutor who is exactly at the limit.
+    already_selected = TutorSubjects.objects.filter(tutor=tutor, subject=subject).exists()
+    if not already_selected and TutorSubjects.objects.filter(tutor=tutor).count() >= TUTOR_SUBJECT_LIMIT:
+        return Response(
+            {"error": f"You can add up to {TUTOR_SUBJECT_LIMIT} subjects only."},
+            status=400,
+        )
+
     tutor_subject, created = TutorSubjects.objects.get_or_create(
         tutor=tutor,
         subject=subject,
-        defaults={"expertise_level": 3, "description": description or ''}
+        defaults={"expertise_level": DEFAULT_TUTOR_SUBJECT_EXPERTISE_LEVEL, "description": description or ''}
     )
 
     if not created and description is not None:

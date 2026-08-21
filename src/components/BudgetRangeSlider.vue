@@ -52,6 +52,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import { HOURLY_RATE_STEP, MAX_HOURLY_RATE, MIN_HOURLY_RATE } from '@/config'
 
 const props = defineProps({
   label: {
@@ -68,15 +69,18 @@ const props = defineProps({
   },
   minLimit: {
     type: Number,
-    default: 100
+    default: MIN_HOURLY_RATE
   },
   maxLimit: {
     type: Number,
-    default: 1000
+    default: MAX_HOURLY_RATE
   },
+  // Matches the granularity of the tutor-side rate stepper, so every budget stop is a rate a
+  // tutor can actually charge. A coarser step over the narrow 50-200 band would leave only a
+  // handful of positions.
   step: {
     type: Number,
-    default: 50
+    default: HOURLY_RATE_STEP
   },
   variant: {
     type: String,

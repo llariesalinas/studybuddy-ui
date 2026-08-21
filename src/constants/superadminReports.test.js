@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   REPORT_DETAIL_DATASETS,
+  REPORT_PERIOD_CUSTOM,
   SORT_ASCENDING,
   SORT_DESCENDING,
   reportPeriodScopeLabel,
@@ -106,6 +107,25 @@ describe('reportPeriodScopeLabel', () => {
 
   it('falls back to the raw value for an unknown period', () => {
     expect(reportPeriodScopeLabel('nonsense')).toBe('nonsense')
+  })
+
+  // "Custom range" alone would not say what the figures beneath it cover.
+  it('spells out a custom window as its actual endpoints', () => {
+    expect(reportPeriodScopeLabel(REPORT_PERIOD_CUSTOM, '2026-04-01', '2026-06-30')).toBe(
+      'Apr 1, 2026 – Jun 30, 2026',
+    )
+  })
+
+  it('renders the endpoints in local time, not shifted by UTC parsing', () => {
+    // `new Date('2026-04-01')` is UTC midnight, which prints as Mar 31 west of UTC.
+    expect(reportPeriodScopeLabel(REPORT_PERIOD_CUSTOM, '2026-04-01', '2026-04-01')).toContain(
+      'Apr 1, 2026',
+    )
+  })
+
+  it('falls back to a generic label until both endpoints are chosen', () => {
+    expect(reportPeriodScopeLabel(REPORT_PERIOD_CUSTOM, '2026-04-01', '')).toBe('Custom range')
+    expect(reportPeriodScopeLabel(REPORT_PERIOD_CUSTOM)).toBe('Custom range')
   })
 })
 

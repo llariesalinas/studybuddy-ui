@@ -1,8 +1,12 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { MAX_HOURLY_RATE, MIN_HOURLY_RATE } from '@/config'
 
-export const INITIAL_BUDGET_MIN = 100
-export const INITIAL_BUDGET_MAX = 1000
+// The tutee budget slider spans exactly the range a tutor rate can occupy -- see
+// MIN_HOURLY_RATE / MAX_HOURLY_RATE in @/config. A wider range would offer budget bands that no
+// tutor can ever fall into.
+export const INITIAL_BUDGET_MIN = MIN_HOURLY_RATE
+export const INITIAL_BUDGET_MAX = MAX_HOURLY_RATE
 
 export const useInitialBookingPrefsStore = defineStore('initialbookingprefs', () => {
   const selectedSubject = ref('')
