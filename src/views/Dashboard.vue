@@ -232,7 +232,7 @@
       <Transition name="fade">
         <div
           v-if="dismissDialogSession"
-          class="dashboard-modal-backdrop"
+          class="dashboard-modal-backdrop sb-overlay"
           @click.self="closeDismissPillDialog"
         >
           <section
@@ -1331,9 +1331,6 @@ const viewMoreTutors = () => router.push({ name: 'tutors' })
 }
 
 .dashboard-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 1080;
   display: grid;
   place-items: center;
   padding: 1rem;
@@ -1341,6 +1338,8 @@ const viewMoreTutors = () => router.push({ name: 'tutors' })
 }
 
 .dashboard-confirm-modal {
+  position: relative;
+  z-index: var(--sb-z-surface);
   width: min(100%, 390px);
   border: 1px solid var(--sb-card-border);
   border-radius: 18px;

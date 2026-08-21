@@ -19,56 +19,58 @@
       @close="isSupportModalOpen = false"
     />
 
-    <div
-      v-if="showLogoutModal"
-      ref="logoutModalRef"
-      class="modal logout-modal show"
-      id="logoutModal"
-      tabindex="-1"
-      role="dialog"
-      aria-modal="true"
-      style="display: block;"
-      @click.self="closeLogoutModal"
-    >
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content rounded-4">
-          
-          <div class="modal-header border-0">
-            <h5 class="modal-title fw-bold">Confirm Logout</h5>
-            <button type="button" class="btn-close" @click="closeLogoutModal"></button>
+    <Teleport to="body">
+      <div
+        v-if="showLogoutModal"
+        ref="logoutModalRef"
+        class="modal logout-modal show"
+        id="logoutModal"
+        tabindex="-1"
+        role="dialog"
+        aria-modal="true"
+        style="display: block;"
+        @click.self="closeLogoutModal"
+      >
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content rounded-4">
+
+            <div class="modal-header border-0">
+              <h5 class="modal-title fw-bold">Confirm Logout</h5>
+              <button type="button" class="btn-close" @click="closeLogoutModal"></button>
+            </div>
+
+            <div class="modal-body sb-muted">
+              Are you sure you want to log out?
+            </div>
+
+            <div class="modal-footer border-0">
+              <button
+                class="btn btn-light sb-btn"
+                @click="closeLogoutModal"
+              >
+                Cancel
+              </button>
+
+              <button
+                class="btn bg-sb-primary text-white sb-btn sb-elevated sb-elevated--brand"
+                @click="logout"
+              >
+                Yes, Log out
+              </button>
+            </div>
+
           </div>
-
-          <div class="modal-body sb-muted">
-            Are you sure you want to log out?
-          </div>
-
-          <div class="modal-footer border-0">
-            <button
-              class="btn btn-light sb-btn"
-              @click="closeLogoutModal"
-            >
-              Cancel
-            </button>
-
-            <button
-              class="btn bg-sb-primary text-white sb-btn sb-elevated sb-elevated--brand"
-              @click="logout"
-            >
-              Yes, Log out
-            </button>
-          </div>
-
         </div>
       </div>
-    </div>
 
-    <!-- `data-sb-owned` keeps clearBootstrapModalState() from ripping out a backdrop Vue renders. -->
-    <div
-      v-if="showLogoutModal"
-      class="modal-backdrop fade show"
-      data-sb-owned
-      @click="closeLogoutModal"
-    ></div>
+      <!-- `data-sb-owned` keeps clearBootstrapModalState() from ripping out a backdrop Vue renders. -->
+      <div
+        v-if="showLogoutModal"
+        class="modal-backdrop fade show sb-overlay"
+        data-sb-owned
+        @click="closeLogoutModal"
+      ></div>
+    </Teleport>
 
     <main
       class="app-main app-main-surface flex-grow-1 overflow-auto p-5 position-relative"
@@ -824,6 +826,10 @@ onBeforeUnmount(() => {
   background: #f3f4f6;
   color: #52606d;
   border: 1px solid #dce3e8;
+}
+
+.logout-modal {
+  z-index: var(--sb-z-surface);
 }
 
 .logout-modal .modal-content {

@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div v-if="open" class="session-check-shell" @click.self="emit('close')">
+    <div v-if="open" class="session-check-shell sb-overlay" @click.self="emit('close')">
       <section
         class="session-check-card"
         role="dialog"
@@ -91,9 +91,6 @@ onUnmounted(() => {
 
 <style scoped>
 .session-check-shell {
-  position: fixed;
-  inset: 0;
-  z-index: 1200;
   display: grid;
   place-items: center;
   padding: 24px;
@@ -101,6 +98,8 @@ onUnmounted(() => {
 }
 
 .session-check-card {
+  position: relative;
+  z-index: var(--sb-z-surface);
   width: min(100%, 460px);
   padding: 28px;
   background: #fff;

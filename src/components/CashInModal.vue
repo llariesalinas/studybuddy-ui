@@ -1,6 +1,7 @@
 <!-- src/components/CashInModal.vue -->
 <template>
-  <div class="modal-backdrop fade show"></div>
+  <Teleport to="body">
+  <div class="modal-backdrop fade show sb-overlay" data-sb-owned></div>
   <div class="modal fade show d-block" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content cashin-modal">
@@ -49,6 +50,7 @@
       </div>
     </div>
   </div>
+  </Teleport>
 </template>
 
 <script setup>
@@ -183,11 +185,7 @@ const submit = async () => {
   font-size: 13px;
 }
 
-.modal-backdrop {
-  z-index: 1050;
-}
-
 .modal {
-  z-index: 1055;
+  z-index: var(--sb-z-surface);
 }
 </style>
