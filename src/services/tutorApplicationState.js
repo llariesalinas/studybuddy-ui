@@ -92,6 +92,43 @@ export const getTutorRenewalStatus = (application) => {
   return null
 }
 
+// Whether this application has ever had a renewal review at all.
+//
+// The server's document_renewal_status() reports 'verified' for *any* approved application, so
+// "approved, never renewed" and "approved after renewing" are indistinguishable from the status
+// alone. Without this a first-time applicant who just got approved is told "Renewal Approved".
+// `has_document_renewal_history` is the authoritative flag; the timestamp keys are a fallback for
+// payload shapes that predate it.
+export const hasRenewalHistory = (application) => {
+  if (application?.has_document_renewal_history !== undefined) {
+    return readBoolean(application, ['has_document_renewal_history'])
+  }
+
+  // Fallbacks for payload shapes that predate the flag. A payload that is explicitly typed as a
+  // renewal, or whose status is literally spelled 'renewal_*', is self-evidently one.
+  const type = normalizeStatus(readFirst(application, [
+    'review_type',
+    'submission_type',
+    'application_type',
+    'document_review_type',
+  ]))
+
+  if (['renewal', 'document_renewal', 'reverification', 're_verification'].includes(type)) {
+    return true
+  }
+
+  if (normalizeStatus(application?.application_status).includes('renewal')) {
+    return true
+  }
+
+  return Boolean(readFirst(application, [
+    'latest_document_renewal_submitted_at',
+    'renewal_submitted_at',
+    'document_renewal_submitted_at',
+    'latest_document_renewal_id',
+  ]))
+}
+
 export const getApplicationReviewKind = (application) => {
   const type = normalizeStatus(readFirst(application, [
     'review_type',
@@ -176,7 +213,11 @@ export const getTutorApplicationFlow = (application) => {
     }
   }
 
-  if (renewalStatus === 'approved') {
+  // Only call an approved state a *renewal* approval when a renewal was actually submitted at
+  // some point. A never-renewed applicant reports renewalStatus 'approved' purely because the
+  // server maps an approved application to 'verified', and falls through to the initial branch
+  // below so they read "Approved", not "Renewal Approved".
+  if (renewalStatus === 'approved' && hasRenewalHistory(application)) {
     return {
       kind: 'renewal',
       status: 'approved',

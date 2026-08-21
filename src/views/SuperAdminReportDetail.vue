@@ -11,17 +11,18 @@
         <p class="scope">{{ scopeLine }}</p>
       </div>
       <div class="detail-controls">
-        <div class="period-toggle" aria-label="Report period">
-          <button
-            v-for="option in periodOptions"
-            :key="option.value"
-            type="button"
-            :class="{ active: period === option.value }"
-            @click="setPeriod(option.value)"
-          >
-            {{ option.label }}
-          </button>
-        </div>
+        <SbDateRangeFilter
+          :model-value="period"
+          :presets="periodOptions"
+          :custom-value="REPORT_PERIOD_CUSTOM"
+          :date-from="draftFrom"
+          :date-to="draftTo"
+          aria-label="Report period"
+          @update:model-value="setPeriod"
+          @update:date-from="draftFrom = $event"
+          @update:date-to="draftTo = $event"
+          @apply="applyCustomRange"
+        />
         <button
           type="button"
           class="export-button"
@@ -99,10 +100,12 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
+import SbDateRangeFilter from '@/components/SbDateRangeFilter.vue'
 import { useHaptics } from '@/composables/useHaptics'
 import { useSuperAdminStore } from '@/stores/superadmin'
 import { useToastStore } from '@/stores/toast'
 import { exportFilename } from '@/utils/csv'
+import { formatCount, formatDecimal, formatPhp } from '@/utils/currency'
 import {
   ALL_INSTITUTIONS_LABEL,
   REPORT_DEFAULT_PERIOD,
@@ -112,6 +115,7 @@ import {
   REPORT_COLUMN_PERCENT,
   REPORT_COLUMN_RATING,
   REPORT_COLUMN_TEXT,
+  REPORT_PERIOD_CUSTOM,
   REPORT_PERIOD_OPTIONS,
   SORT_ASCENDING,
   SORT_DESCENDING,
@@ -148,12 +152,22 @@ const period = computed(() => {
 })
 const institutionId = computed(() => route.query.institution || '')
 
+// Like every other filter here, the range lives in the query string so the page stays linkable
+// and matches the card that opened it. The drafts are the unconfirmed input values.
+const dateFrom = computed(() => (period.value === REPORT_PERIOD_CUSTOM ? String(route.query.from || '') : ''))
+const dateTo = computed(() => (period.value === REPORT_PERIOD_CUSTOM ? String(route.query.to || '') : ''))
+
+const draftFrom = ref(String(route.query.from || ''))
+const draftTo = ref(String(route.query.to || ''))
+
 const search = ref('')
 const sort = ref({ ...dataset.value.defaultSort })
 
 const filterQuery = computed(() => {
   const query = { period: period.value }
   if (institutionId.value) query.institution = institutionId.value
+  if (dateFrom.value) query.from = dateFrom.value
+  if (dateTo.value) query.to = dateTo.value
   return query
 })
 
@@ -176,7 +190,7 @@ const total = computed(() => store.analyticsDetail?.[dataset.value.totalKey] ?? 
 const scopeLine = computed(() =>
   [
     `${total.value} ${dataset.value.countNoun}`,
-    reportPeriodScopeLabel(period.value),
+    reportPeriodScopeLabel(period.value, dateFrom.value, dateTo.value),
     institutionName.value,
   ].join(' · '),
 )
@@ -206,7 +220,7 @@ const sortIconClass = computed(() =>
 )
 
 watch(
-  () => [period.value, institutionId.value],
+  () => [period.value, institutionId.value, dateFrom.value, dateTo.value],
   () => loadDetail(),
 )
 
@@ -225,14 +239,35 @@ onMounted(() => {
 })
 
 function loadDetail() {
-  store.fetchAnalyticsDetail(institutionId.value || null, period.value)
+  // An incomplete custom range would 400; wait for Apply to fill both endpoints.
+  if (period.value === REPORT_PERIOD_CUSTOM && (!dateFrom.value || !dateTo.value)) return
+  store.fetchAnalyticsDetail(institutionId.value || null, period.value, dateFrom.value, dateTo.value)
 }
 
 // `replace` rather than `push`: changing a filter on this page is a refinement, not a new
 // destination, so Back still returns to the dashboard instead of walking every period tried.
 function setPeriod(value) {
   vibrate(patterns.light)
-  router.replace({ query: { ...filterQuery.value, period: value } })
+  const query = { ...filterQuery.value, period: value }
+
+  if (value !== REPORT_PERIOD_CUSTOM) {
+    delete query.from
+    delete query.to
+  }
+
+  router.replace({ query })
+}
+
+function applyCustomRange() {
+  vibrate(patterns.light)
+  router.replace({
+    query: {
+      ...filterQuery.value,
+      period: REPORT_PERIOD_CUSTOM,
+      from: draftFrom.value,
+      to: draftTo.value,
+    },
+  })
 }
 
 function toggleSort(key) {
@@ -267,16 +302,13 @@ function formatCell(value, column) {
 
   switch (column.type) {
     case REPORT_COLUMN_MONEY:
-      return `PHP ${Number(value).toLocaleString(undefined, {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      })}`
+      return formatPhp(value)
     case REPORT_COLUMN_RATING:
-      return Number(value).toFixed(2)
+      return formatDecimal(value, 2)
     case REPORT_COLUMN_PERCENT:
-      return `${(Number(value) * 100).toFixed(1)}%`
+      return `${formatDecimal(Number(value) * 100, 1)}%`
     case REPORT_COLUMN_NUMBER:
-      return Number(value).toLocaleString()
+      return formatCount(value)
     default:
       return value
   }
@@ -287,6 +319,8 @@ async function exportDataset() {
     await store.exportAnalyticsWorkbook({
       institutionId: institutionId.value || null,
       period: period.value,
+      dateFrom: dateFrom.value,
+      dateTo: dateTo.value,
       sections: [dataset.value.exportSection],
       filename: exportFilename(dataset.value.exportFileLabel, 'xlsx'),
     })
@@ -349,30 +383,6 @@ async function exportDataset() {
   align-items: center;
   gap: 0.6rem;
   flex-wrap: wrap;
-}
-
-.period-toggle {
-  display: inline-flex;
-  gap: 0.25rem;
-  padding: 0.25rem;
-  border: 1px solid var(--sb-card-border);
-  border-radius: 999px;
-  background: #fff;
-}
-
-.period-toggle button {
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--sb-text-muted);
-  font-size: 0.78rem;
-  font-weight: 600;
-  padding: 0.3rem 0.85rem;
-}
-
-.period-toggle button.active {
-  background: var(--sb-primary);
-  color: #fff;
 }
 
 .export-button {

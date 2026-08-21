@@ -182,19 +182,31 @@ export const useSuperAdminStore = defineStore('superadmin', () => {
   }
 
   let perfPromise = null
-  const fetchInstitutionPerformance = async (force = false) => {
-    if (institutionPerformance.value.length && !force) return
+  // Keyed by the reporting window: the session/revenue columns are now window-scoped, so a cached
+  // payload from a different window is stale rather than reusable.
+  let perfWindowKey = null
+  const fetchInstitutionPerformance = async (force = false, reportWindow = {}) => {
+    const { period = '', dateFrom = '', dateTo = '' } = reportWindow
+    const windowKey = `${period}|${dateFrom}|${dateTo}`
+    const staleWindow = perfWindowKey !== null && perfWindowKey !== windowKey
+
+    if (institutionPerformance.value.length && !force && !staleWindow) return
     if (perfPromise) {
       await perfPromise
-      if (!force) return
+      if (!force && !staleWindow) return
     }
 
     loading.value.institutionPerformance = true
     error.value.institutionPerformance = null
+    perfWindowKey = windowKey
 
     perfPromise = (async () => {
       try {
-        const res = await api.get('/admin/institutions/performance/')
+        const params = {}
+        if (period) params.period = period
+        if (dateFrom) params.date_from = dateFrom
+        if (dateTo) params.date_to = dateTo
+        const res = await api.get('/admin/institutions/performance/', { params })
         institutionPerformance.value = res.data
       } catch {
         error.value.institutionPerformance = 'Failed to load performance data.'
@@ -277,13 +289,17 @@ export const useSuperAdminStore = defineStore('superadmin', () => {
     return res.data
   }
 
-  const fetchAnalytics = async (institutionId = null, period = '30d') => {
+  // `dateFrom`/`dateTo` carry an explicit reporting window; the server reads them only when
+  // `period` is 'custom', so passing them alongside a preset is harmless.
+  const fetchAnalytics = async (institutionId = null, period = '30d', dateFrom = '', dateTo = '') => {
     loading.value.analytics = true
     error.value.analytics = null
 
     try {
       const params = { period }
       if (institutionId) params.institution_id = institutionId
+      if (dateFrom) params.date_from = dateFrom
+      if (dateTo) params.date_to = dateTo
       const res = await api.get('/admin/analytics/', { params })
       analytics.value = res.data
     } catch {
@@ -296,13 +312,15 @@ export const useSuperAdminStore = defineStore('superadmin', () => {
   // `view=full` returns every ranked row instead of the dashboard's truncated cards. Kept in its
   // own state so a drill-down page never overwrites the dashboard's summary payload, and the two
   // can be open in separate tabs without fighting over one ref.
-  const fetchAnalyticsDetail = async (institutionId = null, period = '30d') => {
+  const fetchAnalyticsDetail = async (institutionId = null, period = '30d', dateFrom = '', dateTo = '') => {
     loading.value.analyticsDetail = true
     error.value.analyticsDetail = null
 
     try {
       const params = { period, view: ANALYTICS_VIEW_FULL }
       if (institutionId) params.institution_id = institutionId
+      if (dateFrom) params.date_from = dateFrom
+      if (dateTo) params.date_to = dateTo
       const res = await api.get('/admin/analytics/', { params })
       analyticsDetail.value = res.data
     } catch {
@@ -318,6 +336,8 @@ export const useSuperAdminStore = defineStore('superadmin', () => {
   const exportAnalyticsWorkbook = async ({
     institutionId = null,
     period = '30d',
+    dateFrom = '',
+    dateTo = '',
     sections = [],
     filename = '',
   } = {}) => {
@@ -327,6 +347,8 @@ export const useSuperAdminStore = defineStore('superadmin', () => {
     try {
       const params = { period }
       if (institutionId) params.institution_id = institutionId
+      if (dateFrom) params.date_from = dateFrom
+      if (dateTo) params.date_to = dateTo
       if (sections.length) params.sections = sections.join(',')
 
       const res = await api.get('/admin/analytics/export/', {

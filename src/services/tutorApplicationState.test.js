@@ -3,6 +3,7 @@ import {
   getApplicationReviewKind,
   getReviewStatus,
   getTutorApplicationFlow,
+  hasRenewalHistory,
   needsTutorApplicationAttention,
   needsTutorApplicationLockout,
   needsTuteeBookingBlock,
@@ -87,6 +88,63 @@ describe('tutor application state helpers', () => {
       needsUpload: false,
     })
     expect(needsTutorApplicationAttention(application)).toBe(false)
+  })
+
+  // The server reports document_renewal_status 'verified' for *any* approved application, so
+  // without the renewal-history flag a first-time applicant was labelled "Renewal Approved".
+  it('calls a freshly approved first-time application an initial approval, not a renewal', () => {
+    const application = {
+      application_status: 'approved',
+      document_renewal_status: 'verified',
+      has_document_renewal_history: false,
+    }
+
+    expect(hasRenewalHistory(application)).toBe(false)
+    expect(getTutorApplicationFlow(application)).toEqual({
+      kind: 'initial',
+      status: 'approved',
+      needsUpload: false,
+    })
+    expect(needsTutorApplicationAttention(application)).toBe(false)
+  })
+
+  it('still calls an approval a renewal once the tutor has actually renewed', () => {
+    const application = {
+      application_status: 'approved',
+      document_renewal_status: 'verified',
+      has_document_renewal_history: true,
+    }
+
+    expect(hasRenewalHistory(application)).toBe(true)
+    expect(getTutorApplicationFlow(application)).toEqual({
+      kind: 'renewal',
+      status: 'approved',
+      needsUpload: false,
+    })
+  })
+
+  it('infers renewal history from a renewal timestamp when the flag is absent', () => {
+    expect(hasRenewalHistory({
+      application_status: 'approved',
+      latest_document_renewal_submitted_at: '2026-05-01T00:00:00Z',
+    })).toBe(true)
+    expect(hasRenewalHistory({ application_status: 'approved' })).toBe(false)
+  })
+
+  // A renewal that has come due on a first application is still genuinely a renewal -- the
+  // history gate must not swallow the due/pending/rejected branch.
+  it('keeps a due renewal in the renewal flow even with no prior renewal history', () => {
+    const application = {
+      application_status: 'approved',
+      document_renewal_status: 'due',
+      has_document_renewal_history: false,
+    }
+
+    expect(getTutorApplicationFlow(application)).toEqual({
+      kind: 'renewal',
+      status: 'due',
+      needsUpload: true,
+    })
   })
 
   it('locks out a never-approved (pending) tutor globally', () => {

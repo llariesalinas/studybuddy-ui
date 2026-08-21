@@ -11,6 +11,7 @@ export const useProfileStore = defineStore('profile', {
     renewalStatus: null,
     renewalRequired: false,
     renewalDueAt: null,
+    hasRenewalHistory: false,
     tuteeVerificationEnforced: false,
     tutorOnboardingSkippedAt: null,
     tutorOnboardingComplete: false,
@@ -35,6 +36,7 @@ export const useProfileStore = defineStore('profile', {
       this.renewalStatus = null
       this.renewalRequired = false
       this.renewalDueAt = null
+      this.hasRenewalHistory = false
       this.tuteeVerificationEnforced = false
       this.tutorOnboardingSkippedAt = null
       this.tutorOnboardingComplete = false
@@ -70,6 +72,9 @@ export const useProfileStore = defineStore('profile', {
       this.renewalStatus = res.data.document_renewal_status || null
       this.renewalRequired = Boolean(res.data.document_renewal_required)
       this.renewalDueAt = res.data.document_renewal_due_at || null
+      // Separates "approved, never renewed" from "approved after renewing" -- both report a
+      // renewalStatus of 'verified'. See hasRenewalHistory in services/tutorApplicationState.js.
+      this.hasRenewalHistory = Boolean(res.data.has_document_renewal_history)
       this.tuteeVerificationEnforced = Boolean(res.data.tutee_verification_enforced)
       this.tutorOnboardingSkippedAt = res.data.tutor_onboarding_skipped_at || null
       this.tutorOnboardingComplete = Boolean(res.data.tutor_onboarding_complete)
