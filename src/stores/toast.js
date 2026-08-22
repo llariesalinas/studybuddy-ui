@@ -5,9 +5,11 @@ export const useToastStore = defineStore('toast', () => {
   const toasts = ref([])
   let nextId = 0
 
-  function push(message, type = 'success', duration = 3500) {
+  // `action` is an optional { label, handler } pair rendered as an inline button -- used by the
+  // dual-role auto-switch toast to offer Undo, since that switch happens without the user asking.
+  function push(message, type = 'success', duration = 3500, action = null) {
     const id = ++nextId
-    toasts.value.push({ id, message, type })
+    toasts.value.push({ id, message, type, action })
     setTimeout(() => dismiss(id), duration)
   }
 

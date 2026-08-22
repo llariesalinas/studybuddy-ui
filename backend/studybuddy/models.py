@@ -4,12 +4,19 @@ from decimal import Decimal
 
 from django.db import models
 from django.db.models import Q
+from django.db.models.functions import Lower
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.contrib.auth.models import User
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.utils import timezone
+
+from .subject_taxonomy import (
+    CATEGORY_ORDER_STEP,
+    UNCATEGORIZED_CATEGORY,
+    UNCATEGORIZED_DISPLAY_ORDER,
+)
 
 
 # Create your models here.
@@ -134,10 +141,32 @@ class UserProfile(models.Model):
         ('SuperAdmin', 'SuperAdmin'),
     ]
 
+    # `role` is the ACTIVE MODE, not the account's identity: one account can hold both the Tutor
+    # and the Tutee experience and switch between them (docs/plans/2026-08-19-dual-role-mode-
+    # switch.md). It still holds exactly one value at a time, so every `role == '...'` check that
+    # asks "what is the requester doing right now" keeps working. Checks that ask "is this OTHER
+    # person a tutor" are identity checks and must use can_tutor/can_tutee instead.
     role = models.CharField(max_length=20, choices=ROLE_CHOICES)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    # Modes this account is PROVISIONED for -- derived, never stored, so they cannot drift from
+    # the rows they describe. "Provisioned" rather than "permitted": every non-admin student is
+    # permitted both modes, so a permission-flavoured flag would gate nothing. Being false is what
+    # makes the "you don't have a {role} account" modal fire and sends the user to onboarding.
+    @property
+    def can_tutor(self):
+        tutor = getattr(self, 'tutor', None)
+
+        if tutor is None or tutor.hourly_rate is None:
+            return False
+
+        return tutor.tutorsubjects_set.exists()
+
+    @property
+    def can_tutee(self):
+        return hasattr(self, 'preference')
 
     def __str__(self):
         return f"{self.fname} {self.lname}"
@@ -198,6 +227,41 @@ class EmailOTPChallenge(models.Model):
 
     def __str__(self):
         return f"{self.purpose} OTP for user {self.user_id}"
+
+
+class TrustedDevice(models.Model):
+    """A browser that has cleared the login OTP and may skip it until the trust expires.
+
+    Only the HMAC of the issued secret is stored, never the secret itself -- a database leak
+    must not hand out working device tokens. `expires_at` slides forward on every accepted
+    login (see TRUSTED_DEVICE_TTL_SECONDS), so an actively used device stays trusted and an
+    abandoned one lapses back to a full email challenge.
+    """
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='trusted_devices')
+    device_id = models.UUIDField(default=uuid.uuid4, unique=True, db_index=True)
+    token_hash = models.CharField(max_length=64)
+    expires_at = models.DateTimeField()
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    last_used_at = models.DateTimeField(default=timezone.now)
+    created_at = models.DateTimeField(auto_now_add=True)
+    # Audit only -- shown to an admin deciding whether to revoke, never used to match a device.
+    user_agent = models.CharField(max_length=255, blank=True, default='')
+    last_ip = models.GenericIPAddressField(null=True, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['user', 'revoked_at']),
+            models.Index(fields=['expires_at']),
+        ]
+        ordering = ['-last_used_at']
+
+    def __str__(self):
+        return f"Trusted device {self.device_id} for user {self.user_id}"
+
+    @property
+    def is_active(self):
+        return self.revoked_at is None and self.expires_at > timezone.now()
 
 
 class EmailSendLog(models.Model):
@@ -691,6 +755,92 @@ def create_tutor_wallet(sender, instance, created, **kwargs):
     if created:
         Wallet.objects.get_or_create(tutor=instance)
 
+#Subject Category Table
+class SubjectCategory(models.Model):
+    """A subject category, stored in its own right rather than derived from subject rows.
+
+    The pickable category list used to be "the distinct Subjects.category strings that exist",
+    which made an empty category unrepresentable -- a category vanished when its last subject was
+    removed, and one could not be created ahead of its first subject. Seeded from
+    subject_taxonomy.CATEGORIES; the table owns the list from then on.
+    """
+
+    name = models.CharField(max_length=100, unique=True)
+    display_order = models.PositiveIntegerField(default=0)
+    # True only for the Uncategorized fallback, which the delete endpoint refuses to remove.
+    is_system = models.BooleanField(default=False)
+
+    class Meta:
+        verbose_name_plural = 'subject categories'
+        ordering = ['display_order', 'name']
+        constraints = [
+            # Names are stored as typed but compared case-insensitively, so 'sports' cannot become
+            # a second category alongside 'Sports'.
+            models.UniqueConstraint(Lower('name'), name='unique_subject_category_name_ci'),
+        ]
+
+    def __str__(self):
+        return self.name
+
+
+def get_uncategorized():
+    """Return the Uncategorized category, for Subjects.category's on_delete fallback.
+
+    Deleting a category moves its subjects here rather than deleting them: TutorSubjects and
+    Preference.subjects point at Subjects, so a cascade would silently strip tutor expertise and
+    tutee preferences.
+    """
+    category, _ = SubjectCategory.objects.get_or_create(
+        name=UNCATEGORIZED_CATEGORY,
+        defaults={
+            'display_order': UNCATEGORIZED_DISPLAY_ORDER,
+            'is_system': True,
+        },
+    )
+    return category
+
+
+def get_uncategorized_id():
+    """The Uncategorized category's pk, for Subjects.category's default.
+
+    Separate from get_uncategorized because a ForeignKey default is a pk, not an instance.
+    """
+    return get_uncategorized().pk
+
+
+def resolve_category(name):
+    """Return the SubjectCategory matching `name` case-insensitively, or None.
+
+    Used by paths that may only reference an existing category (tutor subject proposals), as
+    opposed to admin paths that are allowed to mint one.
+    """
+    name = str(name or '').strip()
+    if not name:
+        return None
+    return SubjectCategory.objects.filter(name__iexact=name).first()
+
+
+def resolve_or_create_category(name):
+    """Return the SubjectCategory matching `name`, creating it if an admin named a new one.
+
+    New categories sort after every existing one, since there is no way to infer where in the
+    authored order an admin meant to slot it.
+    """
+    name = str(name or '').strip()
+    if not name:
+        return None
+    category = resolve_category(name)
+    if category is not None:
+        return category
+    last = (
+        SubjectCategory.objects.exclude(name=UNCATEGORIZED_CATEGORY)
+        .order_by('-display_order')
+        .first()
+    )
+    next_order = (last.display_order if last else 0) + CATEGORY_ORDER_STEP
+    return SubjectCategory.objects.create(name=name, display_order=next_order)
+
+
 #Subjects Table
 class Subjects(models.Model):
     STATUS_CHOICES = [
@@ -701,7 +851,15 @@ class Subjects(models.Model):
     subject_code = models.CharField(max_length=20, primary_key=True)
     subject_name = models.CharField(max_length=100)
     department = models.CharField(max_length=100, blank=True, default='')
-    category = models.CharField(max_length=100, null=True, blank=True)
+    # Required, but defaults to the Uncategorized sink rather than being nullable: "no category
+    # stated" and "category deleted out from under it" are the same situation, and giving them one
+    # representation is the point of the sink. Before this, the same state could be NULL or ''.
+    category = models.ForeignKey(
+        SubjectCategory,
+        on_delete=models.SET(get_uncategorized),
+        related_name='subjects',
+        default=get_uncategorized_id,
+    )
     keywords = models.TextField(blank=True, default='')
     description = models.TextField(blank=True, default='')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='approved')
@@ -1183,3 +1341,48 @@ class SupportTicket(models.Model):
 
     def __str__(self):
         return f"Ticket #{self.id} - {self.subject} ({self.status})"
+
+
+class AlgorithmWeight(models.Model):
+    """One tunable weight in the recommender, editable by a SuperAdmin.
+
+    Replaces the module-level constants in recommender/hybrid.py and
+    recommender/cbf.py, which could previously only be changed by editing code
+    and redeploying.
+
+    Weights belong to a group whose members are normalised together at score
+    time (see recommender/weights.py). Values are therefore stored exactly as
+    entered and are relative, not absolute: 40/20/15/10/10/5 and 8/4/3/2/2/1
+    describe the same algorithm. Normalising rather than validating that a group
+    sums to 1.0 is deliberate - it means an invalid set does not exist, instead
+    of existing and being rejected by a rule every write path has to remember.
+
+    updated_by/updated_at answer "who changed this weight, and when", which is
+    the point of making the weights editable at all.
+    """
+
+    GROUP_HYBRID = 'hybrid'
+    GROUP_CBF = 'cbf'
+    GROUP_CHOICES = [
+        (GROUP_HYBRID, 'Hybrid blend'),
+        (GROUP_CBF, 'Content-based match components'),
+    ]
+
+    group = models.CharField(max_length=20, choices=GROUP_CHOICES)
+    key = models.CharField(max_length=32)
+    value = models.FloatField(validators=[MinValueValidator(0)])
+    updated_by = models.ForeignKey(
+        UserProfile,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='algorithm_weight_updates',
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('group', 'key')
+        ordering = ['group', 'key']
+
+    def __str__(self):
+        return f"{self.group}.{self.key} = {self.value}"

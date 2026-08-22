@@ -10,6 +10,7 @@ from .hybrid import (
     hybrid_prediction_breakdown,
     normalize_tutor_queryset,
 )
+from .weights import load_weights
 from .workload import get_upcoming_week_loads
 
 logger = logging.getLogger(__name__)
@@ -162,7 +163,9 @@ def apply_rating_overrides(ratings, overrides):
     return ratings
 
 
-def build_algorithm_demo_recommendation(tutee, institution_id=None, overrides=None):
+def build_algorithm_demo_recommendation(
+    tutee, institution_id=None, overrides=None, weights=None
+):
     """Runs the real hybrid recommender for a Tutee and returns every candidate
     Tutor's full Hybrid Score breakdown (CBF sub-scores, CF score + contributing
     Top-K Neighbors, Cold-Start flag) for the live panel demo tool. Mirrors
@@ -171,7 +174,11 @@ def build_algorithm_demo_recommendation(tutee, institution_id=None, overrides=No
     _candidate_tutors).
 
     overrides is an optional list of what-if rating edits applied to the matrix
-    in memory and never written back — see apply_rating_overrides."""
+    in memory and never written back — see apply_rating_overrides.
+
+    weights is an optional set of uncommitted algorithm weights, used the same
+    way: the Algorithm Settings preview scores against weights the admin has not
+    saved yet. Left as None, the saved weights are loaded once here."""
     subject_codes = get_student_subject_codes(tutee)
 
     if not subject_codes:
@@ -195,6 +202,10 @@ def build_algorithm_demo_recommendation(tutee, institution_id=None, overrides=No
     co_rated = _build_co_rated_map(ratings, tutee, neighbor_ids)
     target_categories = resolve_target_categories(None, subject_codes)
 
+    # Loaded once, outside the per-tutor loop below.
+    if weights is None:
+        weights = load_weights()
+
     rows = []
     for tutor in candidate_tutors:
         breakdown = hybrid_prediction_breakdown(
@@ -206,6 +217,7 @@ def build_algorithm_demo_recommendation(tutee, institution_id=None, overrides=No
             peer_neighbors=peer_neighbors,
             global_neighbors=global_neighbors,
             target_categories=target_categories,
+            weights=weights,
         )
         cf = breakdown["cf"]
 

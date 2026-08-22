@@ -1,0 +1,415 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-19T00:00:00.000Z",
+  "title": "Design System: StudyBuddy",
+  "extensions": {
+    "colorMeta": {
+      "campus-green": {
+        "role": "primary",
+        "displayName": "Deep Campus Green",
+        "canonical": "#00895A",
+        "tonalRamp": [
+          "#04241A",
+          "#063A2A",
+          "#08513B",
+          "#00704A",
+          "#00895A",
+          "#18A36C",
+          "#7FCFAF",
+          "#DFF1E8"
+        ]
+      },
+      "deep-blue": {
+        "role": "secondary",
+        "displayName": "Deep Blue",
+        "canonical": "#006591",
+        "tonalRamp": [
+          "#021C28",
+          "#03303F",
+          "#04455C",
+          "#005479",
+          "#006591",
+          "#2E8CB6",
+          "#7FBBD8",
+          "#DCEDF6"
+        ]
+      },
+      "aurora-yellow": {
+        "role": "tertiary",
+        "displayName": "Aurora Yellow",
+        "canonical": "#FFC94D",
+        "tonalRamp": [
+          "#3A2B06",
+          "#5C4409",
+          "#7E5D0D",
+          "#DCA21B",
+          "#FFC94D",
+          "#FFD778",
+          "#FFE6AC",
+          "#FFF6E0"
+        ]
+      },
+      "aurora-orange": {
+        "role": "tertiary",
+        "displayName": "Aurora Orange",
+        "canonical": "#FF8A5C",
+        "tonalRamp": [
+          "#3B1608",
+          "#5E240E",
+          "#873515",
+          "#E0683A",
+          "#FF8A5C",
+          "#FFA983",
+          "#FFC8AF",
+          "#FFECE3"
+        ]
+      },
+      "aurora-pink": {
+        "role": "tertiary",
+        "displayName": "Aurora Pink",
+        "canonical": "#FF8FA3",
+        "tonalRamp": [
+          "#3B1119",
+          "#5E1C29",
+          "#87293A",
+          "#E26D86",
+          "#FF8FA3",
+          "#FFAEBE",
+          "#FFCCD6",
+          "#FFEDF1"
+        ]
+      },
+      "aurora-violet": {
+        "role": "tertiary",
+        "displayName": "Aurora Violet",
+        "canonical": "#8E7CF4",
+        "tonalRamp": [
+          "#1B1440",
+          "#2C2166",
+          "#3F308F",
+          "#6A55D6",
+          "#8E7CF4",
+          "#AA9CF7",
+          "#C9C0FA",
+          "#EBE7FD"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "#0A1916",
+        "tonalRamp": [
+          "#050C0A",
+          "#0A1916",
+          "#122A25",
+          "#1C3F37",
+          "#2E5C51",
+          "#5A8C7E",
+          "#A8C6BC",
+          "#E4EFEB"
+        ]
+      },
+      "canvas": {
+        "role": "neutral",
+        "displayName": "Canvas",
+        "canonical": "#F8F9FA",
+        "tonalRamp": [
+          "#16191C",
+          "#2A2F33",
+          "#43494F",
+          "#6B7280",
+          "#9AA1A9",
+          "#C7CCD1",
+          "#EAEAEA",
+          "#F8F9FA"
+        ]
+      },
+      "text-main": {
+        "role": "neutral",
+        "displayName": "Text Main",
+        "canonical": "#163127",
+        "tonalRamp": [
+          "#081410",
+          "#0F2219",
+          "#163127",
+          "#22483A",
+          "#35664F",
+          "#6B7280",
+          "#A0ACB8",
+          "#E0E7E3"
+        ]
+      },
+      "danger": {
+        "role": "neutral",
+        "displayName": "Danger Red",
+        "canonical": "#ef4444",
+        "tonalRamp": [
+          "#3D0B0B",
+          "#5E1212",
+          "#871B1B",
+          "#C42B2B",
+          "#ef4444",
+          "#F47171",
+          "#F9A6A6",
+          "#FDE4E4"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Landing page hero statements only. Never appears in the authenticated app."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Page titles on app screens; the largest type most users see."
+      },
+      "title": { "displayName": "Title", "purpose": "Card and section headings." },
+      "body": { "displayName": "Body", "purpose": "Paragraph copy; the global default on body." },
+      "label": {
+        "displayName": "Label",
+        "purpose": "The workhorse. Table cells, field labels, chips, buttons, metadata, list rows."
+      },
+      "eyebrow": {
+        "displayName": "Eyebrow",
+        "purpose": "Small uppercase green kicker above page titles."
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "Export dialogs and developer panels only."
+      }
+    },
+    "shadows": [
+      {
+        "name": "rest",
+        "value": "0 6px 16px rgba(15, 23, 42, 0.06)",
+        "purpose": "Default resting state of an elevated surface. Barely visible by intent."
+      },
+      {
+        "name": "hover",
+        "value": "0 16px 36px rgba(15, 23, 42, 0.12)",
+        "purpose": "Crossfaded in on hover via an ::after pseudo-element, never animated directly."
+      },
+      {
+        "name": "rest-brand",
+        "value": "0 8px 18px rgba(0, 137, 90, 0.20)",
+        "purpose": "Resting shadow for primary buttons and brand surfaces, tinted green not grey."
+      },
+      {
+        "name": "hover-brand",
+        "value": "0 14px 30px rgba(0, 137, 90, 0.28)",
+        "purpose": "Hover shadow for brand surfaces."
+      },
+      {
+        "name": "glass",
+        "value": "0 24px 70px rgba(15, 23, 42, 0.1)",
+        "purpose": "Wide, soft and diffuse. Used only on .glass-segment panels."
+      },
+      {
+        "name": "halo",
+        "value": "0 0 0 4px rgba(0, 137, 90, 0.12)",
+        "purpose": "The focus ring on form fields."
+      }
+    ],
+    "motion": [
+      {
+        "name": "spring",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "The only easing curve in the system. Every transition uses it."
+      },
+      { "name": "t-quick", "value": "130ms", "purpose": "Leave transitions and fast fades." },
+      {
+        "name": "t-normal",
+        "value": "180ms",
+        "purpose": "Default duration for hover, lift, and enter transitions."
+      },
+      {
+        "name": "lift-control",
+        "value": "-4px",
+        "purpose": "Hover lift for buttons and pills (.sb-btn, .sb-pill)."
+      },
+      {
+        "name": "lift-surface",
+        "value": "-6px",
+        "purpose": "Hover lift for cards and larger surfaces (.sb-interactive)."
+      },
+      {
+        "name": "press",
+        "value": "0.97",
+        "purpose": "Active-state scale, applied over 70ms."
+      }
+    ],
+    "breakpoints": [
+      { "name": "dialog", "value": "640px" },
+      { "name": "panel", "value": "860px" }
+    ],
+    "density": [
+      {
+        "name": "default",
+        "value": "1",
+        "purpose": "Standard scale."
+      },
+      {
+        "name": "compact",
+        "value": "0.8",
+        "purpose": "Applies CSS zoom to #app; requires --sb-vh-fix counterparts for full-height shells."
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one affirmative action. Pill geometry, heavy label, green-tinted shadow.",
+      "html": "<button class=\"ds-btn-primary\" type=\"button\">Confirm booking</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 0.45rem; min-height: 42px; padding: 0.72rem 1rem; border: 0; border-radius: 999px; background: #00895A; color: #fff; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; font-size: 14px; font-weight: 850; box-shadow: 0 16px 32px rgba(0, 137, 90, 0.2); cursor: pointer; transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1), background 180ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn-primary:hover { background: #00704A; transform: translateY(-4px); } .ds-btn-primary:active { transform: scale(0.97); transition-duration: 70ms; } .ds-btn-primary:focus-visible { outline: 4px solid rgba(0, 137, 90, 0.12); outline-offset: 2px; } .ds-btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }"
+    },
+    {
+      "name": "Soft Button",
+      "kind": "button",
+      "refersTo": "button-soft",
+      "description": "The default secondary action. An ink tint with a hairline border.",
+      "html": "<button class=\"ds-btn-soft\" type=\"button\">Reset to defaults</button>",
+      "css": ".ds-btn-soft { display: inline-flex; align-items: center; justify-content: center; gap: 0.45rem; min-height: 42px; padding: 0.72rem 1rem; border: 1px solid rgba(234, 234, 234, 0.9); border-radius: 999px; background: rgba(22, 49, 39, 0.08); color: #163127; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; font-size: 14px; font-weight: 850; cursor: pointer; transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1), background 180ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn-soft:hover { background: rgba(22, 49, 39, 0.14); transform: translateY(-4px); } .ds-btn-soft:active { transform: scale(0.97); transition-duration: 70ms; } .ds-btn-soft:focus-visible { outline: 4px solid rgba(0, 137, 90, 0.12); outline-offset: 2px; }"
+    },
+    {
+      "name": "Danger Soft Button",
+      "kind": "button",
+      "refersTo": "button-danger-soft",
+      "description": "Destructive actions. Tinted, never solid red.",
+      "html": "<button class=\"ds-btn-danger\" type=\"button\">Cancel session</button>",
+      "css": ".ds-btn-danger { display: inline-flex; align-items: center; justify-content: center; gap: 0.45rem; min-height: 42px; padding: 0.72rem 1rem; border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 999px; background: rgba(239, 68, 68, 0.12); color: #ef4444; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; font-size: 14px; font-weight: 850; cursor: pointer; transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1), background 180ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn-danger:hover { background: rgba(239, 68, 68, 0.18); transform: translateY(-4px); } .ds-btn-danger:active { transform: scale(0.97); transition-duration: 70ms; } .ds-btn-danger:focus-visible { outline: 4px solid rgba(0, 137, 90, 0.12); outline-offset: 2px; }"
+    },
+    {
+      "name": "Selectable Pill",
+      "kind": "chip",
+      "refersTo": "button-soft",
+      "description": "Filter and choice chips. Selection is a green outline, never a fill swap.",
+      "html": "<button class=\"ds-pill\" type=\"button\">All institutions</button><button class=\"ds-pill ds-pill-selected\" type=\"button\" aria-pressed=\"true\">STEM</button>",
+      "css": ".ds-pill { display: inline-flex; align-items: center; padding: 7px 14px; margin-right: 8px; border: 1px solid #EAEAEA; border-radius: 999px; background: #fff; color: #6B7280; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; font-size: 12px; font-weight: 600; cursor: pointer; transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-pill:hover { transform: translateY(-4px); } .ds-pill:active { transform: scale(0.97); transition-duration: 70ms; } .ds-pill-selected { outline: 2px solid #00895A; outline-offset: 2px; color: #163127; }"
+    },
+    {
+      "name": "Badge",
+      "kind": "chip",
+      "refersTo": "badge",
+      "description": "Subject tags and status markers. Tinted green, never saturated.",
+      "html": "<span class=\"ds-badge\">Peer tutors</span><span class=\"ds-badge\">Calculus I</span>",
+      "css": ".ds-badge { display: inline-block; margin: 2px; padding: 3px 10px; border: 1px solid #b8dece; border-radius: 999px; background: #edf6f1; color: #00895A; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; font-size: 11px; font-weight: 500; }"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "The standard container. Flat at rest with a hairline edge; lifts only when interactive.",
+      "html": "<article class=\"ds-card\"><h3>Smart tutor matching</h3><p>Pair students with peer tutors based on subjects, ratings, and fit.</p></article>",
+      "css": ".ds-card { padding: 28px; border: 1px solid #EAEAEA; border-radius: 18px; background: #fff; color: #163127; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 180ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-card h3 { margin: 0 0 6px; font-size: 18px; font-weight: 700; } .ds-card p { margin: 0; font-size: 15px; line-height: 1.6; color: #6B7280; } .ds-card:hover { transform: translateY(-6px); box-shadow: 0 16px 36px rgba(15, 23, 42, 0.12); }"
+    },
+    {
+      "name": "Glass Segment",
+      "kind": "custom",
+      "refersTo": "glass-segment",
+      "description": "The signature translucent panel that sits over the aurora wash on profile and session pages.",
+      "html": "<section class=\"ds-glass\"><h3>Upcoming session</h3><p>Calculus I with Jonas Reyes, Thursday 3:00 PM.</p></section>",
+      "css": ".ds-glass { padding: 1.5rem; border: 1px solid color-mix(in srgb, #EAEAEA 82%, transparent); border-radius: 24px; background: color-mix(in srgb, #ffffff 84%, transparent); box-shadow: 0 24px 70px rgba(15, 23, 42, 0.1); font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #163127; } .ds-glass h3 { margin: 0 0 6px; font-size: 18px; font-weight: 800; } .ds-glass p { margin: 0; font-size: 13px; font-weight: 600; color: #6B7280; }"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "card",
+      "description": "Form input with the instant green focus halo. Transition is deliberately disabled so focus is immediate.",
+      "html": "<label class=\"ds-field-label\" for=\"ds-search\">Search tutees</label><input class=\"ds-field\" id=\"ds-search\" type=\"text\" placeholder=\"Search tutees…\" />",
+      "css": ".ds-field-label { display: block; margin-bottom: 6px; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; font-size: 12px; font-weight: 600; color: #6B7280; } .ds-field { width: 100%; max-width: 320px; padding: 10px 14px; border: 1px solid #EAEAEA; border-radius: 12px; background: #fff; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; font-size: 14px; color: #163127; transition: none; } .ds-field::placeholder { color: #a0acb8; } .ds-field:focus, .ds-field:focus-visible { border-color: #00895A; box-shadow: 0 0 0 4px rgba(0, 137, 90, 0.12); outline: none; }"
+    },
+    {
+      "name": "Sidebar Navigation Row",
+      "kind": "nav",
+      "refersTo": "card",
+      "description": "A row from the fixed sidebar shell. Icon plus label, green tint when active.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-nav-row ds-nav-active\" href=\"#\"><svg viewBox=\"0 0 16 16\" width=\"16\" height=\"16\" fill=\"currentColor\" aria-hidden=\"true\"><path d=\"M1 2.5A1.5 1.5 0 0 1 2.5 1h4A1.5 1.5 0 0 1 8 2.5v4A1.5 1.5 0 0 1 6.5 8h-4A1.5 1.5 0 0 1 1 6.5v-4Zm7 7A1.5 1.5 0 0 1 9.5 8h4A1.5 1.5 0 0 1 15 9.5v4a1.5 1.5 0 0 1-1.5 1.5h-4A1.5 1.5 0 0 1 8 13.5v-4Z\"/></svg><span>Dashboard</span></a><a class=\"ds-nav-row\" href=\"#\"><svg viewBox=\"0 0 16 16\" width=\"16\" height=\"16\" fill=\"currentColor\" aria-hidden=\"true\"><path d=\"M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm0 1.5c-3 0-6 1.5-6 3.5v1h12v-1c0-2-3-3.5-6-3.5Z\"/></svg><span>Algorithm Settings</span></a></nav>",
+      "css": ".ds-nav { width: 240px; padding: 12px; border-radius: 18px; background: #0A1916; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; } .ds-nav-row { display: flex; align-items: center; gap: 12px; padding: 10px 14px; margin-bottom: 4px; border-radius: 999px; color: #A8C6BC; font-size: 13px; font-weight: 700; text-decoration: none; transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1), background 180ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-nav-row:hover { background: rgba(255, 255, 255, 0.06); color: #fff; transform: translateY(-4px); } .ds-nav-active { background: rgba(0, 137, 90, 0.22); color: #fff; } .ds-nav-row:focus-visible { outline: 4px solid rgba(0, 137, 90, 0.12); outline-offset: 2px; }"
+    },
+    {
+      "name": "Avatar",
+      "kind": "custom",
+      "refersTo": "avatar",
+      "description": "Initials avatar on the brand green.",
+      "html": "<div class=\"ds-avatar\" aria-hidden=\"true\">AM</div>",
+      "css": ".ds-avatar { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 40px; height: 40px; border-radius: 50%; background: #00895A; color: #fff; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; font-size: 13px; font-weight: 700; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Bright Instrument",
+    "overview": "StudyBuddy is a precision tool that stayed warm. Its screens carry a lot of information at once - schedules, wallets, session states, tutor rankings - and the type scale is unapologetic about it: the working range is 11-14px, and it holds that density by leaning on weight rather than size. Weight 700 and 800 appear over 300 times across the interface; weight 400 appears seven times. Small and bold, not small and quiet.\n\nWhat keeps that density from reading as clinical is geometry and motion, not whitespace. Nearly every interactive element is a pill - a 999px radius is used 169 times, more than every other radius combined - and everything answers when touched: a 4-6px lift on hover, a scale to 0.97 on press, a soft green halo on focus, all on one calibrated spring. A single deep green anchors the whole product, and the playful part of the palette lives almost entirely in atmosphere: three-layer radial gradient washes that sit behind content rather than inside it.\n\nThe system is honest about where it is unfinished. Dark mode is defined but partial, the landing page deliberately sits outside the token system, and one stylesheet defines tokens that no page loads. Those are recorded rather than hidden, because the previous design document's silence about exactly this kind of drift is what src/assets/tokens.test.js now exists to catch.",
+    "keyCharacteristics": [
+      "Dense by design - an 11-14px working scale carrying 700-800 weights",
+      "Pill-first geometry; 999px is the default radius, not an accent",
+      "One green anchors everything; colour play is confined to background washes",
+      "Motion is calibrated, not decorative - one spring, two durations, two lift distances",
+      "Depth appears on intent and is nearly absent at rest",
+      "Tokens are centralised in src/assets/main.css and enforced by a test"
+    ],
+    "rules": [
+      {
+        "name": "The Atmosphere-Only Rule",
+        "body": "The Aurora Pops never colour a control, a label, or a piece of text. They exist inside --sb-wash-blob-* and nowhere else. If an accent needs to carry meaning, it is Deep Campus Green or Deep Blue.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Green Rule",
+        "body": "There is exactly one action colour. A second saturated call-to-action colour on the same screen means one of them is not actually a call to action.",
+        "section": "colors"
+      },
+      {
+        "name": "The Weight-Before-Size Rule",
+        "body": "Hierarchy is established by weight first and size second. Stepping 13px/700 up to 13px/800 is the system's normal move; jumping to 20px is not.",
+        "section": "typography"
+      },
+      {
+        "name": "The No Second Family Rule",
+        "body": "Two families, one for UI and one for code. A decorative third face belongs nowhere in the app.",
+        "section": "typography"
+      },
+      {
+        "name": "The vh Debt Rule",
+        "body": "Any new full-height shell or modal added under compact density must register a --sb-vh-fix counterpart. A raw 100vh inside #app renders 25% too tall at 0.8 zoom.",
+        "section": "layout"
+      },
+      {
+        "name": "The Intent Rule",
+        "body": "A shadow answers an intent. If a surface is not hoverable, focusable, or floating above the page, it gets no shadow - it gets a hairline border instead.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Pill-Or-Card Rule",
+        "body": "If it is interactive and inline, it is a pill (999px). If it is a container, it is a card (14-24px). There is no third shape.",
+        "section": "shapes"
+      },
+      {
+        "name": "The One Spring Rule",
+        "body": "Every transition uses --sb-spring at --sb-t-quick or --sb-t-normal. A bespoke cubic-bezier or a 300ms duration is drift, not expression.",
+        "section": "components"
+      }
+    ],
+    "dos": [
+      "Do reach for tokens from src/assets/main.css rather than typing a hex value. tokens.test.js enforces this.",
+      "Do use 999px for anything interactive and inline; 14-24px for containers.",
+      "Do establish hierarchy with weight before size - 13px/800 over 20px/600.",
+      "Do put new components on the shared motion contract by adding .sb-btn, .sb-pill, or .sb-interactive instead of writing a new transition.",
+      "Do use color-mix against a token for tinted fills and softened borders, the way .sb-btn-soft and .glass-segment do.",
+      "Do declare a private token inside the component when it is genuinely component-scoped.",
+      "Do register a --sb-vh-fix rule when adding a full-height shell or modal, or it will break at compact density."
+    ],
+    "donts": [
+      "Don't read an --sb-* token that is not declared in main.css or the component itself. src/assets/admin.css is never imported and its tokens resolve to unset.",
+      "Don't redefine a core token to a literal colour inside a component. It makes the whole subtree immune to theming, and the test fails on it.",
+      "Don't colour a control with an Aurora Pop. They belong in --sb-wash-blob-* only.",
+      "Don't assume a success token exists. There is no --sb-success; the four-status ramp is asserted by a currently-failing test and is intended, not implemented.",
+      "Don't introduce a new radius. The scale is 10/12/14/18/24 and 999.",
+      "Don't add a resting shadow to a non-interactive surface - use a hairline border.",
+      "Don't write a new font-family stack. Use var(--sb-font-base) or var(--sb-font-mono).",
+      "Don't apply these rules to src/views/LandingPage.vue. It sits outside the token system by product decision (ADR-0012).",
+      "Don't treat dark mode as finished. Adding a light-mode colour token without a dark counterpart deepens that debt."
+    ]
+  }
+}

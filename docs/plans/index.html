@@ -121,19 +121,24 @@
 <body>
 
 <h1>Studybuddy &mdash; Plan Dashboard</h1>
-<p class="subtitle">Regenerated 2026-08-13</p>
+<p class="subtitle">Regenerated 2026-08-22</p>
 
 <div class="badge-row">
-  <span class="count"><span class="dot" style="background:var(--in-progress)"></span>18 In Progress</span>
+  <span class="count"><span class="dot" style="background:var(--in-progress)"></span>19 In Progress</span>
   <span class="count"><span class="dot" style="background:var(--blocked)"></span>0 Blocked</span>
-  <span class="count"><span class="dot" style="background:var(--approved)"></span>5 Approved</span>
+  <span class="count"><span class="dot" style="background:var(--approved)"></span>6 Approved</span>
   <span class="count"><span class="dot" style="background:var(--draft)"></span>17 Draft</span>
-  <span class="count"><span class="dot" style="background:var(--done)"></span>85 Done</span>
+  <span class="count"><span class="dot" style="background:var(--done)"></span>90 Done</span>
 </div>
 
 <div class="group">
-  <div class="group-title">In Progress (18)</div>
+  <div class="group-title">In Progress (19)</div>
   <div class="cards">
+    <div class="card">
+      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-08-21-trusted-device-otp.md">Trusted-device login OTP</a>
+      <div class="meta"><span class="status-badge status-in-progress">In Progress</span><span>2026-08-21</span></div>
+      <div class="summary">OTP once per device per 7 idle days instead of on every login, backed by a revocable TrustedDevice token</div>
+    </div>
     <div class="card">
       <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-08-13-subject-picker-description-highlight.md">Subject picker description highlight + proposal notes label</a>
       <div class="meta"><span class="status-badge status-in-progress">In Progress</span><span>2026-08-13</span></div>
@@ -223,8 +228,13 @@
 </div>
 
 <div class="group">
-  <div class="group-title">Approved (5)</div>
+  <div class="group-title">Approved (6)</div>
   <div class="cards">
+    <div class="card">
+      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-08-14-repository-cleanup.md">Repository cleanup</a>
+      <div class="meta"><span class="status-badge status-approved">Approved</span><span>2026-08-14</span></div>
+      <div class="summary">Remove stray debug files, quarantine non-code artifacts, delete dead scaffolding, and prune worktrees and merged branches.</div>
+    </div>
     <div class="card">
       <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-08-11-authenticated-view-styling-consistency.md">Authenticated view styling consistency (light mode)</a>
       <div class="meta"><span class="status-badge status-approved">Approved</span><span>2026-08-11</span></div>
@@ -324,8 +334,33 @@
 </div>
 
 <details class="group">
-  <summary>Done (85)</summary>
+  <summary>Done (90)</summary>
   <div class="cards">
+    <div class="card">
+      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-08-21-pending-proposed-subject-visibility.md">Pending proposed subject visibility</a>
+      <div class="meta"><span class="status-badge status-done">Done</span><span>2026-08-21</span></div>
+      <div class="summary">Proposed subjects survive a reload in the tutor picker and now say they are awaiting review.</div>
+    </div>
+    <div class="card">
+      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-08-21-subject-category-storage.md">subject-category-storage</a>
+      <div class="meta"><span class="status-badge status-done">Done</span><span>2026-08-21</span></div>
+      <div class="summary">Give Category its own table so it can exist without subjects, and seed Uncategorized and Sports.</div>
+    </div>
+    <div class="card">
+      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-08-20-mode-switcher-redesign.md">Mode switcher redesign and scoped-style fix</a>
+      <div class="meta"><span class="status-badge status-done">Done</span><span>2026-08-20</span></div>
+      <div class="summary">The sidebar mode switcher renders unstyled because it is a multi-root fragment borrowing AppSidebar's scoped CSS; replace it with a self-styled segmented control above the footer and ship the confirmed accessibility fixes with it.</div>
+    </div>
+    <div class="card">
+      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-08-19-dual-role-mode-switch.md">Dual-role account mode switch</a>
+      <div class="meta"><span class="status-badge status-done">Done</span><span>2026-08-19</span></div>
+      <div class="summary">One account can act as both Tutor and Tutee via a persisted active-mode switch, with derived capabilities and auto-switch on cross-mode navigation.</div>
+    </div>
+    <div class="card">
+      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-08-19-dynamic-algorithm-weights.md">Admin-editable algorithm weights</a>
+      <div class="meta"><span class="status-badge status-done">Done</span><span>2026-08-19</span></div>
+      <div class="summary">SuperAdmins tune the hybrid blend and the six CBF component weights from a settings screen, stored per-weight with actor and timestamp, normalised at score time.</div>
+    </div>
     <div class="card">
       <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-08-13-chat-session-card-subject-fix.md">Chat session card shows tutor's course instead of the booked subject</a>
       <div class="meta"><span class="status-badge status-done">Done</span><span>2026-08-13</span></div>
@@ -508,19 +543,19 @@
       <div class="meta"><span class="status-badge status-done">Done</span><span>2026-07-05</span></div>
     </div>
     <div class="card">
-      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-07-04-recommendation-algorithm-demo-tool.md">Recommendation algorithm live demo tool</a>
-      <div class="meta"><span class="status-badge status-done">Done</span><span>2026-07-04</span></div>
-    </div>
-    <div class="card">
       <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-07-04-session-details-profile-redesign.md">Session details redesign — profile-page feel + animated status bar + mid-session pulse</a>
       <div class="meta"><span class="status-badge status-done">Done</span><span>2026-07-04</span></div>
     </div>
     <div class="card">
-      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-07-03-session-countdown-prototype-plan.md">Session countdown (Orbit Strip)</a>
-      <div class="meta"><span class="status-badge status-done">Done</span><span>2026-07-03</span></div>
+      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-07-04-recommendation-algorithm-demo-tool.md">Recommendation algorithm live demo tool</a>
+      <div class="meta"><span class="status-badge status-done">Done</span><span>2026-07-04</span></div>
     </div>
     <div class="card">
       <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-07-03-remove-superadmin-applicant-review.md">Remove Applicant Review from Super Admin</a>
+      <div class="meta"><span class="status-badge status-done">Done</span><span>2026-07-03</span></div>
+    </div>
+    <div class="card">
+      <a class="title" href="vscode://file/C:/FIles/Studybuddy/FrontEnd/studybuddy-ui/docs/plans/2026-07-03-session-countdown-prototype-plan.md">Session countdown (Orbit Strip)</a>
       <div class="meta"><span class="status-badge status-done">Done</span><span>2026-07-03</span></div>
     </div>
     <div class="card">

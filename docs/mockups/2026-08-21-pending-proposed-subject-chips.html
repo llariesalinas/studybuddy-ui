@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Pending proposed subject chips - chosen design</title>
+<style>
+  body {
+    --sb-primary: #00895A;
+    --sb-primary-light: #edf6f1;
+    --sb-bg: #F8F9FA;
+    --sb-card-bg: #ffffff;
+    --sb-card-border: #EAEAEA;
+    --sb-text-main: #163127;
+    --sb-text-muted: #6B7280;
+    --sb-border-light: #e0e7e3;
+    --sb-pop-yellow-deep: #DCA21B;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--sb-bg);
+    color: var(--sb-text-main);
+    margin: 0;
+    padding: 32px;
+  }
+  h1 { font-size: 1.15rem; margin: 0 0 6px; }
+  .note { color: var(--sb-text-muted); font-size: .85rem; max-width: 60ch; margin: 0 0 22px; line-height: 1.5; }
+  .panel { background: var(--sb-card-bg); border: 1px solid var(--sb-card-border); border-radius: 14px; padding: 18px 20px 14px; max-width: 640px; }
+  .selection-tray { border-top: 1px dashed var(--sb-border-light); padding-top: 12px; }
+  .selection-tray > span { font-size: .8rem; color: var(--sb-text-muted); margin-right: 8px; }
+  .subject-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    border: 1px solid var(--sb-card-border); background: var(--sb-card-bg);
+    color: var(--sb-text-main); border-radius: 999px; padding: 7px 13px;
+    margin: 0 7px 8px 0; font-size: .84rem; font-family: inherit; cursor: pointer;
+  }
+  .subject-chip.selected { border-color: var(--sb-primary); background: var(--sb-primary-light); font-weight: 650; }
+  .subject-chip.selected::before { content: "\2713"; color: var(--sb-primary); font-weight: 800; font-size: .78rem; }
+  .section-label { font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; font-weight: 700; color: var(--sb-text-muted); margin: 0 0 7px; }
+  .pending-group { margin-top: 6px; }
+  .subject-chip.pending { border-color: var(--sb-pop-yellow-deep); background: color-mix(in srgb, var(--sb-pop-yellow-deep) 10%, var(--sb-card-bg)); font-weight: 650; }
+  .subject-chip.pending::before { content: "\2713"; color: var(--sb-pop-yellow-deep); font-weight: 800; font-size: .78rem; }
+</style>
+</head>
+<body>
+  <h1>Selection tray - proposed subjects awaiting review</h1>
+  <p class="note">
+    Chosen design (option C of three, 2026-08-21). Approved catalog subjects keep the plain selected
+    chip on the first row; subjects the tutor proposed themselves drop to a labelled sub-row, so one
+    label covers any number of pending chips. The amber accent is
+    <code>--sb-pop-yellow-deep</code>, the only amber token defined in both the light and dark
+    themes; the label reuses the picker's existing <code>.section-label</code> rather than
+    introducing a colour.
+  </p>
+
+  <div class="panel">
+    <div class="selection-tray">
+      <span>Selected 3/8</span>
+      <button class="subject-chip selected">College Algebra &times;</button>
+      <button class="subject-chip selected">Data Structures &times;</button>
+      <div class="pending-group">
+        <p class="section-label">Awaiting admin review</p>
+        <button class="subject-chip pending">Underwater Basket Weaving &times;</button>
+      </div>
+    </div>
+  </div>
+
+  <h1 style="margin-top:30px">Search results - the same subject as a row</h1>
+  <p class="note">
+    Mirror of the tray treatment in the picker's other surface. A row has no sub-row to belong to,
+    so the label rides inline next to the name in the same amber accent.
+  </p>
+
+  <div class="panel">
+    <div class="result-rows">
+      <button class="result-row">
+        <span class="left">
+          <span class="name">Underwater Basket Weaving <span class="pending-flag">Awaiting admin review</span></span>
+          <span class="meta">Hobbies &amp; Arts</span>
+        </span>
+        <span class="check">&#10003; Added</span>
+      </button>
+    </div>
+  </div>
+</body>
+</html>

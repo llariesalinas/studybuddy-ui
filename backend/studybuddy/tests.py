@@ -33,11 +33,14 @@ from .views import (
     credit_tutor_wallet,
     dev_add_wallet_funds,
     dev_remove_wallet_funds,
+    LoginRateThrottle,
     PASSWORD_RESET_GENERIC_MESSAGE,
     TUTOR_SUBJECT_LIMIT,
     WEEKDAY_MAP,
 )
+from .recommender import weights as weights_module
 from .models import (
+    AlgorithmWeight,
     Booking,
     Course,
     EmailOTPChallenge,
@@ -49,6 +52,7 @@ from .models import (
     Payment,
     PaymentMethod,
     Rating,
+    SubjectCategory,
     Subjects,
     SupportTicket,
     SessionCheckIn,
@@ -56,6 +60,7 @@ from .models import (
     TutorAvailability,
     TutorAvailabilityOverride,
     TutorSubjects,
+    TrustedDevice,
     UserProfile,
     Transaction,
     TutorApplication,
@@ -69,6 +74,18 @@ from .models import (
     Preference,
 )
 from .chat.models import ChatRoom, Message
+from .models import get_uncategorized
+from .subject_taxonomy import UNCATEGORIZED_CATEGORY
+
+
+def make_category(name):
+    """The SubjectCategory row for `name`, created if it does not exist yet.
+
+    Subjects.category is a foreign key (see docs/plans/2026-08-21-subject-category-storage.md), so
+    tests that care about a specific category name need the row rather than the string. Tests that
+    do not care can omit category entirely -- it defaults to Uncategorized.
+    """
+    return SubjectCategory.objects.get_or_create(name=name)[0]
 
 
 class SuperAdminRedesignApiTests(APITestCase):
@@ -961,7 +978,7 @@ class GlobalSubjectCatalogTests(APITestCase):
             subject_code="CS101",
             subject_name="Introduction to Computing",
             department="Computer Science",
-            category="Technology & Computer Science",
+            category=make_category("Technology & Computer Science"),
         )
         self.super_user = User.objects.create_user(
             username="super",
@@ -4202,7 +4219,7 @@ class TuteeProfileTests(APITestCase):
             subject_code="MATH101",
             subject_name="College Algebra",
             department="Math",
-            category="College",
+            category=make_category("College"),
         )
         self.tutee_profile.course = course
         self.tutee_profile.save()
@@ -4618,7 +4635,7 @@ class BookingVerificationGateTests(APITestCase):
             subject_code="GATE-SUBJ",
             subject_name="Catalog Approved Subject",
             department="Gate",
-            category=self.course.course_code,
+            category=make_category(self.course.course_code),
         )
         self.tutee_user = User.objects.create_user(
             username="gate-tutee@cpu.edu",
@@ -6224,8 +6241,12 @@ class CbfGraduatedSubjectMatchTests(APITestCase):
     """CBF graduated subject matching: a tutee requesting a specific subject
     sees exact-match tutors ranked above same-field tutors, ranked above
     unrelated tutors, instead of the old all-or-nothing subject match. See
-    docs/plans/ for the approved weights (W_SPECIFIC=0.40, W_GENERAL=0.20,
-    W_EXPERTISE=0.15, W_COURSE=0.10, W_YEAR=0.10, W_LEVEL=0.05)."""
+    docs/plans/ for the approved default weights (W_SPECIFIC=0.40, W_GENERAL=0.20,
+    W_EXPERTISE=0.15, W_COURSE=0.10, W_YEAR=0.10, W_LEVEL=0.05). These are the
+    seeded defaults, not constants - a SuperAdmin can change them from Algorithm
+    Settings. This class asserts the graduated ordering those defaults produce, so
+    it deliberately scores against the defaults rather than whatever is stored;
+    see docs/plans/2026-08-19-dynamic-algorithm-weights.md."""
 
     def setUp(self):
         from studybuddy.recommender.cbf import compute_cbf_breakdown
@@ -6236,19 +6257,19 @@ class CbfGraduatedSubjectMatchTests(APITestCase):
 
         self.requested_subject = Subjects.objects.create(
             subject_code="MATH101", subject_name="Calculus 1", department="Math",
-            category="STEM",
+            category=make_category("STEM"),
         )
         self.same_field_subject = Subjects.objects.create(
             subject_code="MATH201", subject_name="Calculus 2", department="Math",
-            category="STEM",
+            category=make_category("STEM"),
         )
         self.other_same_field_subject = Subjects.objects.create(
             subject_code="PHYS101", subject_name="Physics 1", department="Science",
-            category="STEM",
+            category=make_category("STEM"),
         )
         self.unrelated_subject = Subjects.objects.create(
             subject_code="ART101", subject_name="Painting", department="Arts",
-            category="Arts",
+            category=make_category("Arts"),
         )
         self.null_category_subject = Subjects.objects.create(
             subject_code="GEN101", subject_name="General Studies", department="Gen",
@@ -9269,7 +9290,7 @@ class TutorOnboardingSearchVisibilityTests(APITestCase):
         )
         self.subject = Subjects.objects.create(
             subject_code="ONBOARD101", subject_name="Onboarding Search", department="Education",
-            category=self.course.course_code,
+            category=make_category(self.course.course_code),
         )
         tutee_user = User.objects.create_user(
             username="onboarding-tutee@cpu.edu.ph", email="onboarding-tutee@cpu.edu.ph",
@@ -9478,7 +9499,7 @@ class TutorSubjectProposalTests(APITestCase):
         )
         self.catalog_subject = Subjects.objects.create(
             subject_code="MATH101", subject_name="College Algebra", department="Mathematics",
-            category="Mathematics & Data Sciences",
+            category=make_category("Mathematics & Data Sciences"),
         )
         self.course = Course.objects.create(course_code="PROPOSAL", course_name="Proposal Course")
         self.tutor_user = User.objects.create_user(
@@ -9579,15 +9600,28 @@ class TutorSubjectProposalTests(APITestCase):
         self.assertEqual(link.description, "Updated note.")
 
     def test_proposal_accepts_a_category_outside_the_curated_taxonomy(self):
-        # Subjects.category is free-text (see SubjectSerializer's comment); a tutor proposing under
-        # a category an admin already approved beyond the curated 6 (e.g. "Spoken Languages") must
-        # not be rejected here. See docs/plans/2026-08-12-admin-review-panel-category-keywords-
-        # backdrop.md.
+        # A tutor proposing under a category an admin already added beyond the curated 6 (e.g.
+        # "Spoken Languages") must not be rejected. What changed with the SubjectCategory table is
+        # only that the category has to exist first -- see
+        # docs/plans/2026-08-21-subject-category-storage.md.
+        make_category("Spoken Languages")
+
         with patch("studybuddy.views.subject_is_recognized_for_profile"):
             response = self.propose(category="Spoken Languages")
 
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.data["category"], "Spoken Languages")
+
+    def test_proposal_rejects_a_category_that_does_not_exist(self):
+        """Minting a category is an admin action (the subject catalog or the review panel), and
+        the tutor-side picker only offers categories that already exist."""
+        with patch("studybuddy.views.subject_is_recognized_for_profile"):
+            response = self.propose(category="Category Nobody Created")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(
+            SubjectCategory.objects.filter(name="Category Nobody Created").exists(),
+        )
 
     def test_proposal_rejects_empty_category(self):
         response = self.propose(category="")
@@ -9668,7 +9702,7 @@ class TutorSubjectProposalTests(APITestCase):
         # different field, e.g. Hobbies & Arts, proving selection is catalog-wide now.
         unrelated_subject = Subjects.objects.create(
             subject_code="guitar-101", subject_name="Guitar Basics", department="Instruments",
-            category="Hobbies & Arts",
+            category=make_category("Hobbies & Arts"),
         )
 
         response = self.client.get("/api/subjects/", {"search": "Guitar"})
@@ -9726,7 +9760,7 @@ class AdminProposedSubjectReviewTests(APITestCase):
         """An approved catalog subject the tutor picked, as opposed to proposed."""
         subject = Subjects.objects.create(
             subject_code=code, subject_name=name, department="Sciences",
-            category=category, status="approved",
+            category=make_category(category), status="approved",
         )
         TutorSubjects.objects.create(tutor=self.tutor, subject=subject, expertise_level=4)
         return subject
@@ -9781,7 +9815,7 @@ class AdminProposedSubjectReviewTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         proposal.refresh_from_db()
         self.assertEqual(proposal.subject_name, "Updated Proposal Name")
-        self.assertEqual(proposal.category, "Mathematics & Data Sciences")
+        self.assertEqual(proposal.category.name, "Mathematics & Data Sciences")
         self.assertEqual(proposal.keywords, "algebra, math")
         self.assertEqual(proposal.status, "pending")
         self.assertEqual(proposal.description, "Refined by admin.")
@@ -9861,7 +9895,7 @@ class AdminProposedSubjectReviewTests(APITestCase):
 
         self.assertEqual(response.status_code, 200)
         proposal.refresh_from_db()
-        self.assertEqual(proposal.category, "Invented Category")
+        self.assertEqual(proposal.category.name, "Invented Category")
 
     def test_update_action_still_requires_a_category(self):
         proposal = self.make_proposal("UPDATE-NO-CAT")
@@ -10089,6 +10123,124 @@ class SubjectTaxonomyModuleTests(APITestCase):
             self.assertIn(category, CATEGORIES, f"{name} has an unrecognized category")
 
 
+class SubjectCategoryStorageTests(APITestCase):
+    """Categories exist in their own right rather than being derived from the subjects that
+    happen to reference them. See docs/plans/2026-08-21-subject-category-storage.md."""
+
+    def setUp(self):
+        self.institution = PartnerInstitution.objects.create(
+            institution_name="CPU", school_email_domain="cpu.edu.ph", is_active=True,
+        )
+        self.admin_user = User.objects.create_user(
+            username="cat.admin@cpu.edu.ph", email="cat.admin@cpu.edu.ph", password="password",
+        )
+        self.admin_profile = UserProfile.objects.create(
+            user=self.admin_user, fname="Cat", mname="", lname="Admin", role="SuperAdmin",
+            institution=self.institution,
+        )
+        self.client.force_authenticate(user=self.admin_user)
+
+    def test_a_category_survives_having_no_subjects(self):
+        """The whole point of the table: the derived list could not represent this at all."""
+        # Sports is one of the seeded categories and ships with no subjects at all.
+        category = make_category("Sports")
+        subject = Subjects.objects.create(
+            subject_code="chess", subject_name="Chess", category=category,
+        )
+        subject.delete()
+
+        self.assertTrue(SubjectCategory.objects.filter(name="Sports").exists())
+        response = self.client.get('/api/admin/subject-categories/')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Sports", [row['name'] for row in response.data])
+
+    def test_seeded_taxonomy_categories_include_sports_and_uncategorized(self):
+        from .subject_taxonomy import CATEGORIES
+
+        self.assertIn("Sports", CATEGORIES)
+        self.assertIn(UNCATEGORIZED_CATEGORY, CATEGORIES)
+        # Appended, never prepended: seed_data uses CATEGORIES[:1] as its default course affinity.
+        self.assertEqual(CATEGORIES[0], 'Mathematics & Data Sciences')
+
+    def test_subject_defaults_to_uncategorized_when_no_category_is_given(self):
+        subject = Subjects.objects.create(subject_code="loose", subject_name="Loose Subject")
+        self.assertEqual(subject.category.name, UNCATEGORIZED_CATEGORY)
+
+    def test_deleting_a_category_moves_its_subjects_to_uncategorized(self):
+        """Not a cascade: TutorSubjects and Preference.subjects point at Subjects, so deleting
+        the subjects would strip tutor expertise and tutee preferences."""
+        category = make_category("Doomed Category")
+        subject = Subjects.objects.create(
+            subject_code="doomed", subject_name="Doomed Subject", category=category,
+        )
+
+        response = self.client.delete(f'/api/admin/subject-categories/{category.pk}/')
+        self.assertEqual(response.status_code, 204)
+
+        subject.refresh_from_db()
+        self.assertEqual(subject.category.name, UNCATEGORIZED_CATEGORY)
+        self.assertFalse(SubjectCategory.objects.filter(pk=category.pk).exists())
+
+    def test_uncategorized_cannot_be_deleted(self):
+        uncategorized = get_uncategorized()
+        response = self.client.delete(f'/api/admin/subject-categories/{uncategorized.pk}/')
+        self.assertEqual(response.status_code, 400)
+        self.assertTrue(SubjectCategory.objects.filter(pk=uncategorized.pk).exists())
+
+    def test_category_names_are_case_insensitively_unique(self):
+        make_category("Sports")
+        response = self.client.post('/api/admin/subject-categories/', {'name': 'sports'})
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(SubjectCategory.objects.filter(name__iexact="sports").count(), 1)
+
+    def test_creating_a_category_needs_no_subject(self):
+        response = self.client.post('/api/admin/subject-categories/', {'name': 'Culinary Arts'})
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data['name'], 'Culinary Arts')
+        self.assertEqual(response.data['subject_count'], 0)
+
+    def test_categories_come_back_in_display_order_with_uncategorized_last(self):
+        SubjectCategory.objects.all().delete()
+        make_category("Zebra Studies").__class__.objects.filter(name="Zebra Studies").update(
+            display_order=10,
+        )
+        SubjectCategory.objects.create(name="Alpha Studies", display_order=20)
+        get_uncategorized()
+
+        response = self.client.get('/api/admin/subject-categories/')
+        names = [row['name'] for row in response.data]
+        # display_order wins over alphabetical, and the fallback sorts last.
+        self.assertEqual(names, ["Zebra Studies", "Alpha Studies", UNCATEGORIZED_CATEGORY])
+
+    def test_seed_data_assigns_category_rows_and_keeps_empty_ones(self):
+        """seed_data seeds categories before subjects, and the two categories with no subjects in
+        the fixture still exist afterwards."""
+        from studybuddy.management.commands.seed_data import Command
+
+        command = Command()
+        command.stdout = StringIO()
+        subjects_by_category, subjects_by_name = command._seed_subjects()
+
+        self.assertEqual(subjects_by_category["Sports"], [])
+        self.assertEqual(subjects_by_category[UNCATEGORIZED_CATEGORY], [])
+        self.assertTrue(subjects_by_category["Natural Sciences"])
+        self.assertEqual(
+            subjects_by_name["Python"].category.name, "Technology & Computer Science",
+        )
+        # Keyed by name, not by the category object, since COURSE_CATEGORY_AFFINITY uses names.
+        self.assertTrue(all(isinstance(key, str) for key in subjects_by_category))
+
+    def test_serializer_still_emits_the_category_name(self):
+        """The API contract is unchanged from when category was a CharField."""
+        subject = Subjects.objects.create(
+            subject_code="algebra", subject_name="Algebra",
+            category=make_category("Mathematics & Data Sciences"),
+        )
+        response = self.client.get('/api/admin/course-catalog/')
+        row = next(r for r in response.data if r['subject_code'] == subject.subject_code)
+        self.assertEqual(row['category'], "Mathematics & Data Sciences")
+
+
 class AdminCourseCatalogTaxonomyTests(APITestCase):
     """Admin subject-catalog CRUD on the taxonomy shape: auto-generated slugs, category
     validation, and category-based filtering (replacing the retired course filter)."""
@@ -10140,10 +10292,12 @@ class AdminCourseCatalogTaxonomyTests(APITestCase):
 
     def test_list_filters_by_category(self):
         Subjects.objects.create(
-            subject_code="calculus", subject_name="Calculus", category="Mathematics & Data Sciences",
+            subject_code="calculus", subject_name="Calculus",
+            category=make_category("Mathematics & Data Sciences"),
         )
         Subjects.objects.create(
-            subject_code="guitar", subject_name="Guitar", category="Hobbies & Arts",
+            subject_code="guitar", subject_name="Guitar",
+            category=make_category("Hobbies & Arts"),
         )
 
         response = self.client.get(
@@ -10171,18 +10325,20 @@ class CuratedPersonaCbfOrderingTests(APITestCase):
         self.bsba = Course.objects.create(course_code="BSBA", course_name="Business Administration")
 
         self.python = Subjects.objects.create(
-            subject_code="python", subject_name="Python", category="Technology & Computer Science",
+            subject_code="python", subject_name="Python",
+            category=make_category("Technology & Computer Science"),
         )
         self.data_structures = Subjects.objects.create(
             subject_code="data-structures", subject_name="Data Structures",
-            category="Technology & Computer Science",
+            category=make_category("Technology & Computer Science"),
         )
         self.cpp = Subjects.objects.create(
-            subject_code="cpp", subject_name="C++", category="Technology & Computer Science",
+            subject_code="cpp", subject_name="C++",
+            category=make_category("Technology & Computer Science"),
         )
         self.financial_accounting = Subjects.objects.create(
             subject_code="financial-accounting", subject_name="Financial Accounting",
-            category="Business, Finance & Economics",
+            category=make_category("Business, Finance & Economics"),
         )
 
         s1_user = User.objects.create_user(
@@ -10251,7 +10407,7 @@ class PendingProposedSubjectRemainsSelectableTests(APITestCase):
         self.tutor = Tutor.objects.create(profile=self.tutor_profile)
         self.pending_subject = Subjects.objects.create(
             subject_code="pending-subj", subject_name="Pending Subject",
-            category="Hobbies & Arts", status="pending",
+            category=make_category("Hobbies & Arts"), status="pending",
         )
         TutorSubjects.objects.create(
             tutor=self.tutor, subject=self.pending_subject, expertise_level=3,
@@ -10412,6 +10568,9 @@ class TieBreakerOrderingTests(APITestCase):
 
         def fake_cbf(_student, tutor, *_args, **_kwargs):
             # CF is coerced to 0 for this student, so hybrid = CBF_WEIGHT * cbf.
+            # CBF_WEIGHT is the seeded default rather than a constant now, but it
+            # is still what an unmodified database scores with, which is what this
+            # test sets up.
             return score_by_id[tutor.profile_id] / hybrid.CBF_WEIGHT
 
         with patch.object(hybrid, "get_student_subject_codes", return_value=[]), \
@@ -10699,3 +10858,876 @@ class LateCancellationSupportTicketTests(APITestCase):
         )
 
         self.assertEqual(second_response.status_code, 400)
+
+
+class DualRoleModeSwitchTests(APITestCase):
+    """One account acting as both Tutor and Tutee.
+
+    `UserProfile.role` is the ACTIVE MODE rather than the account's identity, so these cover the
+    two things that distinction introduces: capability derived separately from mode, and the
+    places that used to read `role` as identity.
+    See docs/plans/2026-08-19-dual-role-mode-switch.md.
+    """
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="dual@example.edu",
+            email="dual@example.edu",
+            password="password",
+        )
+        self.profile = UserProfile.objects.create(
+            user=self.user,
+            fname="Dual",
+            mname="",
+            lname="Role",
+            role="Tutee",
+            profile_completed=True,
+        )
+        self.client.force_authenticate(user=self.user)
+
+    def provision_tutor(self, hourly_rate=Decimal("200.00"), with_subject=True):
+        tutor = Tutor.objects.create(profile=self.profile, hourly_rate=hourly_rate)
+        if with_subject:
+            subject = Subjects.objects.create(
+                subject_code="calc-1",
+                subject_name="Calculus 1",
+                category=make_category("Mathematics & Data Sciences"),
+            )
+            TutorSubjects.objects.create(tutor=tutor, subject=subject, expertise_level=3)
+        return tutor
+
+    def reloaded_profile(self):
+        return UserProfile.objects.get(pk=self.profile.pk)
+
+    # --- capability derivation ----------------------------------------------------------------
+
+    def test_can_tutor_is_false_without_a_tutor_row(self):
+        self.assertFalse(self.reloaded_profile().can_tutor)
+
+    def test_can_tutor_is_false_when_the_rate_is_unset(self):
+        self.provision_tutor(hourly_rate=None)
+
+        self.assertFalse(self.reloaded_profile().can_tutor)
+
+    def test_can_tutor_is_false_without_any_subjects(self):
+        self.provision_tutor(with_subject=False)
+
+        self.assertFalse(self.reloaded_profile().can_tutor)
+
+    def test_can_tutor_is_true_with_a_rate_and_at_least_one_subject(self):
+        self.provision_tutor()
+
+        self.assertTrue(self.reloaded_profile().can_tutor)
+
+    def test_can_tutee_follows_the_preference_row(self):
+        self.assertFalse(self.reloaded_profile().can_tutee)
+
+        Preference.objects.create(user=self.profile)
+
+        self.assertTrue(self.reloaded_profile().can_tutee)
+
+    def test_profile_status_exposes_both_capabilities(self):
+        self.provision_tutor()
+
+        response = self.client.get("/api/profile/status/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["can_tutor"])
+        self.assertFalse(response.data["can_tutee"])
+
+    # --- the switch endpoint ------------------------------------------------------------------
+
+    def test_switch_mode_changes_the_active_mode(self):
+        response = self.client.post("/api/switch-mode/", {"mode": "Tutor"}, format="json")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["role"], "Tutor")
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.role, "Tutor")
+
+    def test_switch_mode_into_an_unprovisioned_mode_is_allowed(self):
+        """That is how a user reaches the other mode's onboarding; the guard, not the endpoint,
+        decides whether to offer the switch."""
+        response = self.client.post("/api/switch-mode/", {"mode": "Tutor"}, format="json")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.data["can_tutor"])
+
+    def test_switch_mode_rejects_an_unknown_mode(self):
+        response = self.client.post("/api/switch-mode/", {"mode": "SuperAdmin"}, format="json")
+
+        self.assertEqual(response.status_code, 400)
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.role, "Tutee")
+
+    def test_switch_mode_rejects_admin_accounts(self):
+        self.user.is_staff = True
+        self.user.save(update_fields=["is_staff"])
+
+        response = self.client.post("/api/switch-mode/", {"mode": "Tutor"}, format="json")
+
+        self.assertEqual(response.status_code, 403)
+
+    # --- verification carry-over --------------------------------------------------------------
+
+    def test_switching_carries_an_approved_application_across_roles(self):
+        reviewed_at = timezone.now()
+        TuteeApplication.objects.create(
+            profile=self.profile,
+            school_id="tutee_applications/school_ids/id.png",
+            enrollment_proof="tutee_applications/enrollment_proofs/proof.pdf",
+            application_status="approved",
+            reviewed_at=reviewed_at,
+        )
+
+        self.client.post("/api/switch-mode/", {"mode": "Tutor"}, format="json")
+
+        carried = TutorApplication.objects.get(profile=self.profile)
+        self.assertEqual(carried.application_status, "approved")
+        self.assertEqual(carried.reviewed_at, reviewed_at)
+        # Same storage paths: the documents are referenced, not duplicated in media.
+        self.assertEqual(carried.school_id.name, "tutee_applications/school_ids/id.png")
+
+    def test_a_pending_application_is_not_carried_across(self):
+        TuteeApplication.objects.create(
+            profile=self.profile,
+            school_id="tutee_applications/school_ids/id.png",
+            enrollment_proof="tutee_applications/enrollment_proofs/proof.pdf",
+            application_status="pending",
+        )
+
+        self.client.post("/api/switch-mode/", {"mode": "Tutor"}, format="json")
+
+        self.assertFalse(TutorApplication.objects.filter(profile=self.profile).exists())
+
+    # --- self-matching ------------------------------------------------------------------------
+
+    def test_a_dual_role_account_cannot_book_itself(self):
+        import json
+
+        self.provision_tutor()
+        # Verified, so the booking gates ahead of the self-booking check all pass -- a real
+        # dual-role account is necessarily verified.
+        TuteeApplication.objects.create(
+            profile=self.profile,
+            school_id="tutee_applications/school_ids/id.png",
+            enrollment_proof="tutee_applications/enrollment_proofs/proof.pdf",
+            application_status="approved",
+            reviewed_at=timezone.now(),
+        )
+
+        response = self.client.post(
+            "/api/bookings/confirm/",
+            {
+                "tutor_id": self.profile.id,
+                "slots": json.dumps([
+                    {
+                        "session_date": "2030-01-01",
+                        "start_time": "10:00",
+                        "session_mode": "Online",
+                    }
+                ]),
+            },
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["code"], "self_booking")
+
+    def test_tutor_search_excludes_the_requesting_profile(self):
+        self.provision_tutor()
+
+        response = self.client.get("/api/search-tutors/", {"subject": "calc-1"})
+
+        self.assertEqual(response.status_code, 200)
+        returned_ids = {
+            row.get("profile_id") or row.get("profile") or row.get("id")
+            for row in response.data
+        }
+        self.assertNotIn(self.profile.id, returned_ids)
+
+    # --- identity checks that used to read `role` ---------------------------------------------
+
+    def test_chat_room_lookup_works_for_a_tutor_sitting_in_tutee_mode(self):
+        from .chat.services import get_room_for_tutor_profile
+
+        self.provision_tutor()
+        # The tutor is browsing as a tutee -- the old lookup filtered on role='Tutor' and raised
+        # DoesNotExist, which blocked the tutee from opening the chat at all.
+        self.profile.role = "Tutee"
+        self.profile.save(update_fields=["role"])
+
+        other_user = User.objects.create_user(
+            username="seeker@example.edu",
+            email="seeker@example.edu",
+            password="password",
+        )
+        seeker = UserProfile.objects.create(
+            user=other_user, fname="See", mname="", lname="Ker", role="Tutee"
+        )
+
+        room = get_room_for_tutor_profile(seeker, self.profile.id)
+
+        self.assertEqual(room.tutor_id, self.profile.id)
+        self.assertEqual(room.tutee_id, seeker.id)
+
+    def test_wallet_balance_is_reported_while_in_tutee_mode(self):
+        from .serializers import AdminUserSerializer
+
+        tutor = self.provision_tutor()
+        wallet = Wallet.objects.get(tutor=tutor)
+        wallet.balance = Decimal("125.00")
+        wallet.save(update_fields=["balance"])
+        self.profile.role = "Tutee"
+        self.profile.save(update_fields=["role"])
+
+        serialized = AdminUserSerializer(self.reloaded_profile()).data
+
+        self.assertEqual(serialized["wallet_balance"], 125.0)
+
+
+class AlgorithmWeightNormalizationTests(APITestCase):
+    """The normalise-don't-validate contract from
+    docs/plans/2026-08-19-dynamic-algorithm-weights.md."""
+
+    def test_defaults_already_sum_to_one(self):
+        for group, defaults in weights_module.DEFAULT_WEIGHTS.items():
+            self.assertAlmostEqual(sum(defaults.values()), 1.0, places=9, msg=group)
+
+    def test_normalize_group_scales_to_one(self):
+        result = weights_module.normalize_group(
+            {'cbf': 7.0, 'cf': 1.0}, weights_module.GROUP_HYBRID
+        )
+
+        self.assertAlmostEqual(sum(result.values()), 1.0, places=9)
+        self.assertAlmostEqual(result['cbf'], 0.875, places=9)
+
+    def test_proportional_sets_are_the_same_algorithm(self):
+        """40/20/15/10/10/5 and 8/4/3/2/2/1 must normalise identically - this is
+        the whole reason raw values can be stored without validation."""
+        as_percent = weights_module.normalize_group(
+            {
+                'specific': 40, 'general': 20, 'expertise': 15,
+                'course': 10, 'year': 10, 'level': 5,
+            },
+            weights_module.GROUP_CBF,
+        )
+        as_ratio = weights_module.normalize_group(
+            {
+                'specific': 8, 'general': 4, 'expertise': 3,
+                'course': 2, 'year': 2, 'level': 1,
+            },
+            weights_module.GROUP_CBF,
+        )
+
+        for key in as_percent:
+            self.assertAlmostEqual(as_percent[key], as_ratio[key], places=9, msg=key)
+
+    def test_zero_sum_group_falls_back_to_defaults(self):
+        """A group summing to zero cannot be scaled. Returning all-zero weights
+        would flatten every score in that group and rank every tutor identically,
+        so the defaults stand in instead."""
+        result = weights_module.normalize_group(
+            {key: 0 for key in weights_module.DEFAULT_WEIGHTS[weights_module.GROUP_CBF]},
+            weights_module.GROUP_CBF,
+        )
+
+        self.assertAlmostEqual(sum(result.values()), 1.0, places=9)
+        self.assertAlmostEqual(result['specific'], 0.40, places=9)
+
+    def test_load_weights_falls_back_when_rows_are_missing(self):
+        AlgorithmWeight.objects.all().delete()
+
+        loaded = weights_module.load_weights()
+
+        self.assertAlmostEqual(loaded[weights_module.GROUP_HYBRID]['cbf'], 0.70, places=9)
+        self.assertAlmostEqual(loaded[weights_module.GROUP_CBF]['specific'], 0.40, places=9)
+
+    def test_load_weights_normalises_stored_values(self):
+        AlgorithmWeight.objects.update_or_create(
+            group=weights_module.GROUP_HYBRID, key='cbf', defaults={'value': 3.0}
+        )
+        AlgorithmWeight.objects.update_or_create(
+            group=weights_module.GROUP_HYBRID, key='cf', defaults={'value': 1.0}
+        )
+
+        loaded = weights_module.load_weights()
+
+        self.assertAlmostEqual(loaded[weights_module.GROUP_HYBRID]['cbf'], 0.75, places=9)
+        self.assertAlmostEqual(loaded[weights_module.GROUP_HYBRID]['cf'], 0.25, places=9)
+
+    def test_unknown_stored_keys_are_ignored(self):
+        """Code defines which components exist; the database only supplies values."""
+        AlgorithmWeight.objects.create(
+            group=weights_module.GROUP_CBF, key='not_a_real_component', value=99.0
+        )
+
+        loaded = weights_module.load_weights()
+
+        self.assertNotIn('not_a_real_component', loaded[weights_module.GROUP_CBF])
+        self.assertAlmostEqual(loaded[weights_module.GROUP_CBF]['specific'], 0.40, places=9)
+
+    def test_seed_migration_matches_the_previous_constants(self):
+        """The seeded rows must be the values that were hardcoded before, or the
+        first request after deploying scores differently from the last one."""
+        seeded = {
+            (weight.group, weight.key): weight.value
+            for weight in AlgorithmWeight.objects.all()
+        }
+
+        self.assertEqual(seeded[(weights_module.GROUP_HYBRID, 'cbf')], 0.70)
+        self.assertEqual(seeded[(weights_module.GROUP_HYBRID, 'cf')], 0.30)
+        self.assertEqual(seeded[(weights_module.GROUP_CBF, 'specific')], 0.40)
+        self.assertEqual(seeded[(weights_module.GROUP_CBF, 'general')], 0.20)
+        self.assertEqual(seeded[(weights_module.GROUP_CBF, 'expertise')], 0.15)
+        self.assertEqual(seeded[(weights_module.GROUP_CBF, 'course')], 0.10)
+        self.assertEqual(seeded[(weights_module.GROUP_CBF, 'year')], 0.10)
+        self.assertEqual(seeded[(weights_module.GROUP_CBF, 'level')], 0.05)
+
+
+class AlgorithmWeightScoringTests(APITestCase):
+    """Admin-set weights must actually reach the scorer, and the seeded defaults
+    must reproduce the behaviour that was hardcoded before them."""
+
+    def setUp(self):
+        from studybuddy.recommender.cbf import compute_cbf_breakdown
+
+        self.compute_cbf_breakdown = compute_cbf_breakdown
+
+        self.course = Course.objects.create(course_code="BSIT", course_name="Info Tech")
+        self.subject = Subjects.objects.create(
+            subject_code="MATH101", subject_name="Calculus 1", department="Math",
+            category=make_category("STEM"),
+        )
+
+        student_user = User.objects.create_user(
+            username="weight-student", email="weight-student@example.com", password="password",
+        )
+        self.student = UserProfile.objects.create(
+            user=student_user, fname="Weight", mname="", lname="Student", role="Tutee",
+            year_level=12, course=self.course,
+        )
+
+        tutor_user = User.objects.create_user(
+            username="weight-tutor", email="weight-tutor@example.com", password="password",
+        )
+        tutor_profile = UserProfile.objects.create(
+            user=tutor_user, fname="Weight", mname="", lname="Tutor", role="Tutor",
+            year_level=12, course=self.course,
+        )
+        self.tutor = Tutor.objects.create(
+            profile=tutor_profile, hourly_rate=200, can_online=True, can_f2f=False,
+            teaching_level="College",
+        )
+        TutorSubjects.objects.create(tutor=self.tutor, subject=self.subject, expertise_level=5)
+
+    def _breakdown(self, weights=None):
+        return self.compute_cbf_breakdown(
+            self.student, self.tutor, self.subject.subject_code, weights=weights,
+        )
+
+    def test_defaults_reproduce_the_previous_hardcoded_weights(self):
+        """Characterization test. This tutor matches everything, so each
+        component contributes its own weight and the breakdown should show the
+        exact constants that used to live in cbf.py."""
+        breakdown = self._breakdown()
+
+        self.assertAlmostEqual(breakdown["specific"]["weight"], 0.40, places=9)
+        self.assertAlmostEqual(breakdown["general"]["weight"], 0.20, places=9)
+        self.assertAlmostEqual(breakdown["expertise"]["weight"], 0.15, places=9)
+        self.assertAlmostEqual(breakdown["course"]["weight"], 0.10, places=9)
+        self.assertAlmostEqual(breakdown["year"]["weight"], 0.10, places=9)
+        self.assertAlmostEqual(breakdown["level"]["weight"], 0.05, places=9)
+        self.assertAlmostEqual(breakdown["score"], 1.0, places=9)
+
+    def test_stored_weights_change_the_cbf_breakdown(self):
+        AlgorithmWeight.objects.filter(
+            group=weights_module.GROUP_CBF, key='specific'
+        ).update(value=0.80)
+
+        loaded = weights_module.load_weights()[weights_module.GROUP_CBF]
+        breakdown = self._breakdown(weights=loaded)
+
+        # 0.80 out of a new total of 1.40.
+        self.assertAlmostEqual(breakdown["specific"]["weight"], 0.80 / 1.40, places=9)
+        self.assertAlmostEqual(sum(
+            breakdown[key]["weight"] for key in
+            ('specific', 'general', 'expertise', 'course', 'year', 'level')
+        ), 1.0, places=9)
+
+    def test_hybrid_blend_weights_reach_the_hybrid_score(self):
+        from studybuddy.recommender.hybrid import hybrid_prediction_breakdown
+
+        cbf_only = {
+            weights_module.GROUP_HYBRID: {'cbf': 1.0, 'cf': 0.0},
+            weights_module.GROUP_CBF: weights_module.default_weights()[weights_module.GROUP_CBF],
+        }
+        cf_only = {
+            weights_module.GROUP_HYBRID: {'cbf': 0.0, 'cf': 1.0},
+            weights_module.GROUP_CBF: weights_module.default_weights()[weights_module.GROUP_CBF],
+        }
+
+        all_cbf = hybrid_prediction_breakdown(
+            {}, self.student, self.tutor, self.subject.subject_code, weights=cbf_only,
+        )
+        all_cf = hybrid_prediction_breakdown(
+            {}, self.student, self.tutor, self.subject.subject_code, weights=cf_only,
+        )
+
+        self.assertAlmostEqual(all_cbf["hybrid_score"], all_cbf["cbf"]["score"], places=9)
+        # No ratings, so CF falls back to 0 and an all-CF blend scores nothing.
+        self.assertAlmostEqual(all_cf["hybrid_score"], 0.0, places=9)
+
+    def test_weights_are_loaded_once_not_per_tutor(self):
+        """recommend_tutors_hybrid scores every candidate. Loading weights inside
+        that loop would work and be quietly slow, so pin the query count."""
+        from studybuddy.recommender.hybrid import recommend_tutors_hybrid
+
+        Preference.objects.create(user=self.student).subjects.set([self.subject])
+
+        for index in range(3):
+            user = User.objects.create_user(
+                username=f"loop-tutor-{index}",
+                email=f"loop-tutor-{index}@example.com",
+                password="password",
+            )
+            profile = UserProfile.objects.create(
+                user=user, fname=f"Loop{index}", mname="", lname="Tutor", role="Tutor",
+                year_level=12, course=self.course,
+            )
+            extra = Tutor.objects.create(
+                profile=profile, hourly_rate=200, can_online=True, can_f2f=False,
+                teaching_level="College",
+            )
+            TutorSubjects.objects.create(tutor=extra, subject=self.subject, expertise_level=3)
+
+        with CaptureQueriesContext(connection) as ctx:
+            recommend_tutors_hybrid({}, self.student, self.subject.subject_code)
+
+        weight_queries = [
+            query for query in ctx.captured_queries
+            if 'algorithmweight' in query['sql'].lower()
+        ]
+        self.assertEqual(len(weight_queries), 1, weight_queries)
+
+
+class AlgorithmWeightsApiTests(APITestCase):
+    """The settings endpoints stay reachable without ALGORITHM_DEMO_TOOLS_ENABLED;
+    only the preview is gated by it."""
+
+    WEIGHTS_URL = '/api/admin/algorithm-weights/'
+    PREVIEW_URL = '/api/admin/algorithm-weights/preview/'
+
+    def setUp(self):
+        superadmin_user = User.objects.create_user(
+            username="weights-superadmin", email="weights-superadmin@example.com",
+            password="password",
+        )
+        self.superadmin = UserProfile.objects.create(
+            user=superadmin_user, fname="Super", mname="", lname="Admin", role="SuperAdmin",
+        )
+
+        tutee_user = User.objects.create_user(
+            username="weights-tutee", email="weights-tutee@example.com", password="password",
+        )
+        self.tutee = UserProfile.objects.create(
+            user=tutee_user, fname="Reg", mname="", lname="Tutee", role="Tutee",
+        )
+
+    def _auth_superadmin(self):
+        self.client.force_authenticate(user=self.superadmin.user)
+
+    def test_get_returns_both_groups_with_shares(self):
+        self._auth_superadmin()
+
+        response = self.client.get(self.WEIGHTS_URL)
+
+        self.assertEqual(response.status_code, 200)
+        groups = {group['group']: group for group in response.data['groups']}
+        self.assertEqual(set(groups), {'hybrid', 'cbf'})
+        self.assertEqual(len(groups['cbf']['weights']), 6)
+
+        shares = sum(weight['share'] for weight in groups['cbf']['weights'])
+        self.assertAlmostEqual(shares, 1.0, places=9)
+
+    def test_get_is_available_with_demo_tools_disabled(self):
+        self._auth_superadmin()
+
+        with override_settings(ALGORITHM_DEMO_TOOLS_ENABLED=False):
+            response = self.client.get(self.WEIGHTS_URL)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.data['preview_enabled'])
+
+    def test_non_superadmin_is_refused(self):
+        self.client.force_authenticate(user=self.tutee.user)
+
+        self.assertEqual(self.client.get(self.WEIGHTS_URL).status_code, 403)
+
+    def test_anonymous_is_refused(self):
+        self.assertIn(self.client.get(self.WEIGHTS_URL).status_code, (401, 403))
+
+    def test_patch_stores_raw_values_and_stamps_the_actor(self):
+        self._auth_superadmin()
+
+        response = self.client.patch(
+            self.WEIGHTS_URL, {'groups': {'hybrid': {'cbf': 3.0, 'cf': 1.0}}}, format='json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        stored = AlgorithmWeight.objects.get(group='hybrid', key='cbf')
+        self.assertEqual(stored.value, 3.0)
+        self.assertEqual(stored.updated_by, self.superadmin)
+        self.assertIsNotNone(stored.updated_at)
+
+        hybrid = next(g for g in response.data['groups'] if g['group'] == 'hybrid')
+        self.assertAlmostEqual(
+            next(w['share'] for w in hybrid['weights'] if w['key'] == 'cbf'), 0.75, places=9,
+        )
+        self.assertEqual(hybrid['updated_by'], 'Super Admin')
+
+    def test_patch_rejects_unknown_group_and_key(self):
+        self._auth_superadmin()
+
+        self.assertEqual(self.client.patch(
+            self.WEIGHTS_URL, {'groups': {'nope': {'cbf': 1}}}, format='json',
+        ).status_code, 400)
+
+        self.assertEqual(self.client.patch(
+            self.WEIGHTS_URL, {'groups': {'hybrid': {'nope': 1}}}, format='json',
+        ).status_code, 400)
+
+    def test_patch_rejects_negative_and_non_numeric(self):
+        self._auth_superadmin()
+
+        self.assertEqual(self.client.patch(
+            self.WEIGHTS_URL, {'groups': {'hybrid': {'cbf': -1}}}, format='json',
+        ).status_code, 400)
+
+        self.assertEqual(self.client.patch(
+            self.WEIGHTS_URL, {'groups': {'hybrid': {'cbf': 'lots'}}}, format='json',
+        ).status_code, 400)
+
+    def test_patch_rejects_an_all_zero_group(self):
+        """Normalising a zero-sum group is impossible, so it is refused at the
+        edge rather than silently falling back to defaults after saving."""
+        self._auth_superadmin()
+
+        response = self.client.patch(
+            self.WEIGHTS_URL, {'groups': {'hybrid': {'cbf': 0, 'cf': 0}}}, format='json',
+        )
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_patch_bumps_the_dashboard_recommendation_cache(self):
+        from studybuddy.recommender import dashboard
+
+        self._auth_superadmin()
+        before = dashboard._dashboard_recs_cache_version()
+
+        self.client.patch(
+            self.WEIGHTS_URL, {'groups': {'hybrid': {'cbf': 0.6}}}, format='json',
+        )
+
+        self.assertNotEqual(dashboard._dashboard_recs_cache_version(), before)
+
+    @override_settings(ALGORITHM_DEMO_TOOLS_ENABLED=False)
+    def test_preview_is_gated_off_by_default(self):
+        self._auth_superadmin()
+
+        response = self.client.post(
+            self.PREVIEW_URL, {'tutee_id': self.tutee.id}, format='json',
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+    @override_settings(ALGORITHM_DEMO_TOOLS_ENABLED=True)
+    def test_preview_runs_without_saving_anything(self):
+        self._auth_superadmin()
+
+        response = self.client.post(
+            self.PREVIEW_URL,
+            {'tutee_id': self.tutee.id, 'groups': {'hybrid': {'cbf': 0.1, 'cf': 0.9}}},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        # The tutee has no preferences, so the recommender bails early - the
+        # point here is that the override did not persist.
+        self.assertEqual(
+            AlgorithmWeight.objects.get(group='hybrid', key='cbf').value, 0.70,
+        )
+
+
+@override_settings(ALGORITHM_DEMO_TOOLS_ENABLED=True)
+class AlgorithmWeightsPreviewValidationTests(APITestCase):
+    """The preview validates its overrides exactly as the save does. A preview
+    that accepted a value the save rejects would let an admin study a ranking
+    they could never apply."""
+
+    PREVIEW_URL = '/api/admin/algorithm-weights/preview/'
+
+    def setUp(self):
+        superadmin_user = User.objects.create_user(
+            username="preview-superadmin", email="preview-superadmin@example.com",
+            password="password",
+        )
+        self.superadmin = UserProfile.objects.create(
+            user=superadmin_user, fname="Super", mname="", lname="Admin", role="SuperAdmin",
+        )
+
+        tutee_user = User.objects.create_user(
+            username="preview-tutee", email="preview-tutee@example.com", password="password",
+        )
+        self.tutee = UserProfile.objects.create(
+            user=tutee_user, fname="Prev", mname="", lname="Tutee", role="Tutee",
+        )
+
+        self.client.force_authenticate(user=self.superadmin.user)
+
+    def _preview(self, groups):
+        return self.client.post(
+            self.PREVIEW_URL, {'tutee_id': self.tutee.id, 'groups': groups}, format='json',
+        )
+
+    def test_non_numeric_override_is_a_400_not_a_500(self):
+        response = self._preview({'hybrid': {'cbf': 'lots'}})
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_negative_override_is_rejected(self):
+        """Normalising cannot rescue a negative weight - the group can still sum
+        above zero while that member contributes a negative share."""
+        response = self._preview({'hybrid': {'cbf': -2, 'cf': 3}})
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_unknown_group_and_key_are_rejected(self):
+        self.assertEqual(self._preview({'nope': {'cbf': 1}}).status_code, 400)
+        self.assertEqual(self._preview({'hybrid': {'nope': 1}}).status_code, 400)
+
+    def test_boolean_is_not_accepted_as_a_number(self):
+        self.assertEqual(self._preview({'hybrid': {'cbf': True}}).status_code, 400)
+
+    def test_valid_override_is_accepted(self):
+        response = self._preview({'hybrid': {'cbf': 0.2, 'cf': 0.8}})
+
+        self.assertEqual(response.status_code, 200)
+
+
+@override_settings(
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    FRONTEND_URL="https://studybuddy.example",
+    LOGIN_OTP_TTL_SECONDS=600,
+    LOGIN_OTP_MAX_ATTEMPTS=2,
+    TRUSTED_DEVICE_TTL_SECONDS=7 * 24 * 60 * 60,
+)
+class TrustedDeviceLoginTests(APITestCase):
+    """The OTP is a first-time-on-this-device step, not a per-login one.
+
+    LoginRateThrottle.THROTTLE_RATES is read from settings once at import time (a DRF quirk --
+    override_settings on REST_FRAMEWORK never reaches it), so the 5/min production login rate has
+    to be patched directly rather than overridden, or these tests' repeated login calls throttle.
+    """
+
+    def setUp(self):
+        cache.clear()
+        mail.outbox = []
+        self._throttle_patch = patch.dict(
+            LoginRateThrottle.THROTTLE_RATES, {"login": "1000/min"}
+        )
+        self._throttle_patch.start()
+        self.addCleanup(self._throttle_patch.stop)
+        self.institution = PartnerInstitution.objects.create(
+            institution_name="Example University",
+            school_email_domain="example.edu",
+            is_active=True,
+        )
+        self.user = User.objects.create_user(
+            username="device@example.edu",
+            email="device@example.edu",
+            password="password",
+        )
+        self.profile = UserProfile.objects.create(
+            user=self.user,
+            fname="Trusted",
+            mname="",
+            lname="Device",
+            role="Tutee",
+            institution=self.institution,
+        )
+
+    def login(self, device_token=None):
+        payload = {"email": self.user.email, "password": "password"}
+        if device_token is not None:
+            payload["device_token"] = device_token
+        return self.client.post("/api/login/", payload, format="json")
+
+    def latest_otp_code(self):
+        match = re.search(r"\b(\d{6})\b", mail.outbox[-1].body)
+        self.assertIsNotNone(match)
+        return match.group(1)
+
+    def enrol_device(self):
+        """Run a full password + OTP login and return the issued device token."""
+        challenge_response = self.login()
+        verify_response = self.client.post(
+            "/api/login/verify-otp/",
+            {
+                "challenge_id": challenge_response.data["challenge_id"],
+                "code": self.latest_otp_code(),
+            },
+            format="json",
+        )
+        self.assertEqual(verify_response.status_code, 200)
+        self.assertIn("device_token", verify_response.data)
+        return verify_response.data["device_token"]
+
+    def test_first_login_still_challenges_and_issues_a_device_token(self):
+        token = self.enrol_device()
+
+        device = TrustedDevice.objects.get(user=self.user)
+        self.assertTrue(device.is_active)
+        # The raw secret must never be recoverable from the row.
+        self.assertNotIn(device.token_hash, token)
+        self.assertTrue(token.startswith(f"{device.device_id}."))
+
+    def test_login_without_a_device_token_still_requires_otp(self):
+        self.enrol_device()
+        mail.outbox = []
+
+        response = self.login()
+
+        self.assertTrue(response.data["requires_2fa"])
+        self.assertNotIn("access", response.data)
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_login_with_a_trusted_device_skips_the_otp(self):
+        token = self.enrol_device()
+        mail.outbox = []
+
+        response = self.login(token)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("requires_2fa", response.data)
+        self.assertIn("access", response.data)
+        self.assertIn("refresh", response.data)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_accepted_login_slides_the_expiry_forward(self):
+        token = self.enrol_device()
+        device = TrustedDevice.objects.get(user=self.user)
+        stale = timezone.now() + timedelta(days=2)
+        TrustedDevice.objects.filter(pk=device.pk).update(expires_at=stale)
+
+        self.login(token)
+
+        device.refresh_from_db()
+        self.assertGreater(device.expires_at, stale)
+
+    def test_expired_device_falls_back_to_otp(self):
+        token = self.enrol_device()
+        TrustedDevice.objects.filter(user=self.user).update(
+            expires_at=timezone.now() - timedelta(seconds=1)
+        )
+        mail.outbox = []
+
+        response = self.login(token)
+
+        self.assertTrue(response.data["requires_2fa"])
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_revoked_device_falls_back_to_otp(self):
+        token = self.enrol_device()
+        TrustedDevice.objects.filter(user=self.user).update(revoked_at=timezone.now())
+
+        self.assertTrue(self.login(token).data["requires_2fa"])
+
+    def test_tampered_secret_is_rejected(self):
+        token = self.enrol_device()
+        device_id, _, _ = token.partition(".")
+
+        self.assertTrue(self.login(f"{device_id}.not-the-secret").data["requires_2fa"])
+
+    def test_malformed_token_is_rejected_without_erroring(self):
+        self.enrol_device()
+
+        for bogus in ["", "no-separator", ".", "not-a-uuid.secret"]:
+            response = self.login(bogus)
+            self.assertEqual(response.status_code, 200, msg=bogus)
+            self.assertTrue(response.data.get("requires_2fa"), msg=bogus)
+
+    def test_another_users_device_token_is_rejected(self):
+        token = self.enrol_device()
+        other = User.objects.create_user(
+            username="other@example.edu",
+            email="other@example.edu",
+            password="password",
+        )
+        UserProfile.objects.create(
+            user=other,
+            fname="Other",
+            mname="",
+            lname="User",
+            role="Tutee",
+            institution=self.institution,
+        )
+
+        response = self.client.post(
+            "/api/login/",
+            {"email": other.email, "password": "password", "device_token": token},
+            format="json",
+        )
+
+        self.assertTrue(response.data["requires_2fa"])
+
+    def test_suspension_revokes_trusted_devices(self):
+        token = self.enrol_device()
+        self.profile.is_suspended = True
+        self.profile.save(update_fields=["is_suspended"])
+
+        response = self.login(token)
+
+        self.assertEqual(response.status_code, 403)
+        self.assertIsNotNone(TrustedDevice.objects.get(user=self.user).revoked_at)
+
+    def test_logout_with_device_token_revokes_only_that_device(self):
+        first_token = self.enrol_device()
+        mail.outbox = []
+        second_token = self.enrol_device()
+        self.assertEqual(TrustedDevice.objects.filter(user=self.user).count(), 2)
+
+        login_response = self.login(first_token)
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {login_response.data['access']}")
+        logout_response = self.client.post(
+            "/api/logout/",
+            {"refresh": login_response.data["refresh"], "device_token": first_token},
+            format="json",
+        )
+        self.assertEqual(logout_response.status_code, 200)
+        self.client.credentials()
+
+        self.assertTrue(self.login(first_token).data["requires_2fa"])
+        self.assertIn("access", self.login(second_token).data)
+
+    def test_logout_without_device_token_keeps_the_device_trusted(self):
+        """The idle-timeout and refresh-failure paths log out without forgetting the device."""
+        token = self.enrol_device()
+        login_response = self.login(token)
+
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {login_response.data['access']}")
+        self.client.post(
+            "/api/logout/", {"refresh": login_response.data["refresh"]}, format="json"
+        )
+        self.client.credentials()
+
+        self.assertIn("access", self.login(token).data)
+
+    @override_settings(LOGIN_OTP_DISABLED=True)
+    def test_otp_disabled_short_circuits_before_any_device_logic(self):
+        response = self.login()
+
+        self.assertIn("access", response.data)
+        self.assertNotIn("device_token", response.data)
+        self.assertFalse(TrustedDevice.objects.filter(user=self.user).exists())

@@ -1,6 +1,5 @@
 from django.urls import path, include
 from django.conf.urls.static import static
-from rest_framework_simplejwt.views import TokenRefreshView
 from .views import(
                    cancel_booking,
                    complete_booking,
@@ -26,6 +25,7 @@ from .views import(
 from .admin_views import (
     AdminAnalyticsExportView,
     AdminCourseCatalogView,
+    AdminSubjectCategoryView,
     AdminStatsView, AdminWithdrawalListView, AdminWithdrawalDetailView,
     AdminUserListView, AdminInstitutionView, AdminAnalyticsView,
     AdminUserBookingsView, AdminUserBookingsExportView,
@@ -37,7 +37,9 @@ from .admin_views import (
     AdminTutorDocumentRenewalDetailView, SuperAdminInstitutionPerformanceView,
     AdminTuteeApplicationListView, AdminTuteeApplicationDetailView,
     AdminTuteeDocumentRenewalDetailView, AdminOperationalQueueView,
-    AdminUserVerificationDevToolsView
+    AdminUserVerificationDevToolsView,
+    AdminAlgorithmWeightsView,
+    AdminAlgorithmWeightsPreviewView
 )
 from . import views
 
@@ -68,6 +70,8 @@ urlpatterns = [
     path('admin/users/<int:pk>/stats/', AdminUserStatsView.as_view()),
     path('admin/users/<int:pk>/stats/export/', AdminUserStatsExportView.as_view()),
     path('admin/users/<int:pk>/verification-dev-tools/', AdminUserVerificationDevToolsView.as_view()),
+    path('admin/subject-categories/', AdminSubjectCategoryView.as_view()),
+    path('admin/subject-categories/<int:pk>/', AdminSubjectCategoryView.as_view()),
     path('admin/course-catalog/', AdminCourseCatalogView.as_view()),
     path('admin/course-catalog/<str:pk>/', AdminCourseCatalogView.as_view()),
     path('admin/institutions/', AdminInstitutionView.as_view()),
@@ -92,8 +96,11 @@ urlpatterns = [
     path('password-reset/request/', views.password_reset_request),
     path('password-reset/confirm/', views.password_reset_confirm),
     path('logout/', views.logout_view),
-    path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    # Mode-aware refresh: also returns the profile's current active mode so a client whose mode
+    # was changed on another device notices within one refresh cycle.
+    path('token/refresh/', views.ModeAwareTokenRefreshView.as_view(), name='token_refresh'),
     path('profile/status/', views.profile_status),
+    path('switch-mode/', views.switch_mode),
     path('tutor-application/status/', views.tutor_application_status),
     path('tutor-application/submit/', views.tutor_application_submit),
     path('tutor-application/resubmit/', views.tutor_application_resubmit),
@@ -170,6 +177,11 @@ urlpatterns = [
     path('dev/verification/set-state/', views.dev_verification_set_state),
     path('dev/verification/enforcement/', views.dev_verification_set_enforcement),
     # Recommendation algorithm demo tool (gated in-view by ALGORITHM_DEMO_TOOLS_ENABLED + IsSuperAdminUser)
+    # Algorithm weights: the settings endpoints are ungated (SuperAdmin only),
+    # the preview is gated in-view like the demo tools below it.
+    path('admin/algorithm-weights/', AdminAlgorithmWeightsView.as_view()),
+    path('admin/algorithm-weights/preview/', AdminAlgorithmWeightsPreviewView.as_view()),
+
     path('dev/algorithm-demo/tutees/', views.algorithm_demo_search_tutees),
     path('dev/algorithm-demo/recommend/', views.algorithm_demo_recommend),
     path('dev/algorithm-demo/recommend-whatif/', views.algorithm_demo_recommend_whatif),

@@ -14,6 +14,7 @@ export const useCatalogStore = defineStore('catalog', () => {
   const courses = ref([])
   const institutions = ref([])
   const courseCatalog = ref([])
+  const subjectCategories = ref([])
   const paymentMethods = ref([])
   const receivingInstitutions = ref([])
 
@@ -53,6 +54,21 @@ export const useCatalogStore = defineStore('catalog', () => {
     return courseCatalog.value
   }
 
+  // Categories are stored server-side (SubjectCategory), not derived from the subjects already in
+  // the catalog the way they used to be -- that derivation could not represent a category with no
+  // subjects, so an empty one vanished. Server order is display_order, then name; preserve it.
+  async function fetchSubjectCategories() {
+    const { data } = await api.get('/admin/subject-categories/')
+    subjectCategories.value = Array.isArray(data) ? data : []
+    return subjectCategories.value
+  }
+
+  async function addSubjectCategory(name) {
+    const { data } = await api.post('/admin/subject-categories/', { name })
+    subjectCategories.value = [...subjectCategories.value, data]
+    return data
+  }
+
   // Subjects are also served (as `subjects`) from a session-cached `subjects/` fetch used by
   // tutee-facing pickers. That cache has no other invalidation trigger, so every mutation below
   // that can change what a tutee should see (add, edit, remove, or an external approve/reject)
@@ -61,10 +77,19 @@ export const useCatalogStore = defineStore('catalog', () => {
     clearApiCache('catalog')
   }
 
+  async function refreshCategoriesIfUnknown(name) {
+    if (!name) return
+    const known = subjectCategories.value.some((category) => category.name === name)
+    if (!known) await fetchSubjectCategories()
+  }
+
   async function addCatalogSubject(payload) {
     const { data } = await api.post('/admin/course-catalog/', payload)
     courseCatalog.value = [...courseCatalog.value, data]
     invalidateSubjectsCache()
+    // The save endpoint mints a category the admin named for the first time, so the local list
+    // would otherwise not contain it until the next full load.
+    await refreshCategoriesIfUnknown(data?.category)
     return data
   }
 
@@ -74,6 +99,7 @@ export const useCatalogStore = defineStore('catalog', () => {
       subject.subject_code === subjectCode ? data : subject,
     )
     invalidateSubjectsCache()
+    await refreshCategoriesIfUnknown(data?.category)
     return data
   }
 
@@ -127,12 +153,15 @@ export const useCatalogStore = defineStore('catalog', () => {
     courses,
     institutions,
     courseCatalog,
+    subjectCategories,
     paymentMethods,
     receivingInstitutions,
     fetchSubjects,
     fetchCourses,
     fetchPartnerInstitutions,
     fetchCourseCatalog,
+    fetchSubjectCategories,
+    addSubjectCategory,
     addCatalogSubject,
     updateCatalogSubject,
     removeCatalogSubject,

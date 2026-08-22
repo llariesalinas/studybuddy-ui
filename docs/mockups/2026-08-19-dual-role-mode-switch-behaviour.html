@@ -1,0 +1,251 @@
+<h2>Mode switch &mdash; live behaviour</h2>
+<p class="subtitle">A working simulation of what was built. Click things; state is real. Nav items, labels and copy are lifted from the implementation.</p>
+
+<div class="section" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px">
+  <span class="label" style="margin-right:4px">Signed in as</span>
+  <button class="mock-button" onclick="loadPersona('tutee')" id="p-tutee">Felipe &mdash; Tutee only</button>
+  <button class="mock-button" onclick="loadPersona('tutor')" id="p-tutor">Marisol &mdash; Tutor only</button>
+  <button class="mock-button" onclick="loadPersona('dual')" id="p-dual">Maria &mdash; both modes</button>
+</div>
+
+<div class="mockup">
+  <div class="mockup-header">
+    <span id="hdr">StudyBuddy &mdash; Tutee mode</span>
+  </div>
+  <div class="mockup-body" style="padding:0">
+    <div style="display:flex;min-height:430px;position:relative;overflow:hidden">
+
+      <!-- sidebar -->
+      <div style="width:210px;flex:0 0 210px;background:rgba(127,127,127,.07);border-right:1px solid rgba(127,127,127,.25);display:flex;flex-direction:column;padding:12px 10px">
+        <div style="display:flex;align-items:center;gap:8px;padding:6px 6px 12px">
+          <span style="width:26px;height:26px;border-radius:8px;background:#00895a;color:#fff;display:grid;place-items:center;font-weight:800;font-size:13px">S</span>
+          <strong style="font-size:13.5px">StudyBuddy</strong>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:9px;background:rgba(0,137,90,.10);border-radius:10px;padding:8px 9px;margin-bottom:12px">
+          <span id="avatar" style="width:30px;height:30px;border-radius:50%;background:#00895a;color:#fff;display:grid;place-items:center;font-size:11px;font-weight:800">FF</span>
+          <span style="line-height:1.25">
+            <span id="who" style="display:block;font-size:12.5px;font-weight:700">Felipe Fernandez</span>
+            <span id="roleLabel" style="display:block;font-size:11px;opacity:.65">Tutee</span>
+          </span>
+        </div>
+
+        <div class="label" style="padding-left:6px">Menu</div>
+        <nav id="nav" style="display:flex;flex-direction:column;gap:2px;margin:6px 0 12px"></nav>
+
+        <div class="label" style="padding-left:6px">Support</div>
+        <div style="padding:7px 9px;font-size:12.5px;opacity:.8">Help</div>
+
+        <div style="flex:1"></div>
+
+        <!-- the footer this work added to -->
+        <div style="border-top:1px solid rgba(127,127,127,.25);padding-top:8px">
+          <button
+            id="switcher"
+            onclick="onSwitchClick()"
+            style="width:100%;text-align:left;background:rgba(0,137,90,.12);border:1px solid rgba(0,137,90,.35);border-radius:9px;padding:8px 10px;font-size:12.5px;font-weight:700;cursor:pointer;color:inherit">
+            Switch to Tutor
+          </button>
+          <div style="padding:8px 10px;font-size:12.5px;opacity:.7">Log out</div>
+        </div>
+      </div>
+
+      <!-- main -->
+      <div style="flex:1;padding:18px 20px;position:relative">
+        <div id="page" style="font-size:13px"></div>
+
+        <div class="label" style="margin-top:22px">Simulate an incoming notification</div>
+        <button class="mock-button" style="margin-top:6px" onclick="tapNotification()">
+          &#128276; "Your session with Jomar starts in 15 minutes" &mdash; tap
+        </button>
+        <p id="notifHint" style="font-size:12px;opacity:.65;margin-top:6px"></p>
+
+        <!-- toast -->
+        <div id="toast" style="display:none;position:absolute;top:12px;right:14px;background:#134e4a;color:#fff;border-radius:10px;padding:10px 12px;font-size:12.5px;display:none;align-items:center;gap:12px;box-shadow:0 8px 24px rgba(0,0,0,.25);max-width:300px">
+          <span id="toastMsg" style="flex:1"></span>
+          <button id="toastAction" onclick="undoSwitch()" style="background:rgba(255,255,255,.18);border:none;color:#fff;border-radius:999px;padding:4px 11px;font-size:12px;font-weight:700;cursor:pointer">Undo</button>
+        </div>
+
+        <!-- modal -->
+        <div id="modal" style="display:none;position:absolute;inset:0;background:rgba(15,23,42,.45);align-items:center;justify-content:center;padding:16px">
+          <div style="background:var(--card-bg,#fff);color:#0f172a;border-radius:14px;max-width:390px;padding:18px 20px;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+            <h3 id="modalTitle" style="margin:0 0 10px;font-size:16px">No Tutor account yet</h3>
+            <p id="modalBody" style="font-size:13px;line-height:1.6;margin:0 0 8px;color:#334155"></p>
+            <p id="modalVerified" style="font-size:13px;line-height:1.6;margin:0 0 14px;color:#334155"></p>
+            <div style="display:flex;gap:8px;justify-content:flex-end">
+              <button class="mock-button" onclick="closeModal()">Not now</button>
+              <button onclick="confirmSetup()" style="background:#00895a;color:#fff;border:none;border-radius:999px;padding:7px 15px;font-size:12.5px;font-weight:700;cursor:pointer">Set up <span id="modalCta">Tutor</span> account</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:14px">
+  <div class="label">Live state (what the server and client actually hold)</div>
+  <pre id="state" style="background:rgba(127,127,127,.10);border-radius:10px;padding:12px 14px;font-size:12.5px;overflow-x:auto;margin-top:6px"></pre>
+</div>
+
+<div class="section" style="margin-top:20px">
+  <h3>What to try</h3>
+  <div class="pros-cons">
+    <div class="pros">
+      <h4>Maria (both modes)</h4>
+      <ul>
+        <li>Tap the notification while in Tutee mode &rarr; <strong>auto-switch</strong>, lands on check-in, toast with Undo.</li>
+        <li>Hit <strong>Undo</strong> &rarr; mode and route both restored.</li>
+        <li>Use the sidebar switcher &rarr; deliberate switch, <em>no</em> toast (she asked for it).</li>
+      </ul>
+    </div>
+    <div class="cons">
+      <h4>Felipe / Marisol (one mode)</h4>
+      <ul>
+        <li>Sidebar switcher &rarr; <strong>modal</strong>, no mode change yet.</li>
+        <li>Tap the notification as Felipe &rarr; <strong>bounced</strong>, because <code>can_tutor</code> is false. This is the one case that still redirects.</li>
+        <li>Felipe is verified, so the modal offers document carry-over. Marisol is too.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<script>
+const NAV = {
+  tutee: ['Dashboard', 'Profile', 'Sessions'],
+  tutor: ['Dashboard', 'Profile', 'Schedule', 'Sessions & Reports', 'Wallet']
+}
+const LABEL = { tutor: 'Tutor', tutee: 'Tutee' }
+const PERSONAS = {
+  tutee: { who: 'Felipe Fernandez', avatar: 'FF', mode: 'tutee', can_tutor: false, can_tutee: true,  verified: true },
+  tutor: { who: 'Marisol Aquino',   avatar: 'MA', mode: 'tutor', can_tutor: true,  can_tutee: false, verified: true },
+  dual:  { who: 'Maria Santos',     avatar: 'MS', mode: 'tutee', can_tutor: true,  can_tutee: true,  verified: true }
+}
+
+let S = null
+let page = 'Dashboard'
+let prevMode = null
+let prevPage = null
+let toastTimer = null
+
+function loadPersona(key) {
+  S = Object.assign({}, PERSONAS[key])
+  S.key = key
+  page = 'Dashboard'
+  prevMode = prevPage = null
+  hideToast(); closeModal()
+  document.getElementById('notifHint').textContent = ''
+  render()
+}
+
+function other(mode) { return mode === 'tutor' ? 'tutee' : 'tutor' }
+function provisioned(mode) { return mode === 'tutor' ? S.can_tutor : S.can_tutee }
+
+function render() {
+  document.getElementById('who').textContent = S.who
+  document.getElementById('avatar').textContent = S.avatar
+  document.getElementById('roleLabel').textContent = LABEL[S.mode]
+  document.getElementById('hdr').textContent = 'StudyBuddy — ' + LABEL[S.mode] + ' mode'
+  document.getElementById('switcher').textContent = 'Switch to ' + LABEL[other(S.mode)]
+
+  const nav = document.getElementById('nav')
+  nav.innerHTML = ''
+  NAV[S.mode].forEach(item => {
+    const active = item === page
+    const el = document.createElement('div')
+    el.textContent = item
+    el.style.cssText = 'padding:7px 9px;border-radius:8px;font-size:12.5px;' +
+      (active ? 'background:rgba(0,137,90,.16);font-weight:750;' : 'opacity:.8;')
+    nav.appendChild(el)
+  })
+
+  document.getElementById('page').innerHTML =
+    page === 'Check in'
+      ? '<strong style="font-size:15px">Check in &mdash; Jomar</strong><br><span style="opacity:.7">Calculus &middot; 2:00 PM &middot; tutor-only screen</span>'
+      : '<strong style="font-size:15px">' + LABEL[S.mode] + ' ' + page + '</strong><br><span style="opacity:.7">' +
+        (S.mode === 'tutor' ? 'Your tutoring overview.' : 'Your learning overview.') + '</span>'
+
+  document.getElementById('state').textContent =
+    'UserProfile.role  = "' + LABEL[S.mode] + '"   <- active mode, persisted\n' +
+    'can_tutor         = ' + S.can_tutor + '   <- derived: Tutor row + rate + >=1 subject\n' +
+    'can_tutee         = ' + S.can_tutee + '   <- derived: Preference row exists\n' +
+    'current route     = ' + page
+
+  Array.from(document.querySelectorAll('[id^="p-"]')).forEach(b => {
+    b.style.outline = ('p-' + S.key === b.id) ? '2px solid #00895a' : 'none'
+  })
+}
+
+function showToast(msg, withUndo) {
+  const t = document.getElementById('toast')
+  document.getElementById('toastMsg').textContent = msg
+  document.getElementById('toastAction').style.display = withUndo ? 'block' : 'none'
+  t.style.display = 'flex'
+  clearTimeout(toastTimer)
+  toastTimer = setTimeout(hideToast, 8000)
+}
+function hideToast() { document.getElementById('toast').style.display = 'none' }
+
+function openModal() {
+  const target = other(S.mode)
+  document.getElementById('modalTitle').textContent = 'No ' + LABEL[target] + ' account yet'
+  document.getElementById('modalCta').textContent = LABEL[target]
+  document.getElementById('modalBody').textContent =
+    "You currently don't have a " + LABEL[target] + " account. Setting one up takes a few steps, and you can " +
+    "switch back any time — your existing " + LABEL[S.mode] + " account stays exactly as it is."
+  document.getElementById('modalVerified').textContent =
+    S.verified ? "Your documents are already verified, so you won't need to upload them again." : ''
+  document.getElementById('modal').style.display = 'flex'
+}
+function closeModal() { document.getElementById('modal').style.display = 'none' }
+
+// Sidebar switcher: deliberate. No toast — the user asked for it.
+function onSwitchClick() {
+  const target = other(S.mode)
+  if (!provisioned(target)) { openModal(); return }
+  S.mode = target
+  page = 'Dashboard'
+  render()
+}
+
+function confirmSetup() {
+  const target = other(S.mode)
+  S.mode = target
+  page = 'Onboarding'
+  closeModal()
+  render()
+  document.getElementById('page').innerHTML =
+    '<strong style="font-size:15px">' + LABEL[target] + ' onboarding</strong><br>' +
+    '<span style="opacity:.7">The switch is allowed even though the mode is unprovisioned — that is how you reach ' +
+    'this screen. The router gate lands you here.' +
+    (S.verified ? ' Verification step is skipped: documents carried over.' : '') + '</span>'
+}
+
+// Notification deep link into a tutor-only route.
+function tapNotification() {
+  const hint = document.getElementById('notifHint')
+  if (S.mode === 'tutor') { page = 'Check in'; render(); hint.textContent = 'Already in Tutor mode — straight through, no switch needed.'; return }
+
+  if (!S.can_tutor) {
+    page = 'Dashboard'; render()
+    hint.innerHTML = '<strong style="color:#b91c1c">Bounced.</strong> can_tutor is false, so there is nothing to switch into — the guard redirects. This account genuinely has no tutor side.'
+    return
+  }
+
+  prevMode = S.mode; prevPage = page
+  S.mode = 'tutor'; page = 'Check in'
+  render()
+  showToast('Switched to Tutor mode', true)
+  hint.innerHTML = '<strong style="color:#047857">Auto-switched.</strong> can_tutor was true, so the guard switched and continued instead of bouncing. No missed check-in, no strike.'
+}
+
+function undoSwitch() {
+  if (!prevMode) return
+  S.mode = prevMode; page = prevPage
+  prevMode = prevPage = null
+  hideToast(); render()
+  document.getElementById('notifHint').innerHTML = 'Undone — mode <em>and</em> route restored.'
+}
+
+loadPersona('dual')
+</script>

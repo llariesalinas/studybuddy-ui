@@ -80,6 +80,10 @@ export const PARTNER_INSTITUTIONS_CACHE_TTL_MS = 15 * 60 * 1000
 export const PAYMENT_METHODS_CACHE_TTL_MS = 10 * 60 * 1000
 export const RECEIVING_INSTITUTIONS_CACHE_TTL_MS = 12 * 60 * 60 * 1000
 
+// How long the dual-role auto-switch toast stays up. Longer than a normal toast because it
+// carries an Undo the user has to notice and reach.
+export const MODE_SWITCH_TOAST_MS = 8000
+
 // UI animations
 export const CHAT_SHAKE_MS = 420
 export const CHAT_POP_MS   = 600

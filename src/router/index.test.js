@@ -20,7 +20,11 @@ vi.mock('@/stores/profile', () => ({
     profileCompleted: true,
     tutorOnboardingComplete: true,
     tutorSubjectsCompleted: true,
+    tutorRateSet: true,
     commissionTermsAccepted: true,
+    // A fully onboarded tutee: provisioned for Tutee mode, not for Tutor mode.
+    canTutee: true,
+    canTutor: false,
   }),
 }))
 

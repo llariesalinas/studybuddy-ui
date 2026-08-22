@@ -13,12 +13,19 @@ from .cbf import (
     get_student_subject_codes,
     resolve_target_categories,
 )
+from .weights import DEFAULT_WEIGHTS, GROUP_CBF, GROUP_HYBRID, default_weights, load_weights
 from .workload import get_upcoming_week_loads
 
 logger = logging.getLogger(__name__)
 
-CBF_WEIGHT = 0.7
-CF_WEIGHT = 0.3
+# Shipped defaults, aliased from weights.py so there is one source of truth.
+# Admin overrides arrive per-call via the `weights` argument; see
+# docs/plans/2026-08-19-dynamic-algorithm-weights.md.
+CBF_WEIGHT = DEFAULT_WEIGHTS[GROUP_HYBRID]['cbf']
+CF_WEIGHT = DEFAULT_WEIGHTS[GROUP_HYBRID]['cf']
+
+# Not admin-editable: this is the rating scale itself, and changing it would
+# rescale every CF score rather than reweight it.
 CF_MAX_RATING = 5
 
 # Two hybrid scores are "the same" when they agree to this many decimals — the same
@@ -38,11 +45,18 @@ def hybrid_prediction(
     peer_neighbors=None,
     global_neighbors=None,
     target_categories=None,
+    weights=None,
 ):
     """target_categories should be precomputed once via
     cbf.resolve_target_categories() by callers that loop over many tutors for
     the same student/subject (see recommend_tutors_hybrid) so this isn't a
-    per-tutor query; left as None it is resolved here instead."""
+    per-tutor query; left as None it is resolved here instead.
+
+    weights follows the same contract: load_weights() hits the database, so
+    callers looping over tutors must load once and pass the result in."""
+    if weights is None:
+        weights = default_weights()
+
     if target_categories is None:
         target_categories = resolve_target_categories(
             requested_subject, student_subjects or get_student_subject_codes(student_profile)
@@ -62,6 +76,7 @@ def hybrid_prediction(
         student_subjects=student_subjects,
         tutor_subjects=tutor.tutorsubjects_set.all(),
         target_categories=target_categories,
+        weights=weights[GROUP_CBF],
     )
 
     tutor_id = tutor.profile_id
@@ -77,7 +92,8 @@ def hybrid_prediction(
     if cf_score is None:
         cf_score = 0
 
-    hybrid_score = (CBF_WEIGHT * cbf_score) + (CF_WEIGHT * (cf_score / CF_MAX_RATING))
+    blend = weights[GROUP_HYBRID]
+    hybrid_score = (blend['cbf'] * cbf_score) + (blend['cf'] * (cf_score / CF_MAX_RATING))
 
     logger.debug(
         "Hybrid score for tutor %s: CBF %.3f, CF %.3f, hybrid %.3f",
@@ -99,10 +115,15 @@ def hybrid_prediction_breakdown(
     peer_neighbors=None,
     global_neighbors=None,
     target_categories=None,
+    weights=None,
 ):
     """Same computation as hybrid_prediction, but returns the full CBF/CF breakdown
     alongside the hybrid score. Used by the algorithm demo tool (recommender/demo.py).
-    See hybrid_prediction for the target_categories precompute-once contract."""
+    See hybrid_prediction for the target_categories and weights
+    precompute-once contract."""
+    if weights is None:
+        weights = default_weights()
+
     if target_categories is None:
         target_categories = resolve_target_categories(
             requested_subject, student_subjects or get_student_subject_codes(student_profile)
@@ -122,6 +143,7 @@ def hybrid_prediction_breakdown(
         student_subjects=student_subjects,
         tutor_subjects=tutor.tutorsubjects_set.all(),
         target_categories=target_categories,
+        weights=weights[GROUP_CBF],
     )
 
     tutor_id = tutor.profile_id
@@ -135,7 +157,10 @@ def hybrid_prediction_breakdown(
     )
 
     cf_score_for_hybrid = cf["score"] if cf["score"] is not None else 0
-    hybrid_score = (CBF_WEIGHT * cbf["score"]) + (CF_WEIGHT * (cf_score_for_hybrid / CF_MAX_RATING))
+    blend = weights[GROUP_HYBRID]
+    hybrid_score = (blend['cbf'] * cbf["score"]) + (
+        blend['cf'] * (cf_score_for_hybrid / CF_MAX_RATING)
+    )
 
     return {
         "hybrid_score": hybrid_score,
@@ -162,10 +187,17 @@ def normalize_tutor_queryset(candidate_qs=None):
     return candidate_qs
 
 
-def recommend_tutors_hybrid(ratings, student_profile, requested_subject, candidate_qs=None):
+def recommend_tutors_hybrid(
+    ratings, student_profile, requested_subject, candidate_qs=None, weights=None
+):
     tutors = normalize_tutor_queryset(candidate_qs)
     student_subjects = get_student_subject_codes(student_profile)
     target_categories = resolve_target_categories(requested_subject, student_subjects)
+
+    # Loaded once here, not inside the loop below: load_weights() is a query, and
+    # this function scores every candidate tutor.
+    if weights is None:
+        weights = load_weights()
 
     student_id = student_profile.id
     peer_ids = get_peer_student_ids(ratings, student_profile) if student_id in ratings else []
@@ -184,6 +216,7 @@ def recommend_tutors_hybrid(ratings, student_profile, requested_subject, candida
             peer_neighbors=peer_neighbors,
             global_neighbors=global_neighbors,
             target_categories=target_categories,
+            weights=weights,
         )
 
         recommendations.append({

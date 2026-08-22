@@ -32,7 +32,8 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.throttling import AnonRateThrottle
 from django.utils import timezone
-from rest_framework_simplejwt.tokens import RefreshToken, TokenError
+from rest_framework_simplejwt.tokens import AccessToken, RefreshToken, TokenError
+from rest_framework_simplejwt.views import TokenRefreshView
 from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
 
 
@@ -71,6 +72,11 @@ from .subject_recognition import (
 from django.core.cache import cache
 from . import _verification_dev
 from .models import Booking, Course, EmailOTPChallenge, Notification, PartnerInstitution, Payment, PaymentMethod, Preference, Rating, SessionCheckIn, Subjects, SupportTicket, Tutor, TutorApplication, TutorAvailability, TutorAvailabilityOverride, TutorDocumentRenewalReview, TutorSubjects, Wallet, PlatformActivity, Transaction, TuteeApplication, TuteeDocumentRenewalReview
+from .trusted_devices import (
+    consume_trusted_device,
+    issue_trusted_device,
+    revoke_trusted_devices,
+)
 from .serializers import (
     NotificationSerializer,
     SubjectSerializer,
@@ -109,6 +115,7 @@ from .models import (
     TutorSubjects,
     ACTIVE_BOOKING_STATUSES,
     GRACE_CUTOFF_HOURS,
+    resolve_category,
     MIN_HOURLY_RATE,
     MAX_HOURLY_RATE,
 )
@@ -1413,6 +1420,10 @@ def profile_status(request):
     # Default True (never gated) for non-Tutors and Tutors with no Tutor row yet — the commission
     # gate only applies once a Tutor record exists to accept terms on. See ADR-0010.
     commission_terms_accepted = True
+    # Whether the hourly rate is set. Separate from profile_completed (which covers the SHARED
+    # identity step) because a tutee switching into Tutor mode has completed that shared step but
+    # has never seen the rate step -- without this the onboarding router would skip them past it.
+    tutor_rate_set = False
     if profile.role == 'Tutor':
         tutor = getattr(profile, 'tutor', None)
         if tutor is not None:
@@ -1420,20 +1431,146 @@ def profile_status(request):
             wallet_negative = bool(wallet and wallet.balance < 0)
             tutor_subject_count = TutorSubjects.objects.filter(tutor=tutor).count()
             commission_terms_accepted = tutor.commission_terms_accepted_at is not None
+            tutor_rate_set = tutor.hourly_rate is not None
 
     return Response({
         "profile_completed": profile.profile_completed,
         "role": profile.role,
+        # Modes this account is provisioned for. The router uses these to decide between
+        # auto-switching into the other mode and bouncing to the "no {role} account" modal.
+        "can_tutor": profile.can_tutor,
+        "can_tutee": profile.can_tutee,
         "wallet_negative": wallet_negative,
         "tutee_verification_enforced": tutee_verification_enforced(),
         **get_tutor_onboarding_context(profile),
         "tutor_subject_count": tutor_subject_count,
         "tutor_subjects_completed": tutor_subject_count > 0,
+        "tutor_rate_set": tutor_rate_set,
         "commission_terms_accepted": commission_terms_accepted,
         # Role-agnostic: the tutee cancel modal consumes this today, the tutor UI can later.
         "late_cancellation_strikes": get_strike_snapshot(profile),
         **document_context
     })
+
+class ModeAwareTokenRefreshView(TokenRefreshView):
+    """Stock refresh, plus the profile's current active mode.
+
+    Mode is persisted on UserProfile, so it is account-global: switching on a phone changes the
+    mode a laptop is in. The laptop finds out here, on its next scheduled refresh (worst case
+    ACCESS_REFRESH_INTERVAL_MS, 4 minutes), instead of silently rendering the wrong sidebar.
+    """
+
+    def post(self, request, *args, **kwargs):
+        response = super().post(request, *args, **kwargs)
+
+        if response.status_code != status.HTTP_200_OK:
+            return response
+
+        # Read the user from the freshly issued ACCESS token, not the incoming refresh token:
+        # ROTATE_REFRESH_TOKENS + BLACKLIST_AFTER_ROTATION means the one we were handed is already
+        # blacklisted by the time super() returns.
+        try:
+            user_id = AccessToken(response.data.get('access')).get('user_id')
+        except TokenError:
+            return response
+
+        profile = UserProfile.objects.filter(user_id=user_id).first()
+
+        if profile is not None:
+            response.data['role'] = profile.role
+            response.data['can_tutor'] = profile.can_tutor
+            response.data['can_tutee'] = profile.can_tutee
+
+        return response
+
+
+SWITCHABLE_MODES = ('Tutor', 'Tutee')
+
+
+def carry_over_verification(profile, target_mode):
+    """Give `target_mode` an already-approved application when the other mode has one.
+
+    TutorApplication and TuteeApplication collect the SAME two documents (school_id,
+    enrollment_proof) and answer the same question -- "is this a real enrolled CPU student" --
+    which is role-independent. Asking a dual-role user to upload them twice would ask it twice and
+    double the SuperAdmin review queue, so the approved application is copied across instead.
+    See docs/plans/2026-08-19-dual-role-mode-switch.md.
+
+    No-op when the target already has an application or the source isn't approved.
+    """
+    if target_mode == 'Tutor':
+        target_model, source = TutorApplication, getattr(profile, 'tutee_application', None)
+    else:
+        target_model, source = TuteeApplication, getattr(profile, 'tutor_application', None)
+
+    if source is None or source.application_status != 'approved':
+        return None
+
+    if target_model.objects.filter(profile=profile).exists():
+        return None
+
+    # `.name` is the storage path, so both applications reference the same uploaded files rather
+    # than duplicating them in media. Both then share a reviewed_at, so their 90-day renewal
+    # cadences fall due together -- correct, since they are literally the same two documents.
+    return target_model.objects.create(
+        profile=profile,
+        school_id=source.school_id.name,
+        enrollment_proof=source.enrollment_proof.name,
+        application_status='approved',
+        reviewed_at=source.reviewed_at,
+        reviewed_by=source.reviewed_by,
+    )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def switch_mode(request):
+    """Switch the account's ACTIVE MODE between Tutor and Tutee.
+
+    No token is reissued: `role` is not a JWT claim (see build_login_response_payload) and every
+    backend check reads request.user.userprofile.role fresh from the DB, so the existing
+    access/refresh pair stays valid.
+
+    Switching into a mode the account isn't provisioned for is deliberately allowed -- that is how
+    a user reaches that mode's onboarding. Whether to offer the switch at all is the client's
+    decision, driven by can_tutor/can_tutee.
+    """
+    profile = get_login_profile_for_user(request.user)
+
+    if profile is None:
+        return Response(
+            {"error": "User profile not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    target_mode = str(request.data.get('mode') or '').strip().capitalize()
+
+    if target_mode not in SWITCHABLE_MODES:
+        return Response(
+            {"error": f"Mode must be one of: {', '.join(SWITCHABLE_MODES)}."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # SuperAdmins are excluded outright rather than merely hidden in the UI:
+    # get_login_profile_for_user force-resets staff back to SuperAdmin on every login, so a
+    # switched admin would be silently flipped back mid-session.
+    if profile.role == 'SuperAdmin' or request.user.is_staff or request.user.is_superuser:
+        return Response(
+            {"error": "Admin accounts cannot switch modes."},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    if profile.role != target_mode:
+        profile.role = target_mode
+        profile.save(update_fields=['role', 'updated_at'])
+        carry_over_verification(profile, target_mode)
+
+    return Response({
+        "role": profile.role,
+        "can_tutor": profile.can_tutor,
+        "can_tutee": profile.can_tutee,
+    })
+
 
 @api_view(['POST'])
 @authentication_classes([])
@@ -1466,6 +1603,8 @@ def login_view(request):
         )
 
     if profile.is_suspended:
+        # Drop any standing device trust so re-activation still costs a fresh email challenge.
+        revoke_trusted_devices(user)
         return Response(
             {"error": "Your account has been suspended. Please contact administration for more details."},
             status=status.HTTP_403_FORBIDDEN
@@ -1506,6 +1645,11 @@ def login_view(request):
             profile.save(update_fields=['institution', 'updated_at'])
 
     if settings.LOGIN_OTP_DISABLED:
+        return Response(build_login_response_payload(user, profile))
+
+    # A browser that already cleared the OTP skips it until its trust lapses, so the email
+    # challenge is a first-time-on-this-device step rather than a per-login one.
+    if consume_trusted_device(user, request.data.get("device_token"), request):
         return Response(build_login_response_payload(user, profile))
 
     try:
@@ -1591,6 +1735,9 @@ def password_reset_confirm(request):
     user.set_password(password)
     user.save(update_fields=["password"])
     blacklist_user_refresh_tokens(user)
+    # A password reset is the recovery path for a compromised account, so it has to invalidate
+    # standing device trusts too -- otherwise the attacker's browser keeps skipping the OTP.
+    revoke_trusted_devices(user)
 
     try:
         mailer.enqueue_password_changed(user)
@@ -1649,6 +1796,7 @@ def login_verify_otp(request):
         )
 
     if profile.is_suspended:
+        revoke_trusted_devices(challenge.user)
         return Response(
             {"error": "Your account has been suspended. Please contact administration for more details."},
             status=status.HTTP_403_FORBIDDEN
@@ -1657,7 +1805,13 @@ def login_verify_otp(request):
     challenge.consumed_at = timezone.now()
     challenge.save(update_fields=['consumed_at'])
 
-    return Response(build_login_response_payload(challenge.user, profile))
+    # Clearing the OTP is what enrols this browser; the token rides back with the JWTs so the
+    # next login on it can skip the challenge. Added here rather than in
+    # build_login_response_payload, which other callers reuse without enrolling anything.
+    payload = build_login_response_payload(challenge.user, profile)
+    payload["device_token"] = issue_trusted_device(challenge.user, request)
+
+    return Response(payload)
 
 
 @api_view(['POST'])
@@ -1730,8 +1884,17 @@ def login_resend_otp(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def logout_view(request):
-    """Blacklist the supplied refresh token so it can no longer be used."""
+    """Blacklist the supplied refresh token so it can no longer be used.
+
+    An optional device_token additionally drops this browser's OTP trust. The client only sends
+    it for a deliberate sign-out -- an idle timeout or a failed token refresh ends the session
+    but leaves the device trusted, or the user would face a fresh OTP every idle ten minutes.
+    """
     refresh = request.data.get("refresh")
+    device_token = request.data.get("device_token")
+    if device_token:
+        revoke_trusted_devices(request.user, device_token)
+
     if not refresh:
         return Response(
             {"error": "Refresh token required."},
@@ -1941,6 +2104,9 @@ class SearchTutorsView(APIView):
             )
         tutors = Tutor.objects.filter(
             tutorsubjects__subject__subject_code=subject_code
+        ).exclude(
+            # A dual-role account must never find itself in tutor search.
+            profile_id=student_profile.id
         ).select_related('profile').distinct()
 
         serializer = TutorSearchSerializer(tutors, many=True)
@@ -1954,7 +2120,7 @@ class SubjectListView(ListAPIView):
         search_query = self.request.query_params.get('search', '').strip()
         user = self.request.user
         if not user.is_authenticated or not hasattr(user, 'userprofile'):
-            queryset = Subjects.objects.filter(status='approved')
+            queryset = Subjects.objects.filter(status='approved').select_related('category')
             if search_query:
                 queryset = queryset.filter(
                     Q(subject_name__icontains=search_query)
@@ -2509,6 +2675,19 @@ def confirm_payment_and_book(request):
     method_id = request.data.get("payment_method")
     subject_code = request.data.get("subject")
     preferred_location = request.data.get('preferred_location', '').strip()
+
+    # A dual-role account must not book itself. Search already hides the requester from their own
+    # results, but per ADR-0008 the confirm-time server check is the authority and hiding is only
+    # the surface -- someone holding a stale tutor id could otherwise POST straight past it. This
+    # also keeps chat from ever creating a room whose two participants are the same person.
+    if str(tutor_id) == str(user_profile.id):
+        return Response(
+            {
+                "error": "You cannot book a session with yourself.",
+                "code": "self_booking",
+            },
+            status=400,
+        )
 
     if isinstance(slots, str):
         try:
@@ -3923,11 +4102,17 @@ def get_recommendation_candidate_tutors(
     requested_date=None,
     start_time=None,
     end_time=None,
+    exclude_profile_id=None,
 ):
     base_candidates = Tutor.objects.filter(
         tutorsubjects__subject__subject_code=subject,
         profile__tutor_application__application_status='approved',
     )
+
+    # A dual-role account must never match itself. Excluded as a queryset filter rather than a
+    # per-candidate check because recommend_tutors_hybrid scores every row this returns.
+    if exclude_profile_id is not None:
+        base_candidates = base_candidates.exclude(profile_id=exclude_profile_id)
     eligible_candidate_ids = []
     for candidate in base_candidates.distinct():
         wallet, _ = Wallet.objects.get_or_create(tutor=candidate)
@@ -4046,6 +4231,7 @@ def recommend_tutors_view(request):
         requested_date=requested_date,
         start_time=start_time,
         end_time=end_time,
+        exclude_profile_id=student_profile.id,
     )
 
     results = recommend_tutors_hybrid(
@@ -4270,7 +4456,9 @@ def get_tutor_subjects(request):
     profile = request.user.userprofile
     tutor = Tutor.objects.get(profile=profile)
 
-    subjects = TutorSubjects.objects.filter(tutor=tutor).select_related('subject')
+    subjects = TutorSubjects.objects.filter(tutor=tutor).select_related(
+        'subject', 'subject__category',
+    )
     recognized_codes = recognized_subject_codes_for_profile(profile)
 
     data = [
@@ -4278,7 +4466,7 @@ def get_tutor_subjects(request):
             "subject_code": ts.subject.subject_code,
             "subject_name": ts.subject.subject_name,
             "department": ts.subject.department,
-            "category": ts.subject.category,
+            "category": ts.subject.category.name,
             "description": ts.description or '',
             "status": ts.subject.status,
             "is_recognized": ts.subject.subject_code in recognized_codes,
@@ -4330,17 +4518,22 @@ def propose_tutor_subject(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    # Category is intentionally not restricted to subject_taxonomy.CATEGORIES: it's a free-text
-    # field (see SubjectSerializer's comment), and admins can approve categories beyond the
-    # curated 6 via the review panel -- a tutor re-proposing under one of those approved
-    # categories must not be rejected here. See docs/plans/2026-08-12-admin-review-panel-
-    # category-keywords-backdrop.md.
+    # Categories are admin-owned: minting one happens in the subject catalog or the tutor-
+    # application review panel, never here. The tutor-side picker only offers categories that
+    # already exist, so an unrecognized name means a stale or hand-rolled client, not a
+    # legitimate new category. See docs/plans/2026-08-21-subject-category-storage.md.
+    subject_category = resolve_category(category)
+    if subject_category is None:
+        return Response(
+            {"error": "That category is not recognized."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
     application = TutorApplication.objects.filter(profile=profile).first()
     subject = Subjects.objects.create(
         subject_code=generate_proposed_subject_code(subject_name),
         subject_name=subject_name,
-        category=category,
+        category=subject_category,
         keywords=keywords,
         status='pending',
         proposed_by_tutor=tutor,
@@ -4357,7 +4550,7 @@ def propose_tutor_subject(request):
         {
             "subject_code": subject.subject_code,
             "subject_name": subject.subject_name,
-            "category": subject.category,
+            "category": subject.category.name,
             "keywords": subject.keywords,
             "description": description,
             "status": subject.status,

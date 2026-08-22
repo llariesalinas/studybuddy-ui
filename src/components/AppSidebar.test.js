@@ -15,6 +15,7 @@ const mountSidebar = () =>
       stubs: {
         RouterLink: { template: '<a><slot /></a>' },
         SbThemeToggle: true,
+        SbModeSwitcher: true,
       },
     },
   })

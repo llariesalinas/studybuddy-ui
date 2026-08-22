@@ -1,8 +1,44 @@
 <template>
   <TutorOnboardingShell :current-step="3">
     <h3>Last step: verification</h3>
-    <p class="muted">Upload your documents now, or finish later.</p>
+    <p class="muted">
+      {{ alreadyVerified ? 'Nothing to upload -- your documents are already verified.' : 'Upload your documents now, or finish later.' }}
+    </p>
 
+    <!-- Verification carries across roles: TutorApplication and TuteeApplication collect the same
+         two documents and answer the same role-independent question, so an approved application
+         on the other role is copied over rather than re-collected. -->
+    <div v-if="alreadyVerified" class="why-strip">
+      <i class="bi bi-patch-check" aria-hidden="true"></i>
+      <span
+        ><strong>Your documents are already verified.</strong> We carried over the School ID and
+        enrollment proof you submitted for your {{ otherRoleLabel }} account, so there is nothing
+        to upload here.</span
+      >
+    </div>
+
+    <div v-if="alreadyVerified" class="stack-actions">
+      <button
+        type="button"
+        class="btn-primary-pill sb-btn"
+        :disabled="isSubmitting"
+        @click="finishVerified"
+      >
+        Finish Onboarding
+      </button>
+      <div class="step-nav-row">
+        <button
+          type="button"
+          class="btn-outline-pill sb-btn"
+          :disabled="isSubmitting"
+          @click="goBackToSubjects"
+        >
+          &larr; Back
+        </button>
+      </div>
+    </div>
+
+    <template v-else>
     <div class="why-strip">
       <i class="bi bi-info-circle" aria-hidden="true"></i>
       <span
@@ -66,11 +102,12 @@
         </button>
       </div>
     </div>
+    </template>
   </TutorOnboardingShell>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import TutorOnboardingShell from '@/components/TutorOnboardingShell.vue'
 import { useProfileStore } from '@/stores/profile'
@@ -84,6 +121,11 @@ const toastStore = useToastStore()
 const schoolId = ref(null)
 const enrollmentProof = ref(null)
 const isSubmitting = ref(false)
+
+// An approved application already exists for this role -- it was carried over from the other role
+// on the mode switch, so this step has nothing left to collect.
+const alreadyVerified = computed(() => profileStore.applicationStatus === 'approved')
+const otherRoleLabel = 'Tutee'
 
 const handleFileChange = (event, type) => {
   const file = event.target.files[0]
@@ -104,6 +146,16 @@ const finishOnboarding = async (payload) => {
   profileStore.tutorOnboardingSkippedAt = payload.tutor_onboarding_skipped_at || null
   profileStore.tutorOnboardingComplete = true
   await router.push({ name: 'tch-dashboard' })
+}
+
+const finishVerified = async () => {
+  isSubmitting.value = true
+  try {
+    // No submission: the approved application is already on file. Just release the onboarding gate.
+    await finishOnboarding({ application_status: profileStore.applicationStatus })
+  } finally {
+    isSubmitting.value = false
+  }
 }
 
 const submitVerification = async () => {

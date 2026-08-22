@@ -1,0 +1,203 @@
+<h2>The mode-mismatch problem</h2>
+<p class="subtitle">Same user, same 12 minutes. Left is what today's router guard does once dual-role ships. Right is auto-switch-with-toast.</p>
+
+<div class="section" style="background:rgba(127,127,127,.08);border-radius:10px;padding:14px 18px;margin-bottom:22px">
+  <div class="label">The person</div>
+  <p style="margin:6px 0 0">
+    <strong>Maria</strong> is provisioned in both modes — <code>can_tutor = true</code>, <code>can_tutee = true</code>.
+    She is <strong>currently in Tutee mode</strong> because this morning she was browsing tutors for her own Statistics class.
+    She also tutors Calculus, and she has a <strong>session with Jomar at 2:00 PM</strong> that she has forgotten about.
+  </p>
+</div>
+
+<div class="split">
+
+  <!-- ============ LEFT: BOUNCE ============ -->
+  <div class="mockup">
+    <div class="mockup-header" style="background:#7f1d1d;color:#fff">Today's behavior — guard bounces her</div>
+    <div class="mockup-body" style="padding:0">
+
+      <div style="padding:14px 16px;border-bottom:1px solid rgba(127,127,127,.25)">
+        <div class="label" style="color:#b91c1c">1:45 PM &mdash; notification arrives</div>
+        <div style="margin-top:8px;border:1px solid rgba(127,127,127,.3);border-radius:10px;padding:10px 12px;background:rgba(127,127,127,.06)">
+          <div style="font-size:12px;opacity:.65">StudyBuddy</div>
+          <div style="font-weight:650;margin-top:2px">Your session with Jomar starts in 15 minutes</div>
+          <div style="font-size:12px;opacity:.65;margin-top:4px">Tap to check in &rsaquo;</div>
+        </div>
+        <p style="font-size:12.5px;opacity:.7;margin:8px 0 0">
+          <code>Notification</code> has no role field, so it can't know she's in the wrong mode.
+        </p>
+      </div>
+
+      <div style="padding:14px 16px;border-bottom:1px solid rgba(127,127,127,.25)">
+        <div class="label" style="color:#b91c1c">1:45 PM &mdash; she taps it</div>
+        <div style="margin-top:8px;display:flex;gap:0;border:1px solid rgba(127,127,127,.3);border-radius:10px;overflow:hidden;min-height:96px">
+          <div class="mock-sidebar" style="width:96px;font-size:11px;padding:8px;line-height:1.9">
+            <div style="opacity:.55">TUTEE</div>
+            Dashboard<br>Find Tutors<br>My Bookings<br>Wallet
+          </div>
+          <div class="mock-content" style="flex:1;display:flex;align-items:center;justify-content:center;text-align:center;font-size:12.5px;padding:10px">
+            Route <code>/session/482/checkin</code><br>
+            <span style="opacity:.6">meta.role: 'Tutor'</span>
+          </div>
+        </div>
+        <p style="font-size:12.5px;opacity:.7;margin:8px 0 0">
+          Guard reads <code>role === 'Tutee'</code>. Mismatch.
+        </p>
+      </div>
+
+      <div style="padding:14px 16px;border-bottom:1px solid rgba(127,127,127,.25)">
+        <div class="label" style="color:#b91c1c">1:45 PM &mdash; redirected</div>
+        <div style="margin-top:8px;border:2px solid #b91c1c;border-radius:10px;padding:14px 12px;text-align:center;background:rgba(185,28,28,.07)">
+          <div style="font-weight:700">Tutee Dashboard</div>
+          <div style="font-size:12.5px;opacity:.75;margin-top:6px">
+            No error. No explanation.<br>The check-in screen simply never appeared.
+          </div>
+        </div>
+        <p style="font-size:12.5px;opacity:.7;margin:8px 0 0">
+          She assumes the notification was stale and puts her phone down.
+        </p>
+      </div>
+
+      <div style="padding:14px 16px;border-bottom:1px solid rgba(127,127,127,.25)">
+        <div class="label" style="color:#b91c1c">2:00 PM &mdash; no check-in</div>
+        <div style="margin-top:8px;border:1px solid rgba(127,127,127,.3);border-radius:10px;padding:10px 12px">
+          <div style="font-size:12.5px">Jomar is waiting. <code>SessionCheckIn</code> never created.</div>
+        </div>
+      </div>
+
+      <div style="padding:14px 16px;background:rgba(185,28,28,.09)">
+        <div class="label" style="color:#b91c1c">The cost</div>
+        <div style="margin-top:8px;font-size:13px;line-height:1.75">
+          Session goes no-show &rarr; <strong>Support Ticket</strong> auto-opens &rarr;
+          admin rules it a <strong>Counted Strike</strong> &rarr;
+          <strong style="color:#b91c1c">&#8369;50 deducted from her tutor wallet</strong>,
+          and 1 of 3 strikes this month toward booking suspension.
+        </div>
+        <p style="font-size:12.5px;opacity:.75;margin:10px 0 0">
+          A cosmetic sidebar toggle cost her real money. She never did anything wrong.
+        </p>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ============ RIGHT: AUTO-SWITCH ============ -->
+  <div class="mockup">
+    <div class="mockup-header" style="background:#065f46;color:#fff">Proposed — auto-switch with a toast</div>
+    <div class="mockup-body" style="padding:0">
+
+      <div style="padding:14px 16px;border-bottom:1px solid rgba(127,127,127,.25)">
+        <div class="label" style="color:#047857">1:45 PM &mdash; notification arrives</div>
+        <div style="margin-top:8px;border:1px solid rgba(127,127,127,.3);border-radius:10px;padding:10px 12px;background:rgba(127,127,127,.06)">
+          <div style="font-size:12px;opacity:.65">StudyBuddy</div>
+          <div style="font-weight:650;margin-top:2px">Your session with Jomar starts in 15 minutes</div>
+          <div style="font-size:12px;opacity:.65;margin-top:4px">Tap to check in &rsaquo;</div>
+        </div>
+        <p style="font-size:12.5px;opacity:.7;margin:8px 0 0">
+          Identical. Nothing changes about how notifications are produced.
+        </p>
+      </div>
+
+      <div style="padding:14px 16px;border-bottom:1px solid rgba(127,127,127,.25)">
+        <div class="label" style="color:#047857">1:45 PM &mdash; guard checks capability, not just mode</div>
+        <div style="margin-top:8px;border:1px solid rgba(127,127,127,.3);border-radius:10px;padding:12px;font-size:12.5px;line-height:1.9;background:rgba(127,127,127,.06)">
+          <div>route wants <code>'Tutor'</code>, mode is <code>'Tutee'</code></div>
+          <div><code>can_tutor</code> &rarr; <strong style="color:#047857">true</strong></div>
+          <div style="opacity:.8">&rarr; she is entitled to this page, so don't ask &mdash; switch</div>
+        </div>
+        <p style="font-size:12.5px;opacity:.7;margin:8px 0 0">
+          <code>POST /switch-mode/</code> sets <code>role = 'Tutor'</code>. Token stays valid.
+        </p>
+      </div>
+
+      <div style="padding:14px 16px;border-bottom:1px solid rgba(127,127,127,.25)">
+        <div class="label" style="color:#047857">1:45 PM &mdash; she lands on check-in</div>
+        <div style="margin-top:8px;display:flex;gap:0;border:1px solid rgba(127,127,127,.3);border-radius:10px;overflow:hidden;min-height:96px">
+          <div class="mock-sidebar" style="width:96px;font-size:11px;padding:8px;line-height:1.9">
+            <div style="opacity:.55">TUTOR</div>
+            Dashboard<br>Schedule<br>Sessions<br>Wallet
+          </div>
+          <div class="mock-content" style="flex:1;display:flex;align-items:center;justify-content:center;text-align:center;font-size:12.5px;padding:10px">
+            <strong>Check in &mdash; Jomar</strong><br>
+            <span style="opacity:.6">Calculus &middot; 2:00 PM</span>
+          </div>
+        </div>
+        <div style="margin-top:10px;background:#134e4a;color:#fff;border-radius:8px;padding:9px 12px;font-size:12.5px;display:flex;justify-content:space-between;align-items:center">
+          <span>Switched to Tutor mode</span>
+          <span style="opacity:.75">Undo</span>
+        </div>
+        <p style="font-size:12.5px;opacity:.7;margin:8px 0 0">
+          The toast is what makes the sidebar change legible instead of eerie.
+        </p>
+      </div>
+
+      <div style="padding:14px 16px;border-bottom:1px solid rgba(127,127,127,.25)">
+        <div class="label" style="color:#047857">2:00 PM &mdash; checked in</div>
+        <div style="margin-top:8px;border:1px solid rgba(127,127,127,.3);border-radius:10px;padding:10px 12px">
+          <div style="font-size:12.5px">Session runs. <code>SessionCheckIn</code> created on time.</div>
+        </div>
+      </div>
+
+      <div style="padding:14px 16px;background:rgba(4,120,87,.09)">
+        <div class="label" style="color:#047857">The cost</div>
+        <div style="margin-top:8px;font-size:13px;line-height:1.75">
+          No ticket. No strike. <strong>&#8369;0</strong>.<br>
+          One extra line of guard logic and one toast.
+        </div>
+        <p style="font-size:12.5px;opacity:.75;margin:10px 0 0">
+          The mode switcher is now for <em>deliberate</em> switching only. Deep links handle themselves.
+        </p>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<div class="section" style="margin-top:26px">
+  <h3>Why this generalises beyond check-in</h3>
+  <p class="subtitle" style="margin-bottom:12px">The same bounce happens anywhere a link crosses modes. Check-in is just the one with a price tag.</p>
+  <div class="pros-cons">
+    <div class="cons">
+      <h4>Bounces today (all silent)</h4>
+      <ul>
+        <li>Session check-in &rarr; <strong>&#8369;50 strike</strong></li>
+        <li>"Jomar sent you a message" &rarr; tutor chat room</li>
+        <li>"Your payout was released" &rarr; tutor wallet</li>
+        <li>"Your documents expire in 7 days" &rarr; tutor renewal</li>
+        <li>"New booking confirmed" &rarr; tutor schedule</li>
+      </ul>
+    </div>
+    <div class="pros">
+      <h4>What auto-switch does not change</h4>
+      <ul>
+        <li><code>can_tutor = false</code> still bounces &mdash; that's where your "You don't have a Tutor account" modal fires</li>
+        <li>SuperAdmin never switches</li>
+        <li>Backend stays authoritative; mode is never a permission</li>
+        <li>Deliberate switching still lives in the sidebar</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:20px">
+  <h3>One thing this raises</h3>
+  <p class="subtitle">Should the toast carry an <strong>Undo</strong>, as drawn above?</p>
+  <div class="options">
+    <div class="option" data-choice="undo" onclick="toggleSelect(this)">
+      <div class="letter">A</div>
+      <div class="content">
+        <h3>Toast with Undo</h3>
+        <p>Recoverable if she only wanted a peek and wants her tutee browsing back. Costs a second switch call.</p>
+      </div>
+    </div>
+    <div class="option" data-choice="plain" onclick="toggleSelect(this)">
+      <div class="letter">B</div>
+      <div class="content">
+        <h3>Plain toast, no Undo</h3>
+        <p>Simpler. She switches back from the sidebar like any other deliberate switch.</p>
+      </div>
+    </div>
+  </div>
+</div>

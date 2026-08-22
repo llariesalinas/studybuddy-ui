@@ -49,3 +49,12 @@ dashboard recommendations order identically, and the dashboard's 600-second cach
 ordering for up to ten minutes. The tie is surfaced in the algorithm demo tool but never to tutees
 — a visible "fewer bookings this week" reads as unpopular rather than available, and would leak
 one tutor's booking volume onto another's search result.
+
+**Addendum, 2026-08-19.** The recommender's weights became admin-editable
+(`docs/plans/2026-08-19-dynamic-algorithm-weights.md`), and the two knobs this ADR relies on —
+`HYBRID_SCORE_PRECISION` and `UPCOMING_WEEK_DAYS` — were deliberately left in code rather than
+exposed alongside them. They are not weights: precision defines when two scores count as tied at
+all, and the seven-day window defines what "this week" means. Both are reasoned about here, so
+moving them into a settings screen would put the value somewhere an admin could change without
+encountering the reasoning. The weights carry no comparable argument — which is precisely why they
+became editable and these did not.

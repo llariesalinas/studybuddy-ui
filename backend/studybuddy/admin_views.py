@@ -18,23 +18,31 @@ from django.utils.dateparse import parse_date
 from django.utils.timesince import timesince
 from datetime import timedelta
 from .models import (
+    AlgorithmWeight,
     InstitutionRequest,
     UserProfile, Tutor, Booking, WithdrawalRequest,
     PartnerInstitution, Wallet, Transaction, PlatformActivity,
     TutorApplication, TutorDocumentRenewalReview,
     TuteeApplication, TuteeDocumentRenewalReview, Payment,
-    TutorSubjects, TutorAvailability, Rating, Subjects, SupportTicket,
-    TUTOR_ACCEPTED_SESSION_LOAD_STATUSES
+    TutorSubjects, TutorAvailability, Rating, Subjects, SubjectCategory, SupportTicket,
+    TUTOR_ACCEPTED_SESSION_LOAD_STATUSES,
+    resolve_category,
+    resolve_or_create_category,
 )
+from .trusted_devices import revoke_trusted_devices
 from .serializers import (
     InstitutionRequestSerializer,
     AdminWithdrawalSerializer, AdminUserSerializer,
     PartnerInstitutionSerializer, PlatformActivitySerializer,
+    SubjectCategorySerializer,
     SubjectSerializer, TutorApplicationSerializer, TutorDocumentRenewalReviewSerializer,
     TuteeApplicationSerializer, TuteeDocumentRenewalReviewSerializer
 )
 from django.conf import settings
 from .permissions import IsSuperAdminUser
+from .recommender import weights as algorithm_weights
+from .recommender.dashboard import bump_dashboard_recs_cache_version
+from .recommender.demo import build_algorithm_demo_recommendation
 from .email_utils import (
     send_application_received_email,
     send_application_approved_email,
@@ -531,6 +539,14 @@ class AdminUserListView(APIView):
             profile.is_suspended = parse_bool(is_suspended)
             profile_update_fields.append('is_suspended')
             changed_fields.append('is_suspended')
+
+            if profile.is_suspended:
+                # Suspending has to end the OTP-free logins too, not just block the next one.
+                revoke_trusted_devices(profile.user)
+
+        if parse_bool(request.data.get('revoke_trusted_devices')):
+            revoke_trusted_devices(profile.user)
+            changed_fields.append('revoke_trusted_devices')
 
         if 'role' in request.data:
             role = request.data.get('role')
@@ -1117,9 +1133,9 @@ class AdminCourseCatalogView(APIView):
 
     def get(self, request):
         category = request.query_params.get('category')
-        subjects = Subjects.objects.all().order_by('subject_code')
+        subjects = Subjects.objects.select_related('category').order_by('subject_code')
         if category:
-            subjects = subjects.filter(category=category)
+            subjects = subjects.filter(category__name__iexact=category)
 
         serializer = SubjectSerializer(subjects, many=True)
         return Response(serializer.data)
@@ -1131,6 +1147,11 @@ class AdminCourseCatalogView(APIView):
         if not data.get('subject_code'):
             data['subject_code'] = slugify_subject_code(data.get('subject_name'))
         data.setdefault('department', '')
+        # The catalog screen is one of the two places a SuperAdmin may name a category that does
+        # not exist yet, so mint it before the serializer resolves the name.
+        category = resolve_or_create_category(data.get('category'))
+        if category is not None:
+            data['category'] = category.name
         serializer = SubjectSerializer(data=data)
         serializer.is_valid(raise_exception=True)
         subject = serializer.save()
@@ -1143,7 +1164,12 @@ class AdminCourseCatalogView(APIView):
 
     def patch(self, request, pk=None):
         subject = get_object_or_404(Subjects, pk=pk)
-        serializer = SubjectSerializer(subject, data=request.data, partial=True)
+        data = request.data.copy()
+        if data.get('category'):
+            category = resolve_or_create_category(data.get('category'))
+            if category is not None:
+                data['category'] = category.name
+        serializer = SubjectSerializer(subject, data=data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
@@ -1155,6 +1181,73 @@ class AdminCourseCatalogView(APIView):
         PlatformActivity.objects.create(
             activity_type='admin_action',
             message=f"Global subject removed: {subject_code}",
+            institution=request.user.userprofile.institution,
+        )
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class AdminSubjectCategoryView(APIView):
+    """CRUD for the subject category list.
+
+    Categories exist independently of subjects, so one can be created empty and survives its last
+    subject being removed -- see docs/plans/2026-08-21-subject-category-storage.md.
+    """
+
+    permission_classes = [permissions.IsAuthenticated, IsSuperAdminUser]
+
+    def get(self, request):
+        categories = SubjectCategory.objects.all()
+        return Response(SubjectCategorySerializer(categories, many=True).data)
+
+    def post(self, request):
+        serializer = SubjectCategorySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        name = str(serializer.validated_data.get('name') or '').strip()
+        if resolve_category(name) is not None:
+            return Response(
+                {"error": "A category with that name already exists."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        category = resolve_or_create_category(name)
+        PlatformActivity.objects.create(
+            activity_type='admin_action',
+            message=f"Subject category added: {category.name}",
+            institution=request.user.userprofile.institution,
+        )
+        return Response(
+            SubjectCategorySerializer(category).data, status=status.HTTP_201_CREATED,
+        )
+
+    def patch(self, request, pk=None):
+        category = get_object_or_404(SubjectCategory, pk=pk)
+        name = str(request.data.get('name') or '').strip()
+        clash = resolve_category(name)
+        if name and clash is not None and clash.pk != category.pk:
+            return Response(
+                {"error": "A category with that name already exists."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        serializer = SubjectCategorySerializer(category, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+    def delete(self, request, pk=None):
+        category = get_object_or_404(SubjectCategory, pk=pk)
+        if category.is_system:
+            return Response(
+                {"error": f"{category.name} cannot be deleted."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        # Subjects are not deleted with the category: Subjects.category falls back to
+        # Uncategorized, since TutorSubjects and Preference.subjects point at Subjects and a
+        # cascade would strip tutor expertise and tutee preferences.
+        moved = category.subjects.count()
+        name = category.name
+        category.delete()
+        PlatformActivity.objects.create(
+            activity_type='admin_action',
+            message=f"Subject category removed: {name} ({moved} subjects moved)",
             institution=request.user.userprofile.institution,
         )
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -1829,14 +1922,13 @@ class AdminTutorProposedSubjectDetailView(APIView):
                     {"error": "Subject name and category are required."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            # Category is intentionally not restricted to subject_taxonomy.CATEGORIES: the admin
-            # review panel lets a SuperAdmin add a category beyond the curated 6 (derived from
-            # whatever distinct categories already exist in the catalog), matching how
-            # Subjects.category itself is stored (free CharField, no choices constraint). Sub-Group
-            # follows the same rule — no enforced relationship to Category, just a free label.
+            # A SuperAdmin reviewing a proposal is allowed to mint a category that does not
+            # exist yet -- this panel and the subject catalog are the two places categories are
+            # created. Sub-Group stays free text: no enforced relationship to Category.
+            # See docs/plans/2026-08-21-subject-category-storage.md.
 
             subject.subject_name = subject_name
-            subject.category = category
+            subject.category = resolve_or_create_category(category)
             if keywords is not None:
                 subject.keywords = str(keywords).strip()
             update_fields = ['subject_name', 'category', 'keywords']
@@ -2079,3 +2171,223 @@ class AdminTuteeDocumentRenewalDetailView(APIView):
         enqueue_document_renewal_result_email(renewal.profile, 'tutee', new_status, rejection_reason)
 
         return Response({"message": f"Document renewal {new_status} successfully."})
+
+
+# ---------------------------------------------------------------------------
+# Algorithm weights (SuperAdmin)
+#
+# Deliberately NOT gated on ALGORITHM_DEMO_TOOLS_ENABLED: that flag is off by
+# default, and a control an admin cannot reach in a normal deployment would not
+# satisfy the requirement that the algorithm be tunable from the product. The
+# preview below IS gated, because it renders real tutee names and rating
+# history, which is the data that flag exists to protect.
+# See docs/plans/2026-08-19-dynamic-algorithm-weights.md.
+# ---------------------------------------------------------------------------
+
+class AlgorithmWeightPayloadError(Exception):
+    """Raised for a malformed weights payload, carrying the client-facing message."""
+
+
+def parse_algorithm_weight_groups(payload):
+    """Validate a {group: {key: value}} payload and return it as floats.
+
+    Shared by the settings PATCH and the preview POST so the two cannot drift
+    into validating differently - a preview accepting a value the save would
+    reject would let an admin preview a ranking they can never apply.
+    """
+    if not isinstance(payload, dict) or not payload:
+        raise AlgorithmWeightPayloadError("groups must be a non-empty object.")
+
+    parsed_groups = {}
+
+    for group, entries in payload.items():
+        if group not in algorithm_weights.DEFAULT_WEIGHTS:
+            raise AlgorithmWeightPayloadError("Unknown weight group '%s'." % group)
+
+        if not isinstance(entries, dict) or not entries:
+            raise AlgorithmWeightPayloadError(
+                "Group '%s' must be a non-empty object." % group
+            )
+
+        parsed = {}
+        for key, raw in entries.items():
+            if key not in algorithm_weights.DEFAULT_WEIGHTS[group]:
+                raise AlgorithmWeightPayloadError(
+                    "Unknown weight '%s.%s'." % (group, key)
+                )
+
+            if isinstance(raw, bool):
+                raise AlgorithmWeightPayloadError(
+                    "Weight '%s.%s' must be a number." % (group, key)
+                )
+
+            try:
+                value = float(raw)
+            except (TypeError, ValueError):
+                raise AlgorithmWeightPayloadError(
+                    "Weight '%s.%s' must be a number." % (group, key)
+                )
+
+            # Normalising cannot rescue a negative weight: a group can still sum
+            # above zero while a member contributes a negative share.
+            if value < 0:
+                raise AlgorithmWeightPayloadError(
+                    "Weight '%s.%s' cannot be negative." % (group, key)
+                )
+
+            parsed[key] = value
+
+        parsed_groups[group] = parsed
+
+    return parsed_groups
+
+
+class AdminAlgorithmWeightsView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsSuperAdminUser]
+
+    def _serialize(self):
+        stored = {
+            (weight.group, weight.key): weight
+            for weight in AlgorithmWeight.objects.select_related('updated_by')
+        }
+        normalized = algorithm_weights.load_weights()
+
+        groups = []
+        for group, defaults in algorithm_weights.DEFAULT_WEIGHTS.items():
+            rows = []
+            most_recent = None
+
+            for key, default in defaults.items():
+                row = stored.get((group, key))
+                label, description = algorithm_weights.WEIGHT_LABELS[group][key]
+
+                if row and (most_recent is None or (
+                    row.updated_at and most_recent.updated_at
+                    and row.updated_at > most_recent.updated_at
+                )):
+                    most_recent = row
+
+                rows.append({
+                    'key': key,
+                    'label': label,
+                    'description': description,
+                    'value': row.value if row else default,
+                    'share': normalized[group][key],
+                    'default': default,
+                })
+
+            updated_by = None
+            if most_recent and most_recent.updated_by:
+                updated_by = (
+                    f"{most_recent.updated_by.fname} {most_recent.updated_by.lname}".strip()
+                )
+
+            groups.append({
+                'group': group,
+                'label': algorithm_weights.GROUP_LABELS[group]['label'],
+                'description': algorithm_weights.GROUP_LABELS[group]['description'],
+                'weights': rows,
+                'updated_by': updated_by,
+                'updated_at': most_recent.updated_at if most_recent else None,
+            })
+
+        return {
+            'groups': groups,
+            'preview_enabled': bool(settings.ALGORITHM_DEMO_TOOLS_ENABLED),
+        }
+
+    def get(self, request):
+        return Response(self._serialize())
+
+    def patch(self, request):
+        """Accepts {"groups": {"cbf": {"specific": 0.5, ...}, ...}}.
+
+        Values are stored exactly as sent; the group is normalised at score time,
+        so no sum-to-one validation is needed here. What IS rejected is a group
+        that is entirely zero or negative, which cannot be normalised at all.
+        """
+        try:
+            updates = parse_algorithm_weight_groups(request.data.get('groups'))
+        except AlgorithmWeightPayloadError as err:
+            return Response({"error": str(err)}, status=status.HTTP_400_BAD_REQUEST)
+
+        for group, parsed in updates.items():
+            # Merge with what is stored so a partial update cannot zero a group
+            # by omission.
+            merged = dict(algorithm_weights.DEFAULT_WEIGHTS[group])
+            for weight in AlgorithmWeight.objects.filter(group=group):
+                merged[weight.key] = weight.value
+            merged.update(parsed)
+
+            if sum(merged.values()) <= 0:
+                return Response(
+                    {"error": "Group '%s' must have at least one weight above zero." % group},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        actor = getattr(request.user, 'userprofile', None)
+
+        with transaction.atomic():
+            for group, parsed in updates.items():
+                for key, value in parsed.items():
+                    AlgorithmWeight.objects.update_or_create(
+                        group=group,
+                        key=key,
+                        defaults={'value': value, 'updated_by': actor},
+                    )
+
+        # Dashboard recommendations are cached for 600s. Without this an admin
+        # changes a weight, sees nothing happen for ten minutes, and concludes
+        # the feature is broken.
+        bump_dashboard_recs_cache_version()
+
+        return Response(self._serialize())
+
+
+class AdminAlgorithmWeightsPreviewView(APIView):
+    """Score one tutee against uncommitted weights, writing nothing.
+
+    The read-only counterpart of the settings PATCH above, and a sibling of
+    algorithm_demo_recommend_whatif — same idea, different what-if input.
+    """
+
+    permission_classes = [permissions.IsAuthenticated, IsSuperAdminUser]
+
+    def post(self, request):
+        if not settings.ALGORITHM_DEMO_TOOLS_ENABLED:
+            return Response(
+                {"error": "Algorithm preview tools are disabled."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        tutee_id = request.data.get('tutee_id')
+        if not tutee_id:
+            return Response(
+                {"error": "tutee_id is required."}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        tutee = get_object_or_404(UserProfile, id=tutee_id, role="Tutee")
+
+        overrides = request.data.get('groups')
+        weights = algorithm_weights.load_weights()
+
+        if overrides:
+            try:
+                parsed_overrides = parse_algorithm_weight_groups(overrides)
+            except AlgorithmWeightPayloadError as err:
+                return Response({"error": str(err)}, status=status.HTTP_400_BAD_REQUEST)
+
+            for group, entries in parsed_overrides.items():
+                merged = {
+                    key: entries.get(key, weights[group][key])
+                    for key in algorithm_weights.DEFAULT_WEIGHTS[group]
+                }
+                weights[group] = algorithm_weights.normalize_group(merged, group)
+
+        result = build_algorithm_demo_recommendation(
+            tutee,
+            institution_id=request.data.get('institution_id') or None,
+            weights=weights,
+        )
+
+        return Response(result)

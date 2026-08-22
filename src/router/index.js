@@ -1,8 +1,53 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useProfileStore } from '@/stores/profile'
+import { useToastStore } from '@/stores/toast'
+import { MODE_SWITCH_TOAST_MS } from '@/config'
 
 const GUEST_ONLY_ROUTE_NAMES = ['login', 'register']
+const MODE_LABELS = { tutor: 'Tutor', tutee: 'Tutee' }
+const MODE_HOME = { tutor: '/tch-dashboard', tutee: '/dashboard' }
+
+// The auto-switch happens without the user asking for it, so the toast both explains why the
+// sidebar changed and hands the reversal back -- Undo restores the previous mode AND the route
+// they came from, so an accidental switch costs nothing.
+const announceModeSwitch = (targetRole, previousRole, currentPath) => {
+  const toastStore = useToastStore()
+
+  toastStore.push(
+    `Switched to ${MODE_LABELS[targetRole]} mode`,
+    'success',
+    MODE_SWITCH_TOAST_MS,
+    {
+      label: 'Undo',
+      handler: async () => {
+        const authStore = useAuthStore()
+        const profileStore = useProfileStore()
+
+        try {
+          await authStore.switchMode(previousRole)
+          await profileStore.checkProfileStatus()
+
+          if (router.currentRoute.value.fullPath !== currentPath) {
+            return
+          }
+
+          // The motivating case for auto-switch is a notification deep link, which frequently
+          // opens a fresh tab with no history to go back to -- landing the user nowhere. Fall
+          // back to the restored mode's home so Undo always resolves somewhere valid.
+          if (window.history.state?.back) {
+            router.back()
+          } else {
+            await router.push(MODE_HOME[previousRole])
+          }
+        } catch (error) {
+          console.error('Undo mode switch failed:', error)
+          toastStore.push('Could not switch back. Try the sidebar switcher.', 'error')
+        }
+      }
+    }
+  )
+}
 const TUTOR_ONBOARDING_STEP_ORDER = [
   'tutorpreferencesetup',
   'tutor-subjects-setup',
@@ -271,6 +316,12 @@ const router = createRouter({
       component: () => import('@/views/SuperAdminAlgorithmDemo.vue'),
       meta: { requiresAuth: true, role: 'SuperAdmin' }
     },
+    {
+      path: '/superadmin/algorithm-settings',
+      name: 'superadmin-algorithm-settings',
+      component: () => import('@/views/SuperAdminAlgorithmSettings.vue'),
+      meta: { requiresAuth: true, role: 'SuperAdmin' }
+    },
 
     // ---------- SHARED ROUTES ----------
     {
@@ -356,8 +407,17 @@ router.beforeEach(async (to) => {
       }
     }
 
-    if (normalizedUserRole === 'tutor' && !profileStore.tutorOnboardingComplete) {
-      const furthestStepIndex = !profileStore.profileCompleted
+    // `canTutor` is in the condition because verification now carries over between roles: a tutee
+    // who switches to Tutor gets an already-approved TutorApplication, which alone makes
+    // tutorOnboardingComplete true. Without the capability check they would land on the tutor
+    // dashboard with no hourly rate and no subjects.
+    if (
+      normalizedUserRole === 'tutor' &&
+      (!profileStore.tutorOnboardingComplete || !profileStore.canTutor)
+    ) {
+      // tutorRateSet rather than profileCompleted: a switching tutee has already completed the
+      // shared identity step, so keying step 0 off profileCompleted would skip the rate step.
+      const furthestStepIndex = !profileStore.profileCompleted || !profileStore.tutorRateSet
         ? 0
         : !profileStore.tutorSubjectsCompleted
           ? 1
@@ -382,6 +442,18 @@ router.beforeEach(async (to) => {
       to.name !== 'tutor-commission-terms'
     ) {
       return { name: 'tutor-commission-terms' }
+    }
+
+    // 2c. Tutee-mode provisioning gate. `profileCompleted` only covers the shared identity step,
+    // so a tutor who switches into Tutee mode passes it while having no Preference row at all.
+    // The tutor side of this is already handled by the onboarding gate above.
+    if (
+      normalizedUserRole === 'tutee' &&
+      profileStore.profileCompleted &&
+      !profileStore.canTutee &&
+      to.path !== '/preferencesetup'
+    ) {
+      return '/preferencesetup'
     }
 
     // 3️⃣ Profile completion guard
@@ -410,6 +482,30 @@ router.beforeEach(async (to) => {
 
     // 4️⃣ Role protection
     if (normalizedRouteRoles.length && !normalizedRouteRoles.includes(normalizedUserRole)) {
+
+      // Dual-role auto-switch: `role` is the ACTIVE MODE, not a permission. If the account is
+      // already provisioned for the mode this route wants, prompting would ask a question whose
+      // answer is always yes -- so switch and continue. Bouncing here is not merely annoying: a
+      // tutor browsing in Tutee mode who taps "your session starts in 15 minutes" would be
+      // redirected off check-in, miss it, and take a Counted Strike (a flat wallet deduction) for
+      // a mode toggle they never made. See docs/plans/2026-08-19-dual-role-mode-switch.md.
+      const switchableTarget = normalizedRouteRoles.find(
+        (routeRole) =>
+          (routeRole === 'tutor' && profileStore.canTutor) ||
+          (routeRole === 'tutee' && profileStore.canTutee)
+      )
+
+      if (switchableTarget && (normalizedUserRole === 'tutor' || normalizedUserRole === 'tutee')) {
+        try {
+          await authStore.switchMode(switchableTarget)
+          await profileStore.checkProfileStatus()
+          announceModeSwitch(switchableTarget, normalizedUserRole, to.fullPath)
+          return true
+        } catch (error) {
+          console.error('Mode switch failed:', error)
+          // Fall through to the ordinary redirect rather than stranding the user mid-navigation.
+        }
+      }
 
       if (normalizedUserRole === 'tutor') {
         return '/tch-dashboard'
