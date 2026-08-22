@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mode switcher - chosen design (segmented control)</title>
+<style>
+  :root {
+    --pv-page: #f2f4f3;
+    --pv-ink: #163127;
+    --pv-muted: #5b6b64;
+    --pv-line: #d8dedb;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 2.5rem 2rem 4rem;
+    background: var(--pv-page); color: var(--pv-ink);
+    font-family: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    line-height: 1.6;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; }
+  h1 { font-size: 30px; font-weight: 800; letter-spacing: -0.01em; margin: 0 0 .35rem; }
+  h2 { font-size: 18px; font-weight: 700; margin: 2.5rem 0 .75rem; }
+  .lede { color: var(--pv-muted); font-size: 15px; max-width: 62ch; margin: 0 0 .5rem; }
+  .eyebrow {
+    font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+    color: #00895a; margin: 0 0 .5rem;
+  }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .88em; }
+  .row { display: flex; gap: 1.25rem; flex-wrap: wrap; align-items: flex-start; }
+  .frame { display: flex; flex-direction: column; gap: .4rem; }
+  .cap { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--pv-muted); }
+  .note {
+    flex: 1 1 280px; min-width: 260px; font-size: 14px; padding: 1rem 1.15rem;
+    background: #fff; border: 1px solid var(--pv-line); border-radius: 18px;
+  }
+  .note h3 { margin: 0 0 .5rem; font-size: 14px; font-weight: 800; }
+  .note ul { margin: 0; padding-left: 1.1rem; }
+  .note li + li { margin-top: .3rem; }
+
+  /* ---------- faithful sidebar (tokens copied from src/assets/main.css) ---------- */
+  .sb {
+    --sb-primary: #00895A; --sb-bg: #F8F9FA; --sb-card-bg: #ffffff; --sb-card-border: #EAEAEA;
+    --sb-text-main: #163127; --sb-text-muted: #6B7280; --sb-text-secondary: #495057;
+    --sb-danger: #ef4444; --sb-green-tint: #edf7f3;
+    width: 250px; height: 360px; padding: 1rem .75rem;
+    display: flex; flex-direction: column; overflow: hidden;
+    background: var(--sb-card-bg); border: 1px solid var(--sb-card-border); border-radius: 12px;
+  }
+  .sb--collapsed { width: 76px; }
+  .sb--dark {
+    --sb-primary: #86B7A3; --sb-bg: #050807; --sb-card-bg: #0C1110; --sb-card-border: #1B2A25;
+    --sb-text-main: #F3F7F5; --sb-text-muted: #9AA8A1; --sb-text-secondary: #BAC8C1;
+    --sb-green-tint: rgba(0,137,90,.16);
+  }
+
+  .sb-profile {
+    display: flex; align-items: center; gap: .65rem; margin: 0 .25rem .5rem;
+    padding: .6rem; border-radius: 14px; background: var(--sb-green-tint);
+  }
+  .sb-avatar {
+    display: grid; place-items: center; width: 38px; height: 38px; flex: 0 0 auto;
+    border-radius: 50%; background: var(--sb-primary); color: #fff; font-size: .78rem; font-weight: 800;
+  }
+  .sb-copy { display: grid; gap: .1rem; min-width: 0; }
+  .sb-name { font-size: .85rem; font-weight: 700; color: var(--sb-text-main); }
+  .sb-role { font-size: .72rem; color: var(--sb-text-muted); }
+
+  .sb-nav { display: flex; flex-direction: column; gap: .2rem; }
+  .sb-item {
+    position: relative; display: flex; align-items: center; gap: .7rem; width: 100%;
+    padding: .5rem .6rem; border-radius: 12px; background: transparent;
+    color: var(--sb-text-secondary); font-size: .82rem; font-weight: 500;
+  }
+  .sb-item--active { background: var(--sb-green-tint); color: var(--sb-primary); font-weight: 700; }
+  .sb-item--active::before {
+    content: ''; position: absolute; left: -.6rem; top: .45rem; bottom: .45rem;
+    width: 4px; border-radius: 0 4px 4px 0; background: var(--sb-primary);
+  }
+  .sb-item--danger { color: var(--sb-danger); }
+  .sb-item--danger .sb-chip { background: rgba(239,68,68,.12); color: var(--sb-danger); }
+  .sb-chip {
+    display: grid; place-items: center; width: 32px; height: 32px; flex: 0 0 auto;
+    border-radius: 10px; background: var(--sb-bg); color: var(--sb-text-muted); font-size: .9rem;
+  }
+  .sb-item--active .sb-chip { background: var(--sb-primary); color: #fff; }
+  .sb-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sb-center { justify-content: center; }
+  .sb-spacer { flex: 1 1 auto; }
+  .sb-footer {
+    display: flex; align-items: center; justify-content: space-between; gap: .5rem;
+    margin-top: .5rem; padding-top: .75rem; border-top: 1px solid var(--sb-card-border);
+  }
+  .sb-footer--stack { flex-direction: column; align-items: stretch; gap: .2rem; }
+  .sb-flex1 { flex: 1; min-width: 0; }
+
+  /* ---------- THE CHOSEN CONTROL: segmented mode switcher ---------- */
+  .sb-mode {
+    display: flex; gap: 2px; padding: 3px; margin: 0 .1rem .1rem;
+    border-radius: 999px; background: var(--sb-bg);
+    border: 1px solid var(--sb-card-border);
+  }
+  .sb-mode-cell {
+    flex: 1; text-align: center; padding: .32rem .2rem; border-radius: 999px;
+    font-size: .76rem; font-weight: 700; color: var(--sb-text-muted);
+    border: 0; background: transparent; cursor: pointer;
+    font-family: inherit;
+  }
+  .sb-mode-cell[aria-checked="true"] { background: var(--sb-primary); color: #fff; }
+  .sb-mode-cell:focus-visible { outline: 4px solid rgba(0,137,90,.35); outline-offset: 2px; }
+  .sb-mode--collapsed { flex-direction: column; border-radius: 14px; }
+  .sb-mode--collapsed .sb-mode-cell { border-radius: 10px; font-size: .68rem; padding: .3rem .1rem; }
+
+  /* ---------- setup dialog ---------- */
+  .dlg {
+    width: 420px; padding: 1.25rem 1.35rem 1.1rem; background: #fff;
+    border-radius: 24px; border: 1px solid var(--pv-line);
+    box-shadow: 0 24px 70px rgba(15,23,42,.1);
+  }
+  .dlg h4 { margin: 0 0 .5rem; font-size: 18px; font-weight: 800; }
+  .dlg p { margin: 0 0 1rem; font-size: 14px; color: var(--pv-muted); }
+  .dlg-actions { display: flex; gap: .5rem; justify-content: flex-end; }
+  .btn {
+    border: 0; border-radius: 999px; padding: .6rem 1rem; min-height: 42px;
+    font: inherit; font-size: 13px; font-weight: 800; cursor: pointer;
+  }
+  .btn--soft { background: rgba(10,25,22,.08); color: var(--pv-ink); }
+  .btn--primary { background: #00895a; color: #fff; box-shadow: 0 8px 18px rgba(0,137,90,.2); }
+  .focus-ring { outline: 4px solid rgba(0,137,90,.35); outline-offset: 2px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <p class="eyebrow">Decision artifact &middot; 2026-08-20</p>
+  <h1>Sidebar mode switcher &mdash; segmented control</h1>
+  <p class="lede">
+    Chosen from three options after the existing control was confirmed to render <strong>unstyled</strong>:
+    <code>SbModeSwitcher.vue</code> is a multi-root fragment, so Vue never applies
+    <code>AppSidebar.vue</code>'s scope id to it, and <code>.sb-item</code> / <code>.sb-chip</code> /
+    <code>.sb-item-label</code> exist only inside that scoped block. Verified by mounting the real
+    component and comparing rendered attributes against the Log out button.
+  </p>
+  <p class="lede">
+    The replacement is a two-cell segmented control that shows the current mode and switches to the
+    other, placed <em>above</em> the footer divider so Log out gets its width back.
+  </p>
+
+  <h2>Expanded rail &mdash; 250px</h2>
+  <div class="row">
+    <div class="frame">
+      <div class="cap">Light</div>
+      <div class="sb">
+        <div class="sb-profile">
+          <div class="sb-avatar">RD</div>
+          <div class="sb-copy"><div class="sb-name">Ryan D.</div><div class="sb-role">Tutee</div></div>
+        </div>
+        <div class="sb-nav">
+          <div class="sb-item sb-item--active"><span class="sb-chip">&#9638;</span><span class="sb-label">Dashboard</span></div>
+          <div class="sb-item"><span class="sb-chip">&#9683;</span><span class="sb-label">Sessions</span></div>
+          <div class="sb-item"><span class="sb-chip">&#9711;</span><span class="sb-label">Profile</span></div>
+        </div>
+        <div class="sb-spacer"></div>
+        <div class="sb-mode" role="radiogroup" aria-label="Account mode">
+          <button class="sb-mode-cell" role="radio" aria-checked="true">Tutee</button>
+          <button class="sb-mode-cell" role="radio" aria-checked="false">Tutor</button>
+        </div>
+        <div class="sb-footer">
+          <div class="sb-item sb-item--danger sb-flex1"><span class="sb-chip">&#8677;</span><span class="sb-label">Log out</span></div>
+          <span class="sb-chip">&#9790;</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="frame">
+      <div class="cap">Dark</div>
+      <div class="sb sb--dark">
+        <div class="sb-profile">
+          <div class="sb-avatar">RD</div>
+          <div class="sb-copy"><div class="sb-name">Ryan D.</div><div class="sb-role">Tutee</div></div>
+        </div>
+        <div class="sb-nav">
+          <div class="sb-item sb-item--active"><span class="sb-chip">&#9638;</span><span class="sb-label">Dashboard</span></div>
+          <div class="sb-item"><span class="sb-chip">&#9683;</span><span class="sb-label">Sessions</span></div>
+          <div class="sb-item"><span class="sb-chip">&#9711;</span><span class="sb-label">Profile</span></div>
+        </div>
+        <div class="sb-spacer"></div>
+        <div class="sb-mode" role="radiogroup" aria-label="Account mode">
+          <button class="sb-mode-cell" role="radio" aria-checked="true">Tutee</button>
+          <button class="sb-mode-cell" role="radio" aria-checked="false">Tutor</button>
+        </div>
+        <div class="sb-footer">
+          <div class="sb-item sb-item--danger sb-flex1"><span class="sb-chip">&#8677;</span><span class="sb-label">Log out</span></div>
+          <span class="sb-chip">&#9790;</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="frame">
+      <div class="cap">Focus state</div>
+      <div class="sb">
+        <div class="sb-profile">
+          <div class="sb-avatar">RD</div>
+          <div class="sb-copy"><div class="sb-name">Ryan D.</div><div class="sb-role">Tutee</div></div>
+        </div>
+        <div class="sb-nav">
+          <div class="sb-item sb-item--active"><span class="sb-chip">&#9638;</span><span class="sb-label">Dashboard</span></div>
+        </div>
+        <div class="sb-spacer"></div>
+        <div class="sb-mode" role="radiogroup" aria-label="Account mode">
+          <button class="sb-mode-cell" role="radio" aria-checked="true">Tutee</button>
+          <button class="sb-mode-cell focus-ring" role="radio" aria-checked="false">Tutor</button>
+        </div>
+        <div class="sb-footer">
+          <div class="sb-item sb-item--danger sb-flex1"><span class="sb-chip">&#8677;</span><span class="sb-label">Log out</span></div>
+          <span class="sb-chip">&#9790;</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="note">
+      <h3>Why this placement</h3>
+      <ul>
+        <li>Sits above the <code>.sb-footer</code> border, so it leaves the footer's
+          <code>justify-content: space-between</code> row untouched &mdash; Log out stops competing
+          for width and its label stops clipping.</li>
+        <li>Uses the system's default interactive shape: a 999px pill, per DESIGN.md's
+          <em>Pill-Or-Card Rule</em>.</li>
+        <li>Selection is a filled cell rather than an outline because the two cells are mutually
+          exclusive segments, not independent filter pills.</li>
+        <li>Every colour is an existing token: <code>--sb-bg</code>, <code>--sb-card-border</code>,
+          <code>--sb-primary</code>, <code>--sb-text-muted</code>.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2>Collapsed rail &mdash; 76px</h2>
+  <div class="row">
+    <div class="frame">
+      <div class="cap">Light</div>
+      <div class="sb sb--collapsed">
+        <div class="sb-profile sb-center"><div class="sb-avatar">RD</div></div>
+        <div class="sb-nav">
+          <div class="sb-item sb-item--active sb-center"><span class="sb-chip">&#9638;</span></div>
+          <div class="sb-item sb-center"><span class="sb-chip">&#9683;</span></div>
+          <div class="sb-item sb-center"><span class="sb-chip">&#9711;</span></div>
+        </div>
+        <div class="sb-spacer"></div>
+        <div class="sb-mode sb-mode--collapsed" role="radiogroup" aria-label="Account mode">
+          <button class="sb-mode-cell" role="radio" aria-checked="true" title="Tutee">TE</button>
+          <button class="sb-mode-cell" role="radio" aria-checked="false" title="Tutor">TR</button>
+        </div>
+        <div class="sb-footer sb-footer--stack">
+          <div class="sb-item sb-item--danger sb-center"><span class="sb-chip">&#8677;</span></div>
+          <div class="sb-item sb-center"><span class="sb-chip">&#9790;</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="frame">
+      <div class="cap">Dark</div>
+      <div class="sb sb--collapsed sb--dark">
+        <div class="sb-profile sb-center"><div class="sb-avatar">RD</div></div>
+        <div class="sb-nav">
+          <div class="sb-item sb-item--active sb-center"><span class="sb-chip">&#9638;</span></div>
+          <div class="sb-item sb-center"><span class="sb-chip">&#9683;</span></div>
+          <div class="sb-item sb-center"><span class="sb-chip">&#9711;</span></div>
+        </div>
+        <div class="sb-spacer"></div>
+        <div class="sb-mode sb-mode--collapsed" role="radiogroup" aria-label="Account mode">
+          <button class="sb-mode-cell" role="radio" aria-checked="true" title="Tutee">TE</button>
+          <button class="sb-mode-cell" role="radio" aria-checked="false" title="Tutor">TR</button>
+        </div>
+        <div class="sb-footer sb-footer--stack">
+          <div class="sb-item sb-item--danger sb-center"><span class="sb-chip">&#8677;</span></div>
+          <div class="sb-item sb-center"><span class="sb-chip">&#9790;</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="note">
+      <h3>Collapsed behaviour</h3>
+      <ul>
+        <li>Stacks vertically, matching <code>.sb-sidebar--collapsed .sb-footer</code>, which already
+          switches to <code>flex-direction: column</code>.</li>
+        <li>Keeps two-letter labels rather than collapsing to a single arrow icon. This is the whole
+          reason this option was chosen: an unlabelled
+          <code>bi-arrow-left-right</code> chip is indistinguishable from sync or refresh.</li>
+        <li>Each cell carries a <code>title</code> and the full mode name as its accessible name;
+          the visible TE / TR is a visual abbreviation only.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2>Unprovisioned mode &mdash; setup dialog</h2>
+  <div class="row">
+    <div class="frame">
+      <div class="cap">Opens when the target mode has no account yet</div>
+      <div class="dlg">
+        <h4>No Tutor account yet</h4>
+        <p>
+          You currently don't have a Tutor account. Setting one up takes a few steps, and you can
+          switch back any time &mdash; your existing Tutee account stays exactly as it is.
+          Your documents are already verified, so you won't need to upload them again.
+        </p>
+        <div class="dlg-actions">
+          <button class="btn btn--soft">Not now</button>
+          <button class="btn btn--primary focus-ring">Set up Tutor account</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="note">
+      <h3>Accessibility contract shipped with this control</h3>
+      <ul>
+        <li>The dialog gets an <code>aria-labelledby</code> pointing at its heading &mdash; today it
+          declares <code>role="dialog"</code> and <code>aria-modal="true"</code> with no accessible
+          name (WCAG 4.1.2).</li>
+        <li>Escape closes it; focus moves into the dialog on open, is trapped while it is open, and
+          returns to the segment that opened it on close (WCAG 2.1.2 / 2.4.3).</li>
+        <li>The busy state is announced rather than only swapping a label to
+          <em>Switching&hellip;</em>.</li>
+        <li>Focus is not dropped mid-switch: the group is marked busy instead of the focused cell
+          being disabled out from under the user.</li>
+        <li>Decorative icons carry <code>aria-hidden="true"</code>.</li>
+        <li>Arrow keys move between segments and the group exposes a single tab stop, per the
+          radiogroup pattern.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2>Known tradeoff</h2>
+  <p class="lede">
+    A segmented control implies switching is instant. For a user whose other mode is not provisioned,
+    the first activation opens the setup dialog instead &mdash; the selected cell must not move until
+    the switch actually succeeds, or the control will lie about state.
+  </p>
+
+</div>
+</body>
+</html>

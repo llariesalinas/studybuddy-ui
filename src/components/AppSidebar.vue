@@ -63,8 +63,9 @@
 
     <div class="sb-spacer"></div>
 
+    <SbModeSwitcher />
+
     <div class="sb-footer">
-      <SbModeSwitcher />
       <button
         type="button"
         class="sb-item sb-item-btn sb-item--danger"
