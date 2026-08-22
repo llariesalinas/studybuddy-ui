@@ -229,6 +229,41 @@ class EmailOTPChallenge(models.Model):
         return f"{self.purpose} OTP for user {self.user_id}"
 
 
+class TrustedDevice(models.Model):
+    """A browser that has cleared the login OTP and may skip it until the trust expires.
+
+    Only the HMAC of the issued secret is stored, never the secret itself -- a database leak
+    must not hand out working device tokens. `expires_at` slides forward on every accepted
+    login (see TRUSTED_DEVICE_TTL_SECONDS), so an actively used device stays trusted and an
+    abandoned one lapses back to a full email challenge.
+    """
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='trusted_devices')
+    device_id = models.UUIDField(default=uuid.uuid4, unique=True, db_index=True)
+    token_hash = models.CharField(max_length=64)
+    expires_at = models.DateTimeField()
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    last_used_at = models.DateTimeField(default=timezone.now)
+    created_at = models.DateTimeField(auto_now_add=True)
+    # Audit only -- shown to an admin deciding whether to revoke, never used to match a device.
+    user_agent = models.CharField(max_length=255, blank=True, default='')
+    last_ip = models.GenericIPAddressField(null=True, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['user', 'revoked_at']),
+            models.Index(fields=['expires_at']),
+        ]
+        ordering = ['-last_used_at']
+
+    def __str__(self):
+        return f"Trusted device {self.device_id} for user {self.user_id}"
+
+    @property
+    def is_active(self):
+        return self.revoked_at is None and self.expires_at > timezone.now()
+
+
 class EmailSendLog(models.Model):
     """Audit row written for every outbound email attempt.
 

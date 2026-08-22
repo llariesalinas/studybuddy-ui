@@ -33,6 +33,7 @@ from .views import (
     credit_tutor_wallet,
     dev_add_wallet_funds,
     dev_remove_wallet_funds,
+    LoginRateThrottle,
     PASSWORD_RESET_GENERIC_MESSAGE,
     TUTOR_SUBJECT_LIMIT,
     WEEKDAY_MAP,
@@ -59,6 +60,7 @@ from .models import (
     TutorAvailability,
     TutorAvailabilityOverride,
     TutorSubjects,
+    TrustedDevice,
     UserProfile,
     Transaction,
     TutorApplication,
@@ -11512,3 +11514,220 @@ class AlgorithmWeightsPreviewValidationTests(APITestCase):
         response = self._preview({'hybrid': {'cbf': 0.2, 'cf': 0.8}})
 
         self.assertEqual(response.status_code, 200)
+
+
+@override_settings(
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    FRONTEND_URL="https://studybuddy.example",
+    LOGIN_OTP_TTL_SECONDS=600,
+    LOGIN_OTP_MAX_ATTEMPTS=2,
+    TRUSTED_DEVICE_TTL_SECONDS=7 * 24 * 60 * 60,
+)
+class TrustedDeviceLoginTests(APITestCase):
+    """The OTP is a first-time-on-this-device step, not a per-login one.
+
+    LoginRateThrottle.THROTTLE_RATES is read from settings once at import time (a DRF quirk --
+    override_settings on REST_FRAMEWORK never reaches it), so the 5/min production login rate has
+    to be patched directly rather than overridden, or these tests' repeated login calls throttle.
+    """
+
+    def setUp(self):
+        cache.clear()
+        mail.outbox = []
+        self._throttle_patch = patch.dict(
+            LoginRateThrottle.THROTTLE_RATES, {"login": "1000/min"}
+        )
+        self._throttle_patch.start()
+        self.addCleanup(self._throttle_patch.stop)
+        self.institution = PartnerInstitution.objects.create(
+            institution_name="Example University",
+            school_email_domain="example.edu",
+            is_active=True,
+        )
+        self.user = User.objects.create_user(
+            username="device@example.edu",
+            email="device@example.edu",
+            password="password",
+        )
+        self.profile = UserProfile.objects.create(
+            user=self.user,
+            fname="Trusted",
+            mname="",
+            lname="Device",
+            role="Tutee",
+            institution=self.institution,
+        )
+
+    def login(self, device_token=None):
+        payload = {"email": self.user.email, "password": "password"}
+        if device_token is not None:
+            payload["device_token"] = device_token
+        return self.client.post("/api/login/", payload, format="json")
+
+    def latest_otp_code(self):
+        match = re.search(r"\b(\d{6})\b", mail.outbox[-1].body)
+        self.assertIsNotNone(match)
+        return match.group(1)
+
+    def enrol_device(self):
+        """Run a full password + OTP login and return the issued device token."""
+        challenge_response = self.login()
+        verify_response = self.client.post(
+            "/api/login/verify-otp/",
+            {
+                "challenge_id": challenge_response.data["challenge_id"],
+                "code": self.latest_otp_code(),
+            },
+            format="json",
+        )
+        self.assertEqual(verify_response.status_code, 200)
+        self.assertIn("device_token", verify_response.data)
+        return verify_response.data["device_token"]
+
+    def test_first_login_still_challenges_and_issues_a_device_token(self):
+        token = self.enrol_device()
+
+        device = TrustedDevice.objects.get(user=self.user)
+        self.assertTrue(device.is_active)
+        # The raw secret must never be recoverable from the row.
+        self.assertNotIn(device.token_hash, token)
+        self.assertTrue(token.startswith(f"{device.device_id}."))
+
+    def test_login_without_a_device_token_still_requires_otp(self):
+        self.enrol_device()
+        mail.outbox = []
+
+        response = self.login()
+
+        self.assertTrue(response.data["requires_2fa"])
+        self.assertNotIn("access", response.data)
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_login_with_a_trusted_device_skips_the_otp(self):
+        token = self.enrol_device()
+        mail.outbox = []
+
+        response = self.login(token)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("requires_2fa", response.data)
+        self.assertIn("access", response.data)
+        self.assertIn("refresh", response.data)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_accepted_login_slides_the_expiry_forward(self):
+        token = self.enrol_device()
+        device = TrustedDevice.objects.get(user=self.user)
+        stale = timezone.now() + timedelta(days=2)
+        TrustedDevice.objects.filter(pk=device.pk).update(expires_at=stale)
+
+        self.login(token)
+
+        device.refresh_from_db()
+        self.assertGreater(device.expires_at, stale)
+
+    def test_expired_device_falls_back_to_otp(self):
+        token = self.enrol_device()
+        TrustedDevice.objects.filter(user=self.user).update(
+            expires_at=timezone.now() - timedelta(seconds=1)
+        )
+        mail.outbox = []
+
+        response = self.login(token)
+
+        self.assertTrue(response.data["requires_2fa"])
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_revoked_device_falls_back_to_otp(self):
+        token = self.enrol_device()
+        TrustedDevice.objects.filter(user=self.user).update(revoked_at=timezone.now())
+
+        self.assertTrue(self.login(token).data["requires_2fa"])
+
+    def test_tampered_secret_is_rejected(self):
+        token = self.enrol_device()
+        device_id, _, _ = token.partition(".")
+
+        self.assertTrue(self.login(f"{device_id}.not-the-secret").data["requires_2fa"])
+
+    def test_malformed_token_is_rejected_without_erroring(self):
+        self.enrol_device()
+
+        for bogus in ["", "no-separator", ".", "not-a-uuid.secret"]:
+            response = self.login(bogus)
+            self.assertEqual(response.status_code, 200, msg=bogus)
+            self.assertTrue(response.data.get("requires_2fa"), msg=bogus)
+
+    def test_another_users_device_token_is_rejected(self):
+        token = self.enrol_device()
+        other = User.objects.create_user(
+            username="other@example.edu",
+            email="other@example.edu",
+            password="password",
+        )
+        UserProfile.objects.create(
+            user=other,
+            fname="Other",
+            mname="",
+            lname="User",
+            role="Tutee",
+            institution=self.institution,
+        )
+
+        response = self.client.post(
+            "/api/login/",
+            {"email": other.email, "password": "password", "device_token": token},
+            format="json",
+        )
+
+        self.assertTrue(response.data["requires_2fa"])
+
+    def test_suspension_revokes_trusted_devices(self):
+        token = self.enrol_device()
+        self.profile.is_suspended = True
+        self.profile.save(update_fields=["is_suspended"])
+
+        response = self.login(token)
+
+        self.assertEqual(response.status_code, 403)
+        self.assertIsNotNone(TrustedDevice.objects.get(user=self.user).revoked_at)
+
+    def test_logout_with_device_token_revokes_only_that_device(self):
+        first_token = self.enrol_device()
+        mail.outbox = []
+        second_token = self.enrol_device()
+        self.assertEqual(TrustedDevice.objects.filter(user=self.user).count(), 2)
+
+        login_response = self.login(first_token)
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {login_response.data['access']}")
+        logout_response = self.client.post(
+            "/api/logout/",
+            {"refresh": login_response.data["refresh"], "device_token": first_token},
+            format="json",
+        )
+        self.assertEqual(logout_response.status_code, 200)
+        self.client.credentials()
+
+        self.assertTrue(self.login(first_token).data["requires_2fa"])
+        self.assertIn("access", self.login(second_token).data)
+
+    def test_logout_without_device_token_keeps_the_device_trusted(self):
+        """The idle-timeout and refresh-failure paths log out without forgetting the device."""
+        token = self.enrol_device()
+        login_response = self.login(token)
+
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {login_response.data['access']}")
+        self.client.post(
+            "/api/logout/", {"refresh": login_response.data["refresh"]}, format="json"
+        )
+        self.client.credentials()
+
+        self.assertIn("access", self.login(token).data)
+
+    @override_settings(LOGIN_OTP_DISABLED=True)
+    def test_otp_disabled_short_circuits_before_any_device_logic(self):
+        response = self.login()
+
+        self.assertIn("access", response.data)
+        self.assertNotIn("device_token", response.data)
+        self.assertFalse(TrustedDevice.objects.filter(user=self.user).exists())

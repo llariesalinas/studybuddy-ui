@@ -72,6 +72,11 @@ from .subject_recognition import (
 from django.core.cache import cache
 from . import _verification_dev
 from .models import Booking, Course, EmailOTPChallenge, Notification, PartnerInstitution, Payment, PaymentMethod, Preference, Rating, SessionCheckIn, Subjects, SupportTicket, Tutor, TutorApplication, TutorAvailability, TutorAvailabilityOverride, TutorDocumentRenewalReview, TutorSubjects, Wallet, PlatformActivity, Transaction, TuteeApplication, TuteeDocumentRenewalReview
+from .trusted_devices import (
+    consume_trusted_device,
+    issue_trusted_device,
+    revoke_trusted_devices,
+)
 from .serializers import (
     NotificationSerializer,
     SubjectSerializer,
@@ -1598,6 +1603,8 @@ def login_view(request):
         )
 
     if profile.is_suspended:
+        # Drop any standing device trust so re-activation still costs a fresh email challenge.
+        revoke_trusted_devices(user)
         return Response(
             {"error": "Your account has been suspended. Please contact administration for more details."},
             status=status.HTTP_403_FORBIDDEN
@@ -1638,6 +1645,11 @@ def login_view(request):
             profile.save(update_fields=['institution', 'updated_at'])
 
     if settings.LOGIN_OTP_DISABLED:
+        return Response(build_login_response_payload(user, profile))
+
+    # A browser that already cleared the OTP skips it until its trust lapses, so the email
+    # challenge is a first-time-on-this-device step rather than a per-login one.
+    if consume_trusted_device(user, request.data.get("device_token"), request):
         return Response(build_login_response_payload(user, profile))
 
     try:
@@ -1723,6 +1735,9 @@ def password_reset_confirm(request):
     user.set_password(password)
     user.save(update_fields=["password"])
     blacklist_user_refresh_tokens(user)
+    # A password reset is the recovery path for a compromised account, so it has to invalidate
+    # standing device trusts too -- otherwise the attacker's browser keeps skipping the OTP.
+    revoke_trusted_devices(user)
 
     try:
         mailer.enqueue_password_changed(user)
@@ -1781,6 +1796,7 @@ def login_verify_otp(request):
         )
 
     if profile.is_suspended:
+        revoke_trusted_devices(challenge.user)
         return Response(
             {"error": "Your account has been suspended. Please contact administration for more details."},
             status=status.HTTP_403_FORBIDDEN
@@ -1789,7 +1805,13 @@ def login_verify_otp(request):
     challenge.consumed_at = timezone.now()
     challenge.save(update_fields=['consumed_at'])
 
-    return Response(build_login_response_payload(challenge.user, profile))
+    # Clearing the OTP is what enrols this browser; the token rides back with the JWTs so the
+    # next login on it can skip the challenge. Added here rather than in
+    # build_login_response_payload, which other callers reuse without enrolling anything.
+    payload = build_login_response_payload(challenge.user, profile)
+    payload["device_token"] = issue_trusted_device(challenge.user, request)
+
+    return Response(payload)
 
 
 @api_view(['POST'])
@@ -1862,8 +1884,17 @@ def login_resend_otp(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def logout_view(request):
-    """Blacklist the supplied refresh token so it can no longer be used."""
+    """Blacklist the supplied refresh token so it can no longer be used.
+
+    An optional device_token additionally drops this browser's OTP trust. The client only sends
+    it for a deliberate sign-out -- an idle timeout or a failed token refresh ends the session
+    but leaves the device trusted, or the user would face a fresh OTP every idle ten minutes.
+    """
     refresh = request.data.get("refresh")
+    device_token = request.data.get("device_token")
+    if device_token:
+        revoke_trusted_devices(request.user, device_token)
+
     if not refresh:
         return Response(
             {"error": "Refresh token required."},

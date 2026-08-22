@@ -353,6 +353,11 @@ PASSWORD_RESET_TIMEOUT = 3600
 LOGIN_OTP_TTL_SECONDS = 600
 LOGIN_OTP_MAX_ATTEMPTS = 5
 
+# How long a device stays trusted -- i.e. how long logins from it skip the OTP challenge.
+# This is a *sliding* window: every accepted login pushes the expiry back out by this much, so
+# only a device left unused for the full period has to verify by email again.
+TRUSTED_DEVICE_TTL_SECONDS = 7 * 24 * 60 * 60
+
 # Email resilience tuning (used by studybuddy.mailer)
 # OTP is sent synchronously on the login critical path, so keep its timeout short
 # and retry only a couple of times before failing honestly back to the user.

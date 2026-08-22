@@ -29,6 +29,7 @@ from .models import (
     resolve_category,
     resolve_or_create_category,
 )
+from .trusted_devices import revoke_trusted_devices
 from .serializers import (
     InstitutionRequestSerializer,
     AdminWithdrawalSerializer, AdminUserSerializer,
@@ -538,6 +539,14 @@ class AdminUserListView(APIView):
             profile.is_suspended = parse_bool(is_suspended)
             profile_update_fields.append('is_suspended')
             changed_fields.append('is_suspended')
+
+            if profile.is_suspended:
+                # Suspending has to end the OTP-free logins too, not just block the next one.
+                revoke_trusted_devices(profile.user)
+
+        if parse_bool(request.data.get('revoke_trusted_devices')):
+            revoke_trusted_devices(profile.user)
+            changed_fields.append('revoke_trusted_devices')
 
         if 'role' in request.data:
             role = request.data.get('role')
