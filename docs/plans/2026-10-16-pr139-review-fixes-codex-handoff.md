@@ -1,7 +1,7 @@
 ---
 title: Codex Handoff — Verify the PR #139 Review Fixes
 date: 2026-10-16
-status: Approved
+status: In Progress
 summary: Apply migrations 0087/0088 to the dev database, re-run both test suites with the real environment, and walk the eight-step manual checklist for commit 94bf7f1.
 ---
 
@@ -9,11 +9,12 @@ summary: Apply migrations 0087/0088 to the dev database, re-run both test suites
 
 ## Status & Progress Summary
 
-**Status:** Ready for Codex. The code is done and pushed. This handoff covers only verification
+**Status:** In Progress — frontend checks complete; database connection rejected by Supabase. The code is done and pushed. This handoff covers only verification
 work that needs access the Claude cloud session did not have: the real `.env`, the dev database
 and a browser.
-**Next step:** Give this document to Codex. Work through Tasks 1–5 in order, then report back as
-described at the end. **Do not change application code** unless a task below finds a regression
+**Next step:** Restore the configured database connection, then resume Tasks 2–5. The user
+approved a backup and migrations on the shared demo on 2026-10-16; a verified backup is still required.
+See [verification results](../session-summaries/2026-10-16-pr139-handoff-verification.md). **Do not change application code** unless a task below finds a regression
 caused by `94bf7f1`. If it does, stop and report before fixing.
 
 ---
