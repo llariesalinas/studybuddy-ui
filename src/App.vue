@@ -302,6 +302,7 @@ import VerificationBanner from '@/components/VerificationBanner.vue'
 import WalletDebtBanner from '@/components/WalletDebtBanner.vue'
 import { useChatStore } from '@/stores/chat'
 import router from './router'
+import { reconcileRemoteMode } from '@/services/auth/modeRoutes'
 import { SESSION_POLL_INTERVAL_MS } from './config.js'
 import SbToast from '@/components/SbToast.vue'
 import AppSidebar from '@/components/AppSidebar.vue'
@@ -645,6 +646,11 @@ const userRole = computed(() => authStore.user?.role?.toLowerCase() || null)
 const userFname =  computed(() => authStore.user?.fname || null)
 
 watch(userRole, (role) => densityStore.syncFromRole(role), { immediate: true })
+
+// The revision changes only after the remote role's profile has finished loading.
+watch(() => authStore.remoteModeRevision, async (revision) => {
+  if (revision) await reconcileRemoteMode(router, userRole.value)
+})
 
 const refreshTutorPendingSessions = async () => {
   if (!authStore.isAuthenticated || userRole.value !== 'tutor') {

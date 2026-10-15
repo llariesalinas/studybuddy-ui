@@ -11,12 +11,19 @@ import django.db.models.deletion
 from django.db.models.functions import Lower
 
 from studybuddy.models import get_uncategorized, get_uncategorized_id
-from studybuddy.subject_taxonomy import (
-    CATEGORIES,
-    CATEGORY_ORDER_STEP,
-    UNCATEGORIZED_CATEGORY,
-    seed_display_order,
-)
+# Frozen seed values. Field callables above retain their model identities.
+CATEGORIES = [
+    'Mathematics & Data Sciences', 'Natural Sciences', 'Technology & Computer Science',
+    'Business, Finance & Economics', 'Humanities & Social Sciences', 'Hobbies & Arts',
+    'Sports', 'Uncategorized',
+]
+CATEGORY_ORDER_STEP = 10
+UNCATEGORIZED_CATEGORY = 'Uncategorized'
+
+
+def seed_display_order(name):
+    return 999 if name == UNCATEGORIZED_CATEGORY else (CATEGORIES.index(name) + 1) * 10
+
 
 
 def seed_categories(apps, schema_editor):
@@ -104,6 +111,7 @@ class Migration(migrations.Migration):
         migrations.RemoveField(model_name='subjects', name='category'),
         migrations.RenameField(model_name='subjects', old_name='category_fk',
                                new_name='category'),
+        # The NOT NULL alteration can invoke the live default on a fresh database.
         migrations.AlterField(
             model_name='subjects',
             name='category',

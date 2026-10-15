@@ -134,6 +134,7 @@ class UserProfile(models.Model):
 
     is_domain_exempt = models.BooleanField(default=False)
     tutor_onboarding_skipped_at = models.DateTimeField(null=True, blank=True)
+    tutor_setup_completed_at = models.DateTimeField(null=True, blank=True)
 
     ROLE_CHOICES = [
         ('Tutee', 'Tutee'),
@@ -777,6 +778,10 @@ class SubjectCategory(models.Model):
             # Names are stored as typed but compared case-insensitively, so 'sports' cannot become
             # a second category alongside 'Sports'.
             models.UniqueConstraint(Lower('name'), name='unique_subject_category_name_ci'),
+            models.UniqueConstraint(
+                fields=['is_system'], condition=models.Q(is_system=True),
+                name='unique_system_subject_category',
+            ),
         ]
 
     def __str__(self):
@@ -791,10 +796,10 @@ def get_uncategorized():
     tutee preferences.
     """
     category, _ = SubjectCategory.objects.get_or_create(
-        name=UNCATEGORIZED_CATEGORY,
+        is_system=True,
         defaults={
+            'name': UNCATEGORIZED_CATEGORY,
             'display_order': UNCATEGORIZED_DISPLAY_ORDER,
-            'is_system': True,
         },
     )
     return category
@@ -833,7 +838,7 @@ def resolve_or_create_category(name):
     if category is not None:
         return category
     last = (
-        SubjectCategory.objects.exclude(name=UNCATEGORIZED_CATEGORY)
+        SubjectCategory.objects.exclude(is_system=True)
         .order_by('-display_order')
         .first()
     )

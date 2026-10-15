@@ -1,6 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+const fetchSubjectCategories = vi.fn()
 const fetchSubjectCatalog = vi.fn()
 const fetchTutorSubjects = vi.fn()
 const proposeTutorSubject = vi.fn()
@@ -9,6 +10,7 @@ const removeTutorSubject = vi.fn()
 
 vi.mock('@/services/tutorOnboarding', () => ({
   fetchSubjectCatalog,
+  fetchSubjectCategories,
   fetchTutorSubjects,
   proposeTutorSubject,
   addTutorSubject,
@@ -60,6 +62,7 @@ describe('TutorSubjectSetup', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     fetchSubjectCatalog.mockResolvedValue([APPROVED])
+    fetchSubjectCategories.mockResolvedValue([APPROVED.category, PENDING.category, 'Sports'])
     fetchTutorSubjects.mockResolvedValue([])
   })
 
@@ -137,4 +140,14 @@ describe('TutorSubjectSetup', () => {
     expect(wrapper.text()).toContain('Selected 1/8')
     expect(wrapper.text()).toContain(PENDING.subject_name)
   })
+  it('offers empty categories in the order returned by the server', async () => {
+    fetchSubjectCategories.mockResolvedValueOnce(['Sports', APPROVED.category])
+    const wrapper = mountSetup()
+    await flushPromises()
+    await wrapper.get('.propose-trigger').trigger('click')
+    const options = wrapper.findAll('#proposal-category option').map((option) => option.text())
+    expect(options).toEqual(['Select a category', 'Sports', APPROVED.category])
+    expect(fetchSubjectCategories).toHaveBeenCalledOnce()
+  })
+
 })

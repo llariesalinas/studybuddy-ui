@@ -731,6 +731,7 @@ const saveSubjectEdit = async (subject) => {
     // Sync into the catalog store immediately so the category/sub-group (and keyword) pickers
     // reflect this save without waiting on the next fetchCourseCatalog().
     catalogStore.upsertLocalCatalogSubject(subject)
+    await catalogStore.refreshCategoriesIfUnknown(updated.category)
     editingSubjectCode.value = ''
     categoryMode.value = 'select'
     categoryMismatchNote.value = ''

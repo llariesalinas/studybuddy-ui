@@ -3,18 +3,22 @@ import { useAuthStore } from '@/stores/auth'
 import { useProfileStore } from '@/stores/profile'
 import { useToastStore } from '@/stores/toast'
 import { MODE_SWITCH_TOAST_MS } from '@/config'
+import { MODE_HOME, routeAllowsMode } from '@/services/auth/modeRoutes'
 
 const GUEST_ONLY_ROUTE_NAMES = ['login', 'register']
 const MODE_LABELS = { tutor: 'Tutor', tutee: 'Tutee' }
-const MODE_HOME = { tutor: '/tch-dashboard', tutee: '/dashboard' }
+
+let undoToastId = null
+let undoDestination = null
 
 // The auto-switch happens without the user asking for it, so the toast both explains why the
-// sidebar changed and hands the reversal back -- Undo restores the previous mode AND the route
-// they came from, so an accidental switch costs nothing.
+// sidebar changed and offers Undo. Restoring a mode also restores a compatible page.
 const announceModeSwitch = (targetRole, previousRole, currentPath) => {
   const toastStore = useToastStore()
+  if (undoToastId !== null) toastStore.dismiss(undoToastId)
+  undoDestination = currentPath
 
-  toastStore.push(
+  undoToastId = toastStore.push(
     `Switched to ${MODE_LABELS[targetRole]} mode`,
     'success',
     MODE_SWITCH_TOAST_MS,
@@ -24,22 +28,17 @@ const announceModeSwitch = (targetRole, previousRole, currentPath) => {
         const authStore = useAuthStore()
         const profileStore = useProfileStore()
 
+        if (authStore.userRole?.toLowerCase() !== targetRole) return
+        toastStore.dismiss(undoToastId)
+        undoToastId = null
         try {
           await authStore.switchMode(previousRole)
           await profileStore.checkProfileStatus()
 
-          if (router.currentRoute.value.fullPath !== currentPath) {
-            return
+          if (!routeAllowsMode(router.currentRoute.value, previousRole)) {
+            await router.replace(MODE_HOME[previousRole])
           }
 
-          // The motivating case for auto-switch is a notification deep link, which frequently
-          // opens a fresh tab with no history to go back to -- landing the user nowhere. Fall
-          // back to the restored mode's home so Undo always resolves somewhere valid.
-          if (window.history.state?.back) {
-            router.back()
-          } else {
-            await router.push(MODE_HOME[previousRole])
-          }
         } catch (error) {
           console.error('Undo mode switch failed:', error)
           toastStore.push('Could not switch back. Try the sidebar switcher.', 'error')
@@ -355,7 +354,7 @@ router.beforeEach(async (to) => {
 
   const authStore = useAuthStore()
   const profileStore = useProfileStore()
-  const normalizedUserRole = authStore.userRole?.toLowerCase?.() || null
+  let normalizedUserRole = authStore.userRole?.toLowerCase?.() || null
   const normalizedRouteRoles = Array.isArray(to.meta.role)
     ? to.meta.role.map((role) => role.toLowerCase())
     : to.meta.role
@@ -407,13 +406,34 @@ router.beforeEach(async (to) => {
       }
     }
 
-    // `canTutor` is in the condition because verification now carries over between roles: a tutee
-    // who switches to Tutor gets an already-approved TutorApplication, which alone makes
-    // tutorOnboardingComplete true. Without the capability check they would land on the tutor
-    // dashboard with no hourly rate and no subjects.
+    normalizedUserRole = authStore.userRole?.toLowerCase?.() || null
+    if (normalizedRouteRoles.length && !normalizedRouteRoles.includes(normalizedUserRole)) {
+      const target = normalizedRouteRoles.find((role) =>
+        (role === 'tutor' && profileStore.canTutor) ||
+        (role === 'tutee' && profileStore.canTutee)
+      )
+      if (target && ['tutor', 'tutee'].includes(normalizedUserRole)) {
+        const confirmed = !authStore.modeChangedElsewhere || window.confirm(
+          `Your account is in ${MODE_LABELS[normalizedUserRole]} mode on another device. ` +
+          `Switch to ${MODE_LABELS[target]} here?`
+        )
+        if (!confirmed) return MODE_HOME[normalizedUserRole]
+        try {
+          await authStore.switchMode(target)
+          await profileStore.checkProfileStatus()
+          announceModeSwitch(target, normalizedUserRole, to.fullPath)
+          return to.fullPath
+        } catch (error) {
+          console.error('Mode switch failed:', error)
+          return MODE_HOME[normalizedUserRole]
+        }
+      }
+    }
+
+    // Completion is durable; losing the last subject must not restart onboarding.
     if (
       normalizedUserRole === 'tutor' &&
-      (!profileStore.tutorOnboardingComplete || !profileStore.canTutor)
+      !profileStore.tutorOnboardingComplete
     ) {
       // tutorRateSet rather than profileCompleted: a switching tutee has already completed the
       // shared identity step, so keying step 0 off profileCompleted would skip the rate step.
@@ -483,29 +503,6 @@ router.beforeEach(async (to) => {
     // 4️⃣ Role protection
     if (normalizedRouteRoles.length && !normalizedRouteRoles.includes(normalizedUserRole)) {
 
-      // Dual-role auto-switch: `role` is the ACTIVE MODE, not a permission. If the account is
-      // already provisioned for the mode this route wants, prompting would ask a question whose
-      // answer is always yes -- so switch and continue. Bouncing here is not merely annoying: a
-      // tutor browsing in Tutee mode who taps "your session starts in 15 minutes" would be
-      // redirected off check-in, miss it, and take a Counted Strike (a flat wallet deduction) for
-      // a mode toggle they never made. See docs/plans/2026-08-19-dual-role-mode-switch.md.
-      const switchableTarget = normalizedRouteRoles.find(
-        (routeRole) =>
-          (routeRole === 'tutor' && profileStore.canTutor) ||
-          (routeRole === 'tutee' && profileStore.canTutee)
-      )
-
-      if (switchableTarget && (normalizedUserRole === 'tutor' || normalizedUserRole === 'tutee')) {
-        try {
-          await authStore.switchMode(switchableTarget)
-          await profileStore.checkProfileStatus()
-          announceModeSwitch(switchableTarget, normalizedUserRole, to.fullPath)
-          return true
-        } catch (error) {
-          console.error('Mode switch failed:', error)
-          // Fall through to the ordinary redirect rather than stranding the user mid-navigation.
-        }
-      }
 
       if (normalizedUserRole === 'tutor') {
         return '/tch-dashboard'
@@ -530,6 +527,13 @@ router.beforeEach(async (to) => {
 
   return true
 
+})
+
+router.afterEach((to, from, failure) => {
+  if (!failure && undoToastId !== null && to.fullPath !== undoDestination) {
+    useToastStore().dismiss(undoToastId)
+    undoToastId = null
+  }
 })
 
 export default router

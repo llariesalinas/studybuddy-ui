@@ -154,6 +154,7 @@ export const useCatalogStore = defineStore('catalog', () => {
     institutions,
     courseCatalog,
     subjectCategories,
+    refreshCategoriesIfUnknown,
     paymentMethods,
     receivingInstitutions,
     fetchSubjects,

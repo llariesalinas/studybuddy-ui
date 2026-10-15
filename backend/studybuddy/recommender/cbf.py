@@ -1,7 +1,6 @@
 import logging
 
 from ..models import Preference, Subjects, Tutor
-from ..subject_taxonomy import UNCATEGORIZED_CATEGORY
 from .weights import DEFAULT_WEIGHTS, GROUP_CBF, default_weights, load_weights
 
 logger = logging.getLogger(__name__)
@@ -51,7 +50,7 @@ def resolve_target_categories(requested_subject, subject_codes):
     # the NULL/'' categories that now map onto Uncategorized were skipped here for the same
     # reason. Counting it would inflate the same-field score between unrelated subjects.
     categories = Subjects.objects.filter(subject_code__in=codes).exclude(
-        category__name=UNCATEGORIZED_CATEGORY
+        category__is_system=True
     ).values_list("category_id", flat=True)
     return {category_id for category_id in categories if category_id}
 

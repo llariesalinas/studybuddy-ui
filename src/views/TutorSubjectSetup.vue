@@ -109,6 +109,7 @@ import { TUTOR_SUBJECT_LIMIT } from '@/config'
 import {
   addTutorSubject,
   fetchSubjectCatalog,
+  fetchSubjectCategories,
   fetchTutorSubjects,
   proposeTutorSubject,
   removeTutorSubject,
@@ -126,7 +127,7 @@ const showProposalForm = ref(false)
 const isSubmitting = ref(false)
 const proposal = reactive({ subject_name: '', category: '', description: '', keywords: '' })
 
-const categories = computed(() => [...new Set(allSubjects.value.map((s) => s.category))].sort())
+const categories = ref([])
 
 const isAtSubjectLimit = computed(() => selectedSubjects.value.length >= SUBJECT_LIMIT)
 
@@ -154,7 +155,10 @@ const mergeIntoCatalog = (subjects) => {
 
 const loadSubjects = async () => {
   try {
-    const [catalog, selected] = await Promise.all([fetchSubjectCatalog(), fetchTutorSubjects()])
+    const [catalog, selected, categoryNames] = await Promise.all([
+      fetchSubjectCatalog(), fetchTutorSubjects(), fetchSubjectCategories(),
+    ])
+    categories.value = categoryNames
     allSubjects.value = catalog
     selectedSubjects.value = selected
     mergeIntoCatalog(selected)

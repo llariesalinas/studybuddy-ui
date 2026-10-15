@@ -1,3 +1,4 @@
+import math
 import logging
 import decimal
 import csv
@@ -1196,7 +1197,9 @@ class AdminSubjectCategoryView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsSuperAdminUser]
 
     def get(self, request):
-        categories = SubjectCategory.objects.all()
+        categories = SubjectCategory.objects.annotate(
+            subject_count=Count('subjects'),
+        ).order_by('display_order', 'name')
         return Response(SubjectCategorySerializer(categories, many=True).data)
 
     def post(self, request):
@@ -1221,6 +1224,11 @@ class AdminSubjectCategoryView(APIView):
     def patch(self, request, pk=None):
         category = get_object_or_404(SubjectCategory, pk=pk)
         name = str(request.data.get('name') or '').strip()
+        if category.is_system and 'name' in request.data and name != category.name:
+            return Response(
+                {"error": "The system category cannot be renamed."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         clash = resolve_category(name)
         if name and clash is not None and clash.pk != category.pk:
             return Response(
@@ -2230,9 +2238,9 @@ def parse_algorithm_weight_groups(payload):
 
             # Normalising cannot rescue a negative weight: a group can still sum
             # above zero while a member contributes a negative share.
-            if value < 0:
+            if not math.isfinite(value) or value < 0:
                 raise AlgorithmWeightPayloadError(
-                    "Weight '%s.%s' cannot be negative." % (group, key)
+                    "Weight '%s.%s' must be finite and non-negative." % (group, key)
                 )
 
             parsed[key] = value
@@ -2311,19 +2319,10 @@ class AdminAlgorithmWeightsView(APIView):
         except AlgorithmWeightPayloadError as err:
             return Response({"error": str(err)}, status=status.HTTP_400_BAD_REQUEST)
 
-        for group, parsed in updates.items():
-            # Merge with what is stored so a partial update cannot zero a group
-            # by omission.
-            merged = dict(algorithm_weights.DEFAULT_WEIGHTS[group])
-            for weight in AlgorithmWeight.objects.filter(group=group):
-                merged[weight.key] = weight.value
-            merged.update(parsed)
-
-            if sum(merged.values()) <= 0:
-                return Response(
-                    {"error": "Group '%s' must have at least one weight above zero." % group},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+        try:
+            algorithm_weights.merge_weight_overrides(updates)
+        except ValueError as err:
+            return Response({"error": str(err)}, status=status.HTTP_400_BAD_REQUEST)
 
         actor = getattr(request.user, 'userprofile', None)
 
@@ -2377,12 +2376,14 @@ class AdminAlgorithmWeightsPreviewView(APIView):
             except AlgorithmWeightPayloadError as err:
                 return Response({"error": str(err)}, status=status.HTTP_400_BAD_REQUEST)
 
-            for group, entries in parsed_overrides.items():
-                merged = {
-                    key: entries.get(key, weights[group][key])
-                    for key in algorithm_weights.DEFAULT_WEIGHTS[group]
-                }
-                weights[group] = algorithm_weights.normalize_group(merged, group)
+            try:
+                merged = algorithm_weights.merge_weight_overrides(parsed_overrides)
+            except ValueError as err:
+                return Response({"error": str(err)}, status=status.HTTP_400_BAD_REQUEST)
+            weights = {
+                group: algorithm_weights.normalize_group(entries, group)
+                for group, entries in merged.items()
+            }
 
         result = build_algorithm_demo_recommendation(
             tutee,

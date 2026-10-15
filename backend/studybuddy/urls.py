@@ -46,6 +46,7 @@ from . import views
 print("STUDYBUDDY URLS LOADED")
 
 urlpatterns = [
+    path('subject-categories/', views.subject_categories),
     # Admin Routes
     path('admin/stats/', AdminStatsView.as_view()),
     path('admin/operational-queue/', AdminOperationalQueueView.as_view()),

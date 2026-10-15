@@ -16,6 +16,7 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.db.models import Q
 from django.utils import timezone
 from django.utils.crypto import constant_time_compare
 
@@ -55,6 +56,9 @@ def split_device_token(raw_token):
 
 def issue_trusted_device(user, request):
     """Create a trusted device for this browser and return the raw token to hand the client."""
+    TrustedDevice.objects.filter(user=user).filter(
+        Q(expires_at__lte=timezone.now()) | Q(revoked_at__isnull=False)
+    ).delete()
     secret = secrets.token_urlsafe(DEVICE_SECRET_BYTES)
     device = TrustedDevice(
         user=user,

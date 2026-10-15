@@ -112,3 +112,16 @@ describe('catalog store', () => {
     expect(clearApiCache).toHaveBeenCalledWith('catalog')
   })
 })
+
+it('refreshes unknown categories from a review save and keeps known categories cached', async () => {
+  setActivePinia(createPinia())
+  api.get.mockReset()
+  const catalog = useCatalogStore()
+  catalog.subjectCategories = [{ name: 'Sports' }]
+  await catalog.refreshCategoriesIfUnknown('Sports')
+  expect(api.get).not.toHaveBeenCalled()
+  api.get.mockResolvedValueOnce({ data: [{ name: 'Sports' }, { name: 'Music' }] })
+  await catalog.refreshCategoriesIfUnknown('Music')
+  expect(api.get).toHaveBeenCalledWith('/admin/subject-categories/')
+  expect(catalog.subjectCategories.map((category) => category.name)).toContain('Music')
+})

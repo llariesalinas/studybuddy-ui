@@ -75,6 +75,8 @@ export const useAuthStore = defineStore('auth', () => {
   const token = ref(localStorage.getItem('access_token') || null)
   const refreshToken = ref(localStorage.getItem('refresh_token') || null)
   const user = ref(null)
+  const modeChangedElsewhere = ref(false)
+  const remoteModeRevision = ref(0)
 
   const isAuthenticated = computed(() => !!token.value)
   const userRole = computed(() => user.value?.role || null)
@@ -136,7 +138,10 @@ export const useAuthStore = defineStore('auth', () => {
     const serverRole = normalizeRole(response.data.role)
     if (serverRole && serverRole !== normalizeRole(user.value?.role)) {
       applyRole(serverRole)
+      modeChangedElsewhere.value = true
       profileStore.resetProfileState()
+      await profileStore.checkProfileStatus()
+      remoteModeRevision.value += 1
       useToastStore().push(`Switched to ${capitalizeMode(serverRole)} mode on another device.`)
     }
 
@@ -281,6 +286,8 @@ export const useAuthStore = defineStore('auth', () => {
     token.value = null
     refreshToken.value = null
     user.value = null
+    modeChangedElsewhere.value = false
+    remoteModeRevision.value = 0
     profileStore.resetProfileState()
 
     localStorage.removeItem('access_token')
@@ -364,6 +371,7 @@ export const useAuthStore = defineStore('auth', () => {
     const response = await api.post('/switch-mode/', { mode: capitalizeMode(mode) })
 
     applyRole(response.data.role)
+    modeChangedElsewhere.value = false
     // Capabilities and every role-scoped onboarding flag are re-derived server-side, so drop the
     // cached profile rather than patching it field by field.
     profileStore.resetProfileState()
@@ -376,6 +384,8 @@ export const useAuthStore = defineStore('auth', () => {
     refreshToken,
     user,
     userRole,
+    modeChangedElsewhere,
+    remoteModeRevision,
     isAuthenticated,
     setTokens,
     updateAccessToken,
