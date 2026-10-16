@@ -58,7 +58,7 @@ def bump_dashboard_recs_cache_version():
 
 def dashboard_recs_cache_key(tutee, limit=DEFAULT_LIMIT):
     version = _dashboard_recs_cache_version()
-    return f"dash_recs:v{version}:limit{limit}:{tutee.id}"
+    return f"dash_recs:self-excluded:v{version}:limit{limit}:{tutee.id}"
 
 
 def _serialize(tutor):
@@ -71,8 +71,10 @@ def _serialize(tutor):
     }
 
 
-def _fallback(limit):
-    qs = Tutor.objects.select_related("profile").prefetch_related("tutorsubjects_set__subject")
+def _fallback(tutee, limit):
+    qs = Tutor.objects.exclude(profile_id=tutee.id).select_related("profile").prefetch_related(
+        "tutorsubjects_set__subject"
+    )
     return [_serialize(tutor) for tutor in qs[:limit]]
 
 
@@ -101,7 +103,7 @@ def get_dashboard_recommendations(tutee, limit=DEFAULT_LIMIT):
 
     subject_codes = get_student_subject_codes(tutee)
     if not subject_codes:
-        data = _fallback(limit)
+        data = _fallback(tutee, limit)
         _cache_set(key, data)
         logger.info(
             "Dashboard recs fallback for tutee %s: returned %s in %.3fs",
@@ -113,7 +115,7 @@ def get_dashboard_recommendations(tutee, limit=DEFAULT_LIMIT):
 
     candidate_qs = Tutor.objects.filter(
         tutorsubjects__subject__subject_code__in=subject_codes
-    ).distinct()
+    ).exclude(profile_id=tutee.id).distinct()
 
     ratings = build_rating_matrix()
     ranked = recommend_tutors_hybrid(

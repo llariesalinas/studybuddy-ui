@@ -11,6 +11,7 @@ export const useToastStore = defineStore('toast', () => {
     const id = ++nextId
     toasts.value.push({ id, message, type, action })
     setTimeout(() => dismiss(id), duration)
+    return id
   }
 
   function dismiss(id) {

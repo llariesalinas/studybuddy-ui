@@ -4,14 +4,19 @@
       <div class="row g-3 align-items-end tutor-filter-row">
         <!-- Subject -->
         <div class="col-lg-4 col-md-6">
-          <label class="form-label fw-semibold small sb-muted">Subject</label>
-          <SubjectPickerModal v-model="selectedSubjectCodes" :subjects="subjects" />
+          <label for="search-subject" class="form-label fw-semibold small sb-muted">Subject</label>
+          <SubjectPickerModal
+            id="search-subject"
+            v-model="selectedSubjectCodes"
+            :subjects="subjects"
+          />
         </div>
 
         <!-- Mode -->
         <div class="col-lg-4 col-md-6">
-          <label class="form-label fw-semibold small sb-muted">Mode</label>
+          <label for="search-mode" class="form-label fw-semibold small sb-muted">Mode</label>
           <SbSelectModal
+            id="search-mode"
             v-model="modeModel"
             :options="modeOptions"
             title="Choose Mode"
@@ -25,7 +30,7 @@
         <!-- Location -->
         <div v-if="modeModel === 'Face-to-face' && campusLocationType" class="col-lg-4 col-md-6">
           <div class="d-flex justify-content-between align-items-center gap-2 mb-1 flex-wrap">
-            <label class="form-label fw-semibold small sb-muted mb-0">
+            <label for="search-location" class="form-label fw-semibold small sb-muted mb-0">
               Location ({{ campusLocationType === 'inside' ? 'Inside Campus' : 'Outside Campus' }})
             </label>
             <button
@@ -37,6 +42,7 @@
             </button>
           </div>
           <input
+            id="search-location"
             type="text"
             v-model="locationModel"
             class="form-control border-sb shadow-none py-2 sb-field"
@@ -46,16 +52,20 @@
 
         <!-- Date -->
         <div class="col-lg-4 col-md-6">
-          <label class="form-label fw-semibold small sb-muted">Date</label>
-          <BookingDatePicker v-model="dateModel" />
+          <label for="search-date" class="form-label fw-semibold small sb-muted">Date</label>
+          <BookingDatePicker id="search-date" v-model="dateModel" />
         </div>
 
         <!-- Budget -->
         <div class="col-lg-4 col-md-6 subject-filter-column">
-          <label class="form-label fw-semibold small sb-muted">Budget Range</label>
+          <label for="search-budget" class="form-label fw-semibold small sb-muted">
+            Budget Range
+          </label>
           <div class="budget-filter-wrap">
             <button
               type="button"
+              id="search-budget"
+              :aria-expanded="showBudgetFilter"
               class="btn w-100 budget-toggle-btn shadow-none sb-btn"
               :class="{ 'budget-toggle-btn-active': showBudgetFilter }"
               @click="showBudgetFilter = !showBudgetFilter"
@@ -78,10 +88,11 @@
 
         <!-- Time range (optional) -->
         <div class="col-lg-4 col-md-6">
-          <label class="form-label fw-semibold small sb-muted">
+          <label for="search-time" class="form-label fw-semibold small sb-muted">
             Time <span class="fw-normal">(optional)</span>
           </label>
           <BookingTimeRangePicker
+            id="search-time"
             v-model:start="startTimeModel"
             v-model:end="endTimeModel"
             :selected-date="findTutorsStore.filters.date"
@@ -130,12 +141,12 @@
 
     <div v-if="isLoading" class="text-center py-5">
       <div class="spinner-border text-sb-primary" role="status"></div>
-      <p class="sb-muted mt-2">Running matching algorithm...</p>
+      <p class="sb-muted mt-2">Finding tutors…</p>
     </div>
 
     <div v-else-if="filteredTutors.length" class="row g-4">
       <div class="col-md-6" v-for="tutor in filteredTutors" :key="tutor.profile_id">
-        <div class="card sb-card-surface shadow-sm rounded-4 h-100">
+        <div class="card sb-card-surface sb-card-static shadow-sm rounded-4 h-100">
           <div class="card-body p-4">
             <div class="d-flex justify-content-between align-items-start mb-3">
               <div class="d-flex align-items-center gap-3">
@@ -171,7 +182,7 @@
 
             <div class="d-flex justify-content-between align-items-center mt-auto">
               <div class="small">
-                <span class="fw-bold sb-text">P{{ tutor.hourly_rate }}</span
+                <span class="fw-bold sb-text">PHP {{ tutor.hourly_rate }}</span
                 ><span class="sb-muted">/hr</span>
                 <span class="sb-muted ms-2">. {{ tutor.total_sessions }} sessions</span>
               </div>
@@ -179,7 +190,7 @@
                 @click="toTutorDetails(tutor)"
                 class="btn bg-sb-primary text-white px-4 rounded-3 fw-semibold shadow-sm sb-btn"
               >
-                Book Session
+                View tutor
               </button>
             </div>
 
@@ -875,6 +886,23 @@ onBeforeRouteUpdate(async (to, from, next) => {
     position: static;
     width: 100%;
     margin-top: 0.75rem;
+  }
+}
+@media (min-width: 992px) {
+  .tutor-filter-row {
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--sb-card-border);
+  }
+
+  .card-body h6 {
+    font-size: 16px;
+    font-weight: 800;
+    line-height: 1.3;
+  }
+
+  .card-body > p {
+    color: var(--sb-text-secondary);
+    line-height: 1.6;
   }
 }
 </style>

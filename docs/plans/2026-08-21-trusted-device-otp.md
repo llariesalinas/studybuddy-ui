@@ -117,6 +117,17 @@ everything.
 14. `src/stores/auth.test.js` (or a new one): device token is sent on login, persisted from
     verify-otp, kept on idle logout, cleared on user logout.
 
+**Cleanup (added 2026-10-15 from code review)**
+
+15. **Done 2026-10-16** — `trusted_devices.issue_trusted_device`: before inserting, delete this user's rows that are
+    expired or revoked. Nothing purges them today, and until steps 10-14 ship every OTP login
+    inserts a row the client throws away. Use opportunistic cleanup rather than a django-q
+    `Schedule`, because `qcluster` is often not running (see `AGENTS.md`). Optionally add a
+    `purge_trusted_devices` management command for an ops sweep across all users. Test in
+    `TrustedDeviceLoginTests`: seed one expired, one revoked and one live device, log in through
+    OTP, and assert that only the live device and the new one remain.
+
+
 ## Risks
 
 - **Silent security regression.** A stolen `localStorage` token is a 7-day bypass of the second
@@ -158,3 +169,7 @@ everything.
   the narrowed reading of "logout revokes trust" that keeps idle/refresh-failure logouts from
   re-challenging every 10 minutes. Status: Draft.
 
+
+Cleanup step 15 is implemented and verified by TrustedDeviceLoginTests, including preservation
+of live devices. The pre-existing frontend steps remain outstanding. See
+[review-fix completion](../session-summaries/2026-10-16-pr139-review-fixes.md).

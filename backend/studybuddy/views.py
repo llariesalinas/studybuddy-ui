@@ -115,6 +115,7 @@ from .models import (
     TutorSubjects,
     ACTIVE_BOOKING_STATUSES,
     GRACE_CUTOFF_HOURS,
+    SubjectCategory,
     resolve_category,
     MIN_HOURLY_RATE,
     MAX_HOURLY_RATE,
@@ -171,9 +172,16 @@ SUBJECT_NOT_RECOGNIZED_ERROR = "This subject is not recognized for your course c
 
 def get_tutor_onboarding_context(profile):
     tutor_onboarding_skipped_at = profile.tutor_onboarding_skipped_at
-    tutor_onboarding_complete = bool(
+    # Verification can be carried before tutor setup starts. Remember completed setup so
+    # removing subjects later does not send an established tutor back through onboarding.
+    if profile.tutor_setup_completed_at is None and profile.can_tutor and (
         tutor_onboarding_skipped_at is not None
-        or (profile.role == 'Tutor' and TutorApplication.objects.filter(profile=profile).exists())
+        or TutorApplication.objects.filter(profile=profile).exists()
+    ):
+        profile.tutor_setup_completed_at = timezone.now()
+        profile.save(update_fields=['tutor_setup_completed_at'])
+    tutor_onboarding_complete = bool(
+        profile.tutor_setup_completed_at or tutor_onboarding_skipped_at
     )
 
     return {
@@ -1509,9 +1517,12 @@ def carry_over_verification(profile, target_mode):
     if target_model.objects.filter(profile=profile).exists():
         return None
 
-    # `.name` is the storage path, so both applications reference the same uploaded files rather
-    # than duplicating them in media. Both then share a reviewed_at, so their 90-day renewal
-    # cadences fall due together -- correct, since they are literally the same two documents.
+    # Use the latest approved documents and their review date, including renewed documents.
+    # File names are storage references, so carrying them does not duplicate uploads.
+    latest = source.document_renewal_reviews.filter(
+        status='approved', reviewed_at__isnull=False,
+    ).order_by('-reviewed_at', '-submitted_at').first()
+    source = latest or source
     return target_model.objects.create(
         profile=profile,
         school_id=source.school_id.name,
@@ -2112,6 +2123,14 @@ class SearchTutorsView(APIView):
         serializer = TutorSearchSerializer(tutors, many=True)
         return Response(serializer.data)
 #Subject Serializer
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def subject_categories(request):
+    return Response(list(SubjectCategory.objects.filter(is_system=False).values_list(
+        'name', flat=True,
+    )))
+
 
 class SubjectListView(ListAPIView):
     serializer_class = SubjectSerializer
@@ -4523,7 +4542,7 @@ def propose_tutor_subject(request):
     # already exist, so an unrecognized name means a stale or hand-rolled client, not a
     # legitimate new category. See docs/plans/2026-08-21-subject-category-storage.md.
     subject_category = resolve_category(category)
-    if subject_category is None:
+    if subject_category is None or subject_category.is_system:
         return Response(
             {"error": "That category is not recognized."},
             status=status.HTTP_400_BAD_REQUEST,
@@ -4545,6 +4564,7 @@ def propose_tutor_subject(request):
         expertise_level=DEFAULT_TUTOR_SUBJECT_EXPERTISE_LEVEL,
         description=description,
     )
+    get_tutor_onboarding_context(profile)
 
     return Response(
         {
@@ -4601,6 +4621,7 @@ def add_tutor_subject(request):
 
     bump_dashboard_recs_cache_version()
 
+    get_tutor_onboarding_context(profile)
     return Response({"message": "Subject added"})
 
 @api_view(['PATCH'])
@@ -4629,6 +4650,7 @@ def remove_tutor_subject(request, subject_code):
 
     profile = request.user.userprofile
     tutor = Tutor.objects.get(profile=profile)
+    get_tutor_onboarding_context(profile)
 
     subject = Subjects.objects.filter(
         subject_code=subject_code,
@@ -6215,6 +6237,7 @@ def tutor_application_submit(request):
                 "Failed to send tutor application received email for profile_id=%s", profile.id
             )
 
+    get_tutor_onboarding_context(profile)
     transaction.on_commit(_send_confirmation)
     return Response(
         TutorApplicationSerializer(application, context={'request': request}).data,

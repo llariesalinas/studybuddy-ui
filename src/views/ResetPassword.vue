@@ -6,16 +6,18 @@
     <template #title>Choose New Password</template>
     <template #subtitle>Use a strong password for your StudyBuddy account</template>
 
-    <div v-if="errorMessage" class="sb-auth-alert">{{ errorMessage }}</div>
-    <div v-if="successMessage" class="sb-auth-alert sb-auth-alert-success">
+    <div v-if="errorMessage" class="sb-auth-alert" role="alert">{{ errorMessage }}</div>
+    <div v-if="successMessage" class="sb-auth-alert sb-auth-alert-success" role="status">
       {{ successMessage }}
     </div>
 
     <form @submit.prevent="handleResetPassword">
       <div class="sb-auth-field">
-        <label class="sb-auth-label">New Password</label>
+        <label for="new-password" class="sb-auth-label">New Password</label>
         <input
           v-model="password"
+          id="new-password"
+          autocomplete="new-password"
           type="password"
           class="sb-auth-input sb-field"
           placeholder="********"
@@ -24,9 +26,11 @@
       </div>
 
       <div class="sb-auth-field">
-        <label class="sb-auth-label">Confirm Password</label>
+        <label for="confirm-password" class="sb-auth-label">Confirm Password</label>
         <input
           v-model="passwordConfirm"
+          id="confirm-password"
+          autocomplete="new-password"
           type="password"
           class="sb-auth-input sb-field"
           placeholder="********"

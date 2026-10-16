@@ -455,7 +455,12 @@ body:not(.sb-landing-route) :where(button.rounded-pill, a.rounded-pill, [role='b
   textarea,
   [tabindex]:not([tabindex='-1'])
 ):focus-visible {
-  outline: 4px solid var(--sb-focus-ring);
+  outline: 2px solid var(--sb-primary-hover);
+  outline-offset: 2px;
+}
+
+.sb-field:focus-visible {
+  outline: 2px solid var(--sb-primary-hover);
   outline-offset: 2px;
 }
 
@@ -588,4 +593,104 @@ body:not(.sb-landing-route) :where(button.rounded-pill, a.rounded-pill, [role='b
   .sb-pill:active {
     transform: none !important;
   }
+}
+
+/* Desktop refinement retains the existing page layouts and working density. */
+@media (min-width: 992px) {
+  .app-main .app-page-header {
+    align-items: flex-start;
+    gap: 1.5rem;
+  }
+
+  .app-main .app-page-header h2 {
+    margin-bottom: 0.4rem;
+    font-size: 1.65rem;
+    font-weight: 800;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+
+  .app-main .app-page-header p {
+    max-width: 65ch;
+    margin-bottom: 0;
+    color: var(--sb-text-secondary);
+    line-height: 1.55;
+  }
+
+  .app-main .filter-bar {
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--sb-bg);
+    border-color: var(--sb-card-border);
+  }
+
+  .app-main .filter-tab {
+    min-height: 36px;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .app-main .sb-themed-table {
+    font-size: 13px;
+  }
+
+  .app-main .sb-themed-table thead th {
+    padding-top: 0.85rem;
+    padding-bottom: 0.85rem;
+    color: var(--sb-text-secondary);
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .app-main .sb-themed-table tbody td {
+    padding-top: 0.9rem;
+    padding-bottom: 0.9rem;
+  }
+
+  .app-main .sb-field:not(textarea) {
+    min-height: 42px;
+  }
+
+  .app-main .form-label {
+    margin-bottom: 0.5rem;
+    color: var(--sb-text-secondary);
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .app-main .btn:not(.rounded-circle) {
+    border-radius: 999px;
+    font-weight: 700;
+  }
+
+  .app-main .btn:disabled {
+    cursor: not-allowed;
+  }
+
+  .app-main :is(.summary-value, .summary-total, .metric-value, .balance-card h2) {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.sb-neutral-badge {
+  background: var(--sb-bg);
+  color: var(--sb-text-secondary);
+  border: 1px solid var(--sb-card-border);
+}
+
+.session-details-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--sb-primary);
+  font-weight: 700;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+  white-space: nowrap;
+}
+
+.session-details-link:hover {
+  color: var(--sb-primary-hover);
 }

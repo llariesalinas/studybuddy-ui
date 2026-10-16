@@ -65,27 +65,33 @@ def normalize_group(values, group):
     return {key: value / total for key, value in values.items()}
 
 
-def load_weights():
-    """Return ``{group: {key: normalised_weight}}`` for every group.
-
-    Missing rows fall back to their default, so the recommender keeps working
-    before the seed migration runs and if a key is ever removed by hand. Unknown
-    keys in the database are ignored - the code defines which components exist,
-    the database only supplies their values.
-    """
+def raw_weights():
+    """Known stored components over defaults, before normalization."""
     from ..models import AlgorithmWeight
 
     stored = {}
     for weight in AlgorithmWeight.objects.all():
         stored.setdefault(weight.group, {})[weight.key] = weight.value
-
     return {
-        group: normalize_group(
-            {key: stored.get(group, {}).get(key, default) for key, default in defaults.items()},
-            group,
-        )
+        group: {key: stored.get(group, {}).get(key, default) for key, default in defaults.items()}
         for group, defaults in DEFAULT_WEIGHTS.items()
     }
+
+
+def merge_weight_overrides(parsed):
+    """Use the same raw baseline and strict group validation for Preview and Save."""
+    merged = raw_weights()
+    for group, entries in parsed.items():
+        merged[group].update(entries)
+        if sum(merged[group].values()) <= 0:
+            raise ValueError("Group '%s' must have at least one weight above zero." % group)
+    return merged
+
+
+def load_weights():
+    # Stored unusable groups retain the existing normalize_group fallback. Only new overrides
+    # are strictly validated, so this read path remains safe for the live recommender.
+    return {group: normalize_group(values, group) for group, values in raw_weights().items()}
 
 
 def default_weights():

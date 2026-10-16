@@ -137,7 +137,9 @@
                     <path d="M214 64 l 5 5 l 8 -9" class="svg-ink-stroke" stroke-width="2.6" stroke-linecap="round" />
                   </g>
                   <rect x="150" y="176" width="140" height="34" rx="17" class="svg-green-tint-fill svg-green-tint-stroke" stroke-width="2" />
-                  <text x="176" y="198" class="svg-small-label svg-primary-fill">98% match</text>
+                  <text x="168" y="198" class="svg-small-label svg-primary-fill">
+                    Your subjects
+                  </text>
                 </svg>
 
                 <svg
@@ -309,7 +311,7 @@
         <div class="inner countstrip">
           <div v-for="count in counts" :key="count.label" class="count reveal">
             <div class="n">
-              <span :data-count="count.value">0</span>{{ count.suffix }}
+              {{ count.title }}
             </div>
             <div class="l">{{ count.label }}</div>
           </div>
@@ -448,27 +450,32 @@ const railTools = [
 ]
 
 const counts = [
-  { value: 20, suffix: 's', label: "to tell us what's hurting" },
-  { value: 98, suffix: '%', label: 'match scores, out in the open' },
-  { value: 1, suffix: ' min', label: 'to join with your student email' },
+  { title: 'Find help', label: 'Choose a subject, date and tutor.' },
+  { title: 'Teach peers', label: 'Publish your subjects, rate and weekly availability.' },
+  { title: 'Stay connected', label: 'Keep session details and conversations together.' },
 ]
 
 const faqs = [
   {
     question: 'Who can become a tutor?',
-    answer: "Any student who's strong in a subject. Set your subjects, rate, and availability - you earn per completed session while keeping your own schedule.",
+    answer: 'Students at partner institutions can apply. Set your subjects, rate and availability, ' +
+      'then complete verification before appearing in tutor search.',
   },
   {
     question: 'How much does it cost?',
-    answer: "Joining is free. You only pay per booked session at the tutor's listed rate, and payments are handled online inside the platform.",
+    answer: "Joining is free. Sessions use the tutor's listed hourly rate. " +
+      'Online sessions use online payment; face-to-face sessions use cash ' +
+      'with payment proof submitted for verification.',
   },
   {
     question: 'Can I use it on my campus?',
-    answer: "StudyBuddy is open to any campus. Sign up with your student email and you'll be matched with peers from your own school.",
+    answer: 'StudyBuddy supports partner institutions. Choose your institution during registration ' +
+      'and use an email address from its accepted student email domain.',
   },
   {
     question: 'What happens if a session falls through?',
-    answer: 'You can reschedule or cancel ahead of time, and session history keeps everything on record. If something goes wrong, support is one tap away.',
+    answer: 'Your booking shows its cancellation deadline. Late cancellations open a support review. ' +
+      'If something goes wrong, open Help or report the issue from your session details.',
   },
 ]
 
@@ -491,7 +498,6 @@ let currentScroll = 0
 let railTravel = 0
 const cleanupFns = []
 const motionCleanupFns = []
-const countRafs = new Set()
 
 const goTo = (path) => {
   stopContinuousMotion({ reset: true })
@@ -705,44 +711,10 @@ const stopContinuousMotion = ({ reset = false } = {}) => {
   }
 }
 
-const runCount = (el) => {
-  if (el.dataset.done) return
-  el.dataset.done = '1'
-  const end = Number.parseInt(el.dataset.count || '0', 10)
-
-  if (reducedQuery?.matches) {
-    el.textContent = String(end)
-    return
-  }
-
-  const startedAt = performance.now()
-  const tick = (time) => {
-    countRafs.delete(rafId)
-    if (!isMounted || document.visibilityState !== 'visible') {
-      return
-    }
-    const progress = Math.min(1, (time - startedAt) / 1100)
-    el.textContent = String(Math.round(end * (1 - Math.pow(1 - progress, 3))))
-    if (progress < 1) {
-      rafId = window.requestAnimationFrame(tick)
-      countRafs.add(rafId)
-    } else {
-      countRafs.delete(rafId)
-    }
-  }
-
-  let rafId = window.requestAnimationFrame(tick)
-  countRafs.add(rafId)
-}
-
 const revealAllStatic = () => {
   if (!pageRef.value) return
   pageRef.value.querySelectorAll('.reveal, .panel, .tools, .faq, .tslab, .faqitem, .hero-title').forEach((el) => {
     el.classList.add('in')
-  })
-  pageRef.value.querySelectorAll('[data-count]').forEach((el) => {
-    el.textContent = el.dataset.count || '0'
-    el.dataset.done = '1'
   })
 }
 
@@ -758,7 +730,6 @@ const setupReveals = () => {
     entries.forEach((entry) => {
       if (!entry.isIntersecting) return
       entry.target.classList.add('in')
-      entry.target.querySelectorAll('[data-count]').forEach(runCount)
     })
   }, { threshold: 0.25 })
 
@@ -820,8 +791,6 @@ const cleanupAll = () => {
     heroTimeoutId = null
   }
 
-  countRafs.forEach((id) => window.cancelAnimationFrame(id))
-  countRafs.clear()
   cleanupFns.splice(0).forEach((cleanup) => cleanup())
 }
 
@@ -1350,7 +1319,7 @@ section {
 }
 
 .count .n {
-  font-size: clamp(54px, 6.7vw, 96px);
+  font-size: clamp(28px, 3.2vw, 46px);
   font-weight: 900;
   letter-spacing: -0.03em;
   line-height: 1.04;

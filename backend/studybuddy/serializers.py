@@ -227,7 +227,8 @@ class SubjectCategorySerializer(serializers.ModelSerializer):
     subject_count = serializers.SerializerMethodField()
 
     def get_subject_count(self, obj):
-        return obj.subjects.count()
+        count = getattr(obj, 'subject_count', None)
+        return count if count is not None else obj.subjects.count()
 
     class Meta:
         model = SubjectCategory

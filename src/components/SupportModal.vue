@@ -3,6 +3,8 @@
     <div v-if="open" class="support-modal-shell sb-overlay" @click.self="emit('close')">
       <div
         class="support-modal-card"
+        ref="dialogRef"
+        tabindex="-1"
         role="dialog"
         aria-modal="true"
         aria-labelledby="support-modal-title"
@@ -101,7 +103,8 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch, onUnmounted } from 'vue'
+import { computed, reactive, ref, watch, onUnmounted, toRef } from 'vue'
+import { useDialogFocus } from '@/composables/useDialogFocus'
 import api from '@/services/api/api'
 import { useToastStore } from '@/stores/toast'
 
@@ -115,6 +118,10 @@ const emit = defineEmits(['close', 'submitted'])
 const toastStore = useToastStore()
 
 const isSubmitting = ref(false)
+const dialogRef = ref(null)
+useDialogFocus(toRef(props, 'open'), dialogRef, () => {
+  if (!isSubmitting.value) emit('close')
+})
 const form = reactive({
   category: '',
   subject: '',

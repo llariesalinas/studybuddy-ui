@@ -2,7 +2,6 @@
   <div class="admin-dashboard">
     <header class="dashboard-role-header" aria-label="Current admin dashboard">
       <div>
-        <p class="eyebrow">Dashboard view</p>
         <h1>Admin</h1>
         <p v-if="institutionName" class="header-sub">
           <i class="bi bi-building"></i> {{ institutionName }}
@@ -24,7 +23,11 @@
           <p class="fw-bold mb-0">Some dashboard data did not load</p>
           <p class="small mb-0">{{ store.error.stats || store.error.operationalQueue }}</p>
         </div>
-        <button type="button" class="btn btn-sm btn-danger rounded-pill ms-auto" @click="refreshDashboard">
+        <button
+          type="button"
+          class="btn btn-sm sb-btn sb-btn-soft ms-auto"
+          @click="refreshDashboard"
+        >
           Retry
         </button>
       </div>
@@ -55,7 +58,6 @@
       <article class="surface-panel">
         <div class="panel-heading">
           <div>
-            <p class="eyebrow">Enrollment</p>
             <h3>New members</h3>
           </div>
           <span class="soft-pill">14 days</span>
@@ -90,7 +92,6 @@
       <article class="surface-panel">
         <div class="panel-heading">
           <div>
-            <p class="eyebrow">Operational queue</p>
             <h3>Needs your action</h3>
           </div>
           <span class="soft-pill">{{ store.operationalQueue.count }}</span>
@@ -133,7 +134,6 @@
       <article class="surface-panel">
         <div class="panel-heading">
           <div>
-            <p class="eyebrow">Demand</p>
             <h3>Most requested subjects</h3>
           </div>
           <span class="soft-pill"><i class="bi bi-exclamation-triangle-fill"></i> = supply gap</span>
@@ -168,7 +168,6 @@
       <article class="surface-panel">
         <div class="panel-heading">
           <div>
-            <p class="eyebrow">Community</p>
             <h3>Top tutors</h3>
           </div>
           <router-link to="/admin/users" class="link-button">

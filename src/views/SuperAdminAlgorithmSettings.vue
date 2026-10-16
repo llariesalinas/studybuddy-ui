@@ -3,7 +3,7 @@
 // normalises each group at score time, so the percentage shown here is derived,
 // never stored. See docs/plans/2026-08-19-dynamic-algorithm-weights.md and the
 // chosen design at docs/mockups/2026-08-19-dynamic-algorithm-weights.html.
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import SbSelectModal from '@/components/SbSelectModal.vue'
 import {
   getAlgorithmWeights,
@@ -45,6 +45,8 @@ const previewMessage = ref('')
 const baselineOrder = ref([])
 
 let previewTimer = null
+let previewSeq = 0
+let baselineSeq = 0
 
 const tuteeOptions = computed(() =>
   tutees.value.map((tutee) => ({
@@ -152,14 +154,16 @@ function savedGroups() {
   }, {})
 }
 
-async function loadPreview() {
-  if (!previewEnabled.value || !selectedTuteeId.value) return
+async function loadPreview(sequence = ++previewSeq) {
+  const tuteeId = selectedTuteeId.value
+  if (sequence !== previewSeq || !previewEnabled.value || !selectedTuteeId.value) return
 
   previewLoading.value = true
   previewMessage.value = ''
 
   try {
-    const { data } = await previewAlgorithmWeights(selectedTuteeId.value, pendingGroups())
+    const { data } = await previewAlgorithmWeights(tuteeId, pendingGroups())
+    if (sequence !== previewSeq || tuteeId !== selectedTuteeId.value) return
     previewRows.value = data.rows || []
 
     if (!previewRows.value.length) {
@@ -170,9 +174,11 @@ async function loadPreview() {
     }
 
   } catch {
-    previewMessage.value = 'Could not run the preview.'
+    if (sequence === previewSeq && tuteeId === selectedTuteeId.value) {
+      previewMessage.value = 'Could not run the preview.'
+    }
   } finally {
-    previewLoading.value = false
+    if (sequence === previewSeq) previewLoading.value = false
   }
 }
 
@@ -181,20 +187,25 @@ async function loadPreview() {
 // when a tutee happens to be picked. Loading it separately keeps that true even
 // if the admin drags first and chooses a tutee second.
 async function loadBaseline() {
+  const sequence = ++baselineSeq
+  const tuteeId = selectedTuteeId.value
   if (!previewEnabled.value || !selectedTuteeId.value) return
 
   try {
-    const { data } = await previewAlgorithmWeights(selectedTuteeId.value, savedGroups())
+    const { data } = await previewAlgorithmWeights(tuteeId, savedGroups())
+    if (sequence !== baselineSeq || tuteeId !== selectedTuteeId.value) return
     baselineOrder.value = (data.rows || []).map((row) => row.tutor_id)
   } catch {
-    baselineOrder.value = []
+    if (sequence === baselineSeq) baselineOrder.value = []
   }
 }
 
 function schedulePreview() {
   if (!previewEnabled.value) return
   clearTimeout(previewTimer)
-  previewTimer = setTimeout(loadPreview, PREVIEW_DEBOUNCE_MS)
+  const sequence = ++previewSeq
+  previewLoading.value = Boolean(selectedTuteeId.value)
+  previewTimer = setTimeout(() => loadPreview(sequence), PREVIEW_DEBOUNCE_MS)
 }
 
 // How far a tutor moved from where it sat when this tutee was first previewed,
@@ -211,7 +222,7 @@ async function save() {
   try {
     const { data } = await updateAlgorithmWeights(pendingGroups())
     applyResponse(data)
-    await loadBaseline()
+    await Promise.all([loadBaseline(), loadPreview()])
   } catch (err) {
     errorMessage.value = err.response?.data?.error || 'Could not save the weights.'
   } finally {
@@ -219,11 +230,22 @@ async function save() {
   }
 }
 
-watch(selectedTuteeId, async () => {
+watch(selectedTuteeId, () => {
+  clearTimeout(previewTimer)
+  previewSeq += 1
+  baselineSeq += 1
   baselineOrder.value = []
   previewRows.value = []
-  await loadBaseline()
+  previewMessage.value = ''
+  previewLoading.value = false
+  loadBaseline()
   loadPreview()
+}, { flush: 'sync' })
+
+onBeforeUnmount(() => {
+  clearTimeout(previewTimer)
+  previewSeq += 1
+  baselineSeq += 1
 })
 
 onMounted(async () => {

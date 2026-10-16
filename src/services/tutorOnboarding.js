@@ -1,5 +1,10 @@
 import api from '@/services/api/api'
 
+export const fetchSubjectCategories = async () => {
+  const { data } = await api.get('/subject-categories/')
+  return Array.isArray(data) ? data : []
+}
+
 export const fetchTutorSubjects = async () => {
   const { data } = await api.get('/tutor/subjects/')
   return Array.isArray(data) ? data : []

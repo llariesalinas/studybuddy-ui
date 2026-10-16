@@ -1,6 +1,8 @@
 <template>
   <button
     ref="triggerRef"
+    :id="id"
+    aria-haspopup="dialog"
     type="button"
     class="sb-select-trigger"
     :class="triggerClass"
@@ -129,8 +131,10 @@
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { useDialogFocus } from '@/composables/useDialogFocus'
 
 const props = defineProps({
+  id: { type: String, default: undefined },
   modelValue: {
     type: [String, Number],
     default: null
@@ -198,6 +202,7 @@ const dialogRef = ref(null)
 const searchRef = ref(null)
 const listboxRef = ref(null)
 const optionRefs = ref(new Map())
+useDialogFocus(isOpen, dialogRef, closeModal)
 
 const normalizedGroups = computed(() => {
   const groups = props.groups

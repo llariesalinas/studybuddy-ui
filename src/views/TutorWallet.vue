@@ -2,8 +2,8 @@
 <template>
   <div class="wallet-shell">
     <section class="wallet-grid wallet-top-grid">
-      <article class="glass-panel performance-card sb-interactive">
-        <div class="ring-wrap" aria-label="Wallet performance">
+      <article class="glass-panel performance-card">
+        <div class="ring-wrap" aria-hidden="true">
           <svg class="progress-rings" viewBox="0 0 120 120" role="img">
             <circle class="ring-base" cx="60" cy="60" r="50" pathLength="100"></circle>
             <circle class="ring-base ring-base-inner" cx="60" cy="60" r="36" pathLength="100"></circle>
@@ -30,8 +30,7 @@
         </div>
 
         <div class="performance-copy">
-          <span class="eyebrow">Wallet Ledger</span>
-          <h3>Performance Track</h3>
+          <h3>Earnings summary</h3>
           <p>
             Your wallet activity is based on completed online sessions, platform deductions,
             provider fees, and cash-out ledger entries.
@@ -64,7 +63,7 @@
         </div>
       </article>
 
-      <article class="balance-card glass-panel sb-interactive">
+      <article class="balance-card glass-panel">
         <div>
           <span class="eyebrow balance-eyebrow">Available Balance</span>
           <h2>PHP {{ money(walletStore.balance) }}</h2>
@@ -99,7 +98,6 @@
       <article class="glass-panel activity-card">
         <header class="section-header">
           <div>
-            <span class="eyebrow">Ledger</span>
             <h3>Recent Activity</h3>
           </div>
           <button class="section-action sb-btn" @click="refreshData">Refresh</button>
@@ -145,7 +143,6 @@
       <article class="glass-panel cashout-history-card">
         <header class="section-header">
           <div>
-            <span class="eyebrow">Cash-Outs</span>
             <h3>Cash-Out History</h3>
           </div>
           <span class="history-summary">
@@ -209,15 +206,28 @@
 
     <Teleport to="body">
     <div v-if="showCashoutModal" class="modal-backdrop fade show sb-overlay" data-sb-owned></div>
-    <div v-if="showCashoutModal" class="modal fade show d-block" tabindex="-1">
+    <div
+      v-if="showCashoutModal"
+      ref="cashoutDialogRef"
+      class="modal fade show d-block"
+      tabindex="-1"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="cashout-title"
+    >
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content wallet-modal">
           <div class="modal-header border-0">
             <div>
-              <span class="eyebrow">Wallet</span>
-              <h5 class="modal-title">Cash Out</h5>
+              <h5 id="cashout-title" class="modal-title">Cash Out</h5>
             </div>
-            <button type="button" class="btn-close" @click="closeCashoutModal"></button>
+            <button
+              type="button"
+              class="btn-close"
+              aria-label="Close cash-out"
+              :disabled="isSubmitting"
+              @click="closeCashoutModal"
+            ></button>
           </div>
 
           <div v-if="showConfirmStep" class="modal-body">
@@ -398,6 +408,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import SbSelectModal from '@/components/SbSelectModal.vue'
 import CashInModal from '@/components/CashInModal.vue'
+import { useDialogFocus } from '@/composables/useDialogFocus'
 import { useWalletStore } from '@/stores/wallet'
 import { useToastStore } from '@/stores/toast'
 import { getReceivingInstitutionLogoUrl } from '@/data/receivingInstitutionLogos'
@@ -410,6 +421,10 @@ const walletStore = useWalletStore()
 const showCashinModal = ref(false)
 const showCashoutModal = ref(false)
 const isSubmitting = ref(false)
+const cashoutDialogRef = ref(null)
+useDialogFocus(showCashoutModal, cashoutDialogRef, () => {
+  if (!isSubmitting.value) closeCashoutModal()
+})
 const isDev = import.meta.env.DEV || BOOKING_DEV_TOOLS_ENABLED
 const devAmount = ref(500)
 
@@ -1604,6 +1619,90 @@ watch(showCashoutModal, async (isOpen) => {
   .dev-tools-card {
     align-items: stretch;
     flex-direction: column;
+  }
+}
+@media (min-width: 992px) {
+  .wallet-shell {
+    --wallet-primary: var(--sb-primary);
+    --wallet-primary-hover: var(--sb-primary-hover);
+    --wallet-ink: var(--sb-text-main);
+    --wallet-muted: var(--sb-text-secondary);
+    --wallet-glass: var(--sb-card-bg);
+    --wallet-glass-strong: var(--sb-card-bg);
+  }
+
+  .wallet-shell::before {
+    background: none;
+  }
+
+  .glass-panel {
+    border-color: var(--sb-card-border);
+    border-radius: 18px;
+    box-shadow: none;
+  }
+
+  .performance-card {
+    grid-template-columns: 96px minmax(0, 1fr);
+    gap: 24px;
+    padding: 28px;
+  }
+
+  .ring-wrap {
+    width: 96px;
+    height: 96px;
+  }
+
+  .ring-center {
+    width: 32px;
+    height: 32px;
+    font-size: 16px;
+  }
+
+  .performance-copy h3,
+  .section-header h3 {
+    margin-top: 0;
+    font-size: 18px;
+  }
+
+  .balance-card {
+    background: var(--sb-primary-hover);
+    color: var(--sb-primary-contrast);
+    padding: 24px;
+  }
+
+  .balance-actions {
+    gap: 8px;
+  }
+
+  .balance-cashout-btn {
+    background: var(--sb-primary-contrast);
+    color: var(--sb-primary-hover);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 42px;
+    padding: 8px 12px;
+    border-radius: 999px;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+
+  .balance-refresh-btn {
+    color: var(--sb-primary-contrast);
+    flex: 0 0 36px;
+    width: 36px;
+    height: 42px;
+    border-radius: 999px;
+  }
+
+  .balance-eyebrow,
+  .balance-card p {
+    color: var(--sb-primary-contrast);
+  }
+
+  .balance-card h2 {
+    font-variant-numeric: tabular-nums;
   }
 }
 </style>

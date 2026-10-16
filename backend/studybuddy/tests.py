@@ -6566,6 +6566,28 @@ class DashboardRecommendationServiceTests(APITestCase):
         self.assertEqual(ids, {match.profile.id})
 
 
+    def test_dual_role_self_excluded_in_ranked_and_fallback_results(self):
+        from studybuddy.recommender.dashboard import get_dashboard_recommendations
+        tutor = Tutor.objects.create(profile=self.student, hourly_rate=200)
+        TutorSubjects.objects.create(tutor=tutor, subject=self.subject, expertise_level=3)
+        other = self._make_tutor('other-review-tutor', self.subject)
+        self.assertEqual(
+            [row['id'] for row in get_dashboard_recommendations(self.student)], [other.profile_id],
+        )
+        cache.clear()
+        self._set_preferences(self.subject)
+        self.assertEqual(
+            [row['id'] for row in get_dashboard_recommendations(self.student)], [other.profile_id],
+        )
+
+    def test_cache_namespace_excludes_legacy_results_with_stored_version(self):
+        from studybuddy.recommender.dashboard import dashboard_recs_cache_key, VERSION_CACHE_KEY
+        cache.set(VERSION_CACHE_KEY, 42)
+        self.assertNotEqual(
+            dashboard_recs_cache_key(self.student), f'dash_recs:v42:limit5:{self.student.pk}',
+        )
+
+
 class StudentDashboardRecommendationTests(APITestCase):
     def setUp(self):
         cache.clear()
@@ -9492,6 +9514,23 @@ class TutorOnboardingStateTests(APITestCase):
         self.assertFalse(TutorApplication.objects.filter(profile=profile).exists())
 
 
+    def test_submission_records_completed_setup_before_any_profile_reload(self):
+        self.tutor.hourly_rate = 200
+        self.tutor.save(update_fields=['hourly_rate'])
+        subject = Subjects.objects.create(subject_code='setup-review', subject_name='Setup')
+        TutorSubjects.objects.create(tutor=self.tutor, subject=subject, expertise_level=3)
+        self.client.force_authenticate(user=self.tutor_user)
+        response = self.client.post('/api/tutor-application/submit/', {
+            'school_id': self.upload('id.jpg', 'image/jpeg'),
+            'enrollment_proof': self.upload('proof.pdf', 'application/pdf'),
+        }, format='multipart')
+        self.assertEqual(response.status_code, 201)
+        self.tutor_profile.refresh_from_db()
+        self.assertIsNotNone(self.tutor_profile.tutor_setup_completed_at)
+        self.tutor.tutorsubjects_set.all().delete()
+        self.assertTrue(self.client.get('/api/profile/status/').data['tutor_onboarding_complete'])
+
+
 class TutorSubjectProposalTests(APITestCase):
     def setUp(self):
         self.institution = PartnerInstitution.objects.create(
@@ -9712,6 +9751,14 @@ class TutorSubjectProposalTests(APITestCase):
             unrelated_subject.subject_code,
             [row["subject_code"] for row in response.data],
         )
+
+
+    def test_proposal_rejects_system_category(self):
+        self.client.force_authenticate(user=self.tutor_user)
+        response = self.client.post('/api/tutor/subjects/propose/', {
+            'subject_name': 'System proposal', 'category': 'Uncategorized',
+        }, format='json')
+        self.assertEqual(response.status_code, 400)
 
 
 class AdminProposedSubjectReviewTests(APITestCase):
@@ -10239,6 +10286,53 @@ class SubjectCategoryStorageTests(APITestCase):
         response = self.client.get('/api/admin/course-catalog/')
         row = next(r for r in response.data if r['subject_code'] == subject.subject_code)
         self.assertEqual(row['category'], "Mathematics & Data Sciences")
+
+
+    def test_system_category_cannot_be_renamed_but_can_be_reordered(self):
+        category = SubjectCategory.objects.get(is_system=True)
+        url = f'/api/admin/subject-categories/{category.pk}/'
+        self.assertEqual(self.client.patch(url, {'name': 'Other'}, format='json').status_code, 400)
+        response = self.client.patch(url, {'display_order': 998}, format='json')
+        self.assertEqual(response.status_code, 200)
+        category.refresh_from_db()
+        self.assertEqual(category.name, 'Uncategorized')
+
+    def test_force_renamed_system_category_remains_fallback_and_excluded_from_cbf(self):
+        from studybuddy.models import get_uncategorized
+        from studybuddy.recommender.cbf import resolve_target_categories
+        category = get_uncategorized()
+        SubjectCategory.objects.filter(pk=category.pk).update(name='Renamed system')
+        subject = Subjects.objects.create(subject_code='review-fallback', subject_name='Fallback')
+        self.assertEqual(subject.category_id, category.pk)
+        self.assertEqual(resolve_target_categories(subject.subject_code, []), set())
+        other = make_category('Remove this category')
+        subject.category = other
+        subject.save(update_fields=['category'])
+        other.delete()
+        subject.refresh_from_db()
+        self.assertEqual(subject.category_id, category.pk)
+        self.assertEqual(SubjectCategory.objects.filter(is_system=True).count(), 1)
+
+    def test_public_category_list_has_empty_categories_in_server_order(self):
+        SubjectCategory.objects.create(name='Empty first', display_order=1)
+        self.admin_profile.role = 'Tutor'
+        self.admin_profile.save(update_fields=['role'])
+        response = self.client.get('/api/subject-categories/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data[0], 'Empty first')
+        self.assertNotIn('Uncategorized', response.data)
+        self.client.force_authenticate(user=None)
+        self.assertIn(self.client.get('/api/subject-categories/').status_code, [401, 403])
+
+    def test_category_count_queries_do_not_grow_with_category_count(self):
+        url = '/api/admin/subject-categories/'
+        with CaptureQueriesContext(connection) as initial:
+            self.assertEqual(self.client.get(url).status_code, 200)
+        for index in range(5):
+            SubjectCategory.objects.create(name=f'Review category {index}')
+        with CaptureQueriesContext(connection) as expanded:
+            self.assertEqual(self.client.get(url).status_code, 200)
+        self.assertEqual(len(initial), len(expanded))
 
 
 class AdminCourseCatalogTaxonomyTests(APITestCase):
@@ -11086,6 +11180,61 @@ class DualRoleModeSwitchTests(APITestCase):
         self.assertEqual(serialized["wallet_balance"], 125.0)
 
 
+    def test_carry_over_uses_latest_approved_renewal_in_both_directions(self):
+        for target, source_model, target_model, renewal_model in (
+            ('Tutor', TuteeApplication, TutorApplication, TuteeDocumentRenewalReview),
+            ('Tutee', TutorApplication, TuteeApplication, TutorDocumentRenewalReview),
+        ):
+            with self.subTest(target=target):
+                TutorApplication.objects.filter(profile=self.profile).delete()
+                TuteeApplication.objects.filter(profile=self.profile).delete()
+                self.profile.role = 'Tutee' if target == 'Tutor' else 'Tutor'
+                self.profile.save(update_fields=['role'])
+                source = source_model.objects.create(
+                    profile=self.profile, application_status='approved',
+                    reviewed_at=timezone.now() - timedelta(days=100),
+                    school_id='original/id.png', enrollment_proof='original/proof.pdf',
+                )
+                renewal = renewal_model.objects.create(
+                    application=source, profile=self.profile, status='approved',
+                    reviewed_at=timezone.now() - timedelta(days=5),
+                    school_id='renewal/id.png', enrollment_proof='renewal/proof.pdf',
+                )
+                # A newer pending review must not override the approved documents.
+                renewal_model.objects.create(
+                    application=source, profile=self.profile, status='pending',
+                    school_id='pending/id.png', enrollment_proof='pending/proof.pdf',
+                )
+                response = self.client.post('/api/switch-mode/', {'mode': target}, format='json')
+                self.assertEqual(response.status_code, 200)
+                carried = target_model.objects.get(profile=self.profile)
+                self.assertEqual(carried.reviewed_at, renewal.reviewed_at)
+                self.assertEqual(carried.school_id.name, renewal.school_id.name)
+                self.assertEqual(carried.enrollment_proof.name, renewal.enrollment_proof.name)
+                self.assertEqual(carried.document_renewal_status(), 'verified')
+                self.assertEqual(carried.document_renewal_due_at(), source.document_renewal_due_at())
+
+    def test_carried_verification_does_not_skip_initial_tutor_setup(self):
+        TuteeApplication.objects.create(
+            profile=self.profile, application_status='approved', reviewed_at=timezone.now(),
+        )
+        self.client.post('/api/switch-mode/', {'mode': 'Tutor'}, format='json')
+        response = self.client.get('/api/profile/status/')
+        self.assertFalse(response.data['tutor_onboarding_complete'])
+        self.assertFalse(response.data['tutor_rate_set'])
+
+    def test_completed_setup_survives_removing_all_subjects(self):
+        tutor = self.provision_tutor()
+        self.profile.role = 'Tutor'
+        self.profile.save(update_fields=['role'])
+        TutorApplication.objects.create(profile=self.profile, application_status='approved')
+        self.assertTrue(self.client.get('/api/profile/status/').data['tutor_onboarding_complete'])
+        tutor.tutorsubjects_set.all().delete()
+        response = self.client.get('/api/profile/status/')
+        self.assertTrue(response.data['tutor_onboarding_complete'])
+        self.assertFalse(response.data['can_tutor'])
+
+
 class AlgorithmWeightNormalizationTests(APITestCase):
     """The normalise-don't-validate contract from
     docs/plans/2026-08-19-dynamic-algorithm-weights.md."""
@@ -11516,6 +11665,29 @@ class AlgorithmWeightsPreviewValidationTests(APITestCase):
         self.assertEqual(response.status_code, 200)
 
 
+    def test_zero_sum_override_rejected_by_preview_and_save(self):
+        groups = {'hybrid': {'cbf': 0, 'cf': 0}}
+        self.assertEqual(self._preview(groups).status_code, 400)
+        self.assertEqual(self.client.patch(
+            '/api/admin/algorithm-weights/', {'groups': groups}, format='json',
+        ).status_code, 400)
+
+    def test_partial_preview_uses_raw_stored_values_exactly_as_save(self):
+        from studybuddy import admin_views
+        AlgorithmWeight.objects.update_or_create(group='hybrid', key='cbf', defaults={'value': 3})
+        AlgorithmWeight.objects.update_or_create(group='hybrid', key='cf', defaults={'value': 1})
+        with patch.object(admin_views, 'build_algorithm_demo_recommendation', return_value={}) as score:
+            self.assertEqual(self._preview({'hybrid': {'cbf': 1}}).status_code, 200)
+            previewed = score.call_args.kwargs['weights']
+            self.assertAlmostEqual(previewed['hybrid']['cbf'], 0.5)
+            response = self.client.patch('/api/admin/algorithm-weights/', {
+                'groups': {'hybrid': {'cbf': 1}},
+            }, format='json')
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(self._preview(None).status_code, 200)
+            self.assertEqual(score.call_args.kwargs['weights'], previewed)
+
+
 @override_settings(
     EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
     FRONTEND_URL="https://studybuddy.example",
@@ -11731,3 +11903,19 @@ class TrustedDeviceLoginTests(APITestCase):
         self.assertIn("access", response.data)
         self.assertNotIn("device_token", response.data)
         self.assertFalse(TrustedDevice.objects.filter(user=self.user).exists())
+
+
+    def test_otp_login_purges_only_this_users_expired_and_revoked_devices(self):
+        from studybuddy.trusted_devices import issue_trusted_device
+        from rest_framework.test import APIRequestFactory
+        request = APIRequestFactory().post('/')
+        tokens = [issue_trusted_device(self.user, request) for _ in range(3)]
+        devices = list(TrustedDevice.objects.filter(user=self.user).order_by('created_at'))
+        TrustedDevice.objects.filter(pk=devices[0].pk).update(
+            expires_at=timezone.now() - timedelta(days=1),
+        )
+        TrustedDevice.objects.filter(pk=devices[1].pk).update(revoked_at=timezone.now())
+        self.enrol_device()
+        remaining = set(TrustedDevice.objects.filter(user=self.user).values_list('pk', flat=True))
+        self.assertEqual(len(remaining), 2)
+        self.assertIn(devices[2].pk, remaining)
