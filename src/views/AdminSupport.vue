@@ -29,6 +29,7 @@
               type="text"
               class="form-control border-start-0 shadow-none sb-search-input sb-field"
               placeholder="Search subject or user..."
+              aria-label="Search support tickets by subject or user"
             />
           </div>
         </div>
@@ -150,10 +151,14 @@
         class="offcanvas offcanvas-end border-0 shadow"
         :class="{ show: selectedTicket }"
         tabindex="-1"
+        ref="ticketDialogRef"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="ticket-detail-title"
         style="width: 480px; visibility: visible;"
       >
         <div class="offcanvas-header bg-light">
-          <h5 class="offcanvas-title fw-bold">Ticket Details</h5>
+          <h5 id="ticket-detail-title" class="offcanvas-title fw-bold">Ticket Details</h5>
           <button
             type="button"
             class="btn-close shadow-none"
@@ -494,6 +499,7 @@ import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '@/services/api/api'
 import { useToastStore } from '@/stores/toast'
+import { useDialogFocus } from '@/composables/useDialogFocus'
 
 const router = useRouter()
 const route = useRoute()
@@ -505,6 +511,10 @@ const claimingId = ref(null)
 const resolvingId = ref(null)
 const escalatingId = ref(null)
 const selectedTicket = ref(null)
+const ticketDialogRef = ref(null)
+useDialogFocus(computed(() => Boolean(selectedTicket.value)), ticketDialogRef, () => {
+  selectedTicket.value = null
+})
 const ticketToEscalate = ref(null)
 const escalationReason = ref('')
 const escalationError = ref('')

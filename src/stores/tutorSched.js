@@ -68,6 +68,7 @@ export const useTutorSchedStore = defineStore('tutorAvailability', {
         )
       } catch (error) {
         console.error('Failed to delete slot:', error)
+        throw error
       }
     },
 

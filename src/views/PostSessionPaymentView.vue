@@ -88,8 +88,9 @@
                 This face-to-face session uses cash payment. Attach a photo of your proof of payment so the tutor and admins can verify it.
               </div>
               <div class="mb-3">
-                <label class="form-label">Receipt Image</label>
+                <label for="payment-receipt" class="form-label">Receipt Image</label>
                 <input
+                  id="payment-receipt"
                   type="file"
                   class="form-control"
                   accept="image/*"

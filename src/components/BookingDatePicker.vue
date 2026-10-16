@@ -2,6 +2,10 @@
   <div class="date-picker-wrap">
     <button
       type="button"
+      ref="triggerRef"
+      :id="id"
+      aria-haspopup="dialog"
+      :aria-expanded="isOpen"
       class="btn w-100 text-start border-sb shadow-none date-trigger sb-btn"
       :class="{ 'date-trigger-active': isOpen }"
       @click="openModal"
@@ -14,6 +18,8 @@
       <div v-if="isOpen" class="date-modal-backdrop sb-overlay sb-overlay--nested" @click.self="closeModal">
         <section
           class="date-modal"
+          ref="dialogRef"
+          tabindex="-1"
           role="dialog"
           aria-modal="true"
           aria-labelledby="booking-date-picker-title"
@@ -72,6 +78,8 @@
                 'date-cell-selected': day.isSelected,
               }"
               :disabled="day.isPast || day.isBeyondBookingHorizon || !day.inMonth"
+              :aria-label="day.dateKey"
+              :aria-pressed="day.isSelected"
               @click="selectDate(day)"
             >
               <span>{{ day.dayNumber }}</span>
@@ -89,8 +97,10 @@
 
 <script setup>
 import { computed, ref } from 'vue'
+import { useDialogFocus } from '@/composables/useDialogFocus'
 
 const props = defineProps({
+  id: { type: String, default: undefined },
   modelValue: {
     type: String,
     default: null,
@@ -106,6 +116,9 @@ const emit = defineEmits(['update:modelValue'])
 const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const isOpen = ref(false)
 const monthOffset = ref(0)
+const triggerRef = ref(null)
+const dialogRef = ref(null)
+useDialogFocus(isOpen, dialogRef, () => closeModal())
 const BOOKING_HORIZON_DAYS = 14
 
 const padNumber = (value) => String(value).padStart(2, '0')

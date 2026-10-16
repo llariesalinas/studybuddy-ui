@@ -6,8 +6,8 @@
     <template #title>{{ authTitle }}</template>
     <template #subtitle>{{ authSubtitle }}</template>
 
-    <div v-if="loginError" class="sb-auth-alert">{{ loginError }}</div>
-    <div v-if="successMessage" class="sb-auth-alert sb-auth-alert-success">
+    <div v-if="loginError" class="sb-auth-alert" role="alert">{{ loginError }}</div>
+    <div v-if="successMessage" class="sb-auth-alert sb-auth-alert-success" role="status">
       {{ successMessage }}
     </div>
     <div v-if="debugOtpCode" class="sb-auth-alert sb-auth-alert-dev">
@@ -16,10 +16,12 @@
 
     <form v-if="step === 'password'" @submit.prevent="handleLogin">
       <div class="sb-auth-field">
-        <label class="sb-auth-label">University Email</label>
+        <label for="login-email" class="sb-auth-label">University Email</label>
         <input
           type="email"
           v-model="email"
+          id="login-email"
+          autocomplete="email"
           class="sb-auth-input sb-field"
           placeholder="you@university.edu"
           required
@@ -28,7 +30,7 @@
 
       <div class="sb-auth-field">
         <div class="sb-auth-label-row">
-          <label class="sb-auth-label">Password</label>
+          <label for="login-password" class="sb-auth-label">Password</label>
           <router-link to="/forgot-password" class="sb-auth-link sb-auth-link-sm">
             Forgot?
           </router-link>
@@ -36,6 +38,8 @@
         <input
           type="password"
           v-model="password"
+          id="login-password"
+          autocomplete="current-password"
           class="sb-auth-input sb-field"
           placeholder="********"
           required
@@ -50,10 +54,11 @@
 
     <form v-else @submit.prevent="handleVerifyOtp">
       <div class="sb-auth-field">
-        <label class="sb-auth-label">Email verification code</label>
+        <label for="login-otp" class="sb-auth-label">Email verification code</label>
         <input
           type="text"
           v-model="otp"
+          id="login-otp"
           class="sb-auth-input sb-auth-otp-input sb-field"
           placeholder="Enter the code"
           autocomplete="one-time-code"

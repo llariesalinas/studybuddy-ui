@@ -4,6 +4,9 @@
       <div class="schedule-header">
         <div>
           <h2 class="schedule-title">Weekly Availability</h2>
+          <p class="sb-muted small mb-0 mt-2">
+            Weekly slots repeat. Block a date to take time off without changing your weekly hours.
+          </p>
         </div>
       </div>
 
@@ -14,6 +17,7 @@
               type="button"
               class="week-nav-btn sb-btn"
               :disabled="weekIndex <= 0"
+              aria-label="Previous week"
               @click="navigateWeek(-1)"
             >
               <i class="bi bi-chevron-left"></i>
@@ -22,6 +26,7 @@
               type="button"
               class="week-nav-btn sb-btn"
               :disabled="weekIndex >= monthWeeks.length - 1"
+              aria-label="Next week"
               @click="navigateWeek(1)"
             >
               <i class="bi bi-chevron-right"></i>
@@ -140,9 +145,10 @@
                   v-if="selectedCountForDay(day.code)"
                   type="button"
                   class="selected-day-btn sb-btn"
-                  @click="removeSelectedSlots(day.code)"
+                  :disabled="isDeletingSlots"
+                  @click="requestSlotDeletion(day.code)"
                 >
-                  Remove Selected ({{ selectedCountForDay(day.code) }})
+                  Delete weekly slots ({{ selectedCountForDay(day.code) }})
                 </button>
               </div>
             </article>
@@ -152,12 +158,58 @@
     </section>
 
     <Teleport to="body">
+    <div v-if="pendingDeletion" class="modal-overlay sb-overlay" @click.self="closeDeleteModal">
+      <section
+        ref="deleteDialogRef"
+        class="modal-box"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="delete-weekly-title"
+        aria-describedby="delete-weekly-description"
+        tabindex="-1"
+      >
+        <h2 id="delete-weekly-title" class="h5 fw-bold">Delete weekly availability?</h2>
+        <p id="delete-weekly-description" class="sb-muted">
+          This removes {{ pendingDeletion.ids.length }} weekly
+          slot{{ pendingDeletion.ids.length === 1 ? '' : 's' }} every {{ pendingDeletion.dayName }},
+          not just the date shown. To take one day off, cancel and use Block Date instead.
+        </p>
+        <p v-if="deletionError" class="alert alert-danger small" role="alert">
+          {{ deletionError }}
+        </p>
+        <div class="d-flex justify-content-end gap-2 mt-4">
+          <button
+            type="button"
+            class="btn sb-btn sb-btn-soft"
+            :disabled="isDeletingSlots"
+            @click="closeDeleteModal"
+          >Keep weekly slots</button>
+          <button
+            type="button"
+            class="btn sb-btn sb-btn-danger-soft"
+            :disabled="isDeletingSlots"
+            @click="confirmSlotDeletion"
+          >
+            {{ isDeletingSlots ? 'Deleting…' : 'Delete weekly slots' }}
+          </button>
+        </div>
+      </section>
+    </div>
     <div v-if="showAddModal" class="modal-overlay sb-overlay" @click.self="closeAddModal">
-      <div class="modal-box">
+      <div
+        ref="addDialogRef"
+        class="modal-box"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="add-weekly-title"
+        tabindex="-1"
+      >
         <div class="time-picker-header">
           <div>
-            <h5 class="mb-1">Add Weekly Slot</h5>
-            <p class="time-picker-subtitle mb-0">Pick when the session begins and ends.</p>
+            <h5 id="add-weekly-title" class="mb-1">Add weekly availability</h5>
+            <p class="time-picker-subtitle mb-0">
+              These hours repeat every week on the selected day.
+            </p>
           </div>
           <button
             type="button"
@@ -169,8 +221,9 @@
         </div>
 
         <div class="mb-3">
-          <label>Day</label>
+          <label for="weekly-slot-day">Day</label>
           <SbSelectModal
+            id="weekly-slot-day"
             v-model="newSlot.day"
             :options="dayOptions"
             title="Day"
@@ -313,6 +366,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useTutorSchedStore } from '@/stores/tutorSched'
 import { useToastStore } from '@/stores/toast'
 import SbSelectModal from '@/components/SbSelectModal.vue'
+import { useDialogFocus } from '@/composables/useDialogFocus'
 
 const tutorSchedStore = useTutorSchedStore()
 const toastStore = useToastStore()
@@ -324,6 +378,14 @@ const startPeriod = ref('AM')
 const endPeriod = ref('AM')
 const expandedPicker = ref('start')
 const selectedSlotIds = ref([])
+const pendingDeletion = ref(null)
+const isDeletingSlots = ref(false)
+const deletionError = ref('')
+const deleteDialogRef = ref(null)
+const addDialogRef = ref(null)
+
+useDialogFocus(computed(() => Boolean(pendingDeletion.value)), deleteDialogRef, closeDeleteModal)
+useDialogFocus(showAddModal, addDialogRef, closeAddModal)
 
 const daysOfWeek = [
   { code: 'Mon', label: 'Monday', shortLabel: 'Mon' },
@@ -658,15 +720,37 @@ async function clearSelection() {
   selectedSlotIds.value = []
 }
 
-async function removeSelectedSlots(dayCode) {
+function requestSlotDeletion(dayCode) {
   const daySlotIds = groupedSlots.value[dayCode].map(slot => slot.availability_id)
-  const selectedForDay = selectedSlotIds.value.filter(id => daySlotIds.includes(id))
+  const ids = selectedSlotIds.value.filter(id => daySlotIds.includes(id))
+  if (!ids.length) return
+  deletionError.value = ''
+  pendingDeletion.value = { ids, dayName: daysOfWeek.find(day => day.code === dayCode).label }
+}
 
-  for (const slotId of selectedForDay) {
-    await tutorSchedStore.deleteSlot(slotId)
+function closeDeleteModal() {
+  if (!isDeletingSlots.value) pendingDeletion.value = null
+}
+
+async function confirmSlotDeletion() {
+  if (!pendingDeletion.value || isDeletingSlots.value) return
+  isDeletingSlots.value = true
+  deletionError.value = ''
+  try {
+    for (const slotId of pendingDeletion.value.ids) {
+      await tutorSchedStore.deleteSlot(slotId)
+      pendingDeletion.value.ids = pendingDeletion.value.ids.filter(id => id !== slotId)
+      selectedSlotIds.value = selectedSlotIds.value.filter(id => id !== slotId)
+    }
+    pendingDeletion.value = null
+    toastStore.push('Weekly availability deleted. The selected times no longer repeat.', 'success')
+    await refreshAvailability()
+  } catch {
+    deletionError.value = 'Some weekly slots could not be deleted. ' +
+      'The remaining slots are still selected. Try again or keep them.'
+  } finally {
+    isDeletingSlots.value = false
   }
-
-  await refreshAvailability()
 }
 
 async function toggleFullDayOverride(dateString) {

@@ -6,15 +6,17 @@
     <template #title>Create Account</template>
     <template #subtitle>Join the StudyBuddy network</template>
 
-    <div v-if="generalError" class="sb-auth-alert">{{ generalError }}</div>
+    <div v-if="generalError" class="sb-auth-alert" role="alert">{{ generalError }}</div>
 
     <form @submit.prevent="handleRegister">
       <div class="sb-auth-row sb-auth-row--3">
         <div class="sb-auth-field">
-          <label class="sb-auth-label">First Name</label>
+          <label for="register-first-name" class="sb-auth-label">First Name</label>
           <input
             type="text"
             v-model="store.newUserFname"
+            id="register-first-name"
+            autocomplete="given-name"
             class="sb-auth-input sb-field"
             placeholder="Juan"
             required
@@ -22,20 +24,24 @@
         </div>
 
         <div class="sb-auth-field">
-          <label class="sb-auth-label">Middle Name</label>
+          <label for="register-middle-name" class="sb-auth-label">Middle Name</label>
           <input
             type="text"
             v-model="store.newUserMname"
+            id="register-middle-name"
+            autocomplete="additional-name"
             class="sb-auth-input sb-field"
             placeholder="Optional"
           />
         </div>
 
         <div class="sb-auth-field">
-          <label class="sb-auth-label">Last Name</label>
+          <label for="register-last-name" class="sb-auth-label">Last Name</label>
           <input
             type="text"
             v-model="store.newUserLname"
+            id="register-last-name"
+            autocomplete="family-name"
             class="sb-auth-input sb-field"
             placeholder="Dela Cruz"
             required
@@ -44,10 +50,12 @@
       </div>
 
       <div class="sb-auth-field">
-        <label class="sb-auth-label">University Email</label>
+        <label for="register-email" class="sb-auth-label">University Email</label>
         <input
           type="email"
           v-model="store.newUserEmail"
+          id="register-email"
+          autocomplete="email"
           class="sb-auth-input sb-field"
           placeholder="you@university.edu"
           required
@@ -56,8 +64,9 @@
       </div>
 
       <div class="sb-auth-field">
-        <label class="sb-auth-label">Institution</label>
+        <label for="register-institution" class="sb-auth-label">Institution</label>
         <SbSelectModal
+          id="register-institution"
           v-model="store.selectedInstitutionId"
           :options="institutionOptions"
           title="Institution"
@@ -72,10 +81,12 @@
       </div>
 
       <div class="sb-auth-field">
-        <label class="sb-auth-label">Password</label>
+        <label for="register-password" class="sb-auth-label">Password</label>
         <input
           type="password"
           v-model="store.newUserPassword"
+          id="register-password"
+          autocomplete="new-password"
           class="sb-auth-input sb-field"
           placeholder="••••••••"
           required
@@ -83,8 +94,9 @@
       </div>
 
       <div class="sb-auth-field">
-        <label class="sb-auth-label">I want to</label>
+        <label for="register-role" class="sb-auth-label">I want to</label>
         <SbSelectModal
+          id="register-role"
           v-model="store.newUserType"
           :options="roleOptions"
           title="I want to"

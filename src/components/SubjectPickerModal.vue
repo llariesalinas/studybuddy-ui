@@ -1,6 +1,8 @@
 <template>
   <button
     ref="triggerRef"
+    :id="id"
+    aria-haspopup="dialog"
     type="button"
     class="subject-trigger"
     :aria-expanded="isOpen ? 'true' : 'false'"
@@ -22,6 +24,7 @@
     <div v-if="isOpen" class="subject-backdrop sb-overlay sb-overlay--nested" role="presentation" @click.self="closeModal">
       <section
         :id="dialogId"
+        ref="dialogRef"
         class="subject-dialog"
         role="dialog"
         aria-modal="true"
@@ -131,8 +134,10 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { categoryClass, searchSubjects, subjectCategories } from '@/components/subjectPicker.shared'
+import { useDialogFocus } from '@/composables/useDialogFocus'
 
 const props = defineProps({
+  id: { type: String, default: undefined },
   subjects: { type: Array, required: true },
   modelValue: { type: Array, required: true },
   title: { type: String, default: 'Choose Subject' },
@@ -152,6 +157,8 @@ const previousBodyOverflow = ref('')
 const triggerRef = ref(null)
 const searchRef = ref(null)
 const listRef = ref(null)
+const dialogRef = ref(null)
+useDialogFocus(isOpen, dialogRef, closeModal)
 
 const categories = computed(() => subjectCategories(props.subjects))
 const searchResults = computed(() => searchSubjects(props.subjects, searchQuery.value))

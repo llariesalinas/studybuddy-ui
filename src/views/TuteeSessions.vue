@@ -27,7 +27,8 @@
                         v-model="searchQuery"
                         type="text"
                       class="form-control border-start-0 shadow-none sb-search-input sb-field"
-                        placeholder="Search tutor or subject..."
+                        aria-label="Search sessions by tutor or subject"
+                        placeholder="Search tutor or subject…"
                     >
                 </div>
             </div>
@@ -42,7 +43,7 @@
                             <th>Time</th>
                             <th>Status</th>
                             <th>Rating</th>
-                            <th></th>
+                            <th class="text-end">Actions</th>
                         </tr>
                     </thead>
 
@@ -82,12 +83,25 @@
                                 <span v-if="session.rating" class="text-warning fw-bold small">
                                     <i class="bi bi-star-fill me-1"></i>{{ session.rating }}
                                 </span>
-                                <span v-else class="badge rounded-pill text-bg-danger-subtle text-danger-emphasis border border-danger-subtle">
+                                <span v-else class="badge rounded-pill sb-neutral-badge">
                                     Unrated
                                 </span>
                             </td>
 
-                            <td></td>
+                            <td class="text-end">
+                              <RouterLink
+                                :to="`/tuteeSessionDetails/${session.id}`"
+                                class="session-details-link"
+                                :aria-label="
+                                  `View ${session.subject} session with ` +
+                                  (session.tutor || 'your tutor')
+                                "
+                                @click.stop
+                              >
+                                View session
+                                <i class="bi bi-arrow-up-right" aria-hidden="true"></i>
+                              </RouterLink>
+                            </td>
                         </tr>
 
                         <tr v-else>

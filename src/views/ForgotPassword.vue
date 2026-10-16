@@ -6,16 +6,18 @@
     <template #title>Reset Password</template>
     <template #subtitle>We'll send reset instructions to your university email</template>
 
-    <div v-if="errorMessage" class="sb-auth-alert">{{ errorMessage }}</div>
-    <div v-if="successMessage" class="sb-auth-alert sb-auth-alert-success">
+    <div v-if="errorMessage" class="sb-auth-alert" role="alert">{{ errorMessage }}</div>
+    <div v-if="successMessage" class="sb-auth-alert sb-auth-alert-success" role="status">
       {{ successMessage }}
     </div>
 
     <form @submit.prevent="handleRequestReset">
       <div class="sb-auth-field">
-        <label class="sb-auth-label">University Email</label>
+        <label for="reset-email" class="sb-auth-label">University Email</label>
         <input
           v-model="email"
+          id="reset-email"
+          autocomplete="email"
           type="email"
           class="sb-auth-input sb-field"
           placeholder="you@university.edu"

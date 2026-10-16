@@ -2,6 +2,7 @@
   <div class="time-picker-wrap" @keydown.esc.stop="closePanel">
     <button
       type="button"
+      :id="id"
       class="time-trigger sb-btn"
       :class="{ 'time-trigger-active': isOpen }"
       :disabled="disabled"
@@ -94,6 +95,7 @@ import {
 } from '@/utils/time'
 
 const props = defineProps({
+  id: { type: String, default: undefined },
   start: {
     type: String,
     default: null,

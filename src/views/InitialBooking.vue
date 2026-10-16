@@ -4,14 +4,18 @@
       <div class="card-body p-4 p-md-5">
         <form @submit.prevent="findTutor">
           <div class="mb-3">
-            <label class="form-label fw-semibold small">Subject</label>
-            <SubjectPickerModal v-model="selectedSubjectCodes" :subjects="subjects" />
+            <label for="booking-subject" class="form-label fw-semibold small">Subject</label>
+            <SubjectPickerModal
+              id="booking-subject"
+              v-model="selectedSubjectCodes"
+              :subjects="subjects"
+            />
           </div>
 
           <div class="row g-3 mb-3">
             <div class="col-md-6">
-              <label class="form-label fw-semibold small">Date</label>
-              <BookingDatePicker v-model="selectedDateModel" />
+              <label for="booking-date" class="form-label fw-semibold small">Date</label>
+              <BookingDatePicker id="booking-date" v-model="selectedDateModel" />
             </div>
 
             <div class="col-md-6">
@@ -38,7 +42,7 @@
 
           <div v-if="store.selectedMode === 'Face-to-face' && campusLocationType" class="mb-3">
             <div class="d-flex justify-content-between align-items-center mb-1">
-              <label class="form-label fw-semibold small mb-0">
+              <label for="booking-location" class="form-label fw-semibold small mb-0">
                 Location ({{ campusLocationType === 'inside' ? 'Inside Campus' : 'Outside Campus' }})
               </label>
               <button
@@ -50,6 +54,7 @@
               </button>
             </div>
             <input
+              id="booking-location"
               type="text"
               v-model="store.selectedLocation"
               class="form-control border-sb shadow-none sb-field"
@@ -59,10 +64,11 @@
           </div>
 
           <div class="mb-4">
-            <label class="form-label fw-semibold small">
+            <label for="booking-time" class="form-label fw-semibold small">
               Time <span class="fw-normal sb-muted">(optional)</span>
             </label>
             <BookingTimeRangePicker
+              id="booking-time"
               v-model:start="selectedStartTimeModel"
               v-model:end="selectedEndTimeModel"
               :selected-date="store.selectedDate"

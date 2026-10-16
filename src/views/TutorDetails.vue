@@ -1,6 +1,13 @@
 <template>
   <div class="booking-page py-4">
-    <div class="container">
+    <div v-if="isLoadingDetails" class="text-center py-5" role="status">Loading tutor details…</div>
+    <div v-else-if="detailsError" class="alert alert-warning" role="alert">
+      <p>{{ detailsError }}</p>
+      <button type="button" class="btn sb-btn sb-btn-soft" @click="getTutorDetails">
+        Try again
+      </button>
+    </div>
+    <div v-else class="container">
       <div class="mb-4">
         <button class="back-link sb-btn" type="button" @click="backButton">
           <i class="bi bi-arrow-left"></i>
@@ -71,6 +78,7 @@
                     type="button"
                     class="week-nav-btn sb-btn"
                     :disabled="!canGoPrevious"
+                    aria-label="Previous week"
                     @click="navigateWeek(-1)"
                   >
                     <i class="bi bi-chevron-left"></i>
@@ -79,6 +87,7 @@
                     type="button"
                     class="week-nav-btn sb-btn"
                     :disabled="!canGoNext"
+                    aria-label="Next week"
                     @click="navigateWeek(1)"
                   >
                     <i class="bi bi-chevron-right"></i>
@@ -119,6 +128,7 @@
                         blocked: slot.is_overridden || day.is_blocked
                       }"
                       :disabled="slot.is_booked || day.is_past || !day.in_month || isSlotHeldBySelection(day, slot)"
+                      :aria-pressed="isSlotSelected(day, slot)"
                       @click="toggleSlot(day, currentWeek, slot)"
                     >
                       {{ formatSlotRange(day.date, slot.time_slot) }}
@@ -159,20 +169,26 @@
               <div class="summary-rows">
                 <div class="summary-row">
                   <span class="summary-label">Hourly Rate</span>
-                  <span class="summary-value text-success fw-bold">
-                    {{ currencyFormatter.format(tutorProfile.hourlyRate) }}/hr
+                  <span class="summary-value summary-rate fw-bold">
+                    {{ hourlyRateLabel }}
                   </span>
                 </div>
                 <div class="summary-row">
                   <span class="summary-label">Rating</span>
                   <span class="summary-value align-items-center d-flex gap-1">
-                    <i class="bi bi-star-fill text-warning"></i>
-                    {{ tutorProfile.rating.toFixed(1) }}
+                    <i
+                      v-if="tutorProfile.rating > 0"
+                      class="bi bi-star-fill text-warning"
+                      aria-hidden="true"
+                    ></i>
+                    {{ ratingLabel }}
                   </span>
                 </div>
                 <div class="summary-row">
                   <span class="summary-label">Total Sessions</span>
-                  <span class="summary-value">{{ tutorProfile.sessionCount }}</span>
+                  <span class="summary-value">
+                    {{ tutorProfile.sessionCount ?? 'Unavailable' }}
+                  </span>
                 </div>
               </div>
             </section>
@@ -180,7 +196,8 @@
             <section class="info-card shadow-sm">
               <h2 class="sidebar-title mb-3">Subjects Taught</h2>
 
-              <div class="subjects-accordion">
+              <p v-if="!tutorProfile.subjects.length" class="sb-muted small">No subjects listed.</p>
+              <div v-else class="subjects-accordion">
                 <div
                   v-for="(subject, index) in tutorProfile.subjects"
                   :key="subject.subject_code || index"
@@ -190,6 +207,7 @@
                     type="button"
                     class="subject-accordion-header sb-btn"
                     @click="toggleSubject(index)"
+                    :aria-expanded="expandedSubjects.includes(index)"
                   >
                     <span>{{ subject.subject_name }}</span>
                     <i class="bi" :class="expandedSubjects.includes(index) ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
@@ -201,7 +219,7 @@
                   >
                     <div class="subject-accordion-body">
                       <div class="subject-accordion-content">
-                        {{ subject.description || `Comprehensive sessions focusing on ${subject.subject_name}. Tailored exactly to your pace and learning style to help you achieve your goals.` }}
+                        {{ subject.description || 'No description provided.' }}
                       </div>
                     </div>
                   </div>
@@ -209,8 +227,11 @@
               </div>
 
               <div v-if="isFaceToFace" class="mb-4">
-                <label class="form-label fw-bold small text-muted">Preferred Location</label>
+                <label for="booking-location" class="form-label fw-bold small sb-muted">
+                  Preferred Location
+                </label>
                 <input
+                  id="booking-location"
                   type="text"
                   v-model="bookedSessionStore.bookedSessionLocation"
                   class="form-control border-sb shadow-none py-2 rounded-3 sb-field"
@@ -233,7 +254,19 @@
                 </div>
               </div>
 
-              <p class="policy-note">Free cancellation up to 24 hours before the session.</p>
+              <p class="policy-note" role="status">
+                <template v-if="!selectedSessionCount">
+                  Cancel without a strike until {{ GRACE_CUTOFF_HOURS }} hours before your session.
+                </template>
+                <template v-else-if="isLate">
+                  This booking has no penalty-free cancellation window.
+                  Cancelling opens a late-cancellation review.
+                </template>
+                <template v-else>
+                  Cancel without a strike before {{ cutoffLabel }} (Manila time).
+                  Later cancellations open a review.
+                </template>
+              </p>
 
               <button
                 type="button"
@@ -276,7 +309,8 @@ import { useChatStore } from '@/stores/chat'
 import { useProfileStore } from '@/stores/profile'
 import { useToastStore } from '@/stores/toast'
 import { needsTuteeBookingBlock, needsTuteeStrikeBlock } from '@/services/tutorApplicationState'
-import { formatCutoffLabel } from '@/composables/useCancellationWindow'
+import { formatCutoffLabel, useCancellationWindow } from '@/composables/useCancellationWindow'
+import { GRACE_CUTOFF_HOURS } from '@/config'
 import api from '@/services/api/api'
 
 const router = useRouter()
@@ -300,6 +334,8 @@ const showFullSchedule = ref(false)
 const isSubmittingBooking = ref(false)
 const avatarLoadError = ref(false)
 const expandedSubjects = ref([])
+const isLoadingDetails = ref(true)
+const detailsError = ref('')
 
 const openChat = async () => {
   try {
@@ -319,11 +355,11 @@ const tutorDetails = ref({
   profile_id: null,
   name: '',
   subjects: [],
-  rating: 4.7,
+  rating: null,
   bio: '',
   profile_picture_url: '',
-  hourly_rate: 0,
-  total_sessions: 124,
+  hourly_rate: null,
+  total_sessions: null,
   response_time_label: '',
   pinned_review_id: null,
   pinned_review: null
@@ -360,35 +396,34 @@ const currentWeekLabel = computed(() => {
   return `${startMonth} ${start.getDate()} - ${endMonth} ${end.getDate()}, ${year}`
 })
 
+const numericValue = (value) => {
+  if (value === null || value === undefined || value === '') return null
+  const number = Number(value)
+  return Number.isFinite(number) ? number : null
+}
+
 const tutorProfile = computed(() => ({
-  name: tutorDetails.value.name || 'Tutor Name',
+  name: tutorDetails.value.name || 'Tutor',
   profilePictureUrl: tutorDetails.value.profile_picture_url || '',
   isVerified: Boolean(tutorDetails.value.is_verified),
   institutionName: tutorDetails.value.institutionName || '',
-  hourlyRate: Number(tutorDetails.value.hourly_rate) || 0,
-  rating: Number(tutorDetails.value.rating) || 4.7,
-  sessionCount: Number(tutorDetails.value.total_sessions) || 124,
-  subjects: tutorDetails.value.subjects?.length
-    ? tutorDetails.value.subjects
-    : [
-        {
-          subject_code: 'fallback-1',
-          subject_name: 'Computer Science',
-          description: ''
-        },
-        {
-          subject_code: 'fallback-2',
-          subject_name: 'Beginner Friendly',
-          description: ''
-        },
-        {
-          subject_code: 'fallback-3',
-          subject_name: 'Web Development',
-          description: ''
-        }
-      ],
-  bio: tutorDetails.value.bio || 'This tutor brings patient, step-by-step guidance for learners building confidence in technical subjects. Additional bio content can easily extend here to test the scrollbar constraint and ensure it is functioning correctly. We are dedicated to providing excellent learning experiences for all ages.',
+  hourlyRate: numericValue(tutorDetails.value.hourly_rate),
+  rating: numericValue(tutorDetails.value.rating),
+  sessionCount: numericValue(tutorDetails.value.total_sessions),
+  subjects: tutorDetails.value.subjects || [],
+  bio: tutorDetails.value.bio || 'No introduction provided yet.',
 }))
+
+const hourlyRateLabel = computed(() => tutorProfile.value.hourlyRate === null
+  ? 'Rate unavailable'
+  : `${currencyFormatter.format(tutorProfile.value.hourlyRate)}/hr`
+)
+
+const ratingLabel = computed(() => {
+  const rating = tutorProfile.value.rating
+  if (rating === null) return 'Rating unavailable'
+  return rating > 0 ? rating.toFixed(1) : 'No ratings yet'
+})
 
 const tutorInitials = computed(() => {
   const parts = String(tutorProfile.value.name || '')
@@ -481,7 +516,11 @@ const selectedSessionHours = computed(() => selectedSessionCount.value * SESSION
 
 const estimatedCost = computed(() => selectedSessionHours.value * tutorProfile.value.hourlyRate)
 
-const formattedEstimatedCost = computed(() => currencyFormatter.format(estimatedCost.value))
+const formattedEstimatedCost = computed(() =>
+  tutorProfile.value.hourlyRate === null
+    ? 'Unavailable'
+    : currencyFormatter.format(estimatedCost.value)
+)
 
 const sessionTimeRangeLabel = computed(() => {
   if (!effectiveSelectedSlots.value.length) return ''
@@ -490,6 +529,11 @@ const sessionTimeRangeLabel = computed(() => {
   const last = effectiveSelectedSlots.value[effectiveSelectedSlots.value.length - 1]
 
   return formatTimeRangeLabel(first.session_date, first.time_slot, addOneHour(last.time_slot))
+})
+
+const { isLate, cutoffLabel } = useCancellationWindow({
+  date: computed(() => effectiveSelectedSlots.value[0]?.session_date),
+  startTime: computed(() => effectiveSelectedSlots.value[0]?.time_slot),
 })
 
 const tuteeVerificationSnapshot = computed(() => ({
@@ -519,7 +563,8 @@ const isTuteeBookingBlocked = computed(() =>
 )
 
 const isConfirmBookingDisabled = computed(() =>
-  isTuteeBookingBlocked.value || selectedSlots.value.length === 0 || isSubmittingBooking.value
+  isTuteeBookingBlocked.value || selectedSlots.value.length === 0 ||
+  isSubmittingBooking.value || tutorProfile.value.hourlyRate === null
 )
 
 const confirmBookingButtonLabel = computed(() => {
@@ -535,6 +580,8 @@ const confirmBookingButtonLabel = computed(() => {
   if (isSubmittingBooking.value) {
     return 'Confirming...'
   }
+
+  if (tutorProfile.value.hourlyRate === null) return 'Rate unavailable'
 
   if (selectedSlots.value.length === 0) {
     return 'Select a slot first'
@@ -629,6 +676,8 @@ function availabilityBarClass(day) {
 }
 
 const getTutorDetails = async () => {
+  isLoadingDetails.value = true
+  detailsError.value = ''
   try {
     const response = await api.get(`tutors/${tutorID}/`)
     avatarLoadError.value = false
@@ -637,11 +686,11 @@ const getTutorDetails = async () => {
       name: [response.data.fname, response.data.lname].filter(Boolean).join(' '),
       institutionName: response.data.institution_name || '',
       subjects: Array.isArray(response.data.subjects) ? response.data.subjects : [],
-      rating: response.data.rating_average ?? 4.7,
+      rating: response.data.rating_average ?? null,
       bio: response.data.bio,
       profile_picture_url: response.data.profile_picture_url || '',
-      hourly_rate: response.data.hourly_rate ?? 0,
-      total_sessions: response.data.total_sessions ?? 124,
+      hourly_rate: response.data.hourly_rate ?? null,
+      total_sessions: response.data.total_sessions ?? null,
       response_time_label: response.data.response_time_label || '',
       is_verified: Boolean(response.data.is_verified),
       pinned_review_id: response.data.pinned_review_id ?? null,
@@ -649,6 +698,10 @@ const getTutorDetails = async () => {
     }
   } catch (error) {
     console.error('Failed to load tutor details.', error)
+    detailsError.value =
+      'We could not load this tutor. Try again to see their profile and booking details.'
+  } finally {
+    isLoadingDetails.value = false
   }
 }
 
@@ -827,7 +880,8 @@ const confirmBooking = async () => {
     const destination = confirmation.meeting_link || confirmation.preferred_location
     const cancellationCopy = confirmation.is_born_late
       ? 'This booking has no penalty-free cancellation window.'
-      : `Cancel without a strike before ${new Date(confirmation.cancellation_deadline).toLocaleString()}.`
+      : 'Cancel without a strike before ' +
+        `${formatCutoffLabel(new Date(confirmation.cancellation_deadline))} (Manila time).`
     toastStore.push(`Booking confirmed. ${destination ? `Session details: ${destination}. ` : ''}${cancellationCopy}`)
     initialBookingStore.$reset()
     findTutorsStore.reset()
@@ -1527,6 +1581,65 @@ onMounted(async () => {
   }
   .profile-header {
     grid-template-columns: 1fr;
+  }
+}
+@media (min-width: 992px) {
+  .booking-page {
+    background: transparent;
+  }
+
+  .info-card {
+    background: var(--sb-card-bg);
+    border-color: var(--sb-card-border);
+  }
+
+  .profile-header {
+    padding-right: 40px;
+  }
+
+  .info-card :is(
+    .profile-name, .section-title, .schedule-title, .sidebar-title,
+    .summary-value, .week-range, .day-date
+  ) {
+    color: var(--sb-text-main);
+  }
+
+  .info-card :is(.bio-copy, .schedule-subtitle, .summary-label, .day-name) {
+    color: var(--sb-text-secondary);
+  }
+
+  .info-card .summary-rate {
+    color: var(--sb-primary-hover);
+  }
+
+  .cost-counter {
+    background: color-mix(in srgb, var(--sb-card-bg) 94%, var(--sb-primary) 6%);
+    border-color: var(--sb-card-border);
+  }
+
+  .cost-counter :is(.cost-counter-header, .cost-counter-meta) {
+    color: var(--sb-text-secondary);
+  }
+
+  .cost-counter :is(.cost-counter-amount, .cost-counter-session) {
+    color: var(--sb-primary-hover);
+  }
+
+  .policy-note {
+    color: var(--sb-text-secondary);
+    font-size: 13px;
+    line-height: 1.6;
+    text-align: left;
+  }
+
+  .confirm-booking-btn {
+    background: var(--sb-primary-hover);
+    color: var(--sb-primary-contrast);
+  }
+
+  .confirm-booking-btn:disabled {
+    background: var(--sb-card-border);
+    color: var(--sb-text-secondary);
   }
 }
 </style>

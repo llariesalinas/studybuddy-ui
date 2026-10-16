@@ -26,7 +26,6 @@
         <article class="glass-panel weekly-panel">
           <header class="panel-header weekly-board-header">
             <div class="panel-heading">
-              <p class="panel-kicker">Weekly Schedule</p>
               <h2 class="panel-title">Your Sessions This Week</h2>
               <p class="panel-subtitle">
                 Review your booked sessions across the week and open any session details in one click.
@@ -171,7 +170,6 @@
         <aside class="glass-panel recommendation-panel">
           <header class="panel-header recommendation-header">
             <div class="panel-heading">
-              <p class="panel-kicker">Discover</p>
               <h2 class="panel-title">Try out these tutors</h2>
               <p class="panel-subtitle">Recommended for your courses.</p>
             </div>
